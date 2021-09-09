@@ -2072,7 +2072,8 @@ static CanSILFunctionType getSILFunctionType(
   // for thick or polymorphic functions.  We don't need to worry about
   // non-opaque patterns because the type-checker forbids non-thick
   // function types from having generic parameters or results.
-  if (origType.isTypeParameter() &&
+  if (!constant &&
+      origType.isTypeParameter() &&
       substFnInterfaceType->getExtInfo().getSILRepresentation()
         != SILFunctionType::Representation::Thick &&
       isa<FunctionType>(substFnInterfaceType)) {
@@ -3183,9 +3184,18 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
       auto proto = constant.getDecl()->getDeclContext()->getSelfProtocolDecl();
       witnessMethodConformance = ProtocolConformanceRef(proto);
     }
+    
+    // Does this constant have a preferred abstraction pattern set?
+    AbstractionPattern origType = [&]{
+      if (auto abstraction = TC.getConstantAbstractionPattern(constant)) {
+        return *abstraction;
+      } else {
+        return AbstractionPattern(origLoweredInterfaceType);
+      }
+    }();
 
     return ::getNativeSILFunctionType(
-        TC, context, AbstractionPattern(origLoweredInterfaceType),
+        TC, context, origType,
         origLoweredInterfaceType, extInfoBuilder, constant, constant, None,
         witnessMethodConformance);
   }
