@@ -432,7 +432,6 @@ class AbstractionPattern {
     const clang::ObjCMethodDecl *ObjCMethod;
     const clang::CXXMethodDecl *CXXMethod;
     const AbstractionPattern *OrigTupleElements;
-    const void *RawTypePtr;
   };
   CanGenericSignature GenericSig;
 
@@ -1275,7 +1274,7 @@ public:
   /// pattern?
   bool matchesTuple(CanTupleType substType);
 
-  bool isTuple() const {
+  bool isTuple() {
     switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("querying invalid abstraction pattern!");
@@ -1387,32 +1386,8 @@ public:
       Lowering::TypeConverter &TC
   ) const;
   
-  /// How values are passed or returned according to this abstraction pattern.
-  enum CallingConventionKind {
-    // Value is passed or returned directly as a unit.
-    Direct,
-    // Value is passed or returned indirectly through memory.
-    Indirect,
-    // Value is a tuple that is destructured, and each element is considered
-    // independently.
-    Destructured,
-  };
-  
-  /// If this abstraction pattern appears in function return position, how is
-  /// the corresponding value returned?
-  CallingConventionKind getResultConvention(TypeConverter &TC) const;
-  
-  /// If this abstraction pattern appears in function parameter position, how
-  /// is the corresponding value passed?
-  CallingConventionKind getParameterConvention(TypeConverter &TC) const;
-  
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;
-  
-  bool operator==(const AbstractionPattern &other) const;
-  bool operator!=(const AbstractionPattern &other) const {
-    return !(*this == other);
-  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &out,

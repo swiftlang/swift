@@ -451,9 +451,7 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
       origFTI->getInvocationGenericSignature(), origFTI->getExtInfo(),
       origFTI->getCoroutineKind(), origFTI->getCalleeConvention(),
       clonedInterfaceArgTys, origFTI->getYields(), origFTI->getResults(),
-      origFTI->getOptionalErrorResult(),
-      origFTI->getPatternSubstitutions(),
-      origFTI->getInvocationSubstitutions(),
+      origFTI->getOptionalErrorResult(), SubstitutionMap(), SubstitutionMap(),
       mod.getASTContext(), origFTI->getWitnessMethodConformanceOrInvalid());
 
   assert((orig->isTransparent() || orig->isBare() || orig->getLocation()) &&

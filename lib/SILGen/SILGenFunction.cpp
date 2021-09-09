@@ -429,8 +429,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  CanType expectedType,
-                                 SubstitutionMap subs,
-                                 bool alreadyConverted) {
+                                 SubstitutionMap subs) {
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(constant);
 
   auto constantInfo = getConstantInfo(getTypeExpansionContext(), constant);
@@ -470,14 +469,12 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(
         loc, captureInfo);
   }
-  
+
   if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized) {
     auto result = ManagedValue::forUnmanaged(functionRef);
-    if (!alreadyConverted)
-      result = emitOrigToSubstValue(loc, result,
-                                    AbstractionPattern(expectedType),
-                                    expectedType);
-    return result;
+    return emitOrigToSubstValue(loc, result,
+                                AbstractionPattern(expectedType),
+                                expectedType);
   }
 
   SmallVector<ManagedValue, 4> capturedArgs;
@@ -504,9 +501,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   auto substFormalType = expectedType;
 
   // Generalize if necessary.
-  if (!alreadyConverted)
-    result = emitOrigToSubstValue(loc, result, origFormalType,
-                                  substFormalType);
+  result = emitOrigToSubstValue(loc, result, origFormalType,
+                                substFormalType);
 
   return result;
 }
@@ -523,8 +519,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     // Synthesize the factory function body
     emitDistributedActorFactory(fd);
   } else {
-    prepareEpilog(fd->getResultInterfaceType(),
-                  fd->hasThrows(), CleanupLocation(fd));
+    prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
     
     // Emit the actual function body as usual
     emitStmt(fd->getTypecheckedBody());
@@ -537,16 +532,14 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
-  OrigFnType = SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace));
-  
+
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
     SILDeclRef(ace));
   emitProfilerIncrement(ace);
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
-             ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc(),
-             SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace)));
-  prepareEpilog(resultIfaceTy, ace->isBodyThrowing(), CleanupLocation(ace));
+             ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc());
+  prepareEpilog(true, ace->isBodyThrowing(), CleanupLocation(ace));
 
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitStmt(ce->getBody());
@@ -877,7 +870,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
              dc, interfaceType, /*throws=*/false, SourceLoc());
   if (EmitProfilerIncrement)
     emitProfilerIncrement(value);
-  prepareEpilog(interfaceType, false, CleanupLocation(Loc));
+  prepareEpilog(true, false, CleanupLocation(Loc));
 
   {
     llvm::Optional<SILGenFunction::OpaqueValueRAII> opaqueValue;
@@ -939,7 +932,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
 
   emitBasicProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr,
                   interfaceType, dc, /*throws=*/ false,SourceLoc());
-  prepareEpilog(interfaceType, false, CleanupLocation(loc));
+  prepareEpilog(true, false, CleanupLocation(loc));
 
   auto pbd = var->getParentPatternBinding();
   const auto i = pbd->getPatternEntryIndexForVarDecl(var);
@@ -955,8 +948,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     Scope scope(Cleanups, CleanupLocation(var));
 
     SmallVector<CleanupHandle, 4> cleanups;
-    auto init = prepareIndirectResultInit(AbstractionPattern(resultType),
-                                          resultType, directResults, cleanups);
+    auto init = prepareIndirectResultInit(resultType, directResults, cleanups);
 
     emitApplyOfStoredPropertyInitializer(loc, anchorVar, subs, resultType,
                                          origResultType,
