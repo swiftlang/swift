@@ -4,5 +4,11 @@ import PackageDescription
 
 let package = Package(
   name: "GenUnicodeData",
-  targets: []
+  platforms: [.macOS(.v10_15)],
+  targets: [
+    .target(
+      name: "GenUtils",
+      dependencies: []
+    )
+  ]
 )
