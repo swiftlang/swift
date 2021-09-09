@@ -2002,8 +2002,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
   // synthesized arguments to it.
   if (argumentTuple) {
     cs.addConstraint(ConstraintKind::Bind, *argumentTuple,
-                     FunctionType::composeTuple(ctx, args,
-                                                /*canonicalVararg=*/false),
+                     FunctionType::composeTuple(ctx, args),
                      cs.getConstraintLocator(anchor));
   }
 
@@ -2218,8 +2217,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   };
 
   auto implodeParams = [&](SmallVectorImpl<AnyFunctionType::Param> &params) {
-    auto input = AnyFunctionType::composeTuple(getASTContext(), params,
-                                               /*canonicalVararg=*/false);
+    auto input = AnyFunctionType::composeTuple(getASTContext(), params);
 
     params.clear();
     // If fixes are disabled let's do an easy thing and implode
@@ -6073,8 +6071,7 @@ ConstraintSystem::simplifyConstructionConstraint(
 
     // Tuple construction is simply tuple conversion.
     Type argType = AnyFunctionType::composeTuple(getASTContext(),
-                                                 fnType->getParams(),
-                                                 /*canonicalVararg=*/false);
+                                                 fnType->getParams());
     Type resultType = fnType->getResult();
 
     ConstraintLocatorBuilder builder(locator);
@@ -7006,8 +7003,7 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
 
     if (kind == ConstraintKind::FunctionInput) {
       type = AnyFunctionType::composeTuple(getASTContext(),
-                                           funcTy->getParams(),
-                                           /*canonicalVararg=*/false);
+                                           funcTy->getParams());
       locKind = ConstraintLocator::FunctionArgument;
     } else if (kind == ConstraintKind::FunctionResult) {
       type = funcTy->getResult();

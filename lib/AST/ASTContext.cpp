@@ -3456,12 +3456,10 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
   return type;
 }
 
-Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
-                                   bool canonicalVararg) {
+Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params) {
   SmallVector<TupleTypeElt, 4> elements;
   for (const auto &param : params) {
-    Type eltType = param.getParameterType(canonicalVararg, &ctx);
-    elements.emplace_back(eltType, param.getLabel(),
+    elements.emplace_back(param.getParameterType(), param.getLabel(),
                           param.getParameterFlags());
   }
   return TupleType::get(elements, ctx);

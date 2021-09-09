@@ -2659,8 +2659,7 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
 
   auto indexLoweredTy =
     SGF.getLoweredType(
-      AnyFunctionType::composeTuple(SGF.getASTContext(), indexParams,
-                                    /*canonicalVararg=*/false));
+      AnyFunctionType::composeTuple(SGF.getASTContext(), indexParams));
 
   auto addr = SGF.B.createPointerToAddress(loc, pointer,
                                            indexLoweredTy.getAddressType(),

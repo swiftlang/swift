@@ -4023,8 +4023,7 @@ RValue CallEmission::applyEnumElementConstructor(SGFContext C) {
                                 std::move(*callSite).forward());
 
     auto payloadTy = AnyFunctionType::composeTuple(SGF.getASTContext(),
-                                                  resultFnType.getParams(),
-                                                  /*canonicalVararg*/ true);
+                                                   resultFnType->getParams());
     auto arg = RValue(SGF, argVals, payloadTy->getCanonicalType());
     payload = ArgumentSource(uncurriedLoc, std::move(arg));
     formalResultType = cast<FunctionType>(formalResultType).getResult();

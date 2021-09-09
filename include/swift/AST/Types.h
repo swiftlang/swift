@@ -3005,12 +3005,7 @@ protected:
 
 public:
   /// Take an array of parameters and turn it into a tuple or paren type.
-  static Type composeTuple(ASTContext &ctx, ArrayRef<Param> params,
-                           bool canonicalVararg);
-  static Type composeTuple(ASTContext &ctx, CanParamArrayRef params,
-                           bool canonicalVararg) {
-    return composeTuple(ctx, params.getOriginalArray(), canonicalVararg);
-  }
+  static Type composeTuple(ASTContext &ctx, ArrayRef<Param> params);
 
   /// Given two arrays of parameters determine if they are equal in their
   /// canonicalized form. Internal labels and type sugar is *not* taken into
