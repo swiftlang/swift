@@ -43,9 +43,9 @@ void dumpBits(const SmallBitVector &bits);
 ///
 /// Memory locations are limited to addresses which are guaranteed to
 /// be not aliased, like @in/inout parameters and alloc_stack.
-/// Currently only a certain set of address instructions are supported:
-/// Specifically those instructions which are going to be included when SIL
-/// supports opaque values.
+/// Currently only a certain set of address instructions are supported, for
+/// details see `MemoryLocations::analyzeLocationUsesRecursively` and
+/// `MemoryLocations::analyzeAddrProjection`.
 class MemoryLocations {
 public:
 
@@ -288,7 +288,7 @@ public:
   /// not covered by sub-fields.
   const Bits &getNonTrivialLocations();
 
-  /// Debug dump the MemoryLifetime internals.
+  /// Debug dump the MemoryLocations internals.
   void dump() const;
 
 private:
