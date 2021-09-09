@@ -2205,19 +2205,27 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // take multiple arguments to be passed as an argument in places
   // that expect a function that takes a single tuple (of the same
   // arity);
-  auto canImplodeParams = [&](ArrayRef<AnyFunctionType::Param> params) {
+  auto canImplodeParams = [&](ArrayRef<AnyFunctionType::Param> params,
+                              const FunctionType *destFn) {
     if (params.size() == 1)
+      return false;
+
+    // We do not support imploding into a @differentiable function.
+    if (destFn->isDifferentiable())
       return false;
 
     for (auto &param : params) {
       // We generally cannot handle parameter flags, though we can carve out an
       // exception for ownership flags such as __owned, which we can thunk, and
       // flags that can freely dropped from a function type such as
-      // @_nonEphemeral.
+      // @_nonEphemeral. Note that @noDerivative can also be freely dropped, as
+      // we've already ensured that the destination function is not
+      // @differentiable.
       auto flags = param.getParameterFlags();
       flags = flags.withValueOwnership(
           param.isInOut() ? ValueOwnership::InOut : ValueOwnership::Default);
-      flags = flags.withNonEphemeral(false);
+      flags = flags.withNonEphemeral(false)
+                   .withNoDerivative(false);
       if (!flags.isNone())
         return false;
     }
@@ -2264,12 +2272,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (isSingleTupleParam(ctx, func2Params) &&
-            canImplodeParams(func1Params)) {
+            canImplodeParams(func1Params, /*destFn*/ func2)) {
           implodeParams(func1Params);
           increaseScore(SK_FunctionConversion);
         } else if (!ctx.isSwiftVersionAtLeast(5) &&
                    isSingleTupleParam(ctx, func1Params) &&
-                   canImplodeParams(func2Params)) {
+                   canImplodeParams(func2Params,  /*destFn*/ func1)) {
           auto *simplified = locator.trySimplifyToExpr();
           // We somehow let tuple unsplatting function conversions
           // through in some cases in Swift 4, so let's let that
@@ -2305,11 +2313,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         // 2. `case .bar(let tuple) = e` allows to match multiple
         //    parameters with a single tuple argument.
         if (isSingleTupleParam(ctx, func1Params) &&
-            canImplodeParams(func2Params)) {
+            canImplodeParams(func2Params, /*destFn*/ func1)) {
           implodeParams(func2Params);
           increaseScore(SK_FunctionConversion);
         } else if (isSingleTupleParam(ctx, func2Params) &&
-                   canImplodeParams(func1Params)) {
+                   canImplodeParams(func1Params, /*destFn*/ func2)) {
           implodeParams(func1Params);
           increaseScore(SK_FunctionConversion);
         }
@@ -2320,7 +2328,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       auto *anchor = locator.trySimplifyToExpr();
       if (isa_and_nonnull<ClosureExpr>(anchor) &&
           isSingleTupleParam(ctx, func2Params) &&
-          canImplodeParams(func1Params)) {
+          canImplodeParams(func1Params, /*destFn*/ func2)) {
         auto *fix = AllowClosureParamDestructuring::create(
             *this, func2, getConstraintLocator(anchor));
         if (recordFix(fix))
