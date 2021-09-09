@@ -13,13 +13,17 @@
 import Foundation
 
 public func readFile(_ path: String) -> String {
-  let data = FileManager.default.contents(atPath: path)!
-  return String(decoding: data, as: UTF8.self)
+  do {
+    return try String(contentsOfFile: path)
+  } catch {
+    fatalError(error.localizedDescription)
+  }
 }
 
 public func write(_ data: String, to path: String) {
-  FileManager.default.createFile(
-    atPath: path,
-    contents: data.data(using: .utf8)
-  )
+  do {
+    try data.write(toFile: path, atomically: false, encoding: .utf8)
+  } catch {
+    fatalError(error.localizedDescription)
+  }
 }
