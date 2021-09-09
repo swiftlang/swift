@@ -3308,8 +3308,8 @@ public enum DecodingError: Error {
   /// for debugging.
   case valueNotFound(Any.Type, Context)
 
-  ///  An indication that a keyed decoding container was asked for an entry for
-  ///  the given key, but did not contain one.
+  /// An indication that a keyed decoding container was asked for an entry for
+  /// the given key, but did not contain one.
   ///
   /// As associated values, this case contains the attempted key and context
   /// for debugging.
