@@ -320,20 +320,20 @@ namespace {
             if (!(fnTy1 && fnTy2))
               return;
 
-            auto ODR1 = dyn_cast<OverloadedDeclRefExpr>(binExp1->getFn());
-            auto ODR2 = dyn_cast<OverloadedDeclRefExpr>(binExp2->getFn());
+            auto *UDR1 = dyn_cast<UnresolvedDeclRefExpr>(binExp1->getFn());
+            auto *UDR2 = dyn_cast<UnresolvedDeclRefExpr>(binExp2->getFn());
 
-            if (!(ODR1 && ODR2))
+            if (!(UDR1 && UDR2))
               return;
 
             // TODO: We currently limit this optimization to known arithmetic
             // operators, but we should be able to broaden this out to
             // logical operators as well.
-            if (!isArithmeticOperatorDecl(ODR1->getDecls()[0]))
+
+            if (!UDR1->getName().getBaseIdentifier().isArithmeticOperator())
               return;
 
-            if (ODR1->getDecls()[0]->getBaseName() !=
-                ODR2->getDecls()[0]->getBaseName())
+            if (UDR1->getName() != UDR2->getName())
               return;
 
             // All things equal, we can merge the tyvars for the function
@@ -346,8 +346,8 @@ namespace {
                                          /*updateWorkList*/ false);
             }
 
-            auto odTy1 = CS.getType(ODR1)->getAs<TypeVariableType>();
-            auto odTy2 = CS.getType(ODR2)->getAs<TypeVariableType>();
+            auto odTy1 = CS.getType(UDR1)->getAs<TypeVariableType>();
+            auto odTy2 = CS.getType(UDR2)->getAs<TypeVariableType>();
 
             if (odTy1 && odTy2) {
               auto odRep1 = CS.getRepresentative(odTy1);
