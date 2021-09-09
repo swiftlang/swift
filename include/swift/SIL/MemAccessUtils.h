@@ -171,6 +171,9 @@ SILValue getAccessBase(SILValue address);
 /// AccessedStorage::getRoot() and AccessPath::getRoot().
 SILValue findReferenceRoot(SILValue ref);
 
+/// Find the first owned root of the reference.
+SILValue findOwnershipReferenceRoot(SILValue ref);
+
 /// Return true if \p address points to a let-variable.
 ///
 /// let-variables are only written during let-variable initialization, which is
@@ -1264,9 +1267,13 @@ SILBasicBlock::iterator removeBeginAccess(BeginAccessInst *beginAccess);
 
 namespace swift {
 
-/// Return true if \p svi is a cast that preserves the identity and
+/// Return true if \p svi is a cast that preserves the identity equivalence of
+/// the reference at operand zero.
+bool isIdentityPreservingRefCast(SingleValueInstruction *svi);
+
+/// Return true if \p svi is a cast that preserves the identity equivalence and
 /// reference-counting equivalence of the reference at operand zero.
-bool isRCIdentityPreservingCast(SingleValueInstruction *svi);
+bool isIdentityAndOwnershipPreservingRefCast(SingleValueInstruction *svi);
 
 /// If \p svi is an access projection, return an address-type operand for the
 /// incoming address.
