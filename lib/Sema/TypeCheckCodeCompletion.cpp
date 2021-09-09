@@ -1303,16 +1303,21 @@ void KeyPathTypeCheckCompletionCallback::sawSolution(
       // to look up type variables by their locators.
       auto RootLocator =
           S.getConstraintLocator(KeyPath, {ConstraintLocator::KeyPathRoot});
-      auto BaseVariableType =
+      auto BaseVariableTypeBinding =
           llvm::find_if(S.typeBindings, [&RootLocator](const auto &Entry) {
             return Entry.first->getImpl().getLocator() == RootLocator;
-          })->getSecond();
-      BaseType = S.simplifyType(BaseVariableType);
+          });
+      if (BaseVariableTypeBinding != S.typeBindings.end()) {
+        BaseType = S.simplifyType(BaseVariableTypeBinding->getSecond());
+      }
     }
   } else {
     // We are completing after a component. Get the previous component's result
     // type.
     BaseType = S.simplifyType(S.getType(KeyPath, ComponentIndex - 1));
+  }
+  if (BaseType.isNull()) {
+    return;
   }
 
   // If ExpectedTy is a duplicate of any other result, ignore this solution.
@@ -1321,7 +1326,5 @@ void KeyPathTypeCheckCompletionCallback::sawSolution(
   })) {
     return;
   }
-  if (BaseType) {
-    Results.push_back({BaseType, /*OnRoot=*/(ComponentIndex == 0)});
-  }
+  Results.push_back({BaseType, /*OnRoot=*/(ComponentIndex == 0)});
 }
