@@ -31,6 +31,8 @@
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z \
 // RUN:             -e  _ZZNSt8__detail18__to_chars_10_implIjEEvPcjT_E8__digits \
 // RUN:             -e  _ZZNSt8__detail18__to_chars_10_implImEEvPcjT_E8__digits \
+// RUN:             -e  _ZNKSt8functionIFNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEmmEEclEmm \
+// RUN:             -e  _ZSt9call_onceIRFvPvEJDnEEvRSt9once_flagOT_DpOT0_ \
 // RUN:   > %t/swiftCore-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-no-weak.txt
 // RUN: diff -u %t/swiftCore-all.txt %t/swiftCore-no-weak.txt
@@ -53,6 +55,8 @@
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringISscEET_PFiPT0_mPKS2_P13__va_list_tagEmS5_z \
 // RUN:             -e  _ZZNSt8__detail18__to_chars_10_implIjEEvPcjT_E8__digits \
 // RUN:             -e  _ZZNSt8__detail18__to_chars_10_implImEEvPcjT_E8__digits \
+// RUN:             -e  _ZNKSt8functionIFNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEmmEEclEmm \
+// RUN:             -e  _ZSt9call_onceIRFvPvEJDnEEvRSt9once_flagOT_DpOT0_ \
 // RUN:   > %t/swiftRemoteMirror-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-no-weak.txt
 // RUN: diff -u %t/swiftRemoteMirror-all.txt %t/swiftRemoteMirror-no-weak.txt
