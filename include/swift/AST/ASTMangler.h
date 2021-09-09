@@ -56,6 +56,10 @@ protected:
   /// to fill these in.
   bool AllowSymbolicReferences = false;
 
+  /// If enabled, allows the use of standard substitutions for types in the
+  /// concurrency library.
+  bool AllowConcurrencyStandardSubstitutions = true;
+
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
                                               const OpaqueTypeDecl *>;

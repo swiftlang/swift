@@ -2973,7 +2973,8 @@ bool ASTMangler::tryAppendStandardSubstitution(const GenericTypeDecl *decl) {
     return false;
 
   if (isa<NominalTypeDecl>(decl)) {
-    if (auto Subst = getStandardTypeSubst(decl->getName().str())) {
+    if (auto Subst = getStandardTypeSubst(
+            decl->getName().str(), AllowConcurrencyStandardSubstitutions)) {
       if (!SubstMerging.tryMergeSubst(*this, *Subst, /*isStandardSubst*/ true)){
         appendOperator("S", *Subst);
       }
