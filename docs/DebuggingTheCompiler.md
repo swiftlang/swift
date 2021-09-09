@@ -822,6 +822,13 @@ reducing SIL test cases by:
 For more information and a high level example, see:
 ./swift/utils/bug_reducer/README.md.
 
+### Syncing branches during bisects
+
+When bisecting it might be necessary to run the `update-checkout` script
+each time you change shas. To do this you can pass `--match-timestamp`
+to automatically checkout match the timestamp of the `apple/swift` repo
+across the other repos.
+
 # Debugging the Compiler Build
 
 ## Build Dry Run
