@@ -6,5 +6,5 @@
 // REQUIRES: objc_interop
 
 // CHECK:      struct ConstructorWithNSArrayParam {
-// CHECK-NEXT:   init(_ array: [Any]!)
+// CHECK-NEXT:   init(_ array: [Any]?)
 // CHECK-NEXT: }

@@ -10,6 +10,7 @@ import TypeClassification
 typealias Void = ()
 struct UnsafePointer<T> { }
 struct UnsafeMutablePointer<T> { }
+@frozen public struct CInt { var _value: Builtin.Int32 }
 
 // ITANIUM_X64-LABEL: define swiftcc void @"$ss35copyWithUserProvidedCopyConstructorySo03HascdeF0V_ACtACF"
 // ITANIUM_X64-SAME: (%TSo30HasUserProvidedCopyConstructorV* {{.*}}[[ARG0:%.*]], %TSo30HasUserProvidedCopyConstructorV* {{.*}}[[ARG1:%.*]], %TSo30HasUserProvidedCopyConstructorV* {{.*}}[[ARG2:%.*]])

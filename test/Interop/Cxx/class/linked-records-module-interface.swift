@@ -16,7 +16,7 @@
 // CHECK:   }
 // CHECK:   struct E {
 // CHECK:     init()
-// CHECK:     static func test(_: UnsafePointer<Space.C>!)
+// CHECK:     static func test(_: UnsafePointer<Space.C>?)
 // CHECK:   }
 // CHECK: }
 

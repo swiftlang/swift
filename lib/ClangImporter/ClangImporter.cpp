@@ -4234,6 +4234,52 @@ importName(const clang::NamedDecl *D,
     getDeclName();
 }
 
+Type ClangImporter::importParamType(const clang::ParmVarDecl *decl,
+                                    ParamDecl *swiftParam) {
+  bool isInSystemModule =
+      cast<ClangModuleUnit>(
+          swiftParam->getDeclContext()->getModuleScopeContext())
+          ->isSystemModule();
+  bool allowNSUIntegerAsInt =
+      Impl.shouldAllowNSUIntegerAsInt(isInSystemModule, decl);
+
+  bool knownNonNull = false;
+  auto *swiftFn = cast<AbstractFunctionDecl>(swiftParam->getDeclContext());
+  if (auto clangFn =
+          dyn_cast_or_null<clang::FunctionDecl>(swiftFn->getClangDecl())) {
+    for (const auto *nonnull : clangFn->specific_attrs<clang::NonNullAttr>()) {
+      if (!nonnull->args_size() ||
+          nonnull->isNonNull(decl->getFunctionScopeIndex())) {
+        knownNonNull = true;
+        break;
+      }
+    }
+  }
+  auto paramOptionality = getParamOptionality(decl, knownNonNull);
+
+  ImportTypeKind importKind = ImportTypeKind::Parameter;
+  if (decl->hasAttr<clang::CFReturnsRetainedAttr>())
+    importKind = ImportTypeKind::CFRetainedOutParameter;
+  else if (decl->hasAttr<clang::CFReturnsNotRetainedAttr>())
+    importKind = ImportTypeKind::CFUnretainedOutParameter;
+
+  auto importedType =
+      Impl.importType(decl->getType(), importKind, allowNSUIntegerAsInt,
+                      Bridgeability::Full, paramOptionality);
+  if (!importedType)
+    return swiftParam->getASTContext().getNeverType();
+
+  auto type = importedType.getType();
+
+  // Apply attributes to the type.
+  bool isUnsafeSendable = false;
+  bool isUnsafeMainActor = false;
+  type = Impl.applyParamAttributes(decl, type, isUnsafeSendable,
+                                   isUnsafeMainActor);
+
+  return type;
+}
+
 bool ClangImporter::isInOverlayModuleForImportedModule(
                                                const DeclContext *overlayDC,
                                                const DeclContext *importedDC) {

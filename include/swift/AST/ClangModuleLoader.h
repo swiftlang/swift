@@ -33,6 +33,7 @@ namespace swift {
 
 class Decl;
 class DeclContext;
+class ParamDecl;
 class VisibleDeclConsumer;
 
 /// Represents the different namespaces for types in C.
@@ -238,6 +239,9 @@ public:
                                  SubstitutionMap subst) = 0;
 
   virtual bool isCXXMethodMutating(const clang::CXXMethodDecl *method) = 0;
+
+  virtual Type importParamType(const clang::ParmVarDecl *decl,
+                               ParamDecl *swiftParam) = 0;
 };
 
 /// Describes a C++ template instantiation error.

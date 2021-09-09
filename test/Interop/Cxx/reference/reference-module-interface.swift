@@ -13,4 +13,5 @@
 // CHECK: func getFuncRef() -> @convention(c) () -> Int32
 // CHECK: func getFuncRvalueRef() -> @convention(c) () -> Int32
 
-// CHECK-NOT: dontImportAtomicRef
+// TODO(SR-XXXX): Never will be replaced with a type named something like "FailedImport".
+// CHECK: func dontImportAtomicRef(_: Never)

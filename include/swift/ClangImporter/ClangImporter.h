@@ -458,6 +458,9 @@ public:
   DeclName importName(const clang::NamedDecl *D,
                       clang::DeclarationName givenName);
 
+  Type importParamType(const clang::ParmVarDecl *decl,
+                       ParamDecl *swiftParam) override;
+
   Optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
                  StringRef SwiftPCHHash);

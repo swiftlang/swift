@@ -1861,7 +1861,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   // Import the parameters.
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
-  SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
   // C++ operators that are implemented as non-static member functions get
   // imported into Swift as static methods that have an additional
@@ -1897,10 +1896,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       continue;
     }
 
-    // Check nullability of the parameter.
-    OptionalTypeKind OptionalityOfParam =
-        getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[index]);
-
     ImportTypeKind importKind = ImportTypeKind::Parameter;
     if (param->hasAttr<clang::CFReturnsRetainedAttr>())
       importKind = ImportTypeKind::CFRetainedOutParameter;
@@ -1928,21 +1923,15 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
                    dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
       swiftParamTy =
           findGenericTypeInGenericDecls(templateParamType, genericParams);
-    } else {
-      auto importedType = importType(paramTy, importKind, allowNSUIntegerAsInt,
-                                     Bridgeability::Full, OptionalityOfParam);
-      if (!importedType)
-        return nullptr;
-
-      isParamTypeImplicitlyUnwrapped = importedType.isImplicitlyUnwrapped();
-      swiftParamTy = importedType.getType();
     }
 
     // Apply attributes to the type.
     bool isUnsafeSendable = false;
     bool isUnsafeMainActor = false;
-    swiftParamTy = applyParamAttributes(
-        param, swiftParamTy, isUnsafeSendable, isUnsafeMainActor);
+    if (swiftParamTy) {
+      swiftParamTy = applyParamAttributes(param, swiftParamTy, isUnsafeSendable,
+                                          isUnsafeMainActor);
+    }
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
@@ -1961,7 +1950,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         importSourceLoc(param->getLocation()), bodyName,
         ImportedHeaderUnit);
     paramInfo->setSpecifier(ParamSpecifier::Default);
-    paramInfo->setInterfaceType(swiftParamTy);
+    if (swiftParamTy)
+      paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
     recordUnsafeConcurrencyForDecl(
         paramInfo, isUnsafeSendable, isUnsafeMainActor);
