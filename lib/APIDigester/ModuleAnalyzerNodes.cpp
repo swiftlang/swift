@@ -1797,12 +1797,17 @@ SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context
       Root->addChild(constructSubscriptDeclNode(SD));
     } else if (isa<PatternBindingDecl>(Member)) {
       // All containing variables should have been handled.
+    } else if (isa<EnumCaseDecl>(Member)) {
+      // All containing variables should have been handled.
+    } else if (isa<IfConfigDecl>(Member)) {
+      // All containing members should have been handled.
     } else if (isa<DestructorDecl>(Member)) {
       // deinit has no impact.
     } else if (isa<MissingMemberDecl>(Member)) {
       // avoid adding MissingMemberDecl
     } else {
-      llvm_unreachable("unhandled member decl kind.");
+      llvm::errs() << "Unhandled decl:\n";
+      Member->dump(llvm::errs());
     }
   }
 }
@@ -2160,7 +2165,9 @@ static parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    vfs::getFileOrSTDIN(*Ctx.getSourceMgr().getFileSystem(), FileName);
+    vfs::getFileOrSTDIN(*Ctx.getSourceMgr().getFileSystem(), FileName,
+                        /*FileSize*/-1, /*RequiresNullTerminator*/true,
+                        /*IsVolatile*/false, /*RetryCount*/30);
   if (!FileBufOrErr) {
     llvm_unreachable("Failed to read JSON file");
   }
