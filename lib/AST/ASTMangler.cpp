@@ -2173,8 +2173,14 @@ void ASTMangler::appendModule(const ModuleDecl *module,
 
   // Try the special 'swift' substitution.
   if (ModName == STDLIB_NAME) {
-    assert(useModuleName.empty());
-    return appendOperator("s");
+    if (useModuleName.empty()) {
+      appendOperator("s");
+    } else if (DWARFMangling) {
+      appendOperator("s");
+    } else {
+      appendIdentifier(useModuleName);
+    }
+    return;
   }
 
   if (ModName == MANGLING_MODULE_OBJC) {
