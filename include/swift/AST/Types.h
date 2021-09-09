@@ -3005,7 +3005,11 @@ protected:
 
 public:
   /// Take an array of parameters and turn it into a tuple or paren type.
-  static Type composeTuple(ASTContext &ctx, ArrayRef<Param> params);
+  ///
+  /// \param wantParamFlags Whether to preserve the parameter flags from the
+  /// given set of parameters.
+  static Type composeTuple(ASTContext &ctx, ArrayRef<Param> params,
+                           bool wantParamFlags = true);
 
   /// Given two arrays of parameters determine if they are equal in their
   /// canonicalized form. Internal labels and type sugar is *not* taken into

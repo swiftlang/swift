@@ -2209,16 +2209,27 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (params.size() == 1)
       return false;
 
-    for (auto param : params)
-      if (param.isVariadic() || param.isInOut() || param.isAutoClosure())
+    for (auto &param : params) {
+      // We generally cannot handle parameter flags, though we can carve out an
+      // exception for ownership flags such as __owned, which we can thunk, and
+      // flags that can freely dropped from a function type such as
+      // @_nonEphemeral.
+      auto flags = param.getParameterFlags();
+      flags = flags.withValueOwnership(
+          param.isInOut() ? ValueOwnership::InOut : ValueOwnership::Default);
+      flags = flags.withNonEphemeral(false);
+      if (!flags.isNone())
         return false;
-
+    }
     return true;
   };
 
   auto implodeParams = [&](SmallVectorImpl<AnyFunctionType::Param> &params) {
-    auto input = AnyFunctionType::composeTuple(getASTContext(), params);
-
+    // Form an imploded tuple type, dropping the parameter flags as although
+    // canImplodeParams makes sure we're not dealing with vargs, inout, etc,
+    // we may still have e.g ownership flags left over, which we can drop.
+    auto input = AnyFunctionType::composeTuple(getASTContext(), params,
+                                               /*wantParamFlags*/ false);
     params.clear();
     // If fixes are disabled let's do an easy thing and implode
     // tuple directly into parameters list.
