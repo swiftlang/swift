@@ -392,7 +392,7 @@ public protocol Sequence {
   /// contiguous storage, the method doesn’t call `body` and returns `nil`.
   ///
   /// A `Collection` that provides its own implementation of this method
-  /// must also guarantee that advancing the pointer by the distance to the
+  /// must also guarantee that advancing the pointer by the distance to a
   /// slice's `startIndex` generates an equivalent buffer of its `SubSequence`.
   ///
   /// Successive calls to this method don't necessarily provide the same
