@@ -1163,3 +1163,13 @@ func rdar78917861() {
     }()
   }
 }
+
+// rdar://81228501 - type-checker crash due to applied invalid solution
+func test(arr: [[Int]]) {
+  struct A {
+    init(arg: [Int]) {}
+  }
+
+  arr.map { ($0 as? [Int]).map { A($0) } } // expected-error {{missing argument label 'arg:' in call}} {{36-36=arg: }}
+  // expected-warning@-1 {{conditional cast from '[Int]' to '[Int]' always succeeds}}
+}
