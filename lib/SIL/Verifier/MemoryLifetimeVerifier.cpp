@@ -31,11 +31,8 @@ namespace {
 /// A utility for verifying memory lifetime.
 ///
 /// The MemoryLifetime utility checks the lifetime of memory locations.
-/// This is limited to memory locations which are guaranteed to be not aliased,
-/// like @in or @inout parameters. Also, alloc_stack locations are handled.
-///
-/// In addition to verification, the MemoryLifetime class can be used as utility
-/// (e.g. base class) for optimizations, which need to compute memory lifetime.
+/// This is limited to memory locations which can be handled by
+/// `MemoryLocations`.
 class MemoryLifetimeVerifier {
 
   using Bits = MemoryLocations::Bits;
