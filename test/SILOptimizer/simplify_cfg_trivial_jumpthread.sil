@@ -12,6 +12,7 @@ import Swift
 internal enum Enum {
   case one
   case two
+  case three
 }
 
 enum BoolLike { case true_, false_ }
@@ -20,12 +21,17 @@ enum BoolLike { case true_, false_ }
 // perform unbounded loop peeling.
 //
 // rdar://73357726 ([SR-14068]: Compiling with optimisation runs indefinitely for grpc-swift)
+//
+// Note: this no longer attempts to run jump-threading infinitely, so
+// does not actually unit test the bailout. But it is still an
+// interesting test case.
+//
 // CHECK-LABEL: sil [ossa] @testInfinitePeeling : $@convention(method) (Builtin.Int64, Enum) -> () {
 //
 // There is only one switch_enum blocks, and it is no longer in a loop.
 // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Enum):
-// CHECK:   switch_enum %1 : $Enum, case #Enum.one!enumelt: bb4, case #Enum.two!enumelt: bb1
-// CHECK: bb1:
+// CHECK:   switch_enum %1 : $Enum, case #Enum.one!enumelt: bb4, default bb1
+// CHECK: bb1(%{{.*}} : $Enum):
 // CHECK:   br bb5
 // CHECK: bb2:
 // CHECK:   br bb6

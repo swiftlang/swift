@@ -45,7 +45,7 @@ func test_taskGroup_throws() async {
         return third
 
       case .failure(let error):
-        fatalError("got an erroneous third result")
+        fatalError("got an erroneous third result: \(error)")
 
       case .none:
         print("task group failed to get 3")

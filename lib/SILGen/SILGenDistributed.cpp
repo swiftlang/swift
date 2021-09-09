@@ -622,19 +622,18 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
     auto resolve =
         switchBB->createPhiArgument(optionalReturnTy, OwnershipKind::Owned);
 
-    B.createSwitchEnum(
+    auto *switchEnum = B.createSwitchEnum(
         loc, resolve, nullptr,
         {{C.getOptionalSomeDecl(), resolvedBB},
          {std::make_pair(C.getOptionalNoneDecl(), makeProxyBB)}});
+    switchEnum->createOptionalSomeResult();
   }
 
   // ==== Case 'some') return the resolved instance
   {
     B.emitBlock(resolvedBB);
 
-    auto local = resolvedBB->createPhiArgument(returnTy, OwnershipKind::Owned);
-
-    B.createBranch(loc, returnBB, {local});
+    B.createBranch(loc, returnBB, {resolvedBB->getArgument(0)});
   }
 
   // ==== Case 'none') Create the remote instance

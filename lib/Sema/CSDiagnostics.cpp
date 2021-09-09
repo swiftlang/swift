@@ -7776,3 +7776,27 @@ bool UnsupportedRuntimeCheckedCastFailure::diagnoseAsError() {
       .fixItReplace(getCastRange(), "as");
   return true;
 }
+
+bool InvalidWeakAttributeUse::diagnoseAsError() {
+  auto *pattern =
+      dyn_cast_or_null<NamedPattern>(getAnchor().dyn_cast<Pattern *>());
+  if (!pattern)
+    return false;
+
+  auto *var = pattern->getDecl();
+  auto varType = OptionalType::get(getType(var));
+
+  auto diagnostic =
+      emitDiagnosticAt(var, diag::invalid_ownership_not_optional,
+                       ReferenceOwnership::Weak, varType);
+
+  auto typeRange = var->getTypeSourceRangeForDiagnostics();
+  if (varType->hasSimpleTypeRepr()) {
+    diagnostic.fixItInsertAfter(typeRange.End, "?");
+  } else {
+    diagnostic.fixItInsert(typeRange.Start, "(")
+        .fixItInsertAfter(typeRange.End, ")?");
+  }
+
+  return true;
+}

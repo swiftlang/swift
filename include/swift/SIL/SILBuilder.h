@@ -2221,6 +2221,11 @@ public:
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
                            OperandValueArrayRef Args);
 
+  // This only creates the terminator, not the results. Create the results with
+  // OwnershipForwardingTermInst::createResult() and
+  // SwitchEnumInst::createDefaultResult() to ensure that the result ownership
+  // is correct (it must be consistent with the switch_enum's forwarding
+  // ownership, which may differ from \p Operand's ownership).
   SwitchValueInst *
   createSwitchValue(SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
                     ArrayRef<std::pair<SILValue, SILBasicBlock *>> CaseBBs) {
@@ -2232,16 +2237,14 @@ public:
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
       Optional<ArrayRef<ProfileCounter>> CaseCounts = None,
-      ProfileCounter DefaultCount = ProfileCounter()) {
-    return createSwitchEnum(Loc, Operand, DefaultBB, CaseBBs, CaseCounts,
-                            DefaultCount, Operand.getOwnershipKind());
-  }
+      ProfileCounter DefaultCount = ProfileCounter());
 
   SwitchEnumInst *createSwitchEnum(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
       Optional<ArrayRef<ProfileCounter>> CaseCounts,
-      ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnershipKind) {
+      ProfileCounter DefaultCount,
+      ValueOwnershipKind forwardingOwnershipKind) {
     return insertTerminator(SwitchEnumInst::create(
         getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction(),
         CaseCounts, DefaultCount, forwardingOwnershipKind));

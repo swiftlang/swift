@@ -1023,16 +1023,13 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILLocation loc,
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> caseBBs;
     caseBBs.push_back(std::make_pair(someDecl, someBB));
     builder->setInsertionPoint(curBB);
-    builder->createSwitchEnum(loc, value, noneBB, caseBBs);
+    auto *switchEnum = builder->createSwitchEnum(loc, value, noneBB, caseBBs);
     // In OSSA switch_enum destinations have terminator results.
     //
     // TODO: This should be in a switchEnum utility.
     SILValue unwrappedValue;
     if (builder->hasOwnership()) {
-      // Create a terminator result, NOT a phi, despite the API name.
-      noneBB->createPhiArgument(value->getType(), OwnershipKind::None);
-      unwrappedValue =
-        someBB->createPhiArgument(optionalSrcTy, value.getOwnershipKind());
+      unwrappedValue = switchEnum->createOptionalSomeResult();
       builder->setInsertionPoint(someBB);
     } else {
       builder->setInsertionPoint(someBB);

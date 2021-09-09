@@ -125,17 +125,34 @@ public:
                                              ManagedValue originalValue);
 #include "swift/AST/ReferenceStorage.def"
 
-  ManagedValue createOwnedPhiArgument(SILType type);
-  ManagedValue createGuaranteedPhiArgument(SILType type);
-
-  /// For arguments from terminators that are "transforming terminators". These
-  /// types of guaranteed arguments are validated as part of the operand of the
-  /// transforming terminator since transforming terminators are guaranteed to
-  /// be the only predecessor of our parent block.
+  /// Create the block argument for an OwnershipForwardingTermInst result
+  /// (checked_cast_br or switch_enum). Allows creating terminator
+  /// results separately from creating the terminator. Alternatively, the result
+  /// can be directly created as follows:
   ///
-  /// NOTE: Two examples of transforming terminators are switch_enum,
-  /// checked_cast_br.
-  ManagedValue createGuaranteedTransformingTerminatorArgument(SILType type);
+  ///   ManagedValue::forForwardedRValue(term->createResult(succBB, resultTy))
+  ///
+  /// For a switch_enum with a default payload, use:
+  ///
+  ///   ManagedValue::forForwardedRValue(switchEnum->createDefaultResult())
+  ///
+  ManagedValue createForwardedTermResult(SILType type);
+
+  /// Create a terminator result with specified ownership.
+  ///
+  /// Typically for an apply's return or error value, which should use
+  /// OwnershipKind::Owned. For OwnershipForwardingTermInst (checked_cast_br or
+  /// switch_enum), use createForwardedTermResult instead.
+  ManagedValue createTermResult(SILType type, ValueOwnershipKind ownership);
+
+  /// Create the block argument for an Optional switch_enum.
+  ManagedValue createOptionalSomeResult(SwitchEnumInst *switchEnum) {
+    return ManagedValue::forForwardedRValue(
+        SGF, switchEnum->createOptionalSomeResult());
+  }
+
+  // Create the block argument for a phi.
+  ManagedValue createPhi(SILType type, ValueOwnershipKind ownership);
 
   using SILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,

@@ -913,7 +913,7 @@ sil [ossa] @cse_ossa_utilstest : $@convention(thin) (@guaranteed WrapperStruct) 
 bb0(%0 : @guaranteed $WrapperStruct):
 %f = function_ref @use_nontrivialstruct3 : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
 %none = enum $FakeOptional3, #FakeOptional3.none
-switch_enum %none : $FakeOptional3, case #FakeOptional3.some!enumelt:bb1, case #FakeOptional3.none!enumelt:bb2
+switch_enum %none : $FakeOptional3, case #FakeOptional3.some!enumelt:bb1, case #FakeOptional3.none!enumelt:bb2, forwarding: @guaranteed
 
 bb1(%arg : @guaranteed $WrapperStruct):
 %ex = struct_extract %arg : $WrapperStruct, #WrapperStruct.val

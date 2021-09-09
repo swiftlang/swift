@@ -16,6 +16,12 @@ case none
 case some(T)
 }
 
+enum MultiPayload {
+case none
+case some(Builtin.NativeObject)
+case another(Builtin.NativeObject)
+}
+
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
@@ -387,8 +393,7 @@ bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  destroy_value %3 : $FakeOptional<Builtin.NativeObject>
+bb2:
   br bb3
 
 bb3:
@@ -658,8 +663,7 @@ bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  destroy_value %3 : $FakeOptional<Builtin.NativeObject>
+bb2:
   br bb3
 
 bb3:
@@ -667,21 +671,21 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @switch_enum_test_copyvalue_with_default_and_extract : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-LABEL: sil [ossa] @switch_enum_test_copyvalue_with_default_and_extract : $@convention(thin) (@guaranteed MultiPayload) -> () {
 // CHECK-NOT: copy_value
 // CHECK: } // end sil function 'switch_enum_test_copyvalue_with_default_and_extract'
-sil [ossa] @switch_enum_test_copyvalue_with_default_and_extract : $@convention(thin) (@guaranteed FakeOptional<Builtin.NativeObject>) -> () {
-bb0(%0 : @guaranteed $FakeOptional<Builtin.NativeObject>):
+sil [ossa] @switch_enum_test_copyvalue_with_default_and_extract : $@convention(thin) (@guaranteed MultiPayload) -> () {
+bb0(%0 : @guaranteed $MultiPayload):
   %f = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %1 = copy_value %0 : $FakeOptional<Builtin.NativeObject>
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, default bb2
+  %1 = copy_value %0 : $MultiPayload
+  switch_enum %1 : $MultiPayload, case #MultiPayload.some!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  %3a = unchecked_enum_data %3 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
+bb2(%3 : @owned $MultiPayload):
+  %3a = unchecked_enum_data %3 : $MultiPayload, #MultiPayload.another!enumelt
   apply %f(%3a) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %3a : $Builtin.NativeObject
   br bb3
@@ -693,29 +697,29 @@ bb3:
 
 // TODO: We currently are unable to get rid of the begin_borrow. We should be
 // able to with appropriate analysis.
-// CHECK-LABEL: sil [ossa] @switch_enum_test_copyvalue_with_borrow : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
+// CHECK-LABEL: sil [ossa] @switch_enum_test_copyvalue_with_borrow : $@convention(thin) (@owned MultiPayload) -> () {
 // CHECK-NOT: copy_value
 // CHECK: } // end sil function 'switch_enum_test_copyvalue_with_borrow'
-sil [ossa] @switch_enum_test_copyvalue_with_borrow : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
-bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
+sil [ossa] @switch_enum_test_copyvalue_with_borrow : $@convention(thin) (@owned MultiPayload) -> () {
+bb0(%0 : @owned $MultiPayload):
   %f = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  %0a = begin_borrow %0 : $FakeOptional<Builtin.NativeObject>
-  %1 = copy_value %0a : $FakeOptional<Builtin.NativeObject>
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, default bb2
+  %0a = begin_borrow %0 : $MultiPayload
+  %1 = copy_value %0a : $MultiPayload
+  switch_enum %1 : $MultiPayload, case #MultiPayload.some!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  %3a = unchecked_enum_data %3 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
+bb2(%3 : @owned $MultiPayload):
+  %3a = unchecked_enum_data %3 : $MultiPayload, #MultiPayload.another!enumelt
   apply %f(%3a) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %3a : $Builtin.NativeObject
   br bb3
 
 bb3:
-  end_borrow %0a : $FakeOptional<Builtin.NativeObject>
-  destroy_value %0 : $FakeOptional<Builtin.NativeObject>
+  end_borrow %0a : $MultiPayload
+  destroy_value %0 : $MultiPayload
   %9999 = tuple()
   return %9999 : $()
 }

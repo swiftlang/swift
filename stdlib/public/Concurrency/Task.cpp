@@ -149,7 +149,7 @@ void NullaryContinuationJob::process(Job *_job) {
 void AsyncTask::completeFuture(AsyncContext *context) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
-
+  SWIFT_TASK_DEBUG_LOG("complete future = %p", this);
   assert(isFuture());
   auto fragment = futureFragment();
 
@@ -235,7 +235,6 @@ AsyncTask::~AsyncTask() {
 SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
-
   task->~AsyncTask();
 
   // The task execution itself should always hold a reference to it, so

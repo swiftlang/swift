@@ -27,6 +27,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Once.h"
+#include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringExtras.h"
 #include <algorithm>
@@ -1861,7 +1862,7 @@ swift::swift_getTupleTypeMetadata(MetadataRequest request,
   size_t labelsAllocSize = roundUpToAlignment(labelsLen + 1, sizeof(void*));
   char *newLabels =
     (char *) MetadataAllocator(TupleCacheTag).Allocate(labelsAllocSize, alignof(char));
-  strcpy(newLabels, labels);
+  _swift_strlcpy(newLabels, labels, labelsAllocSize);
   key.Labels = newLabels;
 
   // Update the metadata cache.

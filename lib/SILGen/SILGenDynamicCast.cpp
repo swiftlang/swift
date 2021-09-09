@@ -183,16 +183,15 @@ namespace {
         } else {
           // If we had copy_on_success, then we need to use a guaranteed
           // argument.
-          ManagedValue argument;
-          if (!shouldTakeOnSuccess(consumption)) {
-            argument = SGF.B.createGuaranteedTransformingTerminatorArgument(
-                origTargetTL.getLoweredType());
-          } else {
-            argument =
-                SGF.B.createOwnedPhiArgument(origTargetTL.getLoweredType());
-          }
-          result = finishFromResultScalar(hasAbstraction, argument, consumption,
-                                          abstraction, origTargetTL, ctx);
+          assert(!shouldTakeOnSuccess(consumption)
+                 || operandValue.getOwnershipKind().isCompatibleWith(
+                        OwnershipKind::Owned)
+                        && "cast consumption does not match ownership");
+          ManagedValue termResult =
+              SGF.B.createForwardedTermResult(origTargetTL.getLoweredType());
+          result =
+              finishFromResultScalar(hasAbstraction, termResult, consumption,
+                                     abstraction, origTargetTL, ctx);
         }
 
         handleTrue(result);
@@ -225,24 +224,23 @@ namespace {
         if (shouldDestroyOnFailure(consumption)) {
           {
             FullExpr argScope(SGF.Cleanups, CleanupLocation(Loc));
-            SGF.B.createOwnedPhiArgument(operandValue.getType());
+            SGF.B.createForwardedTermResult(operandValue.getType());
           }
           handleFalse(None);
           assert(!SGF.B.hasValidInsertionPoint() &&
                  "handler did not end block");
           return;
         }
-
+        ManagedValue result =
+            SGF.B.createForwardedTermResult(operandValue.getType());
         switch (consumption) {
         case CastConsumptionKind::BorrowAlways:
         case CastConsumptionKind::CopyOnSuccess:
-          SGF.B.createGuaranteedTransformingTerminatorArgument(
-              operandValue.getType());
           handleFalse(None);
           break;
         case CastConsumptionKind::TakeAlways:
         case CastConsumptionKind::TakeOnSuccess:
-          handleFalse(SGF.B.createOwnedPhiArgument(operandValue.getType()));
+          handleFalse(result);
           break;
         }
 

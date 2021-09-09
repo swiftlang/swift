@@ -12,6 +12,8 @@
 // FIXME: ExistentialCollection needs to be supported before this will work
 // without the ObjC Runtime.
 
+#if SWIFT_ENABLE_REFLECTION
+
 /// A representation of the substructure and display style of an instance of
 /// any type.
 ///
@@ -456,6 +458,70 @@ extension Mirror {
   }
 }
 
+#else  // SWIFT_ENABLE_REFLECTION
+
+@available(*, unavailable)
+public struct Mirror {
+  public enum AncestorRepresentation {
+    case generated
+    case customized(() -> Mirror)
+    case suppressed
+  }
+  public init(reflecting subject: Any) { Builtin.unreachable() }
+  public typealias Child = (label: String?, value: Any)
+  public typealias Children = AnyCollection<Child>
+  public enum DisplayStyle: Sendable {
+    case `struct`, `class`, `enum`, tuple, optional, collection
+    case dictionary, `set`
+  }
+  public init<Subject, C: Collection>(
+    _ subject: Subject,
+    children: C,
+    displayStyle: DisplayStyle? = nil,
+    ancestorRepresentation: AncestorRepresentation = .generated
+  ) where C.Element == Child { Builtin.unreachable() }
+  public init<Subject, C: Collection>(
+    _ subject: Subject,
+    unlabeledChildren: C,
+    displayStyle: DisplayStyle? = nil,
+    ancestorRepresentation: AncestorRepresentation = .generated
+  ) { Builtin.unreachable() }
+  public init<Subject>(
+    _ subject: Subject,
+    children: KeyValuePairs<String, Any>,
+    displayStyle: DisplayStyle? = nil,
+    ancestorRepresentation: AncestorRepresentation = .generated
+  ) { Builtin.unreachable() }
+  public let subjectType: Any.Type
+  public let children: Children
+  public let displayStyle: DisplayStyle?
+  public var superclassMirror: Mirror? { Builtin.unreachable() }
+}
+
+@available(*, unavailable)
+public protocol CustomReflectable {
+  var customMirror: Mirror { get }
+}
+
+@available(*, unavailable)
+public protocol CustomLeafReflectable: CustomReflectable {}
+
+@available(*, unavailable)
+public protocol MirrorPath {}
+@available(*, unavailable)
+extension Int: MirrorPath {}
+@available(*, unavailable)
+extension String: MirrorPath {}
+
+@available(*, unavailable)
+extension Mirror {
+  public func descendant(_ first: MirrorPath, _ rest: MirrorPath...) -> Any? {
+    Builtin.unreachable()
+  }
+}
+
+#endif  // SWIFT_ENABLE_REFLECTION
+
 //===--- General Utilities ------------------------------------------------===//
 
 extension String {
@@ -693,6 +759,8 @@ extension String {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
+
 /// Reflection for `Mirror` itself.
 extension Mirror: CustomStringConvertible {
   public var description: String {
@@ -705,3 +773,5 @@ extension Mirror: CustomReflectable {
     return Mirror(self, children: [:])
   }
 }
+
+#endif  // SWIFT_ENABLE_REFLECTION

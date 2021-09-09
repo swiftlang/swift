@@ -1003,8 +1003,7 @@ bb1(%2 : @owned $Builtin.NativeObject):
   destroy_value %2 : $Builtin.NativeObject
   br bb3
 
-bb2(%3 : @owned $FakeOptional<Builtin.NativeObject>):
-  destroy_value %3 : $FakeOptional<Builtin.NativeObject>
+bb2:
   br bb3
 
 bb3:
@@ -1356,8 +1355,7 @@ bb0(%0 : $*FakeOptionalNativeObjectPairPair):
   %1 = load [copy] %0a : $*FakeOptional<NativeObjectPair>
   switch_enum %1 : $FakeOptional<NativeObjectPair>, case #FakeOptional.some!enumelt: bb1, default bb2
 
-bb2(%2 : @owned $FakeOptional<NativeObjectPair>):
-  destroy_value %2 : $FakeOptional<NativeObjectPair>
+bb2:
   br bbEnd
 
 bb1(%3 : @owned $NativeObjectPair):
@@ -1390,8 +1388,7 @@ bb0(%0 : $*FakeOptionalNativeObjectPairPair):
   %1 = load [copy] %0a : $*FakeOptional<NativeObjectPair>
   switch_enum %1 : $FakeOptional<NativeObjectPair>, case #FakeOptional.some!enumelt: bb1, default bb2
 
-bb2(%2 : @owned $FakeOptional<NativeObjectPair>):
-  destroy_value %2 : $FakeOptional<NativeObjectPair>
+bb2:
   br bbEnd
 
 bb1(%3 : @owned $NativeObjectPair):

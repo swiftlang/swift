@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_ENABLE_REFLECTION
+
 import SwiftShims
 
 @_silgen_name("swift_isClassType")
@@ -365,3 +367,5 @@ public func _forEachFieldWithKeyPath<Root>(
 
   return true
 }
+
+#endif
