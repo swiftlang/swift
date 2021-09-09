@@ -132,6 +132,9 @@ enum class FixKind : uint8_t {
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
 
+  /// Allow a reference to an unknown operator.
+  AllowInvalidOperatorReference,
+
   /// Requested name is not associated with a give base type,
   /// fix this issue by pretending that member exists and matches
   /// given arguments/result types exactly.
@@ -1212,6 +1215,28 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::UseSubscriptOperator;
+  }
+};
+
+class AllowInvalidOperatorReference final : public ConstraintFix {
+  bool hasUnviableCandidates;
+
+  AllowInvalidOperatorReference(ConstraintSystem &cs, ConstraintLocator *locator,
+                                bool hasUnviableCandidates)
+      : ConstraintFix(cs, FixKind::AllowInvalidOperatorReference, locator),
+        hasUnviableCandidates(hasUnviableCandidates) {}
+
+public:
+  std::string getName() const override;
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowInvalidOperatorReference *create(ConstraintSystem &cs,
+                                               ConstraintLocator *locator,
+                                               bool hasUnviableCandidates);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowInvalidOperatorReference;
   }
 };
 

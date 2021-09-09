@@ -131,7 +131,8 @@ void InfixOperatorLookupResult::diagnoseAmbiguity(SourceLoc loc) const {
 
 void InfixOperatorLookupResult::diagnoseMissing(SourceLoc loc,
                                                 bool forBuiltin) const {
-  ModuleDC->getASTContext().Diags.diagnose(loc, diag::unknown_binop);
+  // Don't diagnose anything here. Missing operators will be diagnosed
+  // in the constraint system.
 }
 
 TinyPtrVector<InfixOperatorDecl *>

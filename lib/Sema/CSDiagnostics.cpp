@@ -34,6 +34,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -3498,6 +3499,318 @@ bool SubscriptMisuseFailure::diagnoseAsNote() {
     emitDiagnosticAt(overload->choice.getDecl(), diag::found_candidate);
     return true;
   }
+  return false;
+}
+
+bool InvalidOperatorReference::diagnoseAsError() {
+  if (diagnoseRangeOperatorMisspell())
+    return true;
+
+  if (diagnoseIncDecOperator())
+    return true;
+
+  if (diagnoseOperatorJuxtaposition())
+    return true;
+
+  if (diagnoseNonexistentPowerOperator())
+    return true;
+
+  auto *declRef = getAsExpr<UnresolvedDeclRefExpr>(getAnchor());
+
+  // If there were no candidates at all, it means lookup was unable to find
+  // this operator at all.
+  if (!hasUnviableCandidates) {
+    emitDiagnostic(diag::cannot_find_in_scope, declRef->getName(), /*isOperator=*/true);
+
+    // FIXME: This code is duplicated from resolveDeclRefExpr, but it can't be removed
+    // there because it maybe be diagnosed for regular identifiers, such as 'ꝸꝸꝸ'
+    Identifier simpleName = declRef->getName().getBaseIdentifier();
+    const char *buffer = simpleName.get();
+    llvm::SmallString<64> expectedIdentifier;
+    bool isConfused = false;
+    uint32_t codepoint;
+    uint32_t firstConfusableCodepoint = 0;
+    int totalCodepoints = 0;
+    int offset = 0;
+    while ((codepoint = validateUTF8CharacterAndAdvance(buffer,
+                                                        buffer +
+                                                        strlen(buffer)))
+           != ~0U) {
+      int length = (buffer - simpleName.get()) - offset;
+      if (auto expectedCodepoint =
+          confusable::tryConvertConfusableCharacterToASCII(codepoint)) {
+        if (firstConfusableCodepoint == 0) {
+          firstConfusableCodepoint = codepoint;
+        }
+        isConfused = true;
+        expectedIdentifier += expectedCodepoint;
+      } else {
+        expectedIdentifier += (char)codepoint;
+      }
+
+      totalCodepoints++;
+
+      offset += length;
+    }
+
+    if (isConfused) {
+      if (totalCodepoints == 1) {
+        auto charNames = confusable::getConfusableAndBaseCodepointNames(
+            firstConfusableCodepoint);
+        emitDiagnostic(diag::single_confusable_character,
+                       declRef->getName().isOperator(), simpleName.str(),
+                       charNames.first, expectedIdentifier, charNames.second)
+          .fixItReplace(getLoc(), expectedIdentifier);
+      } else {
+        emitDiagnostic(diag::confusable_character,
+                       declRef->getName().isOperator(), simpleName.str(),
+                       expectedIdentifier)
+            .fixItReplace(getLoc(), expectedIdentifier);
+      }
+
+    }
+
+    return true;
+  }
+
+  unsigned refKind;
+  switch (declRef->getRefKind()) {
+  case DeclRefKind::Ordinary:
+  case DeclRefKind::BinaryOperator:
+    refKind = 0; break;
+  case DeclRefKind::PrefixOperator:
+    refKind = 1; break;
+  case DeclRefKind::PostfixOperator:
+    refKind = 2; break;
+  }
+
+  emitDiagnostic(diag::use_nonmatching_operator, declRef->getName(), refKind);
+  return true;
+}
+
+bool InvalidOperatorReference::diagnoseRangeOperatorMisspell() const {
+  auto *UDRE = getAsExpr<UnresolvedDeclRefExpr>(getAnchor());
+  auto name = UDRE->getName().getBaseIdentifier();
+  if (!name.isOperator())
+    return false;
+
+  auto corrected = StringRef();
+  if (name.str() == ".." || name.str() == "...." ||
+      name.str() == ".…" || name.str() == "…" || name.str() == "….")
+    corrected = "...";
+  else if (name.str() == "...<" || name.str() == "....<" ||
+           name.str() == "…<")
+    corrected = "..<";
+
+  if (corrected.empty())
+    return false;
+
+  emitDiagnostic(diag::cannot_find_in_scope_corrected, UDRE->getName(),
+                 /*operator=*/true, corrected)
+      .highlight(UDRE->getSourceRange())
+      .fixItReplace(UDRE->getSourceRange(), corrected);
+ return true;
+}
+
+bool InvalidOperatorReference::diagnoseIncDecOperator() const {
+  auto *UDRE = getAsExpr<UnresolvedDeclRefExpr>(getAnchor());
+  auto name = UDRE->getName().getBaseIdentifier();
+  if (!name.isOperator())
+    return false;
+
+  auto corrected = StringRef();
+  if (name.str() == "++")
+    corrected = "+= 1";
+  else if (name.str() == "--")
+    corrected = "-= 1";
+
+  if (corrected.empty())
+    return false;
+
+  emitDiagnostic(diag::cannot_find_in_scope_corrected,
+                 UDRE->getName(), /*operator=*/true, corrected)
+      .highlight(UDRE->getSourceRange());
+
+  return true;
+}
+
+static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
+  switch (refKind) {
+  case DeclRefKind::Ordinary:
+  case DeclRefKind::BinaryOperator:
+    return true;
+
+  case DeclRefKind::PrefixOperator:
+    return value->getAttrs().hasAttribute<PrefixAttr>();
+
+  case DeclRefKind::PostfixOperator:
+    return value->getAttrs().hasAttribute<PostfixAttr>();
+  }
+}
+
+static bool containsDeclRefKind(LookupResult &lookupResult,
+                                DeclRefKind refKind) {
+  for (auto candidate : lookupResult) {
+    ValueDecl *D = candidate.getValueDecl();
+    if (!D)
+      continue;
+
+    if (matchesDeclRefKind(D, refKind))
+      return true;
+  }
+
+  return false;
+}
+
+void InvalidOperatorReference::diagnoseBinOpSplit(std::pair<unsigned, bool> splitCandidate,
+                                                  Diag<Identifier, Identifier, bool> diagID) const {
+  auto *UDRE = getAsExpr<UnresolvedDeclRefExpr>(getAnchor());
+  auto &Context = getASTContext();
+  unsigned splitLoc = splitCandidate.first;
+  bool isBinOpFirst = splitCandidate.second;
+  StringRef nameStr = UDRE->getName().getBaseIdentifier().str();
+  auto startStr = nameStr.substr(0, splitLoc);
+  auto endStr = nameStr.drop_front(splitLoc);
+
+  // One valid split found, it is almost certainly the right answer.
+  auto diag = emitDiagnostic(diagID, Context.getIdentifier(startStr),
+                             Context.getIdentifier(endStr), isBinOpFirst);
+  // Highlight the whole operator.
+  diag.highlight(UDRE->getLoc());
+  // Insert whitespace on the left if the binop is at the start, or to the
+  // right if it is end.
+  if (isBinOpFirst)
+    diag.fixItInsert(UDRE->getLoc(), " ");
+  else
+    diag.fixItInsertAfter(UDRE->getLoc(), " ");
+
+  // Insert a space between the operators.
+  diag.fixItInsert(UDRE->getLoc().getAdvancedLoc(splitLoc), " ");
+}
+
+bool InvalidOperatorReference::diagnoseOperatorJuxtaposition() const {
+  auto *UDRE = getAsExpr<UnresolvedDeclRefExpr>(getAnchor());
+  Identifier name = UDRE->getName().getBaseIdentifier();
+  StringRef nameStr = name.str();
+  if (!name.isOperator() || nameStr.size() < 2)
+    return false;
+
+  bool isBinOp = UDRE->getRefKind() == DeclRefKind::BinaryOperator;
+
+  // If this is a binary operator, relex the token, to decide whether it has
+  // whitespace around it or not.  If it does "x +++ y", then it isn't likely to
+  // be a case where a space was forgotten.
+  auto &Context = getDC()->getASTContext();
+  if (isBinOp) {
+    auto tok = Lexer::getTokenAtLocation(Context.SourceMgr, UDRE->getLoc());
+    if (tok.getKind() != tok::oper_binary_unspaced)
+      return false;
+  }
+
+  // Okay, we have a failed lookup of a multicharacter operator. Check to see if
+  // lookup succeeds if part is split off, and record the matches found.
+  //
+  // In the case of a binary operator, the bool indicated is false if the
+  // first half of the split is the unary operator (x!*4) or true if it is the
+  // binary operator (x*+4).
+  std::vector<std::pair<unsigned, bool>> WorkableSplits;
+
+  // Check all the potential splits.
+  for (unsigned splitLoc = 1, e = nameStr.size(); splitLoc != e; ++splitLoc) {
+    // For it to be a valid split, the start and end section must be valid
+    // operators, splitting a unicode code point isn't kosher.
+    auto startStr = nameStr.substr(0, splitLoc);
+    auto endStr = nameStr.drop_front(splitLoc);
+    if (!Lexer::isOperator(startStr) || !Lexer::isOperator(endStr))
+      continue;
+
+    DeclNameRef startName(Context.getIdentifier(startStr));
+    DeclNameRef endName(Context.getIdentifier(endStr));
+
+    // Perform name lookup for the first and second pieces.  If either fail to
+    // be found, then it isn't a valid split.
+    auto startLookup = TypeChecker::lookupUnqualified(
+        getDC(), startName, UDRE->getLoc(), defaultUnqualifiedLookupOptions);
+    if (!startLookup)
+      continue;
+
+    auto endLookup = TypeChecker::lookupUnqualified(getDC(), endName, UDRE->getLoc(),
+                                                    defaultUnqualifiedLookupOptions);
+    if (!endLookup)
+      continue;
+
+    // If the overall operator is a binary one, then we're looking at
+    // juxtaposed binary and unary operators.
+    if (isBinOp) {
+      // Look to see if the candidates found could possibly match.
+      if (containsDeclRefKind(startLookup, DeclRefKind::PostfixOperator) &&
+          containsDeclRefKind(endLookup, DeclRefKind::BinaryOperator))
+        WorkableSplits.push_back({ splitLoc, false });
+
+      if (containsDeclRefKind(startLookup, DeclRefKind::BinaryOperator) &&
+          containsDeclRefKind(endLookup, DeclRefKind::PrefixOperator))
+        WorkableSplits.push_back({ splitLoc, true });
+    } else {
+      // Otherwise, it is two of the same kind, e.g. "!!x" or "!~x".
+      if (containsDeclRefKind(startLookup, UDRE->getRefKind()) &&
+          containsDeclRefKind(endLookup, UDRE->getRefKind()))
+        WorkableSplits.push_back({ splitLoc, false });
+    }
+  }
+
+  switch (WorkableSplits.size()) {
+  case 0:
+    // No splits found, can't produce this diagnostic.
+    return false;
+  case 1:
+    // One candidate: produce an error with a fixit on it.
+    if (isBinOp) {
+      diagnoseBinOpSplit(WorkableSplits[0],
+                         diag::unspaced_binary_operator_fixit);
+    } else {
+      emitDiagnosticAt(
+          UDRE->getLoc().getAdvancedLoc(WorkableSplits[0].first),
+          diag::unspaced_unary_operator);
+    }
+    return true;
+
+  default:
+    // Otherwise, we have to produce a series of notes listing the various
+    // options.
+    emitDiagnostic(isBinOp ? diag::unspaced_binary_operator
+                   : diag::unspaced_unary_operator)
+        .highlight(UDRE->getLoc());
+
+    if (isBinOp) {
+      for (auto candidateSplit : WorkableSplits) {
+        diagnoseBinOpSplit(candidateSplit,
+                           diag::unspaced_binary_operators_candidate);
+      }
+    }
+    return true;
+  }
+}
+
+bool InvalidOperatorReference::diagnoseNonexistentPowerOperator() const {
+  auto *UDRE = getAsExpr<UnresolvedDeclRefExpr>(getAnchor());
+  auto name = UDRE->getName().getBaseIdentifier();
+  if (!(name.isOperator() && name.is("**")))
+    return false;
+
+  auto *DC = getDC()->getModuleScopeContext();
+
+  auto &ctx = DC->getASTContext();
+  DeclNameRef powerName(ctx.getIdentifier("pow"));
+
+  // Look if 'pow(_:_:)' exists within current context.
+  auto lookUp = TypeChecker::lookupUnqualified(
+      DC, powerName, UDRE->getLoc(), defaultUnqualifiedLookupOptions);
+  if (lookUp) {
+    emitDiagnostic(diag::nonexistent_power_operator)
+        .highlight(UDRE->getSourceRange());
+    return true;
+  }
+
   return false;
 }
 

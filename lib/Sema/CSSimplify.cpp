@@ -9945,6 +9945,7 @@ ConstraintSystem::simplifyGlobalOperatorConstraint(
                                                declRef->getLoc());
 
   llvm::SmallVector<OverloadChoice, 4> candidates;
+  bool hasUnviableCandidates = false;
   for (auto entry : lookup) {
     auto *decl = entry.getValueDecl();
     switch (declRef->getRefKind()) {
@@ -9956,12 +9957,14 @@ ConstraintSystem::simplifyGlobalOperatorConstraint(
       if (decl->getAttrs().hasAttribute<PrefixAttr>())
         break;
 
+      hasUnviableCandidates = true;
       continue;
 
     case DeclRefKind::PostfixOperator:
       if (decl->getAttrs().hasAttribute<PostfixAttr>())
         break;
 
+      hasUnviableCandidates = true;
       continue;
     }
 
@@ -9997,8 +10000,14 @@ ConstraintSystem::simplifyGlobalOperatorConstraint(
     return SolutionKind::Solved;
   }
 
-  // TODO: apply fixes for failed operator lookup.
-  return SolutionKind::Error;
+  if (!shouldAttemptFixes())
+    return SolutionKind::Error;
+
+  recordPotentialHole(typeVar);
+
+  auto *fix = AllowInvalidOperatorReference::create(
+      *this, getConstraintLocator(locator), hasUnviableCandidates);
+  return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
 }
 
 bool ConstraintSystem::simplifyAppliedOverloadsImpl(
@@ -11678,7 +11687,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveExtraneousArguments:
   case FixKind::SpecifyTypeForPlaceholder:
   case FixKind::AllowAutoClosurePointerConversion:
-  case FixKind::IgnoreKeyPathContextualMismatch: {
+  case FixKind::IgnoreKeyPathContextualMismatch:
+  case FixKind::AllowInvalidOperatorReference: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

@@ -9,7 +9,10 @@ func test3() {
 
   var s = SomeStruct(value: 42) // use the SomeStruct from multi-file.swift
 
-  var tilde: Bool = 1 ~~~ 2 // expected-error{{operator is not a known binary operator}}
+  // Reporting an error here isn't helpful - the source of the issue
+  // is the operator implementation above missing an operator declaration,
+  // which has already been diagnosed at this point.
+  var tilde: Bool = 1 ~~~ 2
 
   var di = DefaultInit()
 }

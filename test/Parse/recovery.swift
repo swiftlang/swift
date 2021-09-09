@@ -520,7 +520,7 @@ struct ErrorInFunctionSignatureResultArrayType5 {
 
 
 struct ErrorInFunctionSignatureResultArrayType11 { // expected-note{{in declaration of 'ErrorInFunctionSignatureResultArrayType11'}}
-  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{cannot find operator '++' in scope; did you mean '+= 1'?}} expected-error {{cannot find 'a' in scope}} expected-error {{expected declaration}}
+  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{cannot find 'a' in scope}} expected-error {{expected declaration}}
   }
 }
 
@@ -707,10 +707,9 @@ struct InitializerWithLabels {
 // rdar://20337695
 func f1() {
 
-  // expected-error @+6 {{cannot find 'C' in scope}}
-  // expected-note @+5 {{did you mean 'n'?}}
-  // expected-error @+4 {{unary operator cannot be separated from its operand}} {{11-12=}}
-  // expected-error @+3 {{'==' is not a prefix unary operator}}
+  // expected-error @+5 {{cannot find 'C' in scope}}
+  // expected-note @+4 {{did you mean 'n'?}}
+  // expected-error @+3 {{unary operator cannot be separated from its operand}} {{11-12=}}
   // expected-error @+2 {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
   // expected-error@+1 {{type annotation missing in pattern}}
   let n == C { get {}  // expected-error {{cannot find 'get' in scope}}

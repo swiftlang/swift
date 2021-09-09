@@ -690,6 +690,27 @@ UseSubscriptOperator *UseSubscriptOperator::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) UseSubscriptOperator(cs, locator);
 }
 
+std::string AllowInvalidOperatorReference::getName() const {
+  llvm::SmallVector<char, 16> scratch;
+  auto *declRef = getAsExpr<UnresolvedDeclRefExpr>(getAnchor());
+  auto operatorName = declRef->getName().getString(scratch);
+  return "allow invalid operator '" + operatorName.str() + "'";
+}
+
+bool AllowInvalidOperatorReference::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  InvalidOperatorReference failure(solution, getLocator(), hasUnviableCandidates);
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidOperatorReference *
+AllowInvalidOperatorReference::create(ConstraintSystem &cs,
+                                      ConstraintLocator *locator,
+                                      bool hasUnviableCandidates) {
+  return new (cs.getAllocator())
+      AllowInvalidOperatorReference(cs, locator, hasUnviableCandidates);
+}
+
 bool DefineMemberBasedOnUse::diagnose(const Solution &solution,
                                       bool asNote) const {
   MissingMemberFailure failure(solution, BaseType, Name, getLocator());

@@ -1140,6 +1140,34 @@ public:
   bool diagnoseAsNote() override;
 };
 
+class InvalidOperatorReference : public FailureDiagnostic {
+  bool hasUnviableCandidates;
+
+public:
+  InvalidOperatorReference(const Solution &solution, ConstraintLocator *locator,
+                           bool hasUnviableCandidates)
+      : FailureDiagnostic(solution, locator), hasUnviableCandidates(hasUnviableCandidates) {}
+
+  bool diagnoseAsError() override;
+
+  bool diagnoseRangeOperatorMisspell() const;
+
+  bool diagnoseIncDecOperator() const;
+
+  /// If we failed lookup of a binary operator, check to see it to see if
+  /// it is a binary operator juxtaposed with a unary operator (x*-4) that
+  /// needs whitespace.  If so, emit specific diagnostics for it and return true,
+  /// otherwise return false.
+  bool diagnoseOperatorJuxtaposition() const;
+
+  bool diagnoseNonexistentPowerOperator() const;
+
+  /// Emit a diagnostic with a fixit hint for an invalid binary operator, showing
+  /// how to split it according to splitCandidate.
+  void diagnoseBinOpSplit(std::pair<unsigned, bool> splitCandidate,
+                          Diag<Identifier, Identifier, bool> diagID) const;
+};
+
 class InvalidMemberRefFailure : public FailureDiagnostic {
   Type BaseType;
   DeclNameRef Name;
