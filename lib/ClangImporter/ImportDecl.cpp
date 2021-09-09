@@ -4167,8 +4167,9 @@ namespace {
         if (!bodyParams)
           return nullptr;
 
-        importedType =
-            Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
+        if (decl->getReturnType()->isScalarType())
+          importedType =
+              Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
       } else {
         // Import the function type. If we have parameters, make sure their
         // names get into the resulting function type.
@@ -4204,7 +4205,7 @@ namespace {
         name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
       }
 
-      if (!importedType)
+      if (!bodyParams)
         return nullptr;
 
       auto loc = Impl.importSourceLoc(decl->getLocation());
