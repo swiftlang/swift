@@ -1745,13 +1745,13 @@ struct SILDebugVariable {
         DiagnoseUsage(true), Scope(nullptr) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo,
                    bool IsImplicit = false,
-                   bool shouldDiagnoseUsage = true,
+                   bool ShouldDiagnoseUsage = true,
                    Optional<SILType> AuxType = {},
                    Optional<SILLocation> DeclLoc = {},
                    const SILDebugScope *DeclScope = nullptr,
                    llvm::ArrayRef<SILDIExprElement> ExprElements = {})
       : Name(Name), ArgNo(ArgNo), Constant(Constant), Implicit(IsImplicit),
-        DiagnoseUsage(shouldDiagnoseUsage), Type(AuxType), Loc(DeclLoc),
+        DiagnoseUsage(ShouldDiagnoseUsage), Type(AuxType), Loc(DeclLoc),
         Scope(DeclScope), DIExpr(ExprElements) {}
 
   /// Created from either AllocStack or AllocBox instruction

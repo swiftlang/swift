@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -63,41 +63,24 @@ static bool isSetterParam(SILInstruction *I) {
 /// Returns if the SILInstruction if it is part of a VarDecl we want to
 /// track for diagnostics.
 static bool shouldTrackVarDecl(SILInstruction *I) {
-  if (auto *VD = getVarDecl(I)) {
-    
-    if (!VD->shouldDiagnoseUsage()) {
-      return false;
-    }
-    
-    if (VD->isCaptureList()) {
-      return true;
-    }
-    
-    if (isSetterParam(I)) {
-      return true;
-    }
-    
-    // If the variable is implicit, ignore it.
-    if (VD->isImplicit() || VD->getLoc().isInvalid())
-      return false;
-    
-    // If the variable is computed, ignore it.
-    if (!VD->hasStorage())
-      return false;
-    
-    // If the variable was invalid, ignore it and notice that the code is
-    // malformed.
-    if (VD->isInvalid()) {
-      return false;
-    }
-    
-    // If the variable is already unnamed, ignore it.
-    if (!VD->hasName() || VD->getName().str() == "_")
-      return false;
-    
-    return (VD->getDeclContext()->isLocalContext() && !isa<ParamDecl>(VD));
+  
+  auto *VD = getVarDecl(I);
+  
+  if (!VD || !VD->shouldDiagnoseUsage())
+    return false;
+  
+  if (VD->isCaptureList() || isSetterParam(I))
+    return true;
+  
+  if (!VD->hasStorage() ||
+      !VD->hasName() ||
+      VD->isImplicit() ||
+      VD->isInvalid() ||
+      VD->getLoc().isInvalid()) {
+    return false;
   }
-  return false;
+  
+  return VD->getDeclContext()->isLocalContext() && !isa<ParamDecl>(VD);
 }
 
 /// Returns whether the instruction belongs to a self parameter
@@ -128,43 +111,28 @@ static SILValue getDebugVarValue(SILInstruction *I) {
 static bool shouldTrackDebugVar(SILInstruction *I) {
   if (auto *DVI = dyn_cast<DebugValueInst>(I)) {
     
-    // Var declaration may be exempt from usage diagnostics
-    if (!DVI->getVarInfo()->DiagnoseUsage) {
-      return false;
-    }
-    
     // Var declaration is setter parameter 'newValue'
     if (isSetterParam(I)) {
       return true;
     }
     
-    // Var declaration is a parameter that we do not track
     if (DVI->getVarInfo().hasValue()) {
-      if (DVI->getVarInfo().getValue().ArgNo) {
-        
-        // This debug var represents an argument, not the initial declaration
+      
+      auto VarInfo = DVI->getVarInfo();
+      
+      // Var declaration may be exempt from usage diagnostics
+      if (!VarInfo->DiagnoseUsage) {
+        return false;
+      }
+      
+      if (VarInfo->ArgNo) {
+        // Var declaration is a parameter that we do not track
         return false;
       }
     }
     
     // Otherwise, this is just a local var declaration
     return shouldTrackVarDecl(DVI);
-  }
-  return false;
-}
-
-/// Checks that the \c First instruction comes before \c Second
-static bool instructionPrecedes(SILInstruction *First,
-                                SILInstruction *Second,
-                                SILBasicBlock *BB) {
-  auto i = BB->begin(), e = BB->end();
-  while (i != e) {
-    if (&*i == Second) {
-      return false;
-    } else if (&*i == First) {
-      return true;
-    }
-    ++i;
   }
   return false;
 }
@@ -192,17 +160,6 @@ static SILInstruction *getEntryInst(SILInstruction *I) {
   }
   
   return shouldTrackVarDecl(I) ? I : nullptr;
-}
-
-/// Returns true if an argument is inout
-static bool argIsInout(SILArgumentConvention ArgConv) {
-  switch (ArgConv) {
-    case SILArgumentConvention::Indirect_Inout:
-    case SILArgumentConvention::Indirect_InoutAliasable:
-      return true;
-    default:
-      return false;
-  }
 }
 
 /// Finds the corresponding SILArgument for a parameter in an apply
@@ -297,7 +254,7 @@ private:
     
     if (AS && Fn && Fn->isExternalDeclaration()) {
       if ((Op->getUser() == Apply) && AS.isArgumentOperand(*Op)) {
-        return argIsInout(AS.getArgumentConvention(*Op));
+        return AS.getArgumentConvention(*Op).isInoutConvention();
       }
     }
     return false;
@@ -661,7 +618,7 @@ private:
       }
       if ((Op->getUser() == Apply) && AS.isArgumentOperand(*Op)) {
         
-        if (!argIsInout(AS.getArgumentConvention(*Op))) {
+        if (!AS.getArgumentConvention(*Op).isInoutConvention()) {
           // If the parameter is not an inout, trust that the function reads
           // the argument.
           return true;
@@ -1150,6 +1107,7 @@ class VarUsageInfo {
 public:
 
   SILInstruction *EntryInst;
+  llvm::SetVector<SILInstruction *> *SeenInstructions;
   
   SILInstruction *MisusedGetter = nullptr;
   bool DidRead = false;
@@ -1158,7 +1116,9 @@ public:
   bool IsWeakCapture = false;
   VarDecl *InitialReference = nullptr;
   
-  VarUsageInfo(SILInstruction *EntryInst) : EntryInst(EntryInst) {
+  VarUsageInfo(SILInstruction *EntryInst,
+               llvm::SetVector<SILInstruction *> *SeenInstructions)
+  : EntryInst(EntryInst), SeenInstructions(SeenInstructions) {
     collectUsageInfo();
   }
   
@@ -1209,7 +1169,7 @@ private:
       if (!DVI) {
         continue;
       }
-      if (instructionPrecedes(UserDVI, DVI, EntryInst->getParent())) {
+      if (SeenInstructions->count(UserDVI)) {
         InitialRefInst = UserDVI;
       }
     }
@@ -1276,6 +1236,82 @@ public:
     });
   }
   
+  bool diagnoseConditionalParentPattern(VarDecl *var) {
+    
+    auto ps = var->getParentPatternStmt();
+    if (!ps)
+      return false;
+    
+    auto SC = dyn_cast<LabeledConditionalStmt>(ps);
+    if (!SC || SC->getCond().size() != 1)
+      return false;
+    
+    
+    // We only handle the "if let" case right now, since it is vastly the
+    // most common situation that people run into.
+    auto pattern = SC->getCond()[0].getPattern();
+    auto OSP = dyn_cast<OptionalSomePattern>(pattern);
+    if (!OSP)
+      return false;
+    
+    auto LP = dyn_cast<BindingPattern>(OSP->getSubPattern());
+    if (!LP || !isa<NamedPattern>(LP->getSubPattern()))
+      return false;
+    
+    auto initExpr = SC->getCond()[0].getInitializer();
+    if (!initExpr->getStartLoc().isValid())
+      return false;
+    
+    
+    unsigned noParens = initExpr->canAppendPostfixExpression();
+    
+    // If the subexpr is an "as?" cast, we can rewrite it to
+    // be an "is" test.
+    ConditionalCheckedCastExpr *CCE = nullptr;
+    
+    // initExpr can be wrapped inside parens or try expressions.
+    if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>
+        (initExpr->getValueProvidingExpr())) {
+      if (!ccExpr->isImplicit()) {
+        CCE = ccExpr;
+        noParens = true;
+      }
+    }
+    
+    // In cases where the value is optional, the cast expr is
+    // wrapped inside OptionalEvaluationExpr. Unwrap it to get
+    // ConditionalCheckedCastExpr.
+    if (auto oeExpr = dyn_cast<OptionalEvaluationExpr>
+        (initExpr->getValueProvidingExpr())) {
+      if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>
+          (oeExpr->getSubExpr()->getValueProvidingExpr())) {
+        if (!ccExpr->isImplicit()) {
+          CCE = ccExpr;
+          noParens = true;
+        }
+      }
+    }
+    
+    auto diagIF = diags.diagnose(var->getLoc(),
+                                 diag::pbd_never_used_stmtcond,
+                                 var->getName());
+    
+    auto introducerLoc = SC->getCond()[0].getIntroducerLoc();
+    diagIF.fixItReplaceChars(introducerLoc,
+                             initExpr->getStartLoc(),
+                             &"("[noParens]);
+    
+    if (CCE) {
+      // If this was an "x as? T" check, rewrite it to "x is T".
+      diagIF.fixItReplace(SourceRange(CCE->getLoc(), CCE->getQuestionLoc()),
+                          "is");
+    } else {
+      diagIF.fixItInsertAfter(initExpr->getEndLoc(), &") != nil"[noParens]);
+    }
+    
+    return true;
+  }
+  
   void diagnoseUnreadUnmodified(VarDecl *var, bool DidDeferInit) {
     
     // The let is assigned and initialized in seperate lines
@@ -1314,71 +1350,8 @@ public:
     // we prefer to rewrite it to:
     //
     //    if <expr> != nil {
-    if (auto ps = var->getParentPatternStmt()) {
-      if (auto SC = dyn_cast<LabeledConditionalStmt>(ps)) {
-        // We only handle the "if let" case right now, since it is vastly the
-        // most common situation that people run into.
-        if (SC->getCond().size() == 1) {
-          auto pattern = SC->getCond()[0].getPattern();
-          if (auto OSP = dyn_cast<OptionalSomePattern>(pattern)) {
-            if (auto LP = dyn_cast<BindingPattern>(OSP->getSubPattern())) {
-              if (isa<NamedPattern>(LP->getSubPattern())) {
-                auto initExpr = SC->getCond()[0].getInitializer();
-                if (initExpr->getStartLoc().isValid()) {
-                  unsigned noParens = initExpr->canAppendPostfixExpression();
-                  
-                  // If the subexpr is an "as?" cast, we can rewrite it to
-                  // be an "is" test.
-                  ConditionalCheckedCastExpr *CCE = nullptr;
-                  
-                  // initExpr can be wrapped inside parens or try expressions.
-                  if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>
-                      (initExpr->getValueProvidingExpr())) {
-                    if (!ccExpr->isImplicit()) {
-                      CCE = ccExpr;
-                      noParens = true;
-                    }
-                  }
-                  
-                  // In cases where the value is optional, the cast expr is
-                  // wrapped inside OptionalEvaluationExpr. Unwrap it to get
-                  // ConditionalCheckedCastExpr.
-                  if (auto oeExpr = dyn_cast<OptionalEvaluationExpr>
-                      (initExpr->getValueProvidingExpr())) {
-                    if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>
-                        (oeExpr->getSubExpr()->getValueProvidingExpr())) {
-                      if (!ccExpr->isImplicit()) {
-                        CCE = ccExpr;
-                        noParens = true;
-                      }
-                    }
-                  }
-                  
-                  auto diagIF = diags.diagnose(var->getLoc(),
-                                               diag::pbd_never_used_stmtcond,
-                                               var->getName());
-                  auto introducerLoc = SC->getCond()[0].getIntroducerLoc();
-                  diagIF.fixItReplaceChars(introducerLoc,
-                                           initExpr->getStartLoc(),
-                                           &"("[noParens]);
-                  
-                  if (CCE) {
-                    // If this was an "x as? T" check, rewrite it to "x is T".
-                    diagIF.fixItReplace(SourceRange(CCE->getLoc(),
-                                                    CCE->getQuestionLoc()),
-                                        "is");
-                  } else {
-                    diagIF.fixItInsertAfter(initExpr->getEndLoc(),
-                                            &") != nil"[noParens]);
-                  }
-                  return;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    if (diagnoseConditionalParentPattern(var))
+      return;
     
     // If the variable is defined in a pattern that isn't one of the usual
     // conditional statements, try to detect and rewrite "simple" binding
@@ -1508,11 +1481,14 @@ class DiagnoseVarUsage : public SILFunctionTransform {
                <<  Fn.getName() << "\n");
     
     llvm::SetVector<VarDecl *> SeenVarDecls;
+    llvm::SetVector<SILInstruction *> SeenInstructions;
     llvm::MapVector<VarDecl *, VarUsageInfo *> VarDeclUsageInfoPairs;
     
     for (auto &bb : Fn) {
       auto i = bb.begin(), e = bb.end();
       while (i != e) {
+        
+        SeenInstructions.insert(&*i);
         
         SILInstruction *Inst = getEntryInst(&*i);
         if (!Inst) {
@@ -1526,7 +1502,7 @@ class DiagnoseVarUsage : public SILFunctionTransform {
           auto CurrentInfo = VarDeclUsageInfoPairs.lookup(VD);
           CurrentInfo->addEntryInst(Inst);
         } else {
-          VarUsageInfo *UsageInfo = new VarUsageInfo(Inst);
+          VarUsageInfo *UsageInfo = new VarUsageInfo(Inst, &SeenInstructions);
           VarDeclUsageInfoPairs.insert(std::make_pair(VD, UsageInfo));
           SeenVarDecls.insert(VD);
         }

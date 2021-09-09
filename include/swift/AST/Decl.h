@@ -5057,7 +5057,6 @@ public:
   /// var will behave as if it was public, even if it is internal or private.
   bool isLayoutExposedToClients() const;
   
-  /// Is the declaration captured in an #if-config?
   bool shouldDiagnoseUsage() const {
     return Bits.VarDecl.DiagnoseUsage;
   }

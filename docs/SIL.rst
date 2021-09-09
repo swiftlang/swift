@@ -3788,6 +3788,26 @@ case.
 This instruction is only valid in Raw SIL and is rewritten as appropriate
 by the definitive initialization pass.
 
+mark_discarded
+``````````````````
+::
+
+  sil-instruction ::= 'mark_discarded' sil-operand (',' sil-operand)
+
+  %2 = mark_discarded %1 : $*T
+
+Indicates that a constant value has been discarded in source code through an
+underscore assignment. For let-binding variables, an discard assignment may not
+produce any semantic effects and is likewise invisible in SIL.
+
+The purpose of the ``mark_discarded`` instruction is to mark trivial uses of
+such variables for usage diagnostics.
+
+Currently, ``mark_discarded`` instructions will only be generated when the
+``-sil-usage-diagnostics`` frontend flag is used.
+
+It is produced by SILGen, and is only valid in Raw SIL.
+
 mark_uninitialized
 ``````````````````
 ::

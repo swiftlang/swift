@@ -703,7 +703,7 @@ namespace swift {
     /// Whether any error diagnostics have been emitted.
     bool anyErrorOccurred = false;
     
-    /// Emit all warnings as errors
+    /// Use the DiagnoseVarUsage SIL pass for variable usage diagnostics.
     bool silUsageDiagnostics = false;
 
     /// Track the previous emitted Behavior, useful for notes
