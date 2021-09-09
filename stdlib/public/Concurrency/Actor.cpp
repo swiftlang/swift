@@ -1623,7 +1623,7 @@ void DefaultActorImpl::enqueue(Job *job) {
     auto oldStatus = oldState.Flags.getStatus();
     bool wasIdle = oldStatus == Status::Idle;
 
-    // Update the priority: the prriority of the job we're adding
+    // Update the priority: the priority of the job we're adding
     // if the actor was idle, or the max if not.  Only the running
     // thread can decrease the actor's priority once it's non-idle.
     // (But note that the job we enqueue can still observe a
