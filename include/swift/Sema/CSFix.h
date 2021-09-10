@@ -343,6 +343,10 @@ enum class FixKind : uint8_t {
   /// Fix conversion from throwing to non-throwing by removing explicit
   /// `throws` attribute from the source function.
   DropThrowsAttribute,
+
+  /// Fix conversion from async to sync function by removing explicit
+  /// `async` attribute from the source function.
+  DropAsyncAttribute,
 };
 
 class ConstraintFix {
@@ -794,7 +798,8 @@ public:
 class DropAsyncAttribute final : public ContextualMismatch {
   DropAsyncAttribute(ConstraintSystem &cs, FunctionType *fromType,
                      FunctionType *toType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, fromType, toType, locator) {
+      : ContextualMismatch(cs, FixKind::DropAsyncAttribute, fromType, toType,
+                           locator) {
     assert(fromType->isAsync() != toType->isAsync());
   }
 
@@ -807,6 +812,10 @@ public:
                                     FunctionType *fromType,
                                     FunctionType *toType,
                                     ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::DropAsyncAttribute;
+  }
 };
 
 /// Append 'as! T' to force a downcast to the specified type.

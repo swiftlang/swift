@@ -11766,6 +11766,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddQualifierToAccessTopLevelName:
   case FixKind::AddSendableAttribute:
   case FixKind::DropThrowsAttribute:
+  case FixKind::DropAsyncAttribute:
     llvm_unreachable("handled elsewhere");
   }
 
