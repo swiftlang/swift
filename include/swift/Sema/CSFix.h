@@ -339,6 +339,10 @@ enum class FixKind : uint8_t {
   /// Fix conversion from non-Sendable to Sendable by adding explicit
   /// @Sendable attribute to the source function.
   AddSendableAttribute,
+
+  /// Fix conversion from throwing to non-throwing by removing explicit
+  /// `throws` attribute from the source function.
+  DropThrowsAttribute,
 };
 
 class ConstraintFix {
@@ -765,7 +769,8 @@ public:
 class DropThrowsAttribute final : public ContextualMismatch {
   DropThrowsAttribute(ConstraintSystem &cs, FunctionType *fromType,
                       FunctionType *toType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, fromType, toType, locator) {
+      : ContextualMismatch(cs, FixKind::DropThrowsAttribute, fromType, toType,
+                           locator) {
     assert(fromType->isThrowing() != toType->isThrowing());
   }
 
@@ -778,6 +783,10 @@ public:
                                      FunctionType *fromType,
                                      FunctionType *toType,
                                      ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::DropThrowsAttribute;
+  }
 };
 
 /// This is a contextual mismatch between async and non-async
