@@ -54,7 +54,7 @@ extension _AbstractStringStorage {
 
     let range = Range(
       _uncheckedBounds: (aRange.location, aRange.location+aRange.length))
-    let str = String(_nativeStorage: self)
+    let str = String(_nativeStorage: self)!
     str._copyUTF16CodeUnits(
       into: UnsafeMutableBufferPointer(start: buffer, count: range.count),
       range: range)
@@ -161,7 +161,7 @@ extension __StringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) @inline(__always) get {
-      return String(_nativeStorage: self).utf16.count // UTF16View special-cases ASCII for us.
+      return String(_nativeStorage: self)!.utf16.count // UTF16View special-cases ASCII for us.
     }
   }
 
@@ -178,7 +178,7 @@ extension __StringStorage {
   @objc(characterAtIndex:)
   @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
-    let str = String(_nativeStorage: self)
+    let str = String(_nativeStorage: self)!
     return str.utf16[str._toUTF16Index(offset)]
   }
 
@@ -257,7 +257,7 @@ extension __SharedStringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) get {
-      return String(_nativeStorage: self).utf16.count // UTF16View special-cases ASCII for us.
+      return String(_nativeStorage: self)!.utf16.count // UTF16View special-cases ASCII for us.
     }
   }
 
@@ -274,7 +274,7 @@ extension __SharedStringStorage {
   @objc(characterAtIndex:)
   @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
-    let str = String(_nativeStorage: self)
+    let str = String(_nativeStorage: self)!
     return str.utf16[str._toUTF16Index(offset)]
   }
 
