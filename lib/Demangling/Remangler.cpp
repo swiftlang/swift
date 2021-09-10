@@ -397,7 +397,8 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
   if (node->getChild(1)->getKind() != Node::Kind::Identifier)
     return false;
 
-  if (auto Subst = getStandardTypeSubst(node->getChild(1)->getText())) {
+  if (auto Subst = getStandardTypeSubst(
+          node->getChild(1)->getText(), /*allowConcurrencyManglings=*/true)) {
     if (!SubstMerging.tryMergeSubst(*this, *Subst, /*isStandardSubst*/ true)) {
       Buffer << 'S' << *Subst;
     }
