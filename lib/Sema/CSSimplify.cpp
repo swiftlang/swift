@@ -4909,7 +4909,7 @@ bool ConstraintSystem::repairFailures(
       if (contextualType->isEqual(rhs)) {
         auto *loc = getConstraintLocator(
             anchor, LocatorPathElt::ContextualType(purpose));
-        if (hasFixFor(loc, FixKind::ContextualMismatch))
+        if (hasFixFor(loc, FixKind::IgnoreContextualType))
           return true;
 
         if (contextualType->isVoid() && purpose == CTP_ReturnStmt) {
@@ -4918,7 +4918,7 @@ bool ConstraintSystem::repairFailures(
         }
 
         conversionsOrFixes.push_back(
-            ContextualMismatch::create(*this, lhs, rhs, loc));
+            IgnoreContextualType::create(*this, lhs, rhs, loc));
         break;
       }
     }
