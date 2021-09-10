@@ -636,11 +636,12 @@ public:
 class ContextualMismatch : public ConstraintFix {
   Type LHS, RHS;
 
-protected:
   ContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                      ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
         RHS(rhs) {}
+
+protected:
   ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
                      ConstraintLocator *locator, bool warning = false)
       : ConstraintFix(cs, kind, locator, warning), LHS(lhs), RHS(rhs) {}
@@ -657,6 +658,10 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::ContextualMismatch;
+  }
 };
 
 class TreatArrayLiteralAsDictionary final : public ContextualMismatch {
