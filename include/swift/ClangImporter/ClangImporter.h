@@ -458,6 +458,9 @@ public:
   DeclName importName(const clang::NamedDecl *D,
                       clang::DeclarationName givenName);
 
+  Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
+                                DeclContext *dc) override;
+
   Optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
                  StringRef SwiftPCHHash);

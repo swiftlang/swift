@@ -3990,8 +3990,14 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
   llvm::SmallSetVector<FixInContext, 4> fixes;
   for (auto &solution : solutions) {
-    for (auto *fix : solution.Fixes)
+    for (auto *fix : solution.Fixes) {
+      // Ignore warnings in favor of actual error fixes,
+      // because they are not the source of ambiguity/failures.
+      if (fix->isWarning())
+        continue;
+
       fixes.insert({&solution, fix});
+    }
   }
 
   llvm::MapVector<ConstraintLocator *, SmallVector<FixInContext, 4>>

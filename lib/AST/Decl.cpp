@@ -7827,7 +7827,7 @@ FuncDecl *FuncDecl::createImported(ASTContext &Context, SourceLoc FuncLoc,
                                    Type FnRetType,
                                    GenericParamList *GenericParams,
                                    DeclContext *Parent, ClangNode ClangN) {
-  assert(ClangN && FnRetType);
+  assert(ClangN);
   auto *const FD = FuncDecl::createImpl(
       Context, SourceLoc(), StaticSpellingKind::None, FuncLoc, Name, NameLoc,
       Async, SourceLoc(), Throws, SourceLoc(), GenericParams, Parent, ClangN);
