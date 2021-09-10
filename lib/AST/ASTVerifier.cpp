@@ -1136,6 +1136,7 @@ public:
     }
 
     void verifyChecked(TupleExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying TupleExpr", E);
       const TupleType *exprTy = E->getType()->castTo<TupleType>();
       for_each(exprTy->getElements().begin(), exprTy->getElements().end(),
                E->getElements().begin(),
@@ -1148,8 +1149,14 @@ public:
           Out << elt->getType() << "\n";
           abort();
         }
+        if (!field.getParameterFlags().isNone()) {
+          Out << "TupleExpr has non-empty parameter flags?\n";
+          Out << "sub expr: \n";
+          elt->dump(Out);
+          Out << "\n";
+          abort();
+        }
       });
-      // FIXME: Check all the variadic elements.
       verifyCheckedBase(E);
     }
 
@@ -1970,8 +1977,13 @@ public:
 
     void verifyChecked(ParenExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ParenExpr", E);
-      if (!isa<ParenType>(E->getType().getPointer())) {
+      auto ty = dyn_cast<ParenType>(E->getType().getPointer());
+      if (!ty) {
         Out << "ParenExpr not of ParenType\n";
+        abort();
+      }
+      if (!ty->getParameterFlags().isNone()) {
+        Out << "ParenExpr has non-empty parameter flags?\n";
         abort();
       }
       verifyCheckedBase(E);

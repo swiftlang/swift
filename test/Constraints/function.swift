@@ -250,3 +250,16 @@ func test_passing_noescape_function_ref_to_generic_parameter() {
 func SR14784<T>(_ fs: () -> T..., a _ : Int) -> T {
   fs.first! // expected-error{{function produces expected type 'T'; did you mean to call it with '()'?}} {{11-11=()}}
 }
+
+func tuplify<Ts>(_ fn: (Ts) -> Void) {}
+
+func testInvalidTupleImplosions() {
+  func takesVargs(_ x: Int, _ y: String...) {}
+  tuplify(takesVargs) // expected-error {{cannot convert value of type '(Int, String...) -> ()' to expected argument type '(Int) -> Void'}}
+
+  func takesAutoclosure(_ x: @autoclosure () -> Int, y: String) {}
+  tuplify(takesAutoclosure) // expected-error {{cannot convert value of type '(@autoclosure () -> Int, String) -> ()' to expected argument type '(@escaping () -> Int) -> Void'}}
+
+  func takesInout(_ x: Int, _ y: inout String) {}
+  tuplify(takesInout) // expected-error {{cannot convert value of type '(Int, inout String) -> ()' to expected argument type '(Int) -> Void'}}
+}
