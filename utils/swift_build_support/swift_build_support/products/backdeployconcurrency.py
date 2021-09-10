@@ -128,7 +128,8 @@ class BackDeployConcurrency(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS:STRING', '6.0')
 
-        self.build_with_cmake(["back-deployment"], build_variant, [])
+        self.build_with_cmake(["back-deployment"], build_variant, [],
+                              prefer_just_built_toolchain=True)
 
     def should_test(self, host_target):
         return False
