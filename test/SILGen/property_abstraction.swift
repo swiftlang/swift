@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-emit-silgen -module-name property_abstraction %s | %FileCheck %s
 
 struct Int {
@@ -140,11 +139,8 @@ func setBuilder<F: Factory>(_ factory: inout F) where F.Product == MyClass {
 }
 // CHECK: sil hidden [ossa] @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}}F : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
 // CHECK: bb0(%0 : $*F):
-// CHECK:   [[F0:%.*]] = function_ref @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}} : $@convention(thin) () -> @owned MyClass
-// CHECK:   [[F1:%.*]] = thin_to_thick_function [[F0]]
-// CHECK:   [[REABSTRACTOR:%.*]] = function_ref @$s{{.*}}TR :
-// CHECK:   [[F2:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACTOR]]([[F1]])
-// CHECK:   [[F3:%.*]] = convert_function [[F2]]
+// CHECK:   [[F0:%.*]] = function_ref @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}} :
+// CHECK:   [[F0_THICK:%.*]] = thin_to_thick_function [[F0]]
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*F
 // CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter
-// CHECK:   apply [[SETTER]]<F>([[F3]], [[WRITE]])
+// CHECK:   apply [[SETTER]]<F>([[F0_THICK]], [[WRITE]])

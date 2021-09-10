@@ -13,6 +13,7 @@
 #include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Condition.h"
+#include "Conversion.h"
 #include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -415,21 +416,25 @@ namespace {
 static InitializationPtr
 prepareIndirectResultInit(SILGenFunction &SGF,
                           CanSILFunctionType fnTypeForResults,
+                          AbstractionPattern origResultType,
                           CanType resultType,
                           ArrayRef<SILResultInfo> &allResults,
                           MutableArrayRef<SILValue> &directResults,
                           ArrayRef<SILArgument*> &indirectResultAddrs,
                           SmallVectorImpl<CleanupHandle> &cleanups) {
-  // Recursively decompose tuple types.
-  if (auto resultTupleType = dyn_cast<TupleType>(resultType)) {
+  // Recursively decompose tuple abstraction patterns.
+  if (origResultType.isTuple()) {
+    auto resultTupleType = cast<TupleType>(resultType);
     auto tupleInit = new TupleInitialization();
     tupleInit->SubInitializations.reserve(resultTupleType->getNumElements());
 
-    for (auto resultEltType : resultTupleType.getElementTypes()) {
+    for (unsigned i = 0, e = origResultType.getNumTupleElements(); i < e; ++i) {
       auto eltInit = prepareIndirectResultInit(SGF, fnTypeForResults,
-                                               resultEltType, allResults,
-                                               directResults,
-                                               indirectResultAddrs, cleanups);
+                                         origResultType.getTupleElementType(i),
+                                         resultTupleType.getElementType(i),
+                                         allResults,
+                                         directResults,
+                                         indirectResultAddrs, cleanups);
       tupleInit->SubInitializations.push_back(std::move(eltInit));
     }
 
@@ -441,6 +446,7 @@ prepareIndirectResultInit(SILGenFunction &SGF,
   allResults = allResults.slice(1);
 
   // If it's indirect, we should be emitting into an argument.
+  InitializationPtr init;
   if (SGF.silConv.isSILIndirect(result)) {
     // Pull off the next indirect result argument.
     SILValue addr = indirectResultAddrs.front();
@@ -454,15 +460,27 @@ prepareIndirectResultInit(SILGenFunction &SGF,
     auto cleanup = temporary->getInitializedCleanup();
     if (cleanup.isValid())
       cleanups.push_back(cleanup);
-
-    return InitializationPtr(temporary.release());
+    
+    init = InitializationPtr(temporary.release());
+  } else {
+    // Otherwise, make an Initialization that stores the value in the
+    // next element of the directResults array.
+    auto storeInit = new StoreResultInitialization(directResults[0], cleanups);
+    directResults = directResults.slice(1);
+    init = InitializationPtr(storeInit);
   }
-
-  // Otherwise, make an Initialization that stores the value in the
-  // next element of the directResults array.
-  auto init = new StoreResultInitialization(directResults[0], cleanups);
-  directResults = directResults.slice(1);
-  return InitializationPtr(init);
+  
+  // Put a conversion in front of the initialization if necessary.
+  auto loweredResultTy = SGF.getLoweredType(origResultType, resultType);
+  if (loweredResultTy != SGF.getLoweredType(resultType)) {
+    auto conversion = Conversion::getSubstToOrig(origResultType,
+                                                 resultType,
+                                                 loweredResultTy);
+    auto convertingInit = new ConvertingInitialization(conversion,
+                                                       std::move(init));
+    init.reset(convertingInit);
+  }
+  return init;
 }
 
 /// Prepare an Initialization that will initialize the result of the
@@ -473,7 +491,8 @@ prepareIndirectResultInit(SILGenFunction &SGF,
 /// \param cleanups - will be filled (after initialization completes)
 ///   with all the active cleanups managing the result values
 std::unique_ptr<Initialization>
-SILGenFunction::prepareIndirectResultInit(CanType formalResultType,
+SILGenFunction::prepareIndirectResultInit(AbstractionPattern origResultType,
+                                 CanType formalResultType,
                                  SmallVectorImpl<SILValue> &directResultsBuffer,
                                  SmallVectorImpl<CleanupHandle> &cleanups) {
   auto fnConv = F.getConventions();
@@ -487,6 +506,7 @@ SILGenFunction::prepareIndirectResultInit(CanType formalResultType,
 
   auto init = ::prepareIndirectResultInit(*this,
                                           fnConv.funcTy,
+                                          origResultType,
                                           formalResultType, allResults,
                                           directResults, indirectResultAddrs,
                                           cleanups);
@@ -502,6 +522,12 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                     Expr *ret) {
   SmallVector<SILValue, 4> directResults;
 
+  auto retTy = ret->getType()->getCanonicalType();
+  
+  AbstractionPattern origRetTy = OrigFnType
+    ? OrigFnType->getFunctionResultType()
+    : AbstractionPattern(retTy);
+
   if (F.getConventions().hasIndirectSILResults()) {
     // Indirect return of an address-only value.
     FullExpr scope(Cleanups, CleanupLocation(ret));
@@ -509,7 +535,8 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     // Build an initialization which recursively destructures the tuple.
     SmallVector<CleanupHandle, 4> resultCleanups;
     InitializationPtr resultInit =
-      prepareIndirectResultInit(ret->getType()->getCanonicalType(),
+      prepareIndirectResultInit(origRetTy,
+                                ret->getType()->getCanonicalType(),
                                 directResults, resultCleanups);
 
     // Emit the result expression into the initialization.
@@ -522,8 +549,22 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
   } else {
     // SILValue return.
     FullExpr scope(Cleanups, CleanupLocation(ret));
-    RValue RV = emitRValue(ret).ensurePlusOne(*this, CleanupLocation(ret));
-    std::move(RV).forwardAll(*this, directResults);
+    
+    // Does the return context require reabstraction?
+    RValue RV;
+    
+    auto loweredRetTy = getLoweredType(origRetTy, retTy);
+    if (loweredRetTy != getLoweredType(retTy)) {
+      auto conversion = Conversion::getSubstToOrig(origRetTy, retTy,
+                                                   loweredRetTy);
+      RV = RValue(*this, ret, emitConvertedRValue(ret, conversion));
+    } else {
+      RV = emitRValue(ret);
+    }
+    
+    std::move(RV)
+      .ensurePlusOne(*this, CleanupLocation(ret))
+      .forwardAll(*this, directResults);
   }
 
   Cleanups.emitBranchAndCleanups(ReturnDest, branchLoc, directResults);
