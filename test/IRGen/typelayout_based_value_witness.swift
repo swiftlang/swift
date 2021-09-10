@@ -28,6 +28,21 @@ public struct Fixed<T> {
   var c : C<T>
 }
 
+public enum NullableEnum<T> {
+  case Value(a: C<T>)
+  case None
+}
+
+public struct ForwardStruct<T> {
+  var a : UInt64
+  var b : UInt64
+  var c : C<T>
+}
+public enum ForwardEnum<T> {
+  case Value(a: ForwardStruct<T>)
+  case None
+}
+
 // NOTL-LABEL: define{{.*}} %swift.opaque* @"$s30typelayout_based_value_witness1AVwCP"(
 // NOTL:   @"$s30typelayout_based_value_witness1BVMa"(
 // NOTL: }
@@ -108,13 +123,35 @@ public struct Fixed<T> {
 // For fixed types, we should expect a direct gep to the address instead of a
 // manual alignment computation only if we force creating aligned groups for structs
 // FORCE-OPT:  [[T_PARAM:%.*]] = bitcast %swift.opaque* %object to i8*
-// FORCE-OPT:  [[OFFSET:%.*]] = getelementptr inbounds i8, i8* [[T_PARAM]], i64 8
+// FORCE-OPT:  [[OFFSET:%.*]] = getelementptr inbounds i8, i8* [[T_PARAM]], {{(i64|i32)}} {{4|8}}
 // FORCE-OPT:  [[CASTED:%.*]] = bitcast i8* [[OFFSET]] to %T30typelayout_based_value_witness1CC**
-// FORCE-OPT:  %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** [[CASTED]], align 8
-// FORCE-OPT:  [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, i64 0, i32 0
+// FORCE-OPT:  %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** [[CASTED]]
+// FORCE-OPT:  [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, {{(i64|i32)}} 0, i32 0
 // FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]]) #6
 // FORCE-OPT:  ret void
 // FORCE-OPT:}
+
+// FORCE-OPT: define{{.*}} void @"$s30typelayout_based_value_witness12NullableEnumOwxx"(%swift.opaque* noalias nocapture readonly %object, %swift.type* nocapture readnone %"NullableEnum<T>")
+// For enums with a pointer type and a single empty case, the empty case should
+// get encoded as the 0 value, so it should not generate a branch
+// FORCE-OPT: %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** %{{.*}}
+// FORCE-OPT: [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, {{(i64|i32)}} 0, i32 0
+// FORCE-OPT: tail call void @swift_release(%swift.refcounted* [[FIELD]])
+// FORCE-OPT: ret void
+// FORCE-OPT:}
+
+// FORCE-OPT: define{{.*}} void @"$s30typelayout_based_value_witness11ForwardEnumOwxx"(%swift.opaque* noalias nocapture readonly %object, %swift.type* nocapture readnone %"ForwardEnum<T>")
+// Since fixed is able to hold the one extra tag required in it's pointer field,
+// it's safe to release it without checking the case. We should not see a branch here
+// FORCE-OPT:  [[T_PARAM:%.*]] = bitcast %swift.opaque* %object to i8*
+// FORCE-OPT:  [[OFFSET:%.*]] = getelementptr inbounds i8, i8* [[T_PARAM]], {{(i64|i32)}} {{(8|16)}}
+// FORCE-OPT:  [[CASTED:%.*]] = bitcast i8* [[OFFSET]] to %T30typelayout_based_value_witness1CC**
+// FORCE-OPT:  %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** [[CASTED]]
+// FORCE-OPT:  [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, {{(i64|i32)}} 0, i32 0
+// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]]) #6
+// FORCE-OPT:  ret void
+// FORCE-OPT:}
+
 
 // Let's not crash on the following example.
 public protocol P {}

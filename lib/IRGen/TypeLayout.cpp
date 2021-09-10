@@ -60,6 +60,25 @@ bool TypeLayoutEntry::isFixedSize(IRGenModule &IGM) const {
   return true;
 }
 
+bool TypeLayoutEntry::isSingleRetainablePointer() const {
+  assert(isEmpty() &&
+         "Type isn't empty -- perhaps you forgot to override this function?");
+  return false;
+}
+
+bool TypeLayoutEntry::isPOD() const {
+  assert(isEmpty() &&
+         "Type isn't empty -- perhaps you forgot to override this function?");
+  return true;
+}
+
+bool TypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
+    IRGenModule &IGM, unsigned index) const {
+  assert(isEmpty() &&
+         "Type isn't empty -- perhaps you forgot to override this function?");
+  return index == 0;
+}
+
 llvm::Optional<Size> TypeLayoutEntry::fixedSize(IRGenModule &IGM) const {
   assert(isEmpty() &&
          "Type isn't empty -- perhaps you forgot to override this function?");
@@ -669,6 +688,19 @@ llvm::Value *ScalarTypeLayoutEntry::size(IRGenFunction &IGF) const {
 
 bool ScalarTypeLayoutEntry::isFixedSize(IRGenModule &IGM) const { return true; }
 
+bool ScalarTypeLayoutEntry::isPOD() const {
+  return typeInfo.isPOD(ResilienceExpansion::Maximal);
+}
+
+bool ScalarTypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
+    IRGenModule &IGM, unsigned index) const {
+  return typeInfo.canValueWitnessExtraInhabitantsUpTo(IGM, index);
+}
+
+bool ScalarTypeLayoutEntry::isSingleRetainablePointer() const {
+  return typeInfo.isSingleRetainablePointer(ResilienceExpansion::Maximal);
+}
+
 llvm::Optional<Size> ScalarTypeLayoutEntry::fixedSize(IRGenModule &IGM) const {
   return typeInfo.getFixedSize();
 }
@@ -853,6 +885,48 @@ llvm::Value *AlignedGroupEntry::size(IRGenFunction &IGF) const {
 bool AlignedGroupEntry::isFixedSize(IRGenModule &IGM) const {
   return fixedSize(IGM).hasValue();
 }
+
+bool AlignedGroupEntry::isPOD() const {
+  for (auto *entry : entries) {
+    if (!entry->isPOD()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool AlignedGroupEntry::canValueWitnessExtraInhabitantsUpTo(
+    IRGenModule &IGM, unsigned index) const {
+  uint32_t currentMaxXICount = 0;
+  uint32_t currentMaxXIField = 0;
+  // Choose the the field with the max xi count.
+  for (unsigned i = 0; i < entries.size(); i++) {
+    auto entryXICount = entries[i]->fixedXICount(IGM);
+    if (!entryXICount) {
+      return false;
+    }
+    if (*entryXICount > currentMaxXICount) {
+      currentMaxXICount = *entryXICount;
+      currentMaxXIField = i;
+    }
+  }
+
+  // The non-extra-inhabitant-providing fields of the type must be
+  // trivial, because an enum may contain garbage values in those fields'
+  // storage which the value witness operation won't handle.
+  for (unsigned i = 0; i < entries.size(); i++) {
+    if (i == currentMaxXIField)
+      continue;
+    if (!entries[i]->isPOD()) {
+      return false;
+    }
+  }
+
+  return entries[currentMaxXIField]->canValueWitnessExtraInhabitantsUpTo(IGM,
+                                                                         index);
+}
+
+bool AlignedGroupEntry::isSingleRetainablePointer() const { return false; }
 
 llvm::Optional<Size> AlignedGroupEntry::fixedSize(IRGenModule &IGM) const {
   if (_fixedSize.hasValue())
@@ -1218,6 +1292,15 @@ llvm::Value *ArchetypeLayoutEntry::size(IRGenFunction &IGF) const {
 
 bool ArchetypeLayoutEntry::isFixedSize(IRGenModule &IGM) const { return false; }
 
+bool ArchetypeLayoutEntry::isPOD() const { return false; }
+
+bool ArchetypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
+    IRGenModule &IGM, unsigned index) const {
+  return false;
+}
+
+bool ArchetypeLayoutEntry::isSingleRetainablePointer() const { return false; }
+
 llvm::Optional<Size> ArchetypeLayoutEntry::fixedSize(IRGenModule &IGM) const {
   return llvm::NoneType::None;
 }
@@ -1353,6 +1436,22 @@ void EnumTypeLayoutEntry::computeProperties() {
   }
 }
 
+EnumTypeLayoutEntry::CopyDestroyStrategy
+EnumTypeLayoutEntry::copyDestroyKind(IRGenFunction &IGF) const {
+  if (isPOD()) {
+    return POD;
+  } else if (cases.size() == 1 && numEmptyCases <= 1 &&
+             cases[0]->isSingleRetainablePointer()) {
+    return NullableRefcounted;
+  } else {
+    unsigned numTags = numEmptyCases;
+    if (cases[0]->canValueWitnessExtraInhabitantsUpTo(IGF.IGM, numTags - 1)) {
+      return ForwardToPayload;
+    }
+    return Normal;
+  }
+}
+
 llvm::Value *EnumTypeLayoutEntry::size(IRGenFunction &IGF) const {
   assert(!cases.empty());
   auto &IGM = IGF.IGM;
@@ -1416,6 +1515,38 @@ llvm::Value *EnumTypeLayoutEntry::size(IRGenFunction &IGF) const {
 
 bool EnumTypeLayoutEntry::isFixedSize(IRGenModule &IGM) const {
   return fixedSize(IGM).hasValue();
+}
+
+bool EnumTypeLayoutEntry::isPOD() const {
+  for (auto *entry : cases) {
+    if (!entry->isPOD()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool EnumTypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
+    IRGenModule &IGM, unsigned index) const {
+  if (cases.size() == 1) {
+    if (numEmptyCases == 0) {
+      return cases[0]->canValueWitnessExtraInhabitantsUpTo(IGM, index);
+    }
+    auto enumSize = fixedSize(IGM);
+    if (!enumSize) {
+      return false;
+    }
+    FixedEnumTagInfo tagInfo =
+        getFixedEnumTagBytes(*enumSize, cases.size(), numEmptyCases);
+    return cases[0]->canValueWitnessExtraInhabitantsUpTo(
+        IGM, index + tagInfo.numTags);
+  }
+  return false;
+}
+
+bool EnumTypeLayoutEntry::isSingleRetainablePointer() const {
+  return cases.size() == 1 && numEmptyCases == 0 &&
+         cases[0]->isSingleRetainablePointer();
 }
 
 llvm::Optional<Size> EnumTypeLayoutEntry::fixedSize(IRGenModule &IGM) const {
@@ -1516,11 +1647,11 @@ EnumTypeLayoutEntry::fixedXICount(IRGenModule &IGM) const {
   uint32_t extraTagBytes = extraTagInfo.numTagBytes;
   uint32_t numTags = extraTagInfo.numTags;
   if (extraTagBytes == 4) {
-    return *(_fixedXICount = ValueWitnessFlags::MaxNumExtraInhabitants);
+    return *(_fixedXICount = 0x7FFFFFFF);
   } else {
     uint32_t numXIs = (1 << extraTagBytes * 8) - numTags;
     return *(_fixedXICount = std::min(
-                 (uint32_t)ValueWitnessFlags::MaxNumExtraInhabitants, numXIs));
+                 (uint32_t)0x7FFFFFFF, numXIs));
   }
 }
 
@@ -1621,33 +1752,52 @@ void EnumTypeLayoutEntry::initializeSinglePayloadEnum(IRGenFunction &IGF,
   auto &IGM = IGF.IGM;
   auto &Builder = IGF.Builder;
 
-  auto endBB = IGF.createBasicBlock("");
-
-  // See whether the source value has a payload.
-  auto noSrcPayloadBB = testSinglePayloadEnumContainsPayload(IGF, src);
-
-  {
-    ConditionalDominanceScope condition(IGF);
-
+  switch (copyDestroyKind(IGF)) {
+  case POD: {
+    emitMemCpy(IGF, dest, src, size(IGF));
+    break;
+  }
+  case NullableRefcounted:
+  case ForwardToPayload: {
     // Here, the source value has a payload. Initialize the destination
     // with it, and set the extra tag if any to zero.
     payload->initialize(IGF, destData, srcData, isTake);
     // Potentially initialize extra tag bytes.
     payload->storeEnumTagSinglePayload(IGF, IGM.getInt32(0),
                                        IGM.getInt32(numEmptyCases), dest);
-    Builder.CreateBr(endBB);
+    break;
   }
+  case Normal: {
+    auto endBB = IGF.createBasicBlock("");
 
-  // If the source value has no payload, we can primitive-store the
-  // empty-case value.
-  Builder.emitBlock(noSrcPayloadBB);
-  {
-    ConditionalDominanceScope condition(IGF);
-    emitMemCpy(IGF, dest, src, size(IGF));
-    Builder.CreateBr(endBB);
+    // See whether the source value has a payload.
+    auto noSrcPayloadBB = testSinglePayloadEnumContainsPayload(IGF, src);
+
+    {
+      ConditionalDominanceScope condition(IGF);
+
+      // Here, the source value has a payload. Initialize the destination
+      // with it, and set the extra tag if any to zero.
+      payload->initialize(IGF, destData, srcData, isTake);
+      // Potentially initialize extra tag bytes.
+      payload->storeEnumTagSinglePayload(IGF, IGM.getInt32(0),
+                                         IGM.getInt32(numEmptyCases), dest);
+      Builder.CreateBr(endBB);
+    }
+
+    // If the source value has no payload, we can primitive-store the
+    // empty-case value.
+    Builder.emitBlock(noSrcPayloadBB);
+    {
+      ConditionalDominanceScope condition(IGF);
+      emitMemCpy(IGF, dest, src, size(IGF));
+      Builder.CreateBr(endBB);
+    }
+
+    IGF.Builder.emitBlock(endBB);
+    break;
   }
-
-  IGF.Builder.emitBlock(endBB);
+  }
 }
 
 void EnumTypeLayoutEntry::assignSinglePayloadEnum(IRGenFunction &IGF,
@@ -1661,65 +1811,80 @@ void EnumTypeLayoutEntry::assignSinglePayloadEnum(IRGenFunction &IGF,
   auto &IGM = IGF.IGM;
   auto &Builder = IGF.Builder;
 
-  auto endBB = IGF.createBasicBlock("");
-
-  // See whether the current value at the destination has a payload.
-  auto *noDestPayloadBB = testSinglePayloadEnumContainsPayload(IGF, dest);
-  {
-    ConditionalDominanceScope destCondition(IGF);
-
-    // Here, the destination has a payload. Now see if the source also
-    // has one.
-    auto destNoSrcPayloadBB = testSinglePayloadEnumContainsPayload(IGF, src);
-    {
-      ConditionalDominanceScope destSrcCondition(IGF);
-
-      // Here, both source and destination have payloads. Do the
-      // reassignment of the payload in-place.
-      payload->assign(IGF, destData, srcData, isTake);
-      Builder.CreateBr(endBB);
-    }
-
-    // If the destination has a payload but the source doesn't, we can
-    // destroy the payload and primitive-store the new no-payload value.
-    Builder.emitBlock(destNoSrcPayloadBB);
-    {
-      ConditionalDominanceScope destNoSrcCondition(IGF);
-      payload->destroy(IGF, destData);
-      emitMemCpy(IGF, dest, src, this->size(IGF));
-      Builder.CreateBr(endBB);
-    }
+  switch (copyDestroyKind(IGF)) {
+  case POD: {
+    emitMemCpy(IGF, dest, src, size(IGF));
+    break;
   }
-
-  // Now, if the destination has no payload, check if the source has one.
-  Builder.emitBlock(noDestPayloadBB);
-  {
-    ConditionalDominanceScope noDestCondition(IGF);
-    auto noDestNoSrcPayloadBB = testSinglePayloadEnumContainsPayload(IGF, src);
-    {
-      ConditionalDominanceScope noDestSrcCondition(IGF);
-
-      // Here, the source has a payload but the destination doesn't.
-      // We can copy-initialize the source over the destination, then
-      // primitive-store the zero extra tag (if any).
-      payload->initialize(IGF, destData, srcData, isTake);
-      // Potentially initialize extra tag bytes.
-      payload->storeEnumTagSinglePayload(IGF, IGM.getInt32(0),
-                                         IGM.getInt32(numEmptyCases), dest);
-      Builder.CreateBr(endBB);
-    }
-
-    // If neither destination nor source have payloads, we can just
-    // primitive-store the new empty-case value.
-    Builder.emitBlock(noDestNoSrcPayloadBB);
-    {
-      ConditionalDominanceScope noDestNoSrcCondition(IGF);
-      emitMemCpy(IGF, dest, src, this->size(IGF));
-      Builder.CreateBr(endBB);
-    }
+  case ForwardToPayload:
+  case NullableRefcounted: {
+    payload->assign(IGF, destData, srcData, isTake);
+    break;
   }
+  case Normal: {
+    auto endBB = IGF.createBasicBlock("");
 
-  Builder.emitBlock(endBB);
+    // See whether the current value at the destination has a payload.
+    auto *noDestPayloadBB = testSinglePayloadEnumContainsPayload(IGF, dest);
+    {
+      ConditionalDominanceScope destCondition(IGF);
+
+      // Here, the destination has a payload. Now see if the source also
+      // has one.
+      auto destNoSrcPayloadBB = testSinglePayloadEnumContainsPayload(IGF, src);
+      {
+        ConditionalDominanceScope destSrcCondition(IGF);
+
+        // Here, both source and destination have payloads. Do the
+        // reassignment of the payload in-place.
+        payload->assign(IGF, destData, srcData, isTake);
+        Builder.CreateBr(endBB);
+      }
+
+      // If the destination has a payload but the source doesn't, we can
+      // destroy the payload and primitive-store the new no-payload value.
+      Builder.emitBlock(destNoSrcPayloadBB);
+      {
+        ConditionalDominanceScope destNoSrcCondition(IGF);
+        payload->destroy(IGF, destData);
+        emitMemCpy(IGF, dest, src, this->size(IGF));
+        Builder.CreateBr(endBB);
+      }
+    }
+
+    // Now, if the destination has no payload, check if the source has one.
+    Builder.emitBlock(noDestPayloadBB);
+    {
+      ConditionalDominanceScope noDestCondition(IGF);
+      auto noDestNoSrcPayloadBB =
+          testSinglePayloadEnumContainsPayload(IGF, src);
+      {
+        ConditionalDominanceScope noDestSrcCondition(IGF);
+
+        // Here, the source has a payload but the destination doesn't.
+        // We can copy-initialize the source over the destination, then
+        // primitive-store the zero extra tag (if any).
+        payload->initialize(IGF, destData, srcData, isTake);
+        // Potentially initialize extra tag bytes.
+        payload->storeEnumTagSinglePayload(IGF, IGM.getInt32(0),
+                                           IGM.getInt32(numEmptyCases), dest);
+        Builder.CreateBr(endBB);
+      }
+
+      // If neither destination nor source have payloads, we can just
+      // primitive-store the new empty-case value.
+      Builder.emitBlock(noDestNoSrcPayloadBB);
+      {
+        ConditionalDominanceScope noDestNoSrcCondition(IGF);
+        emitMemCpy(IGF, dest, src, this->size(IGF));
+        Builder.CreateBr(endBB);
+      }
+    }
+
+    Builder.emitBlock(endBB);
+    break;
+  }
+  }
 }
 
 void EnumTypeLayoutEntry::multiPayloadEnumForPayloadAndEmptyCases(
@@ -1834,18 +1999,32 @@ void EnumTypeLayoutEntry::initializeMultiPayloadEnum(IRGenFunction &IGF,
 
 void EnumTypeLayoutEntry::destroySinglePayloadEnum(IRGenFunction &IGF,
                                                    Address addr) const {
-  // Check that there is a payload at the address.
-  llvm::BasicBlock *endBB = testSinglePayloadEnumContainsPayload(IGF, addr);
-  {
-    ConditionalDominanceScope condition(IGF);
-
-    // If there is, destroy it.
+  switch (copyDestroyKind(IGF)) {
+  case POD: {
+    break;
+  }
+  case ForwardToPayload:
+  case NullableRefcounted: {
     auto payload = cases[0];
     payload->destroy(IGF, addr);
-
-    IGF.Builder.CreateBr(endBB);
+    break;
   }
-  IGF.Builder.emitBlock(endBB);
+  case Normal: {
+    // Check that there is a payload at the address.
+    llvm::BasicBlock *endBB = testSinglePayloadEnumContainsPayload(IGF, addr);
+    {
+      ConditionalDominanceScope condition(IGF);
+
+      // If there is, destroy it.
+      auto payload = cases[0];
+      payload->destroy(IGF, addr);
+
+      IGF.Builder.CreateBr(endBB);
+    }
+    IGF.Builder.emitBlock(endBB);
+    break;
+  }
+  }
 }
 
 void EnumTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
@@ -2320,6 +2499,17 @@ ResilientTypeLayoutEntry::fixedSize(IRGenModule &IGM) const {
 }
 
 bool ResilientTypeLayoutEntry::isFixedSize(IRGenModule &IGM) const {
+  return false;
+}
+
+bool ResilientTypeLayoutEntry::isSingleRetainablePointer() const {
+  return false;
+}
+
+bool ResilientTypeLayoutEntry::isPOD() const { return false; }
+
+bool ResilientTypeLayoutEntry::canValueWitnessExtraInhabitantsUpTo(
+    IRGenModule &IGM, unsigned index) const {
   return false;
 }
 

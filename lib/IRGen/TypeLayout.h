@@ -67,6 +67,12 @@ public:
   /// Return the size of the type if known statically
   virtual llvm::Optional<Size> fixedSize(IRGenModule &IGM) const;
 
+  /// Return if the type and its subtypes are POD.
+  virtual bool isPOD() const;
+  virtual bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                                   unsigned index) const;
+  virtual bool isSingleRetainablePointer() const;
+
   /// Return if the size of the type is known statically
   virtual bool isFixedSize(IRGenModule &IGM) const;
 
@@ -157,6 +163,10 @@ public:
   bool isFixedSize(IRGenModule &IGM) const override;
   llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
   llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  bool isPOD() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
 
@@ -208,6 +218,10 @@ public:
   bool isFixedSize(IRGenModule &IGM) const override;
   llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
   llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  bool isPOD() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
 
@@ -258,6 +272,10 @@ public:
   bool isFixedSize(IRGenModule &IGM) const override;
   llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
   llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  bool isPOD() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
 
@@ -312,6 +330,10 @@ public:
   bool isFixedSize(IRGenModule &IGM) const override;
   llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
   llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  bool isPOD() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
 
@@ -376,6 +398,22 @@ private:
 class EnumTypeLayoutEntry : public TypeLayoutEntry,
                             public llvm::FoldingSetNode {
 public:
+  /// More efficient value semantics implementations for certain enum layouts.
+  enum CopyDestroyStrategy {
+    /// No special behavior.
+    Normal,
+    /// The payload is POD, so copying is bitwise, and destruction is a noop.
+    POD,
+    /// The payload is a single reference-counted value, and we have
+    /// a single no-payload case which uses the null extra inhabitant, so
+    /// copy and destroy can pass through to retain and release entry
+    /// points.
+    NullableRefcounted,
+    /// The payload's value witnesses can handle the extra inhabitants we use
+    /// for no-payload tags, so we can forward all our calls to them.
+    ForwardToPayload,
+  };
+
   unsigned numEmptyCases;
   unsigned minimumAlignment;
   std::vector<TypeLayoutEntry *> cases;
@@ -400,6 +438,11 @@ public:
   bool isFixedSize(IRGenModule &IGM) const override;
   llvm::Optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
   llvm::Optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  bool isPOD() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
+  CopyDestroyStrategy copyDestroyKind(IRGenFunction &IGF) const;
   llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
   llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
 
