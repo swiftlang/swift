@@ -1519,8 +1519,7 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
     Root->addChild(constructTypeNode(Fun->getResult()));
 
     auto Input = AnyFunctionType::composeTuple(Fun->getASTContext(),
-                                               Fun->getParams(),
-                                               /*canonicalVararg=*/false);
+                                               Fun->getParams());
     Root->addChild(constructTypeNode(Input));
     return Root;
   }

@@ -102,3 +102,13 @@ actor TestActor {
 
 func redecl(_: TestActor) { } // expected-note{{'redecl' previously declared here}}
 func redecl(_: isolated TestActor) { } // expected-error{{invalid redeclaration of 'redecl'}}
+
+func tuplify<Ts>(_ fn: (Ts) -> Void) {} // expected-note {{in call to function 'tuplify'}}
+
+@available(SwiftStdlib 5.5, *)
+func testTuplingIsolated(_ a: isolated A, _ b: isolated A) {
+  // FIXME: We shouldn't duplicate the "cannot convert value of type" diagnostic (SR-15179)
+  tuplify(testTuplingIsolated)
+  // expected-error@-1 {{generic parameter 'Ts' could not be inferred}}
+  // expected-error@-2 2{{cannot convert value of type '(isolated A, isolated A) -> ()' to expected argument type '(Ts) -> Void'}}
+}
