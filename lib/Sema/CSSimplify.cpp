@@ -11563,7 +11563,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype:
   case FixKind::AllowWrappedValueMismatch:
   case FixKind::RemoveExtraneousArguments:
-  case FixKind::SpecifyTypeForPlaceholder: {
+  case FixKind::SpecifyTypeForPlaceholder:
+  case FixKind::AllowAutoClosurePointerConversion: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

@@ -347,6 +347,10 @@ enum class FixKind : uint8_t {
   /// Fix conversion from async to sync function by removing explicit
   /// `async` attribute from the source function.
   DropAsyncAttribute,
+
+  /// Allow invalid pointer conversions for autoclosure result types as if the
+  /// pointer type is a function parameter rather than an autoclosure result.
+  AllowAutoClosurePointerConversion,
 };
 
 class ConstraintFix {
@@ -982,12 +986,12 @@ public:
   }
 };
 
-/// Allow invalid pointer conversions for autoclosure result types as if the
-/// pointer type is a function parameter rather than an autoclosure result.
 class AllowAutoClosurePointerConversion final : public ContextualMismatch {
   AllowAutoClosurePointerConversion(ConstraintSystem &cs, Type pointeeType,
-                                    Type pointerType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, pointeeType, pointerType, locator) {}
+                                    Type pointerType,
+                                    ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowAutoClosurePointerConversion,
+                           pointeeType, pointerType, locator) {}
 
 public:
   std::string getName() const override {
@@ -1000,6 +1004,10 @@ public:
                                                    Type pointeeType,
                                                    Type pointerType,
                                                    ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowAutoClosurePointerConversion;
+  }
 };
 
 class RemoveUnwrap final : public ConstraintFix {
