@@ -125,10 +125,9 @@ SILValue swift::stripCastsWithoutMarkDependence(SILValue v) {
       return v;
 
     if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
-      if (isRCIdentityPreservingCast(svi)
-          || isa<UncheckedTrivialBitCastInst>(v)
-          || isa<BeginAccessInst>(v)
-          || isa<EndCOWMutationInst>(v)) {
+      if (isIdentityPreservingRefCast(svi) ||
+          isa<UncheckedTrivialBitCastInst>(v) || isa<BeginAccessInst>(v) ||
+          isa<EndCOWMutationInst>(v)) {
         v = svi->getOperand(0);
         continue;
       }
@@ -141,10 +140,9 @@ SILValue swift::stripCasts(SILValue v) {
   while (true) {
     v = stripSinglePredecessorArgs(v);
     if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
-      if (isRCIdentityPreservingCast(svi)
-          || isa<UncheckedTrivialBitCastInst>(v)
-          || isa<MarkDependenceInst>(v)
-          || isa<BeginAccessInst>(v)) {
+      if (isIdentityPreservingRefCast(svi) ||
+          isa<UncheckedTrivialBitCastInst>(v) || isa<MarkDependenceInst>(v) ||
+          isa<BeginAccessInst>(v)) {
         v = cast<SingleValueInstruction>(v)->getOperand(0);
         continue;
       }

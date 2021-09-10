@@ -428,3 +428,29 @@ bb0(%0 : @owned $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+class ComplexStruct {
+  var val : NonTrivialStruct
+}
+
+class Klass {
+}
+
+struct NonTrivialStruct {
+  var val : Klass
+}
+
+sil [ossa] @test_borrow : $@convention(thin) (@owned ComplexStruct) -> () {
+bb0(%0 : @owned $ComplexStruct):
+  %2 = copy_value %0 : $ComplexStruct
+  %4 = begin_borrow %2 : $ComplexStruct
+  %5 = ref_element_addr %4 : $ComplexStruct, #ComplexStruct.val
+  %6 = load_borrow %5 : $*NonTrivialStruct
+  destroy_value %0 : $ComplexStruct
+  end_borrow %6 : $NonTrivialStruct
+  end_borrow %4 : $ComplexStruct
+  destroy_value %2 : $ComplexStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
