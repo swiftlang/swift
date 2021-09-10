@@ -975,7 +975,7 @@ NodePointer Demangler::createStandardSubstitution(
     return createSwiftType(Node::Kind::KIND, #TYPENAME);          \
   }
 
-#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)                   \
+#define STANDARD_TYPE_CONCURRENCY(KIND, MANGLING, TYPENAME)                   \
   if (SecondLevel && Subst == #MANGLING[0]) {                    \
     return createSwiftType(Node::Kind::KIND, #TYPENAME);          \
   }
