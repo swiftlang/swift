@@ -65,6 +65,7 @@ const char *usage =
     ;
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -423,8 +424,8 @@ ssize_t pread_all(int fd, void *buf, size_t count, off_t offset)
 
 template <typename T> 
 int parse_macho(int fd, uint32_t offset, uint32_t size, 
-void (^dylibVisitor)(std::filesystem::path path),
-                void (^uuidVisitor)(uuid_t uuid))
+void (^dylibVisitor)(std::filesystem::path const &path),
+                void (^uuidVisitor)(uuid_t const uuid))
 {
     ssize_t readed;
 
@@ -473,9 +474,7 @@ void (^dylibVisitor)(std::filesystem::path path),
             else if (uuidVisitor  &&  cmd->cmd() == LC_UUID) {
                 macho_uuid_command<T>* uuid_cmd = (macho_uuid_command<T>*)cmd;
                 if (uuid_cmd->cmdsize() < sizeof(uuid_command)) continue;
-                uuid_t uuid;
-                memcpy(uuid, uuid_cmd->uuid(), 16);
-                uuidVisitor(uuid);
+                uuidVisitor(uuid_cmd->uuid());
             }
         }
     }
@@ -486,8 +485,8 @@ void (^dylibVisitor)(std::filesystem::path path),
 
 
 int parse_macho(int fd, uint32_t offset, uint32_t size, 
-              void (^dylibVisitor)(std::filesystem::path path),
-              void (^uuidVisitor)(uuid_t uuid))
+              void (^dylibVisitor)(std::filesystem::path const &path),
+              void (^uuidVisitor)(uuid_t const uuid))
 {
     uint32_t magic;
     if (size < sizeof(magic)) return log_vv("file is too small");
@@ -514,8 +513,8 @@ int parse_macho(int fd, uint32_t offset, uint32_t size,
 
 
 int parse_fat(int fd, off_t fsize, char *buffer, size_t size, 
-              void (^dylibVisitor)(std::filesystem::path path),
-              void (^uuidVisitor)(uuid_t uuid))
+              void (^dylibVisitor)(std::filesystem::path const &path),
+              void (^uuidVisitor)(uuid_t const uuid))
 {
     uint32_t magic;
 
@@ -608,8 +607,8 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
 }
 
 
-void process(std::filesystem::path path, void(^dylibVisitor)(std::filesystem::path),
-             void (^uuidVisitor)(uuid_t))
+void process(std::filesystem::path const& path, void(^dylibVisitor)(std::filesystem::path const&),
+             void (^uuidVisitor)(uuid_t const))
 {
     log_vv("Scanning %s...", path.c_str());
 
@@ -644,12 +643,10 @@ bool operator <= (const struct timespec &lhs, const struct timespec &rhs)
 
 // This executable's own path.
 std::filesystem::path self_executable = []() -> std::filesystem::path {
-    uint32_t len = 0;
-    _NSGetExecutablePath(NULL, &len);
-    std::vector<char> buffer;
-    buffer.reserve(len);
-    _NSGetExecutablePath(buffer.data(), &len);
-    return buffer.data();
+    char path[MAXPATHLEN] = {0};
+    uint32_t len = sizeof(path);
+    _NSGetExecutablePath(path, &len);
+    return std::filesystem::path(path);
 }();
 
 
@@ -695,22 +692,20 @@ int xcrunToolCommand(std::vector<std::string> commandAndArguments, XcrunToolBloc
     const char *launchPath = "/usr/bin/xcrun";
 
     // Tell xcrun to search our toolchain first.
-    const char *arguments[commandAndArguments.size() + 5];
-    arguments[0] = launchPath;
-    arguments[1] = "--toolchain";
-    arguments[2] = self_toolchain.c_str();
-    int argsCount = 3;
+    std::vector<const char *> arguments;
+    arguments.push_back(launchPath);
+    arguments.push_back("--toolchain");
+    arguments.push_back(self_toolchain.c_str());
 
     // Tell xcrun to print its command if we are very verbose.
     if (Verbose > 1) {
-        arguments[3] = "--log";
-        argsCount += 1;
+        arguments.push_back("--log");
     }
 
     for (auto const &string : commandAndArguments) {
-        arguments[argsCount++] = string.c_str();
+        arguments.push_back(string.c_str());
     }
-    arguments[argsCount] = NULL;
+    arguments.push_back(NULL);
 
     int outPipe[2];
     int errPipe[2];
@@ -718,7 +713,7 @@ int xcrunToolCommand(std::vector<std::string> commandAndArguments, XcrunToolBloc
     pipe(outPipe);
     pipe(errPipe);
     
-    log_v("  %s", arguments[0]);
+    log_v("  %s", launchPath);
 
     int childPid = fork();
 
@@ -726,7 +721,7 @@ int xcrunToolCommand(std::vector<std::string> commandAndArguments, XcrunToolBloc
         dup2(outPipe[1], STDOUT_FILENO);
         dup2(errPipe[1], STDERR_FILENO);
 
-        execv(launchPath, (char *const *)arguments);
+        execv(launchPath, (char *const *)arguments.data());
     }
     
     // Read stdout and stderr in parallel, then wait for the task 
@@ -791,7 +786,7 @@ copyFile(std::filesystem::path src, std::filesystem::path dst, bool stripBitcode
    }
 }
 
-std::string uuidString(uuid_t uuid) {
+std::string uuidString(uuid_t const uuid) {
     char buffer[37];
     uuid_unparse(uuid, buffer);
     return buffer;
@@ -799,21 +794,20 @@ std::string uuidString(uuid_t uuid) {
 
 void copyLibraries(std::filesystem::path src_dir, std::filesystem::path dst_dir, 
                    std::unordered_map<std::string,
-                   std::unordered_set<std::string>> libs,
+                   std::unordered_set<std::string>> const &libs,
                    bool stripBitcode)
 {
     mkpath_np(dst_dir.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
     
-    for (auto const &pair : libs) {
-        std::filesystem::path src = src_dir/pair.first;
-        std::filesystem::path dst = dst_dir/pair.first;
+    for (auto const &[lib, srcUUIDs]: libs) {
+        std::filesystem::path src = src_dir/lib;
+        std::filesystem::path dst = dst_dir/lib;
         
         // Compare UUIDs of src and dst and don't copy if they're the same.
         // Do not use mod times for this task: the dst copy gets code-signed 
         // and bitcode-stripped so it can look newer than it really is.
-        auto const &srcUUIDs = pair.second;
         __block std::unordered_set<std::string> dstUUIDs;
-        process(dst, NULL, ^(uuid_t uuid) {
+        process(dst, NULL, ^(uuid_t const uuid) {
             dstUUIDs.insert(uuidString(uuid));
         });
 
@@ -821,7 +815,7 @@ void copyLibraries(std::filesystem::path src_dir, std::filesystem::path dst_dir,
         srcUUIDsString.reserve(37 * srcUUIDs.size());
 
         for (auto const &uuidString : srcUUIDs) {
-            srcUUIDsString.append(uuidString + " ");
+            srcUUIDsString.append(uuidString + std::string(" "));
         }
 
         std::string dstUUIDsString;
@@ -836,14 +830,14 @@ void copyLibraries(std::filesystem::path src_dir, std::filesystem::path dst_dir,
 
         if (srcUUIDs == dstUUIDs) {
             log_v("%s is up to date at %s", 
-                  pair.first.c_str(), dst.c_str());
+                  lib.c_str(), dst.c_str());
             continue;
         }
         
         // Perform the copy.
         
         log_v("Copying %s from %s to %s", 
-              pair.first.c_str(), 
+              lib.c_str(),
               src_dir.c_str(), 
               dst_dir.c_str());
         
@@ -961,14 +955,13 @@ int main(int argc, const char *argv[])
         // Neither src_dir nor platform is set. Die.
         fail_usage("At least one of --source-libraries and --platform "
                    "must be set.");
-    }
-    else if (src_dir.empty()) {
+    } else if (src_dir.empty()) {
         // platform is set but src_dir is not. 
         // Use platform to set src_dir relative to us.
         src_dir = self_executable.parent_path().parent_path()/
                   "lib"/"swift-5.0"/platform;
     } else if (platform.empty()) {
-        // src_dir is set but platform is not. 
+        // src_dir is set but platform is not.
         // Pick platform from src_dir's name.
         platform = src_dir.filename();
     }
@@ -1008,8 +1001,8 @@ int main(int argc, const char *argv[])
     __block std::unordered_map<std::string,
                     std::unordered_set<std::string>> swiftLibs;
     for (auto const &path : executables) {
-        process(path, 
-           ^(std::filesystem::path linkedLib) {
+        process(path,
+           ^(std::filesystem::path const &linkedLib) {
                 auto const linkedSrc = src_dir/linkedLib;
                 if (std::filesystem::exists(linkedSrc)) {
                     swiftLibs[linkedLib] = std::unordered_set<std::string>();
@@ -1022,15 +1015,15 @@ int main(int argc, const char *argv[])
     // Also collect the Swift libraries' UUIDs.
     __block std::vector<std::string> worklist;
     worklist.reserve(swiftLibs.size());
-    for (auto const &pair : swiftLibs) {
-        worklist.push_back(pair.first);
+    for (auto const &[lib, _] : swiftLibs) {
+        worklist.push_back(lib);
     }
     while (worklist.size()) {
         auto const &lib = worklist.back();
         worklist.pop_back();
         auto const path = src_dir/lib;
-        process(path, 
-            ^(std::filesystem::path linkedLib) {
+        process(path,
+            ^(std::filesystem::path const &linkedLib) {
                 auto const linkedSrc = src_dir/linkedLib;
                 if (swiftLibs.count(linkedLib) == 0 &&
                     std::filesystem::exists(linkedSrc))
@@ -1039,7 +1032,7 @@ int main(int argc, const char *argv[])
                     worklist.push_back(linkedLib);
                 }
             }, 
-            ^(uuid_t uuid) {
+            ^(uuid_t const uuid) {
                 swiftLibs[lib].insert(uuidString(uuid));
             });
     }
@@ -1057,15 +1050,15 @@ int main(int argc, const char *argv[])
 
     // Collect dependencies of --resource-library libs.
     worklist.clear();
-    for (auto const &pair : swiftLibsForResources) {
-        worklist.push_back(pair.first);
+    for (auto const &[lib, _] : swiftLibsForResources) {
+        worklist.push_back(lib);
     }
     while (worklist.size()) {
         auto const &lib = worklist.back();
         worklist.pop_back();
         auto const path = src_dir/lib;
         process(path,
-            ^(std::filesystem::path linkedLib) {
+            ^(std::filesystem::path const &linkedLib) {
                 auto const linkedSrc = src_dir/linkedLib;
                 if (swiftLibsForResources.count(linkedLib) == 0 &&
                     std::filesystem::exists(linkedSrc))
@@ -1074,7 +1067,7 @@ int main(int argc, const char *argv[])
                     worklist.push_back(linkedLib);
                 }
             },
-            ^(uuid_t uuid) {
+            ^(uuid_t const uuid) {
                 swiftLibsForResources[lib].insert(uuidString(uuid));
             });
     }
@@ -1117,7 +1110,7 @@ int main(int argc, const char *argv[])
         __block bool signedOne = false;
         std::mutex signingLock;
 
-        for (auto const &pair : swiftLibs) {
+        for (auto const &[lib, _] : swiftLibs) {
             // Work around authentication UI problems
             // by signing one synchronously and then signing the rest.
             signingLock.lock();
@@ -1128,13 +1121,11 @@ int main(int argc, const char *argv[])
                 // We are the first signer. Hold the lock until we finish.
             }
 
-            auto const &lib = pair.first;
-            auto const dst = dst_dir/lib;
-
             // Get the code signature, and copy the dylib to the side
             // to preserve it in case it does not change.  We can use
             // this to avoid unnecessary copies during delta installs
             // to devices.
+            auto const dst = dst_dir/lib;
             auto const oldSignatureData = query_code_signature(dst);
             const char *tmpFilePath = 0;
             if (!oldSignatureData.empty()) {
