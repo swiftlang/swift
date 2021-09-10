@@ -6678,9 +6678,9 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
 
   // Always succeed
   if (isCastToExpressibleByNilLiteral(cs, origFromType, toType)) {
-    return AllowAlwaysSucceedCheckedCast::create(
-        cs, fromType, toType, CheckedCastKind::Coercion,
-        cs.getConstraintLocator(locator));
+    return AllowNoopCheckedCast::create(cs, fromType, toType,
+                                        CheckedCastKind::Coercion,
+                                        cs.getConstraintLocator(locator));
   }
 
   // If both original are metatypes we have to use them because most of the
@@ -6715,10 +6715,9 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
         cs, origFromType, origToType, castKind,
         cs.getConstraintLocator(locator));
   } else {
-    // No optionals, just a trivial cast that always succeed.
-    return AllowAlwaysSucceedCheckedCast::create(
-        cs, origFromType, origToType, castKind,
-        cs.getConstraintLocator(locator));
+    // No optionals, just a trivial cast that always succeeds.
+    return AllowNoopCheckedCast::create(cs, origFromType, origToType, castKind,
+                                        cs.getConstraintLocator(locator));
   }
 }
 
@@ -11558,8 +11557,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowRefToInvalidDecl:
   case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
   case FixKind::AllowCheckedCastCoercibleOptionalType:
+  case FixKind::AllowNoopCheckedCast:
   case FixKind::AllowUnsupportedRuntimeCheckedCast:
-  case FixKind::AllowAlwaysSucceedCheckedCast:
   case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype:
   case FixKind::AllowWrappedValueMismatch:
   case FixKind::RemoveExtraneousArguments:

@@ -309,9 +309,9 @@ enum class FixKind : uint8_t {
   /// know the result is always succeed.
   AllowCheckedCastCoercibleOptionalType,
 
-  /// Allow a runtime checked cast where we statically know the result
-  /// is always succeed.
-  AllowAlwaysSucceedCheckedCast,
+  /// Warn about runtime checked cast that is statically known to always
+  /// succeed.
+  AllowNoopCheckedCast,
 
   /// Allow a runtime checked cast where at compile time the from is
   /// convertible, but runtime does not support such convertions. e.g.
@@ -2681,23 +2681,26 @@ public:
   }
 };
 
-class AllowAlwaysSucceedCheckedCast final
-    : public CheckedCastContextualMismatchWarning {
-  AllowAlwaysSucceedCheckedCast(ConstraintSystem &cs, Type fromType,
-                                Type toType, CheckedCastKind kind,
-                                ConstraintLocator *locator)
-      : CheckedCastContextualMismatchWarning(
-            cs, FixKind::AllowUnsupportedRuntimeCheckedCast, fromType, toType,
-            kind, locator) {}
+class AllowNoopCheckedCast final : public CheckedCastContextualMismatchWarning {
+  AllowNoopCheckedCast(ConstraintSystem &cs, Type fromType, Type toType,
+                       CheckedCastKind kind, ConstraintLocator *locator)
+      : CheckedCastContextualMismatchWarning(cs, FixKind::AllowNoopCheckedCast,
+                                             fromType, toType, kind, locator) {}
 
 public:
-  std::string getName() const override { return "checked cast always succeed"; }
+  std::string getName() const override {
+    return "checked cast always succeeds";
+  }
+
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static AllowAlwaysSucceedCheckedCast *create(ConstraintSystem &cs,
-                                               Type fromType, Type toType,
-                                               CheckedCastKind kind,
-                                               ConstraintLocator *locator);
+  static AllowNoopCheckedCast *create(ConstraintSystem &cs, Type fromType,
+                                      Type toType, CheckedCastKind kind,
+                                      ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowNoopCheckedCast;
+  }
 };
 
 class AllowUnsupportedRuntimeCheckedCast final
@@ -2721,6 +2724,10 @@ public:
   static AllowUnsupportedRuntimeCheckedCast *
   attempt(ConstraintSystem &cs, Type fromType, Type toType,
           CheckedCastKind kind, ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowUnsupportedRuntimeCheckedCast;
+  }
 };
 
 class AllowInvalidStaticMemberRefOnProtocolMetatype final

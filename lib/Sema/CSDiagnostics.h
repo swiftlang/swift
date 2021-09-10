@@ -2537,11 +2537,10 @@ private:
 
 /// Warn situations where the compiler can statically know a runtime
 /// checked cast always succeed.
-class AlwaysSucceedCheckedCastFailure final : public CheckedCastBaseFailure {
+class NoopCheckedCast final : public CheckedCastBaseFailure {
 public:
-  AlwaysSucceedCheckedCastFailure(const Solution &solution, Type fromType,
-                                  Type toType, CheckedCastKind kind,
-                                  ConstraintLocator *locator)
+  NoopCheckedCast(const Solution &solution, Type fromType, Type toType,
+                  CheckedCastKind kind, ConstraintLocator *locator)
       : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
 
   bool diagnoseAsError() override;

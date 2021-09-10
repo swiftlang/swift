@@ -7698,7 +7698,7 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseConditionalCastExpr() const {
   return true;
 }
 
-bool AlwaysSucceedCheckedCastFailure::diagnoseIfExpr() const {
+bool NoopCheckedCast::diagnoseIfExpr() const {
   auto *expr = getAsExpr<IsExpr>(CastExpr);
   if (!expr)
     return false;
@@ -7707,7 +7707,7 @@ bool AlwaysSucceedCheckedCastFailure::diagnoseIfExpr() const {
   return true;
 }
 
-bool AlwaysSucceedCheckedCastFailure::diagnoseConditionalCastExpr() const {
+bool NoopCheckedCast::diagnoseConditionalCastExpr() const {
   auto *expr = getAsExpr<ConditionalCheckedCastExpr>(CastExpr);
   if (!expr)
     return false;
@@ -7717,7 +7717,7 @@ bool AlwaysSucceedCheckedCastFailure::diagnoseConditionalCastExpr() const {
   return true;
 }
 
-bool AlwaysSucceedCheckedCastFailure::diagnoseForcedCastExpr() const {
+bool NoopCheckedCast::diagnoseForcedCastExpr() const {
   auto *expr = getAsExpr<ForcedCheckedCastExpr>(CastExpr);
   if (!expr)
     return false;
@@ -7742,7 +7742,7 @@ bool AlwaysSucceedCheckedCastFailure::diagnoseForcedCastExpr() const {
   return true;
 }
 
-bool AlwaysSucceedCheckedCastFailure::diagnoseAsError() {
+bool NoopCheckedCast::diagnoseAsError() {
   if (diagnoseIfExpr())
     return true;
 
