@@ -365,6 +365,10 @@ enum class FixKind : uint8_t {
   /// Ignore either capability (read/write) or type mismatch in conversion
   /// between two key path types.
   IgnoreKeyPathContextualMismatch,
+
+  /// Ignore a type mismatch between deduced element type and externally
+  /// imposed one.
+  IgnoreCollectionElementContextualMismatch,
 };
 
 class ConstraintFix {
@@ -1845,7 +1849,9 @@ public:
 class CollectionElementContextualMismatch final : public ContextualMismatch {
   CollectionElementContextualMismatch(ConstraintSystem &cs, Type srcType,
                                       Type dstType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, srcType, dstType, locator) {}
+      : ContextualMismatch(cs,
+                           FixKind::IgnoreCollectionElementContextualMismatch,
+                           srcType, dstType, locator) {}
 
 public:
   std::string getName() const override {
@@ -1857,6 +1863,10 @@ public:
   static CollectionElementContextualMismatch *
   create(ConstraintSystem &cs, Type srcType, Type dstType,
          ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch;
+  }
 };
 
 class DefaultGenericArgument final : public ConstraintFix {

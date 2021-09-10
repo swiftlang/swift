@@ -11689,7 +11689,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::ContextualMismatch:
   case FixKind::IgnoreContextualType:
   case FixKind::IgnoreAssignmentDestinationType:
-  case FixKind::AllowConversionThroughInOut: {
+  case FixKind::AllowConversionThroughInOut:
+  case FixKind::IgnoreCollectionElementContextualMismatch: {
     auto impact = 1;
 
     auto locator = fix->getLocator();
