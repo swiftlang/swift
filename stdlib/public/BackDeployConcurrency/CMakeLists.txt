@@ -13,6 +13,7 @@
 # This is always build standalone
 include("${CMAKE_CURRENT_SOURCE_DIR}/../../../cmake/modules/StandaloneOverlay.cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/modules")
+set(SWIFT_STDLIB_STABLE_ABI TRUE)
 include(AddSwiftStdlib)
 
 # Don't build the libraries for 32-bit iOS targets; there is no back-deployment
