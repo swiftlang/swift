@@ -3491,6 +3491,28 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
   return boxTy;
 }
 
+Optional<AbstractionPattern>
+TypeConverter::getConstantAbstractionPattern(SILDeclRef constant) {
+  if (auto closure = constant.getAbstractClosureExpr()) {
+    // Using operator[] here creates an entry in the map if one doesn't exist
+    // yet, marking the fact that the lack of abstraction pattern has been
+    // established and cannot be overridden by `setAbstractionPattern` later.
+    return ClosureAbstractionPatterns[closure];
+  }
+  return None;
+}
+
+void TypeConverter::setAbstractionPattern(AbstractClosureExpr *closure,
+                                          AbstractionPattern pattern) {
+  auto existing = ClosureAbstractionPatterns.find(closure);
+  if (existing != ClosureAbstractionPatterns.end()) {
+    assert(*existing->second == pattern
+     && "closure shouldn't be emitted at different abstraction level contexts");
+  } else {
+    ClosureAbstractionPatterns[closure] = pattern;
+  }
+}
+
 static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
                                      SILType Ty,
                                      TypeExpansionContext expansion) {
