@@ -2320,19 +2320,17 @@ class SpecifyKeyPathRootType final : public ConstraintFix {
     SpecifyKeyPathRootType(ConstraintSystem &cs, ConstraintLocator *locator)
         : ConstraintFix(cs, FixKind::SpecifyKeyPathRootType, locator) {}
 
-  public:
-    std::string getName() const override {
-      return "specify key path root type";
-    }
+public:
+  std::string getName() const override { return "specify key path root type"; }
 
-    bool diagnose(const Solution &solution, bool asNote = false) const override;
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-    static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
-                                          ConstraintLocator *locator);
+  static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
+                                        ConstraintLocator *locator);
 
-    static bool classof(ConstraintFix *fix) {
-      return fix->getKind() == FixKind::SpecifyKeyPathRootType;
-    }
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::SpecifyKeyPathRootType;
+  }
 };
 
 /// Diagnose missing unwrap of optional base type on key path application.
@@ -2649,7 +2647,7 @@ class AllowInvalidStaticMemberRefOnProtocolMetatype final
                       FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype,
                       locator) {}
 
-  public:
+public:
   std::string getName() const override {
     return "allow invalid static member reference on a protocol metatype";
   }
