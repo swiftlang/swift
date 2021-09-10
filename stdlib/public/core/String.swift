@@ -981,115 +981,119 @@ extension String {
 }
 
 extension _StringGutsSlice {
+  internal func _forEachUTF8(_ f: (UInt8) throws -> Void) rethrows {
+    for byte in String(_guts).utf8 {
+      try f(byte)
+    }
+  }
+
+  internal func _isScalarNFCQC(
+    _ scalar: Unicode.Scalar,
+    _ prevCCC: inout UInt16
+  ) -> Bool {
+    let normData: UInt16
+
+    if scalar.value < 0x300 {
+      normData = 0
+    } else {
+      normData = _swift_stdlib_getNormData(scalar.value)
+    }
+
+    let ccc = normData >> 3
+    let isNFCQC = normData & 0x6 == 0
+
+    if prevCCC > ccc, ccc != 0 {
+      return false
+    }
+
+    if !isNFCQC {
+      return false
+    }
+
+    prevCCC = ccc
+    return true
+  }
+
   internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
-    var output = _FixedArray16<UInt8>(allZeros: ())
-    var icuInput = _FixedArray16<UInt16>(allZeros: ())
-    var icuOutput = _FixedArray16<UInt16>(allZeros: ())
-    if _fastPath(isFastUTF8) {
-      try withFastUTF8 {
-        return try _fastWithNormalizedCodeUnitsImpl(
-          sourceBuffer: $0,
-          outputBuffer: _castOutputBuffer(&output),
-          icuInputBuffer: _castOutputBuffer(&icuInput),
-          icuOutputBuffer: _castOutputBuffer(&icuOutput),
-          f
-        )
+    // Fast path: If we're already NFC (or ASCII), then we don't need to do
+    // anything at all.
+    if _guts.isNFC {
+      try _forEachUTF8(f)
+      return
+    }
+
+    var isNFCQC = true
+
+    if _guts.isFastUTF8 {
+      _guts.withFastUTF8 { utf8 in
+        var position = 0
+        var prevCCC: UInt16 = 0
+
+        while position < utf8.count {
+          // If our first byte is less than 0xCC, then it means we're under the
+          // 0x300 scalar value and everything up to 0x300 is NFC already.
+          if utf8[position] < 0xCC {
+            // If our first byte is less than 0xC0, then it means it is ASCII
+            // and only takes up a single byte.
+            if utf8[position] < 0xC0 {
+              position &+= 1
+            } else {
+              // Otherwise, this is a 2 byte < 0x300 sequence.
+              position &+= 2
+            }
+            // ASCII always has ccc of 0.
+            prevCCC = 0
+
+            continue
+          }
+
+          let (scalar, len) = _decodeScalar(utf8, startingAt: position)
+
+          if !_isScalarNFCQC(scalar, &prevCCC) {
+            isNFCQC = false
+            return
+          }
+
+          position &+= len
+        }
+      }
+
+      // Because we have access to the fastUTF8, we can go through that instead
+      // of accessing the UTF8 view on String.
+      if isNFCQC {
+        try _guts.withFastUTF8 {
+          for byte in $0 {
+            try f(byte)
+          }
+        }
+
+        return
       }
     } else {
-      return try _foreignWithNormalizedCodeUnitsImpl(
-        outputBuffer: _castOutputBuffer(&output),
-        icuInputBuffer: _castOutputBuffer(&icuInput),
-        icuOutputBuffer: _castOutputBuffer(&icuOutput),
-        f
-      )
-    }
-  }
+      var prevCCC: UInt16 = 0
 
-  internal func _foreignWithNormalizedCodeUnitsImpl(
-    outputBuffer: UnsafeMutableBufferPointer<UInt8>,
-    icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
-    icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
-    _ f: (UInt8) throws -> Void
-  ) rethrows {
-    var outputBuffer = outputBuffer
-    var icuInputBuffer = icuInputBuffer
-    var icuOutputBuffer = icuOutputBuffer
+      for scalar in String(_guts).unicodeScalars {
+        if !_isScalarNFCQC(scalar, &prevCCC) {
+          isNFCQC = false
+          break
+        }
+      }
 
-    var index = range.lowerBound
-    let cachedEndIndex = range.upperBound
+      if isNFCQC {
+        for byte in String(_guts).utf8 {
+          try f(byte)
+        }
 
-    var hasBufferOwnership = false
-
-    defer {
-      if hasBufferOwnership {
-        outputBuffer.deallocate()
-        icuInputBuffer.deallocate()
-        icuOutputBuffer.deallocate()
+        return
       }
     }
 
-    while index < cachedEndIndex {
-      let result = _foreignNormalize(
-        readIndex: index,
-        endIndex: cachedEndIndex,
-        guts: _guts,
-        outputBuffer: &outputBuffer,
-        icuInputBuffer: &icuInputBuffer,
-        icuOutputBuffer: &icuOutputBuffer
-      )
-      for i in 0..<result.amountFilled {
-        try f(outputBuffer[i])
+    for scalar in String(_guts).nfc {
+      try scalar.withUTF8CodeUnits {
+        for byte in $0 {
+          try f(byte)
+        }
       }
-      _internalInvariant(result.nextReadPosition != index)
-      index = result.nextReadPosition
-      if result.allocatedBuffers {
-        _internalInvariant(!hasBufferOwnership)
-        hasBufferOwnership = true
-      }
-    }
-  }
-}
-
-internal func _fastWithNormalizedCodeUnitsImpl(
-  sourceBuffer: UnsafeBufferPointer<UInt8>,
-  outputBuffer: UnsafeMutableBufferPointer<UInt8>,
-  icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
-  icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
-  _ f: (UInt8) throws -> Void
-) rethrows {
-  var outputBuffer = outputBuffer
-  var icuInputBuffer = icuInputBuffer
-  var icuOutputBuffer = icuOutputBuffer
-
-  var index = String.Index(_encodedOffset: 0)
-  let cachedEndIndex = String.Index(_encodedOffset: sourceBuffer.count)
-
-  var hasBufferOwnership = false
-
-  defer {
-    if hasBufferOwnership {
-      outputBuffer.deallocate()
-      icuInputBuffer.deallocate()
-      icuOutputBuffer.deallocate()
-    }
-  }
-
-  while index < cachedEndIndex {
-    let result = _fastNormalize(
-      readIndex: index,
-      sourceBuffer: sourceBuffer,
-      outputBuffer: &outputBuffer,
-      icuInputBuffer: &icuInputBuffer,
-      icuOutputBuffer: &icuOutputBuffer
-    )
-    for i in 0..<result.amountFilled {
-      try f(outputBuffer[i])
-    }
-    _internalInvariant(result.nextReadPosition != index)
-    index = result.nextReadPosition
-    if result.allocatedBuffers {
-      _internalInvariant(!hasBufferOwnership)
-      hasBufferOwnership = true
     }
   }
 }

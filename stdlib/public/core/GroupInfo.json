@@ -9,6 +9,8 @@
     "Character.swift",
     "CharacterProperties.swift",
     "ICU.swift",
+    "NFC.swift",
+    "NFD.swift",
     "NormalizedCodeUnitIterator.swift",
     "SmallString.swift",
     "StaticString.swift",

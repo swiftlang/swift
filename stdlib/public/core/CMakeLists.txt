@@ -101,6 +101,8 @@ set(SWIFTLIB_ESSENTIAL
   NativeDictionary.swift
   NativeSet.swift
   NewtypeWrapper.swift
+  NFC.swift
+  NFD.swift
   ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
