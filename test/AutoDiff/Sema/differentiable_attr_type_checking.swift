@@ -726,3 +726,24 @@ struct Accessors: Differentiable {
 // expected-error @+1 {{cannot differentiate functions returning opaque result types}}
 @differentiable(reverse)
 func opaqueResult(_ x: Float) -> some Differentiable { x }
+
+// Test the function tupling conversion with @differentiable.
+func tuplify<Ts, U>(_ fn: @escaping (Ts) -> U) -> (Ts) -> U { fn }
+func tuplifyDifferentiable<Ts : Differentiable, U>(_ fn: @escaping @differentiable(reverse) (Ts) -> U) -> @differentiable(reverse) (Ts) -> U { fn }
+
+func testTupling(withoutNoDerivative: @escaping @differentiable(reverse) (Float, Float) -> Float,
+                 withNoDerivative: @escaping @differentiable(reverse) (Float, @noDerivative Float) -> Float) {
+  // We support tupling of differentiable functions as long as they drop @differentiable.
+  let _: ((Float, Float)) -> Float = tuplify(withoutNoDerivative)
+  let fn1 = tuplify(withoutNoDerivative)
+  _ = fn1((0, 0))
+
+  // In this case we also drop @noDerivative.
+  let _: ((Float, Float)) -> Float = tuplify(withNoDerivative)
+  let fn2 = tuplify(withNoDerivative)
+  _ = fn2((0, 0))
+
+  // We do not support tupling into an @differentiable function.
+  let _ = tuplifyDifferentiable(withoutNoDerivative) // expected-error {{cannot convert value of type '@differentiable(reverse) (Float, Float) -> Float' to expected argument type '@differentiable(reverse) (Float) -> Float'}}
+  let _ = tuplifyDifferentiable(withNoDerivative) // expected-error {{cannot convert value of type '@differentiable(reverse) (Float, @noDerivative Float) -> Float' to expected argument type '@differentiable(reverse) (Float) -> Float'}}
+}
