@@ -11685,7 +11685,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return matchTypes(*elemTy, dictionaryKeyTy, kind, subflags, elemLoc);
   }
 
-  case FixKind::ContextualMismatch: {
+  case FixKind::ContextualMismatch:
+  case FixKind::IgnoreContextualType: {
     auto impact = 1;
 
     auto locator = fix->getLocator();

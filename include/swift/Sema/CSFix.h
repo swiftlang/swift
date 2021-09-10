@@ -351,6 +351,9 @@ enum class FixKind : uint8_t {
   /// Allow invalid pointer conversions for autoclosure result types as if the
   /// pointer type is a function parameter rather than an autoclosure result.
   AllowAutoClosurePointerConversion,
+
+  /// Ignore externally imposed type.
+  IgnoreContextualType,
 };
 
 class ConstraintFix {
@@ -1938,7 +1941,8 @@ public:
 class IgnoreContextualType : public ContextualMismatch {
   IgnoreContextualType(ConstraintSystem &cs, Type resultTy, Type specifiedTy,
                        ConstraintLocator *locator)
-      : ContextualMismatch(cs, resultTy, specifiedTy, locator) {}
+      : ContextualMismatch(cs, FixKind::IgnoreContextualType, resultTy,
+                           specifiedTy, locator) {}
 
 public:
   std::string getName() const override {
@@ -1950,6 +1954,10 @@ public:
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreContextualType;
+  }
 };
 
 class IgnoreAssignmentDestinationType final : public ContextualMismatch {
