@@ -11686,7 +11686,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::ContextualMismatch:
-  case FixKind::IgnoreContextualType: {
+  case FixKind::IgnoreContextualType:
+  case FixKind::IgnoreAssignmentDestinationType: {
     auto impact = 1;
 
     auto locator = fix->getLocator();

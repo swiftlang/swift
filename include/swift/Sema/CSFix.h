@@ -354,6 +354,9 @@ enum class FixKind : uint8_t {
 
   /// Ignore externally imposed type.
   IgnoreContextualType,
+
+  /// Ignore a type imposed by an assignment destination e.g. `let x: Int = ...`
+  IgnoreAssignmentDestinationType,
 };
 
 class ConstraintFix {
@@ -1963,7 +1966,8 @@ public:
 class IgnoreAssignmentDestinationType final : public ContextualMismatch {
   IgnoreAssignmentDestinationType(ConstraintSystem &cs, Type sourceTy,
                                   Type destTy, ConstraintLocator *locator)
-      : ContextualMismatch(cs, sourceTy, destTy, locator) {}
+      : ContextualMismatch(cs, FixKind::IgnoreAssignmentDestinationType,
+                           sourceTy, destTy, locator) {}
 
 public:
   std::string getName() const override {
@@ -1977,6 +1981,10 @@ public:
   static IgnoreAssignmentDestinationType *create(ConstraintSystem &cs,
                                                  Type sourceTy, Type destTy,
                                                  ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreAssignmentDestinationType;
+  }
 };
 
 /// If this is an argument-to-parameter conversion which is associated with
