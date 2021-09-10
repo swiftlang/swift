@@ -53,6 +53,8 @@
 #include <cstring>
 #include <type_traits>
 
+#include <Block.h>
+
 namespace swift {
 namespace metadataimpl {
 
@@ -287,6 +289,22 @@ struct SwiftWeakRetainableBox :
                                        WeakReference *src) {
     swift_weakTakeAssign(dest, src);
     return dest;
+  }
+};
+
+/// A box implementation class for Block object pointers.
+struct BlockRetainableBox : RetainableBoxBase<BlockRetainableBox, void*> {
+  static constexpr unsigned numExtraInhabitants =
+    swift_getHeapObjectExtraInhabitantCount();
+
+  static void *retain(void *obj) {
+    // Block_copy() is a retain for the case where the block is already in
+    // the heap, but will copy if the block is currently on the stack
+    return Block_copy(obj);
+  }
+
+  static void release(void *obj) {
+    Block_release(obj);
   }
 };
 

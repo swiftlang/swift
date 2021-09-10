@@ -34,6 +34,12 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES DbgHelp)
   endif()
 
+  if(NOT "${SWIFT_PRIMARY_VARIANT_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
+    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
+      BlocksRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}
+      )
+  endif()
+
   add_swift_unittest(SwiftRuntimeLongTests
     LongRefcounting.cpp
     ../Stdlib.cpp

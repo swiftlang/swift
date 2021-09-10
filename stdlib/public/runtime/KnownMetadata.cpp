@@ -246,6 +246,11 @@ const ValueWitnessTable
   swift::VALUE_WITNESS_SYM(THIN_FUNCTION_MANGLING) =
     ValueWitnessTableForBox<FunctionPointerBox>::table;
 
+/// The basic value-witness table for @convention(block) function types.
+const ValueWitnessTable
+  swift::VALUE_WITNESS_SYM(BLOCK_MANGLING) =
+    ValueWitnessTableForBox<BlockRetainableBox>::table;
+
 /*** Empty tuples ************************************************************/
 
 /// The basic value-witness table for empty types.
