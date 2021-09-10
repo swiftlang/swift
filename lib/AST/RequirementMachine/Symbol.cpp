@@ -506,6 +506,9 @@ int Symbol::compare(Symbol other, const ProtocolGraph &graph) const {
     auto protos = getProtocols();
     auto otherProtos = other.getProtocols();
 
+    if (getName() != other.getName())
+      return getName().compare(other.getName());
+
     // Symbols with more protocols are 'smaller' than those with fewer.
     if (protos.size() != otherProtos.size())
       return protos.size() > otherProtos.size() ? -1 : 1;
@@ -516,7 +519,6 @@ int Symbol::compare(Symbol other, const ProtocolGraph &graph) const {
         return result;
     }
 
-    result = getName().compare(other.getName());
     break;
   }
 
