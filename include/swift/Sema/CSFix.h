@@ -361,6 +361,10 @@ enum class FixKind : uint8_t {
   /// Allow argument-to-parameter subtyping even when parameter type
   /// is marked as `inout`.
   AllowConversionThroughInOut,
+
+  /// Ignore either capability (read/write) or type mismatch in conversion
+  /// between two key path types.
+  IgnoreKeyPathContextualMismatch,
 };
 
 class ConstraintFix {
@@ -958,7 +962,8 @@ private:
 class KeyPathContextualMismatch final : public ContextualMismatch {
   KeyPathContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                             ConstraintLocator *locator)
-      : ContextualMismatch(cs, lhs, rhs, locator) {}
+      : ContextualMismatch(cs, FixKind::IgnoreKeyPathContextualMismatch, lhs,
+                           rhs, locator) {}
 
 public:
   std::string getName() const override {
@@ -967,6 +972,10 @@ public:
 
   static KeyPathContextualMismatch *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreKeyPathContextualMismatch;
+  }
 };
 
 /// Detect situations when argument of the @autoclosure parameter is itself

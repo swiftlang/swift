@@ -11564,7 +11564,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowWrappedValueMismatch:
   case FixKind::RemoveExtraneousArguments:
   case FixKind::SpecifyTypeForPlaceholder:
-  case FixKind::AllowAutoClosurePointerConversion: {
+  case FixKind::AllowAutoClosurePointerConversion:
+  case FixKind::IgnoreKeyPathContextualMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
