@@ -1871,8 +1871,9 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // If the whole body is being ignored due to a pre-check failure,
     // let's not record a fix about result type since there is
     // just not enough context to infer it without a body.
-    if (cs.hasFixFor(cs.getConstraintLocator(closure),
-                     FixKind::IgnoreInvalidResultBuilderBody))
+    auto *closureLoc = cs.getConstraintLocator(closure);
+    if (cs.hasFixFor(closureLoc, FixKind::IgnoreInvalidResultBuilderBody) ||
+        cs.hasFixFor(closureLoc, FixKind::IgnoreResultBuilderWithReturnStmts))
       return None;
 
     ConstraintFix *fix = SpecifyClosureReturnType::create(cs, dstLocator);

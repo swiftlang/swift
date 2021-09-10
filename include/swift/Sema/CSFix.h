@@ -290,6 +290,9 @@ enum class FixKind : uint8_t {
   /// Ignore result builder body which fails `pre-check` call.
   IgnoreInvalidResultBuilderBody,
 
+  /// Ignore result builder body if it has `return` statements.
+  IgnoreResultBuilderWithReturnStmts,
+
   /// Resolve type of `nil` by providing a contextual type.
   SpecifyContextualTypeForNil,
 
@@ -2503,10 +2506,15 @@ public:
 };
 
 class IgnoreInvalidResultBuilderBody : public ConstraintFix {
-protected:
   IgnoreInvalidResultBuilderBody(ConstraintSystem &cs,
                                  ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::IgnoreInvalidResultBuilderBody, locator) {}
+      : IgnoreInvalidResultBuilderBody(
+            cs, FixKind::IgnoreInvalidResultBuilderBody, locator) {}
+
+protected:
+  IgnoreInvalidResultBuilderBody(ConstraintSystem &cs, FixKind kind,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator) {}
 
 public:
   std::string getName() const override {
@@ -2533,13 +2541,19 @@ class IgnoreResultBuilderWithReturnStmts final
 
   IgnoreResultBuilderWithReturnStmts(ConstraintSystem &cs, Type builderTy,
                                      ConstraintLocator *locator)
-      : IgnoreInvalidResultBuilderBody(cs, locator), BuilderType(builderTy) {}
+      : IgnoreInvalidResultBuilderBody(
+            cs, FixKind::IgnoreResultBuilderWithReturnStmts, locator),
+        BuilderType(builderTy) {}
 
 public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static IgnoreResultBuilderWithReturnStmts *
   create(ConstraintSystem &cs, Type builderTy, ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreResultBuilderWithReturnStmts;
+  }
 };
 
 class SpecifyContextualTypeForNil final : public ConstraintFix {
