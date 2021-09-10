@@ -1,5 +1,7 @@
 // RUN: %swiftc_driver -emit-ir %s -o - -Xfrontend -disable-implicit-concurrency-module-import | %FileCheck %s -check-prefix ELF
 
+// REQUIRES: SR-15184
+
 // Check that the swift auto link section is available in the object file.
 // RUN: %swiftc_driver -c %s -o %t -Xfrontend -disable-implicit-concurrency-module-import
 // RUN: llvm-readelf %t -S | %FileCheck %s -check-prefix SECTION
