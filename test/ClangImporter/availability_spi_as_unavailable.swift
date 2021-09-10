@@ -1,7 +1,10 @@
 // REQUIRES: OS=macosx
-// RUN: %target-swift-frontend -typecheck %s -F %S/Inputs/frameworks -verify
+// RUN: %target-swift-frontend -typecheck %s -F %S/Inputs/frameworks -verify -DNOT_UNDERLYING
+// RUN: %target-swift-frontend -typecheck %s -F %S/Inputs/frameworks -module-name SPIContainer -import-underlying-module -verify
 
+#if NOT_UNDERLYING
 import SPIContainer
+#endif
 
 @_spi(a) public let a: SPIInterface1
 @_spi(a) public let b: SPIInterface2

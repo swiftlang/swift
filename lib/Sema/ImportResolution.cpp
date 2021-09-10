@@ -513,8 +513,8 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
     unloadedImports.emplace_back(UnloadedImportedModule(importPath.copyTo(ctx),
                                                         /*isScoped=*/false),
                                  ImportFlags::Exported);
-    imports.back().options |= ImportFlags::SPIAccessControl;
-    imports.back().spiGroups = ctx.AllocateCopy(clangSpiGroups);
+    unloadedImports.back().options |= ImportFlags::SPIAccessControl;
+    unloadedImports.back().spiGroups = ctx.AllocateCopy(clangSpiGroups);
   }
 
   return { ctx.AllocateCopy(imports), ctx.AllocateCopy(unloadedImports) };
