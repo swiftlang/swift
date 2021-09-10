@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-// Synthesis of for actores.
+// Synthesis of conformances for actors.
 
 @available(SwiftStdlib 5.5, *)
 actor A1 {
