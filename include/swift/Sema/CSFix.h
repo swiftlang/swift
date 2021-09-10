@@ -335,6 +335,10 @@ enum class FixKind : uint8_t {
 
   /// Allow `weak` declarations to be bound to a non-optional type.
   AllowNonOptionalWeak,
+
+  /// Fix conversion from non-Sendable to Sendable by adding explicit
+  /// @Sendable attribute to the source function.
+  AddSendableAttribute,
 };
 
 class ConstraintFix {
@@ -735,8 +739,9 @@ public:
 /// function types, repair it by adding @Sendable attribute.
 class AddSendableAttribute final : public ContextualMismatch {
   AddSendableAttribute(ConstraintSystem &cs, FunctionType *fromType,
-                     FunctionType *toType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, fromType, toType, locator) {
+                       FunctionType *toType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AddSendableAttribute, fromType, toType,
+                           locator) {
     assert(fromType->isSendable() != toType->isSendable());
   }
 
@@ -746,9 +751,13 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static AddSendableAttribute *create(ConstraintSystem &cs,
-                                    FunctionType *fromType,
-                                    FunctionType *toType,
-                                    ConstraintLocator *locator);
+                                      FunctionType *fromType,
+                                      FunctionType *toType,
+                                      ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AddSendableAttribute;
+  }
 };
 
 /// This is a contextual mismatch between throwing and non-throwing
