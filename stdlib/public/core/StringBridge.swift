@@ -658,7 +658,7 @@ internal func _SwiftCreateBridgedString_DoNotCall(
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSStringBase)
-class __SwiftNativeNSString {
+@_spi(Foundation) public class __SwiftNativeNSString {
   @objc internal init() {}
   deinit {}
 }
