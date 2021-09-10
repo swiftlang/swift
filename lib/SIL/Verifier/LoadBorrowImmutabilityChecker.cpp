@@ -292,8 +292,8 @@ LoadBorrowImmutabilityAnalysis::LoadBorrowImmutabilityAnalysis(
 // \p address may be an address, pointer, or box type.
 bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
     LoadBorrowInst *lbi, ArrayRef<Operand *> endBorrowUses,
-    AccessPath accessPath) {
-
+    AccessPathWithBase accessPathWithBase) {
+  auto accessPath = accessPathWithBase.accessPath;
   LinearLifetimeChecker checker(deadEndBlocks);
   auto writes = cache.get(accessPath);
 
@@ -303,11 +303,20 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
     accessPath.getStorage().print(llvm::errs());
     return false;
   }
+  auto ownershipRoot = accessPath.getStorage().isReference()
+                           ? findOwnershipReferenceRoot(accessPathWithBase.base)
+                           : SILValue();
   // Then for each write...
   for (auto *op : *writes) {
     // First see if the write is a dead end block. In such a case, just skip it.
     if (deadEndBlocks.isDeadEnd(op->getUser()->getParent())) {
       continue;
+    }
+    // A destroy_value will be a definite write only when the destroy is on the
+    // ownershipRoot
+    if (isa<DestroyValueInst>(op->getUser())) {
+      if (op->get() != ownershipRoot)
+        continue;
     }
     // See if the write is within the load borrow's lifetime. If it isn't, we
     // don't have to worry about it.
@@ -326,7 +335,9 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
 //===----------------------------------------------------------------------===//
 
 bool LoadBorrowImmutabilityAnalysis::isImmutable(LoadBorrowInst *lbi) {
-  AccessPath accessPath = AccessPath::computeInScope(lbi->getOperand());
+  auto accessPathWithBase = AccessPathWithBase::compute(lbi->getOperand());
+  auto accessPath = accessPathWithBase.accessPath;
+
   // Bail on an invalid AccessPath. AccessPath completeness is verified
   // independently--it may be invalid in extraordinary situations. When
   // AccessPath is valid, we know all its uses are recognizable.
@@ -358,7 +369,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutable(LoadBorrowInst *lbi) {
     //
     // TODO: As a separate analysis, verify that the load_borrow scope is always
     // nested within the begin_access scope (to ensure no aliasing access).
-    return isImmutableInScope(lbi, endBorrowUses, accessPath);
+    return isImmutableInScope(lbi, endBorrowUses, accessPathWithBase);
   }
   case AccessedStorage::Argument: {
     auto *arg =
@@ -366,7 +377,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutable(LoadBorrowInst *lbi) {
     if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
       return true;
     }
-    return isImmutableInScope(lbi, endBorrowUses, accessPath);
+    return isImmutableInScope(lbi, endBorrowUses, accessPathWithBase);
   }
   // FIXME: A yielded address could overlap with another in this function.
   case AccessedStorage::Yield:
@@ -376,7 +387,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutable(LoadBorrowInst *lbi) {
   case AccessedStorage::Tail:
   case AccessedStorage::Global:
   case AccessedStorage::Unidentified:
-    return isImmutableInScope(lbi, endBorrowUses, accessPath);
+    return isImmutableInScope(lbi, endBorrowUses, accessPathWithBase);
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }

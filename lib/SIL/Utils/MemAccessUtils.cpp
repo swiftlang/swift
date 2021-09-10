@@ -365,6 +365,12 @@ bool swift::isLetAddress(SILValue address) {
 //                          MARK: FindReferenceRoot
 //===----------------------------------------------------------------------===//
 
+bool swift::isIdentityPreservingRefCast(SingleValueInstruction *svi) {
+  // Ignore both copies and other identity and ownership preserving casts
+  return isa<CopyValueInst>(svi) ||
+         isIdentityAndOwnershipPreservingRefCast(svi);
+}
+
 // On some platforms, casting from a metatype to a reference type dynamically
 // allocates a ref-counted box for the metatype. Naturally that is the place
 // where RC-identity begins. Considering the source of such a casts to be
@@ -374,12 +380,12 @@ bool swift::isLetAddress(SILValue address) {
 // The SILVerifier checks that none of these operations cast a trivial value to
 // a reference except unconditional_checked_cast[_value], which is checked By
 // SILDynamicCastInst::isRCIdentityPreserving().
-bool swift::isRCIdentityPreservingCast(SingleValueInstruction *svi) {
+bool swift::isIdentityAndOwnershipPreservingRefCast(
+    SingleValueInstruction *svi) {
   switch (svi->getKind()) {
   default:
     return false;
-  // Ignore ownership casts
-  case SILInstructionKind::CopyValueInst:
+  // Ignore borrows
   case SILInstructionKind::BeginBorrowInst:
   // Ignore class type casts
   case SILInstructionKind::UpcastInst:
@@ -402,8 +408,12 @@ namespace {
 // Essentially RC identity where the starting point is already a reference.
 class FindReferenceRoot {
   SmallPtrSet<SILPhiArgument *, 4> visitedPhis;
+  bool preserveOwnership;
 
 public:
+  FindReferenceRoot(bool preserveOwnership)
+      : preserveOwnership(preserveOwnership) {}
+
   SILValue findRoot(SILValue ref) && {
     SILValue root = recursiveFindRoot(ref);
     assert(root && "all phi inputs must be reachable");
@@ -414,8 +424,15 @@ protected:
   // Return an invalid value for a phi with no resolved inputs.
   SILValue recursiveFindRoot(SILValue ref) {
     while (auto *svi = dyn_cast<SingleValueInstruction>(ref)) {
-      if (!isRCIdentityPreservingCast(svi)) {
-        break;
+      // If preserveOwnership is true, stop at the first owned root
+      if (preserveOwnership) {
+        if (!isIdentityAndOwnershipPreservingRefCast(svi)) {
+          break;
+        }
+      } else {
+        if (!isIdentityPreservingRefCast(svi)) {
+          break;
+        }
       }
       ref = svi->getOperand(0);
     };
@@ -451,7 +468,11 @@ protected:
 } // end anonymous namespace
 
 SILValue swift::findReferenceRoot(SILValue ref) {
-  return FindReferenceRoot().findRoot(ref);
+  return FindReferenceRoot(false /*preserveOwnership*/).findRoot(ref);
+}
+
+SILValue swift::findOwnershipReferenceRoot(SILValue ref) {
+  return FindReferenceRoot(true /*preserveOwnership*/).findRoot(ref);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1340,7 +1361,7 @@ AccessPathDefUseTraversal::UseKind
 AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
                                                 DFSEntry dfs) {
   if (dfs.isRef()) {
-    if (isRCIdentityPreservingCast(svi)) {
+    if (isIdentityPreservingRefCast(svi)) {
       pushUsers(svi, dfs);
       return IgnoredUse;
     }
