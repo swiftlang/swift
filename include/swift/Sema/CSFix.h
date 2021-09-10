@@ -357,6 +357,10 @@ enum class FixKind : uint8_t {
 
   /// Ignore a type imposed by an assignment destination e.g. `let x: Int = ...`
   IgnoreAssignmentDestinationType,
+
+  /// Allow argument-to-parameter subtyping even when parameter type
+  /// is marked as `inout`.
+  AllowConversionThroughInOut,
 };
 
 class ConstraintFix {
@@ -1993,7 +1997,8 @@ public:
 class AllowInOutConversion final : public ContextualMismatch {
   AllowInOutConversion(ConstraintSystem &cs, Type argType, Type paramType,
                        ConstraintLocator *locator)
-      : ContextualMismatch(cs, argType, paramType, locator) {}
+      : ContextualMismatch(cs, FixKind::AllowConversionThroughInOut, argType,
+                           paramType, locator) {}
 
 public:
   std::string getName() const override {
@@ -2005,6 +2010,10 @@ public:
   static AllowInOutConversion *create(ConstraintSystem &cs, Type argType,
                                       Type paramType,
                                       ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowConversionThroughInOut;
+  }
 };
 
 class AllowArgumentMismatch : public ContextualMismatch {
