@@ -1089,8 +1089,7 @@ func rdar74711236() {
     var s = S()
 
     s.arr = {
-      // FIXME: Missing member reference is pattern needs a better diagnostic
-      if let type = context?.store { // expected-error {{type of expression is ambiguous without more context}}
+        if let type = context?.store { // expected-error {{value of type 'Context' has no member 'store'}}
         // `isSupported` should be an invalid declaration to trigger a crash in `map(\.option)`
         let isSupported = context!.supported().contains(type)
         return (isSupported ? [type] : []).map(\.option)
