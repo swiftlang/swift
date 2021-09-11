@@ -2416,24 +2416,6 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
     case SILDIExprOperator::Dereference:
       Operands.push_back(llvm::dwarf::DW_OP_deref);
       break;
-    case SILDIExprOperator::ConstUInt:
-    case SILDIExprOperator::ConstSInt: {
-      auto Args = ExprOperand.args();
-      assert(Args.size() == 1 &&
-             "Incorrect number of argument for op_constu/op_consts");
-      if (ExprOperand.getOperator() == SILDIExprOperator::ConstUInt)
-        Operands.push_back(llvm::dwarf::DW_OP_constu);
-      else
-        Operands.push_back(llvm::dwarf::DW_OP_consts);
-      Operands.push_back(*Args[0].getAsConstInt());
-      break;
-    }
-    case SILDIExprOperator::Plus:
-      Operands.push_back(llvm::dwarf::DW_OP_plus);
-      break;
-    case SILDIExprOperator::Minus:
-      Operands.push_back(llvm::dwarf::DW_OP_minus);
-      break;
     default:
       llvm_unreachable("Unrecognized operator");
     }
@@ -2547,7 +2529,6 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (Indirection == IndirectValue || Indirection == CoroIndirectValue)
       Operands.push_back(llvm::dwarf::DW_OP_deref);
 
-    bool HasFragment = false;
     if (IsPiece) {
       // Advance the offset and align it for the next piece.
       OffsetInBits += llvm::alignTo(SizeInBits, AlignInBits);
@@ -2558,19 +2539,18 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
       // Sanity checks.
       assert(SizeInBits && "zero-sized piece");
-      if (SizeInBits < getSizeInBits(Var) &&
-          OffsetInBits + SizeInBits <= getSizeInBits(Var)) {
-        HasFragment = true;
-        // Add the piece DWARF expression.
-        Operands.push_back(llvm::dwarf::DW_OP_LLVM_fragment);
-        Operands.push_back(OffsetInBits);
-        Operands.push_back(SizeInBits);
-      }
+      assert(SizeInBits < getSizeInBits(Var) && "piece covers entire var");
+      assert(OffsetInBits + SizeInBits <= getSizeInBits(Var) && "pars > totum");
+
+      // Add the piece DWARF expression.
+      Operands.push_back(llvm::dwarf::DW_OP_LLVM_fragment);
+      Operands.push_back(OffsetInBits);
+      Operands.push_back(SizeInBits);
     }
     llvm::DIExpression *DIExpr = DBuilder.createExpression(Operands);
     // DW_OP_LLVM_fragment must be the last part of an DIExpr
-    // so we can't append more if there is already one.
-    if (!HasFragment)
+    // so we can't append more if IsPiece is true.
+    if (!IsPiece)
       DIExpr = appendDIExpression(DIExpr);
     if (DIExpr)
       emitDbgIntrinsic(
