@@ -242,7 +242,7 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 /// Must be run after the completion procedure, since the deletion of
 /// rules is only valid to perform if the rewrite system is confluent.
 void RewriteSystem::simplifyRewriteSystem() {
-  for (auto ruleID : indices(Rules)) {
+  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
     if (rule.isDeleted())
       continue;
@@ -283,8 +283,16 @@ void RewriteSystem::simplifyRewriteSystem() {
     if (!simplify(rhs))
       continue;
 
-    // If the right hand side was further reduced, update the rule.
-    rule = Rule(rule.getLHS(), Term::get(rhs, Context));
+    // We're adding a new rule, so the old rule won't apply anymore.
+    rule.markDeleted();
+
+    unsigned newRuleID = Rules.size();
+
+    // Add a new rule with the simplified right hand side.
+    Rules.emplace_back(lhs, Term::get(rhs, Context));
+    auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), newRuleID);
+    assert(oldRuleID == ruleID);
+    (void) oldRuleID;
   }
 }
 
