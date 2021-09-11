@@ -1278,9 +1278,15 @@ public:
         break;
       case SILInstructionKind::DebugValueInst:
         DebugVarTy = inst->getOperand(0)->getType();
+        if (DebugVarTy.isAddress()) {
+          auto Expr = varInfo->DIExpr.operands();
+          if (!Expr.empty() &&
+              Expr.begin()->getOperator() == SILDIExprOperator::Dereference)
+            DebugVarTy = DebugVarTy.getObjectType();
+        }
         break;
       default:
-        llvm_unreachable("");
+        llvm_unreachable("impossible instruction kind");
       }
     }
 
