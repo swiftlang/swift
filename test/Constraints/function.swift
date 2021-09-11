@@ -263,3 +263,8 @@ func testInvalidTupleImplosions() {
   func takesInout(_ x: Int, _ y: inout String) {}
   tuplify(takesInout) // expected-error {{cannot convert value of type '(Int, inout String) -> ()' to expected argument type '(Int) -> Void'}}
 }
+
+// SR-15179 
+func SR15179<Ts>(_ fn: @escaping (Ts) -> Void) {}
+func fn(_ x: inout Int, _ y: inout Int) {}
+SR15179(fn) // expected-error{{cannot convert value of type '(inout Int, inout Int) -> ()' to expected argument type '(Int) -> Void'}}
