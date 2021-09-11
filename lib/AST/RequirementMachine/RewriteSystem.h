@@ -181,6 +181,11 @@ class RewriteSystem final {
   /// Pairs of rules which have already been checked for overlap.
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
+  /// Homotopy generators (2-cells) for this rewrite system. These are the
+  /// cyclic rewrite paths which rewrite a term back to itself. This
+  /// data informs the generic signature minimization algorithm.
+  std::vector<std::pair<MutableTerm, RewritePath>> HomotopyGenerators;
+
   DebugOptions Debug;
 
 public:
@@ -216,7 +221,8 @@ public:
     return Rules[ruleID];
   }
 
-  bool addRule(MutableTerm lhs, MutableTerm rhs);
+  bool addRule(MutableTerm lhs, MutableTerm rhs,
+               const RewritePath *path=nullptr);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
@@ -249,10 +255,12 @@ public:
 
 private:
   bool
-  computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
-                      const Rule &lhs, const Rule &rhs,
-                      std::vector<std::pair<MutableTerm,
-                                            MutableTerm>> &result) const;
+  computeCriticalPair(
+      ArrayRef<Symbol>::const_iterator from,
+      const Rule &lhs, const Rule &rhs,
+      std::vector<std::pair<MutableTerm, MutableTerm>> &pairs,
+      std::vector<RewritePath> &paths,
+      std::vector<std::pair<MutableTerm, RewritePath>> &loops) const;
 
   void processMergedAssociatedTypes();
 

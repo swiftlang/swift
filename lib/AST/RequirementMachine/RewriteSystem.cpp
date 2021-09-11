@@ -116,30 +116,76 @@ Symbol RewriteSystem::simplifySubstitutionsInSuperclassOrConcreteSymbol(
     }, Context);
 }
 
-bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
+/// Adds a rewrite rule, returning true if the new rule was non-trivial.
+///
+/// If both sides simplify to the same term, the rule is trivial and discarded,
+/// and this method returns false.
+///
+/// If \p path is non-null, the new rule is derived from existing rules in the
+/// rewrite system; the path records a series of rewrite steps which transform
+/// \p lhs to \p rhs.
+bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
+                            const RewritePath *path) {
   assert(!lhs.empty());
   assert(!rhs.empty());
 
   if (Debug.contains(DebugFlags::Add)) {
-    llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n";
+    llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n\n";
   }
 
   // Now simplify both sides as much as possible with the rules we have so far.
   //
   // This avoids unnecessary work in the completion algorithm.
-  simplify(lhs);
-  simplify(rhs);
+  RewritePath lhsPath;
+  RewritePath rhsPath;
+
+  simplify(lhs, &lhsPath);
+  simplify(rhs, &rhsPath);
+
+  RewritePath loop;
+  if (path) {
+    // Produce a path from the simplified lhs to the simplified rhs.
+
+    // (1) First, apply lhsPath in reverse to produce the original lhs.
+    lhsPath.invert();
+    loop.append(lhsPath);
+
+    // (2) Now, apply the path from the original lhs to the original rhs
+    // given to us by the completion procedure.
+    loop.append(*path);
+
+    // (3) Finally, apply rhsPath to produce the simplified rhs, which
+    // is the same as the simplified lhs.
+    loop.append(rhsPath);
+  }
 
   // If the left hand side and right hand side are already equivalent, we're
   // done.
   int result = lhs.compare(rhs, Protos);
-  if (result == 0)
+  if (result == 0) {
+    // If this rule is a consequence of existing rules, add a homotopy
+    // generator.
+    if (path) {
+      // We already have a loop, since the simplified lhs is identical to the
+      // simplified rhs.
+      HomotopyGenerators.emplace_back(lhs, loop);
+
+      if (Debug.contains(DebugFlags::Add)) {
+        llvm::dbgs() << "## Recorded trivial loop at " << lhs << ": ";
+        loop.dump(llvm::dbgs(), lhs, *this);
+        llvm::dbgs() << "\n\n";
+      }
+    }
+
     return false;
+  }
 
   // Orient the two terms so that the left hand side is greater than the
   // right hand side.
-  if (result < 0)
+  if (result < 0) {
     std::swap(lhs, rhs);
+    loop.invert();
+  }
 
   assert(lhs.compare(rhs, Protos) > 0);
 
@@ -152,6 +198,19 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   auto uniquedLHS = Term::get(lhs, Context);
   auto uniquedRHS = Term::get(rhs, Context);
   Rules.emplace_back(uniquedLHS, uniquedRHS);
+
+  if (path) {
+    // We have a rewrite path from the simplified lhs to the simplified rhs;
+    // add a rewrite step applying the new rule in reverse to close the loop.
+    loop.add(RewriteStep(/*offset=*/0, newRuleID, /*inverse=*/true));
+    HomotopyGenerators.emplace_back(lhs, loop);
+
+    if (Debug.contains(DebugFlags::Add)) {
+      llvm::dbgs() << "## Recorded non-trivial loop at " << lhs << ": ";
+      loop.dump(llvm::dbgs(), lhs, *this);
+      llvm::dbgs() << "\n\n";
+    }
+  }
 
   auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), newRuleID);
   if (oldRuleID) {
@@ -279,8 +338,9 @@ void RewriteSystem::simplifyRewriteSystem() {
       continue;
 
     // Now, try to reduce the right hand side.
+    RewritePath rhsPath;
     MutableTerm rhs(rule.getRHS());
-    if (!simplify(rhs))
+    if (!simplify(rhs, &rhsPath))
       continue;
 
     // We're adding a new rule, so the old rule won't apply anymore.
@@ -293,6 +353,27 @@ void RewriteSystem::simplifyRewriteSystem() {
     auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), newRuleID);
     assert(oldRuleID == ruleID);
     (void) oldRuleID;
+
+    // Produce a loop at the simplified rhs.
+    RewritePath loop;
+
+    // (1) First, apply rhsPath in reverse to produce the original rhs.
+    rhsPath.invert();
+    loop.append(rhsPath);
+
+    // (2) Next, apply the original rule in reverse to produce the
+    // original lhs.
+    loop.add(RewriteStep(/*offset=*/0, ruleID, /*inverse=*/true));
+
+    // (3) Finally, apply the new rule to produce the simplified rhs.
+    loop.add(RewriteStep(/*offset=*/0, newRuleID, /*inverse=*/false));
+
+    if (Debug.contains(DebugFlags::Completion)) {
+      llvm::dbgs() << "$ Right hand side simplification recorded a loop: ";
+      loop.dump(llvm::dbgs(), rhs, *this);
+    }
+
+    HomotopyGenerators.emplace_back(rhs, loop);
   }
 }
 
@@ -362,6 +443,13 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "Rewrite system: {\n";
   for (const auto &rule : Rules) {
     out << "- " << rule << "\n";
+  }
+  out << "}\n";
+  out << "Homotopy generators: {\n";
+  for (const auto &loop : HomotopyGenerators) {
+    out << "- " << loop.first << ": ";
+    loop.second.dump(out, loop.first, *this);
+    out << "\n";
   }
   out << "}\n";
 }
