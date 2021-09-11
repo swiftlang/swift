@@ -1332,7 +1332,7 @@ static ManagedValue emitBuiltinConvertUnownedUnsafeToGuaranteed(
 
   // Then grab our LValue operand, drop the last ownership component.
   auto srcLV = SGF.emitLValue(args[1]->getSemanticsProvidingExpr(),
-                              SGFAccessKind::BorrowedAddressRead);
+                              SGFAccessKind::ReadWrite);
   srcLV.unsafelyDropLastComponent(PathComponent::OwnershipKind);
   if (!srcLV.isPhysical() || !srcLV.isLoadingPure()) {
     llvm::report_fatal_error("Builtin.convertUnownedUnsafeToGuaranteed passed "

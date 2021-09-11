@@ -72,7 +72,7 @@ public struct UnsafeValue<Element: AnyObject> {
   // CHECK:  [[COPY_BOX:%.*]] = alloc_box
   // CHECK:  [[COPY_PROJ:%.*]] = project_box [[COPY_BOX]]
   // CHECK:  store [[UNSAFE_VALUE]] to [trivial] [[COPY_PROJ]]
-  // CHECK:  [[VALUE_ADDR:%.*]] = begin_access [read] [unknown] [[COPY_PROJ]]
+  // CHECK:  [[VALUE_ADDR:%.*]] = begin_access [modify] [unknown] [[COPY_PROJ]]
   // CHECK:  [[STR_VALUE_ADDR:%.*]] = struct_element_addr [[VALUE_ADDR]]
   // CHECK:  [[UNMANAGED_VALUE:%.*]] = load [trivial] [[STR_VALUE_ADDR]]
   // CHECK:  [[UNOWNED_REF:%.*]] = unmanaged_to_ref [[UNMANAGED_VALUE]]
