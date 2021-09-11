@@ -399,7 +399,7 @@ public:
         EmitStackPromotionChecks(false), FunctionSections(false),
         PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         LLVMLTOKind(IRGenLLVMLTOKind::None),
-        SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
+        SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Always),
         HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
