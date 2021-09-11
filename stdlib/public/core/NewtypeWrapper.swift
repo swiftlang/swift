@@ -79,7 +79,7 @@ where Base: _SwiftNewtypeWrapper & Hashable, Base.RawValue: Hashable {
     _preconditionFailure("_rawHashValue(_seed:) called on non-canonical AnyHashable box")
   }
 
-  var _base: Any { return _value }
+  var _base: Hashable { return _value }
 
   func _unbox<T: Hashable>() -> T? {
     return _value as? T ?? _value.rawValue as? T

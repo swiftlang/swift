@@ -463,7 +463,7 @@ internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
     self._canonical = value as Set<AnyHashable>
   }
 
-  internal var _base: Any {
+  internal var _base: Hashable {
     return _value
   }
 

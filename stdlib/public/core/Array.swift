@@ -1935,7 +1935,7 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     self._value = value
   }
 
-  internal var _base: Any {
+  internal var _base: Hashable {
     return _value
   }
 

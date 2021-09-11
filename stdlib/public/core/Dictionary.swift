@@ -1627,7 +1627,7 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
     self._canonical = value as Dictionary<AnyHashable, AnyHashable>
   }
 
-  internal var _base: Any {
+  internal var _base: Hashable {
     return _value
   }
 

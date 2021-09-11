@@ -1855,7 +1855,7 @@ internal struct _IntegerAnyHashableBox<
     return _value._rawHashValue(seed: _seed)
   }
 
-  internal var _base: Any {
+  internal var _base: Hashable {
     return _value
   }
 

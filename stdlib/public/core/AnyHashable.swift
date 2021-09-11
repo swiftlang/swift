@@ -51,7 +51,7 @@ internal protocol _AnyHashableBox {
   func _hash(into hasher: inout Hasher)
   func _rawHashValue(_seed: Int) -> Int
 
-  var _base: Any { get }
+  var _base: Hashable { get }
   func _unbox<T: Hashable>() -> T?
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool
 }
@@ -92,7 +92,7 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
     return _baseHashable._rawHashValue(seed: _seed)
   }
 
-  internal var _base: Any {
+  internal var _base: Hashable {
     return _baseHashable
   }
 

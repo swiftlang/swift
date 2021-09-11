@@ -1337,7 +1337,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
     return hasher.finalize()
   }
 
-  internal var _base: Any {
+  internal var _base: Hashable {
     return _value
   }
 
