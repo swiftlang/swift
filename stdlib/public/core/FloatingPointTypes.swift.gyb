@@ -1341,16 +1341,8 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
     return _value
   }
 
-  internal func _unbox<T: Hashable>() -> T? {
+  internal func _downCastConditional<T>() -> T? {
     return _value as? T
-  }
-
-  internal func _downCastConditional<T>(
-    into result: UnsafeMutablePointer<T>
-  ) -> Bool {
-    guard let value = _value as? T else { return false }
-    result.initialize(to: value)
-    return true
   }
 }
 % end

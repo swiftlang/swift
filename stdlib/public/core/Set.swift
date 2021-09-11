@@ -490,16 +490,8 @@ internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
     return _canonical._rawHashValue(seed: _seed)
   }
 
-  internal func _unbox<T: Hashable>() -> T? {
+  internal func _downCastConditional<T>() -> T? {
     return _value as? T
-  }
-
-  internal func _downCastConditional<T>(
-    into result: UnsafeMutablePointer<T>
-  ) -> Bool {
-    guard let value = _value as? T else { return false }
-    result.initialize(to: value)
-    return true
   }
 }
 

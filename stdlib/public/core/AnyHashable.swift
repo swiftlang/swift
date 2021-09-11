@@ -52,8 +52,7 @@ internal protocol _AnyHashableBox {
   func _rawHashValue(_seed: Int) -> Int
 
   var _base: Hashable { get }
-  func _unbox<T: Hashable>() -> T?
-  func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool
+  func _downCastConditional<T>() -> T?
 }
 
 extension _AnyHashableBox {
@@ -69,12 +68,12 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
     self._baseHashable = base
   }
 
-  internal func _unbox<T: Hashable>() -> T? {
-    return (self as _AnyHashableBox as? _ConcreteHashableBox<T>)?._baseHashable
+  internal func _downCastConditional<T>() -> T? {
+    return _baseHashable as? T
   }
 
   internal func _isEqual(to rhs: _AnyHashableBox) -> Bool? {
-    if let rhs: Base = rhs._unbox() {
+    if let rhs: Base = rhs._downCastConditional() {
       return _baseHashable == rhs
     }
     return nil
@@ -94,13 +93,6 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
 
   internal var _base: Hashable {
     return _baseHashable
-  }
-
-  internal
-  func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
-    guard let value = _baseHashable as? T else { return false }
-    result.initialize(to: value)
-    return true
   }
 }
 
@@ -183,7 +175,10 @@ public struct AnyHashable {
   internal
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
     // Attempt the downcast.
-    if _box._downCastConditional(into: result) { return true }
+    if let value: T = _box._downCastConditional() {
+      result.initialize(to: value)
+      return true
+    }
 
     #if _runtime(_ObjC)
     // Bridge to Objective-C and then attempt the cast from there.
