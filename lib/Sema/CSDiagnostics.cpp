@@ -1182,8 +1182,8 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
     }
   }
 
-  bool needsParensInside = exprNeedsParensBeforeAddingAs(anchor);
-  bool needsParensOutside = exprNeedsParensAfterAddingAs(anchor);
+  bool needsParensInside = exprNeedsParensBeforeAddingAs(anchor, DC);
+  bool needsParensOutside = exprNeedsParensAfterAddingAs(anchor, DC);
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -2938,6 +2938,30 @@ bool ContextualFailure::tryIntegerCastFixIts(
         return true;
       }
     }
+  }
+
+  // bridge to prevent roundabout error message
+  // See rdar://problem/82828226
+  if (TypeChecker::isObjCBridgedTo(fromType, toType, getDC())) {
+    auto *ac = castToExpr(getAnchor());
+    bool needsParensInside = exprNeedsParensBeforeAddingAs(ac, getDC());
+    bool needsParensOutside = exprNeedsParensAfterAddingAs(ac, getDC());
+    llvm::SmallString<2> insertBefore;
+    llvm::SmallString<32> insertAfter;
+    if (needsParensOutside) {
+      insertBefore += "(";
+    }
+    if (needsParensInside) {
+      insertBefore += "(";
+      insertAfter += ")";
+    }
+    insertAfter += " as ";
+    insertAfter += toType->getWithoutParens()->getString();
+    if (needsParensOutside)
+      insertAfter += ")";
+    diagnostic.fixItInsert(exprRange.Start, insertBefore);
+    diagnostic.fixItInsertAfter(exprRange.End, insertAfter);
+    return true;
   }
 
   // Add a wrapping integer cast.
