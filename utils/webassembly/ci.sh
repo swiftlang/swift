@@ -28,27 +28,10 @@ TARGET_STDLIB_BUILD_DIR=$SOURCE_PATH/target-build/swift-stdlib-wasi-wasm32
 $DEPENDENCIES_SCRIPT
 $UTILS_PATH/install-build-sdk.sh
 
-export PATH="$HOME/.wasmer/bin:$PATH"
-
 export SCCACHE_CACHE_SIZE="50G"
 export SCCACHE_DIR="$SOURCE_PATH/build-cache"
 
 $BUILD_SCRIPT
 
-echo "Build script completed, will attempt to run test suites..."
-
 # workaround: host target test directory is necessary to use run-test
 mkdir -p "$TARGET_STDLIB_BUILD_DIR/test-$HOST_SUFFIX"
-
-# Run tests
-$RUN_TEST_BIN --build-dir "$TARGET_STDLIB_BUILD_DIR" --target wasi-wasm32 \
-  "$TARGET_STDLIB_BUILD_DIR/test-wasi-wasm32/stdlib"
-
-if [[ "$(uname)" == "Linux" ]]; then
-  echo "Skip running all test suites for Linux"
-else
-  # Run all tests but ignore failure temporarily
-  ninja check-swift-wasi-wasm32 -C "$TARGET_STDLIB_BUILD_DIR" || true
-fi
-
-echo "The test suite has finished"

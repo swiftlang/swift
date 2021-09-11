@@ -17,30 +17,52 @@ jobs:
   build_toolchain:
     env:
       TOOLCHAIN_CHANNEL: DEVELOPMENT
+      DEVELOPER_DIR: /Applications/Xcode_12.5.app/Contents/Developer/
     strategy:
       matrix:
         include:
           - build_os: ubuntu-18.04
+            agent_query: ubuntu-18.04
             target: ubuntu18.04_x86_64
+            run_stdlib_test: false
             run_full_test: false
             run_e2e_test: true
             build_hello_wasm: true
+            clean_build_dir: false
 
           - build_os: ubuntu-20.04
+            agent_query: ubuntu-20.04
             target: ubuntu20.04_x86_64
+            run_stdlib_test: false
             run_full_test: false
             run_e2e_test: true
             build_hello_wasm: true
+            clean_build_dir: false
 
-          - build_os: macos-10.15
+          - build_os: macos-11
+            agent_query: macos-11
             target: macos_x86_64
+            run_stdlib_test: true
             run_full_test: true
             run_e2e_test: true
             build_hello_wasm: true
+            clean_build_dir: false
+
+          - build_os: macos-11
+            agent_query: [self-hosted, macOS, ARM64]
+            target: macos_arm64
+            # FIXME: Enable stdlib test after wasmer fixes singlepass bug on arm64,
+            # fixes cranelift bug on x64, or wasmtime supports arm64
+            # Currently it's hard to run tests on both x64 and arm64.
+            run_stdlib_test: false
+            run_full_test: false
+            run_e2e_test: false
+            build_hello_wasm: true
+            clean_build_dir: true
 
     name: Target ${{ matrix.target }}
     timeout-minutes: 0
-    runs-on: ${{ matrix.build_os }}
+    runs-on: ${{ matrix.agent_query }}
     steps:
       # TODO(katei): Remove this step after https://bugs.swift.org/browse/SR-15135 will be resolved
       - name: (Workaround) Uninstall pre-installed Swift toolchain on Linux
@@ -75,6 +97,11 @@ jobs:
           string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
           message("::set-output name=timestamp::${current_date}")
 
+      - name: Check Xcode version
+        if: ${{ startsWith(matrix.build_os, 'macos-') }}
+        run: |
+          xcodebuild -version
+
       - uses: actions/cache@v1
         with:
           path: build-cache
@@ -82,11 +109,13 @@ jobs:
           restore-keys: |
             ${{ matrix.target }}-sccache-v11-
 
-      - name: Select Xcode version
-        if: ${{ matrix.build_os == 'macos-10.15' }}
+      - name: Clean stdlib build directory
+        if: ${{ matrix.clean_build_dir }}
         run: |
-          sudo xcode-select --switch /Applications/Xcode_12.3.app/Contents/Developer/
-          xcodebuild -version
+          rm -rf ${{ github.workspace }}/target-build \
+            ${{ github.workspace }}/host-build \
+            ${{ github.workspace }}/host-toolchain-sdk \
+            ${{ github.workspace }}/dist-toolchain-sdk
 
       - name: Build ${{ matrix.target }} installable archive
         env:
@@ -94,7 +123,7 @@ jobs:
         run: |
 
           case "${{ matrix.target }}" in
-            "ubuntu20.04_x86_64" | "ubuntu18.04_x86_64" | "macos_x86_64")
+            "ubuntu20.04_x86_64" | "ubuntu18.04_x86_64" | "macos_x86_64" | "macos_arm64")
               ./swift/utils/webassembly/ci.sh
             ;;
             *)
@@ -111,6 +140,23 @@ jobs:
         with:
           name: ${{ matrix.target }}-installable
           path: swift-wasm-${{ env.TOOLCHAIN_CHANNEL }}-SNAPSHOT-${{ matrix.target }}.tar.gz
+
+      - name: Add wasmer in PATH for testing
+        run: echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
+
+      - name: Run stdlib tests for wasi-wasm32
+        if: ${{ matrix.run_stdlib_test }}
+        run: |
+          TARGET_STDLIB_BUILD_DIR=${{ github.workspace }}/target-build/swift-stdlib-wasi-wasm32
+          ./swift/utils/run-test --build-dir "$TARGET_STDLIB_BUILD_DIR" --target wasi-wasm32 \
+            "$TARGET_STDLIB_BUILD_DIR/test-wasi-wasm32/stdlib"
+
+      - name: Run all tests for wasi-wasm32
+        if: ${{ matrix.run_full_test }}
+        run: |
+          TARGET_STDLIB_BUILD_DIR=${{ github.workspace }}/target-build/swift-stdlib-wasi-wasm32
+          # Run all tests but ignore failure temporarily
+          ninja check-swift-wasi-wasm32 -C "$TARGET_STDLIB_BUILD_DIR" || true
 
       - name: Pack test results
         if: ${{ matrix.run_full_test }}
@@ -156,4 +202,3 @@ jobs:
         run: |
           $TOOLCHAIN/usr/bin/swift run # Use TOOLCHAIN env value
         working-directory: ${{ github.workspace }}/integration-tests
-
