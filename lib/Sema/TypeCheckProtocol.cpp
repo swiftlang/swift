@@ -2164,8 +2164,7 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
     return AnyFunctionType::composeTuple(module->getASTContext(),
                                          ctor->getMethodInterfaceType()
                                              ->castTo<FunctionType>()
-                                             ->getParams(),
-                                         /*canonicalVararg=*/false);
+                                             ->getParams());
   }
 
   Type type = decl->getInterfaceType();

@@ -258,13 +258,16 @@ BuiltinTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
 bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
                                               remote::RemoteAddress address,
                                               int *extraInhabitantIndex) const {
+  *extraInhabitantIndex = -1;
+
   switch (SubKind) {
   case RecordKind::Invalid:
   case RecordKind::ClosureContext:
     return false;
 
-  case RecordKind::OpaqueExistential: {
-    if (Fields.size() != 1) {
+  case RecordKind::OpaqueExistential:
+  case RecordKind::ExistentialMetatype: {
+    if (Fields.size() < 1) {
       return false;
     }
     auto metadata = Fields[0];
@@ -274,7 +277,7 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
   }
 
   case RecordKind::ThickFunction: {
-    if (Fields.size() != 2) {
+    if (Fields.size() < 2) {
       return false;
     }
     auto function = Fields[0];
@@ -288,16 +291,25 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
   }
 
   case RecordKind::ClassExistential:
-  case RecordKind::ExistentialMetatype:
-  case RecordKind::ErrorExistential:
-  case RecordKind::ClassInstance: {
-    return false; // XXX TODO XXX
+  case RecordKind::ErrorExistential: {
+    if (Fields.size() < 1) {
+      return true;
+    }
+    auto first = Fields[0];
+    auto firstFieldAddress = address + first.Offset;
+    return first.TI.readExtraInhabitantIndex(reader, firstFieldAddress,
+                                             extraInhabitantIndex);
   }
+
+  case RecordKind::ClassInstance:
+    // This case seems unlikely to ever happen; if we're using XIs with a
+    // class, it'll be with a reference, not with the instance itself (i.e.
+    // we'll be in the RecordKind::ClassExistential case).
+    return false;
 
   case RecordKind::Tuple:
   case RecordKind::Struct: {
     if (Fields.size() == 0) {
-      *extraInhabitantIndex = -1;
       return true;
     }
     // Tuples and Structs inherit XIs from their most capacious member
