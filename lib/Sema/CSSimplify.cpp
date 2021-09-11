@@ -4565,12 +4565,12 @@ bool ConstraintSystem::repairFailures(
       return true;
 
     // If we could record a generic arguments mismatch instead of this fix,
-    // don't record a ContextualMismatch here.
+    // don't record a contextual type mismatch here.
     if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
       break;
 
-    auto *fix = ContextualMismatch::create(*this, lhs, rhs,
-                                           getConstraintLocator(locator));
+    auto *fix = IgnoreContextualType::create(*this, lhs, rhs,
+                                             getConstraintLocator(locator));
     conversionsOrFixes.push_back(fix);
     break;
   }
