@@ -224,7 +224,7 @@ class Product(object):
                 # If this is one of the hosts we should lipo,
                 # install in to a temporary subdirectory.
                 return '%s/intermediate-install/%s' % \
-                    (self.args.install_destdir, host_target)
+                    (os.path.dirname(self.build_dir), host_target)
             elif host_target == "merged-hosts":
                 # This assumes that all hosts are merged to the lipo.
                 return self.args.install_destdir
