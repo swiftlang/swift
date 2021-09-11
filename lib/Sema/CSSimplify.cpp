@@ -4497,8 +4497,21 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
+    auto *parentLoc = getConstraintLocator(anchor, path);
+
     if ((lhs->is<InOutType>() && !rhs->is<InOutType>()) ||
         (!lhs->is<InOutType>() && rhs->is<InOutType>())) {
+      // Since `FunctionArgument` as a last locator element represents
+      // a single parameter of the function type involved in a conversion
+      // to another function type, see `matchFunctionTypes`. If there is already
+      // a fix for the this convertion, we can just ignore individual function
+      // argument in-out mismatch failure by considered this fixed increasing
+      // the score.
+      if (hasFixFor(parentLoc)) {
+        increaseScore(SK_Fix);
+        return true;
+      }
+
       // We want to call matchTypes with the default decomposition options
       // in case there are type variables that we couldn't bind due to the
       // inout attribute mismatch.
@@ -4514,7 +4527,6 @@ bool ConstraintSystem::repairFailures(
       }
     }
 
-    auto *parentLoc = getConstraintLocator(anchor, path);
     // In cases like this `FunctionArgument` as a last locator element
     // represents a single parameter of the function type involved in
     // a conversion to another function type, see `matchFunctionTypes`.
