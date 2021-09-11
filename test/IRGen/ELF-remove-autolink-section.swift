@@ -15,7 +15,7 @@ print("Hi from Swift!")
 // Find the metadata entry for the denylisting of the metadata symbol
 // Ensure that it is in the ASAN metadata
 
-// ELF-DAG: !llvm.asan.globals = !{
+// ELF: !llvm.asan.globals = !{
 // ELF-SAME: [[MD:![0-9]+]]
 // ELF-SAME: }
 
