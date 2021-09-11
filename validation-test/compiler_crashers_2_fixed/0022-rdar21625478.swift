@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-silgen
 
+// REQUIRES: disabledForNow
+
 import StdlibUnittest
 
 public struct MyRange<Bound : ForwardIndex> {
