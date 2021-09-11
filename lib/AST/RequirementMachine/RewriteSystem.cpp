@@ -23,18 +23,76 @@
 using namespace swift;
 using namespace rewriting;
 
+void Rule::dump(llvm::raw_ostream &out) const {
+  out << LHS << " => " << RHS;
+  if (deleted)
+    out << " [deleted]";
+}
+
+void RewritePath::invert() {
+  std::reverse(Steps.begin(), Steps.end());
+
+  for (auto &step : Steps)
+    step.invert();
+}
+
+/// Dumps the rewrite step that was applied to \p term. Mutates \p term to
+/// reflect the application of the rule.
+void RewriteStep::dump(llvm::raw_ostream &out,
+                       MutableTerm &term,
+                       const RewriteSystem &system) const {
+  const auto &rule = system.getRule(RuleID);
+
+  auto lhs = (Inverse ? rule.getRHS() : rule.getLHS());
+  auto rhs = (Inverse ? rule.getLHS() : rule.getRHS());
+
+  assert(std::equal(term.begin() + Offset,
+                    term.begin() + Offset + lhs.size(),
+                    lhs.begin()));
+
+  MutableTerm prefix(term.begin(), term.begin() + Offset);
+  MutableTerm suffix(term.begin() + Offset + lhs.size(), term.end());
+
+  if (!prefix.empty()) {
+    out << prefix;
+    out << ".";
+  }
+  out << "(" << rule.getLHS();
+  out << (Inverse ? " <= " : " => ");
+  out << rule.getRHS() << ")";
+  if (!suffix.empty()) {
+    out << ".";
+    out << suffix;
+  }
+
+  term = prefix;
+  term.append(rhs);
+  term.append(suffix);
+}
+
+/// Dumps a series of rewrite steps applied to \p term.
+void RewritePath::dump(llvm::raw_ostream &out,
+                       MutableTerm term,
+                       const RewriteSystem &system) const {
+  bool first = true;
+
+  for (const auto &step : Steps) {
+    if (!first) {
+      out << " ⊗ ";
+    } else {
+      first = false;
+    }
+
+    step.dump(out, term, system);
+  }
+}
+
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
     : Context(ctx), Debug(ctx.getDebugOptions()) {}
 
 RewriteSystem::~RewriteSystem() {
   Trie.updateHistograms(Context.RuleTrieHistogram,
                         Context.RuleTrieRootHistogram);
-}
-
-void Rule::dump(llvm::raw_ostream &out) const {
-  out << LHS << " => " << RHS;
-  if (deleted)
-    out << " [deleted]";
 }
 
 void RewriteSystem::initialize(
@@ -89,16 +147,16 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
     llvm::dbgs() << "## Simplified and oriented rule " << lhs << " => " << rhs << "\n\n";
   }
 
-  unsigned i = Rules.size();
+  unsigned newRuleID = Rules.size();
 
   auto uniquedLHS = Term::get(lhs, Context);
   auto uniquedRHS = Term::get(rhs, Context);
   Rules.emplace_back(uniquedLHS, uniquedRHS);
 
-  auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), i);
+  auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), newRuleID);
   if (oldRuleID) {
     llvm::errs() << "Duplicate rewrite rule!\n";
-    const auto &oldRule = Rules[*oldRuleID];
+    const auto &oldRule = getRule(*oldRuleID);
     llvm::errs() << "Old rule #" << *oldRuleID << ": ";
     oldRule.dump(llvm::errs());
     llvm::errs() << "\nTrying to replay what happened when I simplified this term:\n";
@@ -116,11 +174,18 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.
-bool RewriteSystem::simplify(MutableTerm &term) const {
+///
+/// If \p path is non-null, records the series of rewrite steps taken.
+bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
   bool changed = false;
 
+  MutableTerm original;
+  RewritePath forDebug;
   if (Debug.contains(DebugFlags::Simplify)) {
-    llvm::dbgs() << "= Term " << term << "\n";
+
+    original = term;
+    if (!path)
+      path = &forDebug;
   }
 
   while (true) {
@@ -131,19 +196,16 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
     while (from < end) {
       auto ruleID = Trie.find(from, end);
       if (ruleID) {
-        const auto &rule = Rules[*ruleID];
+        const auto &rule = getRule(*ruleID);
         if (!rule.isDeleted()) {
-          if (Debug.contains(DebugFlags::Simplify)) {
-            llvm::dbgs() << "== Rule #" << *ruleID << ": " << rule << "\n";
-          }
-
           auto to = from + rule.getLHS().size();
           assert(std::equal(from, to, rule.getLHS().begin()));
 
           term.rewriteSubTerm(from, to, rule.getRHS());
 
-          if (Debug.contains(DebugFlags::Simplify)) {
-            llvm::dbgs() << "=== Result " << term << "\n";
+          if (path) {
+            unsigned offset = (unsigned)(from - term.begin());
+            path->add(RewriteStep(offset, *ruleID, /*inverse=*/false));
           }
 
           changed = true;
@@ -159,6 +221,17 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
       break;
   }
 
+  if (Debug.contains(DebugFlags::Simplify)) {
+    if (changed) {
+      llvm::dbgs() << "= Simplified " << term << ": ";
+      forDebug.dump(llvm::dbgs(), original, *this);
+      llvm::dbgs() << "\n";
+    } else {
+      llvm::dbgs() << "= Irreducible term: " << term << "\n";
+    }
+  }
+
+  assert(path == nullptr || changed != path->empty());
   return changed;
 }
 
@@ -170,7 +243,7 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
 /// rules is only valid to perform if the rewrite system is confluent.
 void RewriteSystem::simplifyRewriteSystem() {
   for (auto ruleID : indices(Rules)) {
-    auto &rule = Rules[ruleID];
+    auto &rule = getRule(ruleID);
     if (rule.isDeleted())
       continue;
 
@@ -186,11 +259,11 @@ void RewriteSystem::simplifyRewriteSystem() {
           continue;
 
         // Ignore other deleted rules.
-        if (Rules[*otherRuleID].isDeleted())
+        if (getRule(*otherRuleID).isDeleted())
           continue;
 
         if (Debug.contains(DebugFlags::Completion)) {
-          const auto &otherRule = Rules[ruleID];
+          const auto &otherRule = getRule(ruleID);
           llvm::dbgs() << "$ Deleting rule " << rule << " because "
                        << "its left hand side contains " << otherRule
                        << "\n";

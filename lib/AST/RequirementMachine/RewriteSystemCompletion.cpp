@@ -235,7 +235,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
 
     // Look for conformance requirements on [P1:T] and [P2:T].
     auto visitRule = [&](unsigned ruleID) {
-      const auto &otherRule = Rules[ruleID];
+      const auto &otherRule = getRule(ruleID);
       const auto &otherLHS = otherRule.getLHS();
       if (otherLHS.size() == 2 &&
           otherLHS[1].getKind() == Symbol::Kind::Protocol) {
@@ -440,7 +440,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
     // For every rule, looking for other rules that overlap with this rule.
     for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
-      const auto &lhs = Rules[i];
+      const auto &lhs = getRule(i);
       if (lhs.isDeleted())
         continue;
 
@@ -458,7 +458,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           if (!CheckedOverlaps.insert(std::make_pair(i, j)).second)
             return;
 
-          const auto &rhs = Rules[j];
+          const auto &rhs = getRule(j);
           if (rhs.isDeleted())
             return;
 
@@ -497,7 +497,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
             if (Debug.contains(DebugFlags::Completion)) {
               llvm::dbgs() << "$ Trivially overlapping rules: (#" << i << ") ";
               llvm::dbgs() << lhs << "\n";
-              llvm::dbgs() << "                -vs- (#" << j << ") ";
+              llvm::dbgs() << "                          -vs- (#" << j << ") ";
               llvm::dbgs() << rhs << ":\n";
             }
           }

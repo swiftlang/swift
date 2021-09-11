@@ -31,6 +31,7 @@ namespace rewriting {
 
 class PropertyMap;
 class RewriteContext;
+class RewriteSystem;
 
 /// A rewrite rule that replaces occurrences of LHS with RHS.
 ///
@@ -76,6 +77,67 @@ public:
     rule.dump(out);
     return out;
   }
+};
+
+/// Records the application of a rewrite rule to a term.
+struct RewriteStep {
+  /// The position within the term where the rule is being applied.
+  unsigned Offset : 16;
+
+  /// The index of the rule in the rewrite system.
+  unsigned RuleID : 15;
+
+  /// If false, the step replaces an occurrence of the rule's left hand side
+  /// with the right hand side. If true, vice versa.
+  unsigned Inverse : 1;
+
+  RewriteStep(unsigned offset, unsigned ruleID, bool inverse) {
+    Offset = offset;
+    assert(Offset == offset && "Overflow");
+    RuleID = ruleID;
+    assert(RuleID == ruleID && "Overflow");
+    Inverse = inverse;
+  }
+
+  void invert() {
+    Inverse = !Inverse;
+  }
+
+  void dump(llvm::raw_ostream &out,
+            MutableTerm &term,
+            const RewriteSystem &system) const;
+};
+
+/// Records a sequence of zero or more rewrite rules applied to a term.
+struct RewritePath {
+  SmallVector<RewriteStep, 3> Steps;
+
+  bool empty() const {
+    return Steps.empty();
+  }
+
+  void add(RewriteStep step) {
+    Steps.push_back(step);
+  }
+
+  // Horizontal composition of paths.
+  void append(RewritePath other) {
+    Steps.append(other.begin(), other.end());
+  }
+
+  decltype(Steps)::const_iterator begin() const {
+    return Steps.begin();
+  }
+
+  decltype(Steps)::const_iterator end() const {
+    return Steps.end();
+  }
+
+  void invert();
+
+  void dump(llvm::raw_ostream &out,
+            MutableTerm term,
+            const RewriteSystem &system) const;
 };
 
 /// A term rewrite system for working with types in a generic signature.
@@ -141,9 +203,22 @@ public:
 
   Symbol simplifySubstitutionsInSuperclassOrConcreteSymbol(Symbol symbol) const;
 
+  unsigned getRuleID(const Rule &rule) const {
+    assert((unsigned)(&rule - &*Rules.begin()) < Rules.size());
+    return (unsigned)(&rule - &*Rules.begin());
+  }
+
+  Rule &getRule(unsigned ruleID) {
+    return Rules[ruleID];
+  }
+
+  const Rule &getRule(unsigned ruleID) const {
+    return Rules[ruleID];
+  }
+
   bool addRule(MutableTerm lhs, MutableTerm rhs);
 
-  bool simplify(MutableTerm &term) const;
+  bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
   enum class CompletionResult {
     /// Confluent completion was computed successfully.
