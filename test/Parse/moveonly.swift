@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -verify-syntax-tree
+// RUN: %target-typecheck-verify-swift -parse-stdlib -disable-availability-checking -verify-syntax-tree
+
+import Swift
 
 class Klass {}
 
@@ -17,4 +19,13 @@ func varDecls(_ x: @_moveOnly Klass, _ x2: @_moveOnly Klass) -> () {
     print(y)
 }
 
-// TODO: Globals
+func getKlass() -> @_moveOnly Builtin.NativeObject {
+    let k = Klass()
+    let b = Builtin.unsafeCastToNativeObject(k)
+    return Builtin.move_NativeObject(b)
+}
+
+var g: @_moveOnly Builtin.NativeObject = getKlass()
+let g2: @_moveOnly Builtin.NativeObject = getKlass()
+
+
