@@ -57,12 +57,10 @@ case $(uname -s) in
   Darwin)
     SWIFT_PACKAGE=buildbot_osx_package
     OS_SUFFIX=osx
-    BUILD_SUBDIR=buildbot_osx
   ;;
   Linux)
     SWIFT_PACKAGE=buildbot_linux
     OS_SUFFIX=linux
-    BUILD_SUBDIR=buildbot_linux
   ;;
   *)
     echo "Unrecognised platform $(uname -s)"
@@ -136,7 +134,7 @@ DISPLAY_NAME_SHORT="Local Swift Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 
 SWIFT_INSTALLABLE_PACKAGE="${RESULT_DIR}/${ARCHIVE}"
-SWIFT_INSTALL_DIR="${RESULT_DIR}/${BUILD_SUBDIR}"
+SWIFT_INSTALL_DIR="${RESULT_DIR}/swift-nightly-install"
 SWIFT_INSTALL_SYMROOT="${RESULT_DIR}/swift-nightly-symroot"
 SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain"
 SYMBOLS_PACKAGE="${RESULT_DIR}/${SYM_ARCHIVE}"
