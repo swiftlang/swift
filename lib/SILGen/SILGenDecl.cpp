@@ -543,10 +543,18 @@ public:
       address = value;
     SILLocation PrologueLoc(vd);
 
-    if (SGF.getASTContext().LangOpts.EnableExperimentalLexicalLifetimes &&
-        value->getOwnershipKind() != OwnershipKind::None)
+    // If we have a move only value, use a move value.
+    if (value->getType().isMoveOnly()) {
       value = SILValue(
-          SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true));
+          SGF.B.createMoveValue(PrologueLoc, value));
+    } else {
+      // Otherwise if we have experimental lexical lifetimes enabled, borrow
+      // [lexical] the value.
+      if (SGF.getASTContext().LangOpts.EnableExperimentalLexicalLifetimes &&
+          value->getOwnershipKind() != OwnershipKind::None)
+        value = SILValue(
+            SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true));
+    }
     SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
     // Emit a debug_value[_addr] instruction to record the start of this value's

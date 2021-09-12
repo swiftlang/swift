@@ -5255,10 +5255,14 @@ move_value
 
    sil-instruction ::= 'move_value' sil-operand
 
-   %1 = move_value %0 : $@_moveOnly A
+   %1 = move_value %0 : $A
+   %1a = move_value %0a : $@moveOnly A
 
-Performs a move of the operand, ending its lifetime. When ownership is enabled,
-it always takes in an `@owned T` and produces a new `@owned @_moveOnly T`. 
+   // %1 is of type $@moveOnly A
+   // %1a is of type $A
+
+Performs a move of a copyable or moveOnly operand, ending its lifetime and
+converting it to a new moveOnly or copyable result respectively.
 
 1. For trivial types, this is equivalent to just propagating through the trivial
    value.

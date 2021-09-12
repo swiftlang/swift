@@ -3121,7 +3121,7 @@ public:
             "cannot get address of static property with struct_element_addr");
     require(EI->getField()->hasStorage(),
             "cannot get address of computed property with ref_element_addr");
-    SILType operandTy = EI->getOperand()->getType();
+    SILType operandTy = EI->getOperand()->getType().unwrapMoveOnlyType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_element_addr operand must be a class instance");
     require(!cd->isResilient(F.getModule().getSwiftModule(),
@@ -5275,8 +5275,8 @@ public:
   void checkMoveValueInst(MoveValueInst *mvi) {
     require(mvi->getOperand()->getType().isObject(),
             "Operand value should be an object");
-    require(mvi->getType().getMoveOnlyType() == mvi->getOperand()->getType(),
-            "Result after removing move only wrapper must be operand type");
+    require(mvi->getType().isMoveOnly() || mvi->getOperand()->getType().isMoveOnly(),
+            "At least one of move-value's operand or result type must be a move only type");
   }
 
   void verifyEpilogBlocks(SILFunction *F) {
