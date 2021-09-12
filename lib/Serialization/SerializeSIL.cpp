@@ -1388,6 +1388,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UnmanagedRetainValueInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::ReleaseValueAddrInst:

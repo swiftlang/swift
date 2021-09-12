@@ -5245,6 +5245,34 @@ independent of the operand. In terms of specific types:
 In ownership qualified functions, a ``copy_value`` produces a +1 value that must
 be consumed at most once along any path through the program.
 
+move_value
+``````````
+
+::
+
+   sil-instruction ::= 'move_value' sil-operand
+
+   %1 = move_value %0 : $@_moveOnly A
+
+Performs a move of the operand, ending its lifetime. When ownership is enabled,
+it always takes in an `@owned T` and produces a new `@owned @_moveOnly T`. 
+
+1. For trivial types, this is equivalent to just propagating through the trivial
+   value.
+2. For reference types, this is equivalent to ending the lifetime of the
+   operand, beginning a new lifetime for the result and setting the result to
+   the value of the operand.
+3. For aggregates, the operation is equivalent to performing a move_value on
+   each of its fields recursively.
+
+After ownership is lowered, we leave in the move_value to provide a place for
+IRGenSIL to know to store a potentially new variable (in case the move was
+associated with a let binding).
+
+NOTE: This instruction is used in an experimental feature called 'move only
+values'. A move_value instruction is an instruction that introduces (or injects)
+a type `T` into the move only value space.
+
 release_value
 `````````````
 
