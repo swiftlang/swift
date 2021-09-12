@@ -127,9 +127,15 @@ bool MoveOnlyChecker::check(NonLocalAccessBlockAnalysis *accessBlockAnalysis,
       }
     }
 
-    diagnose(astContext,
-             movedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
-             diag::sil_moveonlychecker_value_consumed_more_than_once, varName);
+    if (auto *arg = dyn_cast<SILArgument>(movedValue)) {
+      diagnose(astContext,
+               arg->getDecl()->getLoc(),
+               diag::sil_moveonlychecker_value_consumed_more_than_once, varName);
+    } else {
+      diagnose(astContext,
+               movedValue->getDefiningInstruction()->getLoc().getSourceLoc(),
+               diag::sil_moveonlychecker_value_consumed_more_than_once, varName);
+    }
 
     while (consumingUsesNeedingCopy.size()) {
       auto *consumingUse = consumingUsesNeedingCopy.pop_back_val();

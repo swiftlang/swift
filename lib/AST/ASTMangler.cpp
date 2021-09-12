@@ -1387,7 +1387,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       // For now just append the inner type.
       auto moveOnly = cast<MoveOnlyType>(tybase);
       appendType(moveOnly->getInnerType(), sig);
-      appendOperator("INSERT_BETTER_OPERATOR_HERE");
+      //appendOperator("INSERT_BETTER_OPERATOR_HERE");
       return;
     }
     case TypeKind::SILBox: {
