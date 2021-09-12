@@ -854,6 +854,13 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
+static ValueDecl *getMoveOperation(ASTContext &ctx, Identifier id,
+                                   Type argType) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(argType),
+                            _moveOnly(argType));
+}
+
 static ValueDecl *getTransferArrayOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted),
@@ -2499,6 +2506,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::EndUnpairedAccess:
     if (!Types.empty()) return nullptr;
     return getEndUnpairedAccessOperation(Context, Id);
+
+  case BuiltinValueKind::Move:
+    if (Types.size() != 1) return nullptr;
+    return getMoveOperation(Context, Id, Types[0]);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)

@@ -130,6 +130,22 @@ Type synthesizeType(SynthesisContext &SC,
   return ExistentialMetatypeType::get(synthesizeType(SC, M.Sub));
 }
 
+/// A synthesizer that generates a MoveOnly wrapper of a type.
+template <class S>
+struct MoveOnlyTypeSynthesizer {
+  S Sub;
+};
+template <class S>
+constexpr MoveOnlyTypeSynthesizer<S> _moveOnly(S sub) {
+  return {sub};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC,
+                    const MoveOnlyTypeSynthesizer<S> &M) {
+  auto ty = synthesizeType(SC, M.Sub);
+  return MoveOnlyType::get(ty->getCanonicalType());
+}
+
 /// Helper types for variadic synthesis.
 template <class... Ss>
 struct VariadicSynthesizerStorage;
