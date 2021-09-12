@@ -1220,6 +1220,7 @@ function(_add_swift_target_library_single target name)
         "${PLIST_INFO_PLIST_OUT}"
         @ONLY
         NEWLINE_STYLE UNIX)
+    set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
 
     # If Application Extensions are enabled, pass the linker flag marking
     # the dylib as safe.
