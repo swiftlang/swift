@@ -7342,7 +7342,8 @@ class MoveValueInst
   friend class SILBuilder;
 
   MoveValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+      : UnaryInstructionBase(DebugLoc, operand,
+                             operand->getType().makeMoveOnly()) {}
 };
 
 /// Given an object reference, return true iff it is non-nil and refers

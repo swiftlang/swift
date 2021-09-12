@@ -5275,8 +5275,8 @@ public:
   void checkMoveValueInst(MoveValueInst *mvi) {
     require(mvi->getOperand()->getType().isObject(),
             "Operand value should be an object");
-    require(mvi->getType() == mvi->getOperand()->getType(),
-            "Result and operand must have the same type, today.");
+    require(mvi->getType().getMoveOnlyType() == mvi->getOperand()->getType(),
+            "Result after removing move only wrapper must be operand type");
   }
 
   void verifyEpilogBlocks(SILFunction *F) {
