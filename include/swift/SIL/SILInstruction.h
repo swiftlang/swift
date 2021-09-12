@@ -7326,8 +7326,14 @@ class MoveValueInst
                                   SingleValueInstruction> {
   friend class SILBuilder;
 
+  static SILType getMoveOnlyType(SILValue operand) {
+    auto type = MoveOnlyType::get(operand->getType().getASTType());
+    return SILType::getPrimitiveObjectType(type);
+  }
+
   MoveValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+      : UnaryInstructionBase(DebugLoc, operand,
+                             MoveValueInst::getMoveOnlyType(operand)) {}
 };
 
 /// Given an object reference, return true iff it is non-nil and refers

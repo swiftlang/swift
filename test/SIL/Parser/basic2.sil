@@ -44,15 +44,15 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @test_movevalue_parsing : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil [ossa] @test_movevalue_parsing : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @_moveOnly Builtin.NativeObject {
 // CHECK: bb0(%0 :
 // CHECK-NEXT: %1 = move_value %0 : $Builtin.NativeObject
 // CHECK-NEXT: return
 // CHECK-NEXT: } // end sil function 'test_movevalue_parsing'
-sil [ossa] @test_movevalue_parsing : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+sil [ossa] @test_movevalue_parsing : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @_moveOnly Builtin.NativeObject {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = move_value %0 : $Builtin.NativeObject
-  return %1 : $Builtin.NativeObject
+  return %1 : $@_moveOnly Builtin.NativeObject
 }
 
 // CHECK-LABEL: sil @test_movevalue_parsing_non_ossa : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {

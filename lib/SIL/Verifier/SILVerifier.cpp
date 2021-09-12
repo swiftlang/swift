@@ -5274,8 +5274,11 @@ public:
   void checkMoveValueInst(MoveValueInst *mvi) {
     require(mvi->getOperand()->getType().isObject(),
             "Operand value should be an object");
-    require(mvi->getType() == mvi->getOperand()->getType(),
-            "Result and operand must have the same type, today.");
+    auto *moveOnlyTy = mvi->getType().getASTType()->castTo<MoveOnlyType>();
+    auto innerTy = moveOnlyTy->getInnerType();
+    require(innerTy == mvi->getOperand()->getType().getASTType(),
+            "after removing move_only from result, result and operand must "
+            "have the same type");
   }
 
   void verifyEpilogBlocks(SILFunction *F) {
