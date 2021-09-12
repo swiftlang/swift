@@ -80,6 +80,10 @@ namespace {
       return visit(type.getInstanceType());
     }
 
+    bool visitMoveOnlyType(CanMoveOnlyType type) {
+      return visit(type->getInnerType());
+    }
+
     /// Everything else is trivial.  Note that ordinary metatypes of
     /// existential types are still singleton.
     bool visitType(CanType type) {
@@ -636,6 +640,17 @@ namespace {
       // Should not be loaded.
       return asImpl().handleReference(
           type, getReferenceRecursiveProperties(isSensitive));
+    }
+
+    RetTy visitMoveOnlyType(CanMoveOnlyType type, AbstractionPattern origType,
+                            IsTypeExpansionSensitive_t isSensitive) {
+      // We are going to want to be non-trivial but loadable.
+      RecursiveProperties props;
+      props.setNonTrivial();
+      props.addSubobject(classifyType(
+          origType, type->getInnerType()->getCanonicalType(), TC, Expansion));
+      props = mergeIsTypeExpansionSensitive(isSensitive, props);
+      return asImpl().handleReference(type, props);
     }
 
     RetTy handleAggregateByProperties(CanType type, RecursiveProperties props) {

@@ -165,6 +165,13 @@ public:
     return SILType(getASTType(), SILValueCategory::Object);
   }
 
+  bool isMoveOnly() const { return getASTType()->is<MoveOnlyType>(); }
+
+  SILType removingMoveOnly() const {
+    auto *moveType = getASTType()->castTo<MoveOnlyType>();
+    return getPrimitiveObjectType(moveType->getInnerType());
+  }
+
   /// Returns the canonical AST type referenced by this SIL type.
   ///
   /// NOTE:
