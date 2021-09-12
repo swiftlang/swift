@@ -197,6 +197,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
     return functionsCount;
 
   // Nothing else is statically just a class reference.
+  case TypeKind::MoveOnly:
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
   case TypeKind::Unresolved:
@@ -1376,6 +1377,7 @@ CanType TypeBase::computeCanonicalType() {
     break;
   }
 
+  case TypeKind::MoveOnly:
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
@@ -4455,7 +4457,16 @@ case TypeKind::Id:
       return SILBlockStorageType::get(canTransCap);
     return storageTy;
   }
-
+  case TypeKind::MoveOnly: {
+    auto moveTy = cast<MoveOnlyType>(base);
+    Type transformed = moveTy->getInnerType().transformRec(fn);
+    if (!transformed)
+      return Type();
+    CanType canTransformed = transformed->getCanonicalType();
+    if (canTransformed != moveTy->getInnerType())
+      return MoveOnlyType::get(canTransformed);
+    return moveTy;
+  }
   case TypeKind::SILBox: {
     bool changed = false;
     auto boxTy = cast<SILBoxType>(base);
@@ -5180,6 +5191,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     return ReferenceCounting::Unknown;
   }
 
+  case TypeKind::MoveOnly:
   case TypeKind::Function:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:
