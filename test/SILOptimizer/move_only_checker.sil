@@ -1,0 +1,54 @@
+// RUN: %target-sil-opt -sil-move-only-checker %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+//////////////////
+// Declarations //
+//////////////////
+
+sil @use_move_only_value : $@convention(thin) (@guaranteed @move_only Builtin.NativeObject) -> ()
+sil @consume_move_only_value : $@convention(thin) (@owned @move_only Builtin.NativeObject) -> ()
+
+///////////
+// Tests //
+///////////
+
+// No diagnostics.
+sil [ossa] @simple_test : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @move_only Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = move_value %0 : $Builtin.NativeObject
+  return %1 : $@move_only Builtin.NativeObject
+}
+
+sil [ossa] @copies_before_move_only_are_ok : $@convention(thin) (@owned Builtin.NativeObject) -> @owned @move_only Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %0a = copy_value %0 : $Builtin.NativeObject
+  %1 = move_value %0 : $Builtin.NativeObject
+  destroy_value %0a : $Builtin.NativeObject
+  return %1 : $@move_only Builtin.NativeObject
+}
+
+sil [ossa] @destroy_move_only_with_destroy_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %0a = copy_value %0 : $Builtin.NativeObject
+  %1 = move_value %0 : $Builtin.NativeObject
+  destroy_value %0a : $Builtin.NativeObject
+  destroy_value %1 : $@move_only Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Failing tests
+
+sil [ossa] @flag_double_consume_of_move_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = move_value %0 : $Builtin.NativeObject
+  %2 = copy_value %1 : $@move_only Builtin.NativeObject
+  %f = function_ref @consume_move_only_value : $@convention(thin) (@owned @move_only Builtin.NativeObject) -> ()
+  apply %f(%2) : $@convention(thin) (@owned @move_only Builtin.NativeObject) -> ()
+  apply %f(%1) : $@convention(thin) (@owned @move_only Builtin.NativeObject) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
