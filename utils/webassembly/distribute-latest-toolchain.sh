@@ -7,12 +7,8 @@ branch=$1
 channel=$2
 swift_source_dir="$(cd "$(dirname $0)/../.." && pwd)"
 
-targets=(
-  "ubuntu18.04_x86_64"
-  "ubuntu20.04_x86_64"
-  "macos_x86_64"
-)
-
+TARGETS_TO_DIST=${TARGETS_TO_DIST:?"Please set TARGETS_TO_DIST"}
+targets=($TARGETS_TO_DIST)
 DARWIN_TOOLCHAIN_APPLICATION_CERT=${DARWIN_TOOLCHAIN_APPLICATION_CERT:?"Please set DARWIN_TOOLCHAIN_APPLICATION_CERT"}
 DARWIN_TOOLCHAIN_INSTALLER_CERT=${DARWIN_TOOLCHAIN_INSTALLER_CERT:?"Please set DARWIN_TOOLCHAIN_APPLICATION_CERT"}
 DARWIN_TOOLCHAIN_NOTARIZE_EMAIL=${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL:?"Please set DARWIN_TOOLCHAIN_NOTARIZE_EMAIL"}
@@ -207,7 +203,7 @@ for target in ${targets[@]}; do
   unzip $target-installable.zip
 done
 
-original_toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz | head -n1))
+original_toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-${targets[0]}.tar.gz | head -n1))
 toolchain_name=${3:-$original_toolchain_name}
 
 if is_released $toolchain_name; then
@@ -219,7 +215,7 @@ if [[ "$toolchain_name" != "$original_toolchain_name" ]]; then
   for target in ${targets[@]}; do
     tar xfz swift-wasm-$channel-SNAPSHOT-$target.tar.gz
     mv "$original_toolchain_name" "$toolchain_name"
-    if [[ "$target" == "macos_x86_64" ]]; then
+    if [[ "$target" == macos_* ]]; then
       darwin_toolchain_info_plist="$toolchain_name/Info.plist"
       if [[ -n "${DARWIN_TOOLCHAIN_DISPLAY_NAME}" ]]; then
         /usr/libexec/PlistBuddy -c "Set DisplayName '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${darwin_toolchain_info_plist}"
@@ -236,9 +232,9 @@ fi
 release_packages=()
 
 for target in ${targets[@]}; do
-  if [[ "$target" == "macos_x86_64" ]]; then
-    package_darwin_toolchain "swift-wasm-$channel-SNAPSHOT-macos_x86_64.tar.gz" "$toolchain_name-macos_x86_64.pkg"
-    release_packages=("$toolchain_name-macos_x86_64.pkg" "${release_packages[@]}")
+  if [[ "$target" == macos_* ]]; then
+    package_darwin_toolchain "swift-wasm-$channel-SNAPSHOT-$target.tar.gz" "$toolchain_name-$target.pkg"
+    release_packages=("$toolchain_name-$target.pkg" "${release_packages[@]}")
   else
     mv swift-wasm-$channel-SNAPSHOT-$target.tar.gz "$toolchain_name-$target.tar.gz"
     release_packages=("$toolchain_name-$target.tar.gz" "${release_packages[@]}")

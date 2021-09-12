@@ -5,6 +5,21 @@ on:
 jobs:
   nightly-distribution:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - branch: "swiftwasm"
+            channel: "DEVELOPMENT"
+            targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64 macos_arm64"
+          - branch: "swiftwasm-release/5.3"
+            channel: "5.3"
+            targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64"
+          - branch: "swiftwasm-release/5.4"
+            channel: "5.4"
+            targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64"
+          - branch: "swiftwasm-release/5.5"
+            channel: "5.5"
+            targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64"
     steps:
       - uses: actions/checkout@v1
       - name: Setup keychain
@@ -29,36 +44,10 @@ jobs:
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64 }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT_PASSWORD }}
-      - run: ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm DEVELOPMENT
-        env:
-          GITHUB_TOKEN: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
-          DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
-          DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
-          DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
-          DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD }}
-          DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID }}
-        if: github.ref == 'refs/heads/swiftwasm'
 
-      - run: ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm-release/5.3 5.3
+      - run: ./utils/webassembly/distribute-latest-toolchain.sh ${{ matrix.branch }} ${{ matrix.channel }}
         env:
-          GITHUB_TOKEN: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
-          DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
-          DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
-          DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
-          DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD }}
-          DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID }}
-
-      - run: ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm-release/5.4 5.4
-        env:
-          GITHUB_TOKEN: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
-          DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
-          DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
-          DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
-          DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD }}
-          DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID }}
-
-      - run: ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm-release/5.5 5.5
-        env:
+          TARGETS_TO_DIST: ${{ matrix.targets }}
           GITHUB_TOKEN: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
           DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
