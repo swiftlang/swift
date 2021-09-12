@@ -587,6 +587,10 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 #include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(UncheckedOwnershipConversionInst, unchecked_ownership_conversion,
                     SingleValueInstruction, None, MayRelease)
+  // A move_value is an OSSA only instruction. Its result does not have any side
+  // effects relative to other OSSA values like copy_value.
+  SINGLE_VALUE_INST(MoveValueInst, move_value,
+                    SingleValueInstruction, None, DoesNotRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The
