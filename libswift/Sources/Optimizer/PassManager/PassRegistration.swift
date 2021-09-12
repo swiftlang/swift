@@ -41,4 +41,5 @@ private func registerSwiftPasses() {
   registerPass(simplifyGlobalValuePass, { simplifyGlobalValuePass.run($0) })
   registerPass(simplifyStrongRetainPass, { simplifyStrongRetainPass.run($0) })
   registerPass(simplifyStrongReleasePass, { simplifyStrongReleasePass.run($0) })
+  registerPass(assumeSingleThreaded, { assumeSingleThreaded.run($0) })
 }

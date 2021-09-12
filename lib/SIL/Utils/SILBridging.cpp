@@ -456,6 +456,10 @@ SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx) {
   return getCaseIndex(castToInst<SwitchEnumInst>(se)->getCase(idx).first);
 }
 
+void RefCountingInst_setNonAtomic(BridgedInstruction inst) {
+  castToInst<RefCountingInst>(inst)->setNonAtomic();
+}
+
 //===----------------------------------------------------------------------===//
 //                                SILBuilder
 //===----------------------------------------------------------------------===//

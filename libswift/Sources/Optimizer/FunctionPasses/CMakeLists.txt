@@ -9,4 +9,5 @@
 libswift_sources(Optimizer
   SILPrinter.swift
   MergeCondFails.swift
+  AssumeSingleThreaded.swift
 )
