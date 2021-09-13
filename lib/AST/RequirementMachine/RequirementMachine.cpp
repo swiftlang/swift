@@ -413,7 +413,8 @@ void RequirementMachine::computeCompletion() {
     checkCompletionResult();
 
     // Check invariants.
-    System.verify();
+    System.verifyRewriteRules();
+    System.verifyHomotopyGenerators();
 
     // Build the property map, which also performs concrete term
     // unification; if this added any new rules, run the completion

@@ -36,38 +36,49 @@ void RewritePath::invert() {
     step.invert();
 }
 
-/// Dumps the rewrite step that was applied to \p term. Mutates \p term to
-/// reflect the application of the rule.
-void RewriteStep::dump(llvm::raw_ostream &out,
-                       MutableTerm &term,
-                       const RewriteSystem &system) const {
+AppliedRewriteStep RewriteStep::apply(MutableTerm &term,
+                                      const RewriteSystem &system) const {
   const auto &rule = system.getRule(RuleID);
 
   auto lhs = (Inverse ? rule.getRHS() : rule.getLHS());
   auto rhs = (Inverse ? rule.getLHS() : rule.getRHS());
 
-  assert(std::equal(term.begin() + Offset,
-                    term.begin() + Offset + lhs.size(),
-                    lhs.begin()));
+  if (!std::equal(term.begin() + Offset,
+                  term.begin() + Offset + lhs.size(),
+                  lhs.begin())) {
+    llvm::errs() << "Invalid rewrite path\n";
+    llvm::errs() << "- Term: " << term << "\n";
+    llvm::errs() << "- Offset: " << Offset << "\n";
+    llvm::errs() << "- Expected subterm: " << lhs << "\n";
+    abort();
+  }
 
   MutableTerm prefix(term.begin(), term.begin() + Offset);
   MutableTerm suffix(term.begin() + Offset + lhs.size(), term.end());
 
-  if (!prefix.empty()) {
-    out << prefix;
-    out << ".";
-  }
-  out << "(" << rule.getLHS();
-  out << (Inverse ? " <= " : " => ");
-  out << rule.getRHS() << ")";
-  if (!suffix.empty()) {
-    out << ".";
-    out << suffix;
-  }
-
   term = prefix;
   term.append(rhs);
   term.append(suffix);
+
+  return {lhs, rhs, prefix, suffix};
+}
+
+/// Dumps the rewrite step that was applied to \p term. Mutates \p term to
+/// reflect the application of the rule.
+void RewriteStep::dump(llvm::raw_ostream &out,
+                       MutableTerm &term,
+                       const RewriteSystem &system) const {
+  auto result = apply(term, system);
+
+  if (!result.prefix.empty()) {
+    out << result.prefix;
+    out << ".";
+  }
+  out << "(" << result.lhs << " => " << result.rhs << ")";
+  if (!result.suffix.empty()) {
+    out << ".";
+    out << result.suffix;
+  }
 }
 
 /// Dumps a series of rewrite steps applied to \p term.
@@ -377,7 +388,7 @@ void RewriteSystem::simplifyRewriteSystem() {
   }
 }
 
-void RewriteSystem::verify() const {
+void RewriteSystem::verifyRewriteRules() const {
 #ifndef NDEBUG
 
 #define ASSERT_RULE(expr) \
@@ -436,6 +447,25 @@ void RewriteSystem::verify() const {
   }
 
 #undef ASSERT_RULE
+#endif
+}
+
+void RewriteSystem::verifyHomotopyGenerators() const {
+#ifndef NDEBUG
+  for (const auto &loop : HomotopyGenerators) {
+    auto term = loop.first;
+
+    for (const auto &step : loop.second) {
+      (void) step.apply(term, *this);
+    }
+
+    if (term != loop.first) {
+      llvm::errs() << "Not a loop: ";
+      loop.second.dump(llvm::errs(), loop.first, *this);
+      llvm::errs() << "\n";
+      abort();
+    }
+  }
 #endif
 }
 

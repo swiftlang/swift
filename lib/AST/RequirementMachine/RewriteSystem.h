@@ -79,7 +79,22 @@ public:
   }
 };
 
+struct AppliedRewriteStep {
+  Term lhs;
+  Term rhs;
+  MutableTerm prefix;
+  MutableTerm suffix;
+};
+
 /// Records the application of a rewrite rule to a term.
+///
+/// Formally, this is a whiskered, oriented rewrite rule. For example, given a
+/// rule (X => Y) and the term A.X.B, the application at offset 1 yields A.Y.B.
+///
+/// This can be represented as A.(X => Y).B.
+///
+/// Similarly, going in the other direction, if we start from A.Y.B and apply
+/// the inverse rule, we get A.(Y => X).B.
 struct RewriteStep {
   /// The position within the term where the rule is being applied.
   unsigned Offset : 16;
@@ -102,6 +117,9 @@ struct RewriteStep {
   void invert() {
     Inverse = !Inverse;
   }
+
+  AppliedRewriteStep apply(MutableTerm &term,
+                           const RewriteSystem &system) const;
 
   void dump(llvm::raw_ostream &out,
             MutableTerm &term,
@@ -244,7 +262,9 @@ public:
 
   void simplifyRewriteSystem();
 
-  void verify() const;
+  void verifyRewriteRules() const;
+
+  void verifyHomotopyGenerators() const;
 
   std::pair<CompletionResult, unsigned>
   buildPropertyMap(PropertyMap &map,
