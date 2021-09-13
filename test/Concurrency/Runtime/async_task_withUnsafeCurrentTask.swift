@@ -3,7 +3,7 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_task_debug_log
 
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 #if os(Linux)
