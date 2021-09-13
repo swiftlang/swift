@@ -1846,6 +1846,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
   UNARY_INSTRUCTION(CopyValue)
+  UNARY_INSTRUCTION(MoveValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)

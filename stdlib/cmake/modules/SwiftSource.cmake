@@ -796,6 +796,8 @@ function(_compile_swift_files
       ${command_touch_standard_outputs}
       OUTPUT ${standard_outputs}
       DEPENDS
+        "${line_directive_tool}"
+        "${file_path}"
         ${swift_compiler_tool_dep}
         ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
@@ -835,6 +837,8 @@ function(_compile_swift_files
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS
+          "${line_directive_tool}"
+          "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
@@ -891,6 +895,8 @@ function(_compile_swift_files
         OUTPUT
           ${maccatalyst_module_outputs}
         DEPENDS
+          "${line_directive_tool}"
+          "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files}
           ${SWIFTFILE_DEPENDS}
@@ -917,6 +923,8 @@ function(_compile_swift_files
         ${command_touch_sib_outputs}
         OUTPUT ${sib_outputs}
         DEPENDS
+          "${line_directive_tool}"
+          "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}
@@ -934,6 +942,8 @@ function(_compile_swift_files
         ${command_touch_sibopt_outputs}
         OUTPUT ${sibopt_outputs}
         DEPENDS
+          "${line_directive_tool}"
+          "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}
@@ -952,6 +962,8 @@ function(_compile_swift_files
         ${command_touch_sibgen_outputs}
         OUTPUT ${sibgen_outputs}
         DEPENDS
+          "${line_directive_tool}"
+          "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}

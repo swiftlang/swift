@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 //
 // Tests for the non-Foundation API of String
