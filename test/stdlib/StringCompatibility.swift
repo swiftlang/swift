@@ -2,6 +2,7 @@
 // RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
 
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 import StdlibUnittest
 
