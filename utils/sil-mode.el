@@ -124,7 +124,7 @@
                     "unmanaged_retain_value" "unmanaged_release_value"
                     "unmanaged_autorelease_value"
                     "strong_copy_unowned_value" "strong_copy_unmanaged_value"
-                    "destructure_struct" "destructure_tuple")
+                    "destructure_struct" "destructure_tuple" "move_value")
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
    ;; swift declaration as well handled at the top.
