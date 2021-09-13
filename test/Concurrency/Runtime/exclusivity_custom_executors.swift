@@ -17,6 +17,9 @@
 // should be merged into the already created access set while it runs and then
 // unmerged afterwards.
 
+// rdar://82973061
+// XFAIL: linux
+
 import _Concurrency
 import StdlibUnittest
 
