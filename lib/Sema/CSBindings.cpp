@@ -1929,6 +1929,24 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
+  // If type variable has been marked as a possible hole due to
+  // e.g. reference to a missing member. Let's propagate that
+  // information to the object type of the optional type it's
+  // about to be bound to.
+  //
+  // In some situations like pattern bindings e.g. `if let x = base?.member`
+  // - if `member` doesn't exist, `x` cannot be determined either, which
+  // leaves `OptionalEvaluationExpr` representing outer type of `base?.member`
+  // without any contextual information, so even though `x` would get
+  // bound to result type of the chain, underlying type variable wouldn't
+  // be resolved, so we need to propagate holes up the conversion chain.
+  if (TypeVar->getImpl().canBindToHole()) {
+    if (auto objectTy = type->getOptionalObjectType()) {
+      if (auto *typeVar = objectTy->getAs<TypeVariableType>())
+        cs.recordPotentialHole(typeVar);
+    }
+  }
+
   ConstraintSystem::TypeMatchOptions options;
 
   options |= ConstraintSystem::TMF_GenerateConstraints;
