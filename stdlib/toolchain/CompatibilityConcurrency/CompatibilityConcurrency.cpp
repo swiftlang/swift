@@ -20,26 +20,6 @@ using namespace swift;
 
 namespace swift {
 
-// Entrypoint provided by the runtime in the OS that first contains support for
-// concurrency. Explicitly redeclared as "weak" because this code will run on
-// systems where it is not present.
-const FunctionTypeMetadata *
-swift_getFunctionTypeMetadataGlobalActor(
-    FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
-    const Metadata *const *parameters, const uint32_t *parameterFlags,
-    const Metadata *result, const Metadata *globalActor
-) SWIFT_RUNTIME_WEAK_IMPORT;
-
-// Entrypoint provided only in the back-deployed concurrency library, which
-// has a separate allocation area for global-actor-qualified function types.
-extern "C"
-const FunctionTypeMetadata *
-swift_getFunctionTypeMetadataGlobalActorStandalone(
-    FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
-    const Metadata *const *parameters, const uint32_t *parameterFlags,
-    const Metadata *result, const Metadata *globalActor
-) SWIFT_RUNTIME_WEAK_IMPORT;
-
 // Entrypoint called by the compiler when back-deploying concurrency, which
 // switches between the real implementation of
 // swift_getFunctionTypeMetadataGlobalActor and
@@ -66,10 +46,11 @@ swift::swift_getFunctionTypeMetadataGlobalActorBackDeploy(
   static BuilderFn builderFn;
   static dispatch_once_t builderToken;
   dispatch_once(&builderToken, ^{
-      if (swift_getFunctionTypeMetadataGlobalActor) {
-        builderFn = swift_getFunctionTypeMetadataGlobalActor;
+      // Prefer the function from the Swift runtime if it is available.
+      builderFn = reinterpret_cast<BuilderFn>(
+        dlsym(RTLD_DEFAULT, "swift_getFunctionTypeMetadataGlobalActor"));
+      if (builderFn)
         return;
-      }
 
       builderFn = reinterpret_cast<BuilderFn>(
         dlsym(RTLD_DEFAULT,
