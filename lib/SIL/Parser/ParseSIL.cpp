@@ -802,15 +802,35 @@ static SILLinkage resolveSILLinkage(Optional<SILLinkage> linkage,
   }
 }
 
-static bool parseSILOptional(StringRef &Result, SourceLoc &Loc, SILParser &SP) {
-  if (SP.P.consumeIf(tok::l_square)) {
-    Identifier Id;
-    SP.parseSILIdentifier(Id, Loc, diag::expected_in_attribute_list);
-    SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
-    Result = Id.str();
+// Returns false if no optional exists. Returns true on both success and
+// failure. On success, the Result string is nonempty. If the optional is
+// assigned to an integer value, \p value contains the parsed value. Otherwise,
+// value is set to the maximum uint64_t.
+static bool parseSILOptional(StringRef &Result, uint64_t &value, SourceLoc &Loc,
+                             SILParser &SP) {
+  if (!SP.P.consumeIf(tok::l_square))
+    return false;
+
+  value = ~uint64_t(0);
+
+  Identifier Id;
+  if (SP.parseSILIdentifier(Id, Loc, diag::expected_in_attribute_list))
     return true;
+
+  if (SP.P.consumeIf(tok::equal)) {
+    if (SP.parseInteger(value, diag::expected_in_attribute_list))
+      return true;
   }
-  return false;
+  if (SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list))
+    return true;
+
+  Result = Id.str();
+  return true;
+}
+
+static bool parseSILOptional(StringRef &Result, SourceLoc &Loc, SILParser &SP) {
+  uint64_t value;
+  return parseSILOptional(Result, value, Loc, SP);
 }
 
 static bool parseSILOptional(StringRef &Result, SILParser &SP) {
@@ -3603,21 +3623,35 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
                            "to"))
       return true;
-    if (parseSILOptional(attr, *this) && attr.empty())
-      return true;
+
+    bool isStrict = false;
+    bool isInvariant = false;
+    llvm::MaybeAlign alignment;
+    uint64_t parsedValue = 0;
+    while (parseSILOptional(attr, parsedValue, ToLoc, *this)) {
+      if (attr.empty())
+        return true;
+
+      if (attr.equals("strict"))
+        isStrict = true;
+
+      if (attr.equals("invariant"))
+        isInvariant = true;
+
+      if (attr.equals("align"))
+        alignment = llvm::Align(parsedValue);
+    }
+
     if (parseSILType(Ty) || parseSILDebugLocation(InstLoc, B))
       return true;
-
-    bool isStrict = attr.equals("strict");
-    bool isInvariant = attr.equals("invariant");
 
     if (ToToken.str() != "to") {
       P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
       return true;
     }
 
-    ResultVal =
-        B.createPointerToAddress(InstLoc, Val, Ty, isStrict, isInvariant);
+    ResultVal = B.createPointerToAddress(InstLoc, Val, Ty, isStrict,
+                                         isInvariant, alignment);
     break;
   }
   case SILInstructionKind::RefToBridgeObjectInst: {
