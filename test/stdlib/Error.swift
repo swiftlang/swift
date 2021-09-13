@@ -3,6 +3,7 @@
 // RUN: %target-codesign %t/Error
 // RUN: %target-run %t/Error
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 import StdlibUnittest
 
