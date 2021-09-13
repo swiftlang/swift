@@ -10,6 +10,13 @@
 
 import Dispatch
 
+// Work around the inability of older Swift runtimes to print a task priority.
+extension TaskPriority: CustomStringConvertible {
+  public var description: String {
+    "TaskPriority(rawValue: \(rawValue))"
+  }
+}
+
 @available(SwiftStdlib 5.5, *)
 func test_detach() async {
   let a1 = Task.currentPriority
