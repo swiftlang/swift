@@ -25,11 +25,13 @@ let setAB = Set(0 ..< size)                              //   0 ..< 400
 let setCD = Set(size ..< 2 * size)                       // 400 ..< 800
 let setBC = Set(size - quarter ..< 2 * size - quarter)   // 300 ..< 700
 let setB = Set(size - quarter ..< size)                  // 300 ..< 400
+let setCDS = Set(size ..< (size + (size/4)))             // 400 ..< 500
 
 let setOAB = Set(setAB.map(Box.init))
 let setOCD = Set(setCD.map(Box.init))
 let setOBC = Set(setBC.map(Box.init))
 let setOB = Set(setB.map(Box.init))
+let setOCDS = Set(setCDS.map(Box.init))
 
 let countA = size - quarter        // 300
 let countB = quarter               // 100
@@ -368,6 +370,16 @@ public let SetTests = [
     runFunction: { n in run_SetIsDisjointBox(setOAB, setOCD, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOCD]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Smaller.Int0",
+    runFunction: { n in run_SetIsDisjointIntCommutative(setAB, setCDS, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCDS]) }),
+  BenchmarkInfo(
+    name: "Set.isDisjoint.Smaller.Box0",
+    runFunction: { n in run_SetIsDisjointBoxCommutative(setOAB, setOCDS, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCDS]) }),
   BenchmarkInfo(
     name: "Set.isDisjoint.Int25",
     runFunction: { n in run_SetIsDisjointInt(setB, setAB, false, 5000 * n) },
@@ -891,6 +903,22 @@ public func run_SetIsDisjointInt(
     }
 }
 
+// Run isDisjoint Int switching the order of the two sets.  
+@inline(never)
+public func run_SetIsDisjointIntCommutative(
+    _ a: Set<Int>,
+    _ b: Set<Int>,
+    _ r: Bool,
+    _ n: Int) {
+    for _ in 0 ..< n {
+      let isDisjointA = a.isDisjoint(with: identity(b))
+      CheckResults(isDisjointA == r)
+  
+      let isDisjointB = b.isDisjoint(with: identity(a))
+      CheckResults(isDisjointB == r)
+    }
+}
+
 @inline(never)
 public func run_SetIsDisjointSeqInt(
     _ a: Set<Int>,
@@ -1088,6 +1116,22 @@ func run_SetIsDisjointBox(
     for _ in 0 ..< n {
         let isDisjoint = a.isDisjoint(with: identity(b))
         CheckResults(isDisjoint == r)
+    }
+}
+
+// Run isDisjoint Box switching the order of the two sets.  
+@inline(never)
+func run_SetIsDisjointBoxCommutative(
+    _ a: Set<Box<Int>>,
+    _ b: Set<Box<Int>>,
+    _ r: Bool,
+    _ n: Int) {
+    for _ in 0 ..< n {
+        let isDisjointA = a.isDisjoint(with: identity(b))
+        CheckResults(isDisjointA == r)
+  
+        let isDisjointB = b.isDisjoint(with: identity(a))
+        CheckResults(isDisjointB == r)
     }
 }
 
