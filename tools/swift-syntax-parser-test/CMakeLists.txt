@@ -4,7 +4,7 @@ swift_swap_compiler_if_needed("SwiftSyntaxParserTest")
 add_swift_host_tool(swift-syntax-parser-test
   swift-syntax-parser-test.cpp
   LLVM_LINK_COMPONENTS
-    Support
+    support
   SWIFT_COMPONENT tools
 )
 if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
