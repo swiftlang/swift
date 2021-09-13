@@ -18,24 +18,29 @@
 #include "swift/AST/SourceFile.h"
 using namespace swift;
 
+ModuleDependenciesStorageBase::~ModuleDependenciesStorageBase() { }
+
+bool ModuleDependencies::isSwiftModule() const {
+  return isSwiftInterfaceModule() ||
+         isSwiftSourceModule() ||
+         isSwiftBinaryModule() ||
+         isSwiftPlaceholderModule();
+}
+
 ModuleDependenciesKind& operator++(ModuleDependenciesKind& e) {
   if (e == ModuleDependenciesKind::LastKind) {
-    llvm_unreachable("Attempting to incrementa last enum value on ModuleDependenciesKind");
+    llvm_unreachable("Attempting to increment last enum value on ModuleDependenciesKind");
   }
   e = ModuleDependenciesKind(static_cast<std::underlying_type<ModuleDependenciesKind>::type>(e) + 1);
   return e;
 }
 
-ModuleDependenciesStorageBase::~ModuleDependenciesStorageBase() { }
-
-bool ModuleDependencies::isSwiftModule() const {
-  return isSwiftTextualModule() ||
-         isSwiftBinaryModule() ||
-         isSwiftPlaceholderModule();
+bool ModuleDependencies::isSwiftInterfaceModule() const {
+  return isa<SwiftInterfaceModuleDependenciesStorage>(storage.get());
 }
 
-bool ModuleDependencies::isSwiftTextualModule() const {
-  return isa<SwiftTextualModuleDependenciesStorage>(storage.get());
+bool ModuleDependencies::isSwiftSourceModule() const {
+  return isa<SwiftSourceModuleDependenciesStorage>(storage.get());
 }
 
 bool ModuleDependencies::isSwiftBinaryModule() const {
@@ -50,10 +55,15 @@ bool ModuleDependencies::isClangModule() const {
   return isa<ClangModuleDependenciesStorage>(storage.get());
 }
 
-/// Retrieve the dependencies for a Swift module.
-const SwiftTextualModuleDependenciesStorage *
-ModuleDependencies::getAsSwiftTextualModule() const {
-  return dyn_cast<SwiftTextualModuleDependenciesStorage>(storage.get());
+/// Retrieve the dependencies for a Swift textual interface module.
+const SwiftInterfaceModuleDependenciesStorage *
+ModuleDependencies::getAsSwiftInterfaceModule() const {
+  return dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+}
+
+const SwiftSourceModuleDependenciesStorage *
+ModuleDependencies::getAsSwiftSourceModule() const {
+  return dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get());
 }
 
 /// Retrieve the dependencies for a binary Swift dependency module.
@@ -97,46 +107,113 @@ void ModuleDependencies::addModuleDependencies(
   if (fileName.empty())
     return;
 
-  // If the storage is for an interface file, the only source file we
-  // should see is that interface file.
-  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
-  if (swiftStorage->swiftInterfaceFile) {
-    assert(fileName == *swiftStorage->swiftInterfaceFile);
-    return;
+  switch (getKind()) {
+    case swift::ModuleDependenciesKind::SwiftInterface: {
+      // If the storage is for an interface file, the only source file we
+      // should see is that interface file.
+      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+      assert(fileName == swiftInterfaceStorage->swiftInterfaceFile);
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftSource: {
+      // Otherwise, record the source file.
+      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+      swiftSourceStorage->sourceFiles.push_back(fileName.str());
+      break;
+    }
+    default:
+      llvm_unreachable("Unexpected dependency kind");
   }
-
-  // Otherwise, record the source file.
-  swiftStorage->sourceFiles.push_back(fileName.str());
 }
 
 Optional<std::string> ModuleDependencies::getBridgingHeader() const {
-  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
-  return swiftStorage->bridgingHeaderFile;
+  switch (getKind()) {
+    case swift::ModuleDependenciesKind::SwiftInterface: {
+      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+      return swiftInterfaceStorage->bridgingHeaderFile;
+    }
+    case swift::ModuleDependenciesKind::SwiftSource: {
+      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+      return swiftSourceStorage->bridgingHeaderFile;
+    }
+    default:
+      llvm_unreachable("Unexpected dependency kind");
+  }
 }
 
 void ModuleDependencies::addBridgingHeader(StringRef bridgingHeader) {
-  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
-  assert(!swiftStorage->bridgingHeaderFile);
-  swiftStorage->bridgingHeaderFile = bridgingHeader.str();
+  switch (getKind()) {
+    case swift::ModuleDependenciesKind::SwiftInterface: {
+      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+      assert(!swiftInterfaceStorage->bridgingHeaderFile);
+      swiftInterfaceStorage->bridgingHeaderFile = bridgingHeader.str();
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftSource: {
+      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+      assert(!swiftSourceStorage->bridgingHeaderFile);
+      swiftSourceStorage->bridgingHeaderFile = bridgingHeader.str();
+      break;
+    }
+    default:
+      llvm_unreachable("Unexpected dependency kind");
+  }
 }
 
 /// Add source files that the bridging header depends on.
 void ModuleDependencies::addBridgingSourceFile(StringRef bridgingSourceFile) {
-  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
-  swiftStorage->bridgingSourceFiles.push_back(bridgingSourceFile.str());
+  switch (getKind()) {
+    case swift::ModuleDependenciesKind::SwiftInterface: {
+      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+      swiftInterfaceStorage->bridgingSourceFiles.push_back(bridgingSourceFile.str());
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftSource: {
+      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+      swiftSourceStorage->bridgingSourceFiles.push_back(bridgingSourceFile.str());
+      break;
+    }
+    default:
+      llvm_unreachable("Unexpected dependency kind");
+  }
 }
 
 void ModuleDependencies::addSourceFile(StringRef sourceFile) {
-  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
-  swiftStorage->sourceFiles.push_back(sourceFile.str());
+  switch (getKind()) {
+    case swift::ModuleDependenciesKind::SwiftInterface: {
+      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+      swiftInterfaceStorage->sourceFiles.push_back(sourceFile.str());
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftSource: {
+      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+      swiftSourceStorage->sourceFiles.push_back(sourceFile.str());
+      break;
+    }
+    default:
+      llvm_unreachable("Unexpected dependency kind");
+  }
 }
 
 /// Add (Clang) module on which the bridging header depends.
 void ModuleDependencies::addBridgingModuleDependency(
     StringRef module, llvm::StringSet<> &alreadyAddedModules) {
-  auto swiftStorage = cast<SwiftTextualModuleDependenciesStorage>(storage.get());
-  if (alreadyAddedModules.insert(module).second)
-    swiftStorage->bridgingModuleDependencies.push_back(module.str());
+  switch (getKind()) {
+    case swift::ModuleDependenciesKind::SwiftInterface: {
+      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+      if (alreadyAddedModules.insert(module).second)
+        swiftInterfaceStorage->bridgingModuleDependencies.push_back(module.str());
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftSource: {
+      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+      if (alreadyAddedModules.insert(module).second)
+        swiftSourceStorage->bridgingModuleDependencies.push_back(module.str());
+      break;
+    }
+    default:
+      llvm_unreachable("Unexpected dependency kind");
+  }
 }
 
 llvm::StringMap<ModuleDependenciesVector> &
@@ -183,18 +260,14 @@ static bool moduleContainedInImportPathSet(const ModuleDependencies &module,
 {
   std::string modulePath = "";
   switch (module.getKind()) {
-    case swift::ModuleDependenciesKind::SwiftTextual: {
-      auto *swiftDep = module.getAsSwiftTextualModule();
-      if (swiftDep->swiftInterfaceFile)
-        modulePath = *(swiftDep->swiftInterfaceFile);
-      else {
-        // If we encountered a Swift textual dependency without an interface
-        // file, we are seeing the main scan module itself. This means that
-        // our search-path disambiguation is not necessary here.
-        return true;
-      }
+    case swift::ModuleDependenciesKind::SwiftInterface: {
+      modulePath = module.getAsSwiftInterfaceModule()->swiftInterfaceFile;
       break;
     }
+    case swift::ModuleDependenciesKind::SwiftSource:
+      // We are seeing the main scan module itself. This means that
+      // our search-path disambiguation is not necessary here.
+      return true;
     case swift::ModuleDependenciesKind::SwiftBinary: {
       auto *swiftBinaryDep = module.getAsSwiftBinaryModule();
       modulePath = swiftBinaryDep->compiledModulePath;
@@ -295,10 +368,9 @@ GlobalModuleDependenciesCache::findAllDependenciesIrrespectiveOfSearchPaths(
 static std::string modulePathForVerification(const ModuleDependencies &module) {
   std::string existingModulePath = "";
   switch (module.getKind()) {
-    case swift::ModuleDependenciesKind::SwiftTextual: {
-      auto *swiftDep = module.getAsSwiftTextualModule();
-      if (swiftDep->swiftInterfaceFile)
-        existingModulePath = *(swiftDep->swiftInterfaceFile);
+    case swift::ModuleDependenciesKind::SwiftInterface: {
+      auto *swiftDep = module.getAsSwiftInterfaceModule();
+      existingModulePath = swiftDep->swiftInterfaceFile;
       break;
     }
     case swift::ModuleDependenciesKind::SwiftBinary: {
@@ -311,8 +383,9 @@ static std::string modulePathForVerification(const ModuleDependencies &module) {
       existingModulePath = clangDep->moduleMapFile;
       break;
     }
+    case swift::ModuleDependenciesKind::SwiftSource:
     case swift::ModuleDependenciesKind::SwiftPlaceholder:
-    default:
+    case swift::ModuleDependenciesKind::LastKind:
       llvm_unreachable("Unhandled dependency kind.");
   }
   return existingModulePath;
