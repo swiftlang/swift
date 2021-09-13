@@ -657,10 +657,34 @@ CompilerInstance::getRecordedBufferID(const InputFile &input,
   auto buffers = getInputBuffersIfPresent(input);
 
   // Recover by dummy buffer if requested.
-  if (!buffers.hasValue() && shouldRecover &&
-      input.getType() == file_types::TY_Swift) {
-    buffers = ModuleBuffers(llvm::MemoryBuffer::getMemBuffer(
-        "// missing file\n", input.getFileName()));
+  if (!buffers.hasValue() && shouldRecover) {
+    switch (input.getType()) {
+    case file_types::TY_Swift:
+      buffers = ModuleBuffers(llvm::MemoryBuffer::getMemBuffer(
+                                "// missing file\n", input.getFileName()));
+      break;
+    case file_types::TY_Markdown:
+    case file_types::TY_reStructuredText:
+      buffers = ModuleBuffers(llvm::MemoryBuffer::getMemBuffer(
+                                "Missing file\n"
+                                "============\n"
+                                "\n"
+                                "Missing file\n",
+                                input.getFileName()));
+      break;
+    case file_types::TY_LaTeX:
+      buffers = ModuleBuffers(llvm::MemoryBuffer::getMemBuffer(
+                                "\\documentclass{article}\n"
+                                "\\title{Missing file}\n"
+                                "\\begin{document}\n"
+                                "  \\maketitle\n"
+                                "  Missing file\n"
+                                "\\end{document}\n",
+                                input.getFileName()));
+      break;
+    default:
+      break;
+    }
   }
 
   if (!buffers.hasValue()) {
@@ -891,11 +915,22 @@ CompilerInstance::computeMainSourceFileForModule(ModuleDecl *mod) const {
     return nullptr;
   }
 
-  // Try to pull out a file called 'main.swift'.
+  // Try to pull out a file called 'main.(swift|md|rst|tex)'.
   auto MainInputIter =
       std::find_if(Inputs.begin(), Inputs.end(), [](const InputFile &input) {
-        return input.getType() == file_types::TY_Swift &&
-               llvm::sys::path::filename(input.getFileName()) == "main.swift";
+        auto filename = llvm::sys::path::filename(input.getFileName());
+        switch (input.getType()) {
+        case file_types::TY_Swift:
+          return filename == "main.swift";
+        case file_types::TY_Markdown:
+          return filename == "main.md";
+        case file_types::TY_reStructuredText:
+          return filename == "main.rst";
+        case file_types::TY_LaTeX:
+          return filename == "main.tex";
+        default:
+          return false;
+        }
       });
 
   Optional<unsigned> MainBufferID = None;

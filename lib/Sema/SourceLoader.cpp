@@ -36,22 +36,30 @@ using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
 
 static FileOrError findModule(ASTContext &ctx, StringRef moduleID,
                               SourceLoc importLoc) {
+  // Try each of the supported extensions in turn
+  static const char * const exts[] = {
+    ".swift",
+    ".md",
+    ".rst",
+    ".tex"
+  };
+  static const unsigned nExts = sizeof(exts) / sizeof(exts[0]);
   llvm::SmallString<128> inputFilename;
 
   for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
-    inputFilename = Path;
-    llvm::sys::path::append(inputFilename, moduleID);
-    inputFilename.append(".swift");
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      ctx.SourceMgr.getFileSystem()->getBufferForFile(inputFilename.str());
+    for (unsigned nExt = 0; nExt < nExts; ++nExt) {
+        inputFilename = Path;
+        llvm::sys::path::append(inputFilename, moduleID);
+        inputFilename.append(exts[nExt]);
+        FileOrError FileBufOrErr =
+          ctx.SourceMgr.getFileSystem()->getBufferForFile(inputFilename.str());
 
-    // Return if we loaded a file
-    if (FileBufOrErr)
-      return FileBufOrErr;
-    // Or if we get any error other than the file not existing
-    auto err = FileBufOrErr.getError();
-    if (err != std::errc::no_such_file_or_directory)
-      return FileBufOrErr;
+        if (FileBufOrErr)
+          return FileBufOrErr;
+        auto err = FileBufOrErr.getError();
+        if (err != std::errc::no_such_file_or_directory)
+          return FileBufOrErr;
+    }
   }
 
   return make_error_code(std::errc::no_such_file_or_directory);

@@ -272,8 +272,8 @@ public:
   /// batching together into a BatchJob, via a call to \c
   /// constructBatchJob. This is true when the \c Job is a built from a \c
   /// CompileJobAction in a \c Compilation \p C running in \c
-  /// OutputInfo::Mode::StandardCompile output mode, with a single \c TY_Swift
-  /// \c InputAction.
+  /// OutputInfo::Mode::StandardCompile output mode, with a single \c TY_Swift,
+  /// \c TY_Markdown, \c TY_reStructuredText or \c TY_LaTeX \c InputAction.
   bool jobIsBatchable(const Compilation &C, const Job *A) const;
 
   /// Equivalence relation that holds iff the two input Jobs \p A and \p B are

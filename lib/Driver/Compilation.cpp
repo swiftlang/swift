@@ -1905,7 +1905,7 @@ void Compilation::disableIncrementalBuild(Twine why) {
 unsigned Compilation::countSwiftInputs() const {
   unsigned inputCount = 0;
   for (const auto &p : InputFilesWithTypes)
-    if (p.first == file_types::TY_Swift)
+    if (file_types::isSwiftSourceCode(p.first))
       ++inputCount;
   return inputCount;
 }

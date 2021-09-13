@@ -1325,7 +1325,7 @@ void Driver::buildInputs(const ToolChain &TC,
       if (HasVFS || checkInputExistence(*this, Args, Diags, Value))
         Inputs.push_back(std::make_pair(Ty, A));
 
-      if (Ty == file_types::TY_Swift) {
+      if (file_types::isSwiftSourceCode(Ty)) {
         StringRef Basename = llvm::sys::path::filename(Value);
         if (!SourceFileNames.insert({Basename, Value}).second) {
           Diags.diagnose(SourceLoc(), diag::error_two_files_same_name,
@@ -1975,6 +1975,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       Action *Current = C.createAction<InputAction>(*InputArg, InputType);
       switch (InputType) {
       case file_types::TY_Swift:
+      case file_types::TY_Markdown:
+      case file_types::TY_reStructuredText:
+      case file_types::TY_LaTeX:
       case file_types::TY_SIL:
       case file_types::TY_SIB: {
         // Source inputs always need to be compiled.

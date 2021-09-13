@@ -67,6 +67,9 @@ ID file_types::lookupTypeForName(StringRef Name) {
 bool file_types::isTextual(ID Id) {
   switch (Id) {
   case file_types::TY_Swift:
+  case file_types::TY_Markdown:
+  case file_types::TY_reStructuredText:
+  case file_types::TY_LaTeX:
   case file_types::TY_SIL:
   case file_types::TY_Dependencies:
   case file_types::TY_Assembly:
@@ -115,6 +118,18 @@ bool file_types::isTextual(ID Id) {
   llvm_unreachable("All switch cases are covered");
 }
 
+bool file_types::isSwiftSourceCode(ID Id) {
+  switch (Id) {
+  case file_types::TY_Swift:
+  case file_types::TY_Markdown:
+  case file_types::TY_reStructuredText:
+  case file_types::TY_LaTeX:
+    return true;
+  default:
+    return false;
+  }
+}
+
 bool file_types::isAfterLLVM(ID Id) {
   switch (Id) {
   case file_types::TY_Assembly:
@@ -123,6 +138,9 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_Object:
     return true;
   case file_types::TY_Swift:
+  case file_types::TY_Markdown:
+  case file_types::TY_reStructuredText:
+  case file_types::TY_LaTeX:
   case file_types::TY_PCH:
   case file_types::TY_ImportedModules:
   case file_types::TY_TBD:
@@ -169,6 +187,9 @@ bool file_types::isAfterLLVM(ID Id) {
 bool file_types::isPartOfSwiftCompilation(ID Id) {
   switch (Id) {
   case file_types::TY_Swift:
+  case file_types::TY_Markdown:
+  case file_types::TY_reStructuredText:
+  case file_types::TY_LaTeX:
   case file_types::TY_SIL:
   case file_types::TY_RawSIL:
   case file_types::TY_SIB:
