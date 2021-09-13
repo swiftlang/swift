@@ -355,6 +355,8 @@ public:
 
   unsigned VirtualFunctionElimination : 1;
 
+  unsigned WitnessMethodElimination : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -414,6 +416,7 @@ public:
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
+        WitnessMethodElimination(false),
         CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}

@@ -205,7 +205,8 @@ void setModuleFlags(IRGenModule &IGM) {
   Module->addModuleFlag(llvm::Module::Error, "Swift Version",
                         IRGenModule::swiftVersion);
 
-  if (IGM.getOptions().VirtualFunctionElimination) {
+  if (IGM.getOptions().VirtualFunctionElimination ||
+      IGM.getOptions().WitnessMethodElimination) {
     Module->addModuleFlag(llvm::Module::Error, "Virtual Function Elim", 1);
   }
 }

@@ -2163,6 +2163,42 @@ static bool isConstantWitnessTable(SILWitnessTable *wt) {
   return true;
 }
 
+static void addWTableTypeMetadata(IRGenModule &IGM,
+                                  llvm::GlobalVariable *global,
+                                  SILWitnessTable *wt) {
+  auto conf = wt->getConformance();
+  for (auto entry : wt->getEntries()) {
+    if (entry.getKind() != SILWitnessTable::WitnessKind::Method)
+      continue;
+
+    auto mw = entry.getMethodWitness();
+    auto member = mw.Requirement;
+    auto &fnProtoInfo =
+        IGM.getProtocolInfo(conf->getProtocol(), ProtocolInfoKind::Full);
+    auto index = fnProtoInfo.getFunctionIndex(member).forProtocolWitnessTable();
+    auto offset = index.getValue() * IGM.getPointerSize().getValue();
+    global->addTypeMetadata(offset, typeIdForMethod(IGM, member));
+  }
+
+  auto linkage = stripExternalFromLinkage(wt->getLinkage());
+  switch (linkage) {
+  case SILLinkage::Private:
+    global->setVCallVisibilityMetadata(
+        llvm::GlobalObject::VCallVisibility::VCallVisibilityTranslationUnit);
+    break;
+  case SILLinkage::Hidden:
+  case SILLinkage::Shared:
+    global->setVCallVisibilityMetadata(
+        llvm::GlobalObject::VCallVisibility::VCallVisibilityLinkageUnit);
+    break;
+  case SILLinkage::Public:
+  default:
+    global->setVCallVisibilityMetadata(
+        llvm::GlobalObject::VCallVisibility::VCallVisibilityPublic);
+    break;
+  }
+}
+
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Don't emit a witness table if it is a declaration.
   if (wt->isDeclaration())
@@ -2206,6 +2242,10 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     global->setConstant(isConstantWitnessTable(wt));
     global->setAlignment(
         llvm::MaybeAlign(getWitnessTableAlignment().getValue()));
+
+    if (getOptions().WitnessMethodElimination) {
+      addWTableTypeMetadata(*this, global, wt);
+    }
 
     tableSize = wtableBuilder.getTableSize();
     instantiationFunction = wtableBuilder.buildInstantiationFunction();
@@ -3378,6 +3418,35 @@ void irgen::expandTrailingWitnessSignature(IRGenModule &IGM,
   out.push_back(IGM.WitnessTablePtrTy);
 }
 
+static llvm::Value *emitWTableSlotLoad(IRGenFunction &IGF, llvm::Value *wtable,
+                                       SILDeclRef member, Address slot) {
+  if (IGF.IGM.getOptions().WitnessMethodElimination) {
+    // For LLVM IR WME, emit a @llvm.type.checked.load with the type of the
+    // method.
+    llvm::Function *checkedLoadIntrinsic = llvm::Intrinsic::getDeclaration(
+        &IGF.IGM.Module, llvm::Intrinsic::type_checked_load);
+    auto slotAsPointer = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int8PtrTy);
+    auto typeId = typeIdForMethod(IGF.IGM, member);
+
+    // Arguments for @llvm.type.checked.load: 1) target address, 2) offset -
+    // always 0 because target address is directly pointing to the right slot,
+    // 3) type identifier, i.e. the mangled name of the *base* method.
+    SmallVector<llvm::Value *, 8> args;
+    args.push_back(slotAsPointer.getAddress());
+    args.push_back(llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
+    args.push_back(llvm::MetadataAsValue::get(*IGF.IGM.LLVMContext, typeId));
+
+    // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
+    // which could mean redundant loads don't get removed.
+    llvm::Value *checkedLoad =
+        IGF.Builder.CreateCall(checkedLoadIntrinsic, args);
+    return IGF.Builder.CreateExtractValue(checkedLoad, 0);
+  }
+
+  // Not doing LLVM IR WME, can just be a direct load.
+  return IGF.emitInvariantLoad(slot);
+}
+
 FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                                               llvm::Value *wtable,
                                               SILDeclRef member) {
@@ -3389,10 +3458,9 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   // Find the witness we're interested in.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
   auto index = fnProtoInfo.getFunctionIndex(member);
-  llvm::Value *slot;
-  llvm::Value *witnessFnPtr =
-    emitInvariantLoadOfOpaqueWitness(IGF, wtable,
-                                     index.forProtocolWitnessTable(), &slot);
+  auto slot =
+      slotForLoadOfOpaqueWitness(IGF, wtable, index.forProtocolWitnessTable());
+  llvm::Value *witnessFnPtr = emitWTableSlotLoad(IGF, wtable, member, slot);
 
   auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(
       IGF.IGM.getMaximalTypeExpansionContext(), member);
@@ -3403,7 +3471,7 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   auto &schema = fnType->isAsync()
                      ? IGF.getOptions().PointerAuth.AsyncProtocolWitnesses
                      : IGF.getOptions().PointerAuth.ProtocolWitnesses;
-  auto authInfo = PointerAuthInfo::emit(IGF, schema, slot, member);
+  auto authInfo = PointerAuthInfo::emit(IGF, schema, slot.getAddress(), member);
 
   return FunctionPointer(fnType, witnessFnPtr, authInfo, signature);
 }
