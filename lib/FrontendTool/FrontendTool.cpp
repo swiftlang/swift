@@ -1920,7 +1920,7 @@ static bool performCompile(CompilerInstance &Instance, int &ReturnValue,
       return llvm::all_of(
           opts.InputsAndOutputs.getAllInputs(), [](const InputFile &IF) {
             const auto kind = IF.getType();
-            return kind == file_types::TY_Swift ||
+            return file_types::isSwiftSourceCode(kind) ||
                    kind == file_types::TY_SwiftModuleInterfaceFile;
           });
     }

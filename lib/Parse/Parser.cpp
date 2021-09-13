@@ -24,6 +24,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
@@ -32,6 +33,7 @@
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/Basic/DarwinSDKInfo.h"
+#include "llvm/Support/Path.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
@@ -44,6 +46,27 @@ static void getStringPartTokens(const swift::Token &Tok,
                                 const swift::SourceManager &SM, int BufID,
                                 std::vector<swift::Token> &Toks);
 
+namespace {
+swift::LexerMode lexerModeForBuffer(const swift::SourceManager &SM,
+                                    unsigned BufferID) {
+  using namespace swift;
+  namespace path = llvm::sys::path;
+
+  switch (file_types::lookupTypeForExtension(
+            path::extension(SM.getIdentifierForBuffer(BufferID)))) {
+  case file_types::TY_Markdown:
+    return LexerMode::Markdown;
+  case file_types::TY_reStructuredText:
+    return LexerMode::reStructuredText;
+  case file_types::TY_LaTeX:
+    return LexerMode::LaTeX;
+  case file_types::TY_Swift:
+  default:
+    return LexerMode::Swift;
+  }
+}
+}
+
 namespace swift {
 template <typename DF>
 void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
@@ -55,7 +78,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
   if (Offset == 0 && EndOffset == 0)
     EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
 
-  Lexer L(LangOpts, SM, BufferID, Diags, LexerMode::Swift,
+  Lexer L(LangOpts, SM, BufferID, Diags, lexerModeForBuffer(SM, BufferID),
           HashbangMode::Allowed, RetainComments, Offset,
           EndOffset);
 
@@ -322,8 +345,9 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-
-static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
+static LexerMode sourceFileKindToLexerMode(SourceFileKind kind,
+                                           unsigned BufferID,
+                                           SourceManager &SM) {
   switch (kind) {
     case swift::SourceFileKind::Interface:
       return LexerMode::SwiftInterface;
@@ -334,7 +358,7 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
     case swift::SourceFileKind::MacroExpansion:
     case swift::SourceFileKind::DefaultArgument:
     case swift::SourceFileKind::SyntheticMacro:
-      return LexerMode::Swift;
+      return lexerModeForBuffer(SM, BufferID);
   }
   llvm_unreachable("covered switch");
 }
@@ -347,7 +371,9 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine *LexerDiags,
                SILParserStateBase *SIL, PersistentParserState *PersistentState)
     : Parser(std::unique_ptr<Lexer>(new Lexer(
                  SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
-                 BufferID, LexerDiags, sourceFileKindToLexerMode(SF.Kind),
+                 BufferID, LexerDiags,
+                 sourceFileKindToLexerMode(SF.Kind, BufferID,
+                                           SF.getASTContext().SourceMgr),
                  SF.Kind == SourceFileKind::Main ? HashbangMode::Allowed
                                                  : HashbangMode::Disallowed,
                  CommentRetentionMode::AttachToNextToken)),
@@ -390,7 +416,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
         EndOffset = *LexerCutOffOffset;
       }
     }
-    Lexer L(Ctx.LangOpts, SM, BufferID, nullptr, LexerMode::Swift,
+    Lexer L(Ctx.LangOpts, SM, BufferID, nullptr, lexerModeForBuffer(SM, BufferID),
             HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
             SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
             EndOffset);
@@ -1244,7 +1270,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM, BufferID, &Impl.Diags,
-                      LexerMode::Swift, HashbangMode::Allowed,
+                      lexerModeForBuffer(SM, BufferID), HashbangMode::Allowed,
                       CommentRetentionMode::AttachToNextToken, Offset,
                       EndOffset));
   Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,

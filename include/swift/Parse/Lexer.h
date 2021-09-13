@@ -50,6 +50,9 @@ enum class HashbangMode : bool {
 
 enum class LexerMode {
   Swift,
+  Markdown,
+  reStructuredText,
+  LaTeX,
   SwiftInterface,
   SIL
 };
@@ -108,8 +111,12 @@ class Lexer {
   /// Pointer to the next not consumed character.
   const char *CurPtr;
 
+  /// Number of spaces of indentation on the current line.
+  unsigned Indentation;
+  bool ScanningIndent;
+
   Token NextToken;
-  
+
   /// The kind of source we're lexing. This either enables special behavior for
   /// module interfaces, or enables things like the 'sil' keyword if lexing
   /// a .sil file.
@@ -128,6 +135,26 @@ class Lexer {
   /// in a SIL file.  This enables some context-sensitive lexing.
   bool InSILBody = false;
 
+  /// InCodeBlock - When in literate mode, this is false when we're outside a
+  /// code block.
+  bool InCodeBlock = true;
+
+  /// Markdown code blocks are delimited by code fences, which is a sequence of
+  /// at least three consecutive backtick characters or tildes, indented by no
+  /// more than three spaces.  Backticks and tildes cannot be mixed, and the
+  /// closing fence must have at least the same number as the opening fence.
+  /// Keep track of Markdown fence information here.
+  char MarkdownFence;
+  unsigned MarkdownFenceLength;
+
+  /// reStructuredText code blocks are handled using indentation; they start
+  /// after *either* a "::" at the end of a paragraph, *or* a ".. code-block::"
+  /// or ".. sourcecode::" block, and continue until you return to the previous
+  /// indent level.
+  ///
+  /// This means we need to track the indent level of preceding paragraphs.
+  unsigned RSTIndentLevel;
+  
   /// The location at which the comment of the next token starts. \c nullptr if
   /// the next token doesn't have a comment.
   const char *CommentStart;
@@ -572,6 +599,16 @@ private:
   const char *getBufferPtrForSourceLoc(SourceLoc Loc) const {
     return BufferStart + SourceMgr.getLocOffsetInBuffer(Loc, BufferID);
   }
+
+  void rewindToStartOfLine();
+  bool previousLineWasEmpty();
+  void skipRSTCodeBlock();
+  StringRef scanWord(char ExtraTerm=0);
+  void advanceToMarkdownCodeBlock();
+  void advanceToRSTCodeBlock();
+  void advanceToLaTeXCodeBlock();
+  void advanceToCodeBlock();
+  bool atEndOfCodeBlock();
 
   void lexImpl();
   InFlightDiagnostic diagnose(const char *Loc, Diagnostic Diag);
