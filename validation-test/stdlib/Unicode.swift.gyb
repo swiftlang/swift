@@ -211,7 +211,10 @@ UnicodeScalarTests.test("init") {
   expectEqual("i", UnicodeScalar(UInt8(105)))
   expectEqual(nil, UnicodeScalar(UInt32(0xD800)))
   expectEqual("j", Unicode.Scalar(Int(0x6A)))
-  expectEqual(nil, Unicode.Scalar(-0x6A))
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    expectEqual(nil, Unicode.Scalar(-0x6A))
+  }
 }
 
 var UTF8Decoder = TestSuite("UTF8Decoder")
