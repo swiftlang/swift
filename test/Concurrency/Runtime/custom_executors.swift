@@ -5,7 +5,7 @@
 
 // UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 
 // Disabled until test hang can be looked at.
 // UNSUPPORTED: OS=windows-msvc

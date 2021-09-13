@@ -6,6 +6,8 @@
 
 // https://bugs.swift.org/browse/SR-14333
 // UNSUPPORTED: OS=windows-msvc
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 @available(SwiftStdlib 5.5, *)
 protocol Go: Actor {

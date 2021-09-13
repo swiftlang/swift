@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
+
 @available(SwiftStdlib 5.5, *)
 actor Number {
     var val: Int

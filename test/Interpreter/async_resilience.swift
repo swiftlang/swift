@@ -13,7 +13,9 @@
 // RUN: %target-run %t/main %t/%target-library-name(resilient_async)
 
 // REQUIRES: executable_test
-
+// REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 import resilient_async
 
