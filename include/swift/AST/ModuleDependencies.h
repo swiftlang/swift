@@ -37,7 +37,8 @@ class Identifier;
 /// Which kind of module dependencies we are looking for.
 enum class ModuleDependenciesKind : int8_t {
   FirstKind,
-  SwiftTextual = FirstKind,
+  SwiftInterface = FirstKind,
+  SwiftSource,
   SwiftBinary,
   // Placeholder dependencies are a kind of dependencies used only by the
   // dependency scanner. They are swift modules that the scanner will not be
@@ -97,14 +98,14 @@ public:
   std::vector<std::string> moduleDependencies;
 };
 
-/// Describes the dependencies of a Swift module.
+/// Describes the dependencies of a Swift module described by an Swift interface file.
 ///
 /// This class is mostly an implementation detail for \c ModuleDependencies.
-class SwiftTextualModuleDependenciesStorage :
+class SwiftInterfaceModuleDependenciesStorage :
   public ModuleDependenciesStorageBase {
 public:
-  /// The Swift interface file, if it can be used to generate the module file.
-  const Optional<std::string> swiftInterfaceFile;
+  /// The Swift interface file to be used to generate the module file.
+  const std::string swiftInterfaceFile;
 
   /// Potentially ready-to-use compiled modules for the interface file.
   const std::vector<std::string> compiledModuleCandidates;
@@ -136,14 +137,14 @@ public:
   /// (Clang) modules on which the bridging header depends.
   std::vector<std::string> bridgingModuleDependencies;
 
-  SwiftTextualModuleDependenciesStorage(
-      const Optional<std::string> &swiftInterfaceFile,
+  SwiftInterfaceModuleDependenciesStorage(
+      const std::string swiftInterfaceFile,
       ArrayRef<std::string> compiledModuleCandidates,
       ArrayRef<StringRef> buildCommandLine,
       ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash,
       bool isFramework
-  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftTextual),
+  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftInterface),
       swiftInterfaceFile(swiftInterfaceFile),
       compiledModuleCandidates(compiledModuleCandidates.begin(),
                                compiledModuleCandidates.end()),
@@ -152,13 +153,50 @@ public:
       contextHash(contextHash), isFramework(isFramework) { }
 
   ModuleDependenciesStorageBase *clone() const override {
-    return new SwiftTextualModuleDependenciesStorage(*this);
+    return new SwiftInterfaceModuleDependenciesStorage(*this);
   }
 
   static bool classof(const ModuleDependenciesStorageBase *base) {
-    return base->dependencyKind == ModuleDependenciesKind::SwiftTextual;
+    return base->dependencyKind == ModuleDependenciesKind::SwiftInterface;
   }
 };
+
+/// Describes the dependencies of a Swift module
+///
+/// This class is mostly an implementation detail for \c ModuleDependencies.
+class SwiftSourceModuleDependenciesStorage :
+  public ModuleDependenciesStorageBase {
+public:
+  /// To build a PCM to be used by this Swift module, we need to append these
+  /// arguments to the generic PCM build arguments reported from the dependency
+  /// graph.
+  const std::vector<std::string> extraPCMArgs;
+
+  /// Bridging header file, if there is one.
+  Optional<std::string> bridgingHeaderFile;
+
+  /// Swift source files that are part of the Swift module, when known.
+  std::vector<std::string> sourceFiles;
+
+  /// Source files on which the bridging header depends.
+  std::vector<std::string> bridgingSourceFiles;
+
+  /// (Clang) modules on which the bridging header depends.
+  std::vector<std::string> bridgingModuleDependencies;
+
+    SwiftSourceModuleDependenciesStorage(
+      ArrayRef<StringRef> extraPCMArgs
+    ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftSource),
+        extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()) {}
+
+    ModuleDependenciesStorageBase *clone() const override {
+      return new SwiftSourceModuleDependenciesStorage(*this);
+    }
+
+    static bool classof(const ModuleDependenciesStorageBase *base) {
+      return base->dependencyKind == ModuleDependenciesKind::SwiftSource;
+    }
+  };
 
 /// Describes the dependencies of a pre-built Swift module (with no .swiftinterface).
 ///
@@ -291,15 +329,15 @@ public:
 
   /// Describe the module dependencies for a Swift module that can be
   /// built from a Swift interface file (\c .swiftinterface).
-  static ModuleDependencies forSwiftTextualModule(
-      const Optional<std::string> &swiftInterfaceFile,
+  static ModuleDependencies forSwiftInterfaceModule(
+      std::string swiftInterfaceFile,
       ArrayRef<std::string> compiledCandidates,
       ArrayRef<StringRef> buildCommands,
       ArrayRef<StringRef> extraPCMArgs,
       StringRef contextHash,
       bool isFramework) {
     return ModuleDependencies(
-        std::make_unique<SwiftTextualModuleDependenciesStorage>(
+        std::make_unique<SwiftInterfaceModuleDependenciesStorage>(
           swiftInterfaceFile, compiledCandidates, buildCommands,
           extraPCMArgs, contextHash, isFramework));
   }
@@ -316,11 +354,9 @@ public:
   }
 
   /// Describe the main Swift module.
-  static ModuleDependencies forMainSwiftModule(ArrayRef<StringRef> extraPCMArgs) {
+  static ModuleDependencies forSwiftSourceModule(ArrayRef<StringRef> extraPCMArgs) {
     return ModuleDependencies(
-        std::make_unique<SwiftTextualModuleDependenciesStorage>(
-          None, ArrayRef<std::string>(), ArrayRef<StringRef>(),
-          extraPCMArgs, StringRef(), false));
+        std::make_unique<SwiftSourceModuleDependenciesStorage>(extraPCMArgs));
   }
 
   /// Describe the module dependencies for a Clang module that can be
@@ -350,11 +386,14 @@ public:
     return storage->moduleDependencies;
   }
 
-  /// Whether the dependencies are for a Swift module: either Textual, Binary, or Placeholder.
+  /// Whether the dependencies are for a Swift module: either Textual, Source, Binary, or Placeholder.
   bool isSwiftModule() const;
 
   /// Whether the dependencies are for a textual Swift module.
-  bool isSwiftTextualModule() const;
+  bool isSwiftInterfaceModule() const;
+
+  /// Whether the dependencies are for a textual Swift module.
+  bool isSwiftSourceModule() const;
 
   /// Whether the dependencies are for a binary Swift module.
   bool isSwiftBinaryModule() const;
@@ -368,8 +407,11 @@ public:
   ModuleDependenciesKind getKind() const {
     return storage->dependencyKind;
   }
+  /// Retrieve the dependencies for a Swift textual-interface module.
+  const SwiftInterfaceModuleDependenciesStorage *getAsSwiftInterfaceModule() const;
+
   /// Retrieve the dependencies for a Swift module.
-  const SwiftTextualModuleDependenciesStorage *getAsSwiftTextualModule() const;
+  const SwiftSourceModuleDependenciesStorage *getAsSwiftSourceModule() const;
 
   /// Retrieve the dependencies for a binary Swift module.
   const SwiftBinaryModuleDependencyStorage *getAsSwiftBinaryModule() const;

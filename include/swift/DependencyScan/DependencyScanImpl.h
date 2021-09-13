@@ -37,7 +37,8 @@ struct swiftscan_dependency_info_s {
   /// The format is:
   /// `<module-kind>:<module-name>`
   /// where `module-kind` is one of:
-  /// "swiftTextual"
+  /// "swiftInterface"
+  /// "swiftSource"
   /// "swiftBinary"
   /// "swiftPlaceholder"
   /// "clang""

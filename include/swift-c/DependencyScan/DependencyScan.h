@@ -49,6 +49,8 @@ typedef struct {
 } swiftscan_string_set_t;
 
 typedef enum {
+  // This dependency info encodes two ModuleDependencyKind types:
+  // SwiftInterface and SwiftSource.
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL = 0,
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY = 1,
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER = 2,

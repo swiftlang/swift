@@ -212,7 +212,7 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
       break;
     }
 
-    case SWIFT_TEXTUAL_MODULE_DETAILS_NODE: {
+    case SWIFT_INTERFACE_MODULE_DETAILS_NODE: {
       if (!hasCurrentModule)
         llvm::report_fatal_error(
             "Unexpected SWIFT_TEXTUAL_MODULE_DETAILS_NODE record");
@@ -220,7 +220,7 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
           buildCommandLineArrayID, extraPCMArgsArrayID, contextHashID,
           isFramework, bridgingHeaderFileID, sourceFilesArrayID,
           bridgingSourceFilesArrayID, bridgingModuleDependenciesArrayID;
-      SwiftTextualModuleDetailsLayout::readRecord(
+      SwiftInterfaceModuleDetailsLayout::readRecord(
           Scratch, interfaceFileID, compiledModuleCandidatesArrayID,
           buildCommandLineArrayID, extraPCMArgsArrayID, contextHashID,
           isFramework, bridgingHeaderFileID, sourceFilesArrayID,
@@ -255,9 +255,69 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
         extraPCMRefs.push_back(arg);
 
       // Form the dependencies storage object
-      auto moduleDep = ModuleDependencies::forSwiftTextualModule(
-          optionalSwiftInterfaceFile, *compiledModuleCandidates,
+      auto moduleDep = ModuleDependencies::forSwiftInterfaceModule(
+          optionalSwiftInterfaceFile.getValue(), *compiledModuleCandidates,
           buildCommandRefs, extraPCMRefs, *contextHash, isFramework);
+
+      // Add dependencies of this module
+      for (const auto &moduleName : *currentModuleDependencies)
+        moduleDep.addModuleDependency(moduleName);
+
+      // Add bridging header file path
+      if (bridgingHeaderFileID != 0) {
+        auto bridgingHeaderFile = getIdentifier(bridgingHeaderFileID);
+        if (!bridgingHeaderFile)
+          llvm::report_fatal_error("Bad bridging header path");
+
+        moduleDep.addBridgingHeader(*bridgingHeaderFile);
+      }
+
+      // Add bridging source files
+      auto bridgingSourceFiles = getArray(bridgingSourceFilesArrayID);
+      if (!bridgingSourceFiles)
+        llvm::report_fatal_error("Bad bridging source files");
+      for (const auto &file : *bridgingSourceFiles)
+        moduleDep.addBridgingSourceFile(file);
+
+      // Add source files
+      auto sourceFiles = getArray(sourceFilesArrayID);
+      if (!sourceFiles)
+        llvm::report_fatal_error("Bad bridging source files");
+      for (const auto &file : *sourceFiles)
+        moduleDep.addSourceFile(file);
+
+      // Add bridging module dependencies
+      auto bridgingModuleDeps = getArray(bridgingModuleDependenciesArrayID);
+      if (!bridgingModuleDeps)
+        llvm::report_fatal_error("Bad bridging module dependencies");
+      llvm::StringSet<> alreadyAdded;
+      for (const auto &mod : *bridgingModuleDeps)
+        moduleDep.addBridgingModuleDependency(mod, alreadyAdded);
+
+      cache.recordDependencies(currentModuleName, std::move(moduleDep));
+      hasCurrentModule = false;
+      break;
+    }
+
+    case SWIFT_SOURCE_MODULE_DETAILS_NODE: {
+      if (!hasCurrentModule)
+        llvm::report_fatal_error(
+            "Unexpected SWIFT_SOURCE_MODULE_DETAILS_NODE record");
+      unsigned extraPCMArgsArrayID, bridgingHeaderFileID, sourceFilesArrayID,
+          bridgingSourceFilesArrayID, bridgingModuleDependenciesArrayID;
+      SwiftSourceModuleDetailsLayout::readRecord(
+          Scratch, extraPCMArgsArrayID, bridgingHeaderFileID, sourceFilesArrayID,
+          bridgingSourceFilesArrayID, bridgingModuleDependenciesArrayID);
+
+      auto extraPCMArgs = getArray(extraPCMArgsArrayID);
+      if (!extraPCMArgs)
+        llvm::report_fatal_error("Bad PCM Args set");
+      std::vector<StringRef> extraPCMRefs;
+      for (auto &arg : *extraPCMArgs)
+        extraPCMRefs.push_back(arg);
+
+      // Form the dependencies storage object
+      auto moduleDep = ModuleDependencies::forSwiftSourceModule(extraPCMRefs);
 
       // Add dependencies of this module
       for (const auto &moduleName : *currentModuleDependencies)
@@ -636,7 +696,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(graph_block, IDENTIFIER_ARRAY_NODE);
 
   BLOCK_RECORD(graph_block, MODULE_NODE);
-  BLOCK_RECORD(graph_block, SWIFT_TEXTUAL_MODULE_DETAILS_NODE);
+  BLOCK_RECORD(graph_block, SWIFT_INTERFACE_MODULE_DETAILS_NODE);
+  BLOCK_RECORD(graph_block, SWIFT_SOURCE_MODULE_DETAILS_NODE);
   BLOCK_RECORD(graph_block, SWIFT_BINARY_MODULE_DETAILS_NODE);
   BLOCK_RECORD(graph_block, SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE);
   BLOCK_RECORD(graph_block, CLANG_MODULE_DETAILS_NODE);
@@ -683,24 +744,38 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
       getArray(moduleID, ModuleIdentifierArrayKind::DirectDependencies));
 
   switch (dependencyInfo.getKind()) {
-  case swift::ModuleDependenciesKind::SwiftTextual: {
-    auto swiftTextDeps = dependencyInfo.getAsSwiftTextualModule();
+  case swift::ModuleDependenciesKind::SwiftInterface: {
+    auto swiftTextDeps = dependencyInfo.getAsSwiftInterfaceModule();
     assert(swiftTextDeps);
-    unsigned swiftInterfaceFileId =
-        swiftTextDeps->swiftInterfaceFile
-            ? getIdentifier(swiftTextDeps->swiftInterfaceFile.getValue())
-            : 0;
+    unsigned swiftInterfaceFileId = getIdentifier(swiftTextDeps->swiftInterfaceFile);
     unsigned bridgingHeaderFileId =
         swiftTextDeps->bridgingHeaderFile
             ? getIdentifier(swiftTextDeps->bridgingHeaderFile.getValue())
             : 0;
-    SwiftTextualModuleDetailsLayout::emitRecord(
-        Out, ScratchRecord, AbbrCodes[SwiftTextualModuleDetailsLayout::Code],
+    SwiftInterfaceModuleDetailsLayout::emitRecord(
+        Out, ScratchRecord, AbbrCodes[SwiftInterfaceModuleDetailsLayout::Code],
         swiftInterfaceFileId,
         getArray(moduleID, ModuleIdentifierArrayKind::CompiledModuleCandidates),
         getArray(moduleID, ModuleIdentifierArrayKind::BuildCommandLine),
         getArray(moduleID, ModuleIdentifierArrayKind::ExtraPCMArgs),
         getIdentifier(swiftTextDeps->contextHash), swiftTextDeps->isFramework,
+        bridgingHeaderFileId,
+        getArray(moduleID, ModuleIdentifierArrayKind::SourceFiles),
+        getArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles),
+        getArray(moduleID,
+                 ModuleIdentifierArrayKind::BridgingModuleDependencies));
+    break;
+  }
+  case swift::ModuleDependenciesKind::SwiftSource: {
+    auto swiftSourceDeps = dependencyInfo.getAsSwiftSourceModule();
+    assert(swiftSourceDeps);
+    unsigned bridgingHeaderFileId =
+        swiftSourceDeps->bridgingHeaderFile
+            ? getIdentifier(swiftSourceDeps->bridgingHeaderFile.getValue())
+            : 0;
+    SwiftSourceModuleDetailsLayout::emitRecord(
+        Out, ScratchRecord, AbbrCodes[SwiftSourceModuleDetailsLayout::Code],
+        getArray(moduleID, ModuleIdentifierArrayKind::ExtraPCMArgs),
         bridgingHeaderFileId,
         getArray(moduleID, ModuleIdentifierArrayKind::SourceFiles),
         getArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles),
@@ -828,11 +903,10 @@ void Serializer::collectStringsAndArrays(const GlobalModuleDependenciesCache &ca
 
       // Add the dependency-kind-specific data
       switch (dependencyInfo.getKind()) {
-      case swift::ModuleDependenciesKind::SwiftTextual: {
-        auto swiftTextDeps = dependencyInfo.getAsSwiftTextualModule();
+      case swift::ModuleDependenciesKind::SwiftInterface: {
+        auto swiftTextDeps = dependencyInfo.getAsSwiftInterfaceModule();
         assert(swiftTextDeps);
-        if (swiftTextDeps->swiftInterfaceFile)
-          addIdentifier(swiftTextDeps->swiftInterfaceFile.getValue());
+        addIdentifier(swiftTextDeps->swiftInterfaceFile);
         addArray(moduleID, ModuleIdentifierArrayKind::CompiledModuleCandidates,
                  swiftTextDeps->compiledModuleCandidates);
         addArray(moduleID, ModuleIdentifierArrayKind::BuildCommandLine,
@@ -849,6 +923,22 @@ void Serializer::collectStringsAndArrays(const GlobalModuleDependenciesCache &ca
         addArray(moduleID,
                  ModuleIdentifierArrayKind::BridgingModuleDependencies,
                  swiftTextDeps->bridgingModuleDependencies);
+        break;
+      }
+      case swift::ModuleDependenciesKind::SwiftSource: {
+        auto swiftSourceDeps = dependencyInfo.getAsSwiftSourceModule();
+        assert(swiftSourceDeps);
+        addArray(moduleID, ModuleIdentifierArrayKind::ExtraPCMArgs,
+                 swiftSourceDeps->extraPCMArgs);
+        if (swiftSourceDeps->bridgingHeaderFile)
+          addIdentifier(swiftSourceDeps->bridgingHeaderFile.getValue());
+        addArray(moduleID, ModuleIdentifierArrayKind::SourceFiles,
+                 swiftSourceDeps->sourceFiles);
+        addArray(moduleID, ModuleIdentifierArrayKind::BridgingSourceFiles,
+                 swiftSourceDeps->bridgingSourceFiles);
+        addArray(moduleID,
+                 ModuleIdentifierArrayKind::BridgingModuleDependencies,
+                 swiftSourceDeps->bridgingModuleDependencies);
         break;
       }
       case swift::ModuleDependenciesKind::SwiftBinary: {
@@ -901,7 +991,8 @@ void Serializer::writeInterModuleDependenciesCache(
   registerRecordAbbr<IdentifierNodeLayout>();
   registerRecordAbbr<IdentifierArrayLayout>();
   registerRecordAbbr<ModuleInfoLayout>();
-  registerRecordAbbr<SwiftTextualModuleDetailsLayout>();
+  registerRecordAbbr<SwiftSourceModuleDetailsLayout>();
+  registerRecordAbbr<SwiftInterfaceModuleDetailsLayout>();
   registerRecordAbbr<SwiftBinaryModuleDetailsLayout>();
   registerRecordAbbr<SwiftPlaceholderModuleDetailsLayout>();
   registerRecordAbbr<ClangModuleDetailsLayout>();
