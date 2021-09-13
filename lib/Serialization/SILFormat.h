@@ -149,6 +149,7 @@ namespace sil_block {
     SIL_SPECIALIZE_ATTR,
     SIL_PROPERTY,
     SIL_ONE_OPERAND_EXTRA_ATTR,
+    SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR,
     SIL_TWO_OPERANDS_EXTRA_ATTR,
     SIL_INST_DIFFERENTIABLE_FUNCTION,
     SIL_INST_LINEAR_FUNCTION,
@@ -333,7 +334,7 @@ namespace sil_block {
   using SILOneTypeOneOperandLayout = BCRecordLayout<
     SIL_ONE_TYPE_ONE_OPERAND,
     SILInstOpCodeField,
-    BCFixed<2>,          // Optional attributes
+    BCFixed<1>,          // Optional attribute
     TypeIDField,
     SILTypeCategoryField,
     TypeIDField,
@@ -418,6 +419,13 @@ namespace sil_block {
     BCFixed<6>, // Optional attributes
     TypeIDField, SILTypeCategoryField, ValueIDField
   >;
+
+  // SIL instructions with one type, one typed valueref, and extra bits.
+  using SILOneTypeOneOperandExtraAttributeLayout =
+      BCRecordLayout<SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR, SILInstOpCodeField,
+                     BCFixed<10>, // Optional attributes
+                     TypeIDField, SILTypeCategoryField, TypeIDField,
+                     SILTypeCategoryField, ValueIDField>;
 
   // SIL instructions with two typed values.
   using SILTwoOperandsLayout = BCRecordLayout<

@@ -296,6 +296,9 @@ namespace {
                                       unsigned attrs,
                                       CanType type,
                                       SILValue operand);
+    void writeOneTypeOneOperandExtraAttributeLayout(
+      SILInstructionKind valueKind, unsigned attrs,
+      SILType type, SILValue operand);
     void writeOneOperandLayout(SILInstructionKind valueKind,
                                unsigned attrs,
                                SILValue operand);
@@ -681,6 +684,7 @@ void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
         operandTypeRef, unsigned(operandType.getCategory()),
         operandRef);
 }
+
 void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                                  unsigned attrs,
                                                  CanType type,
@@ -694,6 +698,24 @@ void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
         SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
         unsigned(valueKind), attrs,
         typeRef, 0,
+        operandTypeRef, unsigned(operandType.getCategory()),
+        operandRef);
+}
+
+void SILSerializer::
+writeOneTypeOneOperandExtraAttributeLayout(SILInstructionKind valueKind,
+                                           unsigned attrs,
+                                           SILType type,
+                                           SILValue operand) {
+  auto typeRef = S.addTypeRef(type.getASTType());
+  auto operandType = operand->getType();
+  auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+  auto operandRef = addValueRef(operand);
+
+  SILOneTypeOneOperandExtraAttributeLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeOneOperandExtraAttributeLayout::Code],
+        unsigned(valueKind), attrs,
+        typeRef, unsigned(type.getCategory()),
         operandTypeRef, unsigned(operandType.getCategory()),
         operandRef);
 }
@@ -1711,10 +1733,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::PointerToAddressInst: {
     auto &PAI = cast<PointerToAddressInst>(SI);
     assert(PAI.getNumOperands() - PAI.getTypeDependentOperands().size() == 1);
-    unsigned attrs = (PAI.isStrict() ? 1 : 0)
-                   | (PAI.isInvariant() ? 2 : 0);
-    writeOneTypeOneOperandLayout(PAI.getKind(), attrs, PAI.getType(),
-                                 PAI.getOperand());
+    uint8_t encodedAlignment = llvm::encode(PAI.alignment());
+    assert(encodedAlignment == llvm::encode(PAI.alignment())
+           && "pointer_to_address alignment overflow");
+    unsigned attrs = encodedAlignment | (PAI.isStrict() ? 0x100 : 0)
+                     | (PAI.isInvariant() ? 0x200 : 0);
+    writeOneTypeOneOperandExtraAttributeLayout(
+      PAI.getKind(), attrs, PAI.getType(), PAI.getOperand());
     break;
   }
   case SILInstructionKind::RefToBridgeObjectInst: {
@@ -2778,6 +2803,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILOneOperandLayout>();
   registerSILAbbr<SILOneOperandExtraAttributeLayout>();
   registerSILAbbr<SILOneTypeOneOperandLayout>();
+  registerSILAbbr<SILOneTypeOneOperandExtraAttributeLayout>();
   registerSILAbbr<SILInitExistentialLayout>();
   registerSILAbbr<SILOneTypeValuesLayout>();
   registerSILAbbr<SILOneTypeOwnershipValuesLayout>();
