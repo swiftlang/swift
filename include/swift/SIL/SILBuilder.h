@@ -1083,12 +1083,12 @@ public:
         getSILDebugLocation(Loc), Op, Ty));
   }
 
-  PointerToAddressInst *createPointerToAddress(SILLocation Loc, SILValue Op,
-                                               SILType Ty,
-                                               bool isStrict,
-                                               bool isInvariant = false){
+  PointerToAddressInst *
+  createPointerToAddress(SILLocation Loc, SILValue Op, SILType Ty,
+                         bool isStrict, bool isInvariant = false,
+                         llvm::MaybeAlign alignment = llvm::MaybeAlign()) {
     return insert(new (getModule()) PointerToAddressInst(
-                    getSILDebugLocation(Loc), Op, Ty, isStrict, isInvariant));
+        getSILDebugLocation(Loc), Op, Ty, isStrict, isInvariant, alignment));
   }
 
   UncheckedRefCastInst *createUncheckedRefCast(SILLocation Loc, SILValue Op,

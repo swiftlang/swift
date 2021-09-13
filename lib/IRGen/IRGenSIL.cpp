@@ -5622,9 +5622,11 @@ void IRGenSILFunction::visitPointerToAddressInst(swift::PointerToAddressInst *i)
   
   llvm::Type *destType = ti.getStorageType()->getPointerTo();
   ptrValue = Builder.CreateBitCast(ptrValue, destType);
-  
-  setLoweredAddress(i,
-                    ti.getAddressForPointer(ptrValue));
+
+  if (i->alignment())
+    setLoweredAddress(i, Address(ptrValue, Alignment(i->alignment()->value())));
+  else
+    setLoweredAddress(i, ti.getAddressForPointer(ptrValue));
 }
 
 static void emitPointerCastInst(IRGenSILFunction &IGF,

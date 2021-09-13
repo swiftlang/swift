@@ -5125,10 +5125,15 @@ class PointerToAddressInst
   friend SILBuilder;
 
   PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-                       bool IsStrict, bool IsInvariant)
-    : UnaryInstructionBase(DebugLoc, Operand, Ty) {
+                       bool IsStrict, bool IsInvariant,
+                       llvm::MaybeAlign Alignment)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty) {
     SILNode::Bits.PointerToAddressInst.IsStrict = IsStrict;
     SILNode::Bits.PointerToAddressInst.IsInvariant = IsInvariant;
+    unsigned encodedAlignment = llvm::encode(Alignment);
+    SILNode::Bits.PointerToAddressInst.Alignment = encodedAlignment;
+    assert(SILNode::Bits.PointerToAddressInst.Alignment == encodedAlignment
+           && "pointer_to_address alignment overflow");
   }
 
 public:
@@ -5143,6 +5148,13 @@ public:
   /// produces the same value.
   bool isInvariant() const {
     return SILNode::Bits.PointerToAddressInst.IsInvariant;
+  }
+
+  /// The byte alignment of the address. Since the alignment of types isn't
+  /// known until IRGen (TypeInfo::getBestKnownAlignment), in SIL an unknown
+  /// alignment indicates the natural in-memory alignment of the element type.
+  llvm::MaybeAlign alignment() const {
+    return llvm::decodeMaybeAlign(SILNode::Bits.PointerToAddressInst.Alignment);
   }
 };
 
