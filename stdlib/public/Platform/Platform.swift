@@ -46,12 +46,14 @@ public struct DarwinBoolean : ExpressibleByBooleanLiteral {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension DarwinBoolean : CustomReflectable {
   /// Returns a mirror that reflects `self`.
   public var customMirror: Mirror {
     return Mirror(reflecting: boolValue)
   }
 }
+#endif
 
 extension DarwinBoolean : CustomStringConvertible {
   /// A textual representation of `self`.
