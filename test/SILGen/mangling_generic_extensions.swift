@@ -67,3 +67,10 @@ extension Bar {
   // CHECK-LABEL: $s27mangling_generic_extensions3BarV4bar1yyqd__AA8RuncibleRd__AaE5SpoonRp_lF
   func bar1<V: Runcible>(_: V) where U.Spoon: Runcible { }
 }
+
+// Extending specialized types should use the same mangling as same type constraints
+
+extension Foo<Int> {
+  // CHECK-LABEL: sil hidden [ossa] @$s27mangling_generic_extensions3FooVAASiRszlE013someIntFuncOnD0yyF
+  func someIntFuncOnFoo() {}
+}

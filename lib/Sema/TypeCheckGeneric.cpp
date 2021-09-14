@@ -587,8 +587,8 @@ static Type formExtensionInterfaceType(
   auto nominal = dyn_cast<NominalTypeDecl>(genericDecl);
   auto typealias = dyn_cast<TypeAliasDecl>(genericDecl);
   if (!nominal) {
-    Type underlyingType = typealias->getUnderlyingType();
-    nominal = underlyingType->getNominalOrBoundGenericNominal();
+    type = typealias->getUnderlyingType();
+    nominal = type->getNominalOrBoundGenericNominal();
   }
 
   // Form the result.
@@ -618,8 +618,7 @@ static Type formExtensionInterfaceType(
   }
 
   // If we have a typealias, try to form type sugar.
-  if (typealias && TypeChecker::isPassThroughTypealias(
-                       typealias, typealias->getUnderlyingType(), nominal)) {
+  if (typealias) {
     auto typealiasSig = typealias->getGenericSignature();
     SubstitutionMap subMap;
     if (typealiasSig) {
@@ -630,7 +629,6 @@ static Type formExtensionInterfaceType(
 
     resultType = TypeAliasType::get(typealias, parentType, subMap, resultType);
   }
-
 
   return resultType;
 }

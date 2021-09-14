@@ -2661,67 +2661,6 @@ AllMembersRequest::evaluate(
   return evaluateMembersRequest(idc, MembersRequestKind::All);
 }
 
-bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
-                                         Type underlyingType,
-                                         NominalTypeDecl *nominal) {
-  // Pass-through only makes sense when the typealias refers to a nominal
-  // type.
-  if (!nominal) return false;
-
-  // Check that the nominal type and the typealias are either both generic
-  // at this level or neither are.
-  if (nominal->isGeneric() != typealias->isGeneric())
-    return false;
-
-  // Make sure either both have generic signatures or neither do.
-  auto nominalSig = nominal->getGenericSignature();
-  auto typealiasSig = typealias->getGenericSignature();
-  if (static_cast<bool>(nominalSig) != static_cast<bool>(typealiasSig))
-    return false;
-
-  // If neither is generic, we're done: it's a pass-through alias.
-  if (!nominalSig) return true;
-
-  // Check that the type parameters are the same the whole way through.
-  auto nominalGenericParams = nominalSig.getGenericParams();
-  auto typealiasGenericParams = typealiasSig.getGenericParams();
-  if (nominalGenericParams.size() != typealiasGenericParams.size())
-    return false;
-  if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
-                  typealiasGenericParams.begin(),
-                  [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
-                    return gp1->isEqual(gp2);
-                  }))
-    return false;
-
-  // If neither is generic at this level, we have a pass-through typealias.
-  if (!typealias->isGeneric()) return true;
-
-  auto boundGenericType = underlyingType->getAs<BoundGenericType>();
-  if (!boundGenericType) return false;
-
-  // If our arguments line up with our innermost generic parameters, it's
-  // a passthrough typealias.
-  auto innermostGenericParams = typealiasSig.getInnermostGenericParams();
-  auto boundArgs = boundGenericType->getGenericArgs();
-  if (boundArgs.size() != innermostGenericParams.size())
-    return false;
-
-  return std::equal(boundArgs.begin(), boundArgs.end(),
-                    innermostGenericParams.begin(),
-                    [](Type arg, GenericTypeParamType *gp) {
-                      return arg->isEqual(gp);
-                    });
-}
-
-static bool isNonGenericTypeAliasType(Type type) {
-  // A non-generic typealias can extend a specialized type.
-  if (auto *aliasType = dyn_cast<TypeAliasType>(type.getPointer()))
-    return aliasType->getDecl()->getGenericContextDepth() == (unsigned)-1;
-
-  return false;
-}
-
 Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
@@ -2756,28 +2695,11 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   if (extendedType->hasError())
     return error();
 
-  // Hack to allow extending a generic typealias.
-  if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
-    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      // Nested Hack to break cycles if this is called before validation has
-      // finished.
-      if (aliasDecl->hasInterfaceType()) {
-        auto extendedNominal =
-            aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
-        if (extendedNominal)
-          return TypeChecker::isPassThroughTypealias(
-                     aliasDecl, aliasDecl->getUnderlyingType(), extendedNominal)
-                     ? extendedType
-                     : extendedNominal->getDeclaredType();
-      } else {
-        if (auto ty = aliasDecl->getStructuralType()
-                          ->getAs<NominalOrBoundGenericNominalType>())
-          return TypeChecker::isPassThroughTypealias(aliasDecl, ty,
-                                                     ty->getDecl())
-                     ? extendedType
-                     : ty->getDecl()->getDeclaredType();
-      }
-    }
+  // If we're an unbound generic typealias, we may not have a nominal at this
+  // time, so go ahead and return the extended type. This will fail the
+  // non-nominal check even though we're a typealias.
+  if (extendedType->is<UnboundGenericType>()) {
+    return extendedType;
   }
 
   auto &diags = ext->getASTContext().Diags;
@@ -2796,12 +2718,9 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     return error();
   }
 
-  // Cannot extend a bound generic type, unless it's referenced via a
-  // non-generic typealias type.
-  if (extendedType->isSpecialized() &&
-      !isNonGenericTypeAliasType(extendedType)) {
-    diags.diagnose(ext->getLoc(), diag::extension_specialization,
-                   extendedType->getAnyNominal()->getName())
+  // Cannot extend types who contain placeholders.
+  if (extendedType->hasPlaceholder()) {
+    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
          .highlight(extendedRepr->getSourceRange());
     return error();
   }

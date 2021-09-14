@@ -504,9 +504,24 @@ extension X1WithP2Changed {
 
 extension X1WithP2MoreArgs {
   func bad2() {
-    _ = X5<T>() // expected-error{{type 'T' does not conform to protocol 'P2'}}
+    _ = X5<T>()
   }
 }
+
+protocol ReallyBadProto1 {}
+protocol ReallyBadProto2 {}
+
+struct ReallyBadStruct1<T: ReallyBadProto1> {}
+typealias ReallyBadTypealias1<T: ReallyBadProto1> = ReallyBadStruct1<T> where T: ReallyBadProto2
+
+extension ReallyBadTypealias1 { // expected-note {{where 'T' = 'ReallyBadProto1Conformer'}}
+  func hello() {}
+}
+
+struct ReallyBadProto1Conformer: ReallyBadProto1 {}
+
+let x = ReallyBadStruct1<ReallyBadProto1Conformer>()
+x.hello() // expected-error {{referencing instance method 'hello()' on 'ReallyBadStruct1' requires that 'ReallyBadProto1Conformer' conform to 'ReallyBadProto2'}}
 
 // Inference from protocol inheritance clauses is not allowed.
 typealias ExistentialP4WithP2Assoc<T: P4> = P4 where T.P4Assoc : P2
