@@ -1,5 +1,4 @@
-//===---- WebAssemblyToolChains.cpp - Job invocations (WebAssembly-specific)
-//------===//
+//===---- WebAssemblyToolChains.cpp - Job invocations (WebAssembly-specific) ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -189,6 +188,9 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
   // worse. So assume that compiler driver uses wasm-ld and --global-base=1024
   // to reserve low 1KB.
   Arguments.push_back("-Xlinker");
+  Arguments.push_back(context.Args.MakeArgString(
+      Twine("--global-base=") +
+      std::to_string(SWIFT_ABI_WASM32_LEAST_VALID_POINTER)));
 
   // These custom arguments should be right before the object file at the end.
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
