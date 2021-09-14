@@ -10,9 +10,6 @@
 // Disabled until test hang can be looked at.
 // UNSUPPORTED: OS=windows-msvc
 
-// rdar://82973061
-// XFAIL: linux
-
 // This test makes sure that we properly save/restore access when we
 // synchronously launch a task from a serial executor. The access from the task
 // should be merged into the already created access set while it runs and then
