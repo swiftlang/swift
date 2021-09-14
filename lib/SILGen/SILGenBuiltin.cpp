@@ -1577,6 +1577,15 @@ static ManagedValue emitBuiltinHopToActor(SILGenFunction &SGF, SILLocation loc,
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
+static ManagedValue emitBuiltinMove(SILGenFunction &SGF, SILLocation loc,
+                                    SubstitutionMap subs,
+                                    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 1 && "Move has a single argument");
+  auto firstArg = args[0].ensurePlusOne(SGF, loc);
+  CleanupCloner cloner(SGF, firstArg);
+  return cloner.clone(SGF.B.createMoveValue(loc, firstArg.forward(SGF)));
+}
+
 static ManagedValue emitBuiltinAutoDiffCreateLinearMapContext(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
