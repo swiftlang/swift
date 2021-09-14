@@ -4,7 +4,7 @@
 // REQUIRES: concurrency
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 // UNSUPPORTED: linux

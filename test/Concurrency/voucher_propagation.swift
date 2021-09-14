@@ -9,7 +9,7 @@
 // Use objc_interop as a proxy for voucher support in the OS.
 // REQUIRES: objc_interop
 
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import Darwin
