@@ -1908,8 +1908,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.VirtualFunctionElimination = true;
   }
 
-  // Default to disabling swift async extended frame info on linux.
-  if (Triple.getOS() == llvm::Triple::Linux) {
+  // Default to disabling swift async extended frame info on anything but
+  // darwin. Other platforms are unlikely to have support for extended frame
+  // pointer information.
+  if (!Triple.isOSDarwin()) {
     Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
   }
   if (const Arg *A = Args.getLastArg(OPT_swift_async_frame_pointer_EQ)) {
