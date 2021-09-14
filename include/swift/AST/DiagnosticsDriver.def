@@ -166,6 +166,10 @@ ERROR(error_darwin_only_supports_libcxx, none,
       "The only C++ standard library supported on Apple platforms is libc++",
       ())
 
+ERROR(error_wasm_doesnt_support_global_base, none,
+      "The --global-base argument is not supported when targeting WebAssembly",
+      ())
+
 WARNING(warn_drv_darwin_sdk_invalid_settings, none,
     "SDK settings were ignored because 'SDKSettings.json' could not be parsed",
     ())
