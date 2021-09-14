@@ -777,6 +777,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  // Get the SDK name.
+  if (Arg *A = Args.getLastArg(options::OPT_target_sdk_name)) {
+    Opts.SDKName = A->getValue();
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_entry_point_function_name)) {
     Opts.entryPointFunctionName = A->getValue();
   }
