@@ -4142,34 +4142,60 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     break;
   }
-  case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::MetatypeInst: {
-
+  case SILInstructionKind::AllocStackInst: {
     bool hasDynamicLifetime = false;
-    if (Opcode == SILInstructionKind::AllocStackInst &&
-        parseSILOptional(hasDynamicLifetime, *this, "dynamic_lifetime"))
-      return true;
+    bool isLexical = false;
+
+    while (P.consumeIf(tok::l_square)) {
+      Identifier ident;
+      SourceLoc identLoc;
+      if (parseSILIdentifier(ident, identLoc,
+                             diag::expected_in_attribute_list)) {
+        if (P.consumeIf(tok::r_square)) {
+          continue;
+        } else {
+          return true;
+        }
+      }
+      StringRef attr = ident.str();
+
+      if (attr == "dynamic_lifetime") {
+        hasDynamicLifetime = true;
+      } else if (attr == "lexical") {
+        isLexical = true;
+      } else {
+        return true;
+      }
+
+      if (!P.consumeIf(tok::r_square))
+        return true;
+    }
 
     SILType Ty;
     if (parseSILType(Ty))
       return true;
 
-    if (Opcode == SILInstructionKind::AllocStackInst) {
-      SILDebugVariable VarInfo;
-      if (parseSILDebugVar(VarInfo) || parseSILDebugLocation(InstLoc, B))
-        return true;
-      // It doesn't make sense to attach a debug var info if the name is empty
-      if (VarInfo.Name.size())
-        ResultVal =
-            B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime);
-      else
-        ResultVal = B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime);
-    } else {
-      assert(Opcode == SILInstructionKind::MetatypeInst);
-      if (parseSILDebugLocation(InstLoc, B))
-        return true;
-      ResultVal = B.createMetatype(InstLoc, Ty);
-    }
+    SILDebugVariable VarInfo;
+    if (parseSILDebugVar(VarInfo) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    // It doesn't make sense to attach a debug var info if the name is empty
+    if (VarInfo.Name.size())
+      ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
+                                     isLexical);
+    else
+      ResultVal =
+          B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime, isLexical);
+    break;
+  }
+  case SILInstructionKind::MetatypeInst: {
+    SILType Ty;
+    if (parseSILType(Ty))
+      return true;
+
+    assert(Opcode == SILInstructionKind::MetatypeInst);
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createMetatype(InstLoc, Ty);
     break;
   }
   case SILInstructionKind::AllocRefInst:
