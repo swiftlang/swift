@@ -192,6 +192,10 @@ void setModuleFlags(IRGenModule &IGM) {
   // error during LTO if the user tries to combine files across ABIs.
   Module->addModuleFlag(llvm::Module::Error, "Swift Version",
                         IRGenModule::swiftVersion);
+
+  if (IGM.getOptions().VirtualFunctionElimination) {
+    Module->addModuleFlag(llvm::Module::Error, "Virtual Function Elim", 1);
+  }
 }
 
 void swift::performLLVMOptimizations(const IRGenOptions &Opts,
