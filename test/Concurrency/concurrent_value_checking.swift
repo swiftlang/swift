@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
-class NotConcurrent { } // expected-note 17{{class 'NotConcurrent' does not conform to the `Sendable` protocol}}
+class NotConcurrent { } // expected-note 18{{class 'NotConcurrent' does not conform to the `Sendable` protocol}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on actor operations
@@ -303,4 +303,15 @@ typealias TypeAlias1 = @unchecked P // expected-error{{'unchecked' attribute onl
 enum E12<T>: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   case payload(NotConcurrent) // okay
   case other(T) // okay
+}
+
+// ----------------------------------------------------------------------
+// @Sendable inference through optionals
+// ----------------------------------------------------------------------
+func testSendableOptionalInference(nc: NotConcurrent) {
+  var fn: (@Sendable () -> Void)? = nil
+  fn = {
+    print(nc) // expected-warning{{cannot use parameter 'nc' with a non-sendable type 'NotConcurrent' from concurrently-executed code}}
+  }
+  _ = fn
 }
