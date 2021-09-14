@@ -1896,6 +1896,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableGlobalISel = true;
   }
 
+  if (Args.hasArg(OPT_enable_llvm_vfe)) {
+    Opts.VirtualFunctionElimination = true;
+  }
+
   return false;
 }
 
