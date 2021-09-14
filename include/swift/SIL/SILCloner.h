@@ -1084,7 +1084,7 @@ void SILCloner<ImplClass>::visitBeginBorrowInst(BeginBorrowInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createBeginBorrow(getOpLocation(Inst->getLoc()),
                                            getOpValue(Inst->getOperand()), 
-                                           Inst->isDefined()));
+                                           Inst->isLexical()));
 }
 
 template <typename ImplClass>

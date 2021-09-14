@@ -4030,20 +4030,20 @@ class BeginBorrowInst
                                   SingleValueInstruction> {
   friend class SILBuilder;
 
-  bool defined;
+  bool lexical;
 
-  BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue, bool defined)
+  BeginBorrowInst(SILDebugLocation DebugLoc, SILValue LValue, bool isLexical)
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()),
-        defined(defined) {}
+        lexical(isLexical) {}
 
 public:
   using EndBorrowRange =
       decltype(std::declval<ValueBase>().getUsersOfType<EndBorrowInst>());
 
-  /// Whether the borrow scope defined by this instruction corresponds to a
-  /// source-level VarDecl.
-  bool isDefined() const { return defined; }
+  /// Whether the borrow scope introduced by this instruction corresponds to a
+  /// source-level lexical scope.
+  bool isLexical() const { return lexical; }
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;

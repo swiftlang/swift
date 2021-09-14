@@ -3278,12 +3278,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::BeginBorrowInst: {
     SourceLoc AddrLoc;
 
-    bool defined = false;
+    bool isLexical = false;
     StringRef attributeName;
 
     if (parseSILOptional(attributeName, *this)) {
-      if (attributeName.equals("defined"))
-        defined = true;
+      if (attributeName.equals("lexical"))
+        isLexical = true;
       else
         return true;
     }
@@ -3292,7 +3292,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createBeginBorrow(InstLoc, Val, defined);
+    ResultVal = B.createBeginBorrow(InstLoc, Val, isLexical);
     break;
   }
 
