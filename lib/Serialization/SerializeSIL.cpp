@@ -221,7 +221,9 @@ namespace {
         DifferentiabilityWitnessesToEmit;
 
     /// Additional functions we might need to serialize.
-    llvm::SmallVector<const SILFunction *, 16> Worklist;
+    llvm::SmallVector<const SILFunction *, 16> functionWorklist;
+
+    llvm::SmallVector<const SILGlobalVariable *, 16> globalWorklist;
 
     /// String storage for temporarily created strings which are referenced from
     /// the tables.
@@ -244,7 +246,9 @@ namespace {
                                  bool emitDeclarationsForOnoneSupport);
     void addReferencedSILFunction(const SILFunction *F,
                                   bool DeclOnly = false);
-    void processSILFunctionWorklist();
+    void addReferencedGlobalVariable(const SILGlobalVariable *gl);
+
+    void processWorklists();
 
     /// Helper function to update ListOfValues for MethodInst. Format:
     /// Attr, SILDeclRef (DeclID, Kind, uncurryLevel), and an operand.
@@ -334,7 +338,7 @@ void SILSerializer::addMandatorySILFunction(const SILFunction *F,
   // Function body should be serialized unless it is a KeepAsPublic function
   // (which is typically a pre-specialization).
   if (!emitDeclarationsForOnoneSupport)
-    Worklist.push_back(F);
+    functionWorklist.push_back(F);
 }
 
 void SILSerializer::addReferencedSILFunction(const SILFunction *F,
@@ -348,7 +352,7 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
   // serialize the body or just the declaration.
   if (shouldEmitFunctionBody(F)) {
     FuncsToEmit[F] = false;
-    Worklist.push_back(F);
+    functionWorklist.push_back(F);
     return;
   }
 
@@ -357,7 +361,7 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
            F->hasForeignBody());
 
     FuncsToEmit[F] = false;
-    Worklist.push_back(F);
+    functionWorklist.push_back(F);
     return;
   }
 
@@ -365,15 +369,27 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
   FuncsToEmit[F] = true;
 }
 
-void SILSerializer::processSILFunctionWorklist() {
-  while (!Worklist.empty()) {
-    const SILFunction *F = Worklist.back();
-    Worklist.pop_back();
-    assert(F != nullptr);
+void SILSerializer::addReferencedGlobalVariable(const SILGlobalVariable *gl) {
+  if (GlobalsToEmit.insert(gl).second)
+    globalWorklist.push_back(gl);
+}
 
-    assert(FuncsToEmit.count(F) > 0);
-    writeSILFunction(*F, FuncsToEmit[F]);
-  }
+
+void SILSerializer::processWorklists() {
+  do {
+    while (!functionWorklist.empty()) {
+      const SILFunction *F = functionWorklist.pop_back_val();
+      assert(F != nullptr);
+
+      assert(FuncsToEmit.count(F) > 0);
+      writeSILFunction(*F, FuncsToEmit[F]);
+    }
+    while (!globalWorklist.empty()) {
+      const SILGlobalVariable *gl = globalWorklist.pop_back_val();
+      assert(GlobalsToEmit.count(gl) > 0);
+      writeSILGlobalVar(*gl);
+    }
+  } while (!functionWorklist.empty());
 }
 
 /// We enumerate all values in a SILFunction beforehand to correctly
@@ -1116,7 +1132,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Format: Name and type. Use SILOneOperandLayout.
     const AllocGlobalInst *AGI = cast<AllocGlobalInst>(&SI);
     auto *G = AGI->getReferencedGlobal();
-    GlobalsToEmit.insert(G);
+    addReferencedGlobalVariable(G);
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0, 0, 0,
@@ -1128,7 +1144,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Format: Name and type. Use SILOneOperandLayout.
     const GlobalAccessInst *GI = cast<GlobalAccessInst>(&SI);
     auto *G = GI->getReferencedGlobal();
-    GlobalsToEmit.insert(G);
+    addReferencedGlobalVariable(G);
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0,
@@ -2816,6 +2832,12 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
       writeSILDefaultWitnessTable(wt);
   }
 
+  // Add global variables that must be emitted to the list.
+  for (const SILGlobalVariable &g : SILMod->getSILGlobals()) {
+    if (g.isSerialized() || ShouldSerializeAll)
+      addReferencedGlobalVariable(&g);
+  }
+
   // Emit only declarations if it is a module with pre-specializations.
   // And only do it in optimized builds.
   bool emitDeclarationsForOnoneSupport =
@@ -2835,7 +2857,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     }
 
     addMandatorySILFunction(&F, emitDeclarationsForOnoneSupport);
-    processSILFunctionWorklist();
+    processWorklists();
   }
 
   // Write out differentiability witnesses.
@@ -2854,7 +2876,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // Process SIL functions referenced by differentiability witnesses.
   // Note: this is necessary despite processing `FuncsToEmit` below because
   // `Worklist` is processed separately.
-  processSILFunctionWorklist();
+  processWorklists();
 
   // Now write function declarations for every function we've
   // emitted a reference to without emitting a function body for.
@@ -2868,16 +2890,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     }
   }
 
-  // Add global variables that must be emitted to the list.
-  for (const SILGlobalVariable &g : SILMod->getSILGlobals())
-    if (g.isSerialized() || ShouldSerializeAll)
-      GlobalsToEmit.insert(&g);
-
-  // Now write out all referenced global variables.
-  for (auto *g : GlobalsToEmit)
-      writeSILGlobalVar(*g);
-
-  assert(Worklist.empty() && "Did not emit everything in worklist");
+  assert(functionWorklist.empty() && globalWorklist.empty() &&
+         "Did not emit everything in worklists");
 }
 
 void SILSerializer::writeSILModule(const SILModule *SILMod) {
