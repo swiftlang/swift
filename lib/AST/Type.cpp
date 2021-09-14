@@ -1850,7 +1850,7 @@ public:
     auto genericSig = decl->getGenericSignature();
     
     SmallVector<Type, 4> newParams;
-    llvm::DenseMap<Type, Type> newParamsMap;
+    llvm::DenseMap<SubstitutableType *, Type> newParamsMap;
     bool didChange = false;
     
     // The upper bounds for the nominal type's arguments may depend on the
@@ -1991,8 +1991,7 @@ public:
       SmallVector<ProtocolConformanceRef, 4> paramSubstConformances;
       if (paramUpperBound) {
         for (auto proto : paramUpperBound->getConformsTo()) {
-          auto conformance = upperBoundSubstMap.lookupConformance(gp->getCanonicalType(),
-                                                                  proto);
+          auto conformance = upperBoundSubstMap.lookupConformance(gp, proto);
           if (!conformance)
             return CanType();
           paramSubstConformances.push_back(conformance);
@@ -2005,7 +2004,7 @@ public:
         return CanType();
       
       newParams.push_back(newParam);
-      newParamsMap.insert({gpTy, newParam});
+      newParamsMap.insert({gp->castTo<GenericTypeParamType>(), newParam});
       didChange |= (newParam != subst);
     }
     
@@ -2042,14 +2041,15 @@ public:
       
       // Gather the conformances for the new binding type, if the type changed.
       if (didChange) {
-        auto newSubstTy = newParamsMap.find(req.getFirstType());
-        assert(newSubstTy != newParamsMap.end());
+        auto newSubstTy = req.getFirstType().subst(
+          QueryTypeSubstitutionMap{newParamsMap},
+          LookUpConformanceInModule(moduleDecl));
         
-        if (newSubstTy->second->isTypeParameter()) {
+        if (newSubstTy->isTypeParameter()) {
           newConformances.push_back(ProtocolConformanceRef(proto));
         } else {
           auto newConformance
-            = moduleDecl->lookupConformance(newSubstTy->second, proto);
+            = moduleDecl->lookupConformance(newSubstTy, proto);
           if (!newConformance)
             return CanType();
           newConformances.push_back(newConformance);
