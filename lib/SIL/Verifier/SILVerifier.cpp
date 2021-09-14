@@ -3199,6 +3199,7 @@ public:
   }
 
   SILType getMethodSelfType(CanSILFunctionType ft) {
+    SILFunctionConventions fnConv(ft, F.getModule());
     return fnConv.getSILType(ft->getParameters().back(),
                              F.getTypeExpansionContext());
   }
