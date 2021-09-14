@@ -16,10 +16,10 @@ jobs:
             targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64"
           - branch: "swiftwasm-release/5.4"
             channel: "5.4"
-            targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64"
+            targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64 macos_arm64"
           - branch: "swiftwasm-release/5.5"
             channel: "5.5"
-            targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64"
+            targets: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64 macos_arm64"
     steps:
       - uses: actions/checkout@v1
       - name: Setup keychain
