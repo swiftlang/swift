@@ -1751,6 +1751,8 @@ public:
       *this << "[strict] ";
     if (CI->isInvariant())
       *this << "[invariant] ";
+    if (CI->alignment())
+      *this << "[align=" << CI->alignment()->value() << "] ";
     *this << CI->getType();
   }
   void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {

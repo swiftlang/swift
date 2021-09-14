@@ -3,7 +3,7 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: executable_test
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 
 // rdar://78109470
 // UNSUPPORTED: back_deployment_runtime

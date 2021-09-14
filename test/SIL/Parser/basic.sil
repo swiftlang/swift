@@ -310,7 +310,7 @@ bb0(%0 : $*Runcible, %1 : $*Bendable & Runcible):
   return %7 : $()
 }
 
-protocol ClassBound : class {
+protocol ClassBound : AnyObject {
   func classBoundMethod()
 }
 
@@ -837,7 +837,7 @@ bb0(%t : $T):
   return %1 : $()
 }
 
-protocol ClassP : class {}
+protocol ClassP : AnyObject {}
 
 enum MaybePair {
   case Neither
@@ -1571,6 +1571,18 @@ bb0(%0 : $Builtin.RawPointer, %1 : $X):
   store %1 to %3 : $*X
   // CHECK: [[T3:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [strict] $*X
   // CHECK-NEXT: store %1 to [[T3]] : $*X
+  %5 = pointer_to_address %0 : $Builtin.RawPointer to [align=1] $*X
+  store %1 to %5 : $*X
+  // CHECK: [[T4:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [align=1] $*X
+  // CHECK-NEXT: store %1 to [[T4]] : $*X
+  %7 = pointer_to_address %0 : $Builtin.RawPointer to [align=8] $*X
+  store %1 to %7 : $*X
+  // CHECK: [[T5:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [align=8] $*X
+  // CHECK-NEXT: store %1 to [[T5]] : $*X
+  %9 = pointer_to_address %0 : $Builtin.RawPointer to [align=4294967296] $*X
+  store %1 to %9 : $*X
+  // CHECK: [[T6:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [align=4294967296] $*X
+  // CHECK-NEXT: store %1 to [[T6]] : $*X
   %28 = tuple ()
   return %28 : $()
 }

@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
 import Swift
+import Builtin
 
 @_alignment(16) struct Foo { var x, y, z, w: Float }
 @_alignment(16) enum Empty {}
@@ -9,6 +10,7 @@ import Swift
 @_alignment(16) enum SinglePayload { case A(Float), B, C }
 @_alignment(16) enum MultiPayload { case A(Float), B(Float), C }
 
+// CHECK-LABEL: define {{.*}} @test_alignment
 sil @test_alignment : $@convention(thin) () -> () {
 entry:
   // CHECK: alloca %T9alignment3FooV, align 16
@@ -74,5 +76,31 @@ entry:
   dealloc_stack %c : $*Empty
   dealloc_stack %b : $*Singleton
   dealloc_stack %a : $*Foo
+  return undef : $()
+}
+
+// CHECK-LABEL: define {{.*}} @test_unaligned
+// CHECK:   store i64 %{{.*}}, i64* %{{.*}}, align 8
+// CHECK:   %{{.*}} = load i64, i64* %{{.*}}, align 8
+// CHECK:   store i64 %{{.*}}, i64* %{{.*}}, align 1
+// CHECK:   %{{.*}} = load i64, i64* %{{.*}}, align 1
+// CHECK:   store i64 %{{.*}}, i64* %{{.*}}, align 8
+// CHECK:   %{{.*}} = load i64, i64* %{{.*}}, align 8
+// CHECK:   store i64 %{{.*}}, i64* %{{.*}}, align 536870912
+// CHECK:   %{{.*}} = load i64, i64* %{{.*}}, align 536870912
+sil @test_unaligned : $@convention(thin) (Builtin.RawPointer, Builtin.Int64) -> () {
+entry(%0 : $Builtin.RawPointer, %1 : $Builtin.Int64):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to $*Builtin.Int64
+  store %1 to %2 : $*Builtin.Int64
+  %4 = load %2 : $*Builtin.Int64
+  %5 = pointer_to_address %0 : $Builtin.RawPointer to [align=1] $*Builtin.Int64
+  store %1 to %5 : $*Builtin.Int64
+  %7 = load %5 : $*Builtin.Int64
+  %8 = pointer_to_address %0 : $Builtin.RawPointer to [align=8] $*Builtin.Int64
+  store %1 to %8 : $*Builtin.Int64
+  %10 = load %8 : $*Builtin.Int64
+  %11 = pointer_to_address %0 : $Builtin.RawPointer to [align=536870912] $*Builtin.Int64
+  store %1 to %11 : $*Builtin.Int64
+  %12 = load %11 : $*Builtin.Int64
   return undef : $()
 }
