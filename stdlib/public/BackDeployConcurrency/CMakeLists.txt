@@ -46,5 +46,6 @@ set(swift_concurrency_options
 set(swift_concurrency_extra_sources
   "../BackDeployConcurrency/Exclusivity.cpp"
   "../BackDeployConcurrency/Metadata.cpp")
+set(swift_concurrency_async_fp_mode "never")
 
 add_subdirectory(../Concurrency stdlib/public/BackDeployConcurrency)
