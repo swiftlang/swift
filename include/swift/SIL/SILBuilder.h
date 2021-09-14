@@ -365,13 +365,14 @@ public:
 
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
                                    Optional<SILDebugVariable> Var = None,
-                                   bool hasDynamicLifetime = false) {
+                                   bool hasDynamicLifetime = false,
+                                   bool isLexical = false) {
     Loc.markAsPrologue();
     assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocStackInst::create(getSILDebugLocation(Loc), elementType,
-                                         getFunction(),
-                                         Var, hasDynamicLifetime));
+                                         getFunction(), Var, hasDynamicLifetime,
+                                         isLexical));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,

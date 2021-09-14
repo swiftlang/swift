@@ -191,13 +191,13 @@ SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F, Optional<SILDebugVariable> Var,
-                               bool hasDynamicLifetime)
+                               bool hasDynamicLifetime, bool isLexical)
     : InstructionBase(Loc, elementType.getAddressType()),
       SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
                                  Var ? Var->Type.hasValue() : false,
                                  Var ? Var->Loc.hasValue() : false,
                                  Var ? Var->Scope != nullptr : false),
-      dynamicLifetime(hasDynamicLifetime) {
+      dynamicLifetime(hasDynamicLifetime), lexical(isLexical) {
   SILNode::Bits.AllocStackInst.NumOperands =
     TypeDependentOperands.size();
   assert(SILNode::Bits.AllocStackInst.NumOperands ==
@@ -218,19 +218,18 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                          TypeDependentOperands);
 }
 
-AllocStackInst *
-AllocStackInst::create(SILDebugLocation Loc,
-                       SILType elementType, SILFunction &F,
-                       Optional<SILDebugVariable> Var,
-                       bool hasDynamicLifetime) {
+AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
+                                       SILType elementType, SILFunction &F,
+                                       Optional<SILDebugVariable> Var,
+                                       bool hasDynamicLifetime,
+                                       bool isLexical) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
                                elementType.getASTType());
   void *Buffer = allocateDebugVarCarryingInst<AllocStackInst>(
       F.getModule(), Var, TypeDependentOperands);
-  return ::new (Buffer)
-      AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var,
-                     hasDynamicLifetime);
+  return ::new (Buffer) AllocStackInst(Loc, elementType, TypeDependentOperands,
+                                       F, Var, hasDynamicLifetime, isLexical);
 }
 
 VarDecl *AllocationInst::getDecl() const {

@@ -1260,6 +1260,8 @@ public:
   void visitAllocStackInst(AllocStackInst *AVI) {
     if (AVI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
+    if (AVI->isLexical())
+      *this << "[lexical] ";
     *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo(),
                   &AVI->getModule().getASTContext().SourceMgr);
