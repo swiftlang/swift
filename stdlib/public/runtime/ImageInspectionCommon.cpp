@@ -131,9 +131,10 @@ void swift::initializeTypeMetadataRecordLookup() {
 void swift::initializeDynamicReplacementLookup() {
 }
 
+#ifndef NDEBUG
+
 SWIFT_RUNTIME_EXPORT
 const swift::MetadataSections *swift_getMetadataSection(size_t index) {
-  #ifndef NDEBUG
   if (swift::registered == nullptr) {
     return nullptr;
   }
@@ -147,27 +148,21 @@ const swift::MetadataSections *swift_getMetadataSection(size_t index) {
     --index;
   }
   return selected;
-  #else // NDEBUG
-  return nullptr;
-  #endif // else NDEBUG
 }
 
 SWIFT_RUNTIME_EXPORT
 const char *swift_getMetadataSectionName(void *metadata_section) {
-  #ifndef NDEBUG
   swift::SymbolInfo info;
   if (lookupSymbol(metadata_section, &info)) {
     if (info.fileName) {
       return info.fileName;
     }
   }
-  #endif // NDEBUG
   return "";
 }
 
 SWIFT_RUNTIME_EXPORT
 size_t swift_getMetadataSectionCount() {
-  #ifndef NDEBUG
   if (swift::registered == nullptr)
     return 0;
 
@@ -176,10 +171,10 @@ size_t swift_getMetadataSectionCount() {
        current != swift::registered; current = current->next, ++count);
 
   return count;
-  #else // NDEBUG
-  return 0;
-  #endif // else NDEBUG
 }
+
+#endif // NDEBUG
+
 #endif // !defined(__MACH__)
 
 #endif // SWIFT_RUNTIME_IMAGEINSPECTIONCOMMON_H

@@ -455,6 +455,8 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
 // Initializes into the preallocated _group an actual TaskGroupImpl.
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) {
+  SWIFT_TASK_DEBUG_LOG("creating task group = %p", group);
+
   TaskGroupImpl *impl = new (group) TaskGroupImpl(T);
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");
@@ -473,8 +475,7 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group, const Metadata *T) 
 SWIFT_CC(swift)
 static void swift_taskGroup_attachChildImpl(TaskGroup *group,
                                             AsyncTask *child) {
-  SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p\n",
-          child, group);
+  SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p", child, group);
 
   // The counterpart of this (detachChild) is performed by the group itself,
   // when it offers the completed (child) task's value to a waiting task -
@@ -491,11 +492,17 @@ static void swift_taskGroup_destroyImpl(TaskGroup *group) {
 }
 
 void TaskGroupImpl::destroy() {
+  SWIFT_TASK_DEBUG_LOG("destroying task group = %p", this);
+
   // First, remove the group from the task and deallocate the record
   swift_task_removeStatusRecord(getTaskRecord());
 
-  // By the time we call destroy, all tasks inside the group must have been
-  // awaited on already; We handle this on the swift side.
+  // No need to drain our queue here, as by the time we call destroy,
+  // all tasks inside the group must have been awaited on already.
+  // This is done in Swift's withTaskGroup function explicitly.
+
+  // destroy the group's storage
+  this->~TaskGroupImpl();
 }
 
 // =============================================================================
@@ -567,7 +574,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   bool hadErrorResult = false;
   auto errorObject = asyncContextPrefix->errorResult;
   if (errorObject) {
-    // instead we need to enqueue this result:
+    // instead, we need to enqueue this result:
     hadErrorResult = true;
   }
 

@@ -1902,16 +1902,16 @@ class AllocStackInst final
   friend SILBuilder;
 
   bool dynamicLifetime = false;
+  bool lexical = false;
 
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
-                 ArrayRef<SILValue> TypeDependentOperands,
-                 SILFunction &F,
-                 Optional<SILDebugVariable> Var, bool hasDynamicLifetime);
+                 ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
+                 Optional<SILDebugVariable> Var, bool hasDynamicLifetime,
+                 bool isLexical);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
-                                SILFunction &F,
-                                Optional<SILDebugVariable> Var,
-                                bool hasDynamicLifetime);
+                                SILFunction &F, Optional<SILDebugVariable> Var,
+                                bool hasDynamicLifetime, bool isLexical);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -1941,6 +1941,9 @@ public:
   /// An example of an alloc_stack with dynamic lifetime is an alloc_stack that
   /// is conditionally initialized.
   bool hasDynamicLifetime() const { return dynamicLifetime; }
+
+  /// Whether the alloc_stack instruction corresponds to a source-level VarDecl.
+  bool isLexical() const { return lexical; }
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {

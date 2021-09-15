@@ -299,6 +299,10 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
     case control_block::TARGET:
       result.targetTriple = blobData;
       break;
+    case control_block::SDK_NAME: {
+      result.sdkName = blobData;
+      break;
+    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -1210,6 +1214,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       }
       Name = info.name;
       TargetTriple = info.targetTriple;
+      SDKName = info.sdkName;
       CompatibilityVersion = info.compatibilityVersion;
       UserModuleVersion = info.userModuleVersion;
       Bits.ArePrivateImportsEnabled = extInfo.arePrivateImportsEnabled();

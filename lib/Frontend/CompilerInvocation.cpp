@@ -429,6 +429,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
+  Opts.EnableExperimentalDefinedLifetimes |=
+      Args.hasArg(OPT_enable_experimental_defined_lifetimes);
+
   Opts.EnableExperimentalNamedOpaqueTypes |=
       Args.hasArg(OPT_enable_experimental_named_opaque_types);
 
@@ -772,6 +775,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
+  }
+
+  // Get the SDK name.
+  if (Arg *A = Args.getLastArg(options::OPT_target_sdk_name)) {
+    Opts.SDKName = A->getValue();
   }
 
   if (const Arg *A = Args.getLastArg(OPT_entry_point_function_name)) {
@@ -1894,6 +1902,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Triple.getArch() == llvm::Triple::aarch64 &&
       Triple.getArchName() != "arm64e") {
     Opts.EnableGlobalISel = true;
+  }
+
+  if (Args.hasArg(OPT_enable_llvm_vfe)) {
+    Opts.VirtualFunctionElimination = true;
   }
 
   return false;

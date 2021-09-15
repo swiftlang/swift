@@ -1014,8 +1014,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocStackInst: {
     const AllocStackInst *ASI = cast<AllocStackInst>(&SI);
-    writeOneTypeLayout(ASI->getKind(), ASI->hasDynamicLifetime() ? 1 : 0,
-                       ASI->getElementType());
+    unsigned attr =
+        unsigned(ASI->hasDynamicLifetime()) + unsigned(ASI->isLexical() << 1);
+    writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
     break;
   }
   case SILInstructionKind::ProjectValueBufferInst: {

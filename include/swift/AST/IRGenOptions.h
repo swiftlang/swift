@@ -345,6 +345,8 @@ public:
 
   unsigned EnableGlobalISel : 1;
 
+  unsigned VirtualFunctionElimination : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -401,7 +403,8 @@ public:
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),
-        EnableGlobalISel(false), CmdArgs(),
+        EnableGlobalISel(false), VirtualFunctionElimination(false),
+        CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 

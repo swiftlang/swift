@@ -1448,11 +1448,14 @@ public:
                                                      bool isDestroyer,
                                                      bool isForeign,
                                                      ForDefinition_t forDefinition);
-  llvm::GlobalValue *defineTypeMetadata(CanType concreteType,
-                                        bool isPattern,
-                                        bool isConstant,
-                                        ConstantInitFuture init,
-                                        llvm::StringRef section = {});
+  void addVTableTypeMetadata(
+      ClassDecl *decl, llvm::GlobalVariable *var,
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries);
+
+  llvm::GlobalValue *defineTypeMetadata(
+      CanType concreteType, bool isPattern, bool isConstant,
+      ConstantInitFuture init, llvm::StringRef section = {},
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 

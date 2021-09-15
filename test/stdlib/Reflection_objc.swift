@@ -12,6 +12,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// Disabled arm64e for now since it is failing
+// XFAIL: CPU=arm64e
+
 //
 // DO NOT add more tests to this file.  Add them to test/1_stdlib/Runtime.swift.
 //

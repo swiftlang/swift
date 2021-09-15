@@ -247,6 +247,10 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
+def enable_experimental_defined_lifetimes :
+  Flag<["-"], "enable-experimental-defined-lifetimes">,
+  HelpText<"Enable experimental defined lifetimes">;
+
 def enable_experimental_distributed :
   Flag<["-"], "enable-experimental-distributed">,
   HelpText<"Enable experimental 'distributed' actors and functions">;
@@ -488,6 +492,10 @@ def disable_swift3_objc_inference :
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Add 'dynamic' to all declarations">;
+
+def enable_llvm_vfe : Flag<["-"], "enable-llvm-vfe">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Use LLVM Virtual Function Elimination on Swift class virtual tables">;
 
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
@@ -822,6 +830,9 @@ def target_sdk_version : Separate<["-"], "target-sdk-version">,
 
 def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
   HelpText<"The version of target variant SDK used for compilation">;
+
+def target_sdk_name : Separate<["-"], "target-sdk-name">,
+  HelpText<"Canonical name of the target SDK used for compilation">;
 
 def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
   HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;

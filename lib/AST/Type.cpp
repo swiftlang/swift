@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "ast-types"
+
 #include "swift/AST/Types.h"
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
@@ -39,6 +41,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <functional>
@@ -1798,12 +1801,13 @@ public:
   }
   
   CanType visitDynamicSelfType(DynamicSelfType *orig, CanType subst,
-                               ArchetypeType *, ArrayRef<ProtocolConformanceRef>) {
+                           ArchetypeType *upperBound,
+                           ArrayRef<ProtocolConformanceRef> substConformances) {
     // A "dynamic self" type can be bound to another dynamic self type, or the
     // non-dynamic base class type.
     if (auto dynSubst = dyn_cast<DynamicSelfType>(subst)) {
       if (auto newBase = visit(orig->getSelfType(), dynSubst.getSelfType(),
-                               nullptr, {})) {
+                               upperBound, substConformances)) {
         return CanDynamicSelfType::get(newBase, orig->getASTContext())
                                  ->getCanonicalType();
       }
@@ -1811,31 +1815,274 @@ public:
     }
     
     if (auto newNonDynBase = visit(orig->getSelfType(), subst,
-                                   nullptr, {})) {
+                                   upperBound, substConformances)) {
       return newNonDynBase;
     }
     return CanType();
   }
   
+  /// Handle a nominal type with generic parameters anywhere in its context.
+  /// \c origType and \c substType must already have been established to be
+  /// instantiations of the same \c NominalTypeDecl.
+  CanType handleGenericNominalType(NominalTypeDecl *decl,
+                           CanType origType,
+                           CanType substType,
+                           ArchetypeType *upperBound,
+                           ArrayRef<ProtocolConformanceRef> substConformances) {
+    assert(origType->getAnyNominal() == decl
+           && substType->getAnyNominal() == decl);
+    
+    LLVM_DEBUG(llvm::dbgs() << "\n---\nTesting bindability of:\n";
+               origType->print(llvm::dbgs());
+               llvm::dbgs() << "\nto subst type:\n";
+               substType->print(llvm::dbgs());
+               if (upperBound) {
+                 llvm::dbgs() << "\nwith upper bound archetype:\n";
+                 upperBound->print(llvm::dbgs());
+               });
+    
+    auto *moduleDecl = decl->getParentModule();
+    auto origSubMap = origType->getContextSubstitutionMap(
+        moduleDecl, decl, decl->getGenericEnvironment());
+    auto substSubMap = substType->getContextSubstitutionMap(
+        moduleDecl, decl, decl->getGenericEnvironment());
+
+    auto genericSig = decl->getGenericSignature();
+    
+    SmallVector<Type, 4> newParams;
+    llvm::DenseMap<SubstitutableType *, Type> newParamsMap;
+    bool didChange = false;
+    
+    // The upper bounds for the nominal type's arguments may depend on the
+    // upper bounds imposed on the nominal type itself, if conditional
+    // conformances are involved. For instance, if we're looking at:
+    //
+    // protocol P {}
+    // struct A<T: P> {}
+    // struct B<U> {}
+    // extension B: P where U: P {}
+    //
+    // and visiting `A<B<V>>`, then `B<V>` has an upper bound of `_: P` because
+    // of A's generic type constraint. In order to stay within this upper bound,
+    // `V` must also have `_: P` as its upper bound, in order to satisfy the
+    // constraint on `B<V>`. To handle this correctly, ingest requirements
+    // from any extension declarations providing conformances required by the
+    // upper bound.
+    auto upperBoundGenericSig = genericSig;
+    auto upperBoundSubstMap = substSubMap;
+    
+    LLVM_DEBUG(llvm::dbgs() << "\nNominal type generic signature:\n";
+               upperBoundGenericSig.print(llvm::dbgs());
+               upperBoundSubstMap.dump(llvm::dbgs()));
+    
+    if (upperBound && !upperBound->getConformsTo().empty()) {
+      // Start with the set of requirements from the nominal type.
+      SmallVector<Requirement, 4> addedRequirements;
+      
+      llvm::DenseMap<std::pair<CanType, ProtocolDecl*>, ProtocolConformanceRef> addedConformances;
+      
+      for (auto proto : upperBound->getConformsTo()) {
+        // Find the DeclContext providing the conformance for the type.
+        auto nomConformance = moduleDecl->lookupConformance(substType, proto);
+        if (!nomConformance)
+          return CanType();
+        if (nomConformance.isAbstract())
+          continue;
+        auto conformanceContext = nomConformance.getConcrete()->getDeclContext();
+        
+        LLVM_DEBUG(llvm::dbgs() << "\nFound extension conformance for "
+                                << proto->getName()
+                                << " in context:\n";
+                   conformanceContext->printContext(llvm::dbgs()));
+        
+        auto conformanceSig = conformanceContext->getGenericSignatureOfContext();
+        // TODO: Conformance on generalized generic extensions could conceivably
+        // have totally different generic signatures.
+        assert(conformanceSig.getGenericParams().size()
+                 == genericSig.getGenericParams().size()
+               && "generalized generic extension not handled properly");
+        
+        // Collect requirements from the conformance not satisfied by the
+        // original declaration.
+        for (auto reqt : conformanceSig->requirementsNotSatisfiedBy(genericSig)) {
+          LLVM_DEBUG(llvm::dbgs() << "\n- adds requirement\n";
+                     reqt.dump(llvm::dbgs()));
+          
+          addedRequirements.push_back(reqt);
+          
+          // Collect the matching conformance for the substituted type.
+          // TODO: Look this up using the upperBoundSubstConformances
+          if (reqt.getKind() == RequirementKind::Conformance) {
+            auto proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
+            auto substTy = reqt.getFirstType().subst(substSubMap);
+            ProtocolConformanceRef substConformance;
+            if (substTy->isTypeParameter()) {
+              substConformance = ProtocolConformanceRef(proto);
+            } else {
+              substConformance = moduleDecl->lookupConformance(substTy, proto);
+            }
+            
+            LLVM_DEBUG(llvm::dbgs() << "\n` adds conformance for subst type\n";
+                       substTy->print(llvm::dbgs());
+                       substConformance.dump(llvm::dbgs()));
+            
+            auto key = std::make_pair(reqt.getFirstType()->getCanonicalType(),
+                                      proto);
+            
+            addedConformances.insert({key, substConformance});
+          }
+        }
+      }
+      
+      // Build the generic signature with the additional collected requirements.
+      if (!addedRequirements.empty()) {
+        upperBoundGenericSig = evaluateOrDefault(
+                                           decl->getASTContext().evaluator,
+                                           AbstractGenericSignatureRequest{
+                                             upperBoundGenericSig.getPointer(),
+                                             /*genericParams=*/{ },
+                                             std::move(addedRequirements)},
+                                           nullptr);
+        upperBoundSubstMap = SubstitutionMap::get(upperBoundGenericSig,
+          [&](SubstitutableType *t) -> Type {
+            // Type substitutions remain the same as the original substitution
+            // map.
+            return Type(t).subst(substSubMap);
+          },
+          [&](CanType dependentType,
+              Type conformingReplacementType,
+              ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
+            // Check whether we added this conformance.
+            auto added = addedConformances.find({dependentType,
+                                                 conformedProtocol});
+            if (added != addedConformances.end()) {
+              return added->second;
+            }
+            // Otherwise, use the conformance from the original map.
+            
+            return substSubMap.lookupConformance(dependentType, conformedProtocol);
+          });
+        
+        LLVM_DEBUG(llvm::dbgs() << "\nGeneric signature with conditional reqts:\n";
+                   upperBoundGenericSig.print(llvm::dbgs());
+                   upperBoundSubstMap.dump(llvm::dbgs()));
+      }
+    }
+    
+    auto upperBoundGenericEnv = upperBoundGenericSig.getGenericEnvironment();
+    
+    for (auto gpTy : upperBoundGenericSig.getGenericParams()) {
+      auto gp = gpTy->getCanonicalType();
+      
+      auto orig = gp.subst(origSubMap)->getCanonicalType();
+      auto subst = gp.subst(substSubMap)->getCanonicalType();
+      
+      // The new type is upper-bounded by the constraints the nominal type
+      // requires. The substitution operation may be interested in transforming
+      // the substituted type's conformances to these protocols.
+      //
+      // FIXME: The upperBound on the nominal type itself may impose additional
+      // requirements on the type parameters due to conditional conformances.
+      // These are currently not considered, leading to invalid generic signatures
+      // built during SILGen.
+      auto paramUpperBound =
+        GenericEnvironment::mapTypeIntoContext(upperBoundGenericEnv, gp)
+          ->getAs<ArchetypeType>();
+      SmallVector<ProtocolConformanceRef, 4> paramSubstConformances;
+      if (paramUpperBound) {
+        for (auto proto : paramUpperBound->getConformsTo()) {
+          auto conformance = upperBoundSubstMap.lookupConformance(gp, proto);
+          if (!conformance)
+            return CanType();
+          paramSubstConformances.push_back(conformance);
+        }
+      }
+      
+      auto newParam = visit(orig, subst, paramUpperBound,
+                            paramSubstConformances);
+      if (!newParam)
+        return CanType();
+      
+      newParams.push_back(newParam);
+      newParamsMap.insert({gp->castTo<GenericTypeParamType>(), newParam});
+      didChange |= (newParam != subst);
+    }
+    
+    SmallVector<ProtocolConformanceRef, 4> newConformances;
+
+    // Collect conformances for the new substitutions, and verify that they don't
+    // invalidate the binding to the original type.
+    for (const auto &req : genericSig.getRequirements()) {
+      if (req.getKind() != RequirementKind::Conformance) continue;
+
+      auto canTy = req.getFirstType()->getCanonicalType();
+      
+      // Verify the generic requirements, if the subst type is bound to
+      // concrete type.
+      auto *proto = req.getProtocolDecl();
+      if (!canTy.subst(substSubMap)->isTypeParameter()) {
+        auto origConf = origSubMap.lookupConformance(canTy, proto);
+        auto substConf = substSubMap.lookupConformance(canTy, proto);
+
+        if (origConf.isConcrete()) {
+          // A generic argument may inherit a concrete conformance from a class
+          // constraint, which could still be bound to a type parameter we don't
+          // know more about.
+          if (origConf.getConcrete()->getType()->is<ArchetypeType>())
+            continue;
+          
+          if (!substConf.isConcrete())
+            return CanType();
+          if (origConf.getConcrete()->getRootConformance()
+                != substConf.getConcrete()->getRootConformance())
+            return CanType();
+        }
+      }
+      
+      // Gather the conformances for the new binding type, if the type changed.
+      if (didChange) {
+        auto newSubstTy = req.getFirstType().subst(
+          QueryTypeSubstitutionMap{newParamsMap},
+          LookUpConformanceInModule(moduleDecl));
+        
+        if (newSubstTy->isTypeParameter()) {
+          newConformances.push_back(ProtocolConformanceRef(proto));
+        } else {
+          auto newConformance
+            = moduleDecl->lookupConformance(newSubstTy, proto);
+          if (!newConformance)
+            return CanType();
+          newConformances.push_back(newConformance);
+        }
+      }
+    }
+
+    if (!didChange)
+      return substType;
+    
+    // Build the new substituted generic type.
+    auto newSubMap = SubstitutionMap::get(genericSig,
+                                          newParams,
+                                          newConformances);
+    return decl->getDeclaredInterfaceType().subst(newSubMap)
+               ->getCanonicalType();
+  }
+  
   CanType visitNominalType(NominalType *nom, CanType subst,
-                           ArchetypeType*, ArrayRef<ProtocolConformanceRef>) {
+                           ArchetypeType* upperBound,
+                           ArrayRef<ProtocolConformanceRef> substConformances) {
     if (auto substNom = dyn_cast<NominalType>(subst)) {
+      auto nomDecl = nom->getDecl();
       if (nom->getDecl() != substNom->getDecl())
         return CanType();
       
-      // Same decl should always either have or not have a parent.
-      assert((bool)nom->getParent() == (bool)substNom->getParent());
-      
-      if (nom->getParent()) {
-        auto substParent = visit(nom->getParent()->getCanonicalType(),
-                                 substNom->getParent()->getCanonicalType(),
-                                 nullptr, {});
-        if (substParent == substNom.getParent())
-          return subst;
-        return NominalType::get(nom->getDecl(), substParent,
-                                nom->getASTContext())
-          ->getCanonicalType();
+      // If the type is generic (because it's a nested type in a generic context),
+      // process the generic type bindings.
+      if (!isa<ProtocolDecl>(nomDecl) && nomDecl->isGenericContext()) {
+        return handleGenericNominalType(nomDecl, CanType(nom), subst,
+                                        upperBound, substConformances);
       }
+      // Otherwise, the nongeneric nominal types trivially match.
       return subst;
     }
     return CanType();
@@ -2055,7 +2302,8 @@ public:
   }
   
   CanType visitBoundGenericType(BoundGenericType *bgt, CanType subst,
-                            ArchetypeType *, ArrayRef<ProtocolConformanceRef>) {
+                          ArchetypeType *upperBound,
+                          ArrayRef<ProtocolConformanceRef> substConformances) {
     auto substBGT = dyn_cast<BoundGenericType>(subst);
     if (!substBGT)
       return CanType();
@@ -2065,95 +2313,8 @@ public:
 
     auto *decl = bgt->getDecl();
 
-    auto *moduleDecl = decl->getParentModule();
-    auto origSubMap = bgt->getContextSubstitutionMap(
-        moduleDecl, decl, decl->getGenericEnvironment());
-    auto substSubMap = substBGT->getContextSubstitutionMap(
-        moduleDecl, decl, decl->getGenericEnvironment());
-
-    auto genericSig = decl->getGenericSignature();
-    
-    // Same decl should always either have or not have a parent.
-    assert((bool)bgt->getParent() == (bool)substBGT->getParent());
-    CanType newParent;
-    if (bgt->getParent()) {
-      newParent = visit(bgt->getParent()->getCanonicalType(),
-                        substBGT.getParent(),
-                        nullptr, {});
-      if (!newParent)
-        return CanType();
-    }
-    
-    SmallVector<Type, 4> newParams;
-    bool didChange = newParent != substBGT.getParent();
-    
-    auto depthStart =
-      genericSig.getGenericParams().size() - bgt->getGenericArgs().size();
-    for (auto i : indices(bgt->getGenericArgs())) {
-      auto orig = bgt->getGenericArgs()[i]->getCanonicalType();
-      auto subst = substBGT.getGenericArgs()[i];
-      auto gp = genericSig.getGenericParams()[depthStart + i];
-      
-      // The new type is upper-bounded by the constraints the nominal type
-      // requires. The substitution operation may be interested in transforming
-      // the substituted type's conformances to these protocols.
-      auto upperBoundArchetype = decl->mapTypeIntoContext(gp)
-                                     ->getAs<ArchetypeType>();
-      SmallVector<ProtocolConformanceRef, 4> substConformances;
-      if (upperBoundArchetype) {
-        for (auto proto : upperBoundArchetype->getConformsTo()) {
-          auto conformance = substSubMap.lookupConformance(gp->getCanonicalType(),
-                                                           proto);
-          if (!conformance)
-            return CanType();
-          substConformances.push_back(conformance);
-        }
-      }
-      
-      auto newParam = visit(orig, subst, upperBoundArchetype,
-                            substConformances);
-      if (!newParam)
-        return CanType();
-      
-      newParams.push_back(newParam);
-      didChange |= (newParam != subst);
-    }
-
-    for (const auto &req : genericSig.getRequirements()) {
-      if (req.getKind() != RequirementKind::Conformance) continue;
-
-      auto canTy = req.getFirstType()->getCanonicalType();
-
-      // If the substituted type is an interface type, we can't verify the
-      // generic requirements.
-      if (canTy.subst(substSubMap)->isTypeParameter())
-        continue;
-
-      auto *proto = req.getProtocolDecl();
-      auto origConf = origSubMap.lookupConformance(canTy, proto);
-      auto substConf = substSubMap.lookupConformance(canTy, proto);
-
-      if (origConf.isConcrete()) {
-        // A generic argument may inherit a concrete conformance from a class
-        // constraint, which could still be bound to a type parameter we don't
-        // know more about.
-        if (origConf.getConcrete()->getType()->is<ArchetypeType>())
-          continue;
-        
-        if (!substConf.isConcrete())
-          return CanType();
-        if (origConf.getConcrete()->getRootConformance()
-              != substConf.getConcrete()->getRootConformance())
-          return CanType();
-      }
-    }
-
-    if (!didChange)
-      return subst;
-    
-    return BoundGenericType::get(substBGT->getDecl(),
-                                 newParent, newParams)
-      ->getCanonicalType();
+    return handleGenericNominalType(decl, CanType(bgt), subst,
+                                    upperBound, substConformances);
   }
 };
 }
