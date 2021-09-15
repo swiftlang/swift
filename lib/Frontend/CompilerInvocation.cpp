@@ -1908,6 +1908,26 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.VirtualFunctionElimination = true;
   }
 
+  // Default to disabling swift async extended frame info on anything but
+  // darwin. Other platforms are unlikely to have support for extended frame
+  // pointer information.
+  if (!Triple.isOSDarwin()) {
+    Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
+  }
+  if (const Arg *A = Args.getLastArg(OPT_swift_async_frame_pointer_EQ)) {
+    StringRef mode(A->getValue());
+    if (mode == "auto")
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Auto;
+    else if (mode == "always")
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Always;
+    else if (mode == "never")
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
+    else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
+
   return false;
 }
 
