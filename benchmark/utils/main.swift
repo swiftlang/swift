@@ -194,16 +194,16 @@ import Walsh
 import WordCount
 import XorLoop
 
-@inline(__always)
 private func registerBenchmark(_ bench: BenchmarkInfo) {
   registeredBenchmarks.append(bench)
 }
 
-@inline(__always)
 private func registerBenchmark<
   S : Sequence
 >(_ infos: S) where S.Element == BenchmarkInfo {
-  registeredBenchmarks.append(contentsOf: infos)
+  for info in infos {
+    registeredBenchmarks.append(info)
+  }
 }
 
 registerBenchmark(Ackermann)
