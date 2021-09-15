@@ -3352,7 +3352,7 @@ public:
     if (!isAccessor) {
       fn = FuncDecl::createDeserialized(ctx, staticSpelling.getValue(), name,
                                         async, throws, genericParams,
-                                        resultType, DC);
+                                        resultType, /*isMoveOnly*/false, DC);
     } else {
       auto *accessor = AccessorDecl::createDeserialized(
           ctx, accessorKind, storage, staticSpelling.getValue(),

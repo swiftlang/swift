@@ -6289,6 +6289,7 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc FuncLoc;    // Location of the 'func' token.
 
   TypeLoc FnRetType;
+  bool IsRetMoveOnly = false;
 
 protected:
   FuncDecl(DeclKind Kind,
@@ -6351,7 +6352,8 @@ public:
                                       StaticSpellingKind StaticSpelling,
                                       DeclName Name, bool Async, bool Throws,
                                       GenericParamList *GenericParams,
-                                      Type FnRetType, DeclContext *Parent);
+                                      Type FnRetType,
+                                      bool IsFnRetMoveOnly, DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
                           StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
@@ -6359,6 +6361,7 @@ public:
                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
                           GenericParamList *GenericParams,
                           ParameterList *BodyParams, TypeRepr *ResultTyR,
+                          bool IsRetMoveOnly,
                           DeclContext *Parent);
 
   static FuncDecl *createImplicit(ASTContext &Context,
@@ -6366,6 +6369,7 @@ public:
                                   DeclName Name, SourceLoc NameLoc, bool Async,
                                   bool Throws, GenericParamList *GenericParams,
                                   ParameterList *BodyParams, Type FnRetType,
+                                  bool IsFnRetTypeMoveOnly,
                                   DeclContext *Parent);
 
   static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,

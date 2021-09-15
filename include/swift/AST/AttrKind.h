@@ -112,6 +112,15 @@ enum TypeAttrKind {
   TAK_Count
 };
 
+enum FunctionResultAttrKind : unsigned {
+#define FUNCTION_RESULT_ATTR(NAME) FRA_##NAME,
+#include "swift/AST/Attr.def"
+  FRA_Count,
+};
+
+enum : unsigned { NumFunctionResultAttrKindBits =
+  countBitsUsed(static_cast<unsigned>(FunctionResultAttrKind::FRA_Count - 1)) };
+
 } // end namespace swift
 
 #endif

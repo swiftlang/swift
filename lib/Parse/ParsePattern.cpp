@@ -840,7 +840,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 ///   func-signature:
 ///     func-arguments ('async'|'reasync')? func-throws? func-signature-result?
 ///   func-signature-result:
-///     '->' type
+///     '->' func-result-attr type
 ///
 /// Note that this leaves retType as null if unspecified.
 ParserStatus
@@ -852,6 +852,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                bool &reasync,
                                SourceLoc &throwsLoc,
                                bool &rethrows,
+                               FunctionResultAttributes &resultAttrs,
                                TypeRepr *&retType) {
   SyntaxParsingContext SigContext(SyntaxContext, SyntaxKind::FunctionSignature);
   SmallVector<Identifier, 4> NamePieces;
@@ -884,6 +885,10 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     // Check for effect specifiers after the arrow, but before the return type,
     // and correct it.
     parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
+
+    // Next check if we have a function return attribute. If we do, parse it and
+    // return it.
+    parseFunctionResultAttributeList(resultAttrs);
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);

@@ -72,7 +72,9 @@ DECL_NODES = [
          ]),
 
     # function-signature ->
-    #   '(' parameter-list? ')' async? (throws | rethrows)? '->'? type?
+    #   '(' parameter-list? ')' async? (throws | rethrows)? '->'? result
+    # result ->
+    #   function_result_attribute type?
     Node('FunctionSignature', kind='Syntax',
          children=[
              Child('Input', kind='ParameterClause'),
@@ -85,6 +87,8 @@ DECL_NODES = [
                        'ThrowsToken',
                        'RethrowsToken',
                    ]),
+             Child('FunctionResultAttr', kind='AttributeList',
+                   collection_element_name='Attribute', is_optional=True),
              Child('Output', kind='ReturnClause', is_optional=True),
          ]),
 

@@ -7781,13 +7781,15 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        StaticSpellingKind StaticSpelling,
                                        DeclName Name, bool Async, bool Throws,
                                        GenericParamList *GenericParams,
-                                       Type FnRetType, DeclContext *Parent) {
+                                       Type FnRetType, bool IsFnRetMoveOnly,
+                                       DeclContext *Parent) {
   assert(FnRetType && "Deserialized result type must not be null");
   auto *const FD =
       FuncDecl::createImpl(Context, SourceLoc(), StaticSpelling, SourceLoc(),
                            Name, SourceLoc(), Async, SourceLoc(), Throws,
                            SourceLoc(), GenericParams, Parent, ClangNode());
   FD->setResultInterfaceType(FnRetType);
+  FD->IsRetMoveOnly = IsFnRetMoveOnly;
   return FD;
 }
 
@@ -7797,12 +7799,14 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
                            GenericParamList *GenericParams,
                            ParameterList *BodyParams, TypeRepr *ResultTyR,
+                           bool IsRetMoveOnly,
                            DeclContext *Parent) {
   auto *const FD = FuncDecl::createImpl(
       Context, StaticLoc, StaticSpelling, FuncLoc, Name, NameLoc, Async,
       AsyncLoc, Throws, ThrowsLoc, GenericParams, Parent, ClangNode());
   FD->setParameters(BodyParams);
   FD->FnRetType = TypeLoc(ResultTyR);
+  FD->IsRetMoveOnly = true;
   return FD;
 }
 
@@ -7811,6 +7815,7 @@ FuncDecl *FuncDecl::createImplicit(ASTContext &Context,
                                    DeclName Name, SourceLoc NameLoc, bool Async,
                                    bool Throws, GenericParamList *GenericParams,
                                    ParameterList *BodyParams, Type FnRetType,
+                                   bool IsFnRetTypeMoveOnly,
                                    DeclContext *Parent) {
   assert(FnRetType);
   auto *const FD = FuncDecl::createImpl(
@@ -7819,6 +7824,7 @@ FuncDecl *FuncDecl::createImplicit(ASTContext &Context,
   FD->setImplicit();
   FD->setParameters(BodyParams);
   FD->setResultInterfaceType(FnRetType);
+  FD->IsRetMoveOnly = IsFnRetTypeMoveOnly;
   return FD;
 }
 

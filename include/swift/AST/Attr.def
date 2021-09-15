@@ -46,6 +46,10 @@
 #define TYPE_ATTR(X)
 #endif
 
+#ifndef FUNCTION_RESULT_ATTR
+#define FUNCTION_RESULT_ATTR(X)
+#endif
+
 // Type attributes
 TYPE_ATTR(autoclosure)
 TYPE_ATTR(convention)
@@ -90,6 +94,8 @@ TYPE_ATTR(thick)
 
 // Generated interface attributes
 TYPE_ATTR(_opaqueReturnTypeOf)
+
+FUNCTION_RESULT_ATTR(_moveOnly)
 
 // Schema for DECL_ATTR:
 //
@@ -681,6 +687,7 @@ SIMPLE_DECL_ATTR(_moveOnly, MoveOnly,
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 
+#undef FUNCTION_RESULT_ATTR
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

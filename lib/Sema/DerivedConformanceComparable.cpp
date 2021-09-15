@@ -252,7 +252,7 @@ deriveComparable_lt(
       C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
       /*Throws=*/false,
-      /*GenericParams=*/nullptr, params, boolTy, parentDC);
+      /*GenericParams=*/nullptr, params, boolTy, /*isMoveOnly*/false, parentDC);
   comparableDecl->setUserAccessible(false);
 
   // Add the @_implements(Comparable, < (_:_:)) attribute

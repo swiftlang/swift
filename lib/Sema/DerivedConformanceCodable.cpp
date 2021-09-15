@@ -1224,6 +1224,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
       C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
       /*Throws=*/true, /*GenericParams=*/nullptr, params, returnType,
+      /*isMoveOnly*/false,
       conformanceDC);
   encodeDecl->setSynthesized();
 

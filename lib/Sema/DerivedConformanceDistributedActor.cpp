@@ -87,6 +87,7 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
                                /*genericParams=*/nullptr,
                                params,
                                /*returnType*/decl->getDeclaredInterfaceType(),
+                               /*isMoveOnly*/false,
                                decl);
 
   factoryDecl->setDistributedActorFactory(); // TODO(distributed): should we mark this specifically as the resolve factory?

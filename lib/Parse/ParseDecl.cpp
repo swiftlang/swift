@@ -14,10 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/AttrKind.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/Parse/ParserResult.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxKind.h"
 #include "swift/Subsystems.h"
@@ -3697,6 +3699,122 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
   return status;
 }
 
+ParserStatus Parser::parseFunctionResultAttribute(FunctionResultAttributes &Attributes, SourceLoc AtLoc,
+                                                  bool justChecking) {
+  // If this not an identifier, the attribute is malformed.
+  if (Tok.isNot(tok::identifier)) {
+    if (Tok.is(tok::code_complete)) {
+      if (!justChecking) {
+        if (CodeCompletion) {
+          // TODO: Fix.
+          //CodeCompletion->completeTypeAttrBeginning();
+        }
+      }
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionStatus();
+    }
+
+    if (!justChecking)
+      diagnose(Tok, diag::expected_attribute_name);
+    return makeParserError();
+  }
+  // Determine which attribute it is, and diagnose it if unknown.
+  FunctionResultAttrKind attr = FunctionResultAttributes::getAttrKindFromString(Tok.getText());
+
+  if (attr == FRA_Count) {
+    // TODO: Refactor this to use function result attribute diagnostics and set
+    // up one for type attributes as well.
+    auto declAttrID = DeclAttribute::getAttrKindFromString(Tok.getText());
+    if (declAttrID != DAK_Count) {
+      // This is a valid decl attribute so they should have put it on the decl
+      // instead of the type.
+      if (justChecking) return makeParserError();
+
+      // If this is the first attribute, and if we are on a simple decl, emit a
+      // fixit to move the attribute.  Otherwise, we don't have the location of
+      // the @ sign, or we don't have confidence that the fixit will be right.
+      if (!Attributes.empty() || StructureMarkers.empty() ||
+          StructureMarkers.back().Kind != StructureMarkerKind::Declaration ||
+          StructureMarkers.back().Loc.isInvalid() ||
+          peekToken().is(tok::equal)) {
+        diagnose(Tok, diag::decl_attribute_applied_to_type);
+      } else {
+        // Otherwise, this is the first type attribute and we know where the
+        // declaration is.  Emit the same diagnostic, but include a fixit to
+        // move the attribute.  Unfortunately, we don't have enough info to add
+        // the attribute to DeclAttributes.
+        diagnose(Tok, diag::decl_attribute_applied_to_type)
+          .fixItRemove(SourceRange(Attributes.AtLoc, Tok.getLoc()))
+          .fixItInsert(StructureMarkers.back().Loc,
+                       "@" + Tok.getText().str()+" ");
+      }
+
+      // Recover by eating @foo(...) when foo is not known.
+      consumeToken();
+      SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
+
+      if (Tok.is(tok::l_paren) && getEndOfPreviousLoc() == Tok.getLoc()) {
+        CancellableBacktrackingScope backtrack(*this);
+        skipSingle();
+        // If we found '->', or 'throws' after paren, it's likely a parameter
+        // of function type.
+        if (Tok.isNot(tok::arrow, tok::kw_throws, tok::kw_rethrows,
+                      tok::kw_throw))
+          backtrack.cancelBacktrack();
+      }
+
+      return makeParserError();
+    }
+
+    return makeParserSuccess();
+  }
+  
+  // Ok, it is a valid attribute, eat it, and then process it.
+  consumeToken();
+  
+  // In just-checking mode, we only need to consume the tokens, and we don't
+  // want to do any other analysis.
+  if (justChecking)
+    return makeParserSuccess();
+
+  // Diagnose duplicated attributes.
+  if (Attributes.has(attr)) {
+    diagnose(AtLoc, diag::duplicate_attribute, /*isModifier=*/false);
+    return makeParserSuccess();
+  }
+
+  // Handle any attribute-specific processing logic.
+  switch (attr) {
+  default: break;
+  case FRA__moveOnly:
+    break;
+  }
+
+  Attributes.setAttr(attr, AtLoc);
+  return makeParserSuccess();
+}
+
+/// \verbatim
+///   attribute-list:
+///     /*empty*/
+///     attribute-list-clause attribute-list
+///   attribute-list-clause:
+///     '@' attribute
+/// \endverbatim
+ParserStatus Parser::parseFunctionResultAttributeList(FunctionResultAttributes &Attributes) {
+  if (Tok.isNot(tok::at_sign))
+    return makeParserSuccess();
+
+  ParserStatus Status;
+  SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
+  do {
+    SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
+    SourceLoc AtLoc = consumeToken();
+    Status |= parseFunctionResultAttribute(Attributes, AtLoc);
+  } while (Tok.is(tok::at_sign));
+  return Status;
+}
+
 static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
   return Tok.isContextualKeyword("operator") &&
          (Tok2.isContextualKeyword("prefix") ||
@@ -6868,10 +6986,12 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   bool reasync;
   SourceLoc throwsLoc;
   bool rethrows;
+  FunctionResultAttributes resultAttrs;
   Status |= parseFunctionSignature(SimpleName, FullName, BodyParams,
                                    DefaultArgs,
                                    asyncLoc, reasync,
                                    throwsLoc, rethrows,
+                                   resultAttrs,
                                    FuncRetTy);
   if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -6900,6 +7020,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
                               GenericParams,
                               BodyParams, FuncRetTy,
+                              resultAttrs.has(FRA__moveOnly),
                               CurDeclContext);
 
   // Let the source file track the opaque return type mapping, if any.

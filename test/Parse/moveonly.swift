@@ -9,7 +9,7 @@ func argumentsAndReturns(_ x: @_moveOnly Klass) -> @_moveOnly Klass {
 }
 
 func letDecls(_ x: @_moveOnly Klass) -> () {
-    let y: @_moveOnly Klass = x
+    @_moveOnly let y: Klass = x
     print(y)
 }
 

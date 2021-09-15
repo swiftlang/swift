@@ -2387,6 +2387,65 @@ public:
   }
 };
 
+/// FunctionResultAttributes - These are attributes that may be applied to types.
+class FunctionResultAttributes {
+  // Get a SourceLoc for every possible attribute that can be parsed in source.
+  // the presence of the attribute is indicated by its location being set.
+  SourceLoc AttrLocs[FRA_Count];
+
+public:
+  /// AtLoc - This is the location of the first '@' in the attribute specifier.
+  /// If this is an empty attribute specifier, then this will be an invalid loc.
+  SourceLoc AtLoc;
+
+  FunctionResultAttributes() {}
+
+  bool isValid() const { return AtLoc.isValid(); }
+
+  void clearAttribute(FunctionResultAttrKind A) {
+    AttrLocs[A] = SourceLoc();
+  }
+
+  bool has(FunctionResultAttrKind A) const {
+    return getLoc(A).isValid();
+  }
+
+  SourceLoc getLoc(FunctionResultAttrKind A) const {
+    return AttrLocs[A];
+  }
+
+  void setAttr(FunctionResultAttrKind A, SourceLoc L) {
+    assert(!L.isInvalid() && "Cannot clear attribute with this method");
+    AttrLocs[A] = L;
+  }
+
+  void getAttrLocs(SmallVectorImpl<SourceLoc> &Locs) const {
+    for (auto Loc : AttrLocs) {
+      if (Loc.isValid())
+        Locs.push_back(Loc);
+    }
+  }
+
+  // This attribute list is empty if no attributes are specified.  Note that
+  // the presence of the leading @ is not enough to tell, because we want
+  // clients to be able to remove attributes they process until they get to
+  // an empty list.
+  bool empty() const {
+    for (SourceLoc elt : AttrLocs)
+      if (elt.isValid())
+        return false;
+
+    return true;
+  }
+
+  /// Given a name like "moveOnly", return the type attribute ID that
+  /// corresponds to it.  This returns FRA_Count on failure.
+  static FunctionResultAttrKind getAttrKindFromString(StringRef Str);
+
+  /// Return the name (like "autoclosure") for an attribute ID.
+  static const char *getAttrName(FunctionResultAttrKind kind);
+};
+
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 
 inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {

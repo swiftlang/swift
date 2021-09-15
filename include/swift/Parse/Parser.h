@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -1032,6 +1033,9 @@ public:
                              StaticSpellingKind &StaticSpelling,
                              bool isFromClangAttribute = false);
 
+  /// Parse the optional attributes on a FuncDecl result.
+  ParserStatus parseFunctionResultAttributeList(FunctionResultAttributes &Attributes);
+
   /// Parse an availability attribute of the form
   /// @available(*, introduced: 1.0, deprecated: 3.1).
   /// \return \p nullptr if the platform name is invalid
@@ -1100,6 +1104,9 @@ public:
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   PatternBindingInitializer *&initContext,
                                   bool isFromClangAttribute = false);
+
+  ParserStatus parseFunctionResultAttribute(FunctionResultAttributes &Attributes, SourceLoc AtLoc,
+                                            bool justChecking=false);
 
   bool isCustomAttributeArgument();
   bool canParseCustomAttribute();
@@ -1455,6 +1462,7 @@ public:
                                       bool &reasync,
                                       SourceLoc &throws,
                                       bool &rethrows,
+                                      FunctionResultAttributes &resultAttrs,
                                       TypeRepr *&retType);
 
   /// Parse 'async' and 'throws', if present, putting the locations of the
