@@ -472,6 +472,11 @@ function (swift_benchmark_compile_archopts)
         set(extra_options "-Xfrontend"
                           "-disable-swift-bridge-attr")
       endif()
+      # For this file we disable the requirement machine.
+      if("${module_name}" STREQUAL "Differentiation")
+        set(extra_options "-Xfrontend"
+                          "-requirement-machine=off")
+      endif()
       set(objfile "${objdir}/${module_name}.o")
       set(swiftmodule "${objdir}/${module_name}.swiftmodule")
       set(source "${srcdir}/${module_name_path}.swift")
