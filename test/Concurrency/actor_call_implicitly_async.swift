@@ -13,7 +13,7 @@ func rethrower(_ f : @autoclosure () throws -> Any) rethrows -> Any {
 func asAutoclosure(_ f : @autoclosure () -> Any) -> Any { return f() }
 
 // not a concurrency-safe type
-class Box { // expected-note 4{{class 'Box' does not conform to the `Sendable` protocol}}
+class Box { // expected-note 4{{class 'Box' does not conform to the 'Sendable' protocol}}
   var counter : Int = 0
 }
 
