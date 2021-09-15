@@ -16,7 +16,7 @@ toolchain as a one-off, there are a couple of differences:
   - [Troubleshooting cloning issues](#troubleshooting-cloning-issues)
 - [Installing dependencies](#installing-dependencies)
   - [macOS](#macOS)
-  - [Ubuntu Linux](#ubuntu-linux)
+  - [Linux](#linux)
 - [Building the project for the first time](#building-the-project-for-the-first-time)
   - [Spot check dependencies](#spot-check-dependencies)
   - [The roles of different tools](#the-roles-of-different-tools)

@@ -1223,12 +1223,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()), None,
         /*bool hasDynamicLifetime*/ Attr != 0);
     break;
-  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocStackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    bool hasDynamicLifetime = Attr & 0x1;
+    bool isLexical = (Attr >> 1) & 0x1;
     ResultInst = Builder.createAllocStack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        None, /*bool hasDynamicLifetime*/ Attr != 0);
+        None, hasDynamicLifetime, isLexical);
     break;
+  }
   case SILInstructionKind::MetatypeInst:
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultInst = Builder.createMetatype(
