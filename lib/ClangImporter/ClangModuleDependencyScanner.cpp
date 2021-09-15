@@ -306,17 +306,13 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   }
 
   // Determine the command-line arguments for dependency scanning.
-
   std::vector<std::string> commandLineArgs =
     getClangDepScanningInvocationArguments(ctx, *importHackFile);
-
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
-  CompileCommand command(workingDir, *importHackFile, commandLineArgs, "-");
-  SingleCommandCompilationDatabase database(command);
 
   auto clangDependencies = clangImpl->tool.getFullDependencies(
-      database, workingDir, clangImpl->alreadySeen);
+      commandLineArgs, workingDir, clangImpl->alreadySeen);
   if (!clangDependencies) {
     // FIXME: Route this to a normal diagnostic.
     llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());
@@ -354,14 +350,11 @@ bool ClangImporter::addBridgingHeaderDependencies(
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
     getClangDepScanningInvocationArguments(ctx, bridgingHeader);
-
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
-  CompileCommand command(workingDir, bridgingHeader, commandLineArgs, "-");
-  SingleCommandCompilationDatabase database(command);
 
   auto clangDependencies = clangImpl->tool.getFullDependencies(
-      database, workingDir, clangImpl->alreadySeen);
+      commandLineArgs, workingDir, clangImpl->alreadySeen);
 
   if (!clangDependencies) {
     // FIXME: Route this to a normal diagnostic.
