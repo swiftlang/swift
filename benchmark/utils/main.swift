@@ -194,6 +194,9 @@ import Walsh
 import WordCount
 import XorLoop
 
+register(Ackermann.benchmarks)
+register(AngryPhonebook.benchmarks)
+
 private func registerBenchmark(_ bench: BenchmarkInfo) {
   registeredBenchmarks.append(bench)
 }
@@ -206,8 +209,6 @@ private func registerBenchmark<
   }
 }
 
-registerBenchmark(Ackermann)
-registerBenchmark(AngryPhonebook)
 registerBenchmark(AnyHashableWithAClass)
 registerBenchmark(Array2D)
 registerBenchmark(ArrayAppend)
