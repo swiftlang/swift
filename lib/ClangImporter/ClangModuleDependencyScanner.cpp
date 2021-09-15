@@ -363,12 +363,12 @@ bool ClangImporter::addBridgingHeaderDependencies(
 
   // If we've already recorded bridging header dependencies, we're done.
   if (auto swiftInterfaceDeps = targetModule.getAsSwiftInterfaceModule()) {
-    if (!swiftInterfaceDeps->bridgingSourceFiles.empty() ||
-        !swiftInterfaceDeps->bridgingModuleDependencies.empty())
+    if (!swiftInterfaceDeps->textualModuleDetails.bridgingSourceFiles.empty() ||
+        !swiftInterfaceDeps->textualModuleDetails.bridgingModuleDependencies.empty())
       return false;
   } else if (auto swiftSourceDeps = targetModule.getAsSwiftSourceModule()) {
-    if (!swiftSourceDeps->bridgingSourceFiles.empty() ||
-        !swiftSourceDeps->bridgingModuleDependencies.empty())
+    if (!swiftSourceDeps->textualModuleDetails.bridgingSourceFiles.empty() ||
+        !swiftSourceDeps->textualModuleDetails.bridgingModuleDependencies.empty())
       return false;
   } else {
     llvm_unreachable("Unexpected module dependency kind");

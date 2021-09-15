@@ -57,6 +57,7 @@ using IdentifierIDArryField = llvm::BCArray<IdentifierIDField>;
 
 /// Identifiers used to refer to the above arrays
 using FileIDArrayIDField = IdentifierIDField;
+using TripleIDField = IdentifierIDField;
 using DependencyIDArrayIDField = IdentifierIDField;
 using FlagIDArrayIDField = IdentifierIDField;
 
@@ -118,6 +119,7 @@ using IdentifierArrayLayout =
 using ModuleInfoLayout =
     BCRecordLayout<MODULE_NODE,             // ID
                    IdentifierIDField,       // module name
+                   TripleIDField,           // target triple
                    DependencyIDArrayIDField // directDependencies
                    >;
 

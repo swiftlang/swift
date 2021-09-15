@@ -18,20 +18,20 @@
 #include "swift/AST/SourceFile.h"
 using namespace swift;
 
-ModuleDependenciesStorageBase::~ModuleDependenciesStorageBase() { }
+ModuleDependenciesStorageBase::~ModuleDependenciesStorageBase() {}
 
 bool ModuleDependencies::isSwiftModule() const {
-  return isSwiftInterfaceModule() ||
-         isSwiftSourceModule() ||
-         isSwiftBinaryModule() ||
-         isSwiftPlaceholderModule();
+  return isSwiftInterfaceModule() || isSwiftSourceModule() ||
+         isSwiftBinaryModule() || isSwiftPlaceholderModule();
 }
 
-ModuleDependenciesKind& operator++(ModuleDependenciesKind& e) {
+ModuleDependenciesKind &operator++(ModuleDependenciesKind &e) {
   if (e == ModuleDependenciesKind::LastKind) {
-    llvm_unreachable("Attempting to increment last enum value on ModuleDependenciesKind");
+    llvm_unreachable(
+        "Attempting to increment last enum value on ModuleDependenciesKind");
   }
-  e = ModuleDependenciesKind(static_cast<std::underlying_type<ModuleDependenciesKind>::type>(e) + 1);
+  e = ModuleDependenciesKind(
+      static_cast<std::underlying_type<ModuleDependenciesKind>::type>(e) + 1);
   return e;
 }
 
@@ -108,90 +108,95 @@ void ModuleDependencies::addModuleDependencies(
     return;
 
   switch (getKind()) {
-    case swift::ModuleDependenciesKind::SwiftInterface: {
-      // If the storage is for an interface file, the only source file we
-      // should see is that interface file.
-      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
-      assert(fileName == swiftInterfaceStorage->swiftInterfaceFile);
-      break;
-    }
-    case swift::ModuleDependenciesKind::SwiftSource: {
-      // Otherwise, record the source file.
-      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
-      swiftSourceStorage->sourceFiles.push_back(fileName.str());
-      break;
-    }
-    default:
-      llvm_unreachable("Unexpected dependency kind");
+  case swift::ModuleDependenciesKind::SwiftInterface: {
+    // If the storage is for an interface file, the only source file we
+    // should see is that interface file.
+    auto swiftInterfaceStorage =
+        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+    assert(fileName == swiftInterfaceStorage->swiftInterfaceFile);
+    break;
+  }
+  case swift::ModuleDependenciesKind::SwiftSource: {
+    // Otherwise, record the source file.
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    swiftSourceStorage->sourceFiles.push_back(fileName.str());
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
   }
 }
 
 Optional<std::string> ModuleDependencies::getBridgingHeader() const {
   switch (getKind()) {
-    case swift::ModuleDependenciesKind::SwiftInterface: {
-      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
-      return swiftInterfaceStorage->bridgingHeaderFile;
-    }
-    case swift::ModuleDependenciesKind::SwiftSource: {
-      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
-      return swiftSourceStorage->bridgingHeaderFile;
-    }
-    default:
-      llvm_unreachable("Unexpected dependency kind");
+  case swift::ModuleDependenciesKind::SwiftInterface: {
+    auto swiftInterfaceStorage =
+        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+    return swiftInterfaceStorage->textualModuleDetails.bridgingHeaderFile;
+  }
+  case swift::ModuleDependenciesKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    return swiftSourceStorage->textualModuleDetails.bridgingHeaderFile;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
   }
 }
 
 void ModuleDependencies::addBridgingHeader(StringRef bridgingHeader) {
   switch (getKind()) {
-    case swift::ModuleDependenciesKind::SwiftInterface: {
-      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
-      assert(!swiftInterfaceStorage->bridgingHeaderFile);
-      swiftInterfaceStorage->bridgingHeaderFile = bridgingHeader.str();
-      break;
-    }
-    case swift::ModuleDependenciesKind::SwiftSource: {
-      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
-      assert(!swiftSourceStorage->bridgingHeaderFile);
-      swiftSourceStorage->bridgingHeaderFile = bridgingHeader.str();
-      break;
-    }
-    default:
-      llvm_unreachable("Unexpected dependency kind");
+  case swift::ModuleDependenciesKind::SwiftInterface: {
+    auto swiftInterfaceStorage =
+        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+    assert(!swiftInterfaceStorage->textualModuleDetails.bridgingHeaderFile);
+    swiftInterfaceStorage->textualModuleDetails.bridgingHeaderFile = bridgingHeader.str();
+    break;
+  }
+  case swift::ModuleDependenciesKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    assert(!swiftSourceStorage->textualModuleDetails.bridgingHeaderFile);
+    swiftSourceStorage->textualModuleDetails.bridgingHeaderFile = bridgingHeader.str();
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
   }
 }
 
 /// Add source files that the bridging header depends on.
 void ModuleDependencies::addBridgingSourceFile(StringRef bridgingSourceFile) {
   switch (getKind()) {
-    case swift::ModuleDependenciesKind::SwiftInterface: {
-      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
-      swiftInterfaceStorage->bridgingSourceFiles.push_back(bridgingSourceFile.str());
-      break;
-    }
-    case swift::ModuleDependenciesKind::SwiftSource: {
-      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
-      swiftSourceStorage->bridgingSourceFiles.push_back(bridgingSourceFile.str());
-      break;
-    }
-    default:
-      llvm_unreachable("Unexpected dependency kind");
+  case swift::ModuleDependenciesKind::SwiftInterface: {
+    auto swiftInterfaceStorage =
+        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+    swiftInterfaceStorage->textualModuleDetails.bridgingSourceFiles.push_back(
+        bridgingSourceFile.str());
+    break;
+  }
+  case swift::ModuleDependenciesKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    swiftSourceStorage->textualModuleDetails.bridgingSourceFiles.push_back(bridgingSourceFile.str());
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
   }
 }
 
 void ModuleDependencies::addSourceFile(StringRef sourceFile) {
   switch (getKind()) {
-    case swift::ModuleDependenciesKind::SwiftInterface: {
-      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
-      swiftInterfaceStorage->sourceFiles.push_back(sourceFile.str());
-      break;
-    }
-    case swift::ModuleDependenciesKind::SwiftSource: {
-      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
-      swiftSourceStorage->sourceFiles.push_back(sourceFile.str());
-      break;
-    }
-    default:
-      llvm_unreachable("Unexpected dependency kind");
+  case swift::ModuleDependenciesKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    swiftSourceStorage->sourceFiles.push_back(sourceFile.str());
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
   }
 }
 
@@ -199,34 +204,57 @@ void ModuleDependencies::addSourceFile(StringRef sourceFile) {
 void ModuleDependencies::addBridgingModuleDependency(
     StringRef module, llvm::StringSet<> &alreadyAddedModules) {
   switch (getKind()) {
-    case swift::ModuleDependenciesKind::SwiftInterface: {
-      auto swiftInterfaceStorage = cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
-      if (alreadyAddedModules.insert(module).second)
-        swiftInterfaceStorage->bridgingModuleDependencies.push_back(module.str());
-      break;
-    }
-    case swift::ModuleDependenciesKind::SwiftSource: {
-      auto swiftSourceStorage = cast<SwiftSourceModuleDependenciesStorage>(storage.get());
-      if (alreadyAddedModules.insert(module).second)
-        swiftSourceStorage->bridgingModuleDependencies.push_back(module.str());
-      break;
-    }
-    default:
-      llvm_unreachable("Unexpected dependency kind");
+  case swift::ModuleDependenciesKind::SwiftInterface: {
+    auto swiftInterfaceStorage =
+        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+    if (alreadyAddedModules.insert(module).second)
+      swiftInterfaceStorage->textualModuleDetails.bridgingModuleDependencies.push_back(module.str());
+    break;
   }
+  case swift::ModuleDependenciesKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    if (alreadyAddedModules.insert(module).second)
+      swiftSourceStorage->textualModuleDetails.bridgingModuleDependencies.push_back(module.str());
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+}
+
+GlobalModuleDependenciesCache::TargetSpecificGlobalCacheState *
+GlobalModuleDependenciesCache::getCurrentCache() const {
+  assert(CurrentTriple.hasValue() &&
+         "Global Module Dependencies Cache not configured with Triple.");
+  return getCacheForTriple(CurrentTriple.getValue());
+}
+
+GlobalModuleDependenciesCache::TargetSpecificGlobalCacheState *
+GlobalModuleDependenciesCache::getCacheForTriple(StringRef triple) const {
+  auto targetSpecificCache = TargetSpecificCacheMap.find(triple);
+  assert(targetSpecificCache != TargetSpecificCacheMap.end() &&
+         "Global Module Dependencies Cache not configured with Triple-specific "
+         "state.");
+  return targetSpecificCache->getValue().get();
 }
 
 llvm::StringMap<ModuleDependenciesVector> &
 GlobalModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) {
-  auto it = ModuleDependenciesKindMap.find(kind);
-  assert(it != ModuleDependenciesKindMap.end() && "invalid dependency kind");
+  auto targetSpecificCache = getCurrentCache();
+  auto it = targetSpecificCache->ModuleDependenciesMap.find(kind);
+  assert(it != targetSpecificCache->ModuleDependenciesMap.end() &&
+         "invalid dependency kind");
   return it->second;
 }
 
 const llvm::StringMap<ModuleDependenciesVector> &
-GlobalModuleDependenciesCache::getDependenciesMap(ModuleDependenciesKind kind) const {
-  auto it = ModuleDependenciesKindMap.find(kind);
-  assert(it != ModuleDependenciesKindMap.end() && "invalid dependency kind");
+GlobalModuleDependenciesCache::getDependenciesMap(
+    ModuleDependenciesKind kind) const {
+  auto targetSpecificCache = getCurrentCache();
+  auto it = targetSpecificCache->ModuleDependenciesMap.find(kind);
+  assert(it != targetSpecificCache->ModuleDependenciesMap.end() &&
+         "invalid dependency kind");
   return it->second;
 }
 
@@ -238,7 +266,8 @@ static std::string moduleBasePath(const StringRef modulePath) {
     parent = llvm::sys::path::parent_path(parent);
   }
 
-  // If the module is a part of a framework, disambiguate to the framework's parent
+  // If the module is a part of a framework, disambiguate to the framework's
+  // parent
   if (llvm::sys::path::filename(parent) == "Modules") {
     auto grandParent = llvm::sys::path::parent_path(parent);
     if (llvm::sys::path::extension(grandParent) == ".framework") {
@@ -249,42 +278,42 @@ static std::string moduleBasePath(const StringRef modulePath) {
   return parent.str();
 }
 
-static bool moduleContainedInImportPathSet(const StringRef modulePath,
-                                           const llvm::StringSet<> &importPaths)
-{
+static bool
+moduleContainedInImportPathSet(const StringRef modulePath,
+                               const llvm::StringSet<> &importPaths) {
   return importPaths.contains(moduleBasePath(modulePath));
 }
 
-static bool moduleContainedInImportPathSet(const ModuleDependencies &module,
-                                           const llvm::StringSet<> &importPaths)
-{
+static bool
+moduleContainedInImportPathSet(const ModuleDependencies &module,
+                               const llvm::StringSet<> &importPaths) {
   std::string modulePath = "";
   switch (module.getKind()) {
-    case swift::ModuleDependenciesKind::SwiftInterface: {
-      modulePath = module.getAsSwiftInterfaceModule()->swiftInterfaceFile;
-      break;
-    }
-    case swift::ModuleDependenciesKind::SwiftSource:
-      // We are seeing the main scan module itself. This means that
-      // our search-path disambiguation is not necessary here.
-      return true;
-    case swift::ModuleDependenciesKind::SwiftBinary: {
-      auto *swiftBinaryDep = module.getAsSwiftBinaryModule();
-      modulePath = swiftBinaryDep->compiledModulePath;
-      break;
-    }
-    case swift::ModuleDependenciesKind::Clang: {
-      auto *clangDep = module.getAsClangModule();
-      modulePath = clangDep->moduleMapFile;
-      break;
-    }
-    case swift::ModuleDependenciesKind::SwiftPlaceholder: {
-      // Placeholders are resolved as `true` because they are not associated with
-      // any specific search path.
-      return true;
-    }
-    default:
-      llvm_unreachable("Unhandled dependency kind.");
+  case swift::ModuleDependenciesKind::SwiftInterface: {
+    modulePath = module.getAsSwiftInterfaceModule()->swiftInterfaceFile;
+    break;
+  }
+  case swift::ModuleDependenciesKind::SwiftSource:
+    // We are seeing the main scan module itself. This means that
+    // our search-path disambiguation is not necessary here.
+    return true;
+  case swift::ModuleDependenciesKind::SwiftBinary: {
+    auto *swiftBinaryDep = module.getAsSwiftBinaryModule();
+    modulePath = swiftBinaryDep->compiledModulePath;
+    break;
+  }
+  case swift::ModuleDependenciesKind::Clang: {
+    auto *clangDep = module.getAsClangModule();
+    modulePath = clangDep->moduleMapFile;
+    break;
+  }
+  case swift::ModuleDependenciesKind::SwiftPlaceholder: {
+    // Placeholders are resolved as `true` because they are not associated with
+    // any specific search path.
+    return true;
+  }
+  default:
+    llvm_unreachable("Unhandled dependency kind.");
   }
 
   if (moduleContainedInImportPathSet(modulePath, importPaths)) {
@@ -293,35 +322,43 @@ static bool moduleContainedInImportPathSet(const ModuleDependencies &module,
   return false;
 }
 
-GlobalModuleDependenciesCache::GlobalModuleDependenciesCache()  {
-  for (auto kind = ModuleDependenciesKind::FirstKind;
-       kind != ModuleDependenciesKind::LastKind; ++kind) {
-    ModuleDependenciesKindMap.insert(
-        {kind, llvm::StringMap<ModuleDependenciesVector>()});
-  }
+void GlobalModuleDependenciesCache::configureForTriple(std::string triple) {
+  auto knownTriple = TargetSpecificCacheMap.find(triple);
+  if (knownTriple != TargetSpecificCacheMap.end()) {
+    // Set the current triple and leave the rest as-is
+    CurrentTriple = triple;
+  } else {
+    // First time scanning with this triple, initialize target-specific state.
+    std::unique_ptr<TargetSpecificGlobalCacheState> targetSpecificCache =
+        std::make_unique<TargetSpecificGlobalCacheState>();
+    for (auto kind = ModuleDependenciesKind::FirstKind;
+         kind != ModuleDependenciesKind::LastKind; ++kind) {
+      targetSpecificCache->ModuleDependenciesMap.insert(
+          {kind, llvm::StringMap<ModuleDependenciesVector>()});
+    }
 
-  ModuleDependenciesKindMap.insert(
-      {ModuleDependenciesKind::SwiftBinary,
-       llvm::StringMap<ModuleDependenciesVector>()});
-  ModuleDependenciesKindMap.insert(
-      {ModuleDependenciesKind::SwiftPlaceholder,
-       llvm::StringMap<ModuleDependenciesVector>()});
-  ModuleDependenciesKindMap.insert(
-      {ModuleDependenciesKind::Clang,
-       llvm::StringMap<ModuleDependenciesVector>()});
+    TargetSpecificCacheMap.insert({triple, std::move(targetSpecificCache)});
+    CurrentTriple = triple;
+    AllTriples.push_back(triple);
+  }
 }
 
 Optional<ModuleDependencies> GlobalModuleDependenciesCache::findDependencies(
-    StringRef moduleName,
-    ModuleLookupSpecifics details) const {
+    StringRef moduleName, ModuleLookupSpecifics details) const {
   if (!details.kind) {
     for (auto kind = ModuleDependenciesKind::FirstKind;
          kind != ModuleDependenciesKind::LastKind; ++kind) {
-      auto dep = findDependencies(moduleName, {kind, details.currentSearchPaths});
+      auto dep =
+          findDependencies(moduleName, {kind, details.currentSearchPaths});
       if (dep.hasValue())
         return dep.getValue();
     }
     return None;
+  }
+
+  assert(details.kind.hasValue() && "Expected dependencies kind for lookup.");
+  if (details.kind.getValue() == swift::ModuleDependenciesKind::SwiftSource) {
+    return findSourceModuleDependency(moduleName);
   }
 
   const auto &map = getDependenciesMap(*details.kind);
@@ -337,9 +374,18 @@ Optional<ModuleDependencies> GlobalModuleDependenciesCache::findDependencies(
   return None;
 }
 
+Optional<ModuleDependencies>
+GlobalModuleDependenciesCache::findSourceModuleDependency(
+    StringRef moduleName) const {
+  auto known = SwiftSourceModuleDependenciesMap.find(moduleName);
+  if (known != SwiftSourceModuleDependenciesMap.end())
+    return known->second;
+  else
+    return None;
+}
+
 bool GlobalModuleDependenciesCache::hasDependencies(
-    StringRef moduleName,
-    ModuleLookupSpecifics details) const {
+    StringRef moduleName, ModuleLookupSpecifics details) const {
   return findDependencies(moduleName, details).hasValue();
 }
 
@@ -349,12 +395,16 @@ GlobalModuleDependenciesCache::findAllDependenciesIrrespectiveOfSearchPaths(
   if (!kind) {
     for (auto kind = ModuleDependenciesKind::FirstKind;
          kind != ModuleDependenciesKind::LastKind; ++kind) {
-      auto deps = findAllDependenciesIrrespectiveOfSearchPaths(moduleName, kind);
+      auto deps =
+          findAllDependenciesIrrespectiveOfSearchPaths(moduleName, kind);
       if (deps.hasValue())
         return deps.getValue();
     }
     return None;
   }
+
+  assert(kind.hasValue() && "Expected dependencies kind for lookup.");
+  assert(kind.getValue() != swift::ModuleDependenciesKind::SwiftSource);
 
   const auto &map = getDependenciesMap(*kind);
   auto known = map.find(moduleName);
@@ -368,33 +418,45 @@ GlobalModuleDependenciesCache::findAllDependenciesIrrespectiveOfSearchPaths(
 static std::string modulePathForVerification(const ModuleDependencies &module) {
   std::string existingModulePath = "";
   switch (module.getKind()) {
-    case swift::ModuleDependenciesKind::SwiftInterface: {
-      auto *swiftDep = module.getAsSwiftInterfaceModule();
-      existingModulePath = swiftDep->swiftInterfaceFile;
-      break;
-    }
-    case swift::ModuleDependenciesKind::SwiftBinary: {
-      auto *swiftBinaryDep = module.getAsSwiftBinaryModule();
-      existingModulePath = swiftBinaryDep->compiledModulePath;
-      break;
-    }
-    case swift::ModuleDependenciesKind::Clang: {
-      auto *clangDep = module.getAsClangModule();
-      existingModulePath = clangDep->moduleMapFile;
-      break;
-    }
-    case swift::ModuleDependenciesKind::SwiftSource:
-    case swift::ModuleDependenciesKind::SwiftPlaceholder:
-    case swift::ModuleDependenciesKind::LastKind:
-      llvm_unreachable("Unhandled dependency kind.");
+  case swift::ModuleDependenciesKind::SwiftInterface: {
+    auto *swiftDep = module.getAsSwiftInterfaceModule();
+    existingModulePath = swiftDep->swiftInterfaceFile;
+    break;
+  }
+  case swift::ModuleDependenciesKind::SwiftBinary: {
+    auto *swiftBinaryDep = module.getAsSwiftBinaryModule();
+    existingModulePath = swiftBinaryDep->compiledModulePath;
+    break;
+  }
+  case swift::ModuleDependenciesKind::Clang: {
+    auto *clangDep = module.getAsClangModule();
+    existingModulePath = clangDep->moduleMapFile;
+    break;
+  }
+  case swift::ModuleDependenciesKind::SwiftSource:
+  case swift::ModuleDependenciesKind::SwiftPlaceholder:
+  case swift::ModuleDependenciesKind::LastKind:
+    llvm_unreachable("Unhandled dependency kind.");
   }
   return existingModulePath;
 }
 
-const ModuleDependencies* GlobalModuleDependenciesCache::recordDependencies(
-    StringRef moduleName,
-    ModuleDependencies dependencies) {
+const ModuleDependencies *GlobalModuleDependenciesCache::recordDependencies(
+    StringRef moduleName, ModuleDependencies dependencies) {
   auto kind = dependencies.getKind();
+  // Source-based dependencies are recorded independently of the invocation's
+  // target triple.
+  if (kind == swift::ModuleDependenciesKind::SwiftSource) {
+    assert(SwiftSourceModuleDependenciesMap.count(moduleName) == 0 &&
+           "Attempting to record duplicate SwiftSource dependency.");
+    SwiftSourceModuleDependenciesMap.insert(
+        {moduleName, std::move(dependencies)});
+    AllSourceModules.push_back({moduleName.str(), kind});
+    return &(SwiftSourceModuleDependenciesMap.find(moduleName)->second);
+  }
+
+  // All other dependencies are recorded according to the target triple of the
+  // scanning invocation that discovers them.
   auto &map = getDependenciesMap(kind);
   // Cache may already have a dependency for this module
   if (map.count(moduleName) != 0) {
@@ -407,16 +469,26 @@ const ModuleDependencies* GlobalModuleDependenciesCache::recordDependencies(
     }
 
     map[moduleName].emplace_back(std::move(dependencies));
-    return map[moduleName].end()-1;
+    return map[moduleName].end() - 1;
   } else {
     map.insert({moduleName, ModuleDependenciesVector{std::move(dependencies)}});
-    AllModules.push_back({moduleName.str(), kind});
+    getCurrentCache()->AllModules.push_back({moduleName.str(), kind});
     return &(map[moduleName].front());
   }
 }
 
-const ModuleDependencies* GlobalModuleDependenciesCache::updateDependencies(
+const ModuleDependencies *GlobalModuleDependenciesCache::updateDependencies(
     ModuleDependencyID moduleID, ModuleDependencies dependencies) {
+  auto kind = dependencies.getKind();
+  // Source-based dependencies
+  if (kind == swift::ModuleDependenciesKind::SwiftSource) {
+    assert(SwiftSourceModuleDependenciesMap.count(moduleID.first) == 1 &&
+           "Attempting to update non-existing Swift Source dependency.");
+    auto known = SwiftSourceModuleDependenciesMap.find(moduleID.first);
+    known->second = std::move(dependencies);
+    return &(known->second);
+  }
+
   auto &map = getDependenciesMap(moduleID.second);
   auto known = map.find(moduleID.first);
   assert(known != map.end() && "Not yet added to map");
@@ -426,30 +498,33 @@ const ModuleDependencies* GlobalModuleDependenciesCache::updateDependencies(
   return &(known->second[0]);
 }
 
-llvm::StringMap<const ModuleDependencies*> &
-ModuleDependenciesCache::getDependencyReferencesMap(ModuleDependenciesKind kind) {
-  auto it = ModuleDependenciesKindMap.find(kind);
-  assert(it != ModuleDependenciesKindMap.end() && "invalid dependency kind");
+llvm::StringMap<const ModuleDependencies *> &
+ModuleDependenciesCache::getDependencyReferencesMap(
+    ModuleDependenciesKind kind) {
+  auto it = ModuleDependenciesMap.find(kind);
+  assert(it != ModuleDependenciesMap.end() && "invalid dependency kind");
   return it->second;
 }
 
-const llvm::StringMap<const ModuleDependencies*> &
-ModuleDependenciesCache::getDependencyReferencesMap(ModuleDependenciesKind kind) const {
-  auto it = ModuleDependenciesKindMap.find(kind);
-  assert(it != ModuleDependenciesKindMap.end() && "invalid dependency kind");
+const llvm::StringMap<const ModuleDependencies *> &
+ModuleDependenciesCache::getDependencyReferencesMap(
+    ModuleDependenciesKind kind) const {
+  auto it = ModuleDependenciesMap.find(kind);
+  assert(it != ModuleDependenciesMap.end() && "invalid dependency kind");
   return it->second;
 }
 
-ModuleDependenciesCache::ModuleDependenciesCache(GlobalModuleDependenciesCache &globalCache)
-: globalCache(globalCache) {
+ModuleDependenciesCache::ModuleDependenciesCache(
+    GlobalModuleDependenciesCache &globalCache)
+    : globalCache(globalCache) {
   for (auto kind = ModuleDependenciesKind::FirstKind;
-     kind != ModuleDependenciesKind::LastKind; ++kind) {
-    ModuleDependenciesKindMap.insert(
-                         {kind, llvm::StringMap<const ModuleDependencies *>()});
+       kind != ModuleDependenciesKind::LastKind; ++kind) {
+    ModuleDependenciesMap.insert(
+        {kind, llvm::StringMap<const ModuleDependencies *>()});
   }
 }
 
-Optional<const ModuleDependencies*> ModuleDependenciesCache::findDependencies(
+Optional<const ModuleDependencies *> ModuleDependenciesCache::findDependencies(
     StringRef moduleName, Optional<ModuleDependenciesKind> kind) const {
   if (!kind) {
     for (auto kind = ModuleDependenciesKind::FirstKind;
