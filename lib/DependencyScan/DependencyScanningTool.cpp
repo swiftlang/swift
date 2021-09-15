@@ -118,7 +118,12 @@ void DependencyScanningTool::resetCache() {
 llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
 DependencyScanningTool::initScannerForAction(
     ArrayRef<const char *> Command) {
-  return initCompilerInstanceForScan(Command);
+  auto instanceOrErr = initCompilerInstanceForScan(Command);
+  if (instanceOrErr.getError())
+    return instanceOrErr;
+  SharedCache->configureForTriple((*instanceOrErr)->getInvocation()
+                                  .getLangOptions().Target.str());
+  return instanceOrErr;
 }
 
 llvm::ErrorOr<std::unique_ptr<CompilerInstance>>

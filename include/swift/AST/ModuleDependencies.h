@@ -38,7 +38,6 @@ class Identifier;
 enum class ModuleDependenciesKind : int8_t {
   FirstKind,
   SwiftInterface = FirstKind,
-  SwiftSource,
   SwiftBinary,
   // Placeholder dependencies are a kind of dependencies used only by the
   // dependency scanner. They are swift modules that the scanner will not be
@@ -64,7 +63,8 @@ enum class ModuleDependenciesKind : int8_t {
   // of all targets, individually, have been computed.
   SwiftPlaceholder,
   Clang,
-  LastKind = Clang + 1
+  SwiftSource,
+  LastKind = SwiftSource + 1
 };
 
 struct ModuleDependenciesKindHash {
@@ -98,6 +98,25 @@ public:
   std::vector<std::string> moduleDependencies;
 };
 
+struct CommonSwiftTextualModuleDependencyDetails {
+  CommonSwiftTextualModuleDependencyDetails(ArrayRef<StringRef> extraPCMArgs)
+     : extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()) {}
+
+  /// To build a PCM to be used by this Swift module, we need to append these
+  /// arguments to the generic PCM build arguments reported from the dependency
+  /// graph.
+  const std::vector<std::string> extraPCMArgs;
+
+  /// Bridging header file, if there is one.
+  Optional<std::string> bridgingHeaderFile;
+
+  /// Source files on which the bridging header depends.
+  std::vector<std::string> bridgingSourceFiles;
+
+  /// (Clang) modules on which the bridging header depends.
+  std::vector<std::string> bridgingModuleDependencies;
+};
+
 /// Describes the dependencies of a Swift module described by an Swift interface file.
 ///
 /// This class is mostly an implementation detail for \c ModuleDependencies.
@@ -114,28 +133,14 @@ public:
   /// interface.
   const std::vector<std::string> buildCommandLine;
 
-  /// To build a PCM to be used by this Swift module, we need to append these
-  /// arguments to the generic PCM build arguments reported from the dependency
-  /// graph.
-  const std::vector<std::string> extraPCMArgs;
-
   /// The hash value that will be used for the generated module
   const std::string contextHash;
 
   /// A flag that indicates this dependency is a framework
   const bool isFramework;
 
-  /// Bridging header file, if there is one.
-  Optional<std::string> bridgingHeaderFile;
-
-  /// Swift source files that are part of the Swift module, when known.
-  std::vector<std::string> sourceFiles;
-
-  /// Source files on which the bridging header depends.
-  std::vector<std::string> bridgingSourceFiles;
-
-  /// (Clang) modules on which the bridging header depends.
-  std::vector<std::string> bridgingModuleDependencies;
+  /// Details common to Swift textual (interface or source) modules
+  CommonSwiftTextualModuleDependencyDetails textualModuleDetails;
 
   SwiftInterfaceModuleDependenciesStorage(
       const std::string swiftInterfaceFile,
@@ -149,8 +154,9 @@ public:
       compiledModuleCandidates(compiledModuleCandidates.begin(),
                                compiledModuleCandidates.end()),
       buildCommandLine(buildCommandLine.begin(), buildCommandLine.end()),
-      extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()),
-      contextHash(contextHash), isFramework(isFramework) { }
+      contextHash(contextHash), isFramework(isFramework),
+      textualModuleDetails(extraPCMArgs)
+      {}
 
   ModuleDependenciesStorageBase *clone() const override {
     return new SwiftInterfaceModuleDependenciesStorage(*this);
@@ -167,36 +173,26 @@ public:
 class SwiftSourceModuleDependenciesStorage :
   public ModuleDependenciesStorageBase {
 public:
-  /// To build a PCM to be used by this Swift module, we need to append these
-  /// arguments to the generic PCM build arguments reported from the dependency
-  /// graph.
-  const std::vector<std::string> extraPCMArgs;
-
-  /// Bridging header file, if there is one.
-  Optional<std::string> bridgingHeaderFile;
 
   /// Swift source files that are part of the Swift module, when known.
   std::vector<std::string> sourceFiles;
 
-  /// Source files on which the bridging header depends.
-  std::vector<std::string> bridgingSourceFiles;
+  /// Details common to Swift textual (interface or source) modules
+  CommonSwiftTextualModuleDependencyDetails textualModuleDetails;
 
-  /// (Clang) modules on which the bridging header depends.
-  std::vector<std::string> bridgingModuleDependencies;
+  SwiftSourceModuleDependenciesStorage(
+    ArrayRef<StringRef> extraPCMArgs
+  ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftSource),
+      textualModuleDetails(extraPCMArgs) {}
 
-    SwiftSourceModuleDependenciesStorage(
-      ArrayRef<StringRef> extraPCMArgs
-    ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::SwiftSource),
-        extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()) {}
+  ModuleDependenciesStorageBase *clone() const override {
+    return new SwiftSourceModuleDependenciesStorage(*this);
+  }
 
-    ModuleDependenciesStorageBase *clone() const override {
-      return new SwiftSourceModuleDependenciesStorage(*this);
-    }
-
-    static bool classof(const ModuleDependenciesStorageBase *base) {
-      return base->dependencyKind == ModuleDependenciesKind::SwiftSource;
-    }
-  };
+  static bool classof(const ModuleDependenciesStorageBase *base) {
+    return base->dependencyKind == ModuleDependenciesKind::SwiftSource;
+  }
+};
 
 /// Describes the dependencies of a pre-built Swift module (with no .swiftinterface).
 ///
@@ -462,6 +458,14 @@ public:
 
 using ModuleDependencyID = std::pair<std::string, ModuleDependenciesKind>;
 using ModuleDependenciesVector = llvm::SmallVector<ModuleDependencies, 1>;
+using ModuleDependenciesKindMap =
+    std::unordered_map<ModuleDependenciesKind,
+                       llvm::StringMap<ModuleDependenciesVector>,
+                       ModuleDependenciesKindHash>;
+using ModuleDependenciesKindRefMap =
+    std::unordered_map<ModuleDependenciesKind,
+                       llvm::StringMap<const ModuleDependencies *>,
+                       ModuleDependenciesKindHash>;
 
 /// A cache describing the set of module dependencies that has been queried
 /// thus far. This cache records/stores the actual Dependency values and can be
@@ -473,18 +477,35 @@ using ModuleDependenciesVector = llvm::SmallVector<ModuleDependencies, 1>;
 /// ensure that the returned cached dependency was one that can be found in the
 /// current scanning action's filesystem view.
 class GlobalModuleDependenciesCache {
-  /// All cached module dependencies, in the order in which they were
-  /// encountered.
-  std::vector<ModuleDependencyID> AllModules;
+  /// Global cache contents specific to a target-triple specified on a scanner invocation
+  struct TargetSpecificGlobalCacheState {
+    /// All cached module dependencies, in the order in which they were
+    /// encountered.
+    std::vector<ModuleDependencyID> AllModules;
 
-  /// Dependencies for modules that have already been computed.
-  /// This maps a dependency kind to a map of a module's name to a vector of Dependency objects,
-  /// which correspond to instances of the same module that may have been found
-  /// in different sets of search paths.
-  std::unordered_map<ModuleDependenciesKind,
-                     llvm::StringMap<ModuleDependenciesVector>,
-                     ModuleDependenciesKindHash>
-      ModuleDependenciesKindMap;
+    /// Dependencies for modules that have already been computed.
+    /// This maps a dependency kind to a map of a module's name to a vector of Dependency objects,
+    /// which correspond to instances of the same module that may have been found
+    /// in different sets of search paths.
+    ModuleDependenciesKindMap ModuleDependenciesMap;
+  };
+
+  /// All cached Swift source module dependencies, in the order in which they were encountered
+  std::vector<ModuleDependencyID> AllSourceModules;
+
+  /// Dependencies for all Swift source-based modules discovered. Each one is the main
+  /// module of a prior invocation of the scanner.
+  llvm::StringMap<ModuleDependencies> SwiftSourceModuleDependenciesMap;
+
+  /// A map from a String representing the target triple of a scanner invocation to the corresponding
+  /// cached dependencies discovered so far when using this triple.
+  llvm::StringMap<std::unique_ptr<TargetSpecificGlobalCacheState>> TargetSpecificCacheMap;
+
+  /// The current target triple cache configuration
+  Optional<std::string> CurrentTriple;
+
+  /// The triples used by scanners using this cache, in the order in which they were used
+  std::vector<std::string> AllTriples;
 
   /// Additional information needed for Clang dependency scanning.
   ClangModuleDependenciesCacheImpl *clangImpl = nullptr;
@@ -506,12 +527,18 @@ class GlobalModuleDependenciesCache {
   getDependenciesMap(ModuleDependenciesKind kind) const;
 
 public:
-  GlobalModuleDependenciesCache();
+  GlobalModuleDependenciesCache() {};
   GlobalModuleDependenciesCache(const GlobalModuleDependenciesCache &) = delete;
   GlobalModuleDependenciesCache &
   operator=(const GlobalModuleDependenciesCache &) = delete;
 
   virtual ~GlobalModuleDependenciesCache() { destroyClangImpl(); }
+
+  void configureForTriple(std::string triple);
+
+  const std::vector<std::string>& getAllTriples() const {
+    return AllTriples;
+  }
 
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be
@@ -542,6 +569,12 @@ private:
   Optional<ModuleDependencies>
   findDependencies(StringRef moduleName, ModuleLookupSpecifics details) const;
 
+  /// Return a pointer to the target-specific cache state of the current triple configuration.
+  TargetSpecificGlobalCacheState* getCurrentCache() const;
+
+  /// Return a pointer to the target-specific cache state of the specified triple configuration.
+  TargetSpecificGlobalCacheState* getCacheForTriple(StringRef triple) const;
+
 public:
   /// Look for module dependencies for a module with the given name.
   /// This method has a deliberately-obtuse name to indicate that it is not to
@@ -552,6 +585,10 @@ public:
   findAllDependenciesIrrespectiveOfSearchPaths(
       StringRef moduleName, Optional<ModuleDependenciesKind> kind) const;
 
+  /// Look for source-based module dependency details
+  Optional<ModuleDependencies>
+  findSourceModuleDependency(StringRef moduleName) const;
+
   /// Record dependencies for the given module.
   const ModuleDependencies *recordDependencies(StringRef moduleName,
                                                ModuleDependencies dependencies);
@@ -560,9 +597,16 @@ public:
   const ModuleDependencies *updateDependencies(ModuleDependencyID moduleID,
                                                ModuleDependencies dependencies);
 
-  /// Reference the list of all module dependencies.
-  const std::vector<ModuleDependencyID> &getAllModules() const {
-    return AllModules;
+  /// Reference the list of all module dependencies that are not source-based modules
+  /// (i.e. interface dependencies, binary dependencies, clang dependencies).
+  const std::vector<ModuleDependencyID> &getAllNonSourceModules(StringRef triple) const {
+    auto targetSpecificCache = getCacheForTriple(triple);
+    return targetSpecificCache->AllModules;
+  }
+
+  /// Return the list of all source-based modules discovered by this cache
+  const std::vector<ModuleDependencyID> &getAllSourceModules() const {
+    return AllSourceModules;
   }
 };
 
@@ -578,10 +622,7 @@ private:
 
   /// References to data in `globalCache` for dependencies accimulated during
   /// the current scanning action.
-  std::unordered_map<ModuleDependenciesKind,
-                     llvm::StringMap<const ModuleDependencies *>,
-                     ModuleDependenciesKindHash>
-      ModuleDependenciesKindMap;
+  ModuleDependenciesKindRefMap ModuleDependenciesMap;
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
@@ -651,9 +692,8 @@ public:
   void updateDependencies(ModuleDependencyID moduleID,
                           ModuleDependencies dependencies);
 
-  /// Reference the list of all module dependencies.
-  const std::vector<ModuleDependencyID> &getAllModules() const {
-    return globalCache.getAllModules();
+  const std::vector<ModuleDependencyID> &getAllSourceModules() const {
+    return globalCache.getAllSourceModules();
   }
 };
 
