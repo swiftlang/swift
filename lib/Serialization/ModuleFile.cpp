@@ -149,6 +149,15 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
       return error(status);
   }
 
+  auto clientSDK = ctx.LangOpts.SDKName;
+  StringRef moduleSDK = Core->SDKName;
+  if (ctx.SearchPathOpts.EnableSameSDKCheck &&
+      !moduleSDK.empty() && !clientSDK.empty() &&
+      moduleSDK != clientSDK) {
+    status = Status::SDKMismatch;
+    return error(status);
+  }
+
   for (const auto &searchPath : Core->SearchPaths)
     ctx.addSearchPath(searchPath.Path, searchPath.IsFramework,
                       searchPath.IsSystem);

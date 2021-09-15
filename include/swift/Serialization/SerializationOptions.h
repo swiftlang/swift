@@ -35,6 +35,7 @@ namespace swift {
     bool SkipSymbolGraphInheritedDocs = true;
     bool IncludeSPISymbolsInSymbolGraph = false;
     llvm::VersionTuple UserModuleVersion;
+    std::string SDKName;
 
     StringRef GroupInfoPath;
     StringRef ImportedHeader;

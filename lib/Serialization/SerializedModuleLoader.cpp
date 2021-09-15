@@ -976,6 +976,13 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleOSInfo.second, moduleBufferID);
     break;
   }
+
+  case serialization::Status::SDKMismatch:
+    auto currentSDK = Ctx.LangOpts.SDKName;
+    auto moduleSDK = loadInfo.sdkName;
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_sdk_mismatch,
+                       ModuleName, moduleSDK, currentSDK, moduleBufferID);
+    break;
   }
 }
 
