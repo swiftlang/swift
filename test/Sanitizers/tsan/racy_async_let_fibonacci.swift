@@ -10,6 +10,10 @@
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 
+// rdar://80274830 ([Swift CI] Sanitizer report symbolication fails because we fail to start atos, sanbox issue?)
+// REQUIRES: 80274830
+// Might be related/same issue as below
+
 // rdar://75365575 (Failing to start atos external symbolizer)
 // UNSUPPORTED: OS=watchos
 
