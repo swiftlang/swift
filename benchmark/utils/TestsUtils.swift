@@ -287,7 +287,22 @@ public struct SplitMix64: RandomNumberGenerator {
     }
 }
 
-@inlinable // FIXME(inline-always)
+@inlinable
+@inline(__always)
+public func check(
+  _ result: Bool,
+  file: StaticString = #file,
+  function: StaticString = #function,
+  line: Int = #line
+) {
+  guard _fastPath(result) else {
+    print("Incorrect result in \(function), \(file):\(line)")
+    abort()
+  }
+}
+
+@available(*, deprecated)
+@inlinable
 @inline(__always)
 public func CheckResults(
     _ resultsMatch: Bool,
@@ -305,7 +320,7 @@ public func CheckResults(
 // If we do not have an objc-runtime, then we do not have a definition for
 // autoreleasepool. Add in our own fake autoclosure for it that is inline
 // always. That should be able to be eaten through by the optimizer no problem.
-@inlinable // FIXME(inline-always)
+@inlinable
 @inline(__always)
 public func autoreleasepool<Result>(
   invoking body: () throws -> Result
@@ -314,6 +329,9 @@ public func autoreleasepool<Result>(
 }
 #endif
 
+public func getFalse() -> Bool { return false }
+
+@available(*, deprecated, renamed: "getFalse")
 public func False() -> Bool { return false }
 
 /// This is a dummy protocol to test the speed of our protocol dispatch.
@@ -332,6 +350,8 @@ public func blackHole<T>(_ x: T) {
 }
 
 // Return the passed argument without letting the optimizer know that.
+// It's important that this function is in another module than the tests
+// which are using it.
 @inline(never)
 public func identity<T>(_ x: T) -> T {
   return x
