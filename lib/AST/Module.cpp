@@ -2857,7 +2857,7 @@ SynthesizedFileUnit &SourceFile::getOrCreateSynthesizedFile() {
   return *SynthesizedFile;
 }
 
-TypeRefinementContext *SourceFile::getTypeRefinementContext() {
+TypeRefinementContext *SourceFile::getTypeRefinementContext() const {
   return TRC;
 }
 
