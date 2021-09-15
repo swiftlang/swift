@@ -202,6 +202,8 @@ uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 }
 #endif
 
+#if SWIFT_STDLIB_HAS_STDIN
+
 /// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
 /// line.  Can be NULL if no characters were read. This buffer should be
 /// freed by the caller.
@@ -264,6 +266,8 @@ swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
   return result;
 #endif
 }
+
+#endif  // SWIFT_STDLIB_HAS_STDIN
 
 static bool swift_stringIsSignalingNaN(const char *nptr) {
   if (nptr[0] == '+' || nptr[0] == '-') {
