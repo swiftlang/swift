@@ -56,6 +56,7 @@ TYPE_ATTR(noDerivative)
 TYPE_ATTR(async)
 TYPE_ATTR(Sendable)
 TYPE_ATTR(unchecked)
+TYPE_ATTR(_moveOnly)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -669,6 +670,13 @@ SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
   OnFunc | UserInaccessible | NotSerialized | OnNominalType |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   120)
+
+SIMPLE_DECL_ATTR(_moveOnly, MoveOnly,
+  UserInaccessible |
+  ABIStableToAdd | ABIBreakingToRemove |
+  APIStableToAdd | APIBreakingToRemove |
+  OnParam | OnVar,
+  121)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.

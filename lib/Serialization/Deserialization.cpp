@@ -5305,11 +5305,11 @@ public:
       IdentifierID internalLabelID;
       TypeID typeID;
       bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated;
-      bool isNoDerivative;
+      bool isNoDerivative, isMoveOnly;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(
           scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
-          isNonEphemeral, rawOwnership, isIsolated, isNoDerivative);
+          isNonEphemeral, rawOwnership, isIsolated, isNoDerivative, isMoveOnly);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -5323,7 +5323,8 @@ public:
       params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
                                              isNonEphemeral, *ownership,
-                                             isIsolated, isNoDerivative),
+                                             isIsolated, isNoDerivative,
+                                             isMoveOnly),
                           MF.getIdentifier(internalLabelID));
     }
 

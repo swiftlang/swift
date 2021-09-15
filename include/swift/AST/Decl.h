@@ -5292,6 +5292,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
+
+    /// Whether or not this parameter is 'moveOnly'.
+    IsMoveOnly = 1 << 3,
   };
 
   /// The default value, if any, along with flags.
@@ -5458,6 +5461,17 @@ public:
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsIsolated
                                       : flags - Flags::IsIsolated);
+  }
+
+  /// Whether or not this parameter is marked with 'isolated'.
+  bool isMoveOnly() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsMoveOnly);
+  }
+
+  void setIsMoveOnly(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsMoveOnly
+                                      : flags - Flags::IsMoveOnly);
   }
 
   /// Does this parameter reject temporary pointer conversions?

@@ -4428,7 +4428,8 @@ public:
           S.addDeclBaseNameRef(param.getInternalLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
-          paramFlags.isIsolated(), paramFlags.isNoDerivative());
+          paramFlags.isIsolated(), paramFlags.isNoDerivative(),
+          paramFlags.isMoveOnly());
     }
   }
 

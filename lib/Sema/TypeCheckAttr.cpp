@@ -263,9 +263,15 @@ public:
 
   void visitReasyncAttr(ReasyncAttr *attr);
   void visitNonisolatedAttr(NonisolatedAttr *attr);
+
+  void visitMoveOnlyAttr(MoveOnlyAttr *attr);
 };
 
 } // end anonymous namespace
+
+void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
+  // For now allow for anything.
+}
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
   DeclContext *dc = D->getDeclContext();
