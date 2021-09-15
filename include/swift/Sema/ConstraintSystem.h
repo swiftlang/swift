@@ -750,6 +750,9 @@ enum ScoreKind {
   /// to another type (rhs) via implicit initialization of
   /// `rhs` type with an argument of `lhs` value.
   SK_ImplicitValueConversion,
+  /// An implicit conversion from a value of a type conforming
+  /// to Hashable to AnyHashable.
+  SK_AnyHashableConversion,
   /// A user-defined conversion.
   SK_UserConversion,
   /// A non-trivial function conversion.

@@ -61,6 +61,9 @@ static StringRef getScoreKindName(ScoreKind kind) {
   case SK_ForceUnchecked:
     return "force of an implicitly unwrapped optional";
 
+  case SK_AnyHashableConversion:
+    return "AnyHashable conversion";
+
   case SK_UserConversion:
     return "user conversion";
 

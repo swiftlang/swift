@@ -699,7 +699,8 @@ private:
     // and there are no non-trivial function conversions.
     auto &score = BestNonGenericScore->Data;
     return (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
-            score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0);
+            score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0 &&
+            score[SK_AnyHashableConversion] == 0);
   }
 
   /// Attempt to apply given disjunction choice to constraint system.
