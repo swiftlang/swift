@@ -48,7 +48,8 @@ jobs:
       - run: ./utils/webassembly/distribute-latest-toolchain.sh ${{ matrix.branch }} ${{ matrix.channel }}
         env:
           TARGETS_TO_DIST: ${{ matrix.targets }}
-          GITHUB_TOKEN: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILDBOT_GITHUB_TOKEN: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
           DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
           DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
