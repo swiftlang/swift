@@ -1553,13 +1553,13 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
     filenameLength = INT_MAX;
 
   char *message, *nullTerminatedFilename;
-  asprintf(&message,
+  swift_asprintf(&message,
            "implicit Objective-C entrypoint %c[%s %s] is deprecated and will "
            "be removed in Swift 4",
            isInstanceMethod ? '-' : '+',
            class_getName([self class]),
            sel_getName(selector));
-  asprintf(&nullTerminatedFilename, "%*s", (int)filenameLength, filename);
+  swift_asprintf(&nullTerminatedFilename, "%*s", (int)filenameLength, filename);
 
   RuntimeErrorDetails::FixIt fixit = {
     .filename = nullTerminatedFilename,
