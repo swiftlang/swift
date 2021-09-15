@@ -210,7 +210,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   // Delay resolving operator references. These will be resolved in
   // the solver.
   if (Name.isOperator()) {
-    return UDRE;
+    // FIXME: Remove this condition once operand completions
+    // have been ported to solver-based code completion.
+    if (!DC->getASTContext().SourceMgr.hasCodeCompletionBuffer()) {
+      return UDRE;
+    }
   }
 
   DeclNameRef LookupName = Name;
