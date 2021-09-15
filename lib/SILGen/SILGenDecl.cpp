@@ -271,6 +271,10 @@ public:
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
+    SILValue val = SGF.VarLocs[Var].value;
+    if (SGF.getASTContext().LangOpts.EnableExperimentalDefinedLifetimes &&
+        val->getOwnershipKind() != OwnershipKind::None)
+      SGF.B.createEndBorrow(l, val);
     SGF.destroyLocalVariable(l, Var);
   }
 
@@ -537,13 +541,18 @@ public:
     // an argument, for example.
     if (value->getType().isAddress())
       address = value;
+    SILLocation PrologueLoc(vd);
+
+    if (SGF.getASTContext().LangOpts.EnableExperimentalDefinedLifetimes &&
+        value->getOwnershipKind() != OwnershipKind::None)
+      value = SILValue(
+          SGF.B.createBeginBorrow(PrologueLoc, value, /*defined*/ true));
     SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(value);
 
     // Emit a debug_value[_addr] instruction to record the start of this value's
     // lifetime, if permitted to do so.
     if (!EmitDebugValueOnInit)
       return;
-    SILLocation PrologueLoc(vd);
     PrologueLoc.markAsPrologue();
     SILDebugVariable DbgVar(vd->isLet(), /*ArgNo=*/0);
     SGF.B.emitDebugDescription(PrologueLoc, value, DbgVar);
@@ -1723,8 +1732,16 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   // For 'let' bindings, we emit a release_value or destroy_addr, depending on
   // whether we have an address or not.
   SILValue Val = loc.value;
-  if (!Val->getType().isAddress())
-    B.emitDestroyValueOperation(silLoc, Val);
-  else
+  if (!Val->getType().isAddress()) {
+    SILValue valueToBeDestroyed;
+    if (getASTContext().LangOpts.EnableExperimentalDefinedLifetimes &&
+        Val->getOwnershipKind() != OwnershipKind::None) {
+      auto *inst = cast<BeginBorrowInst>(Val.getDefiningInstruction());
+      valueToBeDestroyed = inst->getOperand();
+    } else {
+      valueToBeDestroyed = Val;
+    }
+    B.emitDestroyValueOperation(silLoc, valueToBeDestroyed);
+  } else
     B.createDestroyAddr(silLoc, Val);
 }
