@@ -2025,12 +2025,6 @@ public:
         auto substConf = substSubMap.lookupConformance(canTy, proto);
 
         if (origConf.isConcrete()) {
-          // A generic argument may inherit a concrete conformance from a class
-          // constraint, which could still be bound to a type parameter we don't
-          // know more about.
-          if (origConf.getConcrete()->getType()->is<ArchetypeType>())
-            continue;
-          
           if (!substConf.isConcrete())
             return CanType();
           if (origConf.getConcrete()->getRootConformance()
