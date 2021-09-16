@@ -46,7 +46,7 @@ actor MySuperActor {
   }
 }
 
-class Point { // expected-note{{class 'Point' does not conform to the `Sendable` protocol}}
+class Point { // expected-note{{class 'Point' does not conform to the 'Sendable' protocol}}
   var x : Int = 0
   var y : Int = 0
 }
