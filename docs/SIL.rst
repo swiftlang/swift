@@ -3671,7 +3671,7 @@ begin_borrow
 
 ::
 
-   sil-instruction ::= 'begin_borrow' '[defined]'? sil-operand
+   sil-instruction ::= 'begin_borrow' '[lexical]'? sil-operand
 
    %1 = begin_borrow %0 : $T
 
@@ -3684,7 +3684,7 @@ region in between this borrow and its lifetime ending use, ``%0`` must be
 live. This makes sense semantically since ``%1`` is modeling a new value with a
 dependent lifetime on ``%0``.
 
-The optional ``defined`` attribute specifies that the operand corresponds to a
+The optional ``lexical`` attribute specifies that the operand corresponds to a
 local variable in the Swift source, so special care must be taken when moving
 the end_borrow.
 

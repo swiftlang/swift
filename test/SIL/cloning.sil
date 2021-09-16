@@ -28,21 +28,21 @@ bb0:
   return %2 : $()
 }
 
-sil [ossa] [always_inline] @callee_begin_borrow_defined : $@convention(thin) () -> () {
+sil [ossa] [always_inline] @callee_begin_borrow_lexical : $@convention(thin) () -> () {
   %instance = alloc_ref $X
-  %guaranteed_c = begin_borrow [defined] %instance : $X
+  %guaranteed_c = begin_borrow [lexical] %instance : $X
   end_borrow %guaranteed_c : $X
   destroy_value %instance : $X
   %res = tuple ()
   return %res : $()
 }
 
-// CHECK-LABEL: sil [ossa] @caller_begin_borrow_defined
-// CHECK: begin_borrow [defined]
-// CHECK-LABEL: } // end sil function 'caller_begin_borrow_defined'
-sil [ossa] @caller_begin_borrow_defined : $@convention(thin) () -> () {
-  %callee_begin_borrow_defined = function_ref @callee_begin_borrow_defined : $@convention(thin) () -> ()
-  %res = apply %callee_begin_borrow_defined() : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [ossa] @caller_begin_borrow_lexical
+// CHECK: begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_begin_borrow_lexical'
+sil [ossa] @caller_begin_borrow_lexical : $@convention(thin) () -> () {
+  %callee_begin_borrow_lexical = function_ref @callee_begin_borrow_lexical : $@convention(thin) () -> ()
+  %res = apply %callee_begin_borrow_lexical() : $@convention(thin) () -> ()
   return %res : $()
 }
 
