@@ -11,9 +11,7 @@
 // When run on arm64e, this tests that we build the same interface with
 // `#if _ptrauth(_arm64e)` on.
 //
-// REQUIRES: CPU=arm64
-// Disabled arm64e for now since it isn't passing tests on apple silicon.
-// XFAIL: CPU=arm64e
+// REQUIRES: CPU=arm64 || CPU=arm64e
 
 import PtrAuthFramework // expected-remark{{rebuilding module 'PtrAuthFramework' from interface}}
 
