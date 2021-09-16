@@ -307,6 +307,9 @@ public func autoreleasepool<Result>(
 }
 #endif
 
+public func getFalse() -> Bool { return false }
+
+@available(*, deprecated, renamed: "getFalse()")
 public func False() -> Bool { return false }
 
 /// This is a dummy protocol to test the speed of our protocol dispatch.

@@ -26,7 +26,7 @@ func fibonacci(_ n: Int) -> Int {
 func Fibonacci(_ n: Int) -> Int {
   // This if prevents optimizer from computing return value of Fibonacci(32)
   // at compile time.
-  if False() { return 0 }
+  if getFalse() { return 0 }
 
   if (n <= 2) { return 1 }
   return fibonacci(n - 2) + fibonacci(n - 1)

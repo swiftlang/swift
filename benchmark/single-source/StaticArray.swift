@@ -86,7 +86,7 @@ typealias SA128Int = StaticArray<A2X<A2X<A2X<A2X<A2X<A2X<A0<Int>>>>>>>>
 
 // Make sure the optimizer does not optimize the compute away.
 @inline(never)
-public func sink(_ value: Int) { if False() { print(value) }}
+public func sink(_ value: Int) { if getFalse() { print(value) }}
 
 
 @inline(never)
