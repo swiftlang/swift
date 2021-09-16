@@ -22,7 +22,7 @@ import TestsUtils
 //  - Uniquing initializer for Dictionary with short string keys
 //
 
-public let WordCount = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "WordSplitASCII",
     runFunction: run_WordSplitASCII,

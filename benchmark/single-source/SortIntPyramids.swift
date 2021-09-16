@@ -4,7 +4,7 @@ import TestsUtils
 // Datasets in this benchmark are influenced by stdlib partition function,
 // therefore if stdlib partion implementation changes we should correct these
 // datasets or disable/skip this benchmark
-public let SortIntPyramids = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "SortIntPyramid",
     runFunction: run_SortIntPyramid,

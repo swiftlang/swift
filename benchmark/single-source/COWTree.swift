@@ -5,12 +5,14 @@
 
 import TestsUtils
 
-public var COWTree = BenchmarkInfo(
-  name: "COWTree",
-  runFunction: run_COWTree,
-  tags: [.validation, .abstraction, .String],
-  legacyFactor: 20
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "COWTree",
+    runFunction: run_COWTree,
+    tags: [.validation, .abstraction, .String],
+    legacyFactor: 20
+  ),
+]
 
 @inline(never)
 public func run_COWTree(_ n: Int) {

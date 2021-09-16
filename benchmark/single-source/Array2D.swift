@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,13 +12,15 @@
 
 import TestsUtils
 
-public let Array2D = BenchmarkInfo(
-  name: "Array2D",
-  runFunction: run_Array2D,
-  tags: [.validation, .api, .Array],
-  setUpFunction: { blackHole(inputArray) },
-  tearDownFunction: { inputArray = nil },
-  legacyFactor: 16)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "Array2D",
+    runFunction: run_Array2D,
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(inputArray) },
+    tearDownFunction: { inputArray = nil },
+    legacyFactor: 16),
+]
 
 let size = 256
 

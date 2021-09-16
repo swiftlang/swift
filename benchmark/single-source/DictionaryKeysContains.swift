@@ -16,7 +16,7 @@ import TestsUtils
 import Foundation
 
 #if _runtime(_ObjC)
-public let DictionaryKeysContains = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "DictionaryKeysContainsNative",
     runFunction: run_DictionaryKeysContains,
@@ -32,7 +32,7 @@ public let DictionaryKeysContains = [
     tearDownFunction: teardownDictionary),
 ]
 #else
-public let DictionaryKeysContains = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "DictionaryKeysContainsNative",
     runFunction: run_DictionaryKeysContains,

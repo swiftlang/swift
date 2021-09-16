@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let SIMDReduceInteger = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "SIMDReduce.Int32",
     runFunction: run_SIMDReduceInt32x1,

@@ -1,8 +1,8 @@
-//===--- RangeAssignment.swift --------------------------------------------===//
+//===--- QueueTest.swift --------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,19 +12,20 @@
 
 import TestsUtils
 
-public let QueueGeneric = BenchmarkInfo(
-  name: "QueueGeneric",
-  runFunction: run_QueueGeneric,
-  tags: [.validation, .api],
-  setUpFunction: { buildWorkload() },
-  legacyFactor: 10)
-
-public let QueueConcrete = BenchmarkInfo(
-  name: "QueueConcrete",
-  runFunction: run_QueueConcrete,
-  tags: [.validation, .api],
-  setUpFunction: { buildWorkload() },
-  legacyFactor: 10)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "QueueGeneric",
+    runFunction: run_QueueGeneric,
+    tags: [.validation, .api],
+    setUpFunction: { buildWorkload() },
+    legacyFactor: 10),
+  BenchmarkInfo(
+    name: "QueueConcrete",
+    runFunction: run_QueueConcrete,
+    tags: [.validation, .api],
+    setUpFunction: { buildWorkload() },
+    legacyFactor: 10),
+]
 
 // TODO: remove when there is a native equivalent in the std lib
 extension RangeReplaceableCollection where Self: BidirectionalCollection {

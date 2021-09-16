@@ -22,7 +22,7 @@ let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
 // We run the test at a spread of sizes between 1*x and 2*x, because the
 // quadratic behavior only happens at certain load factors.
 
-public let DictionaryCopy = [
+public let benchmarks = [
   BenchmarkInfo(name:"Dict.CopyKeyValue.16k",
     runFunction: copyKeyValue, tags: t, setUpFunction: { dict(16_000) }),
   BenchmarkInfo(name:"Dict.CopyKeyValue.20k",

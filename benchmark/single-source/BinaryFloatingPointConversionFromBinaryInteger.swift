@@ -16,13 +16,15 @@
 import TestsUtils
 
 #if swift(>=4.2)
-public let BinaryFloatingPointConversionFromBinaryInteger = BenchmarkInfo(
-  name: "BinaryFloatingPointConversionFromBinaryInteger",
-  runFunction: run_BinaryFloatingPointConversionFromBinaryInteger,
-  tags: [.validation, .algorithm]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "BinaryFloatingPointConversionFromBinaryInteger",
+    runFunction: run_BinaryFloatingPointConversionFromBinaryInteger,
+    tags: [.validation, .algorithm]
+  ),
+]
 #else
-public let BinaryFloatingPointConversionFromBinaryInteger: [BenchmarkInfo] = []
+public let benchmarks: [BenchmarkInfo] = []
 #endif
 
 struct MockBinaryInteger<T : BinaryInteger> {

@@ -18,7 +18,7 @@ import TestsUtils
 // Swift's performance switching over enums with substantial amounts of associated data.
 //
 
-public let HTTP2StateMachine = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "HTTP2StateMachine",
     runFunction: run_HTTP2StateMachine,

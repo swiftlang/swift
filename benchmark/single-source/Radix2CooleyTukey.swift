@@ -11,7 +11,7 @@ import Darwin
 #endif
 import TestsUtils
 
-public var Radix2CooleyTukey = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "Radix2CooleyTukey",
     runFunction: run_Radix2CooleyTukey,

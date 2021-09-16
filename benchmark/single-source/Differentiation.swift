@@ -15,7 +15,7 @@
 import TestsUtils
 import _Differentiation
 
-public let Differentiation = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "DifferentiationIdentity",
     runFunction: run_DifferentiationIdentity,

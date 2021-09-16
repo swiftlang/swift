@@ -17,7 +17,7 @@ import TestsUtils
 // shuffling large arrays.
 //
 
-public let RandomShuffle = [
+public let benchmarks = [
   BenchmarkInfo(name: "RandomShuffleDef2", runFunction: run_RandomShuffleDef,
     tags: [.api], setUpFunction: { blackHole(numbersDef) }, legacyFactor: 4),
   BenchmarkInfo(name: "RandomShuffleLCG2", runFunction: run_RandomShuffleLCG,

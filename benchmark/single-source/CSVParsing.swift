@@ -1,5 +1,5 @@
 import TestsUtils
-public let CSVParsing = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "CSVParsing.Char",
     runFunction: run_CSVParsing_characters,

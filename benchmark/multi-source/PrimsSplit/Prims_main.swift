@@ -12,11 +12,13 @@
 
 import TestsUtils
 
-public let PrimsSplit = BenchmarkInfo(
-  name: "PrimsSplit",
-  runFunction: run_PrimsSplit,
-  tags: [.validation, .algorithm],
-  legacyFactor: 5)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "PrimsSplit",
+    runFunction: run_PrimsSplit,
+    tags: [.validation, .algorithm],
+    legacyFactor: 5)
+]
 
 @inline(never)
 public func run_PrimsSplit(_ n: Int) {

@@ -31,7 +31,7 @@
 
 import TestsUtils
 
-public let PrimsNonStrongRef: [BenchmarkInfo] = ({
+public let benchmarks: [BenchmarkInfo] = ({
     var benchmarks: [BenchmarkInfo] = []
 #if false
     // TODO: Stabilize weak benchmark.

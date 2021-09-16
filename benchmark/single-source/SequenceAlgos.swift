@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,7 +20,7 @@ import TestsUtils
 
 let t: [BenchmarkCategory] = [.validation, .api]
 
-public let SequenceAlgos = [
+public let benchmarks = [
   BenchmarkInfo(name: "SequenceAlgosList", runFunction: { for _ in 0..<$0 {
       benchmarkSequenceAlgos(s: l, n: n)
       benchmarkEquatableSequenceAlgos(s: l, n: n)

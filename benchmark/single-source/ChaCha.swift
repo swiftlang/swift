@@ -343,10 +343,12 @@ extension UInt32 {
 }
 
 
-public let ChaCha = BenchmarkInfo(
-  name: "ChaCha",
-  runFunction: run_ChaCha,
-  tags: [.runtime, .cpubench])
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "ChaCha",
+    runFunction: run_ChaCha,
+    tags: [.runtime, .cpubench]),
+]
 
 @inline(never)
 func checkResult(_ plaintext: [UInt8]) {

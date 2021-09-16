@@ -20,7 +20,7 @@ import TestsUtils
 // array is a class property, but also generally tests quicksort in a
 // class which needs a slew of array optimizations, uniqueness, bounds
 // and exclusivity optimizations.
-public let SortArrayInClass = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "SortArrayInClass",
     runFunction: run_SortArrayInClass,

@@ -17,7 +17,7 @@ import TestsUtils
 let t: [BenchmarkCategory] = [.runtime, .refcount, .cpubench]
 let n = 100
 
-public let NIOChannelPipeline = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "NIOChannelPipeline",
     runFunction: runBench,

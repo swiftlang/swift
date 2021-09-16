@@ -16,11 +16,13 @@ import TestsUtils
 // described in Myers (1986). The Diffing benchmark tracks the performance
 // of `Collection.difference(from:to:)`.
 
-public let DiffingMyers = BenchmarkInfo(
-  name: "Diffing.Myers.Similar",
-  runFunction: run_Myers,
-  tags: [.algorithm],
-  setUpFunction: { blackHole((loremIpsum, unabridgedLorem)) })
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "Diffing.Myers.Similar",
+    runFunction: run_Myers,
+    tags: [.algorithm],
+    setUpFunction: { blackHole((loremIpsum, unabridgedLorem)) })
+]
 
 
 let loremIpsum = Array("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.")

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,11 +14,13 @@
 // Given an array and a number C, find elements A and B such that A+B = C
 import TestsUtils
 
-public let TwoSum = BenchmarkInfo(
-  name: "TwoSum",
-  runFunction: run_TwoSum,
-  tags: [.validation, .api, .Dictionary, .Array, .algorithm],
-  legacyFactor: 2)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "TwoSum",
+    runFunction: run_TwoSum,
+    tags: [.validation, .api, .Dictionary, .Array, .algorithm],
+    legacyFactor: 2),
+]
 
 let array = [
   959,  81, 670, 727, 416, 171, 401, 398, 707, 596, 200,   9, 414,  98,  43,

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let ReduceInto = [
+public let benchmarks = [
   BenchmarkInfo(name: "FilterEvenUsingReduce", runFunction: run_FilterEvenUsingReduce, tags: [.validation, .api], legacyFactor: 10),
   BenchmarkInfo(name: "FilterEvenUsingReduceInto", runFunction: run_FilterEvenUsingReduceInto, tags: [.validation, .api]),
   BenchmarkInfo(name: "FrequenciesUsingReduce", runFunction: run_FrequenciesUsingReduce, tags: [.validation, .api], legacyFactor: 10),

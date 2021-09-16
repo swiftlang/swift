@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let SIMDRandomMask = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "SIMDRandomMask.Int8x16",
     runFunction: run_SIMDRandomMaskInt8x16,

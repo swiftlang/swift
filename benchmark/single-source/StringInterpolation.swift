@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,21 +12,23 @@
 
 import TestsUtils
 
-public let StringInterpolation = BenchmarkInfo(
-  name: "StringInterpolation",
-  runFunction: run_StringInterpolation,
-  tags: [.validation, .api, .String],
-  legacyFactor: 100)
-public let StringInterpolationSmall = BenchmarkInfo(
-  name: "StringInterpolationSmall",
-  runFunction: run_StringInterpolationSmall,
-  tags: [.validation, .api, .String],
-  legacyFactor: 10)
-public let StringInterpolationManySmallSegments = BenchmarkInfo(
-  name: "StringInterpolationManySmallSegments",
-  runFunction: run_StringInterpolationManySmallSegments,
-  tags: [.validation, .api, .String],
-  legacyFactor: 100)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "StringInterpolation",
+    runFunction: run_StringInterpolation,
+    tags: [.validation, .api, .String],
+    legacyFactor: 100),
+  BenchmarkInfo(
+    name: "StringInterpolationSmall",
+    runFunction: run_StringInterpolationSmall,
+    tags: [.validation, .api, .String],
+    legacyFactor: 10),
+  BenchmarkInfo(
+    name: "StringInterpolationManySmallSegments",
+    runFunction: run_StringInterpolationManySmallSegments,
+    tags: [.validation, .api, .String],
+    legacyFactor: 100),
+]
 
 class RefTypePrintable : CustomStringConvertible {
   var description: String {

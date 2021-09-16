@@ -5,11 +5,13 @@
 
 import TestsUtils
 
-public let LuhnAlgoLazy = BenchmarkInfo(
-  name: "LuhnAlgoLazy",
-  runFunction: run_LuhnAlgoLazy,
-  tags: [.algorithm]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "LuhnAlgoLazy",
+    runFunction: run_LuhnAlgoLazy,
+    tags: [.algorithm]
+  ),
+]
 
 @inline(never)
 public func run_LuhnAlgoLazy(_ n: Int) {

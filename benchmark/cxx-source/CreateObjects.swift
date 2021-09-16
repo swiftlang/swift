@@ -16,10 +16,12 @@
 import TestsUtils
 import CxxCreateObjects
 
-public let CreateObjects = BenchmarkInfo(
-  name: "CreateObjects",
-  runFunction: run_CreateObjects,
-  tags: [.validation, .bridging])
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "CreateObjects",
+    runFunction: run_CreateObjects,
+    tags: [.validation, .bridging])
+]
 
 @inline(never)
 public func run_CreateObjects(_ n: Int) {

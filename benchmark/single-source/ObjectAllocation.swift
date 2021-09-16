@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,11 +16,13 @@ import TestsUtils
 // 53% _swift_release_dealloc
 // 30% _swift_alloc_object
 // 10% retain/release
-public var ObjectAllocation = BenchmarkInfo(
-  name: "ObjectAllocation",
-  runFunction: run_ObjectAllocation,
-  tags: [.runtime, .cpubench]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "ObjectAllocation",
+    runFunction: run_ObjectAllocation,
+    tags: [.runtime, .cpubench]
+  )
+]
 
 final class XX {
   var xx: Int

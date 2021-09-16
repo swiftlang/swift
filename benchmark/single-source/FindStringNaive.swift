@@ -19,7 +19,7 @@ let t: [BenchmarkCategory] = [.String, .refcount]
 var longStringFoFoFoFox: String?
 var longArrayFoFoFoFox: [UInt8]?
 
-public let FindStringNaive = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "FindString.Loop1.Substring",
     runFunction: runBenchLoop1Substring,

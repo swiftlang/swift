@@ -16,7 +16,7 @@ import TestsUtils
 #if _runtime(_ObjC)
 import Foundation
 
-public let DictionaryBridgeToObjC = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "DictionaryBridgeToObjC_Bridge",
     runFunction: run_DictionaryBridgeToObjC_BridgeToObjC,
@@ -82,5 +82,5 @@ public func run_DictionaryBridgeToObjC_BulkAccess(_ n: Int) {
 }
 
 #else // !_runtime(ObjC)
-public let DictionaryBridgeToObjC: [BenchmarkInfo] = []
+public let benchmarks: [BenchmarkInfo] = []
 #endif

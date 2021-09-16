@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,7 +15,7 @@
 import TestsUtils
 
 let t: [BenchmarkCategory] = [.validation, .api, .Array]
-public let ArrayAppend = [
+public let benchmarks = [
   BenchmarkInfo(name: "ArrayAppend", runFunction: run_ArrayAppend, tags: t, legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendArrayOfInt", runFunction: run_ArrayAppendArrayOfInt, tags: t,
     setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),

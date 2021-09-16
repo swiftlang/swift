@@ -18,7 +18,7 @@ import TestsUtils
 // and floating-point values.
 //
 
-public let RandomValues = [
+public let benchmarks = [
   BenchmarkInfo(name: "RandomIntegersDef", runFunction: run_RandomIntegersDef,
     tags: [.api], legacyFactor: 100),
   BenchmarkInfo(name: "RandomIntegersLCG", runFunction: run_RandomIntegersLCG,

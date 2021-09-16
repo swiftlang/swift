@@ -15,7 +15,7 @@ import TestsUtils
 // This benchmark mostly measures lookups in dictionaries with complex keys,
 // exercising the default hash compression function.
 
-public let Dictionary4 = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "Dictionary4",
     runFunction: run_Dictionary4,

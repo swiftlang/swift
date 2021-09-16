@@ -1,4 +1,4 @@
-//===--- JSON.swift -------------------------------------------------------===//
+//===--- CodableTest.swift ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,14 +14,14 @@ import TestsUtils
 import Foundation
 
 #if _runtime(_ObjC)
-public let Codable = [
+public let benchmarks = [
   BenchmarkInfo(name: "JSONPerfEncode", runFunction: run_JSONPerfEncode, tags: [.validation, .bridging], setUpFunction: setup_json),
   BenchmarkInfo(name: "JSONPerfDecode", runFunction: run_JSONPerfDecode, tags: [.validation, .bridging], setUpFunction: setup_json),
   BenchmarkInfo(name: "PlistPerfEncode", runFunction: run_PlistPerfEncode, tags: [.validation, .bridging], setUpFunction: setup_plist),
   BenchmarkInfo(name: "PlistPerfDecode", runFunction: run_PlistPerfDecode, tags: [.validation, .bridging], setUpFunction: setup_plist),
 ]
 #else
-public let Codable = [
+public let benchmarks = [
   BenchmarkInfo(name: "JSONPerfEncode", runFunction: run_JSONPerfEncode, tags: [.validation, .bridging], setUpFunction: setup_json),
   BenchmarkInfo(name: "JSONPerfDecode", runFunction: run_JSONPerfDecode, tags: [.validation, .bridging], setUpFunction: setup_json),
 ]

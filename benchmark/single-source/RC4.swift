@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,10 +14,12 @@
 // for performance measuring.
 import TestsUtils
 
-public let RC4Test = BenchmarkInfo(
-  name: "RC4",
-  runFunction: run_RC4,
-  tags: [.validation, .algorithm])
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "RC4",
+    runFunction: run_RC4,
+    tags: [.validation, .algorithm]),
+]
 
 struct RC4 {
   var state: [UInt8]

@@ -14,7 +14,7 @@ import TestsUtils
 
 
 // - Definitions
-public let IntegerParsing = [
+public let benchmarks = [
   // IntSmall
   BenchmarkInfo(name: "ParseInt.IntSmall.Decimal",
     runFunction: run_ParseIntFromIntSmallDecimal,

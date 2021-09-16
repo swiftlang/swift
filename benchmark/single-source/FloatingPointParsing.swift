@@ -15,7 +15,7 @@
 
 import TestsUtils
 
-public let FloatingPointParsing = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "ParseFloat.Float.Exp",
     runFunction: run_ParseFloatExp,

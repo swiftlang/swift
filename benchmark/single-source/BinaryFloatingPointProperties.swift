@@ -12,23 +12,23 @@
 
 import TestsUtils
 
-public let BinaryFloatingPointPropertiesBinade = BenchmarkInfo(
-  name: "BinaryFloatingPointPropertiesBinade",
-  runFunction: run_BinaryFloatingPointPropertiesBinade,
-  tags: [.validation, .algorithm]
-)
-
-public let BinaryFloatingPointPropertiesNextUp = BenchmarkInfo(
-  name: "BinaryFloatingPointPropertiesNextUp",
-  runFunction: run_BinaryFloatingPointPropertiesNextUp,
-  tags: [.validation, .algorithm]
-)
-
-public let BinaryFloatingPointPropertiesUlp = BenchmarkInfo(
-  name: "BinaryFloatingPointPropertiesUlp",
-  runFunction: run_BinaryFloatingPointPropertiesUlp,
-  tags: [.validation, .algorithm]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "BinaryFloatingPointPropertiesBinade",
+    runFunction: run_BinaryFloatingPointPropertiesBinade,
+    tags: [.validation, .algorithm]
+  ),
+  BenchmarkInfo(
+    name: "BinaryFloatingPointPropertiesNextUp",
+    runFunction: run_BinaryFloatingPointPropertiesNextUp,
+    tags: [.validation, .algorithm]
+  ),
+  BenchmarkInfo(
+    name: "BinaryFloatingPointPropertiesUlp",
+    runFunction: run_BinaryFloatingPointPropertiesUlp,
+    tags: [.validation, .algorithm]
+  )
+]
 
 @inline(never)
 public func run_BinaryFloatingPointPropertiesBinade(_ n: Int) {

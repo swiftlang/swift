@@ -14,7 +14,7 @@ import TestsUtils
 
 let t: [BenchmarkCategory] = [.validation, .api, .String]
 
-public let InsertCharacter = [
+public let benchmarks = [
   BenchmarkInfo(name: "InsertCharacterEndIndex",
     runFunction: run_InsertCharacterEndIndex, tags: t,
     setUpFunction: buildWorkload),

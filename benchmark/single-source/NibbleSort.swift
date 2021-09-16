@@ -4,12 +4,14 @@
 
 import TestsUtils
 
-public let NibbleSort = BenchmarkInfo(
-  name: "NibbleSort",
-  runFunction: run_NibbleSort,
-  tags: [.validation],
-  legacyFactor: 10
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "NibbleSort",
+    runFunction: run_NibbleSort,
+    tags: [.validation],
+    legacyFactor: 10
+  ),
+]
 
 @inline(never)
 public func run_NibbleSort(_ n: Int) {

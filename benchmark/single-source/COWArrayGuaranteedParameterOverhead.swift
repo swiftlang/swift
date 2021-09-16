@@ -15,12 +15,14 @@ import TestsUtils
 // This test makes sure that even though we have +0 arguments by default that we
 // can properly convert +0 -> +1 to avoid extra COW copies.
 
-public let COWArrayGuaranteedParameterOverhead = BenchmarkInfo(
-  name: "COWArrayGuaranteedParameterOverhead",
-  runFunction: run_COWArrayGuaranteedParameterOverhead,
-  tags: [.regression, .abstraction, .refcount],
-  legacyFactor: 50
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "COWArrayGuaranteedParameterOverhead",
+    runFunction: run_COWArrayGuaranteedParameterOverhead,
+    tags: [.regression, .abstraction, .refcount],
+    legacyFactor: 50
+  ),
+]
 
 @inline(never)
 func caller() {

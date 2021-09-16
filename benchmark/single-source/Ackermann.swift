@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,10 +14,12 @@
 // for performance measuring.
 import TestsUtils
 
-public let Ackermann = BenchmarkInfo(
-  name: "Ackermann",
-  runFunction: run_Ackermann,
-  tags: [.algorithm])
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "Ackermann",
+    runFunction: run_Ackermann,
+    tags: [.algorithm]),
+]
 
 func _ackermann(_ m: Int, _ n : Int) -> Int {
   if (m == 0) { return n + 1 }

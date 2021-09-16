@@ -4,12 +4,14 @@
 
 import TestsUtils
 
-public var RangeReplaceableCollectionPlusDefault = BenchmarkInfo(
-  name: "RangeReplaceableCollectionPlusDefault",
-  runFunction: run_RangeReplaceableCollectionPlusDefault,
-  tags: [.validation],
-  legacyFactor: 4
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "RangeReplaceableCollectionPlusDefault",
+    runFunction: run_RangeReplaceableCollectionPlusDefault,
+    tags: [.validation],
+    legacyFactor: 4
+  ),
+]
 
 @inline(never)
 public func run_RangeReplaceableCollectionPlusDefault(_ n: Int) {

@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let RangeOverlaps = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "RangeOverlapsRange",
     runFunction: run_RangeOverlapsRange,

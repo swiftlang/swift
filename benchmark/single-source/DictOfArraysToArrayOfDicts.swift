@@ -6,11 +6,13 @@
 
 import TestsUtils
 
-public var DictOfArraysToArrayOfDicts = BenchmarkInfo(
-  name: "DictOfArraysToArrayOfDicts",
-  runFunction: run_DictOfArraysToArrayOfDicts,
-  tags: [.algorithm, .Dictionary]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "DictOfArraysToArrayOfDicts",
+    runFunction: run_DictOfArraysToArrayOfDicts,
+    tags: [.algorithm, .Dictionary]
+  ),
+]
 
 @inline(never)
 public func run_DictOfArraysToArrayOfDicts(_ n: Int) {

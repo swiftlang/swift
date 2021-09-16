@@ -15,7 +15,7 @@
 
 import TestsUtils
 
-public let FloatingPointPrinting = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "FloatingPointPrinting_Float_description_small",
     runFunction: run_FloatingPointPrinting_Float_description_small,

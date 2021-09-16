@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,11 +19,13 @@ import MSVCRT
 import Darwin
 #endif
 
-public let StringMatch = BenchmarkInfo(
-  name: "StringMatch",
-  runFunction: run_StringMatch,
-  tags: [.validation, .api, .String],
-  legacyFactor: 100)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "StringMatch",
+    runFunction: run_StringMatch,
+    tags: [.validation, .api, .String],
+    legacyFactor: 100),
+]
 
 /* match: search for regexp anywhere in text */
 func match(regexp: String, text: String) -> Bool {

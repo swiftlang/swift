@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let PointerArithmetics = [
+public let benchmarks = [
   BenchmarkInfo(name: "PointerArithmetics",
   runFunction: run_PointerArithmetics,
   tags: [.validation, .api],

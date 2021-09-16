@@ -14,7 +14,7 @@ import TestsUtils
 
 let tags: [BenchmarkCategory] = [.validation, .api, .String, .cpubench]
 
-public let StringReplaceSubrange = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "String.replaceSubrange.String.Small",
     runFunction: { replaceSubrange($0, smallString, with: "t") },

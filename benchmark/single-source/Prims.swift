@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,11 +22,13 @@
 // update the heap fast when we add a new node to the tree.
 import TestsUtils
 
-public let Prims = BenchmarkInfo(
-  name: "Prims",
-  runFunction: run_Prims,
-  tags: [.validation, .algorithm],
-  legacyFactor: 5)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "Prims",
+    runFunction: run_Prims,
+    tags: [.validation, .algorithm],
+    legacyFactor: 5),
+]
 
 class PriorityQueue {
   final var heap: Array<EdgeCost>

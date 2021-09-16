@@ -15,7 +15,7 @@ import TestsUtils
 // This benchmark mostly measures lookups in dictionaries with complex keys,
 // using the legacy hashValue API.
 
-public let Dictionary4Legacy = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "Dictionary4Legacy",
     runFunction: run_Dictionary4Legacy,

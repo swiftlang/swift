@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let DevirtualizeProtocolComposition = [
+public let benchmarks = [
   BenchmarkInfo(name: "DevirtualizeProtocolComposition", runFunction: run_DevirtualizeProtocolComposition, tags: [.validation, .api]),
 ]
 

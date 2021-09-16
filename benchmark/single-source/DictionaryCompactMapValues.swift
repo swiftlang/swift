@@ -23,7 +23,7 @@ let oddStringMap: [Int: String] = Dictionary(uniqueKeysWithValues:
 
 let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
 
-public let DictionaryCompactMapValues = [
+public let benchmarks = [
   BenchmarkInfo(name: "DictionaryCompactMapValuesOfNilValue",
     runFunction: compactMapValues, tags: t,
     setUpFunction: { blackHole(smallOddNumMap); blackHole(compactOddNums)},

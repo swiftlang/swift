@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,10 +16,12 @@
 
 import TestsUtils
 
-public let ProtocolDispatch2 = BenchmarkInfo(
-  name: "ProtocolDispatch2",
-  runFunction: run_ProtocolDispatch2,
-  tags: [.validation, .abstraction, .cpubench])
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "ProtocolDispatch2",
+    runFunction: run_ProtocolDispatch2,
+    tags: [.validation, .abstraction, .cpubench]),
+]
 
 protocol Pingable { func ping() -> Int;  func pong() -> Int}
 

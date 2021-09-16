@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let StringSplitting = [
+public let benchmarks = [
   BenchmarkInfo(
 	  name: "LineSink.bytes.alpha",
 	  runFunction: run_LinkSink_bytes_alpha,

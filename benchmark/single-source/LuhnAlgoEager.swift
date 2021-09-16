@@ -5,11 +5,13 @@
 
 import TestsUtils
 
-public let LuhnAlgoEager = BenchmarkInfo(
-  name: "LuhnAlgoEager",
-  runFunction: run_LuhnAlgoEager,
-  tags: [.algorithm]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "LuhnAlgoEager",
+    runFunction: run_LuhnAlgoEager,
+    tags: [.algorithm]
+  ),
+]
 
 @inline(never)
 public func run_LuhnAlgoEager(_ n: Int) {

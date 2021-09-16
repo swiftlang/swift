@@ -5,11 +5,13 @@
 
 import TestsUtils
 
-public var Combos = BenchmarkInfo(
-  name: "Combos",
-  runFunction: run_Combos,
-  tags: [.validation, .abstraction]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "Combos",
+    runFunction: run_Combos,
+    tags: [.validation, .abstraction]
+  ),
+]
 
 @inline(never)
 public func run_Combos(_ n: Int) {
