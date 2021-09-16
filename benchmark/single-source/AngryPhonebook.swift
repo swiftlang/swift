@@ -76,9 +76,9 @@ let words = [
   "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank"]
 
 @inline(never)
-public func run_AngryPhonebook(_ N: Int) {
+public func run_AngryPhonebook(_ n: Int) {
   // Permute the names.
-  for _ in 1...N {
+  for _ in 1...n {
     for firstname in words {
       for lastname in words {
         _ = (firstname.uppercased(), lastname.lowercased())
@@ -132,10 +132,10 @@ let longArmenian = phonebook(armenian)
 let longCyrillic = phonebook(cyrillic)
 
 @inline(never)
-public func angryPhonebook(_ N: Int, _ names: [String]) {
+public func angryPhonebook(_ n: Int, _ names: [String]) {
   assert(names.count == 20)
   // Permute the names.
-  for _ in 1...N {
+  for _ in 1...n {
     for firstname in names {
       for lastname in names {
         blackHole((firstname.uppercased(), lastname.lowercased()))
@@ -145,8 +145,8 @@ public func angryPhonebook(_ N: Int, _ names: [String]) {
 }
 
 @inline(never)
-public func angryPhonebook(_ N: Int, precomposed names: String) {
-  for _ in 1...N {
+public func angryPhonebook(_ n: Int, precomposed names: String) {
+  for _ in 1...n {
     blackHole((names.uppercased(), names.lowercased()))
   }
 }

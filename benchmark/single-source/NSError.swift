@@ -39,8 +39,8 @@ func caller(_ x: P) throws {
 }
 
 @inline(never)
-public func run_NSError(_ N: Int) {
-  for _ in 1...N*1000 {
+public func run_NSError(_ n: Int) {
+  for _ in 1...n*1000 {
       let k = K()
       let g = G()
       do {

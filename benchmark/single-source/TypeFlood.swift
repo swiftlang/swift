@@ -101,9 +101,9 @@ func flood2<T>(_ x: T) {
 }
 
 @inline(never)
-public func run_TypeFlood(_ N: Int) {
+public func run_TypeFlood(_ n: Int) {
 
-  for _ in 1...N {
+  for _ in 1...n {
     flood3(Some1<Some1<Some1<Int>>>())
     flood3(Some1<Some1<Some0<Int>>>())
     flood3(Some1<Some0<Some1<Int>>>())

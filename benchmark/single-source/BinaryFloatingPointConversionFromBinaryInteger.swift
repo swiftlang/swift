@@ -196,10 +196,10 @@ extension MockBinaryInteger : BinaryInteger {
 #if swift(>=4.2)
 
 @inline(never)
-public func run_BinaryFloatingPointConversionFromBinaryInteger(_ N: Int) {
+public func run_BinaryFloatingPointConversionFromBinaryInteger(_ n: Int) {
   var xs = [Double]()
-  xs.reserveCapacity(N)
-  for _ in 1...N {
+  xs.reserveCapacity(n)
+  for _ in 1...n {
     var x = 0 as Double
     for i in 0..<2000 {
       x += Double._convert(from: MockBinaryInteger(getInt(i))).value

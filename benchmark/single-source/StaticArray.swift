@@ -90,9 +90,9 @@ public func sink(_ value: Int) { if getFalse() { print(value) }}
 
 
 @inline(never)
-public func run_StaticArray(_ N: Int) {
+public func run_StaticArray(_ n: Int) {
 
-  for _ in 1...N {
+  for _ in 1...n {
     var staticArray = SA128Int(0)
     for i in 0..<staticArray.count() { staticArray[i] = i ^ 123 }
     staticArray.sort()

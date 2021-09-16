@@ -51,7 +51,7 @@ struct LargeKey: Hashable {
 }
 
 @inline(never)
-public func run_Dictionary4(_ N: Int) {
+public func run_Dictionary4(_ n: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 \(reps) \(reps * 99)"
@@ -59,7 +59,7 @@ public func run_Dictionary4(_ N: Int) {
   var hash2 = [LargeKey: Int]()
   var res = ""
 
-  for _ in 1...N {
+  for _ in 1...n {
     // Test insertions
     hash1 = [:]
     for i in 0..<size1 {
@@ -101,7 +101,7 @@ class Box<T : Hashable> : Hashable {
 }
 
 @inline(never)
-public func run_Dictionary4OfObjects(_ N: Int) {
+public func run_Dictionary4OfObjects(_ n: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 \(reps) \(reps * 99)"
@@ -109,7 +109,7 @@ public func run_Dictionary4OfObjects(_ N: Int) {
   var hash2 = [Box<LargeKey>: Int]()
   var res = ""
 
-  for _ in 1...N {
+  for _ in 1...n {
     // Test insertions
     hash1 = [:]
     for i in 0..<size1 {

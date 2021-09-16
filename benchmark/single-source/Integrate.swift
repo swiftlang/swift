@@ -54,14 +54,14 @@ class Integrate {
 }
 
 @inline(never)
-public func run_Integrate(_ N: Int) {
+public func run_Integrate(_ n: Int) {
   let obj = Integrate(f: { x in (x*x + 1.0) * x})
   let left = 0.0
   let right = 10.0
   let ref_result = 2550.0
   let bound = 0.0001
   var result = 0.0
-  for _ in 1...N {
+  for _ in 1...n {
     result = obj.computeArea(left, right:right)
     if abs(result - ref_result) > bound {
       break

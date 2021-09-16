@@ -134,11 +134,11 @@ let half: Dictionary<String, Bool> = {
 }()
 
 @inline(never)
-public func run_Dictionary(N: Int) {
+public func run_Dictionary(n: Int) {
   var dict: Dictionary<String, Bool> = [:]
 
   // Check performance of filling the dictionary:
-  for _ in 1...N {
+  for _ in 1...n {
     dict = [:]
     for word in text {
       dict[word] = true
@@ -150,14 +150,14 @@ public func run_Dictionary(N: Int) {
   dict = half
   // Count number of words from the first half in the entire text
   var count = 0
-  for _ in 1...N {
+  for _ in 1...n {
     for word in text {
       if dict[word] != nil {
         count += 1
       }
     }
   }
-  check(count == N*541)
+  check(count == n*541)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -187,11 +187,11 @@ let halfObjects: Dictionary<Box<String>, Box<Bool>> = {
 }()
 
 @inline(never)
-public func run_DictionaryOfObjects(N: Int) {
+public func run_DictionaryOfObjects(n: Int) {
   var dict: Dictionary<Box<String>, Box<Bool>> = [:]
 
   // Check performance of filling the dictionary:
-  for _ in 1...N {
+  for _ in 1...n {
     dict = [:]
     for word in text {
       dict[Box(word)] = Box(true)
@@ -203,12 +203,12 @@ public func run_DictionaryOfObjects(N: Int) {
   dict = halfObjects
   // Count number of words from the first half in the entire text
   var count = 0
-  for _ in 1...N {
+  for _ in 1...n {
     for word in text {
       if dict[Box(word)] != nil {
         count += 1
       }
     }
   }
-  check(count == N*541)
+  check(count == n*541)
 }

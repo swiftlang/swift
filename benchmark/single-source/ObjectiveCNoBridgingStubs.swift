@@ -60,9 +60,9 @@ func testObjectiveCBridgeStubFromNSStringRef() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubFromNSStringRef(N: Int) {
+public func run_ObjectiveCBridgeStubFromNSStringRef(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubFromNSStringRef()
     }
@@ -82,9 +82,9 @@ func testObjectiveCBridgeStubToNSStringRef() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubToNSStringRef(N: Int) {
+public func run_ObjectiveCBridgeStubToNSStringRef(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubToNSStringRef()
     }
@@ -104,10 +104,10 @@ func testObjectiveCBridgeStubFromNSDateRef() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubFromNSDateRef(N: Int) {
+public func run_ObjectiveCBridgeStubFromNSDateRef(n: Int) {
 #if _runtime(_ObjC)
   autoreleasepool {
-    for _ in 0 ..< N {
+    for _ in 0 ..< n {
       testObjectiveCBridgeStubFromNSDateRef()
     }
   }
@@ -126,9 +126,9 @@ public func testObjectiveCBridgeStubToNSDateRef() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubToNSDateRef(N: Int) {
+public func run_ObjectiveCBridgeStubToNSDateRef(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< 5 * N {
+  for _ in 0 ..< 5 * n {
     autoreleasepool {
       testObjectiveCBridgeStubToNSDateRef()
     }
@@ -149,9 +149,9 @@ func testObjectiveCBridgeStubNSDateRefAccess() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubNSDateRefAccess(N: Int) {
+public func run_ObjectiveCBridgeStubNSDateRefAccess(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubNSDateRefAccess()
     }
@@ -170,9 +170,9 @@ func testObjectiveCBridgeStubNSDateMutationRef() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubNSDateMutationRef(N: Int) {
+public func run_ObjectiveCBridgeStubNSDateMutationRef(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< 100 * N {
+  for _ in 0 ..< 100 * n {
     autoreleasepool {
       testObjectiveCBridgeStubNSDateMutationRef()
     }
@@ -194,9 +194,9 @@ func testObjectiveCBridgeStubURLAppendPathRef() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubURLAppendPathRef(N: Int) {
+public func run_ObjectiveCBridgeStubURLAppendPathRef(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
    autoreleasepool {
      testObjectiveCBridgeStubURLAppendPathRef()
    }
@@ -219,9 +219,9 @@ func testObjectiveCBridgeStubNSDataAppend() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeStubNSDataAppend(N: Int) {
+public func run_ObjectiveCBridgeStubNSDataAppend(n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeStubNSDataAppend()
     }

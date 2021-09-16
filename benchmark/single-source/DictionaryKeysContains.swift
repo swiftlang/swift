@@ -69,11 +69,11 @@ private func teardownDictionary() {
 }
 
 @inline(never)
-public func run_DictionaryKeysContains(_ N: Int) {
+public func run_DictionaryKeysContains(_ n: Int) {
 #if os(Linux)
   fatalError("Unsupported benchmark")
 #else
-  for _ in 0..<(N * 100) {
+  for _ in 0..<(n * 100) {
     check(dictionary.keys.contains("42"))
     check(!dictionary.keys.contains("-1"))
   }

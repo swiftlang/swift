@@ -29,9 +29,9 @@ func check_state(_ state : MyState) -> Int {
 }
 
 @inline(never)
-public func run_OpenClose(_ N: Int) {
+public func run_OpenClose(_ n: Int) {
   var c = 0
-  for _ in 1...N*10000 {
+  for _ in 1...n*10000 {
       c += check_state(identity(MyState.Closed))
   }
   check(c == 0)

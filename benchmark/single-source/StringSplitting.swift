@@ -225,39 +225,39 @@ private let longComplexNewlines: String = {
   return str
 }()
 
-public func run_LinkSink_bytes_alpha(_ N: Int) {
+public func run_LinkSink_bytes_alpha(_ n: Int) {
   let str = alphaInteriorNewlines
-  for _ in 0..<(N*50) {
+  for _ in 0..<(n*50) {
     lineSink(str, view: .utf8, sink: blackHole)
   }
 }
-public func run_LinkSink_bytes_complex(_ N: Int) {
+public func run_LinkSink_bytes_complex(_ n: Int) {
   let str = longComplexNewlines
-  for _ in 0..<N {
+  for _ in 0..<n {
     lineSink(str, view: .utf8, sink: blackHole)
   }
 }
-public func run_LinkSink_scalars_alpha(_ N: Int) {
+public func run_LinkSink_scalars_alpha(_ n: Int) {
   let str = alphaInteriorNewlines
-  for _ in 0..<(N*50) {
+  for _ in 0..<(n*50) {
     lineSink(str, view: .scalar, sink: blackHole)
   }
 }
-public func run_LinkSink_scalars_complex(_ N: Int) {
+public func run_LinkSink_scalars_complex(_ n: Int) {
   let str = longComplexNewlines
-  for _ in 0..<N {
+  for _ in 0..<n {
     lineSink(str, view: .utf8, sink: blackHole)
   }
 }
-public func run_LinkSink_characters_alpha(_ N: Int) {
+public func run_LinkSink_characters_alpha(_ n: Int) {
   let str = alphaInteriorNewlines
-  for _ in 0..<(N*50) {
+  for _ in 0..<(n*50) {
     lineSink(str, view: .character, sink: blackHole)
   }
 }
-public func run_LinkSink_characters_complex(_ N: Int) {
+public func run_LinkSink_characters_complex(_ n: Int) {
   let str = longComplexNewlines
-  for _ in 0..<N {
+  for _ in 0..<n {
     lineSink(str, view: .character, sink: blackHole)
   }
 }

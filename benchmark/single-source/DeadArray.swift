@@ -23,10 +23,10 @@ public let DeadArray = BenchmarkInfo(
 @inline(__always)
 func debug(_ m:String) {}
 
-private var Count = 0
+private var count = 0
 
 @inline(never)
-func bar() { Count += 1 }
+func bar() { count += 1 }
 
 @inline(never)
 func runLoop(_ var1: Int, var2: Int) {
@@ -37,10 +37,10 @@ func runLoop(_ var1: Int, var2: Int) {
 }
 
 @inline(never)
-public func run_DeadArray(_ N: Int) {
-  for _ in 1...N {
-    Count = 0
+public func run_DeadArray(_ n: Int) {
+  for _ in 1...n {
+    count = 0
     runLoop(0, var2: 0)
   }
-  check(Count == 500)
+  check(count == 500)
 }

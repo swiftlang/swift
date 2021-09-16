@@ -54,20 +54,20 @@ class Box<T : Hashable> : Hashable {
   }
 }
 
-func swap(N: Int) {
+func swap(n: Int) {
   var dict = numberMap
   var swapped = false
-  for _ in 1...2500*N {
+  for _ in 1...2500*n {
       (dict[25], dict[75]) = (dict[75]!, dict[25]!)
       swapped = !swapped
       check(swappedCorrectly(swapped, dict[25]!, dict[75]!))
     }
 }
 
-func swapObjects(N: Int) {
+func swapObjects(n: Int) {
   var dict = boxedNumMap
   var swapped = false
-  for _ in 1...250*N {
+  for _ in 1...250*n {
     let b1 = Box(25)
     let b2 = Box(75)
     (dict[b1], dict[b2]) = (dict[b2]!, dict[b1]!)
@@ -77,10 +77,10 @@ func swapObjects(N: Int) {
   }
 }
 
-func swapAt(N: Int) {
+func swapAt(n: Int) {
   var dict = numberMap
   var swapped = false
-  for _ in 1...2500*N {
+  for _ in 1...2500*n {
     let i25 = dict.index(forKey: 25)!
     let i75 = dict.index(forKey: 75)!
     dict.values.swapAt(i25, i75)
@@ -89,10 +89,10 @@ func swapAt(N: Int) {
   }
 }
 
-func swapAtObjects(N: Int) {
+func swapAtObjects(n: Int) {
   var dict = boxedNumMap
   var swapped = false
-  for _ in 1...1000*N {
+  for _ in 1...1000*n {
     let i25 = dict.index(forKey: Box(25))!
     let i75 = dict.index(forKey: Box(75))!
     dict.values.swapAt(i25, i75)

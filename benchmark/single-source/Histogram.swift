@@ -21,10 +21,10 @@ public let Histogram = BenchmarkInfo(
 
 typealias rrggbb_t = UInt32
 
-func output_sorted_sparse_rgb_histogram<S: Sequence>(_ samples: S, _ N: Int)
+func output_sorted_sparse_rgb_histogram<S: Sequence>(_ samples: S, _ n: Int)
   where S.Element == rrggbb_t {
   var histogram = Dictionary<rrggbb_t, Int>()
-  for  _ in 1...50*N {
+  for  _ in 1...50*n {
     for sample in samples {   // This part is really awful, I agree
       let i = histogram.index(forKey: sample)
       histogram[sample] = (i != nil ? histogram[i!].1 : 0) + 1
@@ -115,6 +115,6 @@ let samples: [rrggbb_t] = [
 ]
 
 @inline(never)
-public func run_Histogram(_ N: Int) {
-  output_sorted_sparse_rgb_histogram(samples, N)
+public func run_Histogram(_ n: Int) {
+  output_sorted_sparse_rgb_histogram(samples, n)
 }

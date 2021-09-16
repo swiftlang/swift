@@ -26,8 +26,8 @@ public let DictionaryGroup = [
 ]
 
 @inline(never)
-public func run_DictionaryGroup(_ N: Int) {
-  for _ in 1...N {
+public func run_DictionaryGroup(_ n: Int) {
+  for _ in 1...n {
     let dict = Dictionary(grouping: 0..<10_000, by: { $0 % 10 })
     check(dict.count == 10)
     check(dict[0]!.count == 1_000)
@@ -53,9 +53,9 @@ class Box<T : Hashable> : Hashable {
 var inputObjects: [Box<Int>]! = (0..<1_000).lazy.map { Box($0) }
 
 @inline(never)
-public func run_DictionaryGroupOfObjects(_ N: Int) {
+public func run_DictionaryGroupOfObjects(_ n: Int) {
   let objects: [Box<Int>] = inputObjects
-  for _ in 1...N {
+  for _ in 1...n {
     let dict = Dictionary(grouping: objects, by: { Box($0.value % 10) })
     check(dict.count == 10)
     check(dict[Box(0)]!.count == 100)

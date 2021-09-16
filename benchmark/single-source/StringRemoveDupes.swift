@@ -11,7 +11,7 @@ public var StringRemoveDupes = BenchmarkInfo(
 )
 
 @inline(never)
-public func run_StringRemoveDupes(_ N: Int) {
+public func run_StringRemoveDupes(_ n: Int) {
   let textLengthRef = 25
   let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " +
              "Morbi nisi metus, accumsan eu sagittis et, condimentum ut " +
@@ -21,7 +21,7 @@ public func run_StringRemoveDupes(_ N: Int) {
              "blandit. Morbi leo neque, finibus ut mi in, auctor sagittis."
   var s = ""
 
-  for _ in 1...10*N {
+  for _ in 1...10*n {
     s = text.removeDuplicates()
 
     if s.count != textLengthRef {

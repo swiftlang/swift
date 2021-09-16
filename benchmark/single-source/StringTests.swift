@@ -39,11 +39,11 @@ public let StringTests = [
 ]
 
 // FIXME(string)
-public func run_StringHasPrefixAscii(_ N: Int) {
+public func run_StringHasPrefixAscii(_ n: Int) {
 #if _runtime(_ObjC)
   let prefix = "prefix"
   let testString = "prefixedString"
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     for _ in 0 ..< 10_000 {
       check(testString.hasPrefix(getString(prefix)))
     }
@@ -52,11 +52,11 @@ public func run_StringHasPrefixAscii(_ N: Int) {
 }
 
 // FIXME(string)
-public func run_StringHasSuffixAscii(_ N: Int) {
+public func run_StringHasSuffixAscii(_ n: Int) {
 #if _runtime(_ObjC)
   let suffix = "Suffixed"
   let testString = "StringSuffixed"
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     for _ in 0 ..< 10_000 {
       check(testString.hasSuffix(getString(suffix)))
     }
@@ -65,11 +65,11 @@ public func run_StringHasSuffixAscii(_ N: Int) {
 }
 
 // FIXME(string)
-public func run_StringHasPrefixUnicode(_ N: Int) {
+public func run_StringHasPrefixUnicode(_ n: Int) {
 #if _runtime(_ObjC)
   let prefix = "❄️prefix"
   let testString = "❄️prefixedString"
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     for _ in 0 ..< 100 {
       check(testString.hasPrefix(getString(prefix)))
     }
@@ -78,11 +78,11 @@ public func run_StringHasPrefixUnicode(_ N: Int) {
 }
 
 // FIXME(string)
-public func run_StringHasSuffixUnicode(_ N: Int) {
+public func run_StringHasSuffixUnicode(_ n: Int) {
 #if _runtime(_ObjC)
   let suffix = "❄️Suffixed"
   let testString = "String❄️Suffixed"
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     for _ in 0 ..< 100 {
       check(testString.hasSuffix(getString(suffix)))
     }
@@ -95,10 +95,10 @@ internal func compareEqual(_ str1: String, _ str2: String) -> Bool {
   return str1 == str2
 }
 
-public func run_StringEqualPointerComparison(_ N: Int) {
+public func run_StringEqualPointerComparison(_ n: Int) {
   let str1 = "The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. "
   let str2 = str1
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     for _ in 0 ..< 100_000 {
       check(compareEqual(str1, str2))
     }

@@ -32,9 +32,9 @@ func benchCaptureProp<S : Sequence
   return IteratorSequence(it).reduce(initial, f)
 }
 
-public func run_CaptureProp(_ N: Int) {
+public func run_CaptureProp(_ n: Int) {
   let a = 1...10_000
-  for _ in 1...10*N {
+  for _ in 1...10*n {
     _ = benchCaptureProp(a, sum)
   }
 }

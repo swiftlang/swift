@@ -34,13 +34,13 @@ func countBitSet(_ num: Int) -> Int {
 }
 
 @inline(never)
-public func run_BitCount(_ N: Int) {
+public func run_BitCount(_ n: Int) {
   var sum = 0
-  for _ in 1...1000*N {
+  for _ in 1...1000*n {
     // Check some results.
     sum = sum &+ countBitSet(getInt(1))
               &+ countBitSet(getInt(2))
               &+ countBitSet(getInt(2457))
   }
-  check(sum == 8 * 1000 * N)
+  check(sum == 8 * 1000 * n)
 }

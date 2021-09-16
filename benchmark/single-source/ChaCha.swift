@@ -362,7 +362,7 @@ func checkResult(_ plaintext: [UInt8]) {
 
 @inline(never)
 @_assemblyVision
-public func run_ChaCha(_ N: Int) {
+public func run_ChaCha(_ n: Int) {
   let key = Array(repeating: UInt8(1), count: 32)
   let nonce = Array(repeating: UInt8(2), count: 12)
 
@@ -371,7 +371,7 @@ public func run_ChaCha(_ N: Int) {
   checkResult(checkedtext)
 
   var plaintext = Array(repeating: UInt8(0), count: 30720)  // Chosen for CI runtime
-  for _ in 1...N {
+  for _ in 1...n {
     ChaCha20.encrypt(bytes: &plaintext, key: key, nonce: nonce)
     blackHole(plaintext.first!)
   }

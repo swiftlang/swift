@@ -122,8 +122,8 @@ let buckets: [Bucket<Int>] = {
 }()
 
 @inline(never)
-func run_BucketSort(_ N : Int) {
-  for _ in 0..<N {
+func run_BucketSort(_ n : Int) {
+  for _ in 0..<n {
     let sortedArray = bucketSort(
       items, sortingAlgorithm: InsertionSort(), bucketArray: buckets)
     check(isAscending(sortedArray))

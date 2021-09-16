@@ -52,8 +52,8 @@ let adjacentPyramidsTemplate: [Int] = (1...aPH) + (1...aPH).reversed()
                                     + (1...aPH) + (1...aPH).reversed()
 
 @inline(never)
-public func run_SortIntPyramid(_ N: Int) {
-  for _ in 1...5*N {
+public func run_SortIntPyramid(_ n: Int) {
+  for _ in 1...5*n {
     var pyramid = pyramidTemplate
 
     // sort pyramid in place.
@@ -65,8 +65,8 @@ public func run_SortIntPyramid(_ N: Int) {
 }
 
 @inline(never)
-public func run_SortAdjacentIntPyramids(_ N: Int) {
-  for _ in 1...5*N {
+public func run_SortAdjacentIntPyramids(_ n: Int) {
+  for _ in 1...5*n {
     var adjacentPyramids = adjacentPyramidsTemplate
     adjacentPyramids.sort()
     // Check whether pyramid is sorted.

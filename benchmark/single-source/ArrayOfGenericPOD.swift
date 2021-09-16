@@ -67,8 +67,8 @@ func genStructArray() {
 }
 
 @inline(never)
-public func run_ArrayOfGenericPOD(_ N: Int) {
-  for _ in 0..<N {
+public func run_ArrayOfGenericPOD(_ n: Int) {
+  for _ in 0..<n {
     genEnumArray()
     genStructArray()
   }
@@ -91,8 +91,8 @@ func copyElements<S: Sequence>(_ contents: S) -> [UInt8]
 }
 
 @inline(never)
-public func run_initFromSlice(_ N: Int) {
-  for _ in 0..<N {
+public func run_initFromSlice(_ n: Int) {
+  for _ in 0..<n {
     for _ in 0..<1000 {
       // Slice off at least one element so the array buffer can't be reused.
       blackHole(copyElements(globalArray[0..<4095]))

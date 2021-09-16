@@ -76,7 +76,7 @@ class PriorityQueue {
     while (ind != 0) {
       let p = getParentIndex(ind)
       if heap[p].cost > c {
-        Swap(p, with: ind)
+        swap(p, with: ind)
         ind = p
       } else {
         break
@@ -89,7 +89,7 @@ class PriorityQueue {
     if (heap.isEmpty) {
       return nil
     }
-    Swap(0, with:heap.count-1)
+    swap(0, with:heap.count-1)
     let r = heap.removeLast()
     graphIndexToHeapIndexMap[r.to] = nil
     bubbleDown(0)
@@ -117,21 +117,21 @@ class PriorityQueue {
       if (heap[ind].cost <= heap[min].cost) {
         break
       }
-      Swap(ind, with: min)
+      swap(ind, with: min)
       ind = min
     }
   }
 
   // Swaps elements I and J in the heap and correspondingly updates
   // graphIndexToHeapIndexMap.
-  func Swap(_ i: Int, with j : Int) {
+  func swap(_ i: Int, with j : Int) {
     if (i == j) {
       return
     }
     (heap[i], heap[j]) = (heap[j], heap[i])
-    let (I, J) = (heap[i].to, heap[j].to)
-    (graphIndexToHeapIndexMap[I], graphIndexToHeapIndexMap[J]) =
-    (graphIndexToHeapIndexMap[J], graphIndexToHeapIndexMap[I])
+    let (i2, j2) = (heap[i].to, heap[j].to)
+    (graphIndexToHeapIndexMap[i2], graphIndexToHeapIndexMap[j2]) =
+    (graphIndexToHeapIndexMap[j2], graphIndexToHeapIndexMap[i2])
   }
 
   // Dumps the heap.
@@ -188,7 +188,7 @@ extension Edge : Hashable {
   }
 }
 
-func Prims(_ graph : Array<GraphNode>, _ fun : (Int, Int) -> Double) -> Array<Int?> {
+func prims(_ graph : Array<GraphNode>, _ fun : (Int, Int) -> Double) -> Array<Int?> {
   var treeEdges = Array<Int?>(repeating:nil, count:graph.count)
 
   let queue = PriorityQueue(Num:graph.count)
@@ -219,8 +219,8 @@ func Prims(_ graph : Array<GraphNode>, _ fun : (Int, Int) -> Double) -> Array<In
 }
 
 @inline(never)
-public func run_Prims(_ N: Int) {
-  for _ in 1...N {
+public func run_Prims(_ n: Int) {
+  for _ in 1...n {
     let nodes : [Int] = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
       13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
       29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44,
@@ -747,7 +747,7 @@ public func run_Prims(_ N: Int) {
     }
 
     // Find spanning tree
-    let treeEdges = Prims(graph, { (start: Int, end: Int) in
+    let treeEdges = prims(graph, { (start: Int, end: Int) in
         return map[Edge(start: start, end: end)]!
     })
 

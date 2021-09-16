@@ -18,7 +18,7 @@ public let Dictionary3 = [
 ]
 
 @inline(never)
-public func run_Dictionary3(_ N: Int) {
+public func run_Dictionary3(_ n: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 20 1980"
@@ -26,7 +26,7 @@ public func run_Dictionary3(_ N: Int) {
   var hash2 = [String: Int]()
   var res = ""
 
-  for _ in 1...N {
+  for _ in 1...n {
     hash1 = [:]
     for i in 0..<size1 {
       hash1["foo_" + String(i)] = i
@@ -66,7 +66,7 @@ class Box<T : Hashable> : Hashable {
 }
 
 @inline(never)
-public func run_Dictionary3OfObjects(_ N: Int) {
+public func run_Dictionary3OfObjects(_ n: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 20 1980"
@@ -74,7 +74,7 @@ public func run_Dictionary3OfObjects(_ N: Int) {
   var hash2 : [ Box<String> : Box<Int> ] = [:]
   var res = ""
 
-  for _ in 1...N {
+  for _ in 1...n {
     hash1 = [:]
     for i in 0..<size1 {
       hash1[Box("foo_" + String(i))] = Box(i)

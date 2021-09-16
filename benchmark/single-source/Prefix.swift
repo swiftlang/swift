@@ -85,157 +85,157 @@ public let Prefix = [
 ]
 
 @inline(never)
-public func run_PrefixCountableRange(_ N: Int) {
+public func run_PrefixCountableRange(_ n: Int) {
   let s = 0..<sequenceCount
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixSequence(_ N: Int) {
+public func run_PrefixSequence(_ n: Int) {
   let s = sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySequence(_ N: Int) {
+public func run_PrefixAnySequence(_ n: Int) {
   let s = AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySeqCntRange(_ N: Int) {
+public func run_PrefixAnySeqCntRange(_ n: Int) {
   let s = AnySequence(0..<sequenceCount)
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySeqCRangeIter(_ N: Int) {
+public func run_PrefixAnySeqCRangeIter(_ n: Int) {
   let s = AnySequence((0..<sequenceCount).makeIterator())
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnyCollection(_ N: Int) {
+public func run_PrefixAnyCollection(_ n: Int) {
   let s = AnyCollection(0..<sequenceCount)
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixArray(_ N: Int) {
+public func run_PrefixArray(_ n: Int) {
   let s = array
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixCountableRangeLazy(_ N: Int) {
+public func run_PrefixCountableRangeLazy(_ n: Int) {
   let s = (0..<sequenceCount).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixSequenceLazy(_ N: Int) {
+public func run_PrefixSequenceLazy(_ n: Int) {
   let s = (sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySequenceLazy(_ N: Int) {
+public func run_PrefixAnySequenceLazy(_ n: Int) {
   let s = (AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySeqCntRangeLazy(_ N: Int) {
+public func run_PrefixAnySeqCntRangeLazy(_ n: Int) {
   let s = (AnySequence(0..<sequenceCount)).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySeqCRangeIterLazy(_ N: Int) {
+public func run_PrefixAnySeqCRangeIterLazy(_ n: Int) {
   let s = (AnySequence((0..<sequenceCount).makeIterator())).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnyCollectionLazy(_ N: Int) {
+public func run_PrefixAnyCollectionLazy(_ n: Int) {
   let s = (AnyCollection(0..<sequenceCount)).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixArrayLazy(_ N: Int) {
+public func run_PrefixArrayLazy(_ n: Int) {
   let s = (array).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 

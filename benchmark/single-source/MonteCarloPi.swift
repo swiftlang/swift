@@ -23,15 +23,15 @@ public func run_MonteCarloPi(scale: Int) {
 
   var pointsInside = 0
   let r = 10000
-  let N = 4_000*scale
-  for _ in 1...N {
+  let n = 4_000*scale
+  for _ in 1...n {
     let x = Int(truncatingIfNeeded: rng.next()) % r
     let y = Int(truncatingIfNeeded: rng.next()) % r
     if x*x + y*y < r*r {
       pointsInside += 1
     }
   }
-  let pi_estimate: Double = Double(pointsInside)*4.0/Double(N)
+  let pi_estimate: Double = Double(pointsInside)*4.0/Double(n)
   let pi = 3.1415
   check(abs(pi_estimate - pi) < 0.2)
 }

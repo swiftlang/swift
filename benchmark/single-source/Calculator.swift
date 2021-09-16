@@ -35,9 +35,9 @@ func my_atoi_impl(_ input : String) -> Int {
 }
 
 @inline(never)
-public func run_Calculator(_ N: Int) {
+public func run_Calculator(_ n: Int) {
   var c = 0
-  for _ in 1...N*800 {
+  for _ in 1...n*800 {
       c += my_atoi_impl(identity("1"))
       c += my_atoi_impl(identity("2"))
       c += my_atoi_impl(identity("3"))

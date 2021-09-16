@@ -38,11 +38,11 @@ final class Node {
 }
 
 @inline(never)
-public func run_LinkedList(_ N: Int) {
+public func run_LinkedList(_ n: Int) {
   var sum = 0
   let ref_result = size*(size-1)/2
   var ptr = head
-  for _ in 1...125*N {
+  for _ in 1...125*n {
     ptr = head
     sum = 0
     while let nxt = ptr.next {

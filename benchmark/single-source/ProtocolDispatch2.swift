@@ -53,11 +53,11 @@ func wrapper(_ val : Int,_ game1 : Pingable, _ game2 : Pingable) -> Int {
 }
 
 @inline(never)
-public func run_ProtocolDispatch2(_ N: Int) {
+public func run_ProtocolDispatch2(_ n: Int) {
   var c = 0
   let g1 = Game()
   let g2 = Game()
-  for _ in 1...10*N {
+  for _ in 1...10*n {
     c = 0
     for i in 1...5000 {
       c += wrapper(i, g1, g2)

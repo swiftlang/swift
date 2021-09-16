@@ -54,9 +54,9 @@ class TestHashableDerived4 : TestHashableDerived3 {}
 class TestHashableDerived5 : TestHashableDerived4 {}
 
 @inline(never)
-public func run_AnyHashableWithAClass(_ N: Int) {
+public func run_AnyHashableWithAClass(_ n: Int) {
   let c = TestHashableDerived5(10)
-  for _ in 0...(N*1000) {
+  for _ in 0...(n*1000) {
     _ = AnyHashable(c)
   }
 }

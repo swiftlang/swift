@@ -40,8 +40,8 @@ func makeCharacter_UTF8Length12() -> Character {
   return "\u{00a9}\u{0300}\u{0301}\u{0302}\u{0303}\u{0304}"
 }
 
-public func run_CharacterLiteralsLarge(_ N: Int) {
-  for _ in 0...10000 * N {
+public func run_CharacterLiteralsLarge(_ n: Int) {
+  for _ in 0...10000 * n {
     _ = makeCharacter_UTF8Length9()
     _ = makeCharacter_UTF8Length10()
     _ = makeCharacter_UTF8Length11()

@@ -44,18 +44,18 @@ class ArrayWrapper {
 }
 
 @inline(never)
-public func run_RecursiveOwnedParameter(_ N: Int) {
+public func run_RecursiveOwnedParameter(_ n: Int) {
   let numElts = 1_000
 
   let a = ArrayWrapper(numElts, 0)
   let b = ArrayWrapper(numElts, 1)
 
   var result = 0
-  for _ in 0..<100*N {
+  for _ in 0..<100*n {
     if a.compare(b, 0, numElts) {
       result += 1
     }
   }
-  let refResult = 100*N
+  let refResult = 100*n
   check(result == refResult)
 }

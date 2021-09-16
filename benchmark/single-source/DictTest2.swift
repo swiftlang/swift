@@ -24,11 +24,11 @@ public let Dictionary2 = [
 ]
 
 @inline(never)
-public func run_Dictionary2(_ N: Int) {
+public func run_Dictionary2(_ n: Int) {
   let size = 500
   let ref_result = 199
   var res = 0
-  for _ in 1...N {
+  for _ in 1...n {
     var x: [String: Int] = [:]
     for i in 1...size {
       x[String(i, radix:16)] = i
@@ -65,12 +65,12 @@ class Box<T : Hashable> : Hashable {
 }
 
 @inline(never)
-public func run_Dictionary2OfObjects(_ N: Int) {
+public func run_Dictionary2OfObjects(_ n: Int) {
 
   let size = 500
   let ref_result = 199
   var res = 0
-  for _ in 1...N {
+  for _ in 1...n {
     var x: [Box<String>:Box<Int>] = [:]
     for i in 1...size {
       x[Box(String(i, radix:16))] = Box(i)

@@ -304,9 +304,9 @@ extension String {
 
 struct Stats {
     var n: Int = 0
-    var S: Double = 0.0
+    var s: Double = 0.0
     var mean: Double = 0.0
-    var variance: Double { return n < 2 ? 0.0 : S / Double(n - 1) }
+    var variance: Double { return n < 2 ? 0.0 : s / Double(n - 1) }
     var standardDeviation: Double { return variance.squareRoot() }
 
     static func collect(_ s: inout Stats, _ x: Int){
@@ -317,12 +317,12 @@ struct Stats {
     ///
     /// See Knuth TAOCP vol 2, 3rd edition, page 232, or
     /// https://www.johndcook.com/blog/standard_deviation/
-    static func runningMeanVariance(_ s: inout Stats, _ x: Double){
-        let n = s.n + 1
-        let (k, M_, S_) = (Double(n), s.mean, s.S)
-        let M = M_ + (x - M_) / k
-        let S = S_ + (x - M_) * (x - M)
-        (s.n, s.mean, s.S) = (n, M, S)
+    static func runningMeanVariance(_ stats: inout Stats, _ x: Double){
+        let n = stats.n + 1
+        let (k, m_, s_) = (Double(n), stats.mean, stats.s)
+        let m = m_ + (x - m_) / k
+        let s = s_ + (x - m_) * (x - m)
+        (stats.n, stats.mean, stats.s) = (n, m, s)
     }
 }
 

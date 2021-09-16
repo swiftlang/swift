@@ -27,9 +27,9 @@ let loremIpsum = Array("Lorem ipsum dolor sit amet, consectetur adipiscing elit,
 let unabridgedLorem = Array("Lorem ipsum, quia dolor sit amet consectetur adipisci[ng] velit, sed quia non-numquam [do] eius modi tempora inci[di]dunt, ut labore et dolore magnam aliqua.")
 
 @inline(never)
-public func run_Myers(N: Int) {
+public func run_Myers(n: Int) {
   if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
-    for _ in 1...N {
+    for _ in 1...n {
       blackHole(myers(from: unabridgedLorem, to: loremIpsum, using: ==))
     }
   }

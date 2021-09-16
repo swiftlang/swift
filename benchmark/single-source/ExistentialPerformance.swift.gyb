@@ -239,9 +239,9 @@ func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential)
 }
 % for (group, setup, multiple, workload) in Workloads:
 ${"""
-func {0}(_ N: Int) {{
+func {0}(_ n: Int) {{
 {1}
-  for _ in 0 ..< N * {2} {{{3}  }}
+  for _ in 0 ..< n * {2} {{{3}  }}
 }}""".format(run_function_name(group), setup, multiple, workload)}
 % end
 

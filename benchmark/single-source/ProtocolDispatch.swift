@@ -18,11 +18,11 @@ public let ProtocolDispatch = BenchmarkInfo(
   tags: [.validation, .abstraction])
 
 @inline(never)
-public func run_ProtocolDispatch(_ N: Int) {
+public func run_ProtocolDispatch(_ n: Int) {
 
   let x = someProtocolFactory()
 
-  for _ in 0...100_000 * N {
+  for _ in 0...100_000 * n {
     _ = x.getValue()
   }
 }

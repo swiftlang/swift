@@ -89,8 +89,8 @@ let tests: KeyValuePairs = [
 ]
 
 @inline(never)
-public func run_StringMatch(_ N: Int) {
-  for _ in 1...N {
+public func run_StringMatch(_ n: Int) {
+  for _ in 1...n {
     for (regex, text) in tests {
       _ = match(regexp: regex,text: text)
     }

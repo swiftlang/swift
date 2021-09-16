@@ -40,9 +40,9 @@ func workload_2DArrayTest(_ A: inout Array2D) {
 }
 
 @inline(never)
-public func run_Sim2DArray(_ N: Int) {
-  for _ in 0 ..< N {
-    var A = Array2D(numRows:2048, numCols:32)
-    workload_2DArrayTest(&A)
+public func run_Sim2DArray(_ n: Int) {
+  for _ in 0 ..< n {
+    var a = Array2D(numRows:2048, numCols:32)
+    workload_2DArrayTest(&a)
   }
 }

@@ -12,11 +12,11 @@ public let LuhnAlgoLazy = BenchmarkInfo(
 )
 
 @inline(never)
-public func run_LuhnAlgoLazy(_ N: Int) {
+public func run_LuhnAlgoLazy(_ n: Int) {
     let resultRef = true
     var result = false
 
-    for _ in 1...100*N {
+    for _ in 1...100*n {
         result = lazychecksum(ccnum)
 
         if result != resultRef {

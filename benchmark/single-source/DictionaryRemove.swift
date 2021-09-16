@@ -44,16 +44,16 @@ class Box<T : Hashable> : Hashable {
   }
 }
 
-func remove(N: Int) {
-  for _ in 1...100*N {
+func remove(n: Int) {
+  for _ in 1...100*n {
     var dict = numberMap
     for i in 1...size { dict.removeValue(forKey: i) }
     check(dict.isEmpty)
   }
 }
 
-func removeObjects(N: Int) {
-  for _ in 1...10*N {
+func removeObjects(n: Int) {
+  for _ in 1...10*n {
     var dict = boxedNumMap
     for i in 1...size { dict.removeValue(forKey: Box(i)) }
     check(dict.isEmpty)

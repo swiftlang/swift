@@ -30,8 +30,8 @@ class X<T : Comparable> {
   }
 }
 
-public func run_NopDeinit(_ N: Int) {
-  for _ in 1...N {
+public func run_NopDeinit(_ n: Int) {
+  for _ in 1...n {
     var arr :[X<Int>] = []
     let size = 5
     for i in 1...size { arr.append(X(i)) }

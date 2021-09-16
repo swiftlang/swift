@@ -29,9 +29,9 @@ public let RGBHistogram = [
 ]
 
 @inline(never)
-public func run_RGBHistogram(_ N: Int) {
+public func run_RGBHistogram(_ n: Int) {
     var histogram = [(key: rrggbb_t, value: Int)]()
-    for _ in 1...10*N {
+    for _ in 1...10*n {
         histogram = createSortedSparseRGBHistogram(samples)
         if !isCorrectHistogram(histogram) {
             break
@@ -167,9 +167,9 @@ func createSortedSparseRGBHistogramOfObjects<S : Sequence>(
 }
 
 @inline(never)
-public func run_RGBHistogramOfObjects(_ N: Int) {
+public func run_RGBHistogramOfObjects(_ n: Int) {
     var histogram = [(key: Box<rrggbb_t>, value: Box<Int>)]()
-    for _ in 1...N {
+    for _ in 1...n {
         histogram = createSortedSparseRGBHistogramOfObjects(samples)
         if !isCorrectHistogramOfObjects(histogram) {
             break

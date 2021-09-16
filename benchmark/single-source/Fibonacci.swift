@@ -17,28 +17,28 @@ public let Fibonacci = BenchmarkInfo(
   runFunction: run_Fibonacci,
   tags: [.algorithm])
 
-func fibonacci(_ n: Int) -> Int {
+func _fibonacci(_ n: Int) -> Int {
   if (n <= 2) { return 1 }
   return fibonacci(n - 2) + fibonacci(n - 1)
 }
 
 @inline(never)
-func Fibonacci(_ n: Int) -> Int {
-  // This if prevents optimizer from computing return value of Fibonacci(32)
+func fibonacci(_ n: Int) -> Int {
+  // This if prevents optimizer from computing return value of fibonacci(32)
   // at compile time.
   if getFalse() { return 0 }
 
   if (n <= 2) { return 1 }
-  return fibonacci(n - 2) + fibonacci(n - 1)
+  return _fibonacci(n - 2) + _fibonacci(n - 1)
 }
 
 @inline(never)
-public func run_Fibonacci(_ N: Int) {
+public func run_Fibonacci(_ n: Int) {
   let n = 24
   let ref_result = 46368
   var result = 0
-  for _ in 1...N {
-    result = Fibonacci(n)
+  for _ in 1...n {
+    result = fibonacci(n)
     if result != ref_result {
       break
     }

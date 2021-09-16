@@ -65,11 +65,11 @@ let repeatedCharacter = repeatElement(Character("t"), count: 1)
 
 @inline(never)
 private func replaceSubrange<C: Collection>(
-  _ N: Int, _ string: String, with newElements: C
+  _ n: Int, _ string: String, with newElements: C
 ) where C.Element == Character {
     var copy = getString(string)
     let range = string.startIndex..<string.index(after: string.startIndex)
-    for _ in 0 ..< 500 * N {
+    for _ in 0 ..< 500 * n {
       copy.replaceSubrange(range, with: newElements)
     }
 }

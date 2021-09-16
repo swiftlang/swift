@@ -49,8 +49,8 @@ func dict(_ size: Int) {
 }
 
 @inline(never)
-func copyKeyValue(N: Int) {
-  for _ in 1...N {
+func copyKeyValue(n: Int) {
+  for _ in 1...n {
     var copy = [Int: Int]()
     for (key, value) in dict! {
       copy[key] = value
@@ -62,8 +62,8 @@ func copyKeyValue(N: Int) {
 // Filter with a predicate returning true is essentially the same loop as the
 // one in copyKeyValue above.
 @inline(never)
-func filterAllMatch(N: Int) {
-  for _ in 1...N {
+func filterAllMatch(n: Int) {
+  for _ in 1...n {
     let copy = dict!.filter { _ in true }
     check(copy.count == dict!.count)
   }

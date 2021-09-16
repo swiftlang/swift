@@ -74,8 +74,8 @@ let lettersTemplate : [LetterKind] = [
 ]
 
 @inline(never)
-public func run_SortLargeExistentials(_ N: Int) {
-  for _ in 1...N {
+public func run_SortLargeExistentials(_ n: Int) {
+  for _ in 1...n {
     var letters = lettersTemplate
 
     letters.sort {

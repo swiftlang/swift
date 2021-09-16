@@ -38,7 +38,7 @@ extension Two: Growable {}
 extension Cat: Growable {}
 
 @inline(never)
-public func run_ProtocolConformance(_ N: Int) {
+public func run_ProtocolConformance(_ n: Int) {
   var array: [Growable] = [One(), Two()]
   var i = 0
   var checks = 0
@@ -52,7 +52,7 @@ public func run_ProtocolConformance(_ N: Int) {
 
   // The number of times we've actually seen `elt is P` be true.
   var conforms = 0
-  while checks < N * 500 {
+  while checks < n * 500 {
     let (a, b) = array[i].grow()
     array.append(a)
     array.append(b)

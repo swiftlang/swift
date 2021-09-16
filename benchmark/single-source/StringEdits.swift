@@ -68,8 +68,8 @@ func edits(_ word: String) -> Set<String> {
 }
 
 @inline(never)
-public func run_StringEdits(_ N: Int) {
-  for _ in 1...N {
+public func run_StringEdits(_ n: Int) {
+  for _ in 1...n {
     for word in editWords {
       _ = edits(word)
     }

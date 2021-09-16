@@ -31,8 +31,8 @@ let data: Data = {
 }()
 
 @inline(never)
-public func run_IterateData(_ N: Int) {
-  for _ in 1...10*N {
+public func run_IterateData(_ n: Int) {
+  for _ in 1...10*n {
     _ = data.reduce(0, &+)
   }
 }

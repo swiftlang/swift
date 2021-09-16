@@ -55,9 +55,9 @@ public let Suffix = [
 
 % for (Name, Expr) in Sequences:
 @inline(never)
-public func run_Suffix${Name}(_ N: Int) {
+public func run_Suffix${Name}(_ n: Int) {
   let s = ${Expr}
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.suffix(suffixCount) {
       result += element

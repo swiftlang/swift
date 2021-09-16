@@ -26,10 +26,10 @@ public let PopFront = [
 let arrayCount = 1024
 
 @inline(never)
-public func run_PopFrontArray(_ N: Int) {
+public func run_PopFrontArray(_ n: Int) {
   let orig = Array(repeating: 1, count: arrayCount)
   var a = [Int]()
-  for _ in 1...N {
+  for _ in 1...n {
       var result = 0
       a.append(contentsOf: orig)
       while a.count != 0 {
@@ -41,10 +41,10 @@ public func run_PopFrontArray(_ N: Int) {
 }
 
 @inline(never)
-public func run_PopFrontUnsafePointer(_ N: Int) {
+public func run_PopFrontUnsafePointer(_ n: Int) {
   let orig = Array(repeating: 1, count: arrayCount)
   let a = UnsafeMutablePointer<Int>.allocate(capacity: arrayCount)
-  for _ in 1...N {
+  for _ in 1...n {
       for i in 0..<arrayCount {
         a[i] = orig[i]
       }

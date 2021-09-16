@@ -37,8 +37,8 @@ public func run_MonteCarloE(scale: Int) {
   let numEmptyIntervals = intervals.filter{!$0}.count
   // If there are no empty intervals, then obviously the random generator is
   // not 'random' enough.
-  check(numEmptyIntervals != N)
-  let e_estimate = Double(N)/Double(numEmptyIntervals)
+  check(numEmptyIntervals != n)
+  let e_estimate = Double(n)/Double(numEmptyIntervals)
   let e = 2.71828
   check(abs(e_estimate - e) < 0.2)
 }

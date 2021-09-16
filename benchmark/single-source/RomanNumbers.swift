@@ -17,13 +17,13 @@ import TestsUtils
 // with very short string arguments.
 
 let t: [BenchmarkCategory] = [.api, .String, .algorithm]
-let N = 270
+let n = 270
 
-public let RomanNumbers = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "RomanNumbers2",
     runFunction: {
-      checkId($0, upTo: N, { $0.romanNumeral }, Int.init(romanSSsWdF:)) },
+      checkId($0, upTo: n, { $0.romanNumeral }, Int.init(romanSSsWdF:)) },
     tags: t),
 ]
 

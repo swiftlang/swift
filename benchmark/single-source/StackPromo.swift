@@ -50,10 +50,10 @@ func work(_ f: Foo) -> Int {
   return r
 }
 
-public func run_StackPromo(_ N: Int) {
+public func run_StackPromo(_ n: Int) {
   let foo = Foo()
   var r = 0
-  for i in 0..<N {
+  for i in 0..<n {
     if i % 2 == 0 {
       r += work(foo)
     } else {

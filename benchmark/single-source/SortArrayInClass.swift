@@ -27,7 +27,7 @@ public let SortArrayInClass = [
     tags: [.abstraction, .safetychecks, .exclusivity, .algorithm, .api, .Array])
 ]
 
-let LARGE_ARRAY_SIZE = 10000
+let largeArraySize = 10000
 
 class Sorter {
   var array: [Int]
@@ -75,11 +75,11 @@ class Sorter {
   }
 }
 
-public func run_SortArrayInClass(_ N: Int) {
-  for _ in 1...N {
+public func run_SortArrayInClass(_ n: Int) {
+  for _ in 1...n {
     // The array needs to be reinitialized before each sort, so it
     // can't be a setup/tearDown function.
-    let sorter = Sorter(size:LARGE_ARRAY_SIZE)
+    let sorter = Sorter(size: largeArraySize)
     sorter.quicksort()
   }
 }

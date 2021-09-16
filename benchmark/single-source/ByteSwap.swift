@@ -44,14 +44,14 @@ func byteswap_logn(_ a: UInt64) -> UInt64 {
 }
 
 @inline(never)
-public func run_ByteSwap(_ N: Int) {
+public func run_ByteSwap(_ n: Int) {
   var s: UInt64 = 0
-  for _ in 1...10000*N {
+  for _ in 1...10000*n {
     // Check some results.
     let x : UInt64 = UInt64(getInt(0))
     s = s &+ byteswap_logn(byteswap_n(x &+ 2457))
           &+ byteswap_logn(byteswap_n(x &+ 9129))
           &+ byteswap_logn(byteswap_n(x &+ 3333))
   }
-  check(s == (2457 &+ 9129 &+ 3333) &* 10000 &* N)
+  check(s == (2457 &+ 9129 &+ 3333) &* 10000 &* n)
 }

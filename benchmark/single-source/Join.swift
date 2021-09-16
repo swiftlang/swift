@@ -19,9 +19,9 @@ public let Join = BenchmarkInfo(
   tags: [.validation, .api, .String, .Array])
 
 @inline(never)
-public func run_Join(_ N: Int) {
+public func run_Join(_ n: Int) {
   var array: [String] = []
-  for x in 0..<1000 * N {
+  for x in 0..<1000 * n {
     array.append(String(x))
   }
   _ = array.joined(separator: "")

@@ -45,8 +45,8 @@ class TowersOfHanoi {
 }
 
 @inline(never)
-public func run_Hanoi(_ N: Int) {
-  for _ in 1...10*N {
+public func run_Hanoi(_ n: Int) {
+  for _ in 1...10*n {
     let hanoi: TowersOfHanoi = TowersOfHanoi()
     hanoi.solve(10, start: "A", auxiliary: "B", end: "C")
   }

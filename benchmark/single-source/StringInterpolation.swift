@@ -35,13 +35,13 @@ class RefTypePrintable : CustomStringConvertible {
 }
 
 @inline(never)
-public func run_StringInterpolation(_ N: Int) {
+public func run_StringInterpolation(_ n: Int) {
   let reps = 100
   let refResult = reps
   let anInt: Int64 = 0x1234567812345678
   let aRefCountedObject = RefTypePrintable()
 
-  for _ in 1...N {
+  for _ in 1...n {
     var result = 0
     for _ in 1...reps {
       let s: String = getString(
@@ -59,12 +59,12 @@ public func run_StringInterpolation(_ N: Int) {
 }
 
 @inline(never)
-public func run_StringInterpolationSmall(_ N: Int) {
+public func run_StringInterpolationSmall(_ n: Int) {
   let reps = 100
   let refResult = reps
   let anInt: Int64 = 0x42
 
-  for _ in 1...10*N {
+  for _ in 1...10*n {
     var result = 0
     for _ in 1...reps {
       let s: String = getString(
@@ -77,10 +77,10 @@ public func run_StringInterpolationSmall(_ N: Int) {
 }
 
 @inline(never)
-public func run_StringInterpolationManySmallSegments(_ N: Int) {
-  let numHex = min(UInt64(N), 0x0FFF_FFFF_FFFF_FFFF)
-  let numOct = min(UInt64(N), 0x0000_03FF_FFFF_FFFF)
-  let numBin = min(UInt64(N), 0x7FFF)
+public func run_StringInterpolationManySmallSegments(_ n: Int) {
+  let numHex = min(UInt64(n), 0x0FFF_FFFF_FFFF_FFFF)
+  let numOct = min(UInt64(n), 0x0000_03FF_FFFF_FFFF)
+  let numBin = min(UInt64(n), 0x7FFF)
   let segments = [
     "abc",
     String(numHex, radix: 16),
@@ -98,7 +98,7 @@ public func run_StringInterpolationManySmallSegments(_ N: Int) {
   }
 
   let reps = 100
-  for _ in 1...N {
+  for _ in 1...n {
     for _ in 1...reps {
       blackHole("""
         \(getSegment(0)) \(getSegment(1))/\(getSegment(2))_\(getSegment(3))

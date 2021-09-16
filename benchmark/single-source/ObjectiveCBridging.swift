@@ -130,9 +130,9 @@ func testObjectiveCBridgeFromNSString() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSString(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSString(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSString()
     }
@@ -155,9 +155,9 @@ func testObjectiveCBridgeFromNSStringForced() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSStringForced(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSStringForced(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSStringForced()
     }
@@ -180,9 +180,9 @@ func testObjectiveCBridgeToNSString() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeToNSString(_ N: Int) {
+public func run_ObjectiveCBridgeToNSString(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeToNSString()
     }
@@ -225,9 +225,9 @@ func testObjectiveCBridgeFromNSArrayAnyObject() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSArrayAnyObject(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSArrayAnyObject(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSArrayAnyObject()
     }
@@ -250,9 +250,9 @@ func testObjectiveCBridgeFromNSArrayAnyObjectForced() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSArrayAnyObjectForced(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSArrayAnyObjectForced(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSArrayAnyObjectForced()
     }
@@ -276,9 +276,9 @@ func testObjectiveCBridgeToNSArray() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeToNSArray(_ N: Int) {
+public func run_ObjectiveCBridgeToNSArray(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeToNSArray()
     }
@@ -302,9 +302,9 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToString() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSArrayAnyObjectToString(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSArrayAnyObjectToString(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSArrayAnyObjectToString()
     }
@@ -327,9 +327,9 @@ func testObjectiveCBridgeFromNSArrayAnyObjectToStringForced() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSArrayAnyObjectToStringForced()
     }
@@ -382,9 +382,9 @@ func testObjectiveCBridgeFromNSDictionaryAnyObject() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSDictionaryAnyObject(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSDictionaryAnyObject(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSDictionaryAnyObject()
     }
@@ -409,9 +409,9 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectForced() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSDictionaryAnyObjectForced()
     }
@@ -437,9 +437,9 @@ func testObjectiveCBridgeToNSDictionary() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeToNSDictionary(_ N: Int) {
+public func run_ObjectiveCBridgeToNSDictionary(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeToNSDictionary()
     }
@@ -465,9 +465,9 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToString() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSDictionaryAnyObjectToString()
     }
@@ -493,9 +493,9 @@ func testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced()
     }
@@ -549,9 +549,9 @@ func testObjectiveCBridgeFromNSSetAnyObject() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSSetAnyObject(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSSetAnyObject(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSSetAnyObject()
     }
@@ -576,9 +576,9 @@ func testObjectiveCBridgeFromNSSetAnyObjectForced() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSSetAnyObjectForced(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSSetAnyObjectForced(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSSetAnyObjectForced()
     }
@@ -603,9 +603,9 @@ func testObjectiveCBridgeToNSSet() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeToNSSet(_ N: Int) {
+public func run_ObjectiveCBridgeToNSSet(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
       testObjectiveCBridgeToNSSet()
     }
@@ -631,9 +631,9 @@ func testObjectiveCBridgeFromNSSetAnyObjectToString() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSSetAnyObjectToString(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSSetAnyObjectToString(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSSetAnyObjectToString()
     }
@@ -659,9 +659,9 @@ func testObjectiveCBridgeFromNSSetAnyObjectToStringForced() {
 #endif
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced(_ n: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     autoreleasepool {
     testObjectiveCBridgeFromNSSetAnyObjectToStringForced()
     }
@@ -718,9 +718,9 @@ public func setup_dateComponents() {
 }
 
 @inline(never)
-public func run_ObjectiveCBridgeFromNSDateComponents(_ N: Int) {
+public func run_ObjectiveCBridgeFromNSDateComponents(_ n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     for components in componentsArray! {
       let _ = componentsContainer!.dictionary[components]
     }
@@ -728,7 +728,7 @@ public func run_ObjectiveCBridgeFromNSDateComponents(_ N: Int) {
   #endif
 }
 
-var ASCIIStringFromFile:String? = nil
+var asciiStringFromFile: String? = nil
 public func setup_ASCIIStringFromFile() {
   #if _runtime(_ObjC)
   let url:URL
@@ -746,15 +746,15 @@ public func setup_ASCIIStringFromFile() {
     atomically: true,
     encoding: .ascii
   )
-  ASCIIStringFromFile = try! String(contentsOf: url, encoding: .ascii)
+  asciiStringFromFile = try! String(contentsOf: url, encoding: .ascii)
   #endif
 }
 
 @inline(never)
-public func run_ASCIIStringFromFile(_ N: Int) {
+public func run_ASCIIStringFromFile(_ n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
-    blackHole((ASCIIStringFromFile! + "").utf8.count)
+  for _ in 0 ..< n {
+    blackHole((asciiStringFromFile! + "").utf8.count)
   }
   #endif
 }
@@ -776,9 +776,9 @@ public func setup_UnicodeStringFromCodable() {
 }
 
 @inline(never)
-public func run_UnicodeStringFromCodable(_ N: Int) {
+public func run_UnicodeStringFromCodable(_ n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     for _ in 0..<100 {
       unicodeStringFromCodableDict[identity(unicodeStringFromCodable!)] = ()
     }
@@ -804,9 +804,9 @@ public func setup_bridgedArrays() {
 }
 
 @inline(never)
-public func run_BridgedNSArrayObjectAtIndex(_ N: Int) {
+public func run_BridgedNSArrayObjectAtIndex(_ n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N * 50 {
+  for _ in 0 ..< n * 50 {
     for i in 0..<100 {
       blackHole(bridgedArray[i])
     }
@@ -815,9 +815,9 @@ public func run_BridgedNSArrayObjectAtIndex(_ N: Int) {
 }
 
 @inline(never)
-public func run_BridgedNSArrayMutableCopyObjectAtIndex(_ N: Int) {
+public func run_BridgedNSArrayMutableCopyObjectAtIndex(_ n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N * 100 {
+  for _ in 0 ..< n * 100 {
     for i in 0..<100 {
       blackHole(bridgedArrayMutableCopy[i])
     }
@@ -826,9 +826,9 @@ public func run_BridgedNSArrayMutableCopyObjectAtIndex(_ N: Int) {
 }
 
 @inline(never)
-public func run_RealNSArrayObjectAtIndex(_ N: Int) {
+public func run_RealNSArrayObjectAtIndex(_ n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N * 100 {
+  for _ in 0 ..< n * 100 {
     for i in 0..<100 {
       blackHole(nsArray[i])
     }
@@ -837,9 +837,9 @@ public func run_RealNSArrayObjectAtIndex(_ N: Int) {
 }
 
 @inline(never)
-public func run_RealNSArrayMutableCopyObjectAtIndex(_ N: Int) {
+public func run_RealNSArrayMutableCopyObjectAtIndex(_ n: Int) {
   #if _runtime(_ObjC)
-  for _ in 0 ..< N * 100 {
+  for _ in 0 ..< n * 100 {
     for i in 0..<100 {
       blackHole(nsArrayMutableCopy[i])
     }

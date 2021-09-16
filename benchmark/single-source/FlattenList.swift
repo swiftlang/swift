@@ -47,15 +47,15 @@ func flattenLoop(_ input: [(Int, Int, Int, Int)]) -> [Int] {
 }
 
 @inline(never)
-public func run_FlattenListLoop(_ N: Int) {
-  for _ in 0..<5*N {
+public func run_FlattenListLoop(_ n: Int) {
+  for _ in 0..<5*n {
     blackHole(flattenLoop(inputArray))
   }
 }
 
 @inline(never)
-public func run_FlattenListFlatMap(_ N: Int) {
-  for _ in 1...5*N {
+public func run_FlattenListFlatMap(_ n: Int) {
+  for _ in 1...5*n {
     blackHole(flattenFlatMap(inputArray))
   }
 }

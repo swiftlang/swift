@@ -27,8 +27,8 @@ class Letter {
 }
 
 @inline(never)
-public func run_SortLettersInPlace(_ N: Int) {
-  for _ in 1...100*N {
+public func run_SortLettersInPlace(_ n: Int) {
+  for _ in 1...100*n {
     var letters = [
         Letter("k"), Letter("a"), Letter("x"), Letter("i"), Letter("f"), Letter("l"),
         Letter("o"), Letter("w"), Letter("h"), Letter("p"), Letter("b"), Letter("u"),

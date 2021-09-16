@@ -21,7 +21,7 @@ public let StrToInt = BenchmarkInfo(
   legacyFactor: 10)
 
 @inline(never)
-public func run_StrToInt(_ N: Int) {
+public func run_StrToInt(_ n: Int) {
   // 64 numbers from -500_000 to 500_000 generated randomly
   let input = ["-237392", "293715", "126809", "333779", "-362824", "144198",
                "-394973", "-163669", "-7236", "376965", "-400783", "-118670",
@@ -35,7 +35,7 @@ public func run_StrToInt(_ N: Int) {
                "-316727", "483808", "300149", "-405877", "-98938", "283685",
                "-247856", "-46975", "346060", "160085",]
   let ref_result = 517492
-  func DoOneIter(_ arr: [String]) -> Int {
+  func doOneIter(_ arr: [String]) -> Int {
     var r = 0
     for n in arr {
       r += Int(n)!
@@ -46,8 +46,8 @@ public func run_StrToInt(_ N: Int) {
     return r
   }
   var res = Int.max
-  for _ in 1...100*N {
-    res = res & DoOneIter(input)
+  for _ in 1...100*n {
+    res = res & doOneIter(input)
   }
   check(res == ref_result)
 }

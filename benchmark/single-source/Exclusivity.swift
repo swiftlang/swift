@@ -63,12 +63,12 @@ public var globalCounter: Int = 0
 // - Whole module analysis can remove exclusivity checks (> 10x speedup now, 4x speedup with runtime in OS).
 //   (The global's "public" qualifier should make the benchmark immune to this optimization.)
 @inline(never)
-public func run_accessGlobal(_ N: Int) {
+public func run_accessGlobal(_ n: Int) {
   globalCounter = 0
-  for _ in 1...10000*N {
+  for _ in 1...10000*n {
     globalCounter += 1
   }
-  check(globalCounter == 10000*N)
+  check(globalCounter == 10000*n)
 }
 
 // Measure memory access checks on a class property.
@@ -96,12 +96,12 @@ func updateClass(_ c: C) {
 // TODO: Replacing materializeForSet accessors with yield-once
 // accessors should make the callback overhead go away.
 @inline(never)
-public func run_accessInMatSet(_ N: Int) {
+public func run_accessInMatSet(_ n: Int) {
   let c = C()
-  for _ in 1...10000*N {
+  for _ in 1...10000*n {
     updateClass(c)
   }
-  check(c.counter == 10000*N)
+  check(c.counter == 10000*n)
 }
 
 // Measure nested access to independent objects.
@@ -122,7 +122,7 @@ func update(a: inout Var, b: inout Var, c: inout Var, d: inout Var) {
 }
 
 @inline(never)
-public func run_accessIndependent(_ N: Int) {
+public func run_accessIndependent(_ n: Int) {
   var a = Var()
   var b = Var()
   var c = Var()
@@ -130,9 +130,9 @@ public func run_accessIndependent(_ N: Int) {
   let updateVars = {
     update(a: &a, b: &b, c: &c, d: &d)
   }
-  for _ in 1...1000*N {
+  for _ in 1...1000*n {
     updateVars()
   }
-  check(a.val == 1000*N && b.val == 1000*N && c.val == 1000*N
-    && d.val == 1000*N)
+  check(a.val == 1000*n && b.val == 1000*n && c.val == 1000*n
+    && d.val == 1000*n)
 }

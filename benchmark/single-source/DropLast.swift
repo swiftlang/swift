@@ -86,157 +86,157 @@ public let DropLast = [
 ]
 
 @inline(never)
-public func run_DropLastCountableRange(_ N: Int) {
+public func run_DropLastCountableRange(_ n: Int) {
   let s = 0..<sequenceCount
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastSequence(_ N: Int) {
+public func run_DropLastSequence(_ n: Int) {
   let s = sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastAnySequence(_ N: Int) {
+public func run_DropLastAnySequence(_ n: Int) {
   let s = AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastAnySeqCntRange(_ N: Int) {
+public func run_DropLastAnySeqCntRange(_ n: Int) {
   let s = AnySequence(0..<sequenceCount)
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastAnySeqCRangeIter(_ N: Int) {
+public func run_DropLastAnySeqCRangeIter(_ n: Int) {
   let s = AnySequence((0..<sequenceCount).makeIterator())
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastAnyCollection(_ N: Int) {
+public func run_DropLastAnyCollection(_ n: Int) {
   let s = AnyCollection(0..<sequenceCount)
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastArray(_ N: Int) {
+public func run_DropLastArray(_ n: Int) {
   let s = array
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastCountableRangeLazy(_ N: Int) {
+public func run_DropLastCountableRangeLazy(_ n: Int) {
   let s = (0..<sequenceCount).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastSequenceLazy(_ N: Int) {
+public func run_DropLastSequenceLazy(_ n: Int) {
   let s = (sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastAnySequenceLazy(_ N: Int) {
+public func run_DropLastAnySequenceLazy(_ n: Int) {
   let s = (AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastAnySeqCntRangeLazy(_ N: Int) {
+public func run_DropLastAnySeqCntRangeLazy(_ n: Int) {
   let s = (AnySequence(0..<sequenceCount)).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastAnySeqCRangeIterLazy(_ N: Int) {
+public func run_DropLastAnySeqCRangeIterLazy(_ n: Int) {
   let s = (AnySequence((0..<sequenceCount).makeIterator())).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastAnyCollectionLazy(_ N: Int) {
+public func run_DropLastAnyCollectionLazy(_ n: Int) {
   let s = (AnyCollection(0..<sequenceCount)).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 @inline(never)
-public func run_DropLastArrayLazy(_ N: Int) {
+public func run_DropLastArrayLazy(_ n: Int) {
   let s = (array).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.dropLast(dropCount) {
       result += element
     }
-    check(result == sumCount)
+    CheckResults(result == sumCount)
   }
 }
 

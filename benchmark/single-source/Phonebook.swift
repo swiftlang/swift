@@ -71,8 +71,8 @@ func <(lhs: Record, rhs: Record) -> Bool {
 }
 
 @inline(never)
-public func run_Phonebook(_ N: Int) {
-  for _ in 1...N {
+public func run_Phonebook(_ n: Int) {
+  for _ in 1...n {
     var t = names
     t.sort()
   }

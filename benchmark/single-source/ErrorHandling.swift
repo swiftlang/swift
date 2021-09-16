@@ -35,8 +35,8 @@ func doSomething() throws -> String {
 }
 
 @inline(never)
-public func run_ErrorHandling(_ N: Int) {
-  for _ in 1...500*N {
+public func run_ErrorHandling(_ n: Int) {
+  for _ in 1...500*n {
     do {
       _ = try doSomething()
     } catch _ {

@@ -217,13 +217,13 @@ func test(_ s: String) {
 }
 
 @inline(never)
-public func run_StringSwitch(N: Int) {
+public func run_StringSwitch(n: Int) {
   let first = "Swift"
   let short = "To"
   let long = "(C, C++, Objective-C)."
   let last = "code."
   let none = "non existent string"
-  for _ in 1...100*N {
+  for _ in 1...100*n {
     test(first)
     test(short)
     test(long)

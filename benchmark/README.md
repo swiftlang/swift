@@ -296,10 +296,10 @@ public let YourTestName = BenchmarkInfo(
   tags: [.regression])
 
 @inline(never)
-public func run_YourTestName(N: Int) {
+public func run_YourTestName(n: Int) {
     # Declare variables
 
-    for i in 1...N {
+    for i in 1...n {
         # Perform work
 
         # Verify work was done; break otherwise

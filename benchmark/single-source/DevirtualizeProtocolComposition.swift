@@ -38,8 +38,8 @@ func playGame<T>(_ x: Game<T> & Pingable) -> Int {
 }
 
 @inline(never)
-public func run_DevirtualizeProtocolComposition(N: Int) {
-  for _ in 0..<N * 20_000 {
+public func run_DevirtualizeProtocolComposition(n: Int) {
+  for _ in 0..<n * 20_000 {
     blackHole(playGame(PingPong()))
   }
 }

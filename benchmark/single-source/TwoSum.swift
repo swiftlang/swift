@@ -58,25 +58,25 @@ let array = [
 ]
 
 @inline(never)
-public func run_TwoSum(_ N: Int) {
+public func run_TwoSum(_ n: Int) {
   var i1: Int?
   var i2: Int?
-  var Dict: Dictionary<Int, Int> = [:]
-  for _ in 1...N {
-    for Sum in 500..<600 {
-      Dict = [:]
+  var dict: Dictionary<Int, Int> = [:]
+  for _ in 1...n {
+    for sum in 500..<600 {
+      dict = [:]
       i1 = nil
       i2 = nil
       for n in 0..<array.count {
-        if let m = Dict[Sum-array[n]] {
+        if let m = dict[sum - array[n]] {
           i1 = m
           i2 = n
           break
         }
-        Dict[array[n]] = n
+        dict[array[n]] = n
       }
       check(i1 != nil && i2 != nil)
-      check(Sum == array[i1!] + array[i2!])
+      check(sum == array[i1!] + array[i2!])
     }
   }
 }

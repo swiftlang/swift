@@ -12,14 +12,14 @@ public var RangeReplaceableCollectionPlusDefault = BenchmarkInfo(
 )
 
 @inline(never)
-public func run_RangeReplaceableCollectionPlusDefault(_ N: Int) {
+public func run_RangeReplaceableCollectionPlusDefault(_ n: Int) {
   let stringsRef = [1, 2, 3]
   let strings = ["1", "2", "3"]
   let toInt = { (s: String) -> Int? in Int(s) }
   var a = [Int]()
   var b = [Int]()
 
-  for _ in 1...250*N {
+  for _ in 1...250*n {
     let a2: Array = mapSome(strings, toInt)
     let b2 = mapSome(strings, toInt)
     a = a2

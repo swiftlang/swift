@@ -212,12 +212,12 @@ func convert(_ s: String) {
 }
 
 @inline(never)
-public func run_StringEnumRawValueInitialization(_ N: Int) {
+public func run_StringEnumRawValueInitialization(_ n: Int) {
   let first = "Swift"
   let short = "To"
   let long = "(C, C++, Objective-C)."
   let last = "code."
-  for _ in 1...100*N {
+  for _ in 1...100*n {
     convert(first)
     convert(short)
     convert(long)

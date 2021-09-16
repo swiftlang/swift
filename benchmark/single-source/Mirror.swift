@@ -37,7 +37,7 @@ struct G<T> { var t: T }
 class H<T>: C { var t: T; init(_ t: T) { self.t = t }}
 
 public func run_MirrorDefault(scale: Int) {
-  let N = 100*scale
+  let n = 100*scale
   
   let s1 = S1(s: "foo", d: 3.14)
   let s2 = S2(i: 42, a: [0..<4])
@@ -50,7 +50,7 @@ public func run_MirrorDefault(scale: Int) {
 
   var str = ""
 
-  for _ in 0..<N {
+  for _ in 0..<n {
     str = "\(s1),\(s2),\(c),\(d),\(e),\(f),\(g),\(h)"
     blackHole(str)
   }
@@ -64,11 +64,11 @@ func typename<T>(of: T.Type) -> String {
 }
 
 public func run_TypeName(scale: Int) {
-  let N = 1_000*scale
+  let n = 1_000*scale
   var a: [String] = []
   a.reserveCapacity(16)
 
-  for _ in 0..<N {
+  for _ in 0..<n {
     a = []
     a.removeAll(keepingCapacity: true)
     a.append(typename(of: S1.self))

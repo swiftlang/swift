@@ -118,22 +118,22 @@ func testArray() -> Int {
 }
 
 @inline(never)
-public func run_ObjectAllocation(_ N: Int) {
+public func run_ObjectAllocation(_ n: Int) {
 
-  var SingleObjectResult = 0
-  var TreeResult = 0
-  var ListResult = 0
-  var ArrayResult = 0
+  var singleObjectResult = 0
+  var treeResult = 0
+  var listResult = 0
+  var arrayResult = 0
 
-  for _ in 0..<N {
-    SingleObjectResult = testSingleObject()
-    TreeResult = testTree()
-    ListResult = testList()
-    ArrayResult = testArray()
+  for _ in 0..<n {
+    singleObjectResult = testSingleObject()
+    treeResult = testTree()
+    listResult = testList()
+    arrayResult = testArray()
   }
 
-  check(SingleObjectResult == 499500)
-  check(TreeResult == 90000)
-  check(ListResult == 48375)
-  check(ArrayResult == 3000)
+  check(singleObjectResult == 499500)
+  check(treeResult == 90000)
+  check(listResult == 48375)
+  check(arrayResult == 3000)
 }

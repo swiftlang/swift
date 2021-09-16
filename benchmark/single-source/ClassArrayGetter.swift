@@ -44,9 +44,9 @@ var inputArray: [Box]! = {
   return a
 }()
 
-public func run_ClassArrayGetter(_ N: Int) {
+public func run_ClassArrayGetter(_ n: Int) {
   let a: [Box] = inputArray
-  for _ in 1...N {
+  for _ in 1...n {
     _ = sumArray(a)
   }
 }

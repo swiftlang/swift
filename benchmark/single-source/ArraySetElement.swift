@@ -28,9 +28,9 @@ func storeArrayElement(_ array: inout [Int], _ i: Int) {
   array[i] = i
 }
 
-public func run_ArraySetElement(_ N: Int) {
+public func run_ArraySetElement(_ n: Int) {
   var array = [Int](repeating: 0, count: 10000)
-  for _ in 0..<10*N {
+  for _ in 0..<10*n {
     for i in 0..<array.count {
       storeArrayElement(&array, i)
     }

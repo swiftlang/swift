@@ -36,9 +36,9 @@ func filter_seven(_ input : Int) throws {
 }
 
 @inline(never)
-public func run_SevenBoom(_ N: Int) {
+public func run_SevenBoom(_ n: Int) {
   var c = 0
-  for i in 1...N*5000 {
+  for i in 1...n*5000 {
     do {
       try filter_seven(i)
       c += 1

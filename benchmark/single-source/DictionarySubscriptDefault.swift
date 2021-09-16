@@ -29,8 +29,8 @@ public let DictionarySubscriptDefault = [
 ]
 
 @inline(never)
-public func run_DictionarySubscriptDefaultMutation(_ N: Int) {
-  for _ in 1...N {
+public func run_DictionarySubscriptDefaultMutation(_ n: Int) {
+  for _ in 1...n {
 
     var dict = [Int: Int]()
 
@@ -44,8 +44,8 @@ public func run_DictionarySubscriptDefaultMutation(_ N: Int) {
 }
 
 @inline(never)
-public func run_DictionarySubscriptDefaultMutationArray(_ N: Int) {
-  for _ in 1...N {
+public func run_DictionarySubscriptDefaultMutationArray(_ n: Int) {
+  for _ in 1...n {
 
     var dict = [Int: [Int]]()
 
@@ -91,8 +91,8 @@ class Box<T : Hashable> : Hashable, P {
 }
 
 @inline(never)
-public func run_DictionarySubscriptDefaultMutationOfObjects(_ N: Int) {
-  for _ in 1...N {
+public func run_DictionarySubscriptDefaultMutationOfObjects(_ n: Int) {
+  for _ in 1...n {
 
     var dict = [Box<Int>: Box<Int>]()
 
@@ -106,8 +106,8 @@ public func run_DictionarySubscriptDefaultMutationOfObjects(_ N: Int) {
 }
 
 @inline(never)
-public func run_DictionarySubscriptDefaultMutationArrayOfObjects(_ N: Int) {
-    for _ in 1...N {
+public func run_DictionarySubscriptDefaultMutationArrayOfObjects(_ n: Int) {
+    for _ in 1...n {
 
     var dict = [Box<Int>: [Box<Int>]]()
 

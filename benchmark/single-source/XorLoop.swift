@@ -18,8 +18,8 @@ public let XorLoop = BenchmarkInfo(
   tags: [.validation])
 
 @inline(never)
-public func run_XorLoop(_ N: Int) {
-  for _ in 1...5*N {
+public func run_XorLoop(_ n: Int) {
+  for _ in 1...5*n {
     let size = 100000
     let ref_result = 47813324
     var x = [Int](repeating: 0xA05FD, count: size)

@@ -25,12 +25,12 @@ public let NSDictionaryCastToSwift = BenchmarkInfo(
   legacyFactor: 10)
 
 @inline(never)
-public func run_NSDictionaryCastToSwift(_ N: Int) {
+public func run_NSDictionaryCastToSwift(_ n: Int) {
 #if _runtime(_ObjC)
-    let NSDict = NSDictionary()
+    let nsdict = NSDictionary()
     var swiftDict = [String: NSObject]()
-    for _ in 1...1_000*N {
-        swiftDict = NSDict as! [String: NSObject]
+    for _ in 1...1_000*n {
+        swiftDict = nsdict as! [String: NSObject]
         if !swiftDict.isEmpty {
             break
         }

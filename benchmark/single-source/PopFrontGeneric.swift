@@ -47,10 +47,10 @@ func myArrayReplace<
 }
 
 @inline(never)
-public func run_PopFrontArrayGeneric(_ N: Int) {
+public func run_PopFrontArrayGeneric(_ n: Int) {
   let orig = Array(repeating: 1, count: arrayCount)
   var a = [Int]()
-  for _ in 1...N {
+  for _ in 1...n {
       var result = 0
       a.append(contentsOf: orig)
       while a.count != 0 {

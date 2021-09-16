@@ -363,9 +363,9 @@ public func buildWorkload() {
 }
 
 @inline(never)
-public func run_CSVParsing_characters(_ N: Int) {
+public func run_CSVParsing_characters(_ n: Int) {
   let contents = workload
-  for _ in 0..<N {
+  for _ in 0..<n {
     var remainder = contents[...]
     let result = try! parseCSV(&remainder, initialState: 0) {
       (result: inout Int, _, substr) in
@@ -377,9 +377,9 @@ public func run_CSVParsing_characters(_ N: Int) {
 }
 
 @inline(never)
-public func run_CSVParsing_scalars(_ N: Int) {
+public func run_CSVParsing_scalars(_ n: Int) {
   let contents = workload.unicodeScalars
-  for _ in 0..<N {
+  for _ in 0..<n {
     var remainder = contents[...]
     let result = try! parseCSV(&remainder, initialState: 0) {
       (result: inout Int, _, substr) in
@@ -391,9 +391,9 @@ public func run_CSVParsing_scalars(_ N: Int) {
 }
 
 @inline(never)
-public func run_CSVParsing_utf16(_ N: Int) {
+public func run_CSVParsing_utf16(_ n: Int) {
   let contents = workload.utf16
-  for _ in 0..<N {
+  for _ in 0..<n {
     var remainder = contents[...]
     let result = try! parseCSV(&remainder, initialState: 0) {
       (result: inout Int, _, substr) in
@@ -405,9 +405,9 @@ public func run_CSVParsing_utf16(_ N: Int) {
 }
 
 @inline(never)
-public func run_CSVParsing_utf8(_ N: Int) {
+public func run_CSVParsing_utf8(_ n: Int) {
   let contents = workload.utf8
-  for _ in 0..<N {
+  for _ in 0..<n {
     var remainder = contents[...]
     let result = try! parseCSV(&remainder, initialState: 0) {
       (result: inout Int, _, substr) in
@@ -420,17 +420,17 @@ public func run_CSVParsing_utf8(_ N: Int) {
 
 
 @inline(never)
-public func run_CSVParsingAlt(_ N: Int) {
+public func run_CSVParsingAlt(_ n: Int) {
   let contents = workload
-  for _ in 0..<N {
+  for _ in 0..<n {
     blackHole(contents.parseAlt())
   }
 }
 
 @inline(never)
-public func run_CSVParsingAltIndices(_ N: Int) {
+public func run_CSVParsingAltIndices(_ n: Int) {
   let contents = workload
-  for _ in 0..<N {
+  for _ in 0..<n {
     blackHole(contents.parseAltIndices())
   }
 }

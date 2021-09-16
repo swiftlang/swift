@@ -20,7 +20,7 @@ public let ArraySubscript = BenchmarkInfo(
   legacyFactor: 4)
 
 @inline(never)
-public func run_ArraySubscript(_ N: Int) {
+public func run_ArraySubscript(_ n: Int) {
   var lfsr = LFSR()
 
   let numArrays = 50
@@ -28,7 +28,7 @@ public func run_ArraySubscript(_ N: Int) {
 
   func bound(_ x: Int) -> Int { return min(x, numArrayElements-1) }
 
-  for _ in 1...N {
+  for _ in 1...n {
     var arrays = [[Int]](repeating: [], count: numArrays)
     for i in 0..<numArrays {
       for _ in 0..<numArrayElements {

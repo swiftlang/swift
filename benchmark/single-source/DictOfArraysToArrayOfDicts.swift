@@ -13,7 +13,7 @@ public var DictOfArraysToArrayOfDicts = BenchmarkInfo(
 )
 
 @inline(never)
-public func run_DictOfArraysToArrayOfDicts(_ N: Int) {
+public func run_DictOfArraysToArrayOfDicts(_ n: Int) {
   let returnedFromServer = [
     "title": ["abc",  "def", "ghi"],
     "time": ["1234", "5678", "0123"],
@@ -23,7 +23,7 @@ public func run_DictOfArraysToArrayOfDicts(_ N: Int) {
   var inverted: [[(String, String)]] = []
   var arrayOfDicts: [[String: String]] = [[:]]
 
-  for _ in 1...100*N {
+  for _ in 1...100*n {
     pairs = returnedFromServer.map {
       (key, value) in value.map { (key, $0) }
     }

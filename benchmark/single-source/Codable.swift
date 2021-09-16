@@ -101,26 +101,26 @@ struct CodablePerfTester<Enc: GenericEncoder, Dec: GenericDecoder>  {
   }
 }
 
-var JSONTester: CodablePerfTester<JSONEncoder, JSONDecoder>! = nil
+var jsonTester: CodablePerfTester<JSONEncoder, JSONDecoder>! = nil
 
 public func setup_json() {
-  JSONTester = CodablePerfTester(encoder: JSONEncoder(), decoder: JSONDecoder())
+  jsonTester = CodablePerfTester(encoder: JSONEncoder(), decoder: JSONDecoder())
 }
 
 @inline(never)
-public func run_JSONPerfEncode(_ N: Int) {
+public func run_JSONPerfEncode(_ n: Int) {
   autoreleasepool {
-    for _ in 0 ..< N {
-      JSONTester.encode()
+    for _ in 0 ..< n {
+      jsonTester.encode()
     }
   }
 }
 
 @inline(never)
-public func run_JSONPerfDecode(_ N: Int) {
+public func run_JSONPerfDecode(_ n: Int) {
   autoreleasepool {
-    for _ in 0 ..< N {
-      JSONTester.decode()
+    for _ in 0 ..< n {
+      jsonTester.decode()
     }
   }
 }
@@ -134,18 +134,18 @@ public func setup_plist() {
 }
 
 @inline(never)
-public func run_PlistPerfEncode(_ N: Int) {
+public func run_PlistPerfEncode(_ n: Int) {
   autoreleasepool {
-    for _ in 0 ..< N {
+    for _ in 0 ..< n {
       plistTester.encode()
     }
   }
 }
 
 @inline(never)
-public func run_PlistPerfDecode(_ N: Int) {
+public func run_PlistPerfDecode(_ n: Int) {
   autoreleasepool {
-    for _ in 0 ..< N {
+    for _ in 0 ..< n {
       plistTester.decode()
     }
   }

@@ -72,8 +72,8 @@ func makeLiterals() {
   blackHole(makeCharacter_UTF8Length8())
 }
 
-public func run_CharacterLiteralsSmall(_ N: Int) {
-  for _ in 0...10000 * N {
+public func run_CharacterLiteralsSmall(_ n: Int) {
+  for _ in 0...10000 * n {
     makeLiterals()
   }
 }

@@ -206,8 +206,8 @@ struct Words: IteratorProtocol, Sequence {
 }
 
 @inline(never)
-public func run_WordSplitASCII(_ N: Int) {
-  for _ in 1...N {
+public func run_WordSplitASCII(_ n: Int) {
+  for _ in 1...n {
     let words = Array(Words(identity(asciiText)))
     check(words.count == 280)
     blackHole(words)
@@ -215,8 +215,8 @@ public func run_WordSplitASCII(_ N: Int) {
 }
 
 @inline(never)
-public func run_WordSplitUTF16(_ N: Int) {
-  for _ in 1...N {
+public func run_WordSplitUTF16(_ n: Int) {
+  for _ in 1...n {
     let words = Array(Words(identity(utf16Text)))
     check(words.count == 280)
     blackHole(words)
@@ -227,8 +227,8 @@ let asciiWords = Array(Words(asciiText))
 let utf16Words = Array(Words(utf16Text))
 
 @inline(never)
-public func run_WordCountUniqueASCII(_ N: Int) {
-  for _ in 1...10*N {
+public func run_WordCountUniqueASCII(_ n: Int) {
+  for _ in 1...10*n {
     let words = Set(identity(asciiWords))
     check(words.count == 168)
     blackHole(words)
@@ -236,8 +236,8 @@ public func run_WordCountUniqueASCII(_ N: Int) {
 }
 
 @inline(never)
-public func run_WordCountUniqueUTF16(_ N: Int) {
-  for _ in 1...10*N {
+public func run_WordCountUniqueUTF16(_ n: Int) {
+  for _ in 1...10*n {
     let words = Set(identity(utf16Words))
     check(words.count == 168)
     blackHole(words)
@@ -257,8 +257,8 @@ where S.Element == String {
 }
 
 @inline(never)
-public func run_WordCountHistogramASCII(_ N: Int) {
-  for _ in 1...N {
+public func run_WordCountHistogramASCII(_ n: Int) {
+  for _ in 1...n {
     let words = histogram(for: identity(asciiWords))
     check(words.count == 168)
     check(words[0] == ("and", 15))
@@ -267,8 +267,8 @@ public func run_WordCountHistogramASCII(_ N: Int) {
 }
 
 @inline(never)
-public func run_WordCountHistogramUTF16(_ N: Int) {
-  for _ in 1...N {
+public func run_WordCountHistogramUTF16(_ n: Int) {
+  for _ in 1...n {
     let words = histogram(for: identity(utf16Words))
     check(words.count == 168)
     check(words[0] == ("and", 15))

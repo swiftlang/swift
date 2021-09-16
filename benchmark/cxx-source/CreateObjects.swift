@@ -22,8 +22,8 @@ public let CreateObjects = BenchmarkInfo(
   tags: [.validation, .bridging])
 
 @inline(never)
-public func run_CreateObjects(_ N: Int) {
-  for i in 0...(N * 10_000) {
+public func run_CreateObjects(_ n: Int) {
+  for i in 0...(n * 10_000) {
     let x = Int32(i)
     let f = CxxLoadableIntWrapper(value: x)
     blackHole(f)

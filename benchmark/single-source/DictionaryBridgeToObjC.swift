@@ -55,17 +55,17 @@ let numbers: [String: Int] = [
 ]
 
 @inline(never)
-public func run_DictionaryBridgeToObjC_BridgeToObjC(_ N: Int) {
-  for _ in 1 ... 100 * N {
+public func run_DictionaryBridgeToObjC_BridgeToObjC(_ n: Int) {
+  for _ in 1 ... 100 * n {
     blackHole(numbers as NSDictionary)
   }
 }
 
 @inline(never)
-public func run_DictionaryBridgeToObjC_Access(_ N: Int) {
+public func run_DictionaryBridgeToObjC_Access(_ n: Int) {
   let d = numbers as NSDictionary
   blackHole(d.object(forKey: "one")) // Force bridging of contents
-  for _ in 1 ... 100 * N {
+  for _ in 1 ... 100 * n {
     for key in numbers.keys {
       check(identity(d).object(forKey: key) != nil)
     }
@@ -73,9 +73,9 @@ public func run_DictionaryBridgeToObjC_Access(_ N: Int) {
 }
 
 @inline(never)
-public func run_DictionaryBridgeToObjC_BulkAccess(_ N: Int) {
+public func run_DictionaryBridgeToObjC_BulkAccess(_ n: Int) {
   let d = numbers as NSDictionary
-  for _ in 1 ... 100 * N {
+  for _ in 1 ... 100 * n {
     let d2 = NSDictionary(dictionary: identity(d))
     check(d2.count == d.count)
   }

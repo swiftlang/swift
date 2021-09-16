@@ -1038,14 +1038,14 @@ func benchSortStrings(_ words: [String]) {
   tempwords.sort(by: <)
 }
 
-public func run_SortStrings(_ N: Int) {
-  for _ in 1...5*N {
+public func run_SortStrings(_ n: Int) {
+  for _ in 1...5*n {
     benchSortStrings(words)
   }
 }
 
-public func run_SortSortedStrings(_ N: Int) {
-  for _ in 1...5*N {
+public func run_SortSortedStrings(_ n: Int) {
+  for _ in 1...5*n {
     benchSortStrings(sortedWords)
   }
 }
@@ -2053,8 +2053,8 @@ let unicodeWords: [String] = [
   "❄️overpresumptuous"
   ]
 
-public func run_SortStringsUnicode(_ N: Int) {
-  for _ in 1...N {
+public func run_SortStringsUnicode(_ n: Int) {
+  for _ in 1...n {
     benchSortStrings(unicodeWords)
   }
 }

@@ -358,8 +358,8 @@ let workload = """
 """
 
 @inline(never)
-public func run_CharacterPropertiesFetch(_ N: Int) {
-  for _ in 1...N {
+public func run_CharacterPropertiesFetch(_ n: Int) {
+  for _ in 1...n {
     for c in workload {
         blackHole(isAlphanumeric(c))
         blackHole(isCapitalized(c))
@@ -376,8 +376,8 @@ public func run_CharacterPropertiesFetch(_ N: Int) {
 }
 
 @inline(never)
-public func run_CharacterPropertiesStashed(_ N: Int) {
-  for _ in 1...N {
+public func run_CharacterPropertiesStashed(_ n: Int) {
+  for _ in 1...n {
     for c in workload {
         blackHole(isAlphanumericStashed(c))
         blackHole(isCapitalizedStashed(c))
@@ -394,8 +394,8 @@ public func run_CharacterPropertiesStashed(_ N: Int) {
 }
 
 @inline(never)
-public func run_CharacterPropertiesStashedMemo(_ N: Int) {
-  for _ in 1...N {
+public func run_CharacterPropertiesStashedMemo(_ n: Int) {
+  for _ in 1...n {
     for c in workload {
         blackHole(isAlphanumericStashedMemo(c))
         blackHole(isCapitalizedStashedMemo(c))
@@ -412,8 +412,8 @@ public func run_CharacterPropertiesStashedMemo(_ N: Int) {
 }
 
 @inline(never)
-public func run_CharacterPropertiesPrecomputed(_ N: Int) {
-  for _ in 1...N {
+public func run_CharacterPropertiesPrecomputed(_ n: Int) {
+  for _ in 1...n {
     for c in workload {
         blackHole(isAlphanumericPrecomputed(c))
         blackHole(isCapitalizedPrecomputed(c))

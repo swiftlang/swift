@@ -27,11 +27,11 @@ let alphabetInput: [Character] = [
   ]
 
 @inline(never)
-public func run_SuperChars(_ N: Int) {
+public func run_SuperChars(_ n: Int) {
   // Permute some characters.
   let alphabet: [Character] = alphabetInput
 
-  for _ in 0..<N {
+  for _ in 0..<n {
     for firstChar in alphabet {
       for middleChar in alphabet {
         for lastChar in alphabet {
