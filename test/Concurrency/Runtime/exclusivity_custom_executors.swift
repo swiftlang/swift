@@ -3,8 +3,6 @@
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 
-// REQUIRES: rdar82734785
-
 // rdar://76038845
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
