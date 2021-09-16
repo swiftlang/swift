@@ -26,10 +26,12 @@ public let MonteCarloE = BenchmarkInfo(
   legacyFactor: 20)
 
 public func run_MonteCarloE(scale: Int) {
-  let N = 10_000*scale
-  var intervals = [Bool](repeating: false, count: N)
-  for _ in 1...N {
-    let pos = Int(UInt(truncatingIfNeeded: Random())%UInt(N))
+  var lfsr = LFSR()
+
+  let n = 10_000 * scale
+  var intervals = [Bool](repeating: false, count: n)
+  for _ in 1...n {
+    let pos = Int(UInt(truncatingIfNeeded: lfsr.next()) % UInt(n))
     intervals[pos] = true
   }
   let numEmptyIntervals = intervals.filter{!$0}.count

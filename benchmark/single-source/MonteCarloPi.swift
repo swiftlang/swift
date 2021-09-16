@@ -19,12 +19,14 @@ public let MonteCarloPi = BenchmarkInfo(
   legacyFactor: 125)
 
 public func run_MonteCarloPi(scale: Int) {
+  var rng = LFSR()
+
   var pointsInside = 0
   let r = 10000
   let N = 4_000*scale
   for _ in 1...N {
-    let x = Int(truncatingIfNeeded: Random())%r
-    let y = Int(truncatingIfNeeded: Random())%r
+    let x = Int(truncatingIfNeeded: rng.next()) % r
+    let y = Int(truncatingIfNeeded: rng.next()) % r
     if x*x + y*y < r*r {
       pointsInside += 1
     }

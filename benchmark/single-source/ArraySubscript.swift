@@ -21,7 +21,7 @@ public let ArraySubscript = BenchmarkInfo(
 
 @inline(never)
 public func run_ArraySubscript(_ N: Int) {
-  SRand()
+  var lfsr = LFSR()
 
   let numArrays = 50
   let numArrayElements = 100
@@ -32,7 +32,7 @@ public func run_ArraySubscript(_ N: Int) {
     var arrays = [[Int]](repeating: [], count: numArrays)
     for i in 0..<numArrays {
       for _ in 0..<numArrayElements {
-        arrays[i].append(Int(truncatingIfNeeded: Random()))
+        arrays[i].append(Int(truncatingIfNeeded: lfsr.randInt()))
       }
     }
 
