@@ -5543,9 +5543,11 @@ public protocol CodingKeyRepresentable {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == String {
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   public var codingKey: CodingKey {
     _DictionaryCodingKey(stringValue: rawValue)
   }
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   public init?<T: CodingKey>(codingKey: T) {
     self.init(rawValue: codingKey.stringValue)
   }
@@ -5553,9 +5555,11 @@ extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == Strin
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == Int {
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   public var codingKey: CodingKey {
     _DictionaryCodingKey(intValue: rawValue)
   }
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   public init?<T: CodingKey>(codingKey: T) {
     if let intValue = codingKey.intValue {
       self.init(rawValue: intValue)
@@ -5567,9 +5571,11 @@ extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == Int {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Int: CodingKeyRepresentable {
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   public var codingKey: CodingKey {
     _DictionaryCodingKey(intValue: self)
   }
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   public init?<T: CodingKey>(codingKey: T) {
     if let intValue = codingKey.intValue {
       self = intValue
@@ -5581,9 +5587,11 @@ extension Int: CodingKeyRepresentable {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension String: CodingKeyRepresentable {
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   public var codingKey: CodingKey {
     _DictionaryCodingKey(stringValue: self)
   }
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   public init?<T: CodingKey>(codingKey: T) {
     self = codingKey.stringValue
   }
