@@ -93,7 +93,7 @@ public func run_DropWhileCountableRange(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -104,7 +104,7 @@ public func run_DropWhileSequence(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -115,7 +115,7 @@ public func run_DropWhileAnySequence(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -126,7 +126,7 @@ public func run_DropWhileAnySeqCntRange(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -137,7 +137,7 @@ public func run_DropWhileAnySeqCRangeIter(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -148,7 +148,7 @@ public func run_DropWhileAnyCollection(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -159,7 +159,7 @@ public func run_DropWhileArray(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -170,7 +170,7 @@ public func run_DropWhileCountableRangeLazy(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -181,7 +181,7 @@ public func run_DropWhileSequenceLazy(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -192,7 +192,7 @@ public func run_DropWhileAnySequenceLazy(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -203,7 +203,7 @@ public func run_DropWhileAnySeqCntRangeLazy(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -214,7 +214,7 @@ public func run_DropWhileAnySeqCRangeIterLazy(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -225,7 +225,7 @@ public func run_DropWhileAnyCollectionLazy(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -236,7 +236,7 @@ public func run_DropWhileArrayLazy(_ n: Int) {
     for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 
