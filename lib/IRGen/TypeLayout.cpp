@@ -18,6 +18,7 @@
 #include "IRGenModule.h"
 #include "SwitchBuilder.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/None.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -1605,6 +1606,22 @@ ArchetypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 
 llvm::Optional<std::vector<uint8_t>>
 ArchetypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  std::vector<uint8_t> layoutStr;
+  auto archetypeType = dyn_cast<ArchetypeType>(archetype.getASTType());
+  assert(archetypeType && "archetype wasn't GenericTypeParam!");
+  auto params = archetypeType->getGenericEnvironment()->getGenericParams();
+  for (auto param : params) {
+    if (param->getName() == archetypeType->getName()) {
+      // INDEX := UINT32
+      // ARCHETYPE := 'A' INDEX
+      layoutStr.push_back('A');
+      uint32_t index;
+      llvm::support::endian::write32be(&index, param->getIndex());
+      layoutStr.insert(layoutStr.end(), (uint8_t *)(&index),
+                       (uint8_t *)(&index + 1));
+      return layoutStr;
+    }
+  }
   return llvm::NoneType::None;
 }
 
@@ -2939,7 +2956,16 @@ ResilientTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
 
 llvm::Optional<std::vector<uint8_t>>
 ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
-  return llvm::NoneType::None;
+  std::vector<uint8_t> layoutStr;
+  layoutStr.push_back('R');
+  std::string mangledName = ty.getMangledName();
+  uint32_t nameLength;
+  llvm::support::endian::write32be(&nameLength, mangledName.size());
+  layoutStr.insert(layoutStr.end(), (uint8_t *)(&nameLength),
+                   (uint8_t *)(&nameLength + 1));
+
+  layoutStr.insert(layoutStr.end(), mangledName.begin(), mangledName.end());
+  return layoutStr;
 }
 
 void ResilientTypeLayoutEntry::computeProperties() {
