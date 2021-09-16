@@ -43,27 +43,6 @@
 #include <stdarg.h>
 
 namespace {
-int asprintf(char **strp, const char *fmt, ...) {
-  va_list argp0, argp1;
-
-  va_start(argp0, fmt);
-  va_copy(argp1, argp0);
-
-  int length = _vscprintf(fmt, argp0);
-
-  *strp = reinterpret_cast<char *>(malloc(length + 1));
-  if (*strp == nullptr)
-    return -1;
-
-  length = _vsnprintf(*strp, length, fmt, argp1);
-  (*strp)[length] = '\0';
-
-  va_end(argp0);
-  va_end(argp1);
-
-  return length;
-}
-
 char *strndup(const char *s, size_t n) {
   size_t length = std::min(strlen(s), n);
 
@@ -289,7 +268,7 @@ struct TupleImpl : ReflectionMirrorImpl {
     if (!hasLabel) {
       // The name is the stringized element number '.0'.
       char *str;
-      asprintf(&str, ".%" PRIdPTR, i);
+      swift_asprintf(&str, ".%" PRIdPTR, i);
       *outName = str;
     }
     
