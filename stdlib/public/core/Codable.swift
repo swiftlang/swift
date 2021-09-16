@@ -5537,7 +5537,9 @@ internal struct _DictionaryCodingKey: CodingKey {
 /// container - rather than an unkeyed container of alternating key-value pairs.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol CodingKeyRepresentable {
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   var codingKey: CodingKey { get }
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   init?<T: CodingKey>(codingKey: T)
 }
 
