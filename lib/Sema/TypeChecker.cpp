@@ -252,9 +252,6 @@ static void typeCheckDelayedFunctions(SourceFile &SF) {
   while (currentFunctionIdx < SF.DelayedFunctions.size()) {
     auto *AFD = SF.DelayedFunctions[currentFunctionIdx];
     assert(!AFD->getDeclContext()->isLocalContext());
-
-    TypeChecker::buildTypeRefinementContextHierarchyDelayed(SF, AFD);
-
     (void) AFD->getTypecheckedBody();
     ++currentFunctionIdx;
   }
