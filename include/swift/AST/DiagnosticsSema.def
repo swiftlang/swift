@@ -1940,7 +1940,7 @@ NOTE(nonsendable_tuple_type,none,
      "a tuple type must be composed of 'Sendable' elements to conform to "
      "'Sendable'", ())
 NOTE(non_sendable_nominal,none,
-     "%0 %1 does not conform to the `Sendable` protocol",
+     "%0 %1 does not conform to the 'Sendable' protocol",
       (DescriptiveDeclKind, DeclName))
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
@@ -2963,7 +2963,7 @@ WARNING(differentiable_immutable_wrapper_implicit_noderivative_fixit,none,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(by:)' requirement for %0 "
-      "requires all stored properties not marked with `@noDerivative` to be "
+      "requires all stored properties not marked with '@noDerivative' to be "
       "mutable or have a non-mutating 'move(by:)'; use 'var' instead, or "
       "add an explicit '@noDerivative' attribute "
       "%select{|, or conform %0 to 'AdditiveArithmetic'}1",
@@ -4536,10 +4536,10 @@ ERROR(concurrent_value_outside_source_file,none,
       "%0 %1; use '@unchecked Sendable' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_nonfinal_class,none,
-      "non-final class %0 cannot conform to `Sendable`; "
-      "use `@unchecked Sendable`", (DeclName))
+      "non-final class %0 cannot conform to 'Sendable'; "
+      "use '@unchecked Sendable'", (DeclName))
 ERROR(concurrent_value_inherit,none,
-      "`Sendable` class %1 cannot inherit from another class"
+      "'Sendable' class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
 ERROR(non_sendable_type,none,

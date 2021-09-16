@@ -2,7 +2,7 @@
 
 func acceptSendable<T: Sendable>(_: T) { }
 
-class NotSendable { } // expected-note 2{{class 'NotSendable' does not conform to the `Sendable` protocol}}
+class NotSendable { } // expected-note 2{{class 'NotSendable' does not conform to the 'Sendable' protocol}}
 
 func testSendableBuiltinConformances(
   i: Int, ns: NotSendable, sf: @escaping @Sendable () -> Void,
