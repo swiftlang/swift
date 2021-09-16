@@ -38,6 +38,9 @@ swift_vasprintf(char **strp, const char *fmt, va_list args) {
   int len = vsnprintf(nullptr, 0, fmt, args_for_len);
   va_end(args_for_len);
 
+  // If we fail for any reason, strp needs to be set to NULL.
+  *strp = nullptr;
+
   if (len < 0)
     return -1;
   char *buffer = reinterpret_cast<char *>(malloc(len + 1));
