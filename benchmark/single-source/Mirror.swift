@@ -55,7 +55,7 @@ public func run_MirrorDefault(scale: Int) {
     blackHole(str)
   }
   
-  CheckResults(str ==
+  check(str ==
     "S1(s: \"foo\", d: 3.14),S2(i: 42, a: [Range(0..<4)]),Mirror.C,Mirror.D,a,b(99),G<Double>(t: 12.3),Mirror.H<Swift.Array<Swift.Int>>")
 }
 
@@ -101,5 +101,5 @@ public func run_TypeName(scale: Int) {
     "Optional<S1>",
     "Optional<C>",
   ]
-  CheckResults(a == expected)
+  check(a == expected)
 }

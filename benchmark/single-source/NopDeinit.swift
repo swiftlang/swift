@@ -36,6 +36,6 @@ public func run_NopDeinit(_ N: Int) {
     let size = 5
     for i in 1...size { arr.append(X(i)) }
     arr.removeAll()
-    CheckResults(arr.count == 0)
+    check(arr.count == 0)
   }
 }

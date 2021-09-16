@@ -60,7 +60,7 @@ func swap(N: Int) {
   for _ in 1...2500*N {
       (dict[25], dict[75]) = (dict[75]!, dict[25]!)
       swapped = !swapped
-      CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!))
+      check(swappedCorrectly(swapped, dict[25]!, dict[75]!))
     }
 }
 
@@ -72,7 +72,7 @@ func swapObjects(N: Int) {
     let b2 = Box(75)
     (dict[b1], dict[b2]) = (dict[b2]!, dict[b1]!)
     swapped = !swapped
-    CheckResults(swappedCorrectly(swapped,
+    check(swappedCorrectly(swapped,
       dict[Box(25)]!.value, dict[Box(75)]!.value))
   }
 }
@@ -85,7 +85,7 @@ func swapAt(N: Int) {
     let i75 = dict.index(forKey: 75)!
     dict.values.swapAt(i25, i75)
     swapped = !swapped
-    CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!))
+    check(swappedCorrectly(swapped, dict[25]!, dict[75]!))
   }
 }
 
@@ -97,6 +97,6 @@ func swapAtObjects(N: Int) {
     let i75 = dict.index(forKey: Box(75))!
     dict.values.swapAt(i25, i75)
     swapped = !swapped
-    CheckResults(swappedCorrectly(swapped,
+    check(swappedCorrectly(swapped,
       dict[Box(25)]!.value, dict[Box(75)]!.value))
 }}

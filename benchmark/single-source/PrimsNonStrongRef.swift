@@ -1241,7 +1241,7 @@ func run_PrimsNonStrongRef<Node: GraphNode, Box>(_ state: PrimsState<Node, Box>)
       cost += map[Edge(start: Box(graph[n]), end: Box(graph[i]))]!
     }
   }
-  CheckResults(Int(cost) == 49324)
+  check(Int(cost) == 49324)
 }
 
 @inline(__always)
@@ -1261,7 +1261,7 @@ func run_PrimsNonStrongRefClosureAccess<Node: GraphNode, Box>(_ state: PrimsStat
       cost += map[Edge(start: Box(graph[n]), end: Box(graph[i]))]!
     }
   }
-  CheckResults(Int(cost) == 49324)
+  check(Int(cost) == 49324)
 }
 
 

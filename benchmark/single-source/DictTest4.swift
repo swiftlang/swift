@@ -81,7 +81,7 @@ public func run_Dictionary4(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result)
+  check(res == ref_result)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -131,5 +131,5 @@ public func run_Dictionary4OfObjects(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result)
+  check(res == ref_result)
 }

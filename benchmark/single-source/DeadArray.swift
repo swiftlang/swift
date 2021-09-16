@@ -42,5 +42,5 @@ public func run_DeadArray(_ N: Int) {
     Count = 0
     runLoop(0, var2: 0)
   }
-  CheckResults(Count == 500)
+  check(Count == 500)
 }

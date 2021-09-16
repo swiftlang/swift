@@ -62,7 +62,7 @@ public func run_Prefix${Name}(_ N: Int) {
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 % end

@@ -31,7 +31,7 @@ public func run_COWTree(_ N: Int) {
     }
   }
 
-  CheckResults(checkRef(tree1, tree2, tree3))
+  check(checkRef(tree1, tree2, tree3))
 }
 
 @inline(never)

@@ -54,7 +54,7 @@ public func run_StringInterpolation(_ N: Int) {
       result = result &+ Int(utf16.last!)
       blackHole(s)
     }
-    CheckResults(result == refResult)
+    check(result == refResult)
   }
 }
 
@@ -72,7 +72,7 @@ public func run_StringInterpolationSmall(_ N: Int) {
       result = result &+ Int(s.utf8.last!)
       blackHole(s)
     }
-    CheckResults(result == refResult)
+    check(result == refResult)
   }
 }
 

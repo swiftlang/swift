@@ -350,14 +350,14 @@ public let ChaCha = BenchmarkInfo(
 
 @inline(never)
 func checkResult(_ plaintext: [UInt8]) {
-    CheckResults(plaintext.first! == 6 && plaintext.last! == 254)
+    check(plaintext.first! == 6 && plaintext.last! == 254)
     var hash: UInt64 = 0
     for byte in plaintext {
         // rotate
         hash = (hash &<< 8) | (hash &>> (64 - 8))
         hash ^= UInt64(byte)
     }
-    CheckResults(hash == 0xa1bcdb217d8d14e4)
+    check(hash == 0xa1bcdb217d8d14e4)
 }
 
 @inline(never)

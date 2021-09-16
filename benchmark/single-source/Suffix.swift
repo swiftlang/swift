@@ -92,7 +92,7 @@ public func run_SuffixCountableRange(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -103,7 +103,7 @@ public func run_SuffixSequence(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -114,7 +114,7 @@ public func run_SuffixAnySequence(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -125,7 +125,7 @@ public func run_SuffixAnySeqCntRange(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -136,7 +136,7 @@ public func run_SuffixAnySeqCRangeIter(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -147,7 +147,7 @@ public func run_SuffixAnyCollection(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -158,7 +158,7 @@ public func run_SuffixArray(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -169,7 +169,7 @@ public func run_SuffixCountableRangeLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -180,7 +180,7 @@ public func run_SuffixSequenceLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -191,7 +191,7 @@ public func run_SuffixAnySequenceLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -202,7 +202,7 @@ public func run_SuffixAnySeqCntRangeLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -213,7 +213,7 @@ public func run_SuffixAnySeqCRangeIterLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -224,7 +224,7 @@ public func run_SuffixAnyCollectionLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -235,7 +235,7 @@ public func run_SuffixArrayLazy(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 

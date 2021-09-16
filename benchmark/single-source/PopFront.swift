@@ -36,7 +36,7 @@ public func run_PopFrontArray(_ N: Int) {
         result += a[0]
         a.remove(at: 0)
       }
-      CheckResults(result == arrayCount)
+      check(result == arrayCount)
   }
 }
 
@@ -55,7 +55,7 @@ public func run_PopFrontUnsafePointer(_ N: Int) {
         a.assign(from: a + 1, count: count - 1)
         count -= 1
       }
-      CheckResults(result == arrayCount)
+      check(result == arrayCount)
   }
   a.deallocate()
 }

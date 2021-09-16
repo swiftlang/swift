@@ -50,5 +50,5 @@ public func run_Calculator(_ N: Int) {
       c += my_atoi_impl(identity("10"))
       c -= 45
   }
-  CheckResults(c == 0)
+  check(c == 0)
 }

@@ -27,7 +27,7 @@ public func run_Combos(_ N: Int) {
     }
   }
 
-  CheckResults(combos.first! == firstRef && combos.last! == lastRef)
+  check(combos.first! == firstRef && combos.last! == lastRef)
 }
 
 func combinations

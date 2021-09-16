@@ -30,7 +30,7 @@ public func run_RangeReplaceableCollectionPlusDefault(_ N: Int) {
     }
   }
 
-  CheckResults(compareRef(a, b, stringsRef))
+  check(compareRef(a, b, stringsRef))
 }
 
 func compareRef(_ a: [Int], _ b: [Int], _ ref: [Int]) -> Bool {

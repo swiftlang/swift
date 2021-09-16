@@ -53,5 +53,5 @@ public func run_LinkedList(_ N: Int) {
       break
     }
   }
-  CheckResults(sum == ref_result)
+  check(sum == ref_result)
 }

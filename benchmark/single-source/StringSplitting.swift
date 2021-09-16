@@ -272,8 +272,8 @@ fileprivate func setup() {
   var characterAlpha: Array<String> = []
   lineSink(alphaInteriorNewlines, view: .character) { characterAlpha.append($0) }
 
-  CheckResults(utf8Alpha == scalarAlpha)
-  CheckResults(utf8Alpha == characterAlpha)
+  check(utf8Alpha == scalarAlpha)
+  check(utf8Alpha == characterAlpha)
 
   var utf8Complex: Array<String> = []
   lineSink(longComplexNewlines, view: .utf8) { utf8Complex.append($0) }
@@ -284,8 +284,8 @@ fileprivate func setup() {
   var characterComplex: Array<String> = []
   lineSink(longComplexNewlines, view: .character) { characterComplex.append($0) }
 
-  CheckResults(utf8Complex == scalarComplex)
-  CheckResults(utf8Complex == characterComplex)
+  check(utf8Complex == scalarComplex)
+  check(utf8Complex == characterComplex)
 
   print("preconditions checked")
 }

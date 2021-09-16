@@ -31,5 +31,5 @@ public func run_MonteCarloPi(scale: Int) {
   }
   let pi_estimate: Double = Double(pointsInside)*4.0/Double(N)
   let pi = 3.1415
-  CheckResults(abs(pi_estimate - pi) < 0.2)
+  check(abs(pi_estimate - pi) < 0.2)
 }

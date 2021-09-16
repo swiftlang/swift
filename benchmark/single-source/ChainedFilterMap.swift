@@ -23,7 +23,7 @@ public func run_ChainedFilterMap(_ N: Int) {
     result = numbers.reduce(into: 0) { $0 += $1 }
   }
 
-  CheckResults(result == 416691666)
+  check(result == 416691666)
 }
 
 @inline(never)
@@ -40,5 +40,5 @@ public func run_FatCompactMap(_ N: Int) {
       }
     result = numbers.reduce(into: 0) { $0 += $1 }
   }
-  CheckResults(result == 416691666)
+  check(result == 416691666)
 }

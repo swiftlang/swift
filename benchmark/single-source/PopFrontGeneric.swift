@@ -57,6 +57,6 @@ public func run_PopFrontArrayGeneric(_ N: Int) {
         result += a[0]
         myArrayReplace(&a, 0..<1, EmptyCollection())
       }
-      CheckResults(result == arrayCount)
+      check(result == arrayCount)
   }
 }

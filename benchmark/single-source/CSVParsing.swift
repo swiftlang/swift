@@ -346,7 +346,7 @@ public func buildWorkload() {
   let altIndices: [[String]] = contents.parseAltIndices().map {
     $0.map { String($0) }
   }
-  CheckResults(alt.elementsEqual(altIndices))
+  check(alt.elementsEqual(altIndices))
 
   var remainder = workload[...]
 
@@ -359,7 +359,7 @@ public func buildWorkload() {
       res[res.endIndex-1].append(field)
     }
   }
-  CheckResults(alt.elementsEqual(parseResult))
+  check(alt.elementsEqual(parseResult))
 }
 
 @inline(never)

@@ -144,7 +144,7 @@ public func run_Dictionary(N: Int) {
       dict[word] = true
     }
   }
-  CheckResults(dict.count == 270)
+  check(dict.count == 270)
 
   // Check performance of searching in the dictionary:
   dict = half
@@ -157,7 +157,7 @@ public func run_Dictionary(N: Int) {
       }
     }
   }
-  CheckResults(count == N*541)
+  check(count == N*541)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -197,7 +197,7 @@ public func run_DictionaryOfObjects(N: Int) {
       dict[Box(word)] = Box(true)
     }
   }
-  CheckResults(dict.count == 270)
+  check(dict.count == 270)
 
   // Check performance of searching in the dictionary:
   dict = halfObjects
@@ -210,5 +210,5 @@ public func run_DictionaryOfObjects(N: Int) {
       }
     }
   }
-  CheckResults(count == N*541)
+  check(count == N*541)
 }

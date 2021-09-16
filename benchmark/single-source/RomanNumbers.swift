@@ -31,7 +31,7 @@ public let RomanNumbers = [
 func checkId(_ n: Int, upTo limit: Int, _ itor: (Int) -> String,
   _ rtoi: (String) -> Int?) {
   for _ in 1...n {
-   CheckResults(
+   check(
      zip(1...limit, (1...limit).map(itor).map(rtoi)).allSatisfy { $0 == $1 })
   }
 }

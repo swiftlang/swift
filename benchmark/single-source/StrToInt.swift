@@ -49,5 +49,5 @@ public func run_StrToInt(_ N: Int) {
   for _ in 1...100*N {
     res = res & DoOneIter(input)
   }
-  CheckResults(res == ref_result)
+  check(res == ref_result)
 }

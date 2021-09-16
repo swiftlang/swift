@@ -68,7 +68,7 @@ public func run_accessGlobal(_ N: Int) {
   for _ in 1...10000*N {
     globalCounter += 1
   }
-  CheckResults(globalCounter == 10000*N)
+  check(globalCounter == 10000*N)
 }
 
 // Measure memory access checks on a class property.
@@ -101,7 +101,7 @@ public func run_accessInMatSet(_ N: Int) {
   for _ in 1...10000*N {
     updateClass(c)
   }
-  CheckResults(c.counter == 10000*N)
+  check(c.counter == 10000*N)
 }
 
 // Measure nested access to independent objects.
@@ -133,6 +133,6 @@ public func run_accessIndependent(_ N: Int) {
   for _ in 1...1000*N {
     updateVars()
   }
-  CheckResults(a.val == 1000*N && b.val == 1000*N && c.val == 1000*N
+  check(a.val == 1000*N && b.val == 1000*N && c.val == 1000*N
     && d.val == 1000*N)
 }

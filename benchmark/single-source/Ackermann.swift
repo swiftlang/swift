@@ -47,5 +47,5 @@ public func run_Ackermann(_ N: Int) {
       break
     }
   }
-  CheckResults(result == ref_result[n])
+  check(result == ref_result[n])
 }

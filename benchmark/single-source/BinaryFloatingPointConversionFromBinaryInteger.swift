@@ -206,7 +206,7 @@ public func run_BinaryFloatingPointConversionFromBinaryInteger(_ N: Int) {
     }
     xs.append(x)
   }
-  CheckResults(xs[getInt(0)] == 1999000)
+  check(xs[getInt(0)] == 1999000)
 }
 
 #endif

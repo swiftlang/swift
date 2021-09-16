@@ -262,18 +262,31 @@ public struct SplitMix64: RandomNumberGenerator {
     }
 }
 
-@inlinable // FIXME(inline-always)
+/// Like `precondition`, but also checked in unchecked builds.
+@inlinable
+@inline(__always)
+public func check(
+  _ resultsMatch: Bool,
+  file: StaticString = #file,
+  function: StaticString = #function,
+  line: Int = #line
+) {
+  guard _fastPath(resultsMatch) else {
+    print("Incorrect result in \(function), \(file):\(line)")
+    abort()
+  }
+}
+
+@available(*, deprecated, renamed: "check")
+@inlinable
 @inline(__always)
 public func CheckResults(
-    _ resultsMatch: Bool,
-    file: StaticString = #file,
-    function: StaticString = #function,
-    line: Int = #line
-    ) {
-    guard _fastPath(resultsMatch) else {
-        print("Incorrect result in \(function), \(file):\(line)")
-        abort()
-    }
+  _ resultsMatch: Bool,
+  file: StaticString = #file,
+  function: StaticString = #function,
+  line: Int = #line
+) {
+  check(resultsMatch, file: file, function: function, line: line)
 }
 
 #if !_runtime(_ObjC)

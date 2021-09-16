@@ -26,7 +26,7 @@ public func run_NibbleSort(_ N: Int) {
     }
   }
 
-  CheckResults(c.val == vRef)
+  check(c.val == vRef)
 }
 
 struct NibbleCollection {

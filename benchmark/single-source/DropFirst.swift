@@ -93,7 +93,7 @@ public func run_DropFirstCountableRange(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -104,7 +104,7 @@ public func run_DropFirstSequence(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -115,7 +115,7 @@ public func run_DropFirstAnySequence(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -126,7 +126,7 @@ public func run_DropFirstAnySeqCntRange(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -137,7 +137,7 @@ public func run_DropFirstAnySeqCRangeIter(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -148,7 +148,7 @@ public func run_DropFirstAnyCollection(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -159,7 +159,7 @@ public func run_DropFirstArray(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -170,7 +170,7 @@ public func run_DropFirstCountableRangeLazy(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -181,7 +181,7 @@ public func run_DropFirstSequenceLazy(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -192,7 +192,7 @@ public func run_DropFirstAnySequenceLazy(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -203,7 +203,7 @@ public func run_DropFirstAnySeqCntRangeLazy(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -214,7 +214,7 @@ public func run_DropFirstAnySeqCRangeIterLazy(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -225,7 +225,7 @@ public func run_DropFirstAnyCollectionLazy(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
@@ -236,7 +236,7 @@ public func run_DropFirstArrayLazy(_ N: Int) {
     for element in s.dropFirst(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 

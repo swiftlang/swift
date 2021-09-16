@@ -132,8 +132,8 @@ public func run_ObjectAllocation(_ N: Int) {
     ArrayResult = testArray()
   }
 
-  CheckResults(SingleObjectResult == 499500)
-  CheckResults(TreeResult == 90000)
-  CheckResults(ListResult == 48375)
-  CheckResults(ArrayResult == 3000)
+  check(SingleObjectResult == 499500)
+  check(TreeResult == 90000)
+  check(ListResult == 48375)
+  check(ArrayResult == 3000)
 }

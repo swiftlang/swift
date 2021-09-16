@@ -48,7 +48,7 @@ public func run_RangeOverlapsRange(_ N: Int) {
       }
     }
   }
-  CheckResults(check == 47872 * UInt64(N))
+  check(check == 47872 * UInt64(N))
 }
 
 @inline(never)
@@ -61,7 +61,7 @@ public func run_RangeOverlapsClosedRange(_ N: Int) {
       }
     }
   }
-  CheckResults(check == 51680 * UInt64(N))
+  check(check == 51680 * UInt64(N))
 }
 
 @inline(never)
@@ -74,5 +74,5 @@ public func run_ClosedRangeOverlapsClosedRange(_ N: Int) {
       }
     }
   }
-  CheckResults(check == 55777 * UInt64(N))
+  check(check == 55777 * UInt64(N))
 }

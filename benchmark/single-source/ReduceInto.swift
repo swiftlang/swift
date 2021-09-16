@@ -33,7 +33,7 @@ public func run_SumUsingReduce(_ N: Int) {
       acc &+ num
     }
   }
-  CheckResults(c != 0)
+  check(c != 0)
 }
 
 @inline(never)
@@ -46,7 +46,7 @@ public func run_SumUsingReduceInto(_ N: Int) {
       acc = acc &+ num
     }
   }
-  CheckResults(c != 0)
+  check(c != 0)
 }
 
 // Filter
@@ -66,7 +66,7 @@ public func run_FilterEvenUsingReduce(_ N: Int) {
     }
     c = c &+ a.count
   }
-  CheckResults(c != 0)
+  check(c != 0)
 }
 
 @inline(never)
@@ -82,7 +82,7 @@ public func run_FilterEvenUsingReduceInto(_ N: Int) {
     }
     c = c &+ a.count
   }
-  CheckResults(c != 0)
+  check(c != 0)
 }
 
 // Frequencies
@@ -101,7 +101,7 @@ public func run_FrequenciesUsingReduce(_ N: Int) {
     }
     c = c &+ a.count
   }
-  CheckResults(c != 0)
+  check(c != 0)
 }
 
 @inline(never)
@@ -116,5 +116,5 @@ public func run_FrequenciesUsingReduceInto(_ N: Int) {
     }
     c = c &+ a.count
   }
-  CheckResults(c != 0)
+  check(c != 0)
 }

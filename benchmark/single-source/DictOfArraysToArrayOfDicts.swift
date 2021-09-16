@@ -39,7 +39,7 @@ public func run_DictOfArraysToArrayOfDicts(_ N: Int) {
     }
   }
 
-  CheckResults(arrayOfDicts.count == 3)
+  check(arrayOfDicts.count == 3)
 }
 
 // Given [

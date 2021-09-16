@@ -35,6 +35,6 @@ public func run_NSDictionaryCastToSwift(_ N: Int) {
             break
         }
     }
-    CheckResults(swiftDict.isEmpty)
+    check(swiftDict.isEmpty)
 #endif
 }

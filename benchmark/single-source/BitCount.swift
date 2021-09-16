@@ -42,5 +42,5 @@ public func run_BitCount(_ N: Int) {
               &+ countBitSet(getInt(2))
               &+ countBitSet(getInt(2457))
   }
-  CheckResults(sum == 8 * 1000 * N)
+  check(sum == 8 * 1000 * N)
 }

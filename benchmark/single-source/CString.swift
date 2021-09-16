@@ -47,7 +47,7 @@ public func run_CStringLongAscii(_ N: Int) {
     // static string to c -> from c to String -> implicit conversion
     res &= strlen(ascii.withCString(String.init(cString:)))
   }
-  CheckResults(res == 0)
+  check(res == 0)
 }
 
 @inline(never)
@@ -56,7 +56,7 @@ public func run_CStringLongNonAscii(_ N: Int) {
   for _ in 1...N*500 {
     res &= strlen(japanese.withCString(String.init(cString:)))
   }
-  CheckResults(res == 0)
+  check(res == 0)
 }
 
 
@@ -94,5 +94,5 @@ public func run_CStringShortAscii(_ N: Int) {
     }
     res = res & DoOneIter(strings)
   }
-  CheckResults(res == reference)
+  check(res == reference)
 }

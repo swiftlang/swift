@@ -104,7 +104,7 @@ public func run_Dictionary4Legacy(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result)
+  check(res == ref_result)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -158,5 +158,5 @@ public func run_Dictionary4OfObjectsLegacy(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result)
+  check(res == ref_result)
 }

@@ -72,5 +72,5 @@ public func run_ProtocolConformance(_ N: Int) {
     }
     i += 1
   }
-  CheckResults(expectedConforms == conforms)
+  check(expectedConforms == conforms)
 }

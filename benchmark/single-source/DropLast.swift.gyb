@@ -63,7 +63,7 @@ public func run_DropLast${Name}(_ N: Int) {
     for element in s.dropLast(dropCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 % end

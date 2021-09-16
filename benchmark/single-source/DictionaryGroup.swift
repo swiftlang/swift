@@ -29,8 +29,8 @@ public let DictionaryGroup = [
 public func run_DictionaryGroup(_ N: Int) {
   for _ in 1...N {
     let dict = Dictionary(grouping: 0..<10_000, by: { $0 % 10 })
-    CheckResults(dict.count == 10)
-    CheckResults(dict[0]!.count == 1_000)
+    check(dict.count == 10)
+    check(dict[0]!.count == 1_000)
   }
 }
 
@@ -57,7 +57,7 @@ public func run_DictionaryGroupOfObjects(_ N: Int) {
   let objects: [Box<Int>] = inputObjects
   for _ in 1...N {
     let dict = Dictionary(grouping: objects, by: { Box($0.value % 10) })
-    CheckResults(dict.count == 10)
-    CheckResults(dict[Box(0)]!.count == 100)
+    check(dict.count == 10)
+    check(dict[Box(0)]!.count == 100)
   }
 }

@@ -62,7 +62,7 @@ public func run_Suffix${Name}(_ N: Int) {
     for element in s.suffix(suffixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 % end

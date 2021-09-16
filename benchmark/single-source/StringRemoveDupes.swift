@@ -29,7 +29,7 @@ public func run_StringRemoveDupes(_ N: Int) {
     }
   }
 
-  CheckResults(s.count == textLengthRef)
+  check(s.count == textLengthRef)
 }
 
 // removes all but first occurrence from a sequence, returning an array.

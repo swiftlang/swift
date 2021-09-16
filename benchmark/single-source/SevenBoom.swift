@@ -46,6 +46,6 @@ public func run_SevenBoom(_ N: Int) {
     catch _ {
     }
   }
-  CheckResults(c == 1)
+  check(c == 1)
 }
 

@@ -126,6 +126,6 @@ func run_BucketSort(_ N : Int) {
   for _ in 0..<N {
     let sortedArray = bucketSort(
       items, sortingAlgorithm: InsertionSort(), bucketArray: buckets)
-    CheckResults(isAscending(sortedArray))
+    check(isAscending(sortedArray))
   }
 }

@@ -55,7 +55,7 @@ func copyKeyValue(N: Int) {
     for (key, value) in dict! {
       copy[key] = value
     }
-    CheckResults(copy.count == dict!.count)
+    check(copy.count == dict!.count)
   }
 }
 
@@ -65,6 +65,6 @@ func copyKeyValue(N: Int) {
 func filterAllMatch(N: Int) {
   for _ in 1...N {
     let copy = dict!.filter { _ in true }
-    CheckResults(copy.count == dict!.count)
+    check(copy.count == dict!.count)
   }
 }

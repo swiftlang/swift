@@ -69,7 +69,7 @@ where Elements.Element: Equatable {
   let i = results.reduce(0, { i,_ in i &+ 1 })
   for x in elements { q.enqueue(x) }
   let j = results.reduce(i, { i,_ in i &+ 1 })
-  CheckResults(j == elements.count*2)
+  check(j == elements.count*2)
 }
 
 let n = 1_000
@@ -118,7 +118,7 @@ func testConcreteQueue(elements: [String]) {
   let i = results.reduce(0, { i,_ in i &+ 1 })
   for x in elements { q.enqueue(x) }
   let j = results.reduce(i, { i,_ in i &+ 1 })
-  CheckResults(j == elements.count*2)
+  check(j == elements.count*2)
 }
 
 

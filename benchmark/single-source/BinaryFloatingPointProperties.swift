@@ -41,7 +41,7 @@ public func run_BinaryFloatingPointPropertiesBinade(_ N: Int) {
     }
     xs.append(x)
   }
-  CheckResults(xs[getInt(0)] == 37180757)
+  check(xs[getInt(0)] == 37180757)
 }
 
 @inline(never)
@@ -55,7 +55,7 @@ public func run_BinaryFloatingPointPropertiesNextUp(_ N: Int) {
     }
     xs.append(x)
   }
-  CheckResults(xs[getInt(0)] == 49995000)
+  check(xs[getInt(0)] == 49995000)
 }
 
 @inline(never)
@@ -69,5 +69,5 @@ public func run_BinaryFloatingPointPropertiesUlp(_ N: Int) {
     }
     xs.append(x)
   }
-  CheckResults(xs[getInt(0)] == 0)
+  check(xs[getInt(0)] == 0)
 }

@@ -48,7 +48,7 @@ func remove(N: Int) {
   for _ in 1...100*N {
     var dict = numberMap
     for i in 1...size { dict.removeValue(forKey: i) }
-    CheckResults(dict.isEmpty)
+    check(dict.isEmpty)
   }
 }
 
@@ -56,6 +56,6 @@ func removeObjects(N: Int) {
   for _ in 1...10*N {
     var dict = boxedNumMap
     for i in 1...size { dict.removeValue(forKey: Box(i)) }
-    CheckResults(dict.isEmpty)
+    check(dict.isEmpty)
   }
 }

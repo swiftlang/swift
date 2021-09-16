@@ -26,7 +26,7 @@ class Thing : NSObject {
 
   required override init() {
     let c = type(of: self).col()
-    CheckResults(c!.count == 10)
+    check(c!.count == 10)
   }
 
   private class func col() -> [String : AnyObject]? {

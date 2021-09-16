@@ -55,7 +55,7 @@ func testObjectiveCBridgeStubFromNSStringRef() {
   for _ in 0 ..< 10_000 {
     nsString = b.testToString()
   }
-  CheckResults(nsString.isEqual(to: "Default string value no tagged pointer" as NSString))
+  check(nsString.isEqual(to: "Default string value no tagged pointer" as NSString))
 }
 #endif
 

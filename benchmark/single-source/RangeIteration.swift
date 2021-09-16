@@ -55,7 +55,7 @@ public func run_RangeIterationSigned(_ N: Int) {
     }
   }
 
-  CheckResults(check == 4999950000 * UInt64(N))
+  check(check == 4999950000 * UInt64(N))
 }
 
 #if swift(>=4.2)
@@ -70,7 +70,7 @@ public func run_RangeIterationSigned64(_ N: Int) {
     }
   }
 
-  CheckResults(check == 4999950000 * UInt64(N))
+  check(check == 4999950000 * UInt64(N))
 }
 
 @inline(never)
@@ -83,7 +83,7 @@ public func run_RangeIterationUnsigned(_ N: Int) {
     }
   }
 
-  CheckResults(check == 4999950000 * UInt64(N))
+  check(check == 4999950000 * UInt64(N))
 }
 
 #endif

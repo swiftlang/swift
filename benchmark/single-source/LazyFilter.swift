@@ -42,7 +42,7 @@ public func run_LazilyFilteredRange(_ N: Int) {
     res += Array(c).count
     res -= Array(c).count
   }
-  CheckResults(res == 123)
+  check(res == 123)
 }
 
 let filteredRange = (1..<1_000).map({[$0]}).lazy.filter { $0.first! % 7 == 0 }
@@ -55,7 +55,7 @@ public func run_LazilyFilteredArrays(_ N: Int) {
     res += Array(c).count
     res -= Array(c).count
   }
-  CheckResults(res == 123)
+  check(res == 123)
 }
 
 fileprivate var multiplesOfThree: LazyFilterCollection<Array<Int>>?
@@ -68,6 +68,6 @@ fileprivate func run_LazilyFilteredArrayContains(_ N: Int) {
     for candidate in 1..<500 {
       filteredCount += xs.contains(candidate) ? 1 : 0
     }
-    CheckResults(filteredCount == 166)
+    check(filteredCount == 166)
   }
 }

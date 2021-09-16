@@ -31,5 +31,5 @@ public func run_PointerArithmetics(_ N: Int) {
       }
     }
   }
-  CheckResults(c != 0)
+  check(c != 0)
 }

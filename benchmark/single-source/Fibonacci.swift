@@ -43,5 +43,5 @@ public func run_Fibonacci(_ N: Int) {
       break
     }
   }
-  CheckResults(result == ref_result)
+  check(result == ref_result)
 }

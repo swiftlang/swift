@@ -36,12 +36,12 @@ public let DictionaryCompactMapValues = [
 
 func compactMapValues(N: Int) {
   for _ in 1...20*N {
-    CheckResults(smallOddNumMap.compactMapValues({$0}) == compactOddNums)
+    check(smallOddNumMap.compactMapValues({$0}) == compactOddNums)
   }
 }
 
 func compactMapValuesInt(N: Int) {
   for _ in 1...20*N {
-    CheckResults(oddStringMap.compactMapValues(Int.init) == compactOddNums)
+    check(oddStringMap.compactMapValues(Int.init) == compactOddNums)
   }
 }

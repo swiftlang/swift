@@ -382,9 +382,9 @@ func testPushingRequests() -> Bool {
 @inline(never)
 func run_HTTP2StateMachine(_ N: Int) {
     for _ in 0 ..< 1000000 * N {
-        CheckResults(testSimpleRequestResponse())
-        CheckResults(testPushedRequests())
-        CheckResults(testPushingRequests())
+        check(testSimpleRequestResponse())
+        check(testPushedRequests())
+        check(testPushingRequests())
     }
 }
 

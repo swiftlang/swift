@@ -62,7 +62,7 @@ public func run_PrefixWhile${Name}(_ N: Int) {
     for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 % end

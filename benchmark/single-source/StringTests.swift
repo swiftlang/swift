@@ -45,7 +45,7 @@ public func run_StringHasPrefixAscii(_ N: Int) {
   let testString = "prefixedString"
   for _ in 0 ..< N {
     for _ in 0 ..< 10_000 {
-      CheckResults(testString.hasPrefix(getString(prefix)))
+      check(testString.hasPrefix(getString(prefix)))
     }
   }
 #endif
@@ -58,7 +58,7 @@ public func run_StringHasSuffixAscii(_ N: Int) {
   let testString = "StringSuffixed"
   for _ in 0 ..< N {
     for _ in 0 ..< 10_000 {
-      CheckResults(testString.hasSuffix(getString(suffix)))
+      check(testString.hasSuffix(getString(suffix)))
     }
   }
 #endif
@@ -71,7 +71,7 @@ public func run_StringHasPrefixUnicode(_ N: Int) {
   let testString = "❄️prefixedString"
   for _ in 0 ..< N {
     for _ in 0 ..< 100 {
-      CheckResults(testString.hasPrefix(getString(prefix)))
+      check(testString.hasPrefix(getString(prefix)))
     }
   }
 #endif
@@ -84,7 +84,7 @@ public func run_StringHasSuffixUnicode(_ N: Int) {
   let testString = "String❄️Suffixed"
   for _ in 0 ..< N {
     for _ in 0 ..< 100 {
-      CheckResults(testString.hasSuffix(getString(suffix)))
+      check(testString.hasSuffix(getString(suffix)))
     }
   }
 #endif
@@ -100,7 +100,7 @@ public func run_StringEqualPointerComparison(_ N: Int) {
   let str2 = str1
   for _ in 0 ..< N {
     for _ in 0 ..< 100_000 {
-      CheckResults(compareEqual(str1, str2))
+      check(compareEqual(str1, str2))
     }
   }
 }

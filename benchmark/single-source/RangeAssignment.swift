@@ -27,5 +27,5 @@ public func run_RangeAssignment(_ scale: Int) {
       vector[range] = ArraySlice(vector[range].map { $0 + alfa })
   }
 
-  CheckResults(vector[100] == Double(N))
+  check(vector[100] == Double(N))
 }

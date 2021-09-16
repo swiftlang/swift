@@ -74,7 +74,7 @@ public func run_DictionaryOfAnyHashableStrings_lookup(_ n: Int) {
   for _ in 1...n {
     for i in 0 ..< keys.count {
       let key = keys[i]
-      CheckResults((workload[key] as! Int) == i)
+      check((workload[key] as! Int) == i)
     }
   }
 }

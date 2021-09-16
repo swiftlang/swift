@@ -38,8 +38,8 @@ public func run_DictionarySubscriptDefaultMutation(_ N: Int) {
       dict[i % 100, default: 0] += 1
     }
 
-    CheckResults(dict.count == 100)
-    CheckResults(dict[0]! == 100)
+    check(dict.count == 100)
+    check(dict[0]! == 100)
   }
 }
 
@@ -53,8 +53,8 @@ public func run_DictionarySubscriptDefaultMutationArray(_ N: Int) {
       dict[i % 100, default: []].append(i)
     }
 
-    CheckResults(dict.count == 100)
-    CheckResults(dict[0]!.count == 100)
+    check(dict.count == 100)
+    check(dict[0]!.count == 100)
   }
 }
 
@@ -100,8 +100,8 @@ public func run_DictionarySubscriptDefaultMutationOfObjects(_ N: Int) {
       dict[Box(i % 5), default: Box(0)].mutateValue { $0 += 1 }
     }
 
-    CheckResults(dict.count == 5)
-    CheckResults(dict[Box(0)]!.value == 100)
+    check(dict.count == 5)
+    check(dict[Box(0)]!.value == 100)
   }
 }
 
@@ -115,7 +115,7 @@ public func run_DictionarySubscriptDefaultMutationArrayOfObjects(_ N: Int) {
       dict[Box(i % 5), default: []].append(Box(i))
     }
 
-    CheckResults(dict.count == 5)
-    CheckResults(dict[Box(0)]!.count == 100)
+    check(dict.count == 5)
+    check(dict[Box(0)]!.count == 100)
   }
 }

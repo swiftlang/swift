@@ -295,7 +295,7 @@ public func run_ParseIntFromIntSmallDecimal(N: Int) {
       result &+= Int(string, radix: 10)!
     }
   }
-  CheckResults(result == intSmallValuesSum &* Int(count))
+  check(result == intSmallValuesSum &* Int(count))
 }
 
 @inline(never)
@@ -307,7 +307,7 @@ public func run_ParseIntFromIntSmallBinary(N: Int) {
       result &+= Int(string, radix: 2)!
     }
   }
-  CheckResults(result == intSmallValuesSum &* Int(count))
+  check(result == intSmallValuesSum &* Int(count))
 }
 
 @inline(never)
@@ -319,7 +319,7 @@ public func run_ParseIntFromIntSmallHex(N: Int) {
       result &+= Int(string, radix: 16)!
     }
   }
-  CheckResults(result == intSmallValuesSum &* Int(count))
+  check(result == intSmallValuesSum &* Int(count))
 }
 
 @inline(never)
@@ -331,7 +331,7 @@ public func run_ParseIntFromIntSmallUncommonRadix(N: Int) {
       result &+= Int(string, radix: 7)!
     }
   }
-  CheckResults(result == intSmallValuesSum &* Int(count))
+  check(result == intSmallValuesSum &* Int(count))
 }
 
 // UIntSmall
@@ -344,7 +344,7 @@ public func run_ParseIntFromUIntSmallDecimal(N: Int) {
       result &+= UInt(string, radix: 10)!
     }
   }
-  CheckResults(result == uintSmallValuesSum &* UInt(count))
+  check(result == uintSmallValuesSum &* UInt(count))
 }
 
 @inline(never)
@@ -356,7 +356,7 @@ public func run_ParseIntFromUIntSmallBinary(N: Int) {
       result &+= UInt(string, radix: 2)!
     }
   }
-  CheckResults(result == uintSmallValuesSum &* UInt(count))
+  check(result == uintSmallValuesSum &* UInt(count))
 }
 
 @inline(never)
@@ -368,7 +368,7 @@ public func run_ParseIntFromUIntSmallHex(N: Int) {
       result &+= UInt(string, radix: 16)!
     }
   }
-  CheckResults(result == uintSmallValuesSum &* UInt(count))
+  check(result == uintSmallValuesSum &* UInt(count))
 }
 
 @inline(never)
@@ -380,7 +380,7 @@ public func run_ParseIntFromUIntSmallUncommonRadix(N: Int) {
       result &+= UInt(string, radix: 7)!
     }
   }
-  CheckResults(result == uintSmallValuesSum &* UInt(count))
+  check(result == uintSmallValuesSum &* UInt(count))
 }
 
 // Int32
@@ -393,7 +393,7 @@ public func run_ParseIntFromInt32Decimal(N: Int) {
       result &+= Int32(string, radix: 10)!
     }
   }
-  CheckResults(result == int32ValuesSum &* Int32(count))
+  check(result == int32ValuesSum &* Int32(count))
 }
 
 @inline(never)
@@ -405,7 +405,7 @@ public func run_ParseIntFromInt32Binary(N: Int) {
       result &+= Int32(string, radix: 2)!
     }
   }
-  CheckResults(result == int32ValuesSum &* Int32(count))
+  check(result == int32ValuesSum &* Int32(count))
 }
 
 @inline(never)
@@ -417,7 +417,7 @@ public func run_ParseIntFromInt32Hex(N: Int) {
       result &+= Int32(string, radix: 16)!
     }
   }
-  CheckResults(result == int32ValuesSum &* Int32(count))
+  check(result == int32ValuesSum &* Int32(count))
 }
 
 @inline(never)
@@ -429,7 +429,7 @@ public func run_ParseIntFromInt32UncommonRadix(N: Int) {
       result &+= Int32(string, radix: 7)!
     }
   }
-  CheckResults(result == int32ValuesSum &* Int32(count))
+  check(result == int32ValuesSum &* Int32(count))
 }
 
 // Int64
@@ -442,7 +442,7 @@ public func run_ParseIntFromInt64Decimal(N: Int) {
       result &+= Int64(string, radix: 10)!
     }
   }
-  CheckResults(result == int64ValuesSum &* Int64(count))
+  check(result == int64ValuesSum &* Int64(count))
 }
 
 @inline(never)
@@ -454,7 +454,7 @@ public func run_ParseIntFromInt64Binary(N: Int) {
       result &+= Int64(string, radix: 2)!
     }
   }
-  CheckResults(result == int64ValuesSum &* Int64(count))
+  check(result == int64ValuesSum &* Int64(count))
 }
 
 @inline(never)
@@ -466,7 +466,7 @@ public func run_ParseIntFromInt64Hex(N: Int) {
       result &+= Int64(string, radix: 16)!
     }
   }
-  CheckResults(result == int64ValuesSum &* Int64(count))
+  check(result == int64ValuesSum &* Int64(count))
 }
 
 @inline(never)
@@ -478,7 +478,7 @@ public func run_ParseIntFromInt64UncommonRadix(N: Int) {
       result &+= Int64(string, radix: 7)!
     }
   }
-  CheckResults(result == int64ValuesSum &* Int64(count))
+  check(result == int64ValuesSum &* Int64(count))
 }
 
 // UInt32
@@ -491,7 +491,7 @@ public func run_ParseIntFromUInt32Decimal(N: Int) {
       result &+= UInt32(string, radix: 10)!
     }
   }
-  CheckResults(result == uint32ValuesSum &* UInt32(count))
+  check(result == uint32ValuesSum &* UInt32(count))
 }
 
 @inline(never)
@@ -503,7 +503,7 @@ public func run_ParseIntFromUInt32Binary(N: Int) {
       result &+= UInt32(string, radix: 2)!
     }
   }
-  CheckResults(result == uint32ValuesSum &* UInt32(count))
+  check(result == uint32ValuesSum &* UInt32(count))
 }
 
 @inline(never)
@@ -515,7 +515,7 @@ public func run_ParseIntFromUInt32Hex(N: Int) {
       result &+= UInt32(string, radix: 16)!
     }
   }
-  CheckResults(result == uint32ValuesSum &* UInt32(count))
+  check(result == uint32ValuesSum &* UInt32(count))
 }
 
 @inline(never)
@@ -527,7 +527,7 @@ public func run_ParseIntFromUInt32UncommonRadix(N: Int) {
       result &+= UInt32(string, radix: 7)!
     }
   }
-  CheckResults(result == uint32ValuesSum &* UInt32(count))
+  check(result == uint32ValuesSum &* UInt32(count))
 }
 
 // UInt64
@@ -540,7 +540,7 @@ public func run_ParseIntFromUInt64Decimal(N: Int) {
       result &+= UInt64(string, radix: 10)!
     }
   }
-  CheckResults(result == uint64ValuesSum &* UInt64(count))
+  check(result == uint64ValuesSum &* UInt64(count))
 }
 
 @inline(never)
@@ -552,7 +552,7 @@ public func run_ParseIntFromUInt64Binary(N: Int) {
       result &+= UInt64(string, radix: 2)!
     }
   }
-  CheckResults(result == uint64ValuesSum &* UInt64(count))
+  check(result == uint64ValuesSum &* UInt64(count))
 }
 
 @inline(never)
@@ -564,7 +564,7 @@ public func run_ParseIntFromUInt64Hex(N: Int) {
       result &+= UInt64(string, radix: 16)!
     }
   }
-  CheckResults(result == uint64ValuesSum &* UInt64(count))
+  check(result == uint64ValuesSum &* UInt64(count))
 }
 
 @inline(never)
@@ -576,7 +576,7 @@ public func run_ParseIntFromUInt64UncommonRadix(N: Int) {
       result &+= UInt64(string, radix: 7)!
     }
   }
-  CheckResults(result == uint64ValuesSum &* UInt64(count))
+  check(result == uint64ValuesSum &* UInt64(count))
 }
 
 

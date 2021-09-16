@@ -74,8 +74,8 @@ public func run_DictionaryKeysContains(_ N: Int) {
   fatalError("Unsupported benchmark")
 #else
   for _ in 0..<(N * 100) {
-    CheckResults(dictionary.keys.contains("42"))
-    CheckResults(!dictionary.keys.contains("-1"))
+    check(dictionary.keys.contains("42"))
+    check(!dictionary.keys.contains("-1"))
   }
 #endif
 }

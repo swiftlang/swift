@@ -48,7 +48,7 @@ public func run_ArrayValueProp(_ N: Int) {
     res += addLiteralArray()
     res -= addLiteralArray()
   }
-  CheckResults(res == 123)
+  check(res == 123)
 }
 
 
@@ -89,7 +89,7 @@ public func run_ArrayValueProp2(_ N: Int) {
     res += addLiteralArray2()
     res -= addLiteralArray2()
   }
-  CheckResults(res == 123)
+  check(res == 123)
 }
 
 @inline(never)
@@ -99,7 +99,7 @@ public func run_ArrayValueProp3(_ N: Int) {
     res += addLiteralArray3()
     res -= addLiteralArray3()
   }
-  CheckResults(res == 123)
+  check(res == 123)
 }
 
 @inline(never)
@@ -109,5 +109,5 @@ public func run_ArrayValueProp4(_ N: Int) {
     res += addLiteralArray4()
     res -= addLiteralArray4()
   }
-  CheckResults(res == 123)
+  check(res == 123)
 }

@@ -37,7 +37,7 @@ public func run_RGBHistogram(_ N: Int) {
             break
         }
     }
-    CheckResults(isCorrectHistogram(histogram))
+    check(isCorrectHistogram(histogram))
 }
 
 typealias rrggbb_t = UInt32
@@ -175,5 +175,5 @@ public func run_RGBHistogramOfObjects(_ N: Int) {
             break
         }
     }
-    CheckResults(isCorrectHistogramOfObjects(histogram))
+    check(isCorrectHistogramOfObjects(histogram))
 }

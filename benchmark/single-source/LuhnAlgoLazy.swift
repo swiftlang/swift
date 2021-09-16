@@ -24,7 +24,7 @@ public func run_LuhnAlgoLazy(_ N: Int) {
         }
     }
 
-    CheckResults(result == resultRef)
+    check(result == resultRef)
 }
 
 // Another version of the Luhn algorithm, similar to the one found here:

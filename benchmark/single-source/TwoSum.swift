@@ -75,8 +75,8 @@ public func run_TwoSum(_ N: Int) {
         }
         Dict[array[n]] = n
       }
-      CheckResults(i1 != nil && i2 != nil)
-      CheckResults(Sum == array[i1!] + array[i2!])
+      check(i1 != nil && i2 != nil)
+      check(Sum == array[i1!] + array[i2!])
     }
   }
 }

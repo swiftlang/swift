@@ -233,7 +233,7 @@ public func run_SubstringEquatable(_ N: Int) {
 			if substrings.contains(s) { count = count &+ 1 }
 		}
 	}
-  CheckResults(count == 8*N*500)
+  check(count == 8*N*500)
 }
 
 @inline(never)
@@ -249,7 +249,7 @@ public func run_SubstringEqualString(_ N: Int) {
 			if s == pineapple || s == apple { count = count &+ 1 }
 		}
 	}
-  CheckResults(count == 2*N*500)
+  check(count == 2*N*500)
 }
 
 let _substrings = "pen,pineapple,apple,pen,✒️,🍍,🍏,✒️".split(separator: ",")
@@ -265,7 +265,7 @@ public func run_SubstringComparable(_ N: Int) {
 			count = count &+ 1
 		}
 	}
-  CheckResults(count == N*500)
+  check(count == N*500)
 }
 
 extension Character {

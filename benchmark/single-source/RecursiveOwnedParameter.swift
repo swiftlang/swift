@@ -57,5 +57,5 @@ public func run_RecursiveOwnedParameter(_ N: Int) {
     }
   }
   let refResult = 100*N
-  CheckResults(result == refResult)
+  check(result == refResult)
 }

@@ -60,7 +60,7 @@ public func run_SortIntPyramid(_ N: Int) {
     pyramid.sort()
 
     // Check whether pyramid is sorted.
-    CheckResults(pyramid[0] <= pyramid[pyramid.count/2])
+    check(pyramid[0] <= pyramid[pyramid.count/2])
   }
 }
 
@@ -70,7 +70,7 @@ public func run_SortAdjacentIntPyramids(_ N: Int) {
     var adjacentPyramids = adjacentPyramidsTemplate
     adjacentPyramids.sort()
     // Check whether pyramid is sorted.
-    CheckResults(
+    check(
       adjacentPyramids[0] <= adjacentPyramids[adjacentPyramids.count/2])
   }
 }
