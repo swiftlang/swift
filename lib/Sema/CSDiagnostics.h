@@ -697,6 +697,29 @@ protected:
 
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, Type contextualType);
+
+protected:
+  bool exprNeedsParensBeforeAddingAs(const Expr *expr, DeclContext *DC) const {
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
+                    DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc())
+                    .getSingle();
+    if (!asPG)
+      return true;
+    return exprNeedsParensInsideFollowingOperator(DC, const_cast<Expr *>(expr),
+                                                  asPG);
+  }
+
+  bool exprNeedsParensAfterAddingAs(const Expr *expr, DeclContext *DC) const {
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
+                    DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc())
+                    .getSingle();
+    if (!asPG)
+      return true;
+
+    return exprNeedsParensOutsideFollowingOperator(
+        DC, const_cast<Expr *>(expr), asPG,
+        [&](auto *E) { return findParentExpr(E); });
+  }
 };
 
 /// Diagnose errors related to using an array literal where a
@@ -887,29 +910,6 @@ public:
   ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
-
-private:
-  bool exprNeedsParensBeforeAddingAs(const Expr *expr) {
-    auto *DC = getDC();
-    auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
-    if (!asPG)
-      return true;
-    return exprNeedsParensInsideFollowingOperator(DC, const_cast<Expr *>(expr),
-                                                  asPG);
-  }
-
-  bool exprNeedsParensAfterAddingAs(const Expr *expr) {
-    auto *DC = getDC();
-    auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
-    if (!asPG)
-      return true;
-
-    return exprNeedsParensOutsideFollowingOperator(
-        DC, const_cast<Expr *>(expr), asPG,
-        [&](auto *E) { return findParentExpr(E); });
-  }
 };
 
 /// Diagnose failures related to passing value of some type
