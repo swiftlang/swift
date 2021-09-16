@@ -247,9 +247,9 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_defined_lifetimes :
-  Flag<["-"], "enable-experimental-defined-lifetimes">,
-  HelpText<"Enable experimental defined lifetimes">;
+def enable_experimental_lexical_lifetimes :
+  Flag<["-"], "enable-experimental-lexical-lifetimes">,
+  HelpText<"Enable experimental lexical lifetimes">;
 
 def enable_experimental_distributed :
   Flag<["-"], "enable-experimental-distributed">,
