@@ -55,9 +55,10 @@ public func run_MirrorDefault(scale: Int) {
     str = "\(s1),\(s2),\(c),\(d),\(e),\(f),\(g),\(h)"
     blackHole(str)
   }
-  
+
   check(str ==
-    "S1(s: \"foo\", d: 3.14),S2(i: 42, a: [Range(0..<4)]),Mirror.C,Mirror.D,a,b(99),G<Double>(t: 12.3),Mirror.H<Swift.Array<Swift.Int>>")
+    "S1(s: \"foo\", d: 3.14),S2(i: 42, a: [Range(0..<4)]),MirrorTest.C,MirrorTest.D,a,b(99),G<Double>(t: 12.3),MirrorTest.H<Swift.Array<Swift.Int>>")
+
 }
 
 func typename<T>(of: T.Type) -> String {
