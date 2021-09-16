@@ -112,10 +112,8 @@ enum class LayoutType : char {
   SinglePayloadEnum = 'e',
   MultiPayloadEnum = 'E',
   AlignedGroup = 'a',
-
-  // TODO
-  // ArcheType = 'A',
-  // ResilientType = 'R',
+  ArcheType = 'A',
+  ResilientType = 'R',
 };
 
 // The implemenation of this should be provided by the stdlib when we link this

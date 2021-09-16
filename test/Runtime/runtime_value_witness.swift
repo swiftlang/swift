@@ -1,8 +1,14 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-type-layout -Xfrontend -force-struct-type-layouts -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -lc++) --stdlib-unittest-in-process
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) %S/../Inputs/resilient_struct.swift -enable-library-evolution -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_enum)) %S/../Inputs/resilient_enum.swift -enable-library-evolution -emit-module -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t -L %t -lresilient_struct
+// RUN: %target-build-swift -g -Xfrontend -enable-type-layout -Xfrontend -force-struct-type-layouts -Xfrontend -enable-autolinking-runtime-compatibility-bytecode-layouts -I %t -L %t -lresilient_struct -lresilient_enum -lc++ %s -o %t/a.out
+// RUN: %target-run %t/a.out --stdlib-unittest-in-process
 
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import resilient_struct
+import resilient_enum
 
 var Tests = TestSuite("RuntimeValueWitness")
 
@@ -184,6 +190,103 @@ Tests.test("MultiEnum") {
   let _ = MultiPayloadStruct(a: .NoPayload2, c: LifetimeTracked(0))
   let _ = MultiPayloadStruct(a: .NoPayload3, c: LifetimeTracked(0))
   let _ = MultiPayloadStruct(a: .NoPayload4, c: LifetimeTracked(0))
+}
+
+Tests.test("Archetypes") {
+  @_GenerateLayoutBytecode
+  struct ArchetypeStruct<T> {
+    init(a: T, b: LifetimeTracked) {
+      self.a = a
+      self.b = b
+    }
+    let a: T
+    let b: LifetimeTracked
+  }
+
+  let _ = ArchetypeStruct<UInt64>(a: 0xAAAA, b: LifetimeTracked(0))
+  let _ = ArchetypeStruct<UInt32>(a: 0xBBBB, b: LifetimeTracked(0))
+  let _ = ArchetypeStruct<UInt16>(a: 0xCCCC, b: LifetimeTracked(0))
+  let _ = ArchetypeStruct<UInt8>(a: 0xDD, b: LifetimeTracked(0))
+  let _ = ArchetypeStruct<LifetimeTracked>(a: LifetimeTracked(0), b: LifetimeTracked(0))
+}
+
+Tests.test("Multi Archetypes") {
+  @_GenerateLayoutBytecode
+  struct ArchetypeStruct<S, T> {
+    init(a: S, b: LifetimeTracked, c: T) {
+      self.a = a
+      self.b = b
+      self.c = c
+    }
+    let a: S
+    let b: LifetimeTracked
+    let c: T
+  }
+
+  let _ = ArchetypeStruct<LifetimeTracked, LifetimeTracked>(a: LifetimeTracked(0), b: LifetimeTracked(0), c: LifetimeTracked(0))
+  let _ = ArchetypeStruct<UInt64, UInt64>(a: 0xAAAA, b: LifetimeTracked(0), c: 0)
+  let _ = ArchetypeStruct<UInt64, LifetimeTracked>(a: 0xAAAA, b: LifetimeTracked(0), c: LifetimeTracked(0))
+}
+
+Tests.test("Resilient") {
+  @_GenerateLayoutBytecode
+  struct ResilientStruct<T> {
+    init(a: T, b: Point, c: ResilientSinglePayloadGenericEnum<LifetimeTracked>, d: LifetimeTracked) {
+      self.a = a
+      self.b = b
+      self.c = c
+      self.d = d
+    }
+    let a: T
+    let b: Point
+    let c: ResilientSinglePayloadGenericEnum<LifetimeTracked>
+    let d: LifetimeTracked
+  }
+
+  let _ = ResilientStruct<UInt16>(a: 0xFF, b: Point(x: 0,y: 0), c: .X(LifetimeTracked(0)), d: LifetimeTracked(0))
+  let _ = ResilientStruct<UInt16>(a: 0xFF, b: Point(x: 0,y: 0), c: .A, d: LifetimeTracked(0))
+  let _ = ResilientStruct<UInt16>(a: 0xFF, b: Point(x: 0,y: 0), c: .B, d: LifetimeTracked(0))
+  let _ = ResilientStruct<UInt16>(a: 0xFF, b: Point(x: 0,y: 0), c: .C, d: LifetimeTracked(0))
+}
+
+Tests.test("Archetype Multi Enums") {
+  @_GenerateLayoutBytecode
+  enum ArchetypeEnum<T>: Equatable {
+    case Left(_ a: LifetimeTracked)
+    case Right(_ b: LifetimeTracked)
+    case None
+  }
+  let a1 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(1))
+  var a2 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(2))
+  checkCopies(a1, &a2)
+
+  let b1 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(1))
+  var b2 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(2))
+  checkCopies(b1, &b2)
+
+  let c1 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(1))
+  var c2 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(2))
+  checkCopies(c1, &c2)
+
+  let d1 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(1))
+  var d2 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(2))
+  checkCopies(d1, &d2)
+
+  let e1 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(1))
+  var e2 = ArchetypeEnum<LifetimeTracked>.None
+  checkCopies(e1, &e2)
+
+  let f1 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(1))
+  var f2 = ArchetypeEnum<LifetimeTracked>.None
+  checkCopies(f1, &f2)
+
+  let g1 = ArchetypeEnum<LifetimeTracked>.None
+  var g2 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(2))
+  checkCopies(g1, &g2)
+
+  let h1 = ArchetypeEnum<LifetimeTracked>.None
+  var h2 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(2))
+  checkCopies(h1, &h2)
 }
 
 runAllTests()

@@ -26,7 +26,6 @@
 #include "llvm/Support/SwapByteOrder.h"
 #include <Block.h>
 #include <cstdint>
-#include <iostream>
 
 using namespace swift;
 
@@ -34,6 +33,18 @@ using namespace swift;
 // before we pass them to retain/release functions
 #define MASK_PTR(x)                                                            \
   ((__swift_uintptr_t)x & ~heap_object_abi::SwiftSpareBitsMask)
+
+/// Get the generic argument vector for the passed in metadata
+///
+/// NB: We manually compute the offset instead of using Metadata::getGenericArgs
+/// because Metadata::getGenericArgs checks the isSwift bit which we cannot do
+/// in a compatibility library. Once we merge this into the runtime, we can
+/// safely use Metadata::getGenericArgs. For our purposes right now anyways,
+/// struct and enums always have their generic argument vector at offset + 2 so
+/// we can hard code that.
+const Metadata **getGenericArgs(Metadata *metadata) {
+  return ((const Metadata **)metadata) + 2;
+}
 
 /// The minimum number of bits used for a value.
 /// e.g. bitsToRepresent(5(0b101)) -> 3
@@ -331,13 +342,14 @@ MultiPayloadEnum readMultiPayloadEnum(const uint8_t *typeLayout,
 
   uint32_t numExtraInhabitants = payloadSpareBits.countExtraInhabitants();
   uint32_t tagsInExtraInhabitants =
-      std::min(numExtraInhabitants, numEmptyPayloads);
-  uint32_t spilledTags = numEmptyPayloads - tagsInExtraInhabitants;
+      std::min(numExtraInhabitants, numPayloads + numEmptyPayloads);
+  uint32_t spilledTags =
+      numPayloads + numEmptyPayloads - tagsInExtraInhabitants;
 
   // round up to the nearest byte
   uint8_t extraTagBytes = bytesToRepresent(spilledTags);
 
-  BitVector extraTagBitsSpareBits(extraTagBytes);
+  BitVector extraTagBitsSpareBits(8 * extraTagBytes);
   // If we rounded up, those extra tag bits are spare.
   for (int i = 0; i < extraTagBytes * 8 - bitsToRepresent(spilledTags); i++) {
     extraTagBitsSpareBits.data[i] = 1;
@@ -401,6 +413,22 @@ size_t computeSize(const uint8_t *typeLayout, Metadata *metadata) {
     return readMultiPayloadEnum(typeLayout, metadata).size();
   case LayoutType::SinglePayloadEnum:
     return readSinglePayloadEnum(typeLayout, metadata).size;
+  case LayoutType::ArcheType: {
+    size_t offset = 0;
+    readBytes<uint8_t>(typeLayout, offset);
+    uint32_t index = readBytes<uint32_t>(typeLayout, offset);
+    return getGenericArgs(metadata)[index]->getValueWitnesses()->getSize();
+  }
+  case LayoutType::ResilientType: {
+    size_t offset = 0;
+    // Read 'R'
+    readBytes<uint8_t>(typeLayout, offset);
+    uint32_t mangledNameLength = readBytes<uint32_t>(typeLayout, offset);
+    const Metadata *resilientMetadata = swift_getTypeByMangledNameInContext(
+        (const char *)(typeLayout + offset), mangledNameLength, nullptr,
+        (const void *const *)getGenericArgs(metadata));
+    return resilientMetadata->getValueWitnesses()->getSize();
+  }
   }
 }
 
@@ -433,6 +461,30 @@ BitVector spareBits(const uint8_t *typeLayout, Metadata *metadata) {
     return readSinglePayloadEnum(typeLayout, metadata).spareBits;
   case LayoutType::MultiPayloadEnum:
     return readMultiPayloadEnum(typeLayout, metadata).spareBits();
+  case LayoutType::ArcheType: {
+    // No spare bits stored in archetypes
+    size_t offset = 0;
+    readBytes<uint8_t>(typeLayout, offset);
+    uint32_t index = readBytes<uint32_t>(typeLayout, offset);
+    auto size = getGenericArgs(metadata)[index]->getValueWitnesses()->getSize();
+    return BitVector(size * 8);
+  }
+  case LayoutType::ResilientType: {
+    // No spare bits stored in resilient types
+    // Read 'R'
+    size_t offset;
+    readBytes<uint8_t>(typeLayout, offset);
+    uint32_t mangledNameLength = readBytes<uint32_t>(typeLayout, offset);
+
+    const Metadata *resilientMetadata = swift_getTypeByMangledNameInContext(
+        (const char *)(typeLayout + offset), mangledNameLength, nullptr,
+        (const void *const *)getGenericArgs(metadata));
+
+    offset += mangledNameLength;
+    auto size = resilientMetadata->getValueWitnesses()->getSize();
+    return BitVector(size * 8);
+    break;
+  }
   }
 }
 
@@ -568,20 +620,16 @@ uint32_t extractPayloadTag(const MultiPayloadEnum e, const uint8_t *data) {
 
   // Get the extra tag bits, if any.
   if (e.extraTagBitsSpareBits.size() > 0) {
-    if (!tag) {
-      return e.extraTagBitsSpareBits.getAsU32();
-    } else {
-      uint32_t extraTagValue = 0;
-      if (e.extraTagBitsSpareBits.size() == 8) {
-        extraTagValue = *(const uint8_t *)data + e.payloadSize();
-      } else if (e.extraTagBitsSpareBits.size() == 16) {
-        extraTagValue = *(const uint16_t *)data + e.payloadSize();
-      } else if (e.extraTagBitsSpareBits.size() == 32) {
-        extraTagValue = *(const uint32_t *)data + e.payloadSize();
-      }
-      extraTagValue <<= numSpareBits;
-      tag |= extraTagValue;
+    uint32_t extraTagValue = 0;
+    if (e.extraTagBitsSpareBits.size() == 8) {
+      extraTagValue = *(const uint8_t *)data + e.payloadSize();
+    } else if (e.extraTagBitsSpareBits.size() == 16) {
+      extraTagValue = *(const uint16_t *)data + e.payloadSize();
+    } else if (e.extraTagBitsSpareBits.size() == 32) {
+      extraTagValue = *(const uint32_t *)data + e.payloadSize();
     }
+    extraTagValue <<= numSpareBits;
+    tag |= extraTagValue;
   }
   return tag;
 }
@@ -596,8 +644,13 @@ swift_generic_destroy(void *address, void *metadata,
   case LayoutType::AlignedGroup: {
     AlignedGroup group = readAlignedGroup(typeLayout, typedMetadata);
     for (auto field : group.fields) {
-      uint64_t shiftValue = uint64_t(1) << (field.alignment - '0');
-      uint64_t alignMask = shiftValue - 1;
+      uint64_t alignMask;
+      if (field.alignment == '?') {
+        alignMask = getGenericArgs(typedMetadata)[0]->vw_alignment();
+      } else {
+        uint64_t shiftValue = uint64_t(1) << (field.alignment - '0');
+        alignMask = shiftValue - 1;
+      }
       addr = (uint8_t *)(((uint64_t)addr + alignMask) & (~alignMask));
       swift_generic_destroy(addr, metadata, field.fieldPtr);
       addr += computeSize(field.fieldPtr, typedMetadata);
@@ -692,6 +745,30 @@ swift_generic_destroy(void *address, void *metadata,
       swift::swift_generic_destroy((void *)addr, metadata,
                                    e.payloadLayoutPtr[index]);
     }
+    return;
+  }
+  case LayoutType::ArcheType: {
+    // Read 'A'
+    // Kind is a pointer sized int at offset 0 of metadata pointer
+    size_t offset = 0;
+    readBytes<uint8_t>(typeLayout, offset);
+    uint32_t index = readBytes<uint32_t>(typeLayout, offset);
+    Metadata *typedMetadata = (Metadata *)metadata;
+    getGenericArgs(typedMetadata)[index]->getValueWitnesses()->destroy(
+        (OpaqueValue *)addr, typedMetadata);
+    return;
+  }
+  case LayoutType::ResilientType: {
+    // Read 'R'
+    size_t offset = 0;
+    readBytes<uint8_t>(typeLayout, offset);
+    uint32_t mangledNameLength = readBytes<uint32_t>(typeLayout, offset);
+    const Metadata *resilientMetadata = swift_getTypeByMangledNameInContext(
+        (const char *)(typeLayout + offset), mangledNameLength, nullptr,
+        (const void *const *)getGenericArgs(typedMetadata));
+
+    resilientMetadata->getValueWitnesses()->destroy((OpaqueValue *)addr,
+                                                    resilientMetadata);
     return;
   }
   }
