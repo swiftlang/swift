@@ -355,3 +355,10 @@ func testSR8385() {
   let _: [SR8385] = ["hello", SR8385.text("world")]
   let _: [SR8385] = ["hello", .text("world")]
 }
+
+struct TestMultipleOverloadedInits {
+  var x: Double
+  func foo() {
+    let _ = [Float(x), Float(x), Float(x), Float(x)]
+  }
+}
