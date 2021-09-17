@@ -128,6 +128,12 @@ const Metadata *_Nullable swift_getTypeByMangledNameInContext(
 SWIFT_RUNTIME_EXPORT
 void swift_generic_destroy(void *address, void *metadata,
                            const uint8_t *typeLayout);
+SWIFT_RUNTIME_EXPORT
+void swift_generic_assign(void *dest, void *src, void *metadata,
+                          const uint8_t *typeLayout, bool isTake);
+SWIFT_RUNTIME_EXPORT
+void swift_generic_initialize(void *dest, void *src, void *metadata,
+                              const uint8_t *typeLayout, bool isTake);
 } // namespace swift
 
 /// A simple version of swift/Basic/ClusteredBitVector that doesn't use
@@ -270,6 +276,7 @@ struct MultiPayloadEnum {
   uint32_t payloadSize() const;
   BitVector spareBits() const;
   uint32_t size() const;
+  uint32_t tagSize() const;
   uint32_t tagsInExtraInhabitants() const;
   uint32_t gatherSpareBits(const uint8_t *data, unsigned resultBitWidth) const;
 };
