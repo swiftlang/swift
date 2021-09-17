@@ -24,12 +24,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "TypeFlood",
     runFunction: run_TypeFlood,
-    tags: [.validation, .metadata]),
-]
+    tags: [.validation, .metadata])
 
 protocol Pingable {}
 

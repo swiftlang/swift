@@ -12,13 +12,12 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "MonteCarloPi",
     runFunction: run_MonteCarloPi,
     tags: [.validation, .algorithm],
     legacyFactor: 125)
-]
 
 public func run_MonteCarloPi(scale: Int) {
   var rng = LFSR()

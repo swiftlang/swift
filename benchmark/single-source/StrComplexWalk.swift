@@ -12,13 +12,12 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "StrComplexWalk",
     runFunction: run_StrComplexWalk,
     tags: [.validation, .api, .String],
-    legacyFactor: 10),
-]
+    legacyFactor: 10)
 
 @inline(never)
 public func run_StrComplexWalk(_ n: Int) {

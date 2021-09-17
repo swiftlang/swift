@@ -16,13 +16,12 @@ import TestsUtils
 // 53% _swift_release_dealloc
 // 30% _swift_alloc_object
 // 10% retain/release
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ObjectAllocation",
     runFunction: run_ObjectAllocation,
     tags: [.runtime, .cpubench]
   )
-]
 
 final class XX {
   var xx: Int

@@ -13,14 +13,13 @@
 // This test tests the performance of ASCII Character comparison.
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Chars2",
     runFunction: run_Chars,
     tags: [.validation, .api, .String],
     setUpFunction: { blackHole(alphabetInput) },
-    legacyFactor: 50),
-]
+    legacyFactor: 50)
 
 let alphabetInput: [Character] = [
     "A", "B", "C", "D", "E", "F", "G",

@@ -13,13 +13,12 @@
 // This test tests the performance of ASCII Character comparison.
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "SuperChars2",
     runFunction: run_SuperChars,
     tags: [.validation, .api, .String],
-    setUpFunction: { blackHole(alphabetInput) }),
-]
+    setUpFunction: { blackHole(alphabetInput) })
 
 // Permute some characters.
 let alphabetInput: [Character] = [

@@ -22,14 +22,13 @@ import TestsUtils
 // 11% _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType
 // 16% _swift_retain_[n]
 //  5% swift_conformsToProtocol
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "AnyHashableWithAClass",
     runFunction: run_AnyHashableWithAClass,
     tags: [.abstraction, .runtime, .cpubench],
     legacyFactor: 500
-  ),
-]
+  )
 
 class TestHashableBase : Hashable {
   var value: Int

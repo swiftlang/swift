@@ -15,12 +15,11 @@
 // rdar://problem/22151678
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "BitCount",
     runFunction: run_BitCount,
-    tags: [.validation, .algorithm]),
-]
+    tags: [.validation, .algorithm])
 
 func countBitSet(_ num: Int) -> Int {
   let bits = MemoryLayout<Int>.size * 8

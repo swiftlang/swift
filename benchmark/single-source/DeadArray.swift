@@ -13,14 +13,13 @@
 // rdar://problem/20980377
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "DeadArray",
     runFunction: run_DeadArray,
     tags: [.regression, .unstable],
     legacyFactor: 200
-  ),
-]
+  )
 
 @inline(__always)
 func debug(_ m:String) {}

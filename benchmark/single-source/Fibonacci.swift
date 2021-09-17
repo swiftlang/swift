@@ -12,12 +12,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Fibonacci",
     runFunction: run_Fibonacci,
     tags: [.algorithm])
-]
 
 func _fibonacci(_ n: Int) -> Int {
   if (n <= 2) { return 1 }

@@ -12,13 +12,12 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ObserverUnappliedMethod",
     runFunction: run_ObserverUnappliedMethod,
     tags: [.validation],
-    legacyFactor: 10),
-]
+    legacyFactor: 10)
 
 class Observer {
   @inline(never)

@@ -14,13 +14,12 @@
 // <rdar://problem/22151932>
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Hanoi",
     runFunction: run_Hanoi,
     tags: [.validation, .algorithm],
-    legacyFactor: 10),
-]
+    legacyFactor: 10)
 
 struct Move {
    var from: String

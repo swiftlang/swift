@@ -14,12 +14,11 @@
 // for performance measuring.
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "RC4",
     runFunction: run_RC4,
-    tags: [.validation, .algorithm]),
-]
+    tags: [.validation, .algorithm])
 
 struct RC4 {
   var state: [UInt8]

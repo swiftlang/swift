@@ -12,15 +12,14 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ClassArrayGetter2",
     runFunction: run_ClassArrayGetter,
     tags: [.validation, .api, .Array],
     setUpFunction: { blackHole(inputArray) },
     tearDownFunction: { inputArray = nil },
-    legacyFactor: 10),
-]
+    legacyFactor: 10)
 
 class Box {
   var v: Int

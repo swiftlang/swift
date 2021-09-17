@@ -14,12 +14,11 @@
 // array of letters.
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "SortLettersInPlace",
     runFunction: run_SortLettersInPlace,
     tags: [.validation, .api, .algorithm, .String])
-]
 
 class Letter {
   let value: String

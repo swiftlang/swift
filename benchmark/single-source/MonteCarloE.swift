@@ -19,13 +19,12 @@
 // Thus, e = N / Nempty.
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "MonteCarloE",
     runFunction: run_MonteCarloE,
     tags: [.validation, .algorithm],
-    legacyFactor: 20),
-]
+    legacyFactor: 20)
 
 public func run_MonteCarloE(scale: Int) {
   var lfsr = LFSR()

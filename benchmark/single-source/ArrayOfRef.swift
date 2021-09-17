@@ -18,13 +18,12 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ArrayOfRef",
     runFunction: run_ArrayOfRef,
     tags: [.validation, .api, .Array],
     legacyFactor: 10)
-]
 
 protocol Constructible {
   associatedtype Element

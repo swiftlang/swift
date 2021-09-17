@@ -15,12 +15,11 @@
 // and retain a StringBuffer.
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "CharacterLiteralsLarge",
     runFunction: run_CharacterLiteralsLarge,
     tags: [.validation, .api, .String])
-]
 
 @inline(never)
 func makeCharacter_UTF8Length9() -> Character {

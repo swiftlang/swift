@@ -12,12 +12,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "XorLoop",
     runFunction: run_XorLoop,
     tags: [.validation])
-]
 
 @inline(never)
 public func run_XorLoop(_ n: Int) {

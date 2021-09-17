@@ -12,12 +12,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Calculator",
     runFunction: run_Calculator,
     tags: [.validation])
-]
 
 @inline(never)
 func my_atoi_impl(_ input : String) -> Int {

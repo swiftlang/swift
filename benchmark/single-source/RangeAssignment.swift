@@ -12,12 +12,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "RangeAssignment",
     runFunction: run_RangeAssignment,
-    tags: [.validation, .api]),
-]
+    tags: [.validation, .api])
 
 @inline(never)
 public func run_RangeAssignment(_ scale: Int) {

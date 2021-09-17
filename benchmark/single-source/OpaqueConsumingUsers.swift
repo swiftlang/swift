@@ -12,14 +12,13 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "OpaqueConsumingUsers",
     runFunction: run_OpaqueConsumingUsers,
     tags: [.regression, .abstraction, .refcount],
     setUpFunction: setup_OpaqueConsumingUsers,
-    legacyFactor: 20),
-]
+    legacyFactor: 20)
 
 // This test exercises the ability of the optimizer to propagate the +1 from a
 // consuming argument of a non-inlineable through multiple non-inlinable call

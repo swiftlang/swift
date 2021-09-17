@@ -13,12 +13,11 @@
 // This test tests the performance of ASCII Character comparison.
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Join",
     runFunction: run_Join,
     tags: [.validation, .api, .String, .Array])
-]
 
 @inline(never)
 public func run_Join(_ n: Int) {

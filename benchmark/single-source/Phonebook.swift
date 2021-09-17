@@ -14,15 +14,14 @@
 // for performance measuring.
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Phonebook",
     runFunction: run_Phonebook,
     tags: [.validation, .api, .String],
     setUpFunction: { blackHole(names) },
     legacyFactor: 7
-  ),
-]
+  )
 
 let words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",

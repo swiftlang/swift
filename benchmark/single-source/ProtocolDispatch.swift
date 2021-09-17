@@ -12,12 +12,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ProtocolDispatch",
     runFunction: run_ProtocolDispatch,
-    tags: [.validation, .abstraction]),
-]
+    tags: [.validation, .abstraction])
 
 @inline(never)
 public func run_ProtocolDispatch(_ n: Int) {

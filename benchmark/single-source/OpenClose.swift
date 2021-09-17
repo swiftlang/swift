@@ -13,12 +13,11 @@
 import TestsUtils
 
 // A micro benchmark for checking the speed of string-based enums.
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "OpenClose",
     runFunction: run_OpenClose,
-    tags: [.validation, .api, .String]),
-]
+    tags: [.validation, .api, .String])
 
 enum MyState : String {
     case Closed = "Closed"

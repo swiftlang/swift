@@ -19,13 +19,12 @@ import MSVCRT
 import Darwin
 #endif
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "StringMatch",
     runFunction: run_StringMatch,
     tags: [.validation, .api, .String],
-    legacyFactor: 100),
-]
+    legacyFactor: 100)
 
 /* match: search for regexp anywhere in text */
 func match(regexp: String, text: String) -> Bool {

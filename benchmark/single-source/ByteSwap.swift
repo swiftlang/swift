@@ -15,12 +15,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ByteSwap",
     runFunction: run_ByteSwap,
-    tags: [.validation, .algorithm]),
-]
+    tags: [.validation, .algorithm])
 
 // a naive O(n) implementation of byteswap.
 @inline(never)

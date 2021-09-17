@@ -12,13 +12,12 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "PopFrontArrayGeneric",
     runFunction: run_PopFrontArrayGeneric,
     tags: [.validation, .api, .Array],
-    legacyFactor: 20),
-]
+    legacyFactor: 20)
 
 let arrayCount = 1024
 

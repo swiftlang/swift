@@ -15,13 +15,12 @@ import TestsUtils
 // 33% isUniquelyReferenced
 //   15% swift_rt_swift_isUniquelyReferencedOrPinned_nonNull_native
 //   18% swift_isUniquelyReferencedOrPinned_nonNull_native
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ArraySetElement",
     runFunction: run_ArraySetElement,
     tags: [.runtime, .cpubench]
-  ),
-]
+  )
 
 // This is an effort to defeat isUniquelyReferenced optimization. Ideally
 // microbenchmarks list this should be written in C.

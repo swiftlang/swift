@@ -12,15 +12,14 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Array2D",
     runFunction: run_Array2D,
     tags: [.validation, .api, .Array],
     setUpFunction: { blackHole(inputArray) },
     tearDownFunction: { inputArray = nil },
-    legacyFactor: 16),
-]
+    legacyFactor: 16)
 
 let size = 256
 

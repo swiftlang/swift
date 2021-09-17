@@ -12,12 +12,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Memset",
     runFunction: run_Memset,
-    tags: [.validation]),
-]
+    tags: [.validation])
 
 @inline(never)
 func memset(_ a: inout [Int], _ c: Int) {

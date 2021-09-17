@@ -4,13 +4,12 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "StringRemoveDupes",
     runFunction: run_StringRemoveDupes,
     tags: [.validation, .String]
-  ),
-]
+  )
 
 @inline(never)
 public func run_StringRemoveDupes(_ n: Int) {

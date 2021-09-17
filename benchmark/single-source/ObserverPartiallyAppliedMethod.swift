@@ -12,13 +12,12 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ObserverPartiallyAppliedMethod",
     runFunction: run_ObserverPartiallyAppliedMethod,
     tags: [.validation],
     legacyFactor: 20)
-]
 
 class Observer {
   @inline(never)

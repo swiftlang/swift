@@ -14,13 +14,12 @@
 // It is reported to be very slow: <rdar://problem/17255477>
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "StrToInt",
     runFunction: run_StrToInt,
     tags: [.validation, .api, .String],
-    legacyFactor: 10),
-]
+    legacyFactor: 10)
 
 @inline(never)
 public func run_StrToInt(_ n: Int) {

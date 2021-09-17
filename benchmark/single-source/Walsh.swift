@@ -19,12 +19,11 @@ import MSVCRT
 import Darwin
 #endif
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Walsh",
     runFunction: run_Walsh,
-    tags: [.validation, .algorithm]),
-]
+    tags: [.validation, .algorithm])
 
 func isPowerOfTwo(_ x: Int) -> Bool { return (x & (x - 1)) == 0 }
 

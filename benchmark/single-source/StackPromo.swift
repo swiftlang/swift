@@ -11,13 +11,12 @@
 //===----------------------------------------------------------------------===//
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "StackPromo",
     runFunction: run_StackPromo,
     tags: [.regression, .cpubench],
-    legacyFactor: 100),
-]
+    legacyFactor: 100)
 
 protocol Proto {
   func at() -> Int

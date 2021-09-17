@@ -13,13 +13,12 @@
 // This test checks the performance of modifying an array element.
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ArraySubscript",
     runFunction: run_ArraySubscript,
     tags: [.validation, .api, .Array],
-    legacyFactor: 4),
-]
+    legacyFactor: 4)
 
 @inline(never)
 public func run_ArraySubscript(_ n: Int) {

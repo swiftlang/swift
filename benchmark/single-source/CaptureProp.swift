@@ -12,13 +12,12 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "CaptureProp",
     runFunction: run_CaptureProp,
     tags: [.validation, .api, .refcount],
-    legacyFactor: 10),
-]
+    legacyFactor: 10)
 
 func sum(_ x:Int, y:Int) -> Int {
   return x + y

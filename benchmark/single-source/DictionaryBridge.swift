@@ -16,12 +16,11 @@
 import Foundation
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "DictionaryBridge",
     runFunction: run_DictionaryBridge,
-    tags: [.validation, .api, .Dictionary, .bridging]),
-]
+    tags: [.validation, .api, .Dictionary, .bridging])
 
 #if _runtime(_ObjC)
 class Thing : NSObject {

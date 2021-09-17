@@ -12,12 +12,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "RecursiveOwnedParameter",
     runFunction: run_RecursiveOwnedParameter,
-    tags: [.validation, .api, .Array, .refcount]),
-]
+    tags: [.validation, .api, .Array, .refcount])
 
 // This test recursively visits each element of an array in a class and compares
 // it with every value in a different array stored in a different class. The

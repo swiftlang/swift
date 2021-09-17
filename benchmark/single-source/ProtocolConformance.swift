@@ -12,12 +12,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo (
     name: "ProtocolConformance",
     runFunction: run_ProtocolConformance,
-    tags: [.validation, .runtime]),
-]
+    tags: [.validation, .runtime])
 
 protocol P {}
 

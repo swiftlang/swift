@@ -17,13 +17,12 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ArrayOfGenericRef",
     runFunction: run_ArrayOfGenericRef,
     tags: [.validation, .api, .Array],
     legacyFactor: 10)
-]
 
 protocol Constructible {
   associatedtype Element

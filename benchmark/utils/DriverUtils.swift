@@ -61,6 +61,10 @@ struct BenchResults {
 
 public var registeredBenchmarks: [BenchmarkInfo] = []
 
+public func register(_ benchmark: BenchmarkInfo) {
+  registeredBenchmarks.append(benchmark)
+}
+
 public func register<S: Sequence>(_ benchmarks: S)
 where S.Element == BenchmarkInfo {
   registeredBenchmarks.append(contentsOf: benchmarks)

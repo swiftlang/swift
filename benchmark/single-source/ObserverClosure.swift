@@ -13,13 +13,12 @@
 import TestsUtils
 
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ObserverClosure",
     runFunction: run_ObserverClosure,
     tags: [.validation],
     legacyFactor: 10)
-]
 
 class Observer {
   @inline(never)

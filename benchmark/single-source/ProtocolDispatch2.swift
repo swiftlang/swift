@@ -16,12 +16,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ProtocolDispatch2",
     runFunction: run_ProtocolDispatch2,
-    tags: [.validation, .abstraction, .cpubench]),
-]
+    tags: [.validation, .abstraction, .cpubench])
 
 protocol Pingable { func ping() -> Int;  func pong() -> Int}
 

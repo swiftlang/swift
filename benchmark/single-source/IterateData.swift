@@ -13,13 +13,12 @@
 import TestsUtils
 import Foundation
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "IterateData",
     runFunction: run_IterateData,
     tags: [.validation, .api, .Data],
-    setUpFunction: { blackHole(data) }),
-]
+    setUpFunction: { blackHole(data) })
 
 let data: Data = {
   var data = Data(count: 16 * 1024)

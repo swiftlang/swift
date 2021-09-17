@@ -18,13 +18,12 @@
 import Foundation
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "NSDictionaryCastToSwift",
     runFunction: run_NSDictionaryCastToSwift,
     tags: [.validation, .api, .Dictionary, .bridging],
-    legacyFactor: 10),
-]
+    legacyFactor: 10)
 
 @inline(never)
 public func run_NSDictionaryCastToSwift(_ n: Int) {

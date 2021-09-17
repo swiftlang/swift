@@ -11,12 +11,11 @@
 //===----------------------------------------------------------------------===//
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Sim2DArray",
     runFunction: run_Sim2DArray,
-    tags: [.validation, .api, .Array]),
-]
+    tags: [.validation, .api, .Array])
 
 struct Array2D {
   var storage : [Int]

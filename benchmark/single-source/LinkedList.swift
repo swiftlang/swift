@@ -16,15 +16,14 @@ import TestsUtils
 
 // 47% _swift_retain
 // 43% _swift_release
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "LinkedList",
     runFunction: run_LinkedList,
     tags: [.runtime, .cpubench, .refcount],
     setUpFunction: { for i in 0..<size { head = Node(n:head, d:i) } },
     tearDownFunction: { head = Node(n:nil, d:0) },
-    legacyFactor: 40),
-]
+    legacyFactor: 40)
 
 let size = 100
 var head = Node(n:nil, d:0)

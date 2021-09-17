@@ -18,12 +18,11 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "ArrayOfPOD",
     runFunction: run_ArrayOfPOD,
     tags: [.validation, .api, .Array])
-]
 
 class RefArray<T> {
   var array : [T]

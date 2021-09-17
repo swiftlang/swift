@@ -14,12 +14,11 @@
 // <rdar://problem/17384894>
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Histogram",
     runFunction: run_Histogram,
-    tags: [.validation, .algorithm]),
-]
+    tags: [.validation, .algorithm])
 
 typealias rrggbb_t = UInt32
 

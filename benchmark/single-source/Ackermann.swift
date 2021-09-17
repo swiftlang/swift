@@ -14,12 +14,11 @@
 // for performance measuring.
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "Ackermann",
     runFunction: run_Ackermann,
-    tags: [.algorithm]),
-]
+    tags: [.algorithm])
 
 func _ackermann(_ m: Int, _ n : Int) -> Int {
   if (m == 0) { return n + 1 }

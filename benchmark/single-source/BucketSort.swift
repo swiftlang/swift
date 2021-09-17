@@ -27,14 +27,13 @@
 
 import TestsUtils
 
-public let benchmarks = [
+public let benchmarks =
   BenchmarkInfo(
     name: "BucketSort",
     runFunction: run_BucketSort,
     tags: [.validation, .algorithm],
     setUpFunction: { blackHole(buckets) }
-  ),
-]
+  )
 
 public protocol IntegerConvertible {
     func convertToInt() -> Int
