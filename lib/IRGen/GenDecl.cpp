@@ -3682,7 +3682,7 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
     llvm_unreachable("Don't know how to emit protocols for "
                      "the selected object format.");
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_protos, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_protos, regular";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
@@ -3743,7 +3743,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     llvm_unreachable("Don't know how to emit protocol conformances for "
                      "the selected object format.");
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_proto, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_proto, regular";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
@@ -3769,7 +3769,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_types, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_types, regular";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
