@@ -48,6 +48,14 @@ namespace swift {
 struct ValueLifetimeBoundary {
   SmallVector<SILInstruction *, 8> lastUsers;
   SmallVector<SILBasicBlock *, 8> boundaryEdges;
+
+  /// Visit the point at which a lifetime-ending instruction must be inserted,
+  /// exclusing dead-end blocks. This is only useful when it is known that none
+  /// of the lastUsers ends the lifetime, for example when creating a new borrow
+  /// scope to enclose all uses.
+  void visitInsertionPoints(
+      llvm::function_ref<void(SILBasicBlock::iterator insertPt)> visitor,
+      DeadEndBlocks *deBlocks = nullptr);
 };
 
 /// Computes the lifetime frontier for a given value with respect to a
