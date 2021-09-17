@@ -66,13 +66,6 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
     llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n";
   }
 
-  // First, simplify terms appearing inside concrete substitutions before
-  // doing anything else.
-  if (lhs.back().isSuperclassOrConcreteType())
-    lhs.back() = simplifySubstitutionsInSuperclassOrConcreteSymbol(lhs.back());
-  else if (rhs.back().isSuperclassOrConcreteType())
-    rhs.back() = simplifySubstitutionsInSuperclassOrConcreteSymbol(rhs.back());
-
   // Now simplify both sides as much as possible with the rules we have so far.
   //
   // This avoids unnecessary work in the completion algorithm.
