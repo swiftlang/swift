@@ -47,6 +47,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Serialization/ASTReader.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Config/config.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DebugInfo.h"
@@ -107,9 +108,9 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   const PathRemapper &DebugPrefixMap;
 
   /// Various caches.
-  /// @{
-  using SILVarScope = llvm::PointerUnion<const SILDebugScope *, SILFunction *>;
-  using VarID = std::tuple<SILVarScope, const char *, uint16_t>;
+  /// \{
+  llvm::StringSet<> VarNames;
+  using VarID = std::tuple<llvm::MDNode *, llvm::StringRef, unsigned, uint16_t>;
   llvm::DenseMap<VarID, llvm::TrackingMDNodeRef> LocalVarCache;
   llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
   llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> InlinedAtCache;
@@ -120,7 +121,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
-  /// @}
+  /// \}
 
   /// A list of replaceable fwddecls that need to be RAUWed at the end.
   std::vector<std::pair<TypeBase *, llvm::TrackingMDRef>> ReplaceMap;
@@ -2444,7 +2445,6 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (!DbgTy.getTypeSize())
     DbgTy.setSize(getStorageSize(IGM.DataLayout, Storage));
 
-  SILVarScope KeyScope = DS;
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
   auto DInstLoc = getStartLocation(DbgInstLoc);
@@ -2455,7 +2455,6 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (ArgNo > 0) {
     while (isa<llvm::DILexicalBlock>(Scope))
       Scope = cast<llvm::DILexicalBlock>(Scope)->getScope();
-    KeyScope = DS->getInlinedFunction();
   }
   assert(isa_and_nonnull<llvm::DIScope>(Scope) && "variable has no scope");
   llvm::DIFile *Unit = getFile(Scope);
@@ -2476,22 +2475,25 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   // Create the descriptor for the variable.
   unsigned DVarLine = DInstLine;
+  uint16_t DVarCol = 0;
   if (VarInfo.Loc) {
     auto DVarLoc = getStartLocation(VarInfo.Loc);
     DVarLine = DVarLoc.line;
+    DVarCol = DVarLoc.column;
   }
   llvm::DIScope *VarScope = Scope;
   if (ArgNo == 0 && VarInfo.Scope) {
     if (auto *VS = dyn_cast_or_null<llvm::DILocalScope>(
             getOrCreateScope(VarInfo.Scope))) {
       VarScope = VS;
-      KeyScope = VarInfo.Scope;
     }
   }
 
   // Get or create the DILocalVariable.
   llvm::DILocalVariable *Var;
-  VarID Key(KeyScope, VarInfo.Name.data(), ArgNo);
+  // VarInfo.Name points into tail-allocated storage in debug_value insns.
+  llvm::StringRef UniqueName = VarNames.insert(VarInfo.Name).first->getKey();
+  VarID Key(VarScope, UniqueName, DVarLine, DVarCol);
   auto CachedVar = LocalVarCache.find(Key);
   if (CachedVar != LocalVarCache.end()) {
     Var = cast<llvm::DILocalVariable>(CachedVar->second);
