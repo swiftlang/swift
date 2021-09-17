@@ -391,13 +391,13 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     RewritePath path;
 
     // (1) First, apply the left hand side rule in the reverse direction.
-    path.add(RewriteStep(/*offset=*/0,
-                         getRuleID(lhs),
-                         /*inverse=*/true));
+    path.add(RewriteStep::forRewriteRule(/*offset=*/0,
+                                         getRuleID(lhs),
+                                         /*inverse=*/true));
     // (2) Now, apply the right hand side in the forward direction.
-    path.add(RewriteStep(from - lhs.getLHS().begin(),
-                         getRuleID(rhs),
-                         /*inverse=*/false));
+    path.add(RewriteStep::forRewriteRule(from - lhs.getLHS().begin(),
+                                         getRuleID(rhs),
+                                         /*inverse=*/false));
 
     // If X == TYV, we have a trivial overlap.
     if (x == tyv) {
@@ -419,7 +419,8 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     xv.append(rhs.getLHS().begin() + (lhs.getLHS().end() - from),
               rhs.getLHS().end());
 
-    if (xv.back().isSuperclassOrConcreteType()) {
+    if (xv.back().isSuperclassOrConcreteType() &&
+        lhs.getLHS().begin() != from) {
       xv.back() = xv.back().prependPrefixToConcreteSubstitutions(
           t, Context);
     }
@@ -431,13 +432,22 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     RewritePath path;
 
     // (1) First, apply the left hand side rule in the reverse direction.
-    path.add(RewriteStep(/*offset=*/0,
-                         getRuleID(lhs),
-                         /*inverse=*/true));
-    // (2) Now, apply the right hand side in the forward direction.
-    path.add(RewriteStep(from - lhs.getLHS().begin(),
-                         getRuleID(rhs),
-                         /*inverse=*/false));
+    path.add(RewriteStep::forRewriteRule(/*offset=*/0,
+                                         getRuleID(lhs),
+                                         /*inverse=*/true));
+
+    // (2) Next, if the right hand side rule ends with a concrete type symbol,
+    // perform the concrete type adjustment.
+    if (xv.back().isSuperclassOrConcreteType() &&
+        lhs.getLHS().begin() != from) {
+      path.add(RewriteStep::forAdjustment(from - lhs.getLHS().begin(),
+                                          /*inverse=*/true));
+    }
+
+    // (3) Finally, apply the right hand side in the forward direction.
+    path.add(RewriteStep::forRewriteRule(from - lhs.getLHS().begin(),
+                                         getRuleID(rhs),
+                                         /*inverse=*/false));
 
     // If XV == TY, we have a trivial overlap.
     if (xv == t) {

@@ -96,8 +96,19 @@ struct AppliedRewriteStep {
 /// Similarly, going in the other direction, if we start from A.Y.B and apply
 /// the inverse rule, we get A.(Y => X).B.
 struct RewriteStep {
+  enum StepKind {
+    /// Apply a rewrite rule at the stored offset.
+    ApplyRewriteRule,
+
+    /// Prepend the prefix to each concrete substitution.
+    AdjustConcreteType
+  };
+
+  /// The rewrite step kind.
+  unsigned Kind : 1;
+
   /// The position within the term where the rule is being applied.
-  unsigned Offset : 16;
+  unsigned Offset : 15;
 
   /// The index of the rule in the rewrite system.
   unsigned RuleID : 15;
@@ -106,7 +117,9 @@ struct RewriteStep {
   /// with the right hand side. If true, vice versa.
   unsigned Inverse : 1;
 
-  RewriteStep(unsigned offset, unsigned ruleID, bool inverse) {
+  RewriteStep(StepKind kind, unsigned offset, unsigned ruleID, bool inverse) {
+    Kind = unsigned(kind);
+
     Offset = offset;
     assert(Offset == offset && "Overflow");
     RuleID = ruleID;
@@ -114,12 +127,23 @@ struct RewriteStep {
     Inverse = inverse;
   }
 
+  static RewriteStep forRewriteRule(unsigned offset, unsigned ruleID, bool inverse) {
+    return RewriteStep(ApplyRewriteRule, offset, ruleID, inverse);
+  }
+
+  static RewriteStep forAdjustment(unsigned offset, bool inverse) {
+    return RewriteStep(AdjustConcreteType, offset, /*ruleID=*/0, inverse);
+  }
+
   void invert() {
     Inverse = !Inverse;
   }
 
-  AppliedRewriteStep apply(MutableTerm &term,
-                           const RewriteSystem &system) const;
+  AppliedRewriteStep applyRewriteRule(MutableTerm &term,
+                                      const RewriteSystem &system) const;
+
+  MutableTerm applyAdjustment(MutableTerm &term,
+                              const RewriteSystem &system) const;
 
   void dump(llvm::raw_ostream &out,
             MutableTerm &term,
