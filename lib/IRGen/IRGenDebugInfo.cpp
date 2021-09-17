@@ -2421,8 +2421,22 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
     case SILDIExprOperator::Dereference:
       Operands.push_back(llvm::dwarf::DW_OP_deref);
       break;
-    default:
-      llvm_unreachable("Unrecognized operator");
+    case SILDIExprOperator::Plus:
+      Operands.push_back(llvm::dwarf::DW_OP_plus);
+      break;
+    case SILDIExprOperator::Minus:
+      Operands.push_back(llvm::dwarf::DW_OP_minus);
+      break;
+    case SILDIExprOperator::ConstUInt:
+      Operands.push_back(llvm::dwarf::DW_OP_constu);
+      Operands.push_back(*ExprOperand[1].getAsConstInt());
+      break;
+    case SILDIExprOperator::ConstSInt:
+      Operands.push_back(llvm::dwarf::DW_OP_consts);
+      Operands.push_back(*ExprOperand[1].getAsConstInt());
+      break;
+    case SILDIExprOperator::INVALID:
+      return false;
     }
   }
   return true;
