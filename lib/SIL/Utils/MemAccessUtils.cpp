@@ -367,8 +367,8 @@ bool swift::isLetAddress(SILValue address) {
 
 bool swift::isIdentityPreservingRefCast(SingleValueInstruction *svi) {
   // Ignore both copies and other identity and ownership preserving casts
-  return isa<CopyValueInst>(svi) ||
-         isIdentityAndOwnershipPreservingRefCast(svi);
+  return isa<CopyValueInst>(svi) || isa<BeginBorrowInst>(svi)
+         || isIdentityAndOwnershipPreservingRefCast(svi);
 }
 
 // On some platforms, casting from a metatype to a reference type dynamically
@@ -385,8 +385,6 @@ bool swift::isIdentityAndOwnershipPreservingRefCast(
   switch (svi->getKind()) {
   default:
     return false;
-  // Ignore borrows
-  case SILInstructionKind::BeginBorrowInst:
   // Ignore class type casts
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::UncheckedRefCastInst:
@@ -479,7 +477,7 @@ SILValue swift::findOwnershipReferenceRoot(SILValue ref) {
 //                            MARK: AccessedStorage
 //===----------------------------------------------------------------------===//
 
-SILGlobalVariable *getReferencedGlobal(SILInstruction *inst) {
+static SILGlobalVariable *getReferencedGlobal(SILInstruction *inst) {
   if (auto *gai = dyn_cast<GlobalAddrInst>(inst)) {
     return gai->getReferencedGlobal();
   }
