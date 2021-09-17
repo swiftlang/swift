@@ -329,6 +329,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC=0")
   endif()
 
+  if(SWIFT_STDLIB_HAS_STDIN)
+    list(APPEND result "-DSWIFT_STDLIB_HAS_STDIN")
+  endif()
+
   if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
     list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
   endif()

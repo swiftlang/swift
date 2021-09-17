@@ -210,6 +210,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
     swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
     swift-stdlib-has-darwin-libmalloc             "1"               "whether the Darwin build of stdlib can use extended libmalloc APIs"
+    swift-stdlib-has-stdin                        "1"               "whether to build stdlib assuming the platform supports stdin and getline API"
     swift-disable-dead-stripping                  "0"               "turns off Darwin-specific dead stripping for Swift host tools"
     common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
 
@@ -1970,6 +1971,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_RUNTIME_MACHO_NO_DYLD:BOOL=$(true_false "${SWIFT_RUNTIME_MACHO_NO_DYLD}")
                     -DSWIFT_STDLIB_OS_VERSIONING:BOOL=$(true_false "${SWIFT_STDLIB_OS_VERSIONING}")
                     -DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC}")
+                    -DSWIFT_STDLIB_HAS_STDIN:BOOL=$(true_false "${SWIFT_STDLIB_HAS_STDIN}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"

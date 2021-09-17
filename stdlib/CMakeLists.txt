@@ -76,8 +76,12 @@ option(SWIFT_RUNTIME_MACHO_NO_DYLD
        FALSE)
 
 option(SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
-  "Build stdlib assuming the Darwin build of stdlib can use extended libmalloc APIs"
-  )
+       "Build stdlib assuming the Darwin build of stdlib can use extended libmalloc APIs"
+       TRUE)
+
+option(SWIFT_STDLIB_HAS_STDIN
+       "Build stdlib assuming the platform supports stdin and getline API."
+       TRUE)
 
 option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
