@@ -67,7 +67,7 @@ struct CustomRawRepresentable: RawRepresentable, Hashable {
   }
 }
 
-suite.test("Custom hashing") {
+suite.test("_rawHashValue forwarding") {
   // In 5.0, RawRepresentable had a bogus default implementation for
   // _rawHashValue(seed:) that interfered with custom hashing for
   // RawRepresentable types. Adding a custom hash(into:) implementation should
@@ -78,6 +78,38 @@ suite.test("Custom hashing") {
   if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     let r = CustomRawRepresentable(rawValue: 42)!
     expectEqual(Hasher.hash(r), Hasher.hash(23))
+  }
+}
+
+struct Bogus: Hashable {
+  var hashValue: Int { 42 }
+  static func ==(left: Self, right: Self) -> Bool { true }
+}
+
+struct CustomRawRepresentable2: RawRepresentable, Hashable {
+  var rawValue: Bogus
+
+  init?(rawValue: Bogus) {
+    self.rawValue = rawValue
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(23)
+  }
+}
+
+
+suite.test("hashValue forwarding") {
+  // In versions up to and including 5.5, RawRepresentable had a bogus default
+  // implementation for `hashValue` that forwarded directly to
+  // `rawValue.hashValue`, instead of `self.hash(into:)`. Adding a custom
+  // hash(into:) implementation should always be enough to customize hashing.
+  //
+  // See https://github.com/apple/swift/pull/39155
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    let r = CustomRawRepresentable2(rawValue: Bogus())!
+    expectEqual(r.hashValue, 23.hashValue)
   }
 }
 
