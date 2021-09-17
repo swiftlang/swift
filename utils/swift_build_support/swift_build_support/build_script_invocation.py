@@ -439,12 +439,6 @@ class BuildScriptInvocation(object):
                 ' '.join(args.llvm_ninja_targets_for_cross_compile_hosts)
             ]
 
-        if args.darwin_symroot_path_filters:
-            impl_args += [
-                "--darwin_symroot_path_filters=%s" %
-                ' '.join(args.darwin_symroot_path_filters)
-            ]
-
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
@@ -511,9 +505,6 @@ class BuildScriptInvocation(object):
         # in the host toolchain. If the host toolchain is not equpipped with
         # a Swift compiler, a warning is emitted. In the future, it may become
         # mandatory that the host toolchain come with its own `swiftc`.
-        if self.args.build_early_swift_driver:
-            before_impl_product_classes.append(products.EarlySwiftDriver)
-
         if self.args.build_cmark:
             before_impl_product_classes.append(products.CMark)
 
