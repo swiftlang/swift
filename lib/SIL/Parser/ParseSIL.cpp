@@ -1721,8 +1721,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
             IsNegative = true;
           }
           int64_t Val;
-          // FIXME: Use the correct diagnostic
-          if (parseInteger(Val, diag::sil_invalid_scope_slot))
+          if (parseInteger(Val, diag::sil_invalid_constant))
             return true;
           if (IsNegative)
             Val = -Val;
