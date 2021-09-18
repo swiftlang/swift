@@ -308,7 +308,7 @@ public:
   std::vector<PatternMatchContext*> SwitchStack;
   /// Keep track of our current nested scope.
   ///
-  /// The boolean tracks whether this is a 'guard' scope, which should be
+  /// The boolean tracks whether this is a binding scope, which should be
   /// popped automatically when we leave the innermost BraceStmt scope.
   std::vector<llvm::PointerIntPair<const SILDebugScope *, 1>> DebugScopeStack;
 
@@ -583,11 +583,12 @@ public:
 
   /// Enter the debug scope for \p Loc, creating it if necessary.
   ///
-  /// \param isGuardScope If true, this is a scope for the bindings introduced by
-  /// a 'guard' statement. This scope ends when the next innermost BraceStmt ends.
-  void enterDebugScope(SILLocation Loc, bool isGuardScope=false) {
-    auto *Parent =
-        DebugScopeStack.size() ? DebugScopeStack.back().getPointer() : F.getDebugScope();
+  /// \param isBindingScope If true, this is a scope for the bindings introduced
+  /// by a let expression. This scope ends when the next innermost BraceStmt
+  /// ends.
+  void enterDebugScope(SILLocation Loc, bool isBindingScope = false) {
+    auto *Parent = DebugScopeStack.size() ? DebugScopeStack.back().getPointer()
+                                          : F.getDebugScope();
     auto *DS = Parent;
     // Don't create a pointless scope for the function body's BraceStmt.
     if (!DebugScopeStack.empty())
@@ -595,7 +596,7 @@ public:
       if (RegularLocation(DS->getLoc()) != RegularLocation(Loc))
         DS = new (SGM.M)
           SILDebugScope(RegularLocation(Loc), &getFunction(), DS);
-    DebugScopeStack.emplace_back(DS, isGuardScope);
+    DebugScopeStack.emplace_back(DS, isBindingScope);
     B.setCurrentDebugScope(DS);
   }
 

@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// Temporarily disabled due to a runtime crash.
+// REQUIRES: rdar83066987
+
 import StdlibUnittest
 
 let Tests = TestSuite(#file)

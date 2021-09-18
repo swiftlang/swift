@@ -247,9 +247,9 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_defined_lifetimes :
-  Flag<["-"], "enable-experimental-defined-lifetimes">,
-  HelpText<"Enable experimental defined lifetimes">;
+def enable_experimental_lexical_lifetimes :
+  Flag<["-"], "enable-experimental-lexical-lifetimes">,
+  HelpText<"Enable experimental lexical lifetimes">;
 
 def enable_experimental_distributed :
   Flag<["-"], "enable-experimental-distributed">,
@@ -805,6 +805,10 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
+
+def swift_async_frame_pointer_EQ : Joined<["-"], "swift-async-frame-pointer=">,
+  Flags<[FrontendOption]>,
+  HelpText<"One of 'auto', 'always' or 'never'">;
 
 def previous_module_installname_map_file
   : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,

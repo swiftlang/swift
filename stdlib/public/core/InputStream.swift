@@ -12,6 +12,8 @@
 
 import SwiftShims
 
+#if SWIFT_STDLIB_HAS_STDIN
+
 /// Returns a string read from standard input through the end of the current
 /// line or until EOF is reached.
 ///
@@ -42,3 +44,5 @@ public func readLine(strippingNewline: Bool = true) -> String? {
   }
   return result
 }
+
+#endif

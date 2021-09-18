@@ -1469,7 +1469,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
       Attr = ECMI->doKeepUnique();
     } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
-      Attr = BBI->isDefined();
+      Attr = BBI->isLexical();
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;

@@ -1508,8 +1508,8 @@ public:
   }
 
   void visitBeginBorrowInst(BeginBorrowInst *LBI) {
-    if (LBI->isDefined()) {
-      *this << "[defined] ";
+    if (LBI->isLexical()) {
+      *this << "[lexical] ";
     }
     *this << getIDAndType(LBI->getOperand());
   }
