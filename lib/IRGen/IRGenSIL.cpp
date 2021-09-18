@@ -1149,6 +1149,9 @@ public:
   void visitRetainValueInst(RetainValueInst *i);
   void visitRetainValueAddrInst(RetainValueAddrInst *i);
   void visitCopyValueInst(CopyValueInst *i);
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *i) {
+    llvm_unreachable("Lowered after OSSA.");
+  }
   void visitMoveValueInst(MoveValueInst *i);
   void visitReleaseValueInst(ReleaseValueInst *i);
   void visitReleaseValueAddrInst(ReleaseValueAddrInst *i);

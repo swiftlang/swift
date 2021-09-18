@@ -132,6 +132,27 @@ ManagedValue SILGenBuilder::createRefElementAddr(SILLocation loc,
   return ManagedValue::forUnmanaged(result);
 }
 
+ManagedValue
+SILGenBuilder::createExplicitCopyValue(SILLocation loc,
+                                       ManagedValue originalValue) {
+  auto &lowering = SGF.getTypeLowering(originalValue.getType());
+  if (lowering.isTrivial())
+    return originalValue;
+
+  SILType ty = originalValue.getType();
+  assert(!ty.isAddress() && "Can not perform a copy value of an address typed "
+                            "value");
+
+  if (ty.isObject() &&
+      originalValue.getOwnershipKind() == OwnershipKind::None) {
+    return originalValue;
+  }
+
+  SILValue result =
+      SILBuilder::createExplicitCopyValue(loc, originalValue.getValue());
+  return SGF.emitManagedRValueWithCleanup(result, lowering);
+}
+
 ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
                                             ManagedValue originalValue) {
   auto &lowering = SGF.getTypeLowering(originalValue.getType());

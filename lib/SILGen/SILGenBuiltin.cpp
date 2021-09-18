@@ -1586,6 +1586,13 @@ static ManagedValue emitBuiltinMove(SILGenFunction &SGF, SILLocation loc,
   return cloner.clone(SGF.B.createMoveValue(loc, firstArg.forward(SGF)));
 }
 
+static ManagedValue emitBuiltinCopy(SILGenFunction &SGF, SILLocation loc,
+                                    SubstitutionMap subs,
+                                    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 1 && "Move has a single argument");
+  return SGF.B.createExplicitCopyValue(loc, args[0]);
+}
+
 static ManagedValue emitBuiltinAutoDiffCreateLinearMapContext(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {

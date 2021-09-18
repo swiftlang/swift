@@ -91,6 +91,14 @@ public:
                                     VarDecl *field, SILType resultTy);
 
   using SILBuilder::createCopyValue;
+  using SILBuilder::createExplicitCopyValue;
+
+  /// Emit an explicit +1 copy on \p originalValue that lives until the end of
+  /// the current lexical scope.
+  ///
+  /// This form of copy_value will not be eliminated by Copy Propagation.
+  ManagedValue createExplicitCopyValue(SILLocation loc,
+                                       ManagedValue originalValue);
 
   /// Emit a +1 copy on \p originalValue that lives until the end of the current
   /// lexical scope.

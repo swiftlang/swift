@@ -515,8 +515,14 @@ BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinu
 /// Force the current task to be rescheduled on the specified actor.
 BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 
-/// Generate a move_value instruction to convert a T to a @_moveOnly T.
+/// Generate a move_value instruction to convert a @_moveOnly? T to a @_moveOnly
+/// T. Idempotent.
 BUILTIN_SIL_OPERATION(Move, "move", Special)
+
+/// Generate an explicit_copy_value instruction. This instruction is a
+/// copy_value that will not be eliminated by copy propagation. Outside of OSSA
+/// it is lowered to a retain.
+BUILTIN_SIL_OPERATION(Copy, "copy", Special)
 
 #undef BUILTIN_SIL_OPERATION
 

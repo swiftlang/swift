@@ -1830,6 +1830,10 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitMoveValueInst(MoveValueInst *I) {
     *this << getIDAndType(I->getOperand());
   }
