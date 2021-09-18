@@ -141,16 +141,18 @@ class CMake(object):
 
         if self.prefer_just_built_toolchain and product:
             toolchain_path = product.install_toolchain_path(args.host_target)
+            cmake_swiftc_path = os.getenv('CMAKE_Swift_COMPILER',
+                                          os.path.join(toolchain_path, 'bin', 'swiftc'))
             define("CMAKE_C_COMPILER:PATH", os.path.join(toolchain_path,
                                                          'bin', 'clang'))
             define("CMAKE_CXX_COMPILER:PATH", os.path.join(toolchain_path,
                                                            'bin', 'clang++'))
-            define("CMAKE_Swift_COMPILER:PATH", os.path.join(toolchain_path,
-                                                             'bin', 'swiftc'))
+            define("CMAKE_Swift_COMPILER:PATH", cmake_swiftc_path)
         else:
+            cmake_swiftc_path = os.getenv('CMAKE_Swift_COMPILER', toolchain.swiftc)
             define("CMAKE_C_COMPILER:PATH", toolchain.cc)
             define("CMAKE_CXX_COMPILER:PATH", toolchain.cxx)
-            define("CMAKE_Swift_COMPILER:PATH", toolchain.swiftc)
+            define("CMAKE_Swift_COMPILER:PATH", cmake_swiftc_path)
         define("CMAKE_LIBTOOL:PATH", toolchain.libtool)
         define("CMAKE_AR:PATH", toolchain.ar)
         define("CMAKE_RANLIB:PATH", toolchain.ranlib)
