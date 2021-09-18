@@ -723,7 +723,7 @@ endfunction()
 # cmake's builtin swift support.
 function(add_libswift name)
   set(libswift_compile_options
-      "-target" "x86_64-apple-macosx10.15" # TODO: this is a hack until I figure out where the target is being set.
+      "-target" "x86_64-apple-macosx10.15" # TODO: remove this once #38675 lands.
       "-Xfrontend" "-validate-tbd-against-ir=none"
       "-Xfrontend" "-enable-cxx-interop")
 

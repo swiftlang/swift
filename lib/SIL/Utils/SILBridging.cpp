@@ -15,6 +15,8 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILBuilder.h"
 
+#include <string>
+
 using namespace swift;
 
 namespace {
@@ -159,11 +161,12 @@ BridgedStringRef SILFunction_getName(BridgedFunction function) {
   return getBridgedStringRef(castToFunction(function)->getName());
 }
 
-BridgedStringRef SILFunction_debugDescription(BridgedFunction function) {
+std::string SILFunction_debugDescription(BridgedFunction function) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToFunction(function)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function) {
@@ -207,11 +210,12 @@ BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block) {
   return {castToBasicBlock(block)->getParent()};
 }
 
-BridgedStringRef SILBasicBlock_debugDescription(BridgedBasicBlock block) {
+std::string SILBasicBlock_debugDescription(BridgedBasicBlock block) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToBasicBlock(block)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block) {
@@ -271,11 +275,12 @@ BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
 static_assert(BridgedOperandSize == sizeof(Operand),
               "wrong bridged Operand size");
 
-BridgedStringRef SILNode_debugDescription(BridgedNode node) {
+std::string SILNode_debugDescription(BridgedNode node) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToSILNode(node)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 static Operand *castToOperand(BridgedOperand operand) {
@@ -318,11 +323,12 @@ BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global) {
   return getBridgedStringRef(castToGlobal(global)->getName());
 }
 
-BridgedStringRef SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
+std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToGlobal(global)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 //===----------------------------------------------------------------------===//
