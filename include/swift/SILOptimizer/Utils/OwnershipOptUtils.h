@@ -212,6 +212,8 @@ public:
 private:
   OwnershipFixupContext *ctx;
   SILValue oldValue;
+  // newValue is the aspirational replacement. It might not be the actual
+  // replacement after SILCombine fixups (like type casting) and OSSA fixups.
   SILValue newValue;
 
 public:
@@ -253,21 +255,27 @@ public:
   /// Perform OSSA fixup on newValue and return a fixed-up value based that can
   /// be used to replace all uses of oldValue.
   ///
-  /// This is so that we can avoid creating "forwarding" transformation
-  /// instructions before we know if we can perform the RAUW. Any such
-  /// "forwarding" transformation must be performed upon \p newValue at \p
-  /// oldValue's insertion point so that we can then here RAUW the transformed
-  /// \p newValue.
+  /// This is only used by clients that must transform \p newValue, such as
+  /// adding type casts, before it can be used to replace \p oldValue.
+  ///
+  /// \p rewrittenNewValue is only passed when the client needs to regenerate
+  /// newValue after checking its RAUW validity, but before performing OSSA
+  /// fixup on it.
+  SILValue prepareReplacement(SILValue rewrittenNewValue = SILValue());
+
+  /// Perform the actual RAUW--replace all uses if \p oldValue.
+  ///
+  /// Precondition: \p replacementValue is either invalid or has the same type
+  /// as \p oldValue and is a valid OSSA replacement.
   SILBasicBlock::iterator
-  perform(SingleValueInstruction *maybeTransformedNewValue = nullptr);
+  perform(SILValue replacementValue = SILValue());
 
 private:
-  SILBasicBlock::iterator replaceAddressUses(SingleValueInstruction *oldValue,
-                                             SILValue newValue);
-
   void invalidate() {
     ctx = nullptr;
   }
+
+  SILValue getReplacementAddress();
 };
 
 /// A utility composed ontop of OwnershipFixupContext that knows how to replace
