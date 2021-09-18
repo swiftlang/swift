@@ -712,6 +712,9 @@ public:
 /// object with guaranteed ownership. All transitive address uses of the
 /// interior pointer must be within the lifetime of the guaranteed lifetime. As
 /// such, these must be treated as implicit uses of the parent guaranteed value.
+///
+/// FIXME: This should probably also handle project_box once we support
+/// borrowing a box.
 struct InteriorPointerOperand {
   Operand *operand;
   InteriorPointerOperandKind kind;
