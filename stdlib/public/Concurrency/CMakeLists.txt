@@ -31,6 +31,26 @@ if(SWIFT_CONCURRENCY_USES_DISPATCH)
   endif()
 endif()
 
+
+set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
+set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS)
+
+if(NOT swift_concurrency_async_fp_mode)
+  set(swift_concurrency_async_fp_mode "always")
+endif()
+
+# Don't emit extended frame info on platforms other than darwin, system
+# backtracer and system debugger are unlikely to support it.
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+    "-fswift-async-fp=${swift_concurrency_async_fp_mode}")
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
+    "-Xfrontend"
+    "-swift-async-frame-pointer=${swift_concurrency_async_fp_mode}")
+else()
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=never")
+endif()
+
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ../CompatibilityOverride/CompatibilityOverride.cpp
   Actor.cpp
@@ -91,13 +111,14 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   LINK_LIBRARIES ${swift_concurrency_link_libraries}
 
   C_COMPILE_FLAGS
-    -Dswift_Concurrency_EXPORTS
+    -Dswift_Concurrency_EXPORTS ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
     -Xfrontend -define-availability
     -Xfrontend "SwiftStdlib 5.5:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0"
+    ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
   LINK_FLAGS "${SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS}"
   ${swift_concurrency_options}
   INSTALL_IN_COMPONENT ${swift_concurrency_install_component}

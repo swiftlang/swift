@@ -1604,6 +1604,10 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   // arguments in the textual interface file. So copy to use a new compiler
   // invocation.
   CompilerInvocation subInvocation = genericSubInvocation;
+
+  // Save the target triple from the original context.
+  llvm::Triple originalTargetTriple(subInvocation.getLangOptions().Target);
+
   std::vector<StringRef> BuildArgs(GenericArgs.begin(), GenericArgs.end());
   assert(BuildArgs.size() == GenericArgs.size());
   // Configure inputs
@@ -1653,6 +1657,22 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   if (subInvocation.parseArgs(SubArgs, *Diags)) {
     return std::make_error_code(std::errc::not_supported);
   }
+
+  // If the target triple parsed from the Swift interface file differs
+  // only in subarchitecture from the original target triple, then
+  // we have loaded a Swift interface from a different-but-compatible
+  // architecture slice. Use the original subarchitecture.
+  llvm::Triple parsedTargetTriple(subInvocation.getTargetTriple());
+  if (parsedTargetTriple.getSubArch() != originalTargetTriple.getSubArch() &&
+      parsedTargetTriple.getArch() == originalTargetTriple.getArch() &&
+      parsedTargetTriple.getVendor() == originalTargetTriple.getVendor() &&
+      parsedTargetTriple.getOS() == originalTargetTriple.getOS() &&
+      parsedTargetTriple.getEnvironment()
+        == originalTargetTriple.getEnvironment()) {
+    parsedTargetTriple.setArchName(originalTargetTriple.getArchName());
+    subInvocation.setTargetTriple(parsedTargetTriple.str());
+  }
+
   CompilerInstance subInstance;
   SubCompilerInstanceInfo info;
   info.Instance = &subInstance;

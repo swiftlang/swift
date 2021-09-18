@@ -229,3 +229,12 @@ let _: Int = r
 // SR-11998 / rdar://problem/58455441
 class C<T> {}
 var sub: C! = C<Int>()
+
+// FIXME: We probably shouldn't support this, we don't support other
+// 'direct call' features such as default arguments for curried calls.
+struct CurriedIUO {
+  func silly() -> Int! { nil }
+  func testSilly() {
+    let _: Int = CurriedIUO.silly(self)()
+  }
+}

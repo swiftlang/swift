@@ -1123,7 +1123,15 @@ extension Set {
   ///   otherwise, `false`.
   @inlinable
   public func isDisjoint(with other: Set<Element>) -> Bool {
-    return _isDisjoint(with: other)
+    guard !isEmpty && !other.isEmpty else { return true }
+    let (smaller, larger) =
+      count < other.count ? (self, other) : (other, self)
+    for member in smaller {
+      if larger.contains(member) {
+        return false
+      }
+    }
+    return true
   }
     
   @inlinable
