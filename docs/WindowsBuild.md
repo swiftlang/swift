@@ -122,6 +122,13 @@ cmake -B "S:\b\1" ^
   -C S:\swift\cmake\caches\Windows-x86_64.cmake ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_C_COMPILER=cl ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=cl ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^  
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
   -D LLVM_ENABLE_PDB=YES ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR=S:\cmark ^
@@ -154,6 +161,7 @@ cmake -B S:\b\2 ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
   -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D ENABLE_SWIFT=YES ^
   -G Ninja ^
@@ -175,6 +183,7 @@ cmake -B S:\b\3 ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" ^
   -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" ^
@@ -204,6 +213,7 @@ path S:\b\3\bin;%PATH%
 cmake -B S:\b\4 ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D dispatch_DIR=S:\b\2\cmake\modules ^
   -D Foundation_DIR=S:\b\3\cmake\modules ^
@@ -234,6 +244,7 @@ cmake -B S:\b\3 ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
+  -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D CURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" ^
   -D CURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" ^
@@ -242,6 +253,7 @@ cmake -B S:\b\3 ^
   -D ICU_UC_LIBRARY_RELEASE=S:\Library\icu-67\usr\lib\icuuc67.lib ^
   -D LIBXML2_LIBRARY=S:\Library\libxml2-development\usr\lib\libxml2s.lib ^
   -D LIBXML2_INCLUDE_DIR=S:\Library\libxml2-development\usr\include\libxml2 ^
+  -D LIBXML2_DEFINITIONS="/DLIBXML_STATIC" ^
   -D ENABLE_TESTING=YES ^
   -D dispatch_DIR=S:\b\2\cmake\modules ^
   -D XCTest_DIR=S:\b\4\cmake\modules ^
@@ -284,8 +296,9 @@ cmake -B S:\b\6 ^
   -D CMAKE_BUILD_TYPE=RelWithDebInfo ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
   -D CMAKE_CXX_COMPILER=S:/b/1/bin/clang-cl.exe ^
-  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D CMAKE_CXX_FLAGS="-Xclang -fno-split-cold-code" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D LLBUILD_SUPPORT_BINDINGS=Swift ^
   -D dispatch_DIR=S:\b\2\cmake\modules ^
   -D Foundation_DIR=S:\b\3\cmake\modules ^
@@ -310,6 +323,7 @@ cmake -B S:\b\7 ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D dispatch_DIR=S:\b\2\cmake\modules ^
   -D Foundation_DIR=S:\b\3\cmake\modules ^
@@ -327,6 +341,7 @@ cmake -B S:\b\8 ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D dispatch_DIR=S:\b\2\cmake\modules ^
   -D Foundation_DIR=S:\b\3\cmake\modules ^
@@ -344,6 +359,7 @@ cmake -B S:\b\9 ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_MT=mt ^
   -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D dispatch_DIR=S:\b\2\cmake\modules ^
   -D Foundation_DIR=S:\b\3\cmake\modules ^
@@ -364,8 +380,9 @@ cmake -B S:\b\10 ^
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=Release ^
   -D CMAKE_C_COMPILER=S:/b/1/bin/clang-cl.exe ^
-  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D CMAKE_INSTALL_PREFIX=C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=S:/b/1/bin/swiftc.exe ^
   -D dispatch_DIR=S:\b\2\cmake\modules ^
   -D Foundation_DIR=S:\b\3\cmake\modules ^
   -D TSC_DIR=S:\b\5\cmake\modules ^
