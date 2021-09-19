@@ -46,7 +46,7 @@ swift_vasprintf(char **strp, const char *fmt, va_list args) {
   char *buffer = reinterpret_cast<char *>(malloc(len + 1));
   if (!buffer)
     return -1;
-  int result = vsprintf(buffer, fmt, args);
+  int result = vsnprintf(buffer, len + 1, fmt, args);
   if (result < 0) {
     free(buffer);
     return -1;
