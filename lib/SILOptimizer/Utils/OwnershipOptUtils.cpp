@@ -230,7 +230,7 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
 /// extending %ownedValue's liveness to new paths and hopefully simplifies
 /// downstream optimization and debugging. Unnecessary copies could be
 /// avoided with simple dominance check if it becomes desirable to do so.
-struct BorrowedLifetimeExtender {
+class BorrowedLifetimeExtender {
   BorrowedValue borrowedValue;
 
   // Owned value currently being extended over borrowedValue.
@@ -245,6 +245,21 @@ struct BorrowedLifetimeExtender {
   /// utility and OSSA representation are stable.
   SWIFT_ASSERT_ONLY_DECL(llvm::SmallDenseSet<PhiOperand, 4> reborrowedOperands);
 
+public:
+  /// Precondition: \p borrowedValue must introduce a local borrow scope
+  /// (begin_borrow, load_borrow, & phi).
+  BorrowedLifetimeExtender(BorrowedValue borrowedValue,
+                           InstModCallbacks &callbacks)
+      : borrowedValue(borrowedValue), callbacks(callbacks) {
+    assert(borrowedValue.isLocalScope() && "expect a valid borrowed value");
+  }
+
+  /// Extend \p ownedValue over this extended borrow scope.
+  ///
+  /// Precondition: \p ownedValue dominates this borrowed value.
+  void extendOverBorrowScopeAndConsume(SILValue ownedValue);
+
+protected:
   /// Initially map the reborrowed phi to an invalid value prior to creating the
   /// owned phi.
   void discoverReborrow(PhiValue reborrowedPhi) {
@@ -282,21 +297,6 @@ struct BorrowedLifetimeExtender {
     return SILValue();
   }
 
-public:
-  /// Precondition: \p borrowedValue must introduce a local borrow scope
-  /// (begin_borrow, load_borrow, & phi).
-  BorrowedLifetimeExtender(BorrowedValue borrowedValue,
-                           InstModCallbacks &callbacks)
-      : borrowedValue(borrowedValue), callbacks(callbacks) {
-    assert(borrowedValue.isLocalScope() && "expect a valid borrowed value");
-  }
-
-  /// Extend \p ownedValue over this extended borrow scope.
-  ///
-  /// Precondition: \p ownedValue dominates this borrowed value.
-  void extendOverBorrowScopeAndConsume(SILValue ownedValue);
-
-protected:
   void analyzeExtendedScope();
 
   SILValue createCopyAtEdge(PhiOperand reborrowOper);
