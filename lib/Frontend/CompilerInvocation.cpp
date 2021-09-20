@@ -1550,7 +1550,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            const SILOptions &SILOpts,
                            StringRef SDKPath,
                            StringRef ResourceDir,
-                           const llvm::Triple &Triple) {
+                           const LangOptions &LangOpts) {
   using namespace options;
 
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
@@ -1767,6 +1767,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
+  llvm::Triple Triple = LangOpts.Target;
+
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
     Opts.SanitizeCoverage =
         parseSanitizerCoverageArgValue(A, Triple, Diags, Opts.Sanitizers);
@@ -1868,21 +1870,26 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     return runtimeCompatibilityVersion;
   };
 
-  // Autolink runtime compatibility libraries, if asked to.
-  if (!Args.hasArg(options::OPT_disable_autolinking_runtime_compatibility)) {
-    Opts.AutolinkRuntimeCompatibilityLibraryVersion = getRuntimeCompatVersion();
-  }
+  if (!LangOpts.DisableImplicitConcurrencyModuleImport) {
+    // Autolink runtime compatibility libraries, if asked to.
+    if (!Args.hasArg(options::OPT_disable_autolinking_runtime_compatibility)) {
+      Opts.AutolinkRuntimeCompatibilityLibraryVersion =
+          getRuntimeCompatVersion();
+    }
 
-  if (!Args.hasArg(options::
-          OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
-    Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
-        getRuntimeCompatVersion();
-  }
+    if (!Args.hasArg(
+            options::
+                OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
+      Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
+          getRuntimeCompatVersion();
+    }
 
-  if (!Args.hasArg(
-          options::OPT_disable_autolinking_runtime_compatibility_concurrency)) {
-    Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion =
-        getRuntimeCompatVersion();
+    if (!Args.hasArg(
+            options::
+                OPT_disable_autolinking_runtime_compatibility_concurrency)) {
+      Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion =
+          getRuntimeCompatVersion();
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
@@ -2090,7 +2097,7 @@ bool CompilerInvocation::parseArgs(
 
   if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts, SILOpts,
                      getSDKPath(), SearchPathOpts.RuntimeResourcePath,
-                     LangOpts.Target)) {
+                     LangOpts)) {
     return true;
   }
 
