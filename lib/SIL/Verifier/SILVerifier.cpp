@@ -666,7 +666,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILFunction &F;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
-  SmallVector<StringRef, 16> DebugVars;
+  SmallVector<std::pair<StringRef, SILType>, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
   std::unique_ptr<DominanceInfo> Dominance;
@@ -1265,6 +1265,31 @@ public:
     if (!varInfo)
       return;
 
+    // Retrive debug variable type
+    SILType DebugVarTy;
+    if (varInfo->Type)
+      DebugVarTy = *varInfo->Type;
+    else {
+      // Fetch from related SSA value
+      switch (inst->getKind()) {
+      case SILInstructionKind::AllocStackInst:
+      case SILInstructionKind::AllocBoxInst:
+        DebugVarTy = inst->getResult(0)->getType();
+        break;
+      case SILInstructionKind::DebugValueInst:
+        DebugVarTy = inst->getOperand(0)->getType();
+        if (DebugVarTy.isAddress()) {
+          auto Expr = varInfo->DIExpr.operands();
+          if (!Expr.empty() &&
+              Expr.begin()->getOperator() == SILDIExprOperator::Dereference)
+            DebugVarTy = DebugVarTy.getObjectType();
+        }
+        break;
+      default:
+        llvm_unreachable("impossible instruction kind");
+      }
+    }
+
     auto *debugScope = inst->getDebugScope();
     if (varInfo->ArgNo)
       require(!varInfo->Name.empty(), "function argument without a name");
@@ -1278,17 +1303,20 @@ public:
     if (debugScope && !debugScope->InlinedCallSite)
       if (unsigned argNum = varInfo->ArgNo) {
         // It is a function argument.
-        if (argNum < DebugVars.size() && !DebugVars[argNum].empty()) {
-          require(DebugVars[argNum] == varInfo->Name,
+        if (argNum < DebugVars.size() && !DebugVars[argNum].first.empty()) {
+          require(DebugVars[argNum].first == varInfo->Name,
                   "Scope contains conflicting debug variables for one function "
                   "argument");
+          // Check for type
+          require(DebugVars[argNum].second == DebugVarTy,
+                  "conflicting debug variable type!");
         } else {
           // Reserve enough space.
           while (DebugVars.size() <= argNum) {
-            DebugVars.push_back(StringRef());
+            DebugVars.push_back({StringRef(), SILType()});
           }
         }
-        DebugVars[argNum] = varInfo->Name;
+        DebugVars[argNum] = {varInfo->Name, DebugVarTy};
       }
 
     // Check the (auxiliary) debug variable scope
