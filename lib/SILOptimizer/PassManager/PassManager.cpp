@@ -1096,7 +1096,11 @@ FixedSizeSlab *LibswiftPassInvocation::allocSlab(FixedSizeSlab *afterSlab) {
 }
 
 FixedSizeSlab *LibswiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
-  FixedSizeSlab *prev = std::prev(&*slab->getIterator());
+  FixedSizeSlab *prev = nullptr;
+  assert(!allocatedSlabs.empty());
+  if (&allocatedSlabs.front() != slab)
+    prev = &*std::prev(slab->getIterator());
+
   allocatedSlabs.remove(*slab);
   passManager->getModule()->freeSlab(slab);
   return prev;
