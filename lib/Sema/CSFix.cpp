@@ -1920,19 +1920,19 @@ bool AllowCheckedCastCoercibleOptionalType::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
-AllowAlwaysSucceedCheckedCast *
-AllowAlwaysSucceedCheckedCast::create(ConstraintSystem &cs, Type fromType,
-                                      Type toType, CheckedCastKind kind,
-                                      ConstraintLocator *locator) {
+AllowNoopCheckedCast *AllowNoopCheckedCast::create(ConstraintSystem &cs,
+                                                   Type fromType, Type toType,
+                                                   CheckedCastKind kind,
+                                                   ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowAlwaysSucceedCheckedCast(cs, fromType, toType, kind, locator);
+      AllowNoopCheckedCast(cs, fromType, toType, kind, locator);
 }
 
-bool AllowAlwaysSucceedCheckedCast::diagnose(const Solution &solution,
-                                             bool asNote) const {
-  AlwaysSucceedCheckedCastFailure failure(solution, getFromType(), getToType(),
-                                          CastKind, getLocator());
-  return failure.diagnose(asNote);
+bool AllowNoopCheckedCast::diagnose(const Solution &solution,
+                                    bool asNote) const {
+  NoopCheckedCast warning(solution, getFromType(), getToType(), CastKind,
+                          getLocator());
+  return warning.diagnose(asNote);
 }
 
 // Although function types maybe compile-time convertible because

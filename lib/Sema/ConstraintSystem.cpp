@@ -3885,7 +3885,7 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
         if (fixLocator->isForContextualType())
           return true;
 
-        if (!(fix.second->getKind() == FixKind::ContextualMismatch ||
+        if (!(fix.second->getKind() == FixKind::IgnoreContextualType ||
               fix.second->getKind() == FixKind::AllowTupleTypeMismatch))
           return false;
 

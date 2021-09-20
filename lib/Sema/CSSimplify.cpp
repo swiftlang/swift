@@ -4596,12 +4596,12 @@ bool ConstraintSystem::repairFailures(
       return true;
 
     // If we could record a generic arguments mismatch instead of this fix,
-    // don't record a ContextualMismatch here.
+    // don't record a contextual type mismatch here.
     if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
       break;
 
-    auto *fix = ContextualMismatch::create(*this, lhs, rhs,
-                                           getConstraintLocator(locator));
+    auto *fix = IgnoreContextualType::create(*this, lhs, rhs,
+                                             getConstraintLocator(locator));
     conversionsOrFixes.push_back(fix);
     break;
   }
@@ -4940,7 +4940,7 @@ bool ConstraintSystem::repairFailures(
       if (contextualType->isEqual(rhs)) {
         auto *loc = getConstraintLocator(
             anchor, LocatorPathElt::ContextualType(purpose));
-        if (hasFixFor(loc, FixKind::ContextualMismatch))
+        if (hasFixFor(loc, FixKind::IgnoreContextualType))
           return true;
 
         if (contextualType->isVoid() && purpose == CTP_ReturnStmt) {
@@ -4949,7 +4949,7 @@ bool ConstraintSystem::repairFailures(
         }
 
         conversionsOrFixes.push_back(
-            ContextualMismatch::create(*this, lhs, rhs, loc));
+            IgnoreContextualType::create(*this, lhs, rhs, loc));
         break;
       }
     }
@@ -6708,9 +6708,9 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
 
   // Always succeed
   if (isCastToExpressibleByNilLiteral(cs, origFromType, toType)) {
-    return AllowAlwaysSucceedCheckedCast::create(
-        cs, fromType, toType, CheckedCastKind::Coercion,
-        cs.getConstraintLocator(locator));
+    return AllowNoopCheckedCast::create(cs, fromType, toType,
+                                        CheckedCastKind::Coercion,
+                                        cs.getConstraintLocator(locator));
   }
 
   // If both original are metatypes we have to use them because most of the
@@ -6745,10 +6745,9 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
         cs, origFromType, origToType, castKind,
         cs.getConstraintLocator(locator));
   } else {
-    // No optionals, just a trivial cast that always succeed.
-    return AllowAlwaysSucceedCheckedCast::create(
-        cs, origFromType, origToType, castKind,
-        cs.getConstraintLocator(locator));
+    // No optionals, just a trivial cast that always succeeds.
+    return AllowNoopCheckedCast::create(cs, origFromType, origToType, castKind,
+                                        cs.getConstraintLocator(locator));
   }
 }
 
@@ -11583,16 +11582,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyLabelToAssociateTrailingClosure:
   case FixKind::AllowKeyPathWithoutComponents:
   case FixKind::IgnoreInvalidResultBuilderBody:
+  case FixKind::IgnoreResultBuilderWithReturnStmts:
   case FixKind::SpecifyContextualTypeForNil:
   case FixKind::AllowRefToInvalidDecl:
   case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
   case FixKind::AllowCheckedCastCoercibleOptionalType:
+  case FixKind::AllowNoopCheckedCast:
   case FixKind::AllowUnsupportedRuntimeCheckedCast:
-  case FixKind::AllowAlwaysSucceedCheckedCast:
   case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype:
   case FixKind::AllowWrappedValueMismatch:
   case FixKind::RemoveExtraneousArguments:
-  case FixKind::SpecifyTypeForPlaceholder: {
+  case FixKind::SpecifyTypeForPlaceholder:
+  case FixKind::AllowAutoClosurePointerConversion:
+  case FixKind::IgnoreKeyPathContextualMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -11713,7 +11715,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return matchTypes(*elemTy, dictionaryKeyTy, kind, subflags, elemLoc);
   }
 
-  case FixKind::ContextualMismatch: {
+  case FixKind::ContextualMismatch:
+  case FixKind::IgnoreContextualType:
+  case FixKind::IgnoreAssignmentDestinationType:
+  case FixKind::AllowConversionThroughInOut:
+  case FixKind::IgnoreCollectionElementContextualMismatch: {
     auto impact = 1;
 
     auto locator = fix->getLocator();
@@ -11793,6 +11799,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyClosureParameterType:
   case FixKind::SpecifyClosureReturnType:
   case FixKind::AddQualifierToAccessTopLevelName:
+  case FixKind::AddSendableAttribute:
+  case FixKind::DropThrowsAttribute:
+  case FixKind::DropAsyncAttribute:
     llvm_unreachable("handled elsewhere");
   }
 
