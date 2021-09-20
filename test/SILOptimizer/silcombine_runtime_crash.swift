@@ -2,6 +2,7 @@
 // RUN: %target-build-swift -O %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-build-swift -Xllvm -sil-enable-late-ome -sil-verify-all -O %s -o %t/a.out
 
 // REQUIRES: executable_test
 

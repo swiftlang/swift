@@ -361,11 +361,10 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
 }
 
 /// Inserts releases of all stores in \p users.
-static void insertCompensatingReleases(SILInstruction *before,
-                                       const UserList &users) {
+static void insertCompensatingReleases(const UserList &users) {
   for (SILInstruction *user : users) {
     if (auto *store = dyn_cast<StoreInst>(user)) {
-      createDecrementBefore(store->getSrc(), before);
+      createDecrementBefore(store->getSrc(), store);
     }
   }
 }
@@ -834,7 +833,7 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
     }
   }
   if (releaseOfTailElems)
-    insertCompensatingReleases(releaseOfTailElems, UsersToRemove);
+    insertCompensatingReleases(UsersToRemove);
 
   // Remove the AllocRef and all of its users.
   removeInstructions(
