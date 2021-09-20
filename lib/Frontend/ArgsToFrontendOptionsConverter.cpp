@@ -244,6 +244,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
 
+  // This must be called after computing module name, module abi name,
+  // and module link name.
+  if (computeModuleAliases())
+    return true;
+
   if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
     Opts.AccessNotesPath = A->getValue();
 
@@ -495,6 +500,40 @@ bool ArgsToFrontendOptionsConverter::setUpImmediateArgs() {
     }
   }
 
+  return false;
+}
+
+bool ArgsToFrontendOptionsConverter::computeModuleAliases() {
+  auto list = Args.getAllArgValues(options::OPT_module_alias);
+  if (!list.empty()) {
+    for (auto val: list) {
+      auto i = val.find("=");
+      if (i == std::string::npos) {
+          Diags.diagnose(SourceLoc(), diag::error_bad_module_alias, val);
+          return true;
+      }
+
+      std::string *lhs = new std::string(val.substr(0, i));
+      std::string *rhs = new std::string(val.substr(i+1, val.length()));
+      auto modAlias = StringRef(*lhs);
+      auto modValue = StringRef(*rhs);
+
+      if (modAlias.empty() ||
+          modValue.empty() ||
+          modAlias == Opts.ModuleName ||
+          modAlias == Opts.ModuleABIName ||
+          modAlias == Opts.ModuleLinkName ||
+          modValue == Opts.ModuleName ||
+          modValue == Opts.ModuleABIName ||
+          modValue == Opts.ModuleLinkName ||
+          !Lexer::isIdentifier(modAlias) ||
+          !Lexer::isIdentifier(modValue)) {
+          Diags.diagnose(SourceLoc(), diag::error_bad_module_alias, val);
+          return true;
+      }
+      Opts.ModuleAliasMap.insert({ modAlias, modValue });
+    }
+  }
   return false;
 }
 

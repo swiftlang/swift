@@ -150,7 +150,8 @@ ERROR(error_stdlib_module_name,none,
       "module name \"%0\" is reserved for the standard library"
       "%select{|; use -module-name flag to specify an alternate name}1",
       (StringRef, bool))
-
+ERROR(error_bad_module_alias,none,
+      "invalid module alias \"%0\" for an imported module; make sure the input format is correct (-module-alias alias=underlying_name), where the alias maps to an imported module, and the names do not contain special characters", (StringRef))
 ERROR(error_stdlib_not_found,Fatal,
       "unable to load standard library for target '%0'", (StringRef))
 

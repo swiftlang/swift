@@ -300,6 +300,14 @@ public:
     return FrontendOpts.ParseStdlib;
   }
 
+  void setModuleAliasMap(std::map<StringRef, StringRef> ModAliasMap) {
+      FrontendOpts.ModuleAliasMap = ModAliasMap;
+  }
+
+  std::map<StringRef, StringRef> getModuleAliasMap() const {
+      return FrontendOpts.ModuleAliasMap;
+  }
+
   void setModuleName(StringRef Name) {
     FrontendOpts.ModuleName = Name.str();
     IRGenOpts.ModuleName = Name.str();
