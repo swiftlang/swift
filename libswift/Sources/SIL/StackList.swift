@@ -29,10 +29,10 @@ public struct StackList<Element> : Sequence, CustomReflectable {
   private let context: BridgedPassContext
   private var firstSlab = BridgedSlab(data: nil)
   private var lastSlab = BridgedSlab(data: nil)
-  private var endIndex: Int = slabCapacity
+  private var endIndex: Int = 0
 
   private static var slabCapacity: Int {
-    BridgedSlabCapacity / MemoryLayout<Element>.size
+    BridgedSlabCapacity / MemoryLayout<Element>.stride
   }
 
   private static func bind(_ slab: BridgedSlab) -> UnsafeMutablePointer<Element> {
@@ -84,16 +84,24 @@ public struct StackList<Element> : Sequence, CustomReflectable {
   public mutating func push(_ element: Element) {
     if endIndex >= StackList.slabCapacity {
       lastSlab = PassContext_allocSlab(context, lastSlab)
-      if firstSlab.data == nil {
-        firstSlab = lastSlab
-      }
       endIndex = 0
+    } else if firstSlab.data == nil {
+      assert(endIndex == 0)
+      firstSlab = PassContext_allocSlab(context, lastSlab)
+      lastSlab = firstSlab
     }
     (StackList.bind(lastSlab) + endIndex).initialize(to: element)
     endIndex += 1
   }
-  
-  public var isEmpty: Bool { return firstSlab.data == nil }
+
+  public mutating
+  func append<S: Sequence>(contentsOf other: S) where S.Element == Element {
+    for elem in other {
+      push(elem)
+    }
+  }
+
+  public var isEmpty: Bool { return endIndex == 0 }
   
   public mutating func pop() -> Element? {
     if isEmpty {
@@ -108,26 +116,18 @@ public struct StackList<Element> : Sequence, CustomReflectable {
         _ = PassContext_freeSlab(context, lastSlab)
         firstSlab.data = nil
         lastSlab.data = nil
+        endIndex = 0
       } else {
         lastSlab = PassContext_freeSlab(context, lastSlab)
+        endIndex = StackList.slabCapacity
       }
-      endIndex = StackList.slabCapacity
     }
 
     return elem
   }
   
   public mutating func removeAll() {
-    if isEmpty {
-      return
-    }
-    while lastSlab.data != firstSlab.data {
-      lastSlab = PassContext_freeSlab(context, lastSlab)
-    }
-    _ = PassContext_freeSlab(context, lastSlab)
-    firstSlab.data = nil
-    lastSlab.data = nil
-    endIndex = StackList.slabCapacity
+    while pop() != nil { }
   }
   
   public var customMirror: Mirror {
