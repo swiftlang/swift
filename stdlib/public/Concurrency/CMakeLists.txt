@@ -35,19 +35,29 @@ endif()
 set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS)
 
+check_cxx_compiler_flag(-fswift-async-fp=always CXX_COMPILER_HAS_SWIFT_ASYNC_FP_FLAG)
+
 if(NOT swift_concurrency_async_fp_mode)
   set(swift_concurrency_async_fp_mode "always")
 endif()
 
-# Don't emit extended frame info on platforms other than darwin, system
-# backtracer and system debugger are unlikely to support it.
+# Don't emit extended frame info on platforms other than darwin, if the compiler
+# has that flag, as the system backtracer and system debugger are unlikely to
+# support it.
 if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
-    "-fswift-async-fp=${swift_concurrency_async_fp_mode}")
-  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
-    "-Xfrontend"
-    "-swift-async-frame-pointer=${swift_concurrency_async_fp_mode}")
-else()
+  if(CXX_COMPILER_HAS_SWIFT_ASYNC_FP_FLAG)
+    list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+      "-fswift-async-fp=${swift_concurrency_async_fp_mode}")
+    list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
+      "-Xfrontend"
+      "-swift-async-frame-pointer=${swift_concurrency_async_fp_mode}")
+  else()
+    message(ERROR
+      "The -fswift-async-fp clang flag is not available. This is most likely "
+      "because you are using the Xcode toolchain, which may not have the "
+      "latest flags yet.")
+  endif()
+elseif(CXX_COMPILER_HAS_SWIFT_ASYNC_FP_FLAG)
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS "-fswift-async-fp=never")
 endif()
 
