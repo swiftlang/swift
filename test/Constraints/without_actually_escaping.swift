@@ -60,8 +60,10 @@ func rethrowThroughWAE(_ zz: (Int, Int, Int) throws -> Int, _ value: Int) throws
   }
 }
 
-let _: ((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> ()
-  = withoutActuallyEscaping(_:do:) // expected-error{{}}
+// There should be two errors - here one for async -> sync, and another throws -> non-throws
+let _: ((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> () = withoutActuallyEscaping(_:do:)
+// expected-error@-1 {{invalid conversion from throwing function of type '((Int) -> Int, (@escaping (Int) -> Int) async throws -> ()) async throws -> ()' to non-throwing function type '((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> ()'}}
+// expected-error@-2 {{invalid conversion from 'async' function of type '((Int) -> Int, (@escaping (Int) -> Int) async throws -> ()) async throws -> ()' to synchronous function type '((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> ()'}}
 
 
 // Failing to propagate @noescape into non-single-expression
