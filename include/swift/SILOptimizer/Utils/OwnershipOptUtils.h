@@ -58,6 +58,9 @@ struct OwnershipFixupContext {
   InstModCallbacks &callbacks;
   DeadEndBlocks &deBlocks;
 
+
+  // FIXME: remove these two vectors once BorrowedLifetimeExtender is used
+  // everywhere.
   SmallVector<Operand *, 8> transitiveBorrowedUses;
   SmallVector<PhiOperand, 8> recursiveReborrows;
 
