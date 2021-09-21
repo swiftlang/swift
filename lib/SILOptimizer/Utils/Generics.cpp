@@ -802,23 +802,14 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   auto CanSpecializedGenericSig = SpecializedGenericSig.getCanonicalSignature();
 
   // First substitute concrete types into the existing function type.
-  CanSILFunctionType FnTy;
-  {
-    FnTy = OrigF->getLoweredFunctionType()
-                ->substGenericArgs(M, SubstMap, getResilienceExpansion())
-                ->getUnsubstitutedType(M);
-    // FIXME: Some of the added new requirements may not have been taken into
-    // account by the substGenericArgs. So, canonicalize in the context of the
-    // specialized signature.
-    if (CanSpecializedGenericSig)
-      FnTy = cast<SILFunctionType>(
-          CanSpecializedGenericSig->getCanonicalTypeInContext(FnTy));
-    else {
-      FnTy = cast<SILFunctionType>(FnTy->getCanonicalType());
-      assert(!FnTy->hasTypeParameter() && "Type parameters outside generic context?");
-    }
-  }
+  CanSILFunctionType FnTy =
+      cast<SILFunctionType>(CanSpecializedGenericSig.getCanonicalTypeInContext(
+          OrigF->getLoweredFunctionType()
+              ->substGenericArgs(M, SubstMap, getResilienceExpansion())
+              ->getUnsubstitutedType(M)));
   assert(FnTy);
+  assert((CanSpecializedGenericSig || !FnTy->hasTypeParameter()) &&
+         "Type parameters outside generic context?");
 
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(
@@ -1439,8 +1430,7 @@ void FunctionSignaturePartialSpecializer::
     createGenericParamsForCalleeGenericParams() {
   for (auto GP : CalleeGenericSig.getGenericParams()) {
     auto CanTy = GP->getCanonicalType();
-    auto CanTyInContext =
-        CalleeGenericSig->getCanonicalTypeInContext(CanTy);
+    auto CanTyInContext = CalleeGenericSig.getCanonicalTypeInContext(CanTy);
     auto Replacement = CanTyInContext.subst(CalleeInterfaceToCallerArchetypeMap);
     LLVM_DEBUG(llvm::dbgs() << "\n\nChecking callee generic parameter:\n";
                CanTy->dump(llvm::dbgs()));

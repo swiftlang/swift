@@ -135,8 +135,8 @@ private:
   bool hasTangentSpace(SILValue value) {
     auto type = value->getType().getASTType();
     // Remap archetypes in the derivative generic signature, if it exists.
-    if (derivativeGenericSignature && type->hasArchetype()) {
-      type = derivativeGenericSignature->getCanonicalTypeInContext(
+    if (type->hasArchetype()) {
+      type = derivativeGenericSignature.getCanonicalTypeInContext(
           type->mapTypeOutOfContext());
     }
     // Look up conformance in the current module.

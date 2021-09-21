@@ -5159,9 +5159,9 @@ bool ASTContext::overrideGenericSignatureReqsSatisfied(
 
   switch (direction) {
   case OverrideGenericSignatureReqCheck::BaseReqSatisfiedByDerived:
-    return sig->requirementsNotSatisfiedBy(derivedSig).empty();
+    return sig.requirementsNotSatisfiedBy(derivedSig).empty();
   case OverrideGenericSignatureReqCheck::DerivedReqSatisfiedByBase:
-    return derivedSig->requirementsNotSatisfiedBy(sig).empty();
+    return derivedSig.requirementsNotSatisfiedBy(sig).empty();
   }
   llvm_unreachable("Unhandled OverrideGenericSignatureReqCheck in switch");
 }
