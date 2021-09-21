@@ -6776,8 +6776,26 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   auto methodType = i->getType().castTo<SILFunctionType>();
 
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
-  if (IGM.hasResilientMetadata(classDecl,
-                               ResilienceExpansion::Maximal)) {
+  bool shouldUseDispatchThunk = false;
+  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal)) {
+    shouldUseDispatchThunk = true;
+  } else if (IGM.getOptions().VirtualFunctionElimination) {
+    // For VFE, use a thunk if the target class is in another module. This
+    // enables VFE (which scans function bodies for used type identifiers) to
+    // work across modules by relying on:
+    //
+    // (1) virtual call sites are in thunks in the same module as the class,
+    //     therefore they are always visible to VFE,
+    // (2) if a thunk symbol is unused by any other module, we can safely
+    //     eliminate it.
+    //
+    // See the virtual-function-elimination-two-modules.swift testcase for an
+    // example of how cross-module VFE can be effectively used.
+    shouldUseDispatchThunk =
+        classDecl->getModuleContext() != IGM.getSwiftModule();
+  }
+
+  if (shouldUseDispatchThunk) {
     llvm::Constant *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
 
     if (methodType->isAsync()) {

@@ -501,6 +501,12 @@ def enable_llvm_wme : Flag<["-"], "enable-llvm-wme">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Use LLVM IR Witness Method Elimination on Swift protocol witness tables">;
 
+def internalize_at_link : Flag<["-"], "internalize-at-link">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Allow internalizing public symbols and vtables at link time (assume"
+  " all client code of public types is part of the same link unit, or that"
+  " external symbols are explicitly requested via -exported_symbols_list)">;
+
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
