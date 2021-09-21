@@ -530,7 +530,7 @@ class AbstractionPattern {
     OrigType = origType;
     GenericSig = CanGenericSignature();
     if (OrigType->hasTypeParameter()) {
-      assert(OrigType == signature->getCanonicalTypeInContext(origType));
+      assert(OrigType == signature.getCanonicalTypeInContext(origType));
       GenericSig = signature;
     }
   }
