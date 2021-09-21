@@ -841,9 +841,13 @@ static bool parseSILOptional(StringRef &Result, SILParser &SP) {
 /// Parse an option attribute ('[' Expected ']')?
 static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
   StringRef Optional;
-  if (parseSILOptional(Optional, SP)) {
-    if (Optional != Expected)
+  SourceLoc Loc;
+  if (parseSILOptional(Optional, Loc, SP)) {
+    if (Optional != Expected) {
+      SP.P.diagnose(Loc, diag::sil_invalid_attribute_for_expected, Optional,
+                    Expected);
       return true;
+    }
     Result = true;
   }
   return false;
@@ -3279,14 +3283,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     SourceLoc AddrLoc;
 
     bool isLexical = false;
-    StringRef attributeName;
-
-    if (parseSILOptional(attributeName, *this)) {
-      if (attributeName.equals("lexical"))
-        isLexical = true;
-      else
-        return true;
-    }
+    if (parseSILOptional(isLexical, *this, "lexical"))
+      return true;
 
     if (parseTypedValueRef(Val, AddrLoc, B) ||
         parseSILDebugLocation(InstLoc, B))
@@ -4146,29 +4144,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     bool hasDynamicLifetime = false;
     bool isLexical = false;
 
-    while (P.consumeIf(tok::l_square)) {
-      Identifier ident;
-      SourceLoc identLoc;
-      if (parseSILIdentifier(ident, identLoc,
-                             diag::expected_in_attribute_list)) {
-        if (P.consumeIf(tok::r_square)) {
-          continue;
-        } else {
-          return true;
-        }
-      }
-      StringRef attr = ident.str();
-
-      if (attr == "dynamic_lifetime") {
+    StringRef attributeName;
+    SourceLoc attributeLoc;
+    while (parseSILOptional(attributeName, attributeLoc, *this)) {
+      if (attributeName == "dynamic_lifetime")
         hasDynamicLifetime = true;
-      } else if (attr == "lexical") {
+      else if (attributeName == "lexical")
         isLexical = true;
-      } else {
+      else {
+        P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
+                   attributeName, "alloc_stack");
         return true;
       }
-
-      if (!P.consumeIf(tok::r_square))
-        return true;
     }
 
     SILType Ty;
