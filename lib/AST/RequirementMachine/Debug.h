@@ -34,10 +34,10 @@ enum class DebugFlags : unsigned {
   ConcreteUnification = (1<<4),
 
   /// Print debug output when concretizing nested types in the property map.
-  ConcretizeNestedTypes = (1<<5)
+  ConcretizeNestedTypes = (1<<5),
 
   /// Print debug output from the homotopy reduction algorithm.
-  HomotopyReduction = (1<<7),
+  HomotopyReduction = (1<<6)
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

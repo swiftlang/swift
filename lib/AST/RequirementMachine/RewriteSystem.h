@@ -157,6 +157,8 @@ struct RewriteStep {
 
   void apply(MutableTerm &term, const RewriteSystem &system) const;
 
+  bool checkCancellation(const RewriteStep &other) const;
+
   void dump(llvm::raw_ostream &out,
             MutableTerm &term,
             const RewriteSystem &system) const;
@@ -190,6 +192,17 @@ struct RewritePath {
   decltype(Steps)::const_iterator end() const {
     return Steps.end();
   }
+
+  llvm::SmallVector<unsigned, 1> findRulesAppearingOnceInEmptyContext() const;
+
+  RewritePath splitCycleAtRule(unsigned ruleID) const;
+
+  bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
+
+  void computeFreelyReducedPath();
+
+  void computeCyclicallyReducedLoop(MutableTerm &basepoint,
+                                    const RewriteSystem &system);
 
   void invert();
 
@@ -311,6 +324,8 @@ public:
                              unsigned maxDepth);
 
   void simplifyRewriteSystem();
+
+  void minimizeRewriteSystem();
 
   void verifyRewriteRules() const;
 
