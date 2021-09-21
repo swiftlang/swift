@@ -88,6 +88,7 @@ RewriteSystem::RewriteSystem(RewriteContext &ctx)
   Initialized = 0;
   Complete = 0;
   Minimized = 0;
+  RecordHomotopyGenerators = 0;
 }
 
 RewriteSystem::~RewriteSystem() {
@@ -96,12 +97,14 @@ RewriteSystem::~RewriteSystem() {
 }
 
 void RewriteSystem::initialize(
+    bool recordHomotopyGenerators,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&associatedTypeRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
     ProtocolGraph &&graph) {
   assert(!Initialized);
   Initialized = 1;
 
+  RecordHomotopyGenerators = recordHomotopyGenerators;
   Protos = graph;
 
   for (const auto &rule : associatedTypeRules) {
@@ -170,7 +173,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
     if (path) {
       // We already have a loop, since the simplified lhs is identical to the
       // simplified rhs.
-      HomotopyGenerators.emplace_back(lhs, loop);
+      recordHomotopyGenerator(lhs, loop);
 
       if (Debug.contains(DebugFlags::Add)) {
         llvm::dbgs() << "## Recorded trivial loop at " << lhs << ": ";
@@ -206,7 +209,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
     // add a rewrite step applying the new rule in reverse to close the loop.
     loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
                                          newRuleID, /*inverse=*/true));
-    HomotopyGenerators.emplace_back(lhs, loop);
+    recordHomotopyGenerator(lhs, loop);
 
     if (Debug.contains(DebugFlags::Add)) {
       llvm::dbgs() << "## Recorded non-trivial loop at " << lhs << ": ";
@@ -376,7 +379,7 @@ void RewriteSystem::simplifyRewriteSystem() {
     loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
                                          newRuleID, /*inverse=*/true));
 
-    HomotopyGenerators.emplace_back(MutableTerm(lhs), loop);
+    recordHomotopyGenerator(MutableTerm(lhs), loop);
 
     if (Debug.contains(DebugFlags::Completion)) {
       llvm::dbgs() << "$ Right hand side simplification recorded a loop: ";
