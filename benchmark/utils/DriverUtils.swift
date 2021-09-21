@@ -59,7 +59,23 @@ struct BenchResults {
   var median: T { return self[0.5] }
 }
 
-public var registeredBenchmarks: [BenchmarkInfo] = []
+public var registeredBenchmarks: [Benchmark] = []
+
+public func register(_ benchmark: Benchmark) {
+  registeredBenchmarks.append(benchmark)
+}
+
+public func register<S: Sequence>(_ benchmarks: S) where S.Element == Benchmark {
+  registeredBenchmarks.append(contentsOf: benchmarks)
+}
+
+extension Benchmark {
+  /// Returns true if this benchmark should be run on the current platform.
+  var shouldRun: Bool {
+    return !unsupportedPlatforms.contains(.currentPlatform)
+  }
+}
+
 
 enum TestAction {
   case run
@@ -112,11 +128,11 @@ struct TestConfig {
   let afterRunSleep: UInt32?
 
   /// The list of tests to run.
-  let tests: [(index: String, info: BenchmarkInfo)]
+  let tests: [(index: String, benchmark: Benchmark)]
 
   let action: TestAction
 
-  init(_ registeredBenchmarks: [BenchmarkInfo]) {
+  init(_ registeredBenchmarks: [Benchmark]) {
 
     struct PartialTestConfig {
       var delim: String?
@@ -265,27 +281,27 @@ struct TestConfig {
   /// - Returns: An array of test number and benchmark info tuples satisfying
   ///     specified filtering conditions.
   static func filterTests(
-    _ registeredBenchmarks: [BenchmarkInfo],
+    _ registeredBenchmarks: [Benchmark],
     tests: [String],
     tags: Set<BenchmarkCategory>,
     skipTags: Set<BenchmarkCategory>
-  ) -> [(index: String, info: BenchmarkInfo)] {
+  ) -> [(index: String, benchmark: Benchmark)] {
     var t = tests
     let filtersIndex = t.partition { $0.hasPrefix("+") || $0.hasPrefix("-") }
     let excludesIndex = t[filtersIndex...].partition { $0.hasPrefix("-") }
     let specifiedTests = Set(t[..<filtersIndex])
     let includes = t[filtersIndex..<excludesIndex].map { $0.dropFirst() }
     let excludes = t[excludesIndex...].map { $0.dropFirst() }
-    let allTests = registeredBenchmarks.sorted()
+    let allTests = registeredBenchmarks.sorted(by: { $0.name < $1.name })
     let indices = Dictionary(uniqueKeysWithValues:
       zip(allTests.map { $0.name },
           (1...).lazy.map { String($0) } ))
 
-    func byTags(b: BenchmarkInfo) -> Bool {
+    func byTags(_ b: Benchmark) -> Bool {
       return b.tags.isSuperset(of: tags) &&
         b.tags.isDisjoint(with: skipTags)
     }
-    func byNamesOrIndices(b: BenchmarkInfo) -> Bool {
+    func byNamesOrIndices(_ b: Benchmark) -> Bool {
       return specifiedTests.contains(b.name) ||
         // !! "`allTests` have been assigned an index"
         specifiedTests.contains(indices[b.name]!) ||
@@ -520,20 +536,20 @@ final class TestRunner {
   }
 
   /// Measure the `fn` and return the average sample time per iteration (μs).
-  func measure(_ name: String, fn: (Int) -> Void, numIters: Int) -> Int {
+  func measure(_ benchmark: Benchmark, iterations: Int) -> Int {
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
-    name.withCString { p in startTrackingObjects(p) }
+    benchmark.name.withCString { p in startTrackingObjects(p) }
 #endif
 
     startMeasurement()
-    fn(numIters)
+    benchmark.run(iterations: iterations)
     stopMeasurement()
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in stopTrackingObjects(p) }
 #endif
 
-    return lastSampleTime.microseconds / numIters
+    return lastSampleTime.microseconds / iterations
   }
 
   func logVerbose(_ msg: @autoclosure () -> String) {
@@ -541,11 +557,11 @@ final class TestRunner {
   }
 
   /// Run the benchmark and return the measured results.
-  func run(_ test: BenchmarkInfo) -> BenchResults? {
+  func run(_ test: Benchmark) -> BenchResults? {
     // Before we do anything, check that we actually have a function to
     // run. If we don't it is because the benchmark is not supported on
     // the platform and we should skip it.
-    guard let testFn = test.runFunction else {
+    guard test.shouldRun else {
       logVerbose("Skipping unsupported benchmark \(test.name)!")
       return nil
     }
@@ -559,16 +575,14 @@ final class TestRunner {
     }
 
     resetMeasurements()
-    if let setUp = test.setUpFunction {
-      setUp()
-      stopMeasurement()
-      logVerbose("    SetUp \(lastSampleTime.microseconds)")
-      resetMeasurements()
-    }
+    test.setUp()
+    stopMeasurement()
+    logVerbose("    SetUp \(lastSampleTime.microseconds)")
+    resetMeasurements()
 
     // Determine number of iterations for testFn to run for desired time.
     func iterationsPerSampleTime() -> (numIters: Int, oneIter: Int) {
-      let oneIter = measure(test.name, fn: testFn, numIters: 1)
+      let oneIter = measure(test, iterations: 1)
       if oneIter > 0 {
         let timePerSample = Int(c.sampleTime * 1_000_000.0) // microseconds (μs)
         return (max(timePerSample / oneIter, 1), oneIter)
@@ -600,10 +614,10 @@ final class TestRunner {
     logVerbose("    Collecting \(numSamples) samples.")
     logVerbose("    Measuring with scale \(numIters).")
     for _ in samples.count..<numSamples {
-      addSample(measure(test.name, fn: testFn, numIters: numIters))
+      addSample(measure(test, iterations: numIters))
     }
 
-    test.tearDownFunction?()
+    test.tearDown()
     if let lf = test.legacyFactor {
       logVerbose("    Applying legacy factor: \(lf)")
       samples = samples.map { $0 * lf }
@@ -640,7 +654,7 @@ final class TestRunner {
   func runBenchmarks() {
     var testCount = 0
 
-    func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
+    func report(_ index: String, _ t: Benchmark, results: BenchResults?) {
       func values(r: BenchResults) -> [String] {
         func quantiles(q: Int) -> [Int] {
           let qs = (0...q).map { i in r[Double(i) / Double(q)] }

@@ -108,6 +108,56 @@ public struct BenchmarkPlatformSet : OptionSet {
   }
 }
 
+public protocol Benchmark {
+  typealias Tags = Set<BenchmarkCategory>
+
+  /// The name of the benchmark that should be displayed by the harness.
+  var name: String { get }
+
+  /// A set of category tags that describe this benchmark. This is used by the
+  /// harness to allow for easy slicing of the set of benchmarks along tag
+  /// boundaries, e.x.: run all string benchmarks or ref count benchmarks, etc.
+  var tags: Tags { get }
+
+  /// The platforms that this benchmark does not support. This is an OptionSet.
+  var unsupportedPlatforms: BenchmarkPlatformSet { get }
+
+  /// DON'T USE ON NEW BENCHMARKS!
+  /// Optional `legacyFactor` is a multiplication constant applied to runtime
+  /// statistics reported in the benchmark summary (it doesn’t affect the
+  /// individual sample times reported in `--verbose` mode).
+  ///
+  /// It enables the migration of benchmark suite to smaller workloads (< 1 ms),
+  /// which are more robust to measurement errors from system under load,
+  /// while maintaining the continuity of longterm benchmark tracking.
+  ///
+  /// Most legacy benchmarks had workloads artificially inflated in their main
+  /// `for` loops with a constant integer factor and the migration consisted of
+  /// dividing it so that the optimized runtime (-O) was less than 1000 μs and
+  /// storing the divisor in `legacyFactor`. This effectively only increases the
+  /// frequency of measurement, gathering more samples that are much less likely
+  /// to be interrupted by a context switch.
+  var legacyFactor: Int? { get }
+
+  /// This method is run before benchmark samples are timed.
+  func setUp()
+
+  /// A function that invokes the specific benchmark routine.
+  func run(iterations: Int)
+
+  /// This method is run after samples are taken.
+  func tearDown()
+}
+
+// Default implementations.
+extension Benchmark {
+  public var unsupportedPlatforms: BenchmarkPlatformSet { [] }
+  public var legacyFactor: Int? { nil }
+  public func setUp() {}
+  public func tearDown() {}
+}
+
+@available(*, deprecated)
 public struct BenchmarkInfo {
   /// The name of the benchmark that should be displayed by the harness.
   public var name: String
@@ -115,44 +165,19 @@ public struct BenchmarkInfo {
   /// Shadow static variable for runFunction.
   private var _runFunction: (Int) -> ()
 
-  /// A function that invokes the specific benchmark routine.
-  public var runFunction: ((Int) -> ())? {
-    if !shouldRun {
-      return nil
-    }
-    return _runFunction
-  }
-
   /// A set of category tags that describe this benchmark. This is used by the
   /// harness to allow for easy slicing of the set of benchmarks along tag
   /// boundaries, e.x.: run all string benchmarks or ref count benchmarks, etc.
   public var tags: Set<BenchmarkCategory>
 
   /// The platforms that this benchmark supports. This is an OptionSet.
-  private var unsupportedPlatforms: BenchmarkPlatformSet
+  public var unsupportedPlatforms: BenchmarkPlatformSet
 
   /// Shadow variable for setUpFunction.
   private var _setUpFunction: (() -> ())?
 
-  /// An optional function that if non-null is run before benchmark samples
-  /// are timed.
-  public var setUpFunction : (() -> ())? {
-    if !shouldRun {
-      return nil
-    }
-    return _setUpFunction
-  }
-
   /// Shadow static variable for computed property tearDownFunction.
   private var _tearDownFunction: (() -> ())?
-
-  /// An optional function that if non-null is run after samples are taken.
-  public var tearDownFunction: (() -> ())? {
-    if !shouldRun {
-      return nil
-    }
-    return _tearDownFunction
-  }
 
   /// DON'T USE ON NEW BENCHMARKS!
   /// Optional `legacyFactor` is a multiplication constant applied to runtime
@@ -171,38 +196,38 @@ public struct BenchmarkInfo {
   /// to be interrupted by a context switch.
   public var legacyFactor: Int?
 
-  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory],
-              setUpFunction: (() -> ())? = nil,
-              tearDownFunction: (() -> ())? = nil,
-              unsupportedPlatforms: BenchmarkPlatformSet = [],
-              legacyFactor: Int? = nil) {
+  public init(
+    name: String,
+    runFunction: @escaping (Int) -> (),
+    tags: [BenchmarkCategory],
+    setUpFunction: (() -> ())? = nil,
+    tearDownFunction: (() -> ())? = nil,
+    unsupportedPlatforms: BenchmarkPlatformSet = [],
+    legacyFactor: Int? = nil
+  ) {
     self.name = name
-    self._runFunction = runFunction
     self.tags = Set(tags)
+    self.unsupportedPlatforms = unsupportedPlatforms
+    self._runFunction = runFunction
     self._setUpFunction = setUpFunction
     self._tearDownFunction = tearDownFunction
-    self.unsupportedPlatforms = unsupportedPlatforms
     self.legacyFactor = legacyFactor
   }
-
-  /// Returns true if this benchmark should be run on the current platform.
-  var shouldRun: Bool {
-    return !unsupportedPlatforms.contains(.currentPlatform)
-  }
 }
 
-extension BenchmarkInfo : Comparable {
-  public static func < (lhs: BenchmarkInfo, rhs: BenchmarkInfo) -> Bool {
-    return lhs.name < rhs.name
+@available(*, deprecated)
+extension BenchmarkInfo: Benchmark {
+  public func setUp() {
+    _setUpFunction?()
   }
-  public static func == (lhs: BenchmarkInfo, rhs: BenchmarkInfo) -> Bool {
-    return lhs.name == rhs.name
-  }
-}
 
-extension BenchmarkInfo : Hashable {
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(name)
+  /// An optional function that if non-null is run after samples are taken.
+  public func tearDown() {
+    _tearDownFunction?()
+  }
+
+  public func run(iterations: Int) {
+    _runFunction(iterations)
   }
 }
 
@@ -262,7 +287,22 @@ public struct SplitMix64: RandomNumberGenerator {
     }
 }
 
-@inlinable // FIXME(inline-always)
+@inlinable
+@inline(__always)
+public func check(
+  _ result: Bool,
+  file: StaticString = #file,
+  function: StaticString = #function,
+  line: Int = #line
+) {
+  guard _fastPath(result) else {
+    print("Incorrect result in \(function), \(file):\(line)")
+    abort()
+  }
+}
+
+@available(*, deprecated)
+@inlinable
 @inline(__always)
 public func CheckResults(
     _ resultsMatch: Bool,
@@ -280,7 +320,7 @@ public func CheckResults(
 // If we do not have an objc-runtime, then we do not have a definition for
 // autoreleasepool. Add in our own fake autoclosure for it that is inline
 // always. That should be able to be eaten through by the optimizer no problem.
-@inlinable // FIXME(inline-always)
+@inlinable
 @inline(__always)
 public func autoreleasepool<Result>(
   invoking body: () throws -> Result
@@ -289,6 +329,9 @@ public func autoreleasepool<Result>(
 }
 #endif
 
+public func getFalse() -> Bool { return false }
+
+@available(*, deprecated, renamed: "getFalse")
 public func False() -> Bool { return false }
 
 /// This is a dummy protocol to test the speed of our protocol dispatch.
@@ -307,6 +350,8 @@ public func blackHole<T>(_ x: T) {
 }
 
 // Return the passed argument without letting the optimizer know that.
+// It's important that this function is in another module than the tests
+// which are using it.
 @inline(never)
 public func identity<T>(_ x: T) -> T {
   return x

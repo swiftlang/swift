@@ -14,78 +14,6 @@
 // to test uppercase and lowercase ASCII string fast paths.
 import TestsUtils
 
-let t: [BenchmarkCategory] = [.validation, .api, .String]
-
-public let AngryPhonebook = [
-  BenchmarkInfo(
-    name: "AngryPhonebook",
-    runFunction: run_AngryPhonebook,
-    tags: t,
-    legacyFactor: 7),
-
-  // Small String Workloads
-  BenchmarkInfo(
-    name: "AngryPhonebook.ASCII2.Small",
-    runFunction: { angryPhonebook($0*10, ascii) },
-    tags: t,
-    setUpFunction: { blackHole(ascii) }),
-  BenchmarkInfo(
-    name: "AngryPhonebook.Strasse.Small",
-    runFunction: { angryPhonebook($0, strasse) },
-    tags: t,
-    setUpFunction: { blackHole(strasse) }),
-  BenchmarkInfo(
-    name: "AngryPhonebook.Armenian.Small",
-    runFunction: { angryPhonebook($0, armenian) },
-    tags: t,
-    setUpFunction: { blackHole(armenian) }),
-  BenchmarkInfo(
-    name: "AngryPhonebook.Cyrillic.Small",
-    runFunction: { angryPhonebook($0, cyrillic) },
-    tags: t,
-    setUpFunction: { blackHole(cyrillic) }),
-
-  // Regular String Workloads
-  BenchmarkInfo(
-    name: "AngryPhonebook.ASCII2",
-    runFunction: { angryPhonebook($0*10, precomposed: longASCII) },
-    tags: t,
-    setUpFunction: { blackHole(longASCII) }),
-  BenchmarkInfo(
-    name: "AngryPhonebook.Strasse",
-    runFunction: { angryPhonebook($0, precomposed: longStrasse) },
-    tags: t,
-    setUpFunction: { blackHole(longStrasse) }),
-  BenchmarkInfo(
-    name: "AngryPhonebook.Armenian",
-    runFunction: { angryPhonebook($0, precomposed: longArmenian) },
-    tags: t,
-    setUpFunction: { blackHole(longArmenian) }),
-  BenchmarkInfo(
-    name: "AngryPhonebook.Cyrillic",
-    runFunction: { angryPhonebook($0, precomposed: longCyrillic) },
-    tags: t,
-    setUpFunction: { blackHole(longCyrillic) })
-]
-
-let words = [
-  "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
-  "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",
-  "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",
-  "Joshua", "Kevin", "Ronald", "Timothy", "Jason", "Jeffrey", "Gary", "Ryan",
-  "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank"]
-
-@inline(never)
-public func run_AngryPhonebook(_ N: Int) {
-  // Permute the names.
-  for _ in 1...N {
-    for firstname in words {
-      for lastname in words {
-        _ = (firstname.uppercased(), lastname.lowercased())
-      }
-    }
-  }
-}
 
 // Workloads for various scripts. Always 20 names for 400 pairings.
 // To keep the performance of various scripts roughly comparable, aim for
@@ -102,6 +30,13 @@ public func run_AngryPhonebook(_ N: Int) {
 //  strasse | 140 B |  240 B |  longStrasse |  6798 B | 11996 B
 // armenian | 232 B |  232 B | longArmenian | 10478 B | 11676 B
 // cyrillic | 238 B |  238 B | longCyrillic | 10718 B | 11916 B
+
+let words = [
+  "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
+  "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",
+  "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",
+  "Joshua", "Kevin", "Ronald", "Timothy", "Jason", "Jeffrey", "Gary", "Ryan",
+  "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank"]
 
 let ascii = Array(words.prefix(20))
 // Pathological case, uppercase: ß -> SS
@@ -131,22 +66,124 @@ let longStrasse = phonebook(strasse)
 let longArmenian = phonebook(armenian)
 let longCyrillic = phonebook(cyrillic)
 
-@inline(never)
-public func angryPhonebook(_ N: Int, _ names: [String]) {
-  assert(names.count == 20)
-  // Permute the names.
-  for _ in 1...N {
-    for firstname in names {
-      for lastname in names {
-        blackHole((firstname.uppercased(), lastname.lowercased()))
+
+struct LegacyAngryPhonebook: Benchmark {
+  let name: String
+
+  init(name: String) {
+    self.name = name
+  }
+
+  var tags: Tags { [.validation, .api, .String] }
+  var legacyFactor: Int? { 7 }
+
+  func run(iterations: Int) {
+    run_AngryPhonebook(iterations)
+  }
+
+  @inline(never)
+  @usableFromInline
+  func run_AngryPhonebook(_ iterations: Int) {
+    // Permute the names.
+    for _ in 1...iterations {
+      for firstname in words {
+        for lastname in words {
+          _ = (firstname.uppercased(), lastname.lowercased())
+        }
       }
     }
   }
 }
 
-@inline(never)
-public func angryPhonebook(_ N: Int, precomposed names: String) {
-  for _ in 1...N {
-    blackHole((names.uppercased(), names.lowercased()))
+struct AngryPhonebook: Benchmark {
+  let name: String
+  let input: [String]
+  let factor: Int
+
+  init(name: String, input: [String], factor: Int = 1) {
+    self.name = name
+    self.input = input
+    self.factor = factor
+  }
+
+  var tags: Tags { [.validation, .api, .String] }
+
+  func run(iterations: Int) {
+    Self.angryPhonebook(factor * iterations, input)
+  }
+
+  @inline(never)
+  @usableFromInline
+  static func angryPhonebook(_ iterations: Int, _ names: [String]) {
+    assert(names.count == 20)
+    // Permute the names.
+    for _ in 1...iterations {
+      for firstname in names {
+        for lastname in names {
+          blackHole((firstname.uppercased(), lastname.lowercased()))
+        }
+      }
+    }
   }
 }
+
+struct PrecomposedAngryPhonebook: Benchmark {
+  let name: String
+  let input: String
+  let factor: Int
+
+  init(name: String, input: String, factor: Int = 1) {
+    self.name = name
+    self.input = input
+    self.factor = factor
+  }
+
+  var tags: Tags { [.validation, .api, .String] }
+
+  func run(iterations: Int) {
+    Self.angryPhonebook(factor * iterations, input)
+  }
+
+  @inline(never)
+  @usableFromInline
+  static func angryPhonebook(_ iterations: Int, _ names: String) {
+    for _ in 1...iterations {
+      blackHole((names.uppercased(), names.lowercased()))
+    }
+  }
+}
+
+public let benchmarks: [Benchmark] = [
+  LegacyAngryPhonebook(name: "AngryPhonebook"),
+
+  // Small String Workloads
+  AngryPhonebook(
+    name: "AngryPhonebook.ASCII2.Small",
+    input: ascii,
+    factor: 10),
+  AngryPhonebook(
+    name: "AngryPhonebook.Strasse.Small",
+    input: strasse),
+  AngryPhonebook(
+    name: "AngryPhonebook.Armenian.Small",
+    input: armenian),
+  AngryPhonebook(
+    name: "AngryPhonebook.Cyrillic.Small",
+    input: cyrillic),
+
+  // Regular String Workloads
+  PrecomposedAngryPhonebook(
+    name: "AngryPhonebook.ASCII2",
+    input: longASCII,
+    factor: 10),
+  PrecomposedAngryPhonebook(
+    name: "AngryPhonebook.Strasse",
+    input: longStrasse),
+  PrecomposedAngryPhonebook(
+    name: "AngryPhonebook.Armenian",
+    input: longArmenian),
+  PrecomposedAngryPhonebook(
+    name: "AngryPhonebook.Cyrillic",
+    input: longCyrillic),
+]
+
