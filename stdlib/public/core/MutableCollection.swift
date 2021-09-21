@@ -121,7 +121,8 @@ where SubSequence: MutableCollection
   /// After partitioning a collection, there is a pivot index `p` where
   /// no element before `p` satisfies the `belongsInSecondPartition`
   /// predicate and every element at or after `p` satisfies
-  /// `belongsInSecondPartition`.
+  /// `belongsInSecondPartition`. This operation is not stable, so the
+  /// relative ordering of elements within the partitions is not preserved.
   ///
   /// In the following example, an array of numbers is partitioned by a
   /// predicate that matches elements greater than 30.
@@ -140,6 +141,11 @@ where SubSequence: MutableCollection
   ///     // first == [30, 10, 20, 30, 30]
   ///     let second = numbers[p...]
   ///     // second == [60, 40]
+  ///
+  /// Note that elements in both partitions have changed their
+  /// relative order compared to before partitioning. That is, `40`
+  /// appears before `60` in the original collection, but afterward
+  /// after calling `partition(by:)`.
   ///
   /// - Parameter belongsInSecondPartition: A predicate used to partition
   ///   the collection. All elements satisfying this predicate are ordered
