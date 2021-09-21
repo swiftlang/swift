@@ -309,26 +309,29 @@ llvm::PointerType *IRGenModule::getEnumValueWitnessTablePtrTy() {
                                            "swift.enum_vwtable", true);
 }
 
-/// Load a specific witness from a known table.  The result is
-/// always an i8*.
-llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
-                                                     llvm::Value *table,
-                                                     WitnessIndex index,
-                                                     llvm::Value **slotPtr) {
+Address irgen::slotForLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                          llvm::Value *table,
+                                          WitnessIndex index) {
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
 
   // GEP to the appropriate index, avoiding spurious IR in the trivial case.
   llvm::Value *slot = table;
   if (index.getValue() != 0)
     slot = IGF.Builder.CreateConstInBoundsGEP1_32(
-       table->getType()->getPointerElementType(), table, index.getValue());
+        table->getType()->getPointerElementType(), table, index.getValue());
 
-  if (slotPtr) *slotPtr = slot;
+  return Address(slot, IGF.IGM.getPointerAlignment());
+}
 
-  auto witness =
-    IGF.Builder.CreateLoad(Address(slot, IGF.IGM.getPointerAlignment()));
-  IGF.setInvariantLoad(witness);
-  return witness;
+/// Load a specific witness from a known table.  The result is
+/// always an i8*.
+llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                     llvm::Value *table,
+                                                     WitnessIndex index,
+                                                     llvm::Value **slotPtr) {
+  auto slot = slotForLoadOfOpaqueWitness(IGF, table, index);
+  if (slotPtr) *slotPtr = slot.getAddress();
+  return IGF.emitInvariantLoad(slot);
 }
 
 /// Load a specific witness from a known table.  The result is
