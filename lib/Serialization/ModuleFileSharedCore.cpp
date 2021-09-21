@@ -325,7 +325,7 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
 
       StringRef moduleRevision = blobData;
       if (isCompilerTagged && !moduleRevision.empty()) {
-        std::string compilerRevision = forcedDebugRevision ?
+        StringRef compilerRevision = forcedDebugRevision ?
           forcedDebugRevision : version::getSwiftRevision();
         if (moduleRevision != compilerRevision)
           result.status = Status::RevisionIncompatible;
