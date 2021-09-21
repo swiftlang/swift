@@ -13,6 +13,8 @@
 #ifndef SWIFT_RQM_DEBUG_H
 #define SWIFT_RQM_DEBUG_H
 
+#include "swift/Basic/OptionSet.h"
+
 namespace swift {
 
 namespace rewriting {

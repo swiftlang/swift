@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include "RewriteSystem.h"
@@ -310,7 +312,7 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 
 /// Returns true if this rewrite step is an inverse of \p other
 /// (and vice versa).
-bool RewriteStep::checkCancellation(const RewriteStep &other) const {
+bool RewriteStep::isInverseOf(const RewriteStep &other) const {
   if (Kind != other.Kind)
     return false;
 
@@ -328,15 +330,92 @@ bool RewriteStep::checkCancellation(const RewriteStep &other) const {
   return true;
 };
 
+bool RewriteStep::maybeSwapRewriteSteps(RewriteStep &other,
+                                        const RewriteSystem &system) {
+  if (Kind != RewriteStep::ApplyRewriteRule ||
+      other.Kind != RewriteStep::ApplyRewriteRule)
+    return false;
+
+  // Two rewrite steps are _orthogonal_ if they rewrite disjoint subterms
+  // in context. Orthogonal rewrite steps commute, so we can canonicalize
+  // a path by placing the left-most step first.
+  //
+  // Eg, A.U.B.(X => Y).C ⊗ A.(U => V).B.Y == A.(U => V).B.X ⊗ A.V.B.(X => Y).
+  //
+  // Or, in diagram form. We want to turn this:
+  //
+  //   ----- time ----->
+  // +---------+---------+
+  // |    A    |    A    |
+  // +---------+---------+
+  // |    U    | U ==> V |
+  // +---------+---------+
+  // |    B    |    B    |
+  // +---------+---------+
+  // | X ==> Y |    Y    |
+  // +---------+---------+
+  // |    C    |    C    |
+  // +---------+---------+
+  //
+  // Into this:
+  //
+  // +---------+---------+
+  // |    A    |    A    |
+  // +---------+---------+
+  // | U ==> V |    V    |
+  // +---------+---------+
+  // |    B    |    B    |
+  // +---------+---------+
+  // |    X    | X ==> Y |
+  // +---------+---------+
+  // |    C    |    C    |
+  // +---------+---------+
+  //
+  // Note that
+  //
+  // StartOffset == |A|+|U|+|B|
+  // EndOffset = |C|
+  //
+  // other.StartOffset = |A|
+  // other.EndOffset = |B|+|Y|+|C|
+  //
+  // After interchange, we adjust:
+  //
+  // StartOffset = |A|
+  // EndOffset = |B|+|X|+|C|
+  //
+  // other.StartOffset = |A|+|V|+|B|
+  // other.EndOffset = |C|
+
+  const auto &rule = system.getRule(RuleID);
+  auto lhs = (Inverse ? rule.getRHS() : rule.getLHS());
+  auto rhs = (Inverse ? rule.getLHS() : rule.getRHS());
+
+  const auto &otherRule = system.getRule(other.RuleID);
+  auto otherLHS = (other.Inverse ? otherRule.getRHS() : otherRule.getLHS());
+  auto otherRHS = (other.Inverse ? otherRule.getLHS() : otherRule.getRHS());
+
+  if (StartOffset < other.StartOffset + otherLHS.size())
+    return false;
+
+  std::swap(*this, other);
+  EndOffset += (lhs.size() - rhs.size());
+  other.StartOffset += (otherRHS.size() - otherLHS.size());
+
+  return true;
+}
+
 /// Cancels out adjacent rewrite steps that are inverses of each other.
 /// This does not change either endpoint of the path, and the path does
 /// not necessarily need to be a loop.
-void RewritePath::computeFreelyReducedPath() {
+bool RewritePath::computeFreelyReducedPath() {
   SmallVector<RewriteStep, 4> newSteps;
+  bool changed = false;
 
   for (const auto &step : Steps) {
     if (!newSteps.empty() &&
-        newSteps.back().checkCancellation(step)) {
+        newSteps.back().isInverseOf(step)) {
+      changed = true;
       newSteps.pop_back();
       continue;
     }
@@ -345,6 +424,7 @@ void RewritePath::computeFreelyReducedPath() {
   }
 
   std::swap(newSteps, Steps);
+  return changed;
 }
 
 /// Given a path that is a loop around the given basepoint, cancels out
@@ -358,14 +438,14 @@ void RewritePath::computeFreelyReducedPath() {
 /// The first step is the inverse of the last step, so the cyclic
 /// reduction is the 3-cell (Y.A => Y.B) * Y.(B => A), with a new
 /// basepoint 'Y.A'.
-void RewritePath::computeCyclicallyReducedLoop(MutableTerm &basepoint,
+bool RewritePath::computeCyclicallyReducedLoop(MutableTerm &basepoint,
                                                const RewriteSystem &system) {
   unsigned count = 0;
 
   while (2 * count + 1 < size()) {
     auto left = Steps[count];
     auto right = Steps[Steps.size() - count - 1];
-    if (!left.checkCancellation(right))
+    if (!left.isInverseOf(right))
       break;
 
     // Update the basepoint by applying the first step in the path.
@@ -376,6 +456,22 @@ void RewritePath::computeCyclicallyReducedLoop(MutableTerm &basepoint,
 
   std::rotate(Steps.begin(), Steps.begin() + count, Steps.end() - count);
   Steps.erase(Steps.end() - 2 * count, Steps.end());
+
+  return count > 0;
+}
+
+bool RewritePath::computeLeftCanonicalForm(const RewriteSystem &system) {
+  bool changed = false;
+
+  for (unsigned i = 1, e = Steps.size(); i < e; ++i) {
+    auto &prevStep = Steps[i - 1];
+    auto &step = Steps[i];
+
+    if (prevStep.maybeSwapRewriteSteps(step, system))
+      changed = true;
+  }
+
+  return changed;
 }
 
 /// Dumps a series of rewrite steps applied to \p term.
@@ -465,12 +561,20 @@ void RewriteSystem::minimizeRewriteSystem() {
 
       if (changed) {
         unsigned size = loop.second.size();
-        loop.second.computeFreelyReducedPath();
-        loop.second.computeCyclicallyReducedLoop(loop.first, *this);
 
-        if (size != loop.second.size()) {
-          llvm::dbgs() << "** Note: Cyclically reduced the loop to eliminate "
-                       << (size - loop.second.size()) << " steps\n";
+        bool changed;
+        do {
+          changed = false;
+          changed |= loop.second.computeFreelyReducedPath();
+          changed |= loop.second.computeCyclicallyReducedLoop(loop.first, *this);
+          changed |= loop.second.computeLeftCanonicalForm(*this);
+        } while (changed);
+
+        if (Debug.contains(DebugFlags::HomotopyReduction)) {
+          if (size != loop.second.size()) {
+            llvm::dbgs() << "** Note: Cyclically reduced the loop to eliminate "
+                         << (size - loop.second.size()) << " steps\n";
+          }
         }
 
         if (Debug.contains(DebugFlags::HomotopyReduction)) {

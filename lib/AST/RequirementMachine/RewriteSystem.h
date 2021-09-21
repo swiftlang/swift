@@ -157,7 +157,10 @@ struct RewriteStep {
 
   void apply(MutableTerm &term, const RewriteSystem &system) const;
 
-  bool checkCancellation(const RewriteStep &other) const;
+  bool isInverseOf(const RewriteStep &other) const;
+
+  bool maybeSwapRewriteSteps(RewriteStep &other,
+                             const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out,
             MutableTerm &term,
@@ -199,10 +202,12 @@ struct RewritePath {
 
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
-  void computeFreelyReducedPath();
+  bool computeFreelyReducedPath();
 
-  void computeCyclicallyReducedLoop(MutableTerm &basepoint,
+  bool computeCyclicallyReducedLoop(MutableTerm &basepoint,
                                     const RewriteSystem &system);
+
+  bool computeLeftCanonicalForm(const RewriteSystem &system);
 
   void invert();
 
