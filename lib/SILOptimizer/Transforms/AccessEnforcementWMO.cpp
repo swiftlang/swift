@@ -81,7 +81,7 @@ getDisjointAccessLocation(AccessedStorageWithBase storageAndBase) {
   case AccessedStorage::Class:
     // Class and Globals are always a VarDecl, but the global decl may have a
     // null value for global_addr -> phi.
-    return cast_or_null<VarDecl>(storage.getDecl(storageAndBase.base));
+    return cast_or_null<VarDecl>(storageAndBase.getDecl());
   case AccessedStorage::Box:
   case AccessedStorage::Stack:
   case AccessedStorage::Tail:

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,7 +11,35 @@
 //===----------------------------------------------------------------------===//
 ///
 /// These utilities model the storage locations of memory access. See
-/// ProgrammersGuide.md for high-level design.
+/// SILMemoryAccess.md for high-level design.
+///
+/// Terminology: In the examples below, 'address' is the address of the memory
+/// operation, 'access' is the address of the formal access scope, 'base' is the
+/// address of the formally accessed memory, and 'root' is the reference root of
+/// the object that the formally accessed memory is a member of.
+///
+///  struct S {
+///    var field: Int64
+///   }
+///   class C {
+///     var prop: S
+///   }
+///
+///   %root    = alloc_ref $C
+///   %base    = ref_element_addr %root : $C, #C.prop
+///   %access  = begin_access [read] [static] %base : $*S
+///   %address = struct_element_addr %access : $*S, #.field
+///   %value   = load [trivial] %address : $*Int64
+///   end_access %access : $*S
+/// 
+/// OR
+/// 
+///   %root    = alloc_box $S
+///   %base    = project_box %root : ${ var S }
+///   %access  = begin_access [read] [static] %base : $*S
+///   %address = struct_element_addr %access : $*S, #.field
+///   %value   = load [trivial] %address : $*Int64
+///   end_access %access : $*S
 ///
 /// All memory operations that are part of a formal access, as defined by
 /// exclusivity rules, are marked by begin_access and end_access instructions.
@@ -32,9 +60,10 @@
 /// storage casts. This is useful when the type of the returned access address
 /// must be consistent with the memory operation's type (the same type or a
 /// parent type). For a formal access, this typically returns the begin_access,
-/// but it is not guaranteed to because some accesses contain storage casts. For
-/// non-formal access, it returns a best-effort address corresponding to the
-/// base of an access.
+/// but it is not guaranteed to because some accesses contain storage casts
+/// (TODO: make storage casts within access scopes illegal). For non-formal
+/// access, it returns a best-effort address corresponding to the base of an
+/// access.
 ///
 /// 2. getAccessScope(): If the memory operation is part of a formal access,
 /// then this is guaranteed to return the begin_access marker. Otherwise, it
@@ -47,23 +76,24 @@
 /// address or pointer type, but never a reference or box type.
 /// Each object's property or its tail storage is separately accessed.
 ///
-/// For better identification an access base, use
-/// AccessedStorage::compute(). It returns an AccessedStorage value
-/// that identifies the storage of a memory access. It provides APIs
-/// for inspecting type of accessed storage and allows for disambiguation
-/// between different types of storage and different properties within a class.
+/// In addition to the free-standing functions, the AccessBase and
+/// AccessedStorage classes encapsulte the identity of an access. They can be
+/// used to:
+/// - directly compare and hash access identities
+/// - exhaustively switch over the kinds of accesses
+/// - cache access lookups for repeated queries
 ///
-/// AccessedStorage::compute() follows the same logic as getAccessBase(), but if
-/// the base is not recognized as a valid access, it returns invalid
-/// AccessedStorage. It also performs further analysis to determine the root
-/// reference of an object access.
+/// AccessBase::compute() follows the same logic as getAccessBase(), but if the
+/// base is not recognized as a valid access, it returns invalid
+/// AccessBase. AccessedStorage::compute() extends this API by using
+/// findReferenceRoot() to more precisely identify the storage object.
 ///
-/// AccessedStorage::compute() returns the outermost AccessedStorage for any
-/// memory address. It can be called on the address of a memory operation, the
-/// address of a begin_access, or any other address value. If the address is
-/// from an enforced begin_access or from any memory operation that is part of a
-/// formal access, then it returns a valid AccessedStorage value. If the memory
-/// operation is not part of a formal access, then it still identifies the
+/// AccessBase::compute() and AccessedStorage::compute() can be called on the
+/// address of any memory operation, the address of a begin_access, or any other
+/// address value. If the address is the operand of any enforced begin_access or
+/// any memory operation that corresponds to formal access, then compute()
+/// must return a valid AccessBase or AccessedStorage value. If the memory
+/// operation is *not* part of a formal access, then it still identifies the
 /// accessed storage as a best effort, but the result may be invalid storage.
 ///
 ///    An active goal is to require compute() to always return a
@@ -77,27 +107,27 @@
 /// make incorrect assumptions about the absence of access to globals or class
 /// properties.
 ///
-/// AccessedStorage::computeInScope() returns an AccessedStorage value for the
+/// computeInScope() returns an AccessBase or AccessedStorage value for the
 /// immediately enclosing access scope. Within a formal access, it always
 /// returns a Nested storage kind, which provides the begin_access marker.
 ///
-/// identifyFormalAccess() works like AccessedStorage::computeInScope(), but
-/// finds the storage corresponding to a begin_access marker, rather than an
-/// arbitrary address. This must return a valid AccessedStorage value unless the
-/// access has "Unsafe" enforcement. The given begin_access marker may be nested
-/// within another, outer access scope. For the purpose of exclusivity, nested
-/// accesses are considered distinct formal accesses so they return distinct
-/// AccessedStorage values even though they may access the same memory. This
-/// way, nested accesses do not appear to conflict.
+/// identifyFormalAccess() works like AccessedStorage::computeInScope(), but it
+/// should only be passed finds an address that is the operand of a begin_access
+/// marker, rather than any arbitrary address. This must return a valid
+/// AccessedStorage value unless the access has "Unsafe" enforcement. The given
+/// begin_access marker may be nested within another, outer access scope. For
+/// the purpose of exclusivity, nested accesses are considered distinct formal
+/// accesses so they return distinct AccessedStorage values even though they may
+/// access the same memory. This way, nested accesses do not appear to conflict.
 ///
 /// AccessPath identifies both the accessed storage and the path to a specific
-/// storage location within that storage object. See ProgrammersGuide.md and the
+/// storage location within that storage object. See SILMemoryAccess.md and the
 /// class comments below for details. AccessPath::compute() and
 /// AccessPath::computeInScope() mirror the AccessedStorage API.
 /// AccessPath::contains() and AccessPath::mayOverlap() provide efficient
 /// comparison of access paths.
 ///
-/// AccessPath::collectUses() provides all reachable uses of the accessed
+/// AccessPath::collectUses() gathers all reachable uses of the accessed
 /// storage, allowing the selection of Exact, Inner, or Overlapping uses.
 /// visitAccessedStorageUses() and visitAccessPathUses() generalize
 /// handling of all reachable uses for a given storage location.
@@ -214,39 +244,24 @@ enum class NestedAccessType { StopAtAccessBegin, IgnoreAccessBegin };
 /// previous.
 enum class AccessUseType { Exact, Inner, Overlapping };
 
-/// Represents the identity of a storage object being accessed.
+/// The physical representation used to identify access information and common
+/// API used by both AccessBase and AccessedStorage.
 ///
-/// Requirements:
+/// May be one of several kinds of "identified" storage objects. Storage is
+/// "identified" when the base of the formal access is recognized and the kind
+/// of storage precisely identified.
 ///
-///     A bitwise comparable encoding and hash key to identify each location
-///     being formally accessed. Any two accesses of "uniquely identified"
-///     storage must have the same key if they access the same storage and
-///     distinct keys if they access distinct storage. For more efficient
-///     analysis, accesses to non-uniquely identified storage should have the
-///     same key if they may point to the same storage.
-///
-///     Complete identification of all class or global accesses. Failing to
-///     identify a class or global access will introduce undefined program
-///     behavior which can't be tested.
-///
-/// Memory operations on "uniquely identified" storage cannot overlap with any
-/// other memory operation on distinct "uniquely identified" storage.
-///
-/// AccessedStorage may be one of several kinds of "identified" storage
-/// objects. Storage is "identified" when the base of the formal access is
-/// recognized and the kind of storage precisely identified. The base is usually
-/// represented by the SILValue that the memory address is derived from. For
-/// global variable access, the base is the global's declaration instead.
-///
-/// Unidentified *valid* storage is also associated with a SILValue that
-/// produces the accessed address but that value has not been determined to be
-/// the base of a formal access. It may be from a ref_tail_addr, undef, or some
-/// recognized memory initialization pattern. Unidentified valid storage cannot
-/// represent any arbitrary base address--it must at least been proven not to
-/// correspond to any class or global variable access, unless it's nested within
-/// another access to the same object. So, Unidentified can overlap with
-/// Class/Global access because it was derived from another Class/Global access,
-/// but Unidentified can never be the only formal access to that memory.
+/// Unidentified access may have a valid AccessRepresentation. This is the case
+/// for a SILValue that produces the address but that value has not been
+/// determined to be the *base* of a formal access. It may be from a
+/// ref_tail_addr, undef, or some recognized memory initialization pattern. A
+/// valid Unidentified address cannot represent any arbitrary address--it must
+/// at least be proven not to correspond to any class or global variable
+/// access. The Unidentified address can be nested within another access to the
+/// same object such that the Unidentified value is derived from the identified
+/// Class/Global access. But the Unidentified access can never be the *only*
+/// formal access to Class/Global memory. This would break assumptions that all
+/// Class/Global accesses are discoverable.
 ///
 /// An *invalid* AccessedStorage object is Unidentified and associated with an
 /// invalid SILValue. This signals that analysis has failed to recognize an
@@ -256,18 +271,10 @@ enum class AccessUseType { Exact, Inner, Overlapping };
 ///     AccessedStorage is either valid or explicitly guarded by an "unsafe"
 ///     begin_access.
 ///
-/// Note that the SILValue that represents a storage object is not
-/// necessarilly an address type. It may instead be a SILBoxType. So, even
-/// though address phis are not allowed, finding the base of an access may
-/// require traversing phis.
-///
-/// Support for integer IDs and bitsets. An AccessedStorage value has enough
-/// extra bits to store a unique index for each identified access in a
-/// function. An AccessedStorage (without an ID) can be cheaply formed
-/// on-the-fly for any memory operation then used as a hash key to lookup its
-/// unique integer index which is stored directly in the hashed value but not
-/// used as part of the hash key.
-class AccessedStorage {
+/// Some identified storage is also known to be "uniquely identified". Memory
+/// operations on "uniquely identified" storage cannot overlap with any other
+/// memory operation on distinct "uniquely identified" storage.
+class AccessRepresentation {
 public:
   /// Enumerate over all valid begin_access bases. Clients can use a covered
   /// switch to warn if AccessedStorage ever adds a case.
@@ -286,9 +293,330 @@ public:
 
   static const char *getKindName(Kind k);
 
+  // Checking the storage kind is far more common than other fields. Make sure
+  // it can be byte load with no shift.
+  static const int ReservedKindBits = 7;
+  static_assert(ReservedKindBits >= NumKindBits, "Too many storage kinds.");
+
+  static const unsigned InvalidElementIndex =
+      (1 << (32 - (ReservedKindBits + 1))) - 1;
   // Give object tail storage a fake large property index for convenience.
+
   static constexpr unsigned TailIndex = std::numeric_limits<int>::max();
 
+protected:
+  // Form a bitfield that is effectively a union over any pass-specific data
+  // with the fields used within this class as a common prefix.
+  //
+  // This allows passes to embed analysis flags, and reserves enough space to
+  // embed a unique index.
+  //
+  // AccessedStorageAnalysis defines an StorageAccessInfo object that maps each
+  // storage object within a function to its unique storage index and summary
+  // information of that storage object.
+  //
+  // AccessEnforcementOpts defines an AccessEnforcementOptsInfo object that maps
+  // each begin_access to its storage object, unique access index, and summary
+  // info for that access.
+  union {
+    uint64_t opaqueBits;
+    // elementIndex can overflow while gracefully degrading analysis. For now,
+    // reserve an absurd number of bits at a nice alignment boundary, but this
+    // can be reduced.
+    SWIFT_INLINE_BITFIELD_BASE(AccessRepresentation, 32,
+                               kind : ReservedKindBits,
+                               isLet : 1,
+                               elementIndex : 32 - (ReservedKindBits + 1));
+
+    // Define bits for use in AccessedStorageAnalysis. Each identified storage
+    // object is mapped to one instance of this subclass.
+    SWIFT_INLINE_BITFIELD_FULL(StorageAccessInfo, AccessRepresentation,
+                               64 - NumAccessRepresentationBits,
+                               accessKind : NumSILAccessKindBits,
+                               noNestedConflict : 1,
+                               storageIndex : 64 - (NumAccessRepresentationBits
+                                                    + NumSILAccessKindBits
+                                                    + 1));
+
+    // Define bits for use in the AccessEnforcementOpts pass. Each begin_access
+    // in the function is mapped to one instance of this subclass.  Reserve a
+    // bit for a seenNestedConflict flag, which is the per-begin-access result
+    // of pass-specific analysis. The remaning bits are sufficient to index all
+    // begin_[unpaired_]access instructions.
+    //
+    // `AccessRepresentation` refers to the AccessRepresentationBitfield defined
+    // above, setting aside enough bits for common data.
+    SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo,
+                               AccessRepresentation,
+                               64 - NumAccessRepresentationBits,
+                               seenNestedConflict : 1,
+                               seenIdenticalStorage : 1,
+                               beginAccessIndex :
+                                 62 - NumAccessRepresentationBits);
+
+    // Define data flow bits for use in the AccessEnforcementDom pass. Each
+    // begin_access in the function is mapped to one instance of this subclass.
+    SWIFT_INLINE_BITFIELD(DomAccessedStorage, AccessRepresentation, 1 + 1,
+                          isInner : 1, containsRead : 1);
+  } Bits;
+
+  // 'value' or 'global' and 'isLet' are initialized in the subclass.
+  union {
+    // For AccessBase, 'value' always contains the base address.
+    //
+    // For AccessedStorage:
+    // - For Global, 'global' refers to the global variable
+    // - For Class and Tail, 'value' contains the object root
+    // - For other access kinds, 'value' contains the base address
+    SILValue value;
+    SILGlobalVariable *global;
+  };
+
+  void setLetAccess(bool isLet) {
+    Bits.AccessRepresentation.isLet = isLet;
+  }
+
+public:
+  AccessRepresentation() : value() {
+    Bits.opaqueBits = 0;
+    initKind(Unidentified, InvalidElementIndex);
+  }
+
+  AccessRepresentation(SILValue base, Kind kind);
+
+  Kind getKind() const {
+    return static_cast<Kind>(Bits.AccessRepresentation.kind);
+  }
+
+  void initKind(Kind k, unsigned elementIndex) {
+    Bits.opaqueBits = 0;
+    Bits.AccessRepresentation.kind = k;
+    Bits.AccessRepresentation.elementIndex = elementIndex;
+  }
+
+  unsigned getElementIndex() const {
+    return Bits.AccessRepresentation.elementIndex;
+  }
+
+  void setElementIndex(unsigned elementIndex) {
+    Bits.AccessRepresentation.elementIndex = elementIndex;
+  }
+
+  // Return true if this is a valid access representation.
+  operator bool() const { return getKind() != Unidentified || value; }
+
+  // Clear any bits reserved for subclass data. Useful for up-casting back to
+  // the base class.
+  void resetSubclassData() {
+    initKind(getKind(), Bits.AccessRepresentation.elementIndex);
+  }
+
+  SILValue getValue() const {
+    assert(getKind() != Global && getKind() != Class && getKind() != Tail);
+    assert(value && "Invalid storage has an invalid value");
+    return value;
+  }
+
+  unsigned getParamIndex() const {
+    assert(getKind() == Argument);
+    return getElementIndex();
+  }
+
+  SILFunctionArgument *getArgument() const {
+    assert(getKind() == Argument);
+    return cast<SILFunctionArgument>(value);
+  }
+
+  /// Return true if this access is based on a reference-counted object.
+  bool isReference() const {
+    return getKind() == Box || getKind() == Class || getKind() == Tail;
+  }
+
+  /// Return true if the given access is guaranteed to be within an object of
+  /// class type.
+  bool isObjectAccess() const {
+    return getKind() == Class || getKind() == Tail;
+  }
+
+  unsigned getPropertyIndex() const {
+    assert(getKind() == Class);
+    return getElementIndex();
+  }
+
+  /// Return true if the given storage objects have identical access information
+  ///
+  /// This compares only the AccessedStorage base class bits, ignoring the
+  /// subclass bits. It is used for hash lookup equality, so it should not
+  /// perform any additional lookups or dereference memory outside itself.
+  bool hasIdenticalAccessInfo(const AccessRepresentation &other) const {
+    if (getKind() != other.getKind())
+      return false;
+
+    switch (getKind()) {
+    case Box:
+    case Stack:
+    case Tail:
+    case Argument:
+    case Yield:
+    case Nested:
+    case Unidentified:
+      return value == other.value;
+    case Global:
+      return global == other.global;
+    case Class:
+      return value == other.value
+             && getElementIndex() == other.getElementIndex();
+    }
+    llvm_unreachable("covered switch");
+  }
+  /// Return true if the storage is guaranteed local.
+  bool isLocal() const {
+    switch (getKind()) {
+    case Box:
+      return isa<AllocBoxInst>(value);
+    case Stack:
+      return true;
+    case Global:
+    case Class:
+    case Tail:
+    case Argument:
+    case Yield:
+    case Nested:
+    case Unidentified:
+      return false;
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
+  /// If this is a uniquely identified formal access, then it cannot
+  /// alias with any other uniquely identified access to different storage.
+  bool isUniquelyIdentified() const {
+    switch (getKind()) {
+    case Box:
+      return isa<AllocBoxInst>(value);
+    case Stack:
+    case Global:
+      return true;
+    case Argument:
+      return
+        getArgument()->getArgumentConvention().isExclusiveIndirectParameter();
+    case Class:
+    case Tail:
+    case Yield:
+    case Nested:
+    case Unidentified:
+      return false;
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
+  /// Return true if this storage is guaranteed not to overlap with \p other's
+  /// storage.
+  bool isDistinctFrom(const AccessRepresentation &other) const;
+
+  /// Return true if this identifies the base of a formal access location.
+  ///
+  /// Most formal access bases are uniquely identified, but class access
+  /// may alias other references to the same object.
+  bool isFormalAccessBase() const {
+    if (isUniquelyIdentified())
+      return true;
+
+    return getKind() == Class;
+  }
+
+  /// Return true if the given access is on a 'let' lvalue.
+  bool isLetAccess() const { return Bits.AccessRepresentation.isLet; }
+
+  void print(raw_ostream &os) const;
+
+private:
+  // Disable direct comparison because we allow subclassing with bitfields.
+  // Currently, we use DenseMapInfo to unique storage, which defines key
+  // equalilty only in terms of the base AccessedStorage class bits.
+  bool operator==(const AccessRepresentation &) const = delete;
+  bool operator!=(const AccessRepresentation &) const = delete;
+};
+
+/// The base of a formal access.
+///
+/// Note that the SILValue that represents a storage object is not
+/// necessarilly an address type. It may instead be a SILBoxType. So, even
+/// though address phis are not allowed, finding the base of an access may
+/// require traversing phis.
+class AccessBase : public AccessRepresentation {
+public:
+  static AccessBase compute(SILValue sourceAddress);
+
+  // Do not add any members to this class. AccessBase can be copied as
+  // AccessRepresentation.
+
+public:
+  AccessBase() = default;
+
+  AccessBase(SILValue base, Kind kind);
+
+  /// Return the base address of this access.
+  ///
+  /// Precondition: this is a valid AccessedBase.
+  ///
+  /// Postcondition: the returned value has address or RawPointer type.
+  SILValue getBaseAddress() const {
+    assert(value && "An invalid base value implies invalid storage");
+    assert(value->getType().isAddress()
+           || isa<BuiltinRawPointerType>(value->getType().getASTType()));
+    return value;
+  }
+
+  /// Return the immediate reference for the box or class object being accessed.
+  ///
+  /// Use findReferenceRoot() or findOwnershipRoot() on this result to precisely
+  /// identify the storage object.
+  ///
+  /// Precondition: isReference() is true.
+  SILValue getReference() const;
+
+  /// Return the global variable being accessed.
+  ///
+  /// Precondition: getKind() == Global
+  SILGlobalVariable *getGlobal() const;
+
+  /// Returns the ValueDecl for the formal access, if it can be
+  /// determined. Otherwise returns null.
+  const ValueDecl *getDecl() const;
+
+  void print(raw_ostream &os) const;
+  void dump() const;
+};
+
+/// Represents the identity of a storage object being accessed.
+///
+/// Combines AccessBase with the reference root for Class and Tail access to
+/// more precisely identify storage. For efficiency of the physical
+/// representation, this does not preserve the base address. For convenient
+/// access to both the address base and storage use AccessedStorageWithBase.
+///
+/// Requirements:
+///
+///     A bitwise comparable encoding and hash key to identify each location
+///     being formally accessed. Any two accesses of "uniquely identified"
+///     storage must have the same key if they access the same storage and
+///     distinct keys if they access distinct storage. For more efficient
+///     analysis, accesses to non-uniquely identified storage should have the
+///     same key if they may point to the same storage.
+///
+///     Complete identification of all class or global accesses. Failing to
+///     identify a class or global access will introduce undefined program
+///     behavior which can't be tested.
+///
+/// Support for integer IDs and bitsets. An AccessedStorage value has enough
+/// extra bits to store a unique index for each identified access in a
+/// function. An AccessedStorage (without an ID) can be cheaply formed
+/// on-the-fly for any memory operation then used as a hash key to lookup its
+/// unique integer index which is stored directly in the hashed value but not
+/// used as part of the hash key.
+class AccessedStorage : public AccessRepresentation {
+public:
   /// Return an AccessedStorage value that best identifies a formally accessed
   /// variable pointed to by \p sourceAddress, looking through any nested
   /// formal accesses to find the underlying storage.
@@ -316,145 +644,20 @@ public:
   static AccessedStorage computeInScope(SILValue sourceAddress);
 
   /// Create storage for the tail elements of \p object.
-  static AccessedStorage forObjectTail(SILValue object) {
-    AccessedStorage storage;
-    storage.initKind(Tail, TailIndex);
-    storage.value = findReferenceRoot(object);
-    return storage;
+  static AccessedStorage forBase(AccessBase base) {
+    return AccessedStorage(base.getBaseAddress(), base.getKind());
   }
 
-protected:
-  // Checking the storage kind is far more common than other fields. Make sure
-  // it can be byte load with no shift.
-  static const int ReservedKindBits = 7;
-  static_assert(ReservedKindBits >= NumKindBits, "Too many storage kinds.");
+  /// Create storage for the tail elements of \p object.
+  static AccessedStorage forObjectTail(SILValue object);
 
-  static const unsigned InvalidElementIndex =
-      (1 << (32 - (ReservedKindBits + 1))) - 1;
-
-  // Form a bitfield that is effectively a union over any pass-specific data
-  // with the fields used within this class as a common prefix.
-  //
-  // This allows passes to embed analysis flags, and reserves enough space to
-  // embed a unique index.
-  //
-  // AccessedStorageAnalysis defines an StorageAccessInfo object that maps each
-  // storage object within a function to its unique storage index and summary
-  // information of that storage object.
-  //
-  // AccessEnforcementOpts defines an AccessEnforcementOptsInfo object that maps
-  // each begin_access to its storage object, unique access index, and summary
-  // info for that access.
-  union {
-    uint64_t opaqueBits;
-    // elementIndex can overflow while gracefully degrading analysis. For now,
-    // reserve an absurd number of bits at a nice alignment boundary, but this
-    // can be reduced.
-    SWIFT_INLINE_BITFIELD_BASE(AccessedStorage, 32,
-                               kind : ReservedKindBits,
-                               isLet : 1,
-                               elementIndex : 32 - (ReservedKindBits + 1));
-
-    // Define bits for use in AccessedStorageAnalysis. Each identified storage
-    // object is mapped to one instance of this subclass.
-    SWIFT_INLINE_BITFIELD_FULL(StorageAccessInfo, AccessedStorage,
-                               64 - NumAccessedStorageBits,
-                               accessKind : NumSILAccessKindBits,
-                               noNestedConflict : 1,
-                               storageIndex : 64 - (NumAccessedStorageBits
-                                                    + NumSILAccessKindBits
-                                                    + 1));
-
-    // Define bits for use in the AccessEnforcementOpts pass. Each begin_access
-    // in the function is mapped to one instance of this subclass.  Reserve a
-    // bit for a seenNestedConflict flag, which is the per-begin-access result
-    // of pass-specific analysis. The remaning bits are sufficient to index all
-    // begin_[unpaired_]access instructions.
-    //
-    // `AccessedStorage` refers to the AccessedStorageBitfield defined above,
-    // setting aside enough bits for common data.
-    SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo, AccessedStorage,
-                               64 - NumAccessedStorageBits,
-                               seenNestedConflict : 1,
-                               seenIdenticalStorage : 1,
-                               beginAccessIndex : 62 - NumAccessedStorageBits);
-
-    // Define data flow bits for use in the AccessEnforcementDom pass. Each
-    // begin_access in the function is mapped to one instance of this subclass.
-    SWIFT_INLINE_BITFIELD(DomAccessedStorage, AccessedStorage, 1 + 1,
-                          isInner : 1, containsRead : 1);
-  } Bits;
-
-private:
-  union {
-    // For non-class storage, 'value' is the access base. For class storage
-    // 'value' is the object base, where the access base is the class' stored
-    // property. For tail storage 'value' is the object base and there is no
-    // value for the access base.
-    SILValue value;
-    SILGlobalVariable *global;
-  };
-
-  void initKind(Kind k, unsigned elementIndex) {
-    Bits.opaqueBits = 0;
-    Bits.AccessedStorage.kind = k;
-    Bits.AccessedStorage.elementIndex = elementIndex;
-  }
-
-  unsigned getElementIndex() const { return Bits.AccessedStorage.elementIndex; }
-  void setElementIndex(unsigned elementIndex) {
-    Bits.AccessedStorage.elementIndex = elementIndex;
-  }
+  // Do not add any members to this class. AccessBase can be copied as
+  // AccessRepresentation.
 
 public:
-  AccessedStorage() : value() { initKind(Unidentified, InvalidElementIndex); }
+  AccessedStorage() = default;
 
   AccessedStorage(SILValue base, Kind kind);
-
-  // Return true if this is a valid storage object.
-  operator bool() const { return getKind() != Unidentified || value; }
-
-  Kind getKind() const { return static_cast<Kind>(Bits.AccessedStorage.kind); }
-
-  // Clear any bits reserved for subclass data. Useful for up-casting back to
-  // the base class.
-  void resetSubclassData() {
-    initKind(getKind(), Bits.AccessedStorage.elementIndex);
-  }
-
-  SILValue getValue() const {
-    assert(getKind() != Global && getKind() != Class && getKind() != Tail);
-    assert(value && "Invalid storage has an invalid value");
-    return value;
-  }
-
-  unsigned getParamIndex() const {
-    assert(getKind() == Argument);
-    return getElementIndex();
-  }
-
-  SILFunctionArgument *getArgument() const {
-    assert(getKind() == Argument);
-    return cast<SILFunctionArgument>(value);
-  }
-
-  SILGlobalVariable *getGlobal() const {
-    assert(getKind() == Global);
-    return global;
-  }
-
-  bool isReference() const {
-    return getKind() == Box || getKind() == Class || getKind() == Tail;
-  }
-
-  SILValue getObject() const {
-    assert(isReference());
-    return value;
-  }
-  unsigned getPropertyIndex() const {
-    assert(getKind() == Class);
-    return getElementIndex();
-  }
 
   /// Return a new AccessedStorage for Class/Tail/Box access based on
   /// existing storage and a new object.
@@ -463,6 +666,16 @@ public:
     storage.initKind(getKind(), getElementIndex());
     storage.value = findReferenceRoot(object);
     return storage;
+  }
+
+  SILGlobalVariable *getGlobal() const {
+    assert(getKind() == Global);
+    return global;
+  }
+
+  SILValue getObject() const {
+    assert(isReference());
+    return value;
   }
 
   /// Return the address or reference root that the storage was based
@@ -504,91 +717,7 @@ public:
   /// subclass bits. It is used for hash lookup equality, so it should not
   /// perform any additional lookups or dereference memory outside itself.
   bool hasIdenticalStorage(const AccessedStorage &other) const {
-    if (getKind() != other.getKind())
-      return false;
-
-    switch (getKind()) {
-    case Box:
-    case Stack:
-    case Tail:
-    case Argument:
-    case Yield:
-    case Nested:
-    case Unidentified:
-      return value == other.value;
-    case Global:
-      return global == other.global;
-    case Class:
-      return value == other.value
-             && getElementIndex() == other.getElementIndex();
-    }
-    llvm_unreachable("covered switch");
-  }
-
-  /// Return true if the storage is guaranteed local.
-  bool isLocal() const {
-    switch (getKind()) {
-    case Box:
-      return isa<AllocBoxInst>(value);
-    case Stack:
-      return true;
-    case Global:
-    case Class:
-    case Tail:
-    case Argument:
-    case Yield:
-    case Nested:
-    case Unidentified:
-      return false;
-    }
-    llvm_unreachable("unhandled kind");
-  }
-
-  /// Return true if the given access is guaranteed to be within a heap object.
-  bool isObjectAccess() const {
-    return getKind() == Class || getKind() == Tail;
-  }
-
-  /// Return true if the given access is on a 'let' lvalue.
-  bool isLetAccess() const { return Bits.AccessedStorage.isLet; }
-
-  /// If this is a uniquely identified formal access, then it cannot
-  /// alias with any other uniquely identified access to different storage.
-  bool isUniquelyIdentified() const {
-    switch (getKind()) {
-    case Box:
-      return isa<AllocBoxInst>(value);
-    case Stack:
-    case Global:
-      return true;
-    case Argument:
-      return
-        getArgument()->getArgumentConvention().isExclusiveIndirectParameter();
-    case Class:
-    case Tail:
-    case Yield:
-    case Nested:
-    case Unidentified:
-      return false;
-    }
-    llvm_unreachable("unhandled kind");
-  }
-
-  /// Return true if this storage is guaranteed not to overlap with \p other's
-  /// storage.
-  bool isDistinctFrom(const AccessedStorage &other) const {
-    return isDistinctFrom<&AccessedStorage::isUniquelyIdentified>(other);
-  }
-
-  /// Return true if this identifies the base of a formal access location.
-  ///
-  /// Most formal access bases are uniquely identified, but class access
-  /// may alias other references to the same object.
-  bool isFormalAccessBase() const {
-    if (isUniquelyIdentified())
-      return true;
-
-    return getKind() == Class;
+    return hasIdenticalAccessInfo(other);
   }
 
   /// Return true if this storage is valid for all uses in a function without
@@ -597,13 +726,7 @@ public:
 
   /// Returns the ValueDecl for the underlying storage, if it can be
   /// determined. Otherwise returns null.
-  ///
-  /// If \p base is provided, then it must be the accessed base for this
-  /// storage, as passed to the AccessedStorage constructor. What \p base is
-  /// provided, this is guaranteed to return a valid decl for class properties;
-  /// otherwise it is only a best effort based on the type of the object root
-  /// *before* the object is cast to the final accessed reference type.
-  const ValueDecl *getDecl(SILValue base = SILValue()) const;
+  const ValueDecl *getDecl() const;
 
   /// Get all leaf uses of all address, pointer, or box values that have a this
   /// AccessedStorage in common. Return true if all uses were found before
@@ -622,61 +745,6 @@ public:
 
   void print(raw_ostream &os) const;
   void dump() const;
-
-private:
-  // Disable direct comparison because we allow subclassing with bitfields.
-  // Currently, we use DenseMapInfo to unique storage, which defines key
-  // equalilty only in terms of the base AccessedStorage class bits.
-  bool operator==(const AccessedStorage &) const = delete;
-  bool operator!=(const AccessedStorage &) const = delete;
-
-  template <bool (AccessedStorage::*IsUniqueFn)() const>
-  bool isDistinctFrom(const AccessedStorage &other) const {
-    if ((this->*IsUniqueFn)()) {
-      if ((other.*IsUniqueFn)() && !hasIdenticalStorage(other))
-        return true;
-
-      if (other.isObjectAccess())
-        return true;
-
-      // We currently assume that Unidentified storage may overlap with
-      // Box/Stack storage.
-      return false;
-    }
-    if ((other.*IsUniqueFn)())
-      return other.isDistinctFrom<IsUniqueFn>(*this);
-
-    // Neither storage is uniquely identified.
-    if (isObjectAccess()) {
-      if (other.isObjectAccess()) {
-        // Property access cannot overlap with Tail access.
-        if (getKind() != other.getKind())
-          return true;
-
-        // We could also check if the object types are distinct, but that only
-        // helps if we know the relationships between class types.
-        return getKind() == Class
-               && getPropertyIndex() != other.getPropertyIndex();
-      }
-      // Any type of nested/argument address may be within the same object.
-      //
-      // We also currently assume Unidentified access may be within an object
-      // purely to handle KeyPath accesses. The deriviation of the KeyPath
-      // address must separately appear to be a Class access so that all Class
-      // accesses are accounted for.
-      return false;
-    }
-    if (other.isObjectAccess())
-      return other.isDistinctFrom<IsUniqueFn>(*this);
-
-    // Neither storage is from a class or tail.
-    //
-    // Unidentified values may alias with each other or with any kind of
-    // nested/argument access.
-    return false;
-  }
-
-  void setLetAccess(SILValue base);
 };
 
 } // end namespace swift
@@ -744,6 +812,12 @@ namespace swift {
 /// For convenience, encapsulate and AccessedStorage value along with its
 /// accessed base address.
 struct AccessedStorageWithBase {
+  /// Identical to AccessedStorage::compute but preserves the access base.
+  static AccessedStorageWithBase compute(SILValue sourceAddress);
+
+  /// Identical to AccessedStorage::computeInScope but preserves the base.
+  static AccessedStorageWithBase computeInScope(SILValue sourceAddress);
+
   AccessedStorage storage;
   // The base of the formal access. For class storage, it is the
   // ref_element_addr. For global storage it is the global_addr or initializer
@@ -756,11 +830,25 @@ struct AccessedStorageWithBase {
   AccessedStorageWithBase(AccessedStorage storage, SILValue base)
       : storage(storage), base(base) {}
 
-  /// Identical to AccessedStorage::compute but preserves the access base.
-  static AccessedStorageWithBase compute(SILValue sourceAddress);
+  AccessBase getAccessBase() const {
+    return AccessBase(base, storage.getKind());
+  }
 
-  /// Identical to AccessedStorage::computeInScope but preserves the base.
-  static AccessedStorageWithBase computeInScope(SILValue sourceAddress);
+  /// Returns the ValueDecl for the underlying storage, if it can be
+  /// determined. Otherwise returns null. This is more complete than either
+  /// AccessBase::getDecl() or AccessedStorage::getDecl().
+  const ValueDecl *getDecl() const;
+
+  bool operator==(const AccessedStorageWithBase &other) const {
+    return storage.hasIdenticalStorage(other.storage) && base == other.base;
+  }
+
+  bool operator!=(const AccessedStorageWithBase &other) const {
+    return !(*this == other);
+  }
+
+  void print(raw_ostream &os) const;
+  void dump() const;
 };
 
 /// Return an AccessedStorage value that identifies formally accessed storage
@@ -1061,6 +1149,10 @@ struct AccessPathWithBase {
 
   AccessPathWithBase(AccessPath accessPath, SILValue base)
       : accessPath(accessPath), base(base) {}
+
+  AccessBase getAccessBase() const {
+    return AccessBase(base, accessPath.getStorage().getKind());
+  }
 
   bool operator==(AccessPathWithBase other) const {
     return accessPath == other.accessPath && base == other.base;
