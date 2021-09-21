@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let BufferFill = [
+public let benchmarks = [
   BenchmarkInfo(name: "BufferFillFromSlice",
                 runFunction: bufferFillFromSliceExecute,
                 tags: [.validation, .api],
@@ -61,10 +61,10 @@ public func bufferFillFromSliceExecute(n: Int) {
     let slice = Slice(base: a, bounds: a.indices)
     var (iterator, copied) = b.initialize(from: slice)
     blackHole(b)
-    CheckResults(copied == a.count && iterator.next() == nil)
+    check(copied == a.count && iterator.next() == nil)
   }
 
-  CheckResults(a[r] == b[r])
+  check(a[r] == b[r])
 }
 
 var ra: [UInt8] = []
@@ -94,7 +94,7 @@ public func rawBufferCopyBytesExecute(n: Int) {
     blackHole(rb)
   }
 
-  CheckResults(ra[r] == rb[r])
+  check(ra[r] == rb[r])
 }
 
 public func rawBufferInitializeMemorySetup() {
@@ -117,12 +117,12 @@ public func rawBufferInitializeMemoryExecute(n: Int) {
   for _ in 0..<n {
     var (iterator, initialized) = rb.initializeMemory(as: Int.self, from: a)
     blackHole(rb)
-    CheckResults(initialized.count == a.count && iterator.next() == nil)
+    check(initialized.count == a.count && iterator.next() == nil)
   }
 
   let offset = rb.baseAddress!.advanced(by: r*MemoryLayout<Int>.stride)
   let value = offset.load(as: Int.self)
-  CheckResults(value == a[r])
+  check(value == a[r])
 }
 
 var r8: UnsafeRawBufferPointer = .init(start: nil, count: 0)
@@ -159,8 +159,8 @@ public func rawBufferCopyContentsExecute(n: Int) {
   for _ in 0..<n {
     var (iterator, initialized) = b8.initialize(from: r8)
     blackHole(b8)
-    CheckResults(initialized == r8.count && iterator.next() == nil)
+    check(initialized == r8.count && iterator.next() == nil)
   }
 
-  CheckResults(b8[r] == r8[r])
+  check(b8[r] == r8[r])
 }

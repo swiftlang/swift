@@ -1,8 +1,8 @@
-//===--- Substring.swift --------------------------------------------------===//
+//===--- SubstringTest.swift ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let SubstringTest = [
+public let benchmarks = [
   BenchmarkInfo(name: "EqualStringSubstring", runFunction: run_EqualStringSubstring, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "EqualSubstringString", runFunction: run_EqualSubstringString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "EqualSubstringSubstring", runFunction: run_EqualSubstringSubstring, tags: [.validation, .api, .String]),
@@ -40,10 +40,10 @@ let (s2, ss2) = equivalentWithDistinctBuffers()
 let quiteLong = String(repeating: "0", count: 10_000)[...]
 
 @inline(never)
-public func run_SubstringFromLongString(_ N: Int) {
+public func run_SubstringFromLongString(_ n: Int) {
   var s = longWide
   s += "!" // ensure the string has a real buffer
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     blackHole(Substring(s))
   }
 }
@@ -55,30 +55,30 @@ func create<T : RangeReplaceableCollection, U : Collection>(
 }
 
 @inline(never)
-public func run_SubstringFromLongStringGeneric(_ N: Int) {
+public func run_SubstringFromLongStringGeneric(_ n: Int) {
   var s = longWide
   s += "!" // ensure the string has a real buffer
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     create(Substring.self, from: s)
   }
 }
 
 @inline(never)
-public func run_StringFromLongWholeSubstring(_ N: Int) {
+public func run_StringFromLongWholeSubstring(_ n: Int) {
   var s0 = longWide
   s0 += "!" // ensure the string has a real buffer
   let s = Substring(s0)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     blackHole(String(s))
   }
 }
 
 @inline(never)
-public func run_StringFromLongWholeSubstringGeneric(_ N: Int) {
+public func run_StringFromLongWholeSubstringGeneric(_ n: Int) {
   var s0 = longWide
   s0 += "!" // ensure the string has a real buffer
   let s = Substring(s0)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     create(String.self, from: s)
   }
 }
@@ -95,45 +95,45 @@ private func equivalentWithDistinctBuffers() -> (String, Substring) {
 }
 
 @inline(never)
-public func run_EqualStringSubstring(_ N: Int) {
+public func run_EqualStringSubstring(_ n: Int) {
   let (a, b) = (s1, ss1)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     blackHole(a == b)
   }
 }
 
 @inline(never)
-public func run_EqualSubstringString(_ N: Int) {
+public func run_EqualSubstringString(_ n: Int) {
   let (a, b) = (s1, ss1)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     blackHole(b == a)
   }
 }
 
 @inline(never)
-public func run_EqualSubstringSubstring(_ N: Int) {
+public func run_EqualSubstringSubstring(_ n: Int) {
   let (_, a) = (s1, ss1)
   let (_, b) = (s2, ss2)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     blackHole(a == b)
   }
 }
 
 @inline(never)
-public func run_EqualSubstringSubstringGenericEquatable(_ N: Int) {
+public func run_EqualSubstringSubstringGenericEquatable(_ n: Int) {
   let (_, a) = (s1, ss1)
   let (_, b) = (s2, ss2)
   func check<T>(_ x: T, _ y: T) where T : Equatable {
     blackHole(x == y)
   }
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     check(a, b)
   }
 }
 
 @inline(never)
-public func run_SubstringRemoveFirst1(_ N: Int) {
-  for _ in 1...N {
+public func run_SubstringRemoveFirst1(_ n: Int) {
+  for _ in 1...n {
     var s = quiteLong
     s.removeFirst(1)
     blackHole(s.first == "0")
@@ -141,8 +141,8 @@ public func run_SubstringRemoveFirst1(_ N: Int) {
 }
 
 @inline(never)
-public func run_SubstringRemoveLast1(_ N: Int) {
-  for _ in 1...N {
+public func run_SubstringRemoveLast1(_ n: Int) {
+  for _ in 1...n {
     var s = quiteLong
     s.removeLast(1)
     blackHole(s.first == "0")
@@ -156,26 +156,26 @@ where T : StringProtocol, U : StringProtocol {
 }
 
 @inline(never)
-public func run _EqualStringSubstringGenericStringProtocol(_ N: Int) {
+public func run _EqualStringSubstringGenericStringProtocol(_ n: Int) {
   let (a, b) = (s1, ss1)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     checkEqual(a, b)
   }
 }
 
 @inline(never)
-public func run _EqualSubstringStringGenericStringProtocol(_ N: Int) {
+public func run _EqualSubstringStringGenericStringProtocol(_ n: Int) {
   let (a, b) = (s1, ss1)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     checkEqual(b, a)
   }
 }
 
 @inline(never)
-public func run _EqualSubstringSubstringGenericStringProtocol(_ N: Int) {
+public func run _EqualSubstringSubstringGenericStringProtocol(_ n: Int) {
   let (_, a) = (s1, ss1)
   let (_, b) = (s2, ss2)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     checkEqual(a, b)
   }
 }
@@ -185,87 +185,87 @@ public func run _EqualSubstringSubstringGenericStringProtocol(_ N: Int) {
 
 /*
 @inline(never)
-public func run _LessStringSubstring(_ N: Int) {
+public func run _LessStringSubstring(_ n: Int) {
   let (a, b) = (s1, ss1)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     blackHole(a < b)
   }
 }
 
 @inline(never)
-public func run _LessSubstringString(_ N: Int) {
+public func run _LessSubstringString(_ n: Int) {
   let (a, b) = (s1, ss1)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     blackHole(b < a)
   }
 }
 */
 
 @inline(never)
-public func run_LessSubstringSubstring(_ N: Int) {
+public func run_LessSubstringSubstring(_ n: Int) {
   let (_, a) = (s1, ss1)
   let (_, b) = (s2, ss2)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     blackHole(a < b)
   }
 }
 
 @inline(never)
-public func run_LessSubstringSubstringGenericComparable(_ N: Int) {
+public func run_LessSubstringSubstringGenericComparable(_ n: Int) {
   let (_, a) = (s1, ss1)
   let (_, b) = (s2, ss2)
   func check<T>(_ x: T, _ y: T) where T : Comparable {
     blackHole(x < y)
   }
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     check(a, b)
   }
 }
 
 @inline(never)
-public func run_SubstringEquatable(_ N: Int) {
+public func run_SubstringEquatable(_ n: Int) {
 	var string = "pen,pineapple,apple,pen"
 	string += ",✒️,🍍,🍏,✒️"
 	let substrings = string.split(separator: ",")
 	var count = 0
-	for _ in 1...N*500 {
+	for _ in 1...n*500 {
 		for s in substrings {
 			if substrings.contains(s) { count = count &+ 1 }
 		}
 	}
-  CheckResults(count == 8*N*500)
+  check(count == 8*n*500)
 }
 
 @inline(never)
-public func run_SubstringEqualString(_ N: Int) {
+public func run_SubstringEqualString(_ n: Int) {
 	var string = "pen,pineapple,apple,pen"
 	string += ",✒️,🍍,🍏,✒️"
 	let substrings = string.split(separator: ",")
 	let pineapple = "pineapple"
 	let apple = "🍏"
 	var count = 0
-	for _ in 1...N*500 {
+	for _ in 1...n*500 {
 		for s in substrings {
 			if s == pineapple || s == apple { count = count &+ 1 }
 		}
 	}
-  CheckResults(count == 2*N*500)
+  check(count == 2*n*500)
 }
 
 let _substrings = "pen,pineapple,apple,pen,✒️,🍍,🍏,✒️".split(separator: ",")
 let _comparison = _substrings + ["PPAP"]
 
 @inline(never)
-public func run_SubstringComparable(_ N: Int) {
+public func run_SubstringComparable(_ n: Int) {
 	let substrings = _substrings // without this alias, there was 25% slowdown
 	let comparison = _comparison // due to increased retain/release traffic 🤷‍‍
 	var count = 0
-	for _ in 1...N*500 {
+	for _ in 1...n*500 {
 		if substrings.lexicographicallyPrecedes(comparison) {
 			count = count &+ 1
 		}
 	}
-  CheckResults(count == N*500)
+  check(count == n*500)
 }
 
 extension Character {
@@ -290,10 +290,10 @@ extension Substring {
 let _trimmableSubstrings = "pineapple,🍍,  pineapple\t,\r\n\r\n\r\n, 🍍 ,".split(separator: ",")
 
 @inline(never)
-public func run_SubstringTrimmingASCIIWhitespace(_ N: Int) {
+public func run_SubstringTrimmingASCIIWhitespace(_ n: Int) {
   let substrings = _trimmableSubstrings // bringing this alias from above
   var count = 0
-  for _ in 1...N*100 {
+  for _ in 1...n*100 {
     for substring in substrings {
       blackHole(substring.trimWhitespace())
     }
@@ -307,26 +307,26 @@ where T : StringProtocol, U : StringProtocol {
 }
 
 @inline(never)
-public func run _LessStringSubstringGenericStringProtocol(_ N: Int) {
+public func run _LessStringSubstringGenericStringProtocol(_ n: Int) {
   let (a, b) = (s1, ss1)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     checkLess(a, b)
   }
 }
 
 @inline(never)
-public func run _LessSubstringStringGenericStringProtocol(_ N: Int) {
+public func run _LessSubstringStringGenericStringProtocol(_ n: Int) {
   let (a, b) = (s1, ss1)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     checkLess(b, a)
   }
 }
 
 @inline(never)
-public func run _LessSubstringSubstringGenericStringProtocol(_ N: Int) {
+public func run _LessSubstringSubstringGenericStringProtocol(_ n: Int) {
   let (_, a) = (s1, ss1)
   let (_, b) = (s2, ss2)
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     checkLess(a, b)
   }
 }
