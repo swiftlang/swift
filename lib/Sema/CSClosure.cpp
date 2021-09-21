@@ -1204,8 +1204,35 @@ private:
   }
 
   ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
-    if (!returnStmt->hasResult())
-      return returnStmt;
+    if (!returnStmt->hasResult()) {
+      // It's possible to infer e.g. `Void?` for cases where
+      // `return` doesn't have an expression. If contextual
+      // type is `Void` wrapped into N optional types, let's
+      // add an implicit `()` expression and let it be injected
+      // into optional required number of times.
+      auto &ctx = closure->getASTContext();
+
+      // If contextual is not optional, there is nothing to do here.
+      if (resultType->isVoid())
+        return returnStmt;
+
+      assert(resultType->getOptionalObjectType() &&
+             resultType->lookThroughAllOptionalTypes()->isVoid());
+
+      auto &cs = solution.getConstraintSystem();
+
+      // Build an implicit empty tuple to represent `Void` return
+      auto *emptyTuple = TupleExpr::createEmpty(ctx,
+                                                /*LParenLoc=*/SourceLoc(),
+                                                /*RParenLoc=*/SourceLoc(),
+                                                /*Implicit=*/true);
+      emptyTuple->setType(ctx.TheEmptyTupleType);
+      // Cache the type of this new expression in the constraint system
+      // for the future reference.
+      cs.cacheExprTypes(emptyTuple);
+
+      returnStmt->setResult(emptyTuple);
+    }
 
     auto *resultExpr = returnStmt->getResult();
 
