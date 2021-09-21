@@ -1,8 +1,8 @@
-//===--- DictionaryLiteral.swift ------------------------------------------===//
+//===--- DictionaryLiteralTest.swift --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,11 +14,13 @@
 // rdar://problem/19804127
 import TestsUtils
 
-public let DictionaryLiteral = BenchmarkInfo(
-  name: "DictionaryLiteral",
-  runFunction: run_DictionaryLiteral,
-  tags: [.validation, .api, .Dictionary],
-  legacyFactor: 10)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "DictionaryLiteral",
+    runFunction: run_DictionaryLiteral,
+    tags: [.validation, .api, .Dictionary],
+    legacyFactor: 10),
+]
 
 @inline(never)
 func makeDictionary() -> [Int: Int] {
@@ -26,8 +28,8 @@ func makeDictionary() -> [Int: Int] {
 }
 
 @inline(never)
-public func run_DictionaryLiteral(_ N: Int) {
-  for _ in 1...1000*N {
+public func run_DictionaryLiteral(_ n: Int) {
+  for _ in 1...1000*n {
     _ = makeDictionary()
   }
 }

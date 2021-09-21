@@ -16,7 +16,7 @@ import TestsUtils
 // breadcrumbs. These are used to speed up range- and positional access through
 // conventional NSString APIs.
 
-public let Breadcrumbs: [BenchmarkInfo] = [
+public let benchmarks: [BenchmarkInfo] = [
   UTF16ToIdx(workload: longASCIIWorkload, count: 5_000).info,
   UTF16ToIdx(workload: longMixedWorkload, count: 5_000).info,
   IdxToUTF16(workload: longASCIIWorkload, count: 5_000).info,

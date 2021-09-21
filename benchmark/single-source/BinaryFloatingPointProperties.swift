@@ -12,62 +12,62 @@
 
 import TestsUtils
 
-public let BinaryFloatingPointPropertiesBinade = BenchmarkInfo(
-  name: "BinaryFloatingPointPropertiesBinade",
-  runFunction: run_BinaryFloatingPointPropertiesBinade,
-  tags: [.validation, .algorithm]
-)
-
-public let BinaryFloatingPointPropertiesNextUp = BenchmarkInfo(
-  name: "BinaryFloatingPointPropertiesNextUp",
-  runFunction: run_BinaryFloatingPointPropertiesNextUp,
-  tags: [.validation, .algorithm]
-)
-
-public let BinaryFloatingPointPropertiesUlp = BenchmarkInfo(
-  name: "BinaryFloatingPointPropertiesUlp",
-  runFunction: run_BinaryFloatingPointPropertiesUlp,
-  tags: [.validation, .algorithm]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "BinaryFloatingPointPropertiesBinade",
+    runFunction: run_BinaryFloatingPointPropertiesBinade,
+    tags: [.validation, .algorithm]
+  ),
+  BenchmarkInfo(
+    name: "BinaryFloatingPointPropertiesNextUp",
+    runFunction: run_BinaryFloatingPointPropertiesNextUp,
+    tags: [.validation, .algorithm]
+  ),
+  BenchmarkInfo(
+    name: "BinaryFloatingPointPropertiesUlp",
+    runFunction: run_BinaryFloatingPointPropertiesUlp,
+    tags: [.validation, .algorithm]
+  )
+]
 
 @inline(never)
-public func run_BinaryFloatingPointPropertiesBinade(_ N: Int) {
+public func run_BinaryFloatingPointPropertiesBinade(_ n: Int) {
   var xs = [Double]()
-  xs.reserveCapacity(N)
-  for _ in 1...N {
+  xs.reserveCapacity(n)
+  for _ in 1...n {
     var x = 0 as Double
     for i in 0..<10000 {
       x += Double(getInt(i)).binade
     }
     xs.append(x)
   }
-  CheckResults(xs[getInt(0)] == 37180757)
+  check(xs[getInt(0)] == 37180757)
 }
 
 @inline(never)
-public func run_BinaryFloatingPointPropertiesNextUp(_ N: Int) {
+public func run_BinaryFloatingPointPropertiesNextUp(_ n: Int) {
   var xs = [Int]()
-  xs.reserveCapacity(N)
-  for _ in 1...N {
+  xs.reserveCapacity(n)
+  for _ in 1...n {
     var x = 0 as Int
     for i in 0..<10000 {
       x += Int(Double(getInt(i)).nextUp)
     }
     xs.append(x)
   }
-  CheckResults(xs[getInt(0)] == 49995000)
+  check(xs[getInt(0)] == 49995000)
 }
 
 @inline(never)
-public func run_BinaryFloatingPointPropertiesUlp(_ N: Int) {
+public func run_BinaryFloatingPointPropertiesUlp(_ n: Int) {
   var xs = [Int]()
-  xs.reserveCapacity(N)
-  for _ in 1...N {
+  xs.reserveCapacity(n)
+  for _ in 1...n {
     var x = 0 as Int
     for i in 0..<10000 {
       x += Int(Double(getInt(i)).ulp)
     }
     xs.append(x)
   }
-  CheckResults(xs[getInt(0)] == 0)
+  check(xs[getInt(0)] == 0)
 }

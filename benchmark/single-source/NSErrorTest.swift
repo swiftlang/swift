@@ -1,8 +1,8 @@
-//===--- NSError.swift ----------------------------------------------------===//
+//===--- NSErrorTest.swift ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,10 +13,12 @@
 import TestsUtils
 import Foundation
 
-public let NSErrorTest = BenchmarkInfo(
-  name: "NSError",
-  runFunction: run_NSError,
-  tags: [.validation, .exceptions, .bridging])
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "NSError",
+    runFunction: run_NSError,
+    tags: [.validation, .exceptions, .bridging]),
+]
 
 protocol P {
   func buzz() throws -> Int
@@ -39,8 +41,8 @@ func caller(_ x: P) throws {
 }
 
 @inline(never)
-public func run_NSError(_ N: Int) {
-  for _ in 1...N*1000 {
+public func run_NSError(_ n: Int) {
+  for _ in 1...n*1000 {
       let k = K()
       let g = G()
       do {

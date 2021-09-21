@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let StringSplitting = [
+public let benchmarks = [
   BenchmarkInfo(
 	  name: "LineSink.bytes.alpha",
 	  runFunction: run_LinkSink_bytes_alpha,
@@ -225,39 +225,39 @@ private let longComplexNewlines: String = {
   return str
 }()
 
-public func run_LinkSink_bytes_alpha(_ N: Int) {
+public func run_LinkSink_bytes_alpha(_ n: Int) {
   let str = alphaInteriorNewlines
-  for _ in 0..<(N*50) {
+  for _ in 0..<(n*50) {
     lineSink(str, view: .utf8, sink: blackHole)
   }
 }
-public func run_LinkSink_bytes_complex(_ N: Int) {
+public func run_LinkSink_bytes_complex(_ n: Int) {
   let str = longComplexNewlines
-  for _ in 0..<N {
+  for _ in 0..<n {
     lineSink(str, view: .utf8, sink: blackHole)
   }
 }
-public func run_LinkSink_scalars_alpha(_ N: Int) {
+public func run_LinkSink_scalars_alpha(_ n: Int) {
   let str = alphaInteriorNewlines
-  for _ in 0..<(N*50) {
+  for _ in 0..<(n*50) {
     lineSink(str, view: .scalar, sink: blackHole)
   }
 }
-public func run_LinkSink_scalars_complex(_ N: Int) {
+public func run_LinkSink_scalars_complex(_ n: Int) {
   let str = longComplexNewlines
-  for _ in 0..<N {
+  for _ in 0..<n {
     lineSink(str, view: .utf8, sink: blackHole)
   }
 }
-public func run_LinkSink_characters_alpha(_ N: Int) {
+public func run_LinkSink_characters_alpha(_ n: Int) {
   let str = alphaInteriorNewlines
-  for _ in 0..<(N*50) {
+  for _ in 0..<(n*50) {
     lineSink(str, view: .character, sink: blackHole)
   }
 }
-public func run_LinkSink_characters_complex(_ N: Int) {
+public func run_LinkSink_characters_complex(_ n: Int) {
   let str = longComplexNewlines
-  for _ in 0..<N {
+  for _ in 0..<n {
     lineSink(str, view: .character, sink: blackHole)
   }
 }
@@ -272,8 +272,8 @@ fileprivate func setup() {
   var characterAlpha: Array<String> = []
   lineSink(alphaInteriorNewlines, view: .character) { characterAlpha.append($0) }
 
-  CheckResults(utf8Alpha == scalarAlpha)
-  CheckResults(utf8Alpha == characterAlpha)
+  check(utf8Alpha == scalarAlpha)
+  check(utf8Alpha == characterAlpha)
 
   var utf8Complex: Array<String> = []
   lineSink(longComplexNewlines, view: .utf8) { utf8Complex.append($0) }
@@ -284,8 +284,8 @@ fileprivate func setup() {
   var characterComplex: Array<String> = []
   lineSink(longComplexNewlines, view: .character) { characterComplex.append($0) }
 
-  CheckResults(utf8Complex == scalarComplex)
-  CheckResults(utf8Complex == characterComplex)
+  check(utf8Complex == scalarComplex)
+  check(utf8Complex == characterComplex)
 
   print("preconditions checked")
 }

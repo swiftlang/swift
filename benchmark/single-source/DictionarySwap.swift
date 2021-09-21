@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,7 +21,7 @@ let boxedNumMap = Dictionary(uniqueKeysWithValues: zip(boxedNums, boxedNums))
 
 let t: [BenchmarkCategory] = [.validation, .api, .Dictionary, .cpubench]
 
-public let DictionarySwap = [
+public let benchmarks = [
   BenchmarkInfo(name: "DictionarySwap",
     runFunction: swap, tags: t, legacyFactor: 4),
   BenchmarkInfo(name: "DictionarySwapOfObjects",
@@ -54,49 +54,49 @@ class Box<T : Hashable> : Hashable {
   }
 }
 
-func swap(N: Int) {
+func swap(n: Int) {
   var dict = numberMap
   var swapped = false
-  for _ in 1...2500*N {
+  for _ in 1...2500*n {
       (dict[25], dict[75]) = (dict[75]!, dict[25]!)
       swapped = !swapped
-      CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!))
+      check(swappedCorrectly(swapped, dict[25]!, dict[75]!))
     }
 }
 
-func swapObjects(N: Int) {
+func swapObjects(n: Int) {
   var dict = boxedNumMap
   var swapped = false
-  for _ in 1...250*N {
+  for _ in 1...250*n {
     let b1 = Box(25)
     let b2 = Box(75)
     (dict[b1], dict[b2]) = (dict[b2]!, dict[b1]!)
     swapped = !swapped
-    CheckResults(swappedCorrectly(swapped,
+    check(swappedCorrectly(swapped,
       dict[Box(25)]!.value, dict[Box(75)]!.value))
   }
 }
 
-func swapAt(N: Int) {
+func swapAt(n: Int) {
   var dict = numberMap
   var swapped = false
-  for _ in 1...2500*N {
+  for _ in 1...2500*n {
     let i25 = dict.index(forKey: 25)!
     let i75 = dict.index(forKey: 75)!
     dict.values.swapAt(i25, i75)
     swapped = !swapped
-    CheckResults(swappedCorrectly(swapped, dict[25]!, dict[75]!))
+    check(swappedCorrectly(swapped, dict[25]!, dict[75]!))
   }
 }
 
-func swapAtObjects(N: Int) {
+func swapAtObjects(n: Int) {
   var dict = boxedNumMap
   var swapped = false
-  for _ in 1...1000*N {
+  for _ in 1...1000*n {
     let i25 = dict.index(forKey: Box(25))!
     let i75 = dict.index(forKey: Box(75))!
     dict.values.swapAt(i25, i75)
     swapped = !swapped
-    CheckResults(swappedCorrectly(swapped,
+    check(swappedCorrectly(swapped,
       dict[Box(25)]!.value, dict[Box(75)]!.value))
 }}
