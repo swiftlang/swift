@@ -3402,11 +3402,11 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   
   // Instantiate the layout with identity substitutions.
   auto subMap = SubstitutionMap::get(
-    signature,
-    [&](SubstitutableType *type) -> Type {
-      return signature->getCanonicalTypeInContext(type);
-    },
-    MakeAbstractConformanceForGenericType());
+      signature,
+      [&](SubstitutableType *type) -> Type {
+        return signature.getCanonicalTypeInContext(type);
+      },
+      MakeAbstractConformanceForGenericType());
 
   auto boxTy = SILBoxType::get(C, layout, subMap);
 #ifndef NDEBUG

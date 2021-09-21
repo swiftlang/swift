@@ -352,8 +352,8 @@ private:
   /// Find the tangent space of a given canonical type.
   Optional<TangentSpace> getTangentSpace(CanType type) {
     // Use witness generic signature to remap types.
-    if (auto witnessGenSig = witness->getDerivativeGenericSignature())
-      type = witnessGenSig->getCanonicalTypeInContext(type);
+    type = witness->getDerivativeGenericSignature().getCanonicalTypeInContext(
+        type);
     return type->getAutoDiffTangentSpace(
         LookUpConformanceInModule(getModule().getSwiftModule()));
   }
