@@ -32,15 +32,6 @@
 #include "../SwiftShims/LibcShims.h"
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-int _swift_stdlib_putchar_unlocked(int c) {
-#if defined(_WIN32)
-  return _putc_nolock(c, stdout);
-#else
-  return putchar_unlocked(c);
-#endif
-}
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr,
                                                   __swift_size_t size,
                                                   __swift_size_t nitems) {
