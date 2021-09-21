@@ -437,7 +437,8 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation) {
 void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
   for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
     swiftscan_string_dispose(set->strings[SI]);
-  delete[] set->strings;
+  if (set->count > 0)
+    delete[] set->strings;
   delete set;
 }
 
