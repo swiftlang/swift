@@ -807,6 +807,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, MODULE_NAME);
   BLOCK_RECORD(control_block, TARGET);
   BLOCK_RECORD(control_block, SDK_NAME);
+  BLOCK_RECORD(control_block, REVISION);
 
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
@@ -953,11 +954,12 @@ void Serializer::writeBlockInfoBlock() {
 
 void Serializer::writeHeader(const SerializationOptions &options) {
   {
-    BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
+    BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 4);
     control_block::ModuleNameLayout ModuleName(Out);
     control_block::MetadataLayout Metadata(Out);
     control_block::TargetLayout Target(Out);
     control_block::SDKNameLayout SDKName(Out);
+    control_block::RevisionLayout Revision(Out);
 
     ModuleName.emit(ScratchRecord, M->getName().str());
 
@@ -995,6 +997,18 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       SDKName.emit(ScratchRecord, options.SDKName);
 
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
+
+    // Write the producer's Swift revision only for resilient modules.
+    if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
+      auto revision = version::getSwiftRevision();
+
+      static const char* forcedDebugRevision =
+        ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
+      if (forcedDebugRevision)
+        revision = forcedDebugRevision;
+
+      Revision.emit(ScratchRecord, revision);
+    }
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);

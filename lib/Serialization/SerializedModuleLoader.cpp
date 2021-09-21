@@ -839,6 +839,10 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_old, ModuleName,
                        moduleBufferID);
     break;
+  case serialization::Status::RevisionIncompatible:
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_revision,
+                       ModuleName, moduleBufferID);
+    break;
   case serialization::Status::Malformed:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_malformed_module,
                        moduleBufferID);

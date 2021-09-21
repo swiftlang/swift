@@ -39,6 +39,9 @@ enum class Status {
   /// compiler.
   FormatTooNew,
 
+  /// The precise revision version doesn't match.
+  RevisionIncompatible,
+
   /// The module file depends on another module that can't be loaded.
   MissingDependency,
 

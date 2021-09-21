@@ -438,7 +438,7 @@ std::string getSwiftFullVersion(Version effectiveVersion) {
   return OS.str();
 }
 
-std::string getSwiftRevision() {
+StringRef getSwiftRevision() {
 #ifdef SWIFT_REVISION
   return SWIFT_REVISION;
 #else

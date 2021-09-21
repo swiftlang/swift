@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 629; // BuilderSDK
+const uint16_t SWIFTMODULE_VERSION_MINOR = 630; // Precise
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -755,7 +755,8 @@ namespace control_block {
     METADATA = 1,
     MODULE_NAME,
     TARGET,
-    SDK_NAME
+    SDK_NAME,
+    REVISION,
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -783,6 +784,11 @@ namespace control_block {
 
   using SDKNameLayout = BCRecordLayout<
     SDK_NAME,
+    BCBlob
+  >;
+
+  using RevisionLayout = BCRecordLayout<
+    REVISION,
     BCBlob
   >;
 }
