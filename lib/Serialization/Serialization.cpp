@@ -36,6 +36,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/APIDigester/ModuleAnalyzerNodes.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
@@ -5610,6 +5611,17 @@ bool Serializer::allowCompilerErrors() const {
   return getASTContext().LangOpts.AllowModuleWithCompilerErrors;
 }
 
+
+static void emitABIDescriptor(ModuleOrSourceFile DC,
+                              const SerializationOptions &options) {
+  if (!options.ABIDescriptorPath.empty()) {
+    if (DC.is<ModuleDecl*>()) {
+      swift::ide::api::dumpModuleContent(DC.get<ModuleDecl*>(),
+                                         options.ABIDescriptorPath, true);
+    }
+  }
+}
+
 void swift::serializeToBuffers(
   ModuleOrSourceFile DC, const SerializationOptions &options,
   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
@@ -5633,6 +5645,7 @@ void swift::serializeToBuffers(
     });
     if (hadError)
       return;
+    emitABIDescriptor(DC, options);
     if (moduleBuffer)
       *moduleBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
                         std::move(buf), options.OutputPath);
@@ -5737,4 +5750,5 @@ void swift::serialize(ModuleOrSourceFile DC,
       symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
     }
   }
+  emitABIDescriptor(DC, options);
 }
