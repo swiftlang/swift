@@ -1662,7 +1662,11 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     if (!isUnderlyingClangModule) {
       if (auto found = cache.findDependencies(
               moduleName,
-              {ModuleDependenciesKind::SwiftTextual, searchPathSet}))
+              {ModuleDependenciesKind::SwiftSource, searchPathSet}))
+        return found;
+      if (auto found = cache.findDependencies(
+              moduleName,
+              {ModuleDependenciesKind::SwiftInterface, searchPathSet}))
         return found;
       if (auto found = cache.findDependencies(
               moduleName, {ModuleDependenciesKind::SwiftBinary, searchPathSet}))
