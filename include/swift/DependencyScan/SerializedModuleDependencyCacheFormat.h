@@ -37,7 +37,7 @@ using llvm::BCVBR;
 /// Every .moddepcache file begins with these 4 bytes, for easy identification.
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D',
                                                                   'C'};
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 1;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 2;
 /// Increment this on every change.
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 0;
 
@@ -57,6 +57,7 @@ using IdentifierIDArryField = llvm::BCArray<IdentifierIDField>;
 
 /// Identifiers used to refer to the above arrays
 using FileIDArrayIDField = IdentifierIDField;
+using TripleIDField = IdentifierIDField;
 using DependencyIDArrayIDField = IdentifierIDField;
 using FlagIDArrayIDField = IdentifierIDField;
 
@@ -72,7 +73,8 @@ namespace graph_block {
 enum {
   METADATA = 1,
   MODULE_NODE,
-  SWIFT_TEXTUAL_MODULE_DETAILS_NODE,
+  SWIFT_INTERFACE_MODULE_DETAILS_NODE,
+  SWIFT_SOURCE_MODULE_DETAILS_NODE,
   SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE,
   SWIFT_BINARY_MODULE_DETAILS_NODE,
   CLANG_MODULE_DETAILS_NODE,
@@ -109,18 +111,20 @@ using IdentifierArrayLayout =
 
 // After the array records, we have a sequence of Module info
 // records, each of which is followed by one of:
-// - SwiftTextualModuleDetails
+// - SwiftInterfaceModuleDetails
+// - SwiftSourceModuleDetails
 // - SwiftBinaryModuleDetails
 // - SwiftPlaceholderModuleDetails
 // - ClangModuleDetails
 using ModuleInfoLayout =
     BCRecordLayout<MODULE_NODE,             // ID
                    IdentifierIDField,       // module name
+                   TripleIDField,           // target triple
                    DependencyIDArrayIDField // directDependencies
                    >;
 
-using SwiftTextualModuleDetailsLayout =
-    BCRecordLayout<SWIFT_TEXTUAL_MODULE_DETAILS_NODE, // ID
+using SwiftInterfaceModuleDetailsLayout =
+    BCRecordLayout<SWIFT_INTERFACE_MODULE_DETAILS_NODE, // ID
                    FileIDField,                       // swiftInterfaceFile
                    FileIDArrayIDField, // compiledModuleCandidates
                    FlagIDArrayIDField, // buildCommandLine
@@ -130,7 +134,16 @@ using SwiftTextualModuleDetailsLayout =
                    FileIDField,        // bridgingHeaderFile
                    FileIDArrayIDField, // sourceFiles
                    FileIDArrayIDField, // bridgingSourceFiles
-                   IdentifierIDField   // bridgingModuleDependencies
+                   FileIDArrayIDField   // bridgingModuleDependencies
+                   >;
+
+using SwiftSourceModuleDetailsLayout =
+    BCRecordLayout<SWIFT_SOURCE_MODULE_DETAILS_NODE, // ID
+                   FlagIDArrayIDField, // extraPCMArgs
+                   FileIDField,        // bridgingHeaderFile
+                   FileIDArrayIDField, // sourceFiles
+                   FileIDArrayIDField, // bridgingSourceFiles
+                   FileIDArrayIDField  // bridgingModuleDependencies
                    >;
 
 using SwiftBinaryModuleDetailsLayout =

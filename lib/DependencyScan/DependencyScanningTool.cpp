@@ -35,7 +35,7 @@ DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
     const llvm::StringSet<> &PlaceholderModules) {
   // The primary instance used to scan the query Swift source-code
-  auto InstanceOrErr = initCompilerInstanceForScan(Command);
+  auto InstanceOrErr = initScannerForAction(Command);
   if (std::error_code EC = InstanceOrErr.getError())
     return EC;
   auto Instance = std::move(*InstanceOrErr);
@@ -54,7 +54,7 @@ DependencyScanningTool::getDependencies(
 llvm::ErrorOr<swiftscan_import_set_t>
 DependencyScanningTool::getImports(ArrayRef<const char *> Command) {
   // The primary instance used to scan the query Swift source-code
-  auto InstanceOrErr = initCompilerInstanceForScan(Command);
+  auto InstanceOrErr = initScannerForAction(Command);
   if (std::error_code EC = InstanceOrErr.getError())
     return EC;
   auto Instance = std::move(*InstanceOrErr);
@@ -74,7 +74,7 @@ DependencyScanningTool::getDependencies(
     const std::vector<BatchScanInput> &BatchInput,
     const llvm::StringSet<> &PlaceholderModules) {
   // The primary instance used to scan Swift modules
-  auto InstanceOrErr = initCompilerInstanceForScan(Command);
+  auto InstanceOrErr = initScannerForAction(Command);
   if (std::error_code EC = InstanceOrErr.getError())
     return std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>(
         BatchInput.size(), std::make_error_code(std::errc::invalid_argument));
@@ -113,6 +113,17 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
 
 void DependencyScanningTool::resetCache() {
   SharedCache.reset(new GlobalModuleDependenciesCache());
+}
+
+llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
+DependencyScanningTool::initScannerForAction(
+    ArrayRef<const char *> Command) {
+  auto instanceOrErr = initCompilerInstanceForScan(Command);
+  if (instanceOrErr.getError())
+    return instanceOrErr;
+  SharedCache->configureForTriple((*instanceOrErr)->getInvocation()
+                                  .getLangOptions().Target.str());
+  return instanceOrErr;
 }
 
 llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
