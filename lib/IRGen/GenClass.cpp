@@ -2699,6 +2699,8 @@ static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
     args.push_back(llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
     args.push_back(llvm::MetadataAsValue::get(*IGF.IGM.LLVMContext, typeId));
 
+    // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
+    // which could mean redundant loads don't get removed.
     llvm::Value *checkedLoad =
         IGF.Builder.CreateCall(checkedLoadIntrinsic, args);
     auto fnPtr = IGF.Builder.CreateExtractValue(checkedLoad, 0);

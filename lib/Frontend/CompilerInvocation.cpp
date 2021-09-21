@@ -1908,6 +1908,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.VirtualFunctionElimination = true;
   }
 
+  if (Args.hasArg(OPT_enable_llvm_wme)) {
+    Opts.WitnessMethodElimination = true;
+  }
+
   // Default to disabling swift async extended frame info on anything but
   // darwin. Other platforms are unlikely to have support for extended frame
   // pointer information.

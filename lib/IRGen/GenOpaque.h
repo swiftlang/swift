@@ -38,6 +38,11 @@ namespace irgen {
   /// Return the alignment of a fixed buffer.
   Alignment getFixedBufferAlignment(IRGenModule &IGM);
 
+  /// Given a witness table (protocol or value), return the address of the slot
+  /// for one of the witnesses.
+  Address slotForLoadOfOpaqueWitness(IRGenFunction &IGF, llvm::Value *table,
+                                     WitnessIndex index);
+
   /// Given a witness table (protocol or value), load one of the
   /// witnesses.
   ///
