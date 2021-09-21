@@ -31,6 +31,7 @@ namespace swift {
     const char *DocOutputPath = nullptr;
     const char *SourceInfoOutputPath = nullptr;
     std::string SymbolGraphOutputDir;
+    std::string ABIDescriptorPath;
     bool SkipSymbolGraphInheritedDocs = true;
     bool IncludeSPISymbolsInSymbolGraph = false;
 

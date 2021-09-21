@@ -508,6 +508,8 @@ swiftscan_compiler_supported_arguments_query() {
 
 swiftscan_string_set_t *
 swiftscan_compiler_supported_features_query() {
-  // TODO: We are yet to figure out how "Features" will be organized.
-  return nullptr;
+  std::vector<std::string> allFeatures;
+  allFeatures.emplace_back("library-level");
+  allFeatures.emplace_back("emit-abi-descriptor");
+  return create_set(allFeatures);
 }
