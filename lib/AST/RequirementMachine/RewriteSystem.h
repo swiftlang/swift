@@ -107,8 +107,13 @@ struct RewriteStep {
   /// The rewrite step kind.
   unsigned Kind : 1;
 
-  /// The position within the term where the rule is being applied.
-  unsigned Offset : 15;
+  /// The size of the left whisker, which is the position within the term where
+  /// the rule is being applied. In A.(X => Y).B, this is |A|=1.
+  unsigned StartOffset : 7;
+
+  /// The size of the right whisker, which is the length of the remaining suffix
+  /// after the rule is applied. In A.(X => Y).B, this is |B|=1.
+  unsigned EndOffset : 7;
 
   /// The index of the rule in the rewrite system.
   unsigned RuleID : 15;
@@ -117,22 +122,27 @@ struct RewriteStep {
   /// with the right hand side. If true, vice versa.
   unsigned Inverse : 1;
 
-  RewriteStep(StepKind kind, unsigned offset, unsigned ruleID, bool inverse) {
+  RewriteStep(StepKind kind, unsigned startOffset, unsigned endOffset,
+              unsigned ruleID, bool inverse) {
     Kind = unsigned(kind);
 
-    Offset = offset;
-    assert(Offset == offset && "Overflow");
+    StartOffset = startOffset;
+    assert(StartOffset == startOffset && "Overflow");
+    EndOffset = endOffset;
+    assert(EndOffset == endOffset && "Overflow");
     RuleID = ruleID;
     assert(RuleID == ruleID && "Overflow");
     Inverse = inverse;
   }
 
-  static RewriteStep forRewriteRule(unsigned offset, unsigned ruleID, bool inverse) {
-    return RewriteStep(ApplyRewriteRule, offset, ruleID, inverse);
+  static RewriteStep forRewriteRule(unsigned startOffset, unsigned endOffset,
+                                    unsigned ruleID, bool inverse) {
+    return RewriteStep(ApplyRewriteRule, startOffset, endOffset, ruleID, inverse);
   }
 
   static RewriteStep forAdjustment(unsigned offset, bool inverse) {
-    return RewriteStep(AdjustConcreteType, offset, /*ruleID=*/0, inverse);
+    return RewriteStep(AdjustConcreteType, offset, /*endOffset=*/0,
+                       /*ruleID=*/0, inverse);
   }
 
   void invert() {
@@ -145,6 +155,8 @@ struct RewriteStep {
   MutableTerm applyAdjustment(MutableTerm &term,
                               const RewriteSystem &system) const;
 
+  void apply(MutableTerm &term, const RewriteSystem &system) const;
+
   void dump(llvm::raw_ostream &out,
             MutableTerm &term,
             const RewriteSystem &system) const;
@@ -156,6 +168,10 @@ struct RewritePath {
 
   bool empty() const {
     return Steps.empty();
+  }
+
+  unsigned size() const {
+    return Steps.size();
   }
 
   void add(RewriteStep step) {
@@ -223,9 +239,19 @@ class RewriteSystem final {
   /// Pairs of rules which have already been checked for overlap.
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
-  /// Homotopy generators (2-cells) for this rewrite system. These are the
-  /// cyclic rewrite paths which rewrite a term back to itself. This
-  /// data informs the generic signature minimization algorithm.
+  /// Homotopy generators for this rewrite system. These are the
+  /// cyclic rewrite paths which rewrite a term back to itself.
+  ///
+  /// In the category theory interpretation, a rewrite rule is a generating
+  /// 2-cell, and a rewrite path is a 2-cell made from a composition of
+  /// generating 2-cells.
+  ///
+  /// Homotopy generators, in turn, are 3-cells. The special case of a
+  /// 3-cell discovered during completion can be viewed as two parallel
+  /// 2-cells; this is actually represented as a single 2-cell forming a
+  /// loop around a base point.
+  ///
+  /// This data informs the generic signature minimization algorithm.
   std::vector<std::pair<MutableTerm, RewritePath>> HomotopyGenerators;
 
   DebugOptions Debug;

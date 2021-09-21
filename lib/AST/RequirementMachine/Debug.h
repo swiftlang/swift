@@ -35,6 +35,9 @@ enum class DebugFlags : unsigned {
 
   /// Print debug output when concretizing nested types in the property map.
   ConcretizeNestedTypes = (1<<5)
+
+  /// Print debug output from the homotopy reduction algorithm.
+  HomotopyReduction = (1<<7),
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

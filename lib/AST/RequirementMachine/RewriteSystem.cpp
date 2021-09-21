@@ -46,18 +46,27 @@ RewriteStep::applyRewriteRule(MutableTerm &term,
   auto lhs = (Inverse ? rule.getRHS() : rule.getLHS());
   auto rhs = (Inverse ? rule.getLHS() : rule.getRHS());
 
-  if (!std::equal(term.begin() + Offset,
-                  term.begin() + Offset + lhs.size(),
-                  lhs.begin())) {
-    llvm::errs() << "Invalid rewrite path\n";
+  auto bug = [&](StringRef msg) {
+    llvm::errs() << msg << "\n";
     llvm::errs() << "- Term: " << term << "\n";
-    llvm::errs() << "- Offset: " << Offset << "\n";
+    llvm::errs() << "- StartOffset: " << StartOffset << "\n";
+    llvm::errs() << "- EndOffset: " << EndOffset << "\n";
     llvm::errs() << "- Expected subterm: " << lhs << "\n";
     abort();
+  };
+
+  if (term.size() != StartOffset + lhs.size() + EndOffset) {
+    bug("Invalid whiskering");
   }
 
-  MutableTerm prefix(term.begin(), term.begin() + Offset);
-  MutableTerm suffix(term.begin() + Offset + lhs.size(), term.end());
+  if (!std::equal(term.begin() + StartOffset,
+                  term.begin() + StartOffset + lhs.size(),
+                  lhs.begin())) {
+    bug("Invalid subterm");
+  }
+
+  MutableTerm prefix(term.begin(), term.begin() + StartOffset);
+  MutableTerm suffix(term.end() - EndOffset, term.end());
 
   term = prefix;
   term.append(rhs);
@@ -69,25 +78,27 @@ RewriteStep::applyRewriteRule(MutableTerm &term,
 MutableTerm RewriteStep::applyAdjustment(MutableTerm &term,
                                          const RewriteSystem &system) const {
   assert(Kind == AdjustConcreteType);
+  assert(EndOffset == 0);
+  assert(RuleID == 0);
 
   auto &ctx = system.getRewriteContext();
-  MutableTerm prefix(term.begin(), term.begin() + Offset);
+  MutableTerm prefix(term.begin(), term.begin() + StartOffset);
 
   // We're either adding or removing the prefix to each concrete substitution.
   term.back() = term.back().transformConcreteSubstitutions(
     [&](Term t) -> Term {
       if (Inverse) {
         if (!std::equal(t.begin(),
-                        t.begin() + Offset,
+                        t.begin() + StartOffset,
                         prefix.begin())) {
           llvm::errs() << "Invalid rewrite path\n";
           llvm::errs() << "- Term: " << term << "\n";
-          llvm::errs() << "- Offset: " << Offset << "\n";
+          llvm::errs() << "- Start offset: " << StartOffset << "\n";
           llvm::errs() << "- Expected subterm: " << prefix << "\n";
           abort();
         }
 
-        MutableTerm mutTerm(t.begin() + Offset, t.end());
+        MutableTerm mutTerm(t.begin() + StartOffset, t.end());
         return Term::get(mutTerm, ctx);
       } else {
         MutableTerm mutTerm(prefix);
@@ -97,6 +108,18 @@ MutableTerm RewriteStep::applyAdjustment(MutableTerm &term,
     }, ctx);
 
   return prefix;
+}
+
+void RewriteStep::apply(MutableTerm &term, const RewriteSystem &system) const {
+  switch (Kind) {
+  case ApplyRewriteRule:
+    (void) applyRewriteRule(term, system);
+    break;
+
+  case AdjustConcreteType:
+    (void) applyAdjustment(term, system);
+    break;
+  }
 }
 
 /// Dumps the rewrite step that was applied to \p term. Mutates \p term to
@@ -264,7 +287,8 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
   if (path) {
     // We have a rewrite path from the simplified lhs to the simplified rhs;
     // add a rewrite step applying the new rule in reverse to close the loop.
-    loop.add(RewriteStep::forRewriteRule(/*offset=*/0, newRuleID, /*inverse=*/true));
+    loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
+                                         newRuleID, /*inverse=*/true));
     HomotopyGenerators.emplace_back(lhs, loop);
 
     if (Debug.contains(DebugFlags::Add)) {
@@ -322,11 +346,13 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
           auto to = from + rule.getLHS().size();
           assert(std::equal(from, to, rule.getLHS().begin()));
 
+          unsigned startOffset = (unsigned)(from - term.begin());
+          unsigned endOffset = term.size() - rule.getLHS().size() - startOffset;
+
           term.rewriteSubTerm(from, to, rule.getRHS());
 
           if (path) {
-            unsigned offset = (unsigned)(from - term.begin());
-            path->add(RewriteStep::forRewriteRule(offset, *ruleID,
+            path->add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
                                                   /*inverse=*/false));
           }
 
@@ -426,12 +452,12 @@ void RewriteSystem::simplifyRewriteSystem() {
 
     // (2) Next, apply the original rule in reverse to produce the
     // original lhs.
-    loop.add(RewriteStep::forRewriteRule(/*offset=*/0, ruleID,
-                                         /*inverse=*/true));
+    loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
+                                         ruleID, /*inverse=*/true));
 
     // (3) Finally, apply the new rule to produce the simplified rhs.
-    loop.add(RewriteStep::forRewriteRule(/*offset=*/0, newRuleID,
-                                         /*inverse=*/false));
+    loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
+                                         newRuleID, /*inverse=*/false));
 
     if (Debug.contains(DebugFlags::Completion)) {
       llvm::dbgs() << "$ Right hand side simplification recorded a loop: ";
@@ -510,14 +536,7 @@ void RewriteSystem::verifyHomotopyGenerators() const {
     auto term = loop.first;
 
     for (const auto &step : loop.second) {
-      switch (step.Kind) {
-      case RewriteStep::ApplyRewriteRule:
-        (void) step.applyRewriteRule(term, *this);
-        break;
-      case RewriteStep::AdjustConcreteType:
-        (void) step.applyAdjustment(term, *this);
-        break;
-      }
+      step.apply(term, *this);
     }
 
     if (term != loop.first) {

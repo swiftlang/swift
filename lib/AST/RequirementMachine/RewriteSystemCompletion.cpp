@@ -380,22 +380,31 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     //
     // In this case, T and V are both empty.
 
+    // Compute the terms T and V.
+    MutableTerm t(lhs.getLHS().begin(), from);
+    MutableTerm v(from + rhs.getLHS().size(), lhs.getLHS().end());
+
     // Compute the term TYV.
-    MutableTerm tyv(lhs.getLHS().begin(), from);
+    MutableTerm tyv(t);
     tyv.append(rhs.getRHS());
-    tyv.append(from + rhs.getLHS().size(), lhs.getLHS().end());
+    tyv.append(v);
 
     MutableTerm x(lhs.getRHS());
 
-    // Compute a path from X to TYV.
+    // Compute a path from X to TYV: (X => TUV) ⊗ T.(U => Y).V
     RewritePath path;
 
-    // (1) First, apply the left hand side rule in the reverse direction.
-    path.add(RewriteStep::forRewriteRule(/*offset=*/0,
+    // (1) First, apply the left hand side rule in the reverse direction:
+    //
+    //     (X => TUV)
+    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
+                                         /*endOffset=*/0,
                                          getRuleID(lhs),
                                          /*inverse=*/true));
-    // (2) Now, apply the right hand side in the forward direction.
-    path.add(RewriteStep::forRewriteRule(from - lhs.getLHS().begin(),
+    // (2) Now, apply the right hand side in the forward direction:
+    //
+    //     T.(U => Y).V 
+    path.add(RewriteStep::forRewriteRule(t.size(), v.size(),
                                          getRuleID(rhs),
                                          /*inverse=*/false));
 
@@ -411,52 +420,55 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
   } else {
     // lhs == TU -> X, rhs == UV -> Y.
 
-    // Compute the term T.
+    // Compute the terms T and V.
     MutableTerm t(lhs.getLHS().begin(), from);
+    MutableTerm v(rhs.getLHS().begin() + (lhs.getLHS().end() - from),
+                  rhs.getLHS().end());
 
     // Compute the term XV.
     MutableTerm xv(lhs.getRHS());
-    xv.append(rhs.getLHS().begin() + (lhs.getLHS().end() - from),
-              rhs.getLHS().end());
-
-    if (xv.back().isSuperclassOrConcreteType() &&
-        lhs.getLHS().begin() != from) {
-      xv.back() = xv.back().prependPrefixToConcreteSubstitutions(
-          t, Context);
-    }
+    xv.append(v);
 
     // Compute the term TY.
-    t.append(rhs.getRHS());
+    MutableTerm ty(t);
+    ty.append(rhs.getRHS());
 
-    // Compute a path from XV to TY.
+    // Compute a path from XV to TY: (X => TU).V ⊗ (σ - T) ⊗ T.(UV => Y)
     RewritePath path;
 
-    // (1) First, apply the left hand side rule in the reverse direction.
-    path.add(RewriteStep::forRewriteRule(/*offset=*/0,
+    // (1) First, apply the left hand side rule in the reverse direction:
+    //
+    //     (X => TU).V
+    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0, v.size(),
                                          getRuleID(lhs),
                                          /*inverse=*/true));
 
     // (2) Next, if the right hand side rule ends with a concrete type symbol,
-    // perform the concrete type adjustment.
-    if (xv.back().isSuperclassOrConcreteType() &&
-        lhs.getLHS().begin() != from) {
-      path.add(RewriteStep::forAdjustment(from - lhs.getLHS().begin(),
-                                          /*inverse=*/true));
+    // perform the concrete type adjustment:
+    //
+    //     (σ - T)
+    if (xv.back().isSuperclassOrConcreteType() && t.size() > 0) {
+      path.add(RewriteStep::forAdjustment(t.size(), /*inverse=*/true));
+
+      xv.back() = xv.back().prependPrefixToConcreteSubstitutions(
+          t, Context);
     }
 
-    // (3) Finally, apply the right hand side in the forward direction.
-    path.add(RewriteStep::forRewriteRule(from - lhs.getLHS().begin(),
+    // (3) Finally, apply the right hand side in the forward direction:
+    //
+    //     T.(UV => Y)
+    path.add(RewriteStep::forRewriteRule(t.size(), /*endOffset=*/0,
                                          getRuleID(rhs),
                                          /*inverse=*/false));
 
     // If XV == TY, we have a trivial overlap.
-    if (xv == t) {
+    if (xv == ty) {
       loops.emplace_back(xv, path);
       return false;
     }
 
     // Add the pair (XV, TY).
-    pairs.emplace_back(xv, t);
+    pairs.emplace_back(xv, ty);
     paths.push_back(path);
   }
 

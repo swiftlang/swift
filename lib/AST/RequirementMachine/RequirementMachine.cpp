@@ -448,3 +448,7 @@ void RequirementMachine::computeCompletion() {
 bool RequirementMachine::isComplete() const {
   return Complete;
 }
+
+void RequirementMachine::computeMinimalRequirements(const ProtocolDecl *proto) {
+  System.minimizeRewriteSystem();
+}

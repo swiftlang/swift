@@ -33,6 +33,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("completion", DebugFlags::Completion)
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
+      .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
