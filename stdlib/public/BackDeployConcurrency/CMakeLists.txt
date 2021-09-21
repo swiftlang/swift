@@ -10,6 +10,8 @@
 #
 #===----------------------------------------------------------------------===#
 
+cmake_minimum_required(VERSION 3.19.6)
+
 # This is always build standalone
 include("${CMAKE_CURRENT_SOURCE_DIR}/../../../cmake/modules/StandaloneOverlay.cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/modules")
