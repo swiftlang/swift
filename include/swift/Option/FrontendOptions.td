@@ -495,7 +495,11 @@ def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
 
 def enable_llvm_vfe : Flag<["-"], "enable-llvm-vfe">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
-  HelpText<"Use LLVM Virtual Function Elimination on Swift class virtual tables">;
+  HelpText<"Use LLVM IR Virtual Function Elimination on Swift class virtual tables">;
+
+def enable_llvm_wme : Flag<["-"], "enable-llvm-wme">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Use LLVM IR Witness Method Elimination on Swift protocol witness tables">;
 
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
