@@ -591,6 +591,10 @@ public:
     return getKind() == Class;
   }
 
+  /// Return true if this storage is valid for all uses in a function without
+  /// checking its lifetime.
+  bool isGuaranteedForFunction() const;
+
   /// Returns the ValueDecl for the underlying storage, if it can be
   /// determined. Otherwise returns null.
   ///

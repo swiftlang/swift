@@ -570,6 +570,17 @@ void AccessedStorage::visitRoots(
   }
 }
 
+bool AccessedStorage::isGuaranteedForFunction() const {
+  if (getKind() == AccessedStorage::Argument) {
+    return getArgument()->getArgumentConvention().isGuaranteedConvention();
+  }
+  if (isObjectAccess()) {
+    return getRoot().getOwnershipKind() == OwnershipKind::Guaranteed
+           && isa<SILFunctionArgument>(getRoot());
+  }
+  return false;
+}
+
 // Set 'isLet' to true if this storage can be determined to be a 'let' variable.
 //
 // \p base must be the access base for this storage, as passed to the
