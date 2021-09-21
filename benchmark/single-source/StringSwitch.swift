@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let StringSwitch = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "StringSwitch",
     runFunction: run_StringSwitch,
@@ -217,13 +217,13 @@ func test(_ s: String) {
 }
 
 @inline(never)
-public func run_StringSwitch(N: Int) {
+public func run_StringSwitch(n: Int) {
   let first = "Swift"
   let short = "To"
   let long = "(C, C++, Objective-C)."
   let last = "code."
   let none = "non existent string"
-  for _ in 1...100*N {
+  for _ in 1...100*n {
     test(first)
     test(short)
     test(long)

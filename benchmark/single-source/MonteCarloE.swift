@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,24 +19,27 @@
 // Thus, e = N / Nempty.
 import TestsUtils
 
-public let MonteCarloE = BenchmarkInfo(
-  name: "MonteCarloE",
-  runFunction: run_MonteCarloE,
-  tags: [.validation, .algorithm],
-  legacyFactor: 20)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "MonteCarloE",
+    runFunction: run_MonteCarloE,
+    tags: [.validation, .algorithm],
+    legacyFactor: 20)
 
 public func run_MonteCarloE(scale: Int) {
-  let N = 10_000*scale
-  var intervals = [Bool](repeating: false, count: N)
-  for _ in 1...N {
-    let pos = Int(UInt(truncatingIfNeeded: Random())%UInt(N))
+  var lfsr = LFSR()
+
+  let n = 10_000 * scale
+  var intervals = [Bool](repeating: false, count: n)
+  for _ in 1...n {
+    let pos = Int(UInt(truncatingIfNeeded: lfsr.next()) % UInt(n))
     intervals[pos] = true
   }
   let numEmptyIntervals = intervals.filter{!$0}.count
   // If there are no empty intervals, then obviously the random generator is
   // not 'random' enough.
-  CheckResults(numEmptyIntervals != N)
-  let e_estimate = Double(N)/Double(numEmptyIntervals)
+  check(numEmptyIntervals != n)
+  let e_estimate = Double(n)/Double(numEmptyIntervals)
   let e = 2.71828
-  CheckResults(abs(e_estimate - e) < 0.2)
+  check(abs(e_estimate - e) < 0.2)
 }

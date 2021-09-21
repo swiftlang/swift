@@ -512,6 +512,9 @@ void BorrowedValue::getLocalScopeEndingInstructions(
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
+// Note: BorrowedLifetimeExtender assumes no intermediate values between a
+// borrow introducer and its reborrow. The borrowed value must be an operand of
+// the reborrow.
 bool BorrowedValue::visitLocalScopeEndingUses(
     function_ref<bool(Operand *)> visitor) const {
   assert(isLocalScope() && "Should only call this given a local scope");

@@ -991,8 +991,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       auto genericSig = FnDecl->getGenericSignature();
 
       if (auto sig = attr->getSpecializedSignature()) {
-        requirementsScratch = sig->requirementsNotSatisfiedBy(
-            genericSig);
+        requirementsScratch = sig.requirementsNotSatisfiedBy(genericSig);
         requirements = requirementsScratch;
       }
     }

@@ -1,4 +1,4 @@
-//===--- JSON.swift -------------------------------------------------------===//
+//===--- CodableTest.swift ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,14 +14,14 @@ import TestsUtils
 import Foundation
 
 #if _runtime(_ObjC)
-public let Codable = [
+public let benchmarks = [
   BenchmarkInfo(name: "JSONPerfEncode", runFunction: run_JSONPerfEncode, tags: [.validation, .bridging], setUpFunction: setup_json),
   BenchmarkInfo(name: "JSONPerfDecode", runFunction: run_JSONPerfDecode, tags: [.validation, .bridging], setUpFunction: setup_json),
   BenchmarkInfo(name: "PlistPerfEncode", runFunction: run_PlistPerfEncode, tags: [.validation, .bridging], setUpFunction: setup_plist),
   BenchmarkInfo(name: "PlistPerfDecode", runFunction: run_PlistPerfDecode, tags: [.validation, .bridging], setUpFunction: setup_plist),
 ]
 #else
-public let Codable = [
+public let benchmarks = [
   BenchmarkInfo(name: "JSONPerfEncode", runFunction: run_JSONPerfEncode, tags: [.validation, .bridging], setUpFunction: setup_json),
   BenchmarkInfo(name: "JSONPerfDecode", runFunction: run_JSONPerfDecode, tags: [.validation, .bridging], setUpFunction: setup_json),
 ]
@@ -101,26 +101,26 @@ struct CodablePerfTester<Enc: GenericEncoder, Dec: GenericDecoder>  {
   }
 }
 
-var JSONTester: CodablePerfTester<JSONEncoder, JSONDecoder>! = nil
+var jsonTester: CodablePerfTester<JSONEncoder, JSONDecoder>! = nil
 
 public func setup_json() {
-  JSONTester = CodablePerfTester(encoder: JSONEncoder(), decoder: JSONDecoder())
+  jsonTester = CodablePerfTester(encoder: JSONEncoder(), decoder: JSONDecoder())
 }
 
 @inline(never)
-public func run_JSONPerfEncode(_ N: Int) {
+public func run_JSONPerfEncode(_ n: Int) {
   autoreleasepool {
-    for _ in 0 ..< N {
-      JSONTester.encode()
+    for _ in 0 ..< n {
+      jsonTester.encode()
     }
   }
 }
 
 @inline(never)
-public func run_JSONPerfDecode(_ N: Int) {
+public func run_JSONPerfDecode(_ n: Int) {
   autoreleasepool {
-    for _ in 0 ..< N {
-      JSONTester.decode()
+    for _ in 0 ..< n {
+      jsonTester.decode()
     }
   }
 }
@@ -134,18 +134,18 @@ public func setup_plist() {
 }
 
 @inline(never)
-public func run_PlistPerfEncode(_ N: Int) {
+public func run_PlistPerfEncode(_ n: Int) {
   autoreleasepool {
-    for _ in 0 ..< N {
+    for _ in 0 ..< n {
       plistTester.encode()
     }
   }
 }
 
 @inline(never)
-public func run_PlistPerfDecode(_ N: Int) {
+public func run_PlistPerfDecode(_ n: Int) {
   autoreleasepool {
-    for _ in 0 ..< N {
+    for _ in 0 ..< n {
       plistTester.decode()
     }
   }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,11 +13,12 @@
 import TestsUtils
 import Foundation
 
-public let IterateData = BenchmarkInfo(
-  name: "IterateData",
-  runFunction: run_IterateData,
-  tags: [.validation, .api, .Data],
-  setUpFunction: { blackHole(data) })
+public let benchmarks =
+  BenchmarkInfo(
+    name: "IterateData",
+    runFunction: run_IterateData,
+    tags: [.validation, .api, .Data],
+    setUpFunction: { blackHole(data) })
 
 let data: Data = {
   var data = Data(count: 16 * 1024)
@@ -31,8 +32,8 @@ let data: Data = {
 }()
 
 @inline(never)
-public func run_IterateData(_ N: Int) {
-  for _ in 1...10*N {
+public func run_IterateData(_ n: Int) {
+  for _ in 1...10*n {
     _ = data.reduce(0, &+)
   }
 }

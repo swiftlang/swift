@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,7 +15,7 @@ import Foundation
 
 let d: [BenchmarkCategory] =  [.validation, .api, .Data, .cpubench]
 
-public let DataBenchmarks = [
+public let benchmarks = [
   BenchmarkInfo(name: "DataCreateEmpty",
     runFunction: { for _ in 0..<$0*10_000 { blackHole(Data()) } },
     tags: d, legacyFactor: 10),
@@ -394,8 +394,8 @@ func sampleData(_ type: SampleKind) -> Data {
 }
 
 @inline(never)
-func withUnsafeBytes(_ N: Int, data: Data) {
-  for _ in 1...N {
+func withUnsafeBytes(_ n: Int, data: Data) {
+  for _ in 1...n {
     data.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
       blackHole(ptr.pointee)
     }
@@ -403,8 +403,8 @@ func withUnsafeBytes(_ N: Int, data: Data) {
 }
 
 @inline(never)
-func withUnsafeMutableBytes(_ N: Int, data: Data) {
-  for _ in 1...N {
+func withUnsafeMutableBytes(_ n: Int, data: Data) {
+  for _ in 1...n {
     var copy = data
     copy.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
       // Mutate a byte
@@ -414,61 +414,61 @@ func withUnsafeMutableBytes(_ N: Int, data: Data) {
 }
 
 @inline(never)
-func copyBytes(_ N: Int, data: Data) {
+func copyBytes(_ n: Int, data: Data) {
   let amount = data.count
   let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: amount)
   defer { buffer.deallocate() }
-  for _ in 1...N {
+  for _ in 1...n {
     data.copyBytes(to: buffer, from: 0..<amount)
   }
 }
 
 @inline(never)
-func append(_ N: Int, bytes count: Int, to data: Data) {
+func append(_ n: Int, bytes count: Int, to data: Data) {
   let bytes = malloc(count).assumingMemoryBound(to: UInt8.self)
   defer { free(bytes) }
-  for _ in 1...N {
+  for _ in 1...n {
     var copy = data
     copy.append(bytes, count: count)
   }
 }
 
 @inline(never)
-func append(_ N: Int, array bytes: [UInt8], to data: Data) {
-  for _ in 1...N {
+func append(_ n: Int, array bytes: [UInt8], to data: Data) {
+  for _ in 1...n {
     var copy = data
     copy.append(contentsOf: bytes)
   }
 }
 
 @inline(never)
-func append(_ N: Int, sequenceLength: Int, to data: Data) {
+func append(_ n: Int, sequenceLength: Int, to data: Data) {
   let bytes = repeatElement(UInt8(0xA0), count: sequenceLength)
-  for _ in 1...N {
+  for _ in 1...n {
     var copy = data
     copy.append(contentsOf: bytes)
   }
 }
 
 @inline(never)
-func append<S: Sequence>(_ N: Int, sequence: S, to data: Data)
+func append<S: Sequence>(_ n: Int, sequence: S, to data: Data)
 where S.Element == UInt8 {
-  for _ in 1...N {
+  for _ in 1...n {
     var copy = data
     copy.append(contentsOf: sequence)
   }
 }
 
 @inline(never)
-func _init<S: Sequence>(_ N: Int, sequence: S) where S.Element == UInt8 {
-  for _ in 1...N {
+func _init<S: Sequence>(_ n: Int, sequence: S) where S.Element == UInt8 {
+  for _ in 1...n {
     blackHole(Data(sequence))
   }
 }
 
 @inline(never)
-func resetBytes(_ N: Int, in range: Range<Data.Index>, data: Data) {
-  for _ in 1...N {
+func resetBytes(_ n: Int, in range: Range<Data.Index>, data: Data) {
+  for _ in 1...n {
     var copy = data
     copy.resetBytes(in: range)
   }
@@ -476,12 +476,12 @@ func resetBytes(_ N: Int, in range: Range<Data.Index>, data: Data) {
 
 @inline(never)
 func replace(
-  _ N: Int,
+  _ n: Int,
   data: Data,
   subrange range: Range<Data.Index>,
   with replacement: Data
 ) {
-  for _ in 1...N {
+  for _ in 1...n {
     var copy = data
     copy.replaceSubrange(range, with: replacement)
   }
@@ -489,7 +489,7 @@ func replace(
 
 @inline(never)
 func replaceBuffer(
-  _ N: Int,
+  _ n: Int,
   data: Data,
   subrange range: Range<Data.Index>,
   with replacement: Data
@@ -497,7 +497,7 @@ func replaceBuffer(
   replacement.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) in
     let buffer = UnsafeBufferPointer(start: bytes, count: replacement.count)
 
-    for _ in 1...N {
+    for _ in 1...n {
       var copy = data
       copy.replaceSubrange(range, with: buffer)
     }
@@ -505,57 +505,57 @@ func replaceBuffer(
 }
 
 @inline(never)
-func append(_ N: Int, data: Data, to target: Data) {
+func append(_ n: Int, data: Data, to target: Data) {
   var copy: Data
-  for _ in 1...N {
+  for _ in 1...n {
     copy = target
     copy.append(data)
   }
 }
 
 @inline(never)
-public func count(_ N: Int, data: Data) {
-  for _ in 1...N {
+public func count(_ n: Int, data: Data) {
+  for _ in 1...n {
     blackHole(data.count)
   }
 }
 
 @inline(never)
-public func setCount(_ N: Int, data: Data, extra: Int) {
+public func setCount(_ n: Int, data: Data, extra: Int) {
   var copy = data
   let count = data.count + extra
   let orig = data.count
-  for _ in 1...N {
+  for _ in 1...n {
     copy.count = count
     copy.count = orig
   }
 }
 
 @inline(never)
-public func string(_ N: Int, from data: Data) {
-  for _ in 1...N {
+public func string(_ n: Int, from data: Data) {
+  for _ in 1...n {
     blackHole(String(decoding: data, as: UTF8.self))
   }
 }
 
 @inline(never)
-public func dataFromUTF8View(_ N: Int, from string: String) {
-  for _ in 1...N {
+public func dataFromUTF8View(_ n: Int, from string: String) {
+  for _ in 1...n {
     blackHole(Data(string.utf8))
   }
 }
 
 @inline(never)
-public func dataUsingUTF8Encoding(_ N: Int, from string: String) {
-  for _ in 1...N {
+public func dataUsingUTF8Encoding(_ n: Int, from string: String) {
+  for _ in 1...n {
     autoreleasepool { blackHole(string.data(using: .utf8)) }
   }
 }
 
 @inline(never)
-public func hash(_ N: Int, data: Data) {
+public func hash(_ n: Int, data: Data) {
   var hasher = Hasher()
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     hasher.combine(data)
   }
 

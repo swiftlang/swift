@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let RangeOverlaps = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "RangeOverlapsRange",
     runFunction: run_RangeOverlapsRange,
@@ -39,40 +39,40 @@ private let ranges: [Range<Int>] = (-8...8).flatMap { a in (0...16).map { l in a
 private let closedRanges: [ClosedRange<Int>] = (-8...8).flatMap { a in (0...16).map { l in a...(a+l) } }
 
 @inline(never)
-public func run_RangeOverlapsRange(_ N: Int) {
-  var check: UInt64 = 0
-  for _ in 0..<N {
+public func run_RangeOverlapsRange(_ n: Int) {
+  var checksum: UInt64 = 0
+  for _ in 0..<n {
     for lhs in ranges {
       for rhs in ranges {
-        if lhs.overlaps(rhs) { check += 1 }
+        if lhs.overlaps(rhs) { checksum += 1 }
       }
     }
   }
-  CheckResults(check == 47872 * UInt64(N))
+  check(checksum == 47872 * UInt64(n))
 }
 
 @inline(never)
-public func run_RangeOverlapsClosedRange(_ N: Int) {
-  var check: UInt64 = 0
-  for _ in 0..<N {
+public func run_RangeOverlapsClosedRange(_ n: Int) {
+  var checksum: UInt64 = 0
+  for _ in 0..<n {
     for lhs in ranges {
       for rhs in closedRanges {
-        if lhs.overlaps(rhs) { check += 1 }
+        if lhs.overlaps(rhs) { checksum += 1 }
       }
     }
   }
-  CheckResults(check == 51680 * UInt64(N))
+  check(checksum == 51680 * UInt64(n))
 }
 
 @inline(never)
-public func run_ClosedRangeOverlapsClosedRange(_ N: Int) {
-  var check: UInt64 = 0
-  for _ in 0..<N {
+public func run_ClosedRangeOverlapsClosedRange(_ n: Int) {
+  var checksum: UInt64 = 0
+  for _ in 0..<n {
     for lhs in closedRanges {
       for rhs in closedRanges {
-        if lhs.overlaps(rhs) { check += 1 }
+        if lhs.overlaps(rhs) { checksum += 1 }
       }
     }
   }
-  CheckResults(check == 55777 * UInt64(N))
+  check(checksum == 55777 * UInt64(n))
 }

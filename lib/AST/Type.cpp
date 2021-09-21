@@ -1450,10 +1450,7 @@ CanType TypeBase::computeCanonicalType() {
 }
 
 CanType TypeBase::getCanonicalType(GenericSignature sig) {
-  if (!sig)
-    return getCanonicalType();
-
-  return sig->getCanonicalTypeInContext(this);
+  return sig.getCanonicalTypeInContext(this);
 }
 
 TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
@@ -1904,7 +1901,7 @@ public:
         
         // Collect requirements from the conformance not satisfied by the
         // original declaration.
-        for (auto reqt : conformanceSig->requirementsNotSatisfiedBy(genericSig)) {
+        for (auto reqt : conformanceSig.requirementsNotSatisfiedBy(genericSig)) {
           LLVM_DEBUG(llvm::dbgs() << "\n- adds requirement\n";
                      reqt.dump(llvm::dbgs()));
           

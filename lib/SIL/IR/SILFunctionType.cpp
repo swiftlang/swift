@@ -3542,21 +3542,18 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
 
   assert(base.requiresNewVTableEntry() && "base must not be an override");
 
-  // Figure out the generic signature for the class method call. This is the
-  // signature of the derived class, with requirements transplanted from
-  // the base method. The derived method is allowed to have fewer
-  // requirements, in which case the thunk will translate the calling
-  // convention appropriately before calling the derived method.
-  bool hasGenericRequirementDifference = false;
 
   auto derivedSig = derived.getDecl()->getAsGenericContext()
                                      ->getGenericSignature();
   auto genericSig = Context.getOverrideGenericSignature(base.getDecl(),
                                                         derived.getDecl());
-  if (genericSig) {
-    hasGenericRequirementDifference =
-      !genericSig->requirementsNotSatisfiedBy(derivedSig).empty();
-  }
+  // Figure out the generic signature for the class method call. This is the
+  // signature of the derived class, with requirements transplanted from
+  // the base method. The derived method is allowed to have fewer
+  // requirements, in which case the thunk will translate the calling
+  // convention appropriately before calling the derived method.
+  bool hasGenericRequirementDifference =
+      !genericSig.requirementsNotSatisfiedBy(derivedSig).empty();
 
   auto baseInfo = getConstantInfo(context, base);
   auto derivedInfo = getConstantInfo(context, derived);

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,13 +16,14 @@ import TestsUtils
 
 // 47% _swift_retain
 // 43% _swift_release
-public var LinkedList = BenchmarkInfo(
-  name: "LinkedList",
-  runFunction: run_LinkedList,
-  tags: [.runtime, .cpubench, .refcount],
-  setUpFunction: { for i in 0..<size { head = Node(n:head, d:i) } },
-  tearDownFunction: { head = Node(n:nil, d:0) },
-  legacyFactor: 40)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "LinkedList",
+    runFunction: run_LinkedList,
+    tags: [.runtime, .cpubench, .refcount],
+    setUpFunction: { for i in 0..<size { head = Node(n:head, d:i) } },
+    tearDownFunction: { head = Node(n:nil, d:0) },
+    legacyFactor: 40)
 
 let size = 100
 var head = Node(n:nil, d:0)
@@ -38,11 +39,11 @@ final class Node {
 }
 
 @inline(never)
-public func run_LinkedList(_ N: Int) {
+public func run_LinkedList(_ n: Int) {
   var sum = 0
   let ref_result = size*(size-1)/2
   var ptr = head
-  for _ in 1...125*N {
+  for _ in 1...125*n {
     ptr = head
     sum = 0
     while let nxt = ptr.next {
@@ -53,5 +54,5 @@ public func run_LinkedList(_ N: Int) {
       break
     }
   }
-  CheckResults(sum == ref_result)
+  check(sum == ref_result)
 }

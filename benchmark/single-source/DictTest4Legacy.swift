@@ -15,7 +15,7 @@ import TestsUtils
 // This benchmark mostly measures lookups in dictionaries with complex keys,
 // using the legacy hashValue API.
 
-public let Dictionary4Legacy = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "Dictionary4Legacy",
     runFunction: run_Dictionary4Legacy,
@@ -74,7 +74,7 @@ struct LargeKey: Hashable {
 }
 
 @inline(never)
-public func run_Dictionary4Legacy(_ N: Int) {
+public func run_Dictionary4Legacy(_ n: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 \(reps) \(reps * 99)"
@@ -82,7 +82,7 @@ public func run_Dictionary4Legacy(_ N: Int) {
   var hash2 = [LargeKey: Int]()
   var res = ""
 
-  for _ in 1...N {
+  for _ in 1...n {
     // Test insertions
     hash1 = [:]
     for i in 0..<size1 {
@@ -104,7 +104,7 @@ public func run_Dictionary4Legacy(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result)
+  check(res == ref_result)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -128,7 +128,7 @@ class Box<T : Hashable> : Hashable {
 }
 
 @inline(never)
-public func run_Dictionary4OfObjectsLegacy(_ N: Int) {
+public func run_Dictionary4OfObjectsLegacy(_ n: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 \(reps) \(reps * 99)"
@@ -136,7 +136,7 @@ public func run_Dictionary4OfObjectsLegacy(_ N: Int) {
   var hash2 = [Box<LargeKey>: Int]()
   var res = ""
 
-  for _ in 1...N {
+  for _ in 1...n {
     // Test insertions
     hash1 = [:]
     for i in 0..<size1 {
@@ -158,5 +158,5 @@ public func run_Dictionary4OfObjectsLegacy(_ N: Int) {
       break
     }
   }
-  CheckResults(res == ref_result)
+  check(res == ref_result)
 }
