@@ -313,16 +313,18 @@ If needed you can multiply N by a fixed amount (e.g. `1...100*N`) to achieve thi
 // rdar://problem/00000000
 import TestsUtils
 
-public let YourTestName = BenchmarkInfo(
-  name: "YourTestName",
-  runFunction: run_YourTestName,
-  tags: [.regression])
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "YourTestName",
+    runFunction: run_YourTestName,
+    tags: [.regression])
+]
 
 @inline(never)
-public func run_YourTestName(N: Int) {
+public func run_YourTestName(n: Int) {
     # Declare variables
 
-    for i in 1...N {
+    for i in 1...n {
         # Perform work
 
         # Verify work was done; break otherwise

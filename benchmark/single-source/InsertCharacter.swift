@@ -14,7 +14,7 @@ import TestsUtils
 
 let t: [BenchmarkCategory] = [.validation, .api, .String]
 
-public let InsertCharacter = [
+public let benchmarks = [
   BenchmarkInfo(name: "InsertCharacterEndIndex",
     runFunction: run_InsertCharacterEndIndex, tags: t,
     setUpFunction: buildWorkload),
@@ -57,13 +57,13 @@ func insertTowardsEndIndex(_ c: Character, in string: String, count: Int) {
 }
 
 @inline(never)
-func run_InsertCharacterTowardsEndIndex(_ N: Int) {
-  insertTowardsEndIndex("s", in: str, count: N * 3000)
+func run_InsertCharacterTowardsEndIndex(_ n: Int) {
+  insertTowardsEndIndex("s", in: str, count: n * 3000)
 }
 
 @inline(never)
-func run_InsertCharacterTowardsEndIndexNonASCII(_ N: Int) {
-  insertTowardsEndIndex("👩🏼‍💻", in: str, count: N * 1000)
+func run_InsertCharacterTowardsEndIndexNonASCII(_ n: Int) {
+  insertTowardsEndIndex("👩🏼‍💻", in: str, count: n * 1000)
 }
 
 // Insert at end index
@@ -78,13 +78,13 @@ func insertAtEndIndex(_ c: Character, in string: String, count: Int) {
 }
 
 @inline(never)
-func run_InsertCharacterEndIndex(_ N: Int) {
-  insertAtEndIndex("s", in: str, count: N * 3000)
+func run_InsertCharacterEndIndex(_ n: Int) {
+  insertAtEndIndex("s", in: str, count: n * 3000)
 }
 
 @inline(never)
-func run_InsertCharacterEndIndexNonASCII(_ N: Int) {
-  insertAtEndIndex("👩🏾‍🏫", in: str, count: N * 1000)
+func run_InsertCharacterEndIndexNonASCII(_ n: Int) {
+  insertAtEndIndex("👩🏾‍🏫", in: str, count: n * 1000)
 }
 
 // Insert at start index
@@ -103,11 +103,11 @@ func insertAtStartIndex(
 }
 
 @inline(never)
-func run_InsertCharacterStartIndex(_ N: Int) {
-  insertAtStartIndex("w", in: str, count: N * 15, insertions: 50)
+func run_InsertCharacterStartIndex(_ n: Int) {
+  insertAtStartIndex("w", in: str, count: n * 15, insertions: 50)
 }
 
 @inline(never)
-func run_InsertCharacterStartIndexNonASCII(_ N: Int) {
-  insertAtStartIndex("👩🏾‍🏫", in: str, count: N * 75, insertions: 25)
+func run_InsertCharacterStartIndexNonASCII(_ n: Int) {
+  insertAtStartIndex("👩🏾‍🏫", in: str, count: n * 75, insertions: 25)
 }

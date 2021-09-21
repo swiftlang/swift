@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -30,7 +30,7 @@ import TestsUtils
 let t: [BenchmarkCategory] = [.skip]
 let ta: [BenchmarkCategory] = [.api, .Array, .skip]
 
-public let ExistentialPerformance: [BenchmarkInfo] = [
+public let benchmarks: [BenchmarkInfo] = [
   BenchmarkInfo(name: "Existential.method.1x.Ref1",
     runFunction: run_method1x, tags: t, setUpFunction: etRef1),
   BenchmarkInfo(name: "Existential.method.1x.Ref2",
@@ -464,56 +464,56 @@ func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential)
   return e0.doIt() && e1.doIt() && e0.reallyDoIt() && e1.reallyDoIt()
 }
 
-func run_method1x(_ N: Int) {
+func run_method1x(_ n: Int) {
   let existential = existentialType.init()
-  for _ in 0 ..< N * 20_000 {
+  for _ in 0 ..< n * 20_000 {
     if !existential.doIt() {
       fatalError("expected true")
     }
   }
 }
 
-func run_method2x(_ N: Int) {
+func run_method2x(_ n: Int) {
   let existential = existentialType.init()
-  for _ in 0 ..< N * 20_000 {
+  for _ in 0 ..< n * 20_000 {
     if !existential.doIt()  || !existential.reallyDoIt() {
       fatalError("expected true")
     }
   }
 }
 
-func run_Pass_method1x(_ N: Int) {
+func run_Pass_method1x(_ n: Int) {
   let existential = existentialType.init()
   let existential2 = existentialType.init()
-  for _ in 0 ..< N * 20_000 {
+  for _ in 0 ..< n * 20_000 {
     if !passExistentialTwiceOneMethodCall(existential, existential2) {
       fatalError("expected true")
     }
   }
 }
 
-func run_Pass_method2x(_ N: Int) {
+func run_Pass_method2x(_ n: Int) {
   let existential = existentialType.init()
   let existential2 = existentialType.init()
-  for _ in 0 ..< N * 20_000 {
+  for _ in 0 ..< n * 20_000 {
     if !passExistentialTwiceTwoMethodCalls(existential, existential2) {
       fatalError("expected true")
     }
   }
 }
 
-func run_Mutating(_ N: Int) {
+func run_Mutating(_ n: Int) {
   var existential = existentialType.init()
-  for _ in 0 ..< N * 10_000 {
+  for _ in 0 ..< n * 10_000 {
     if !existential.mutateIt()  {
       fatalError("expected true")
     }
   }
 }
 
-func run_MutatingAndNonMutating(_ N: Int) {
+func run_MutatingAndNonMutating(_ n: Int) {
   var existential = existentialType.init()
-  for _ in 0 ..< N * 10_000 {
+  for _ in 0 ..< n * 10_000 {
     let _ = existential.doIt()
     if !existential.mutateIt()  {
       fatalError("expected true")
@@ -521,16 +521,16 @@ func run_MutatingAndNonMutating(_ N: Int) {
   }
 }
 
-func run_Array_init(_ N: Int) {
+func run_Array_init(_ n: Int) {
 
-  for _ in 0 ..< N * 100 {
+  for _ in 0 ..< n * 100 {
     blackHole(Array(repeating: existentialType.init(), count: 128))
   }
 }
 
-func run_Array_method1x(_ N: Int) {
+func run_Array_method1x(_ n: Int) {
   let existentialArray = array!
-  for _ in 0 ..< N * 100 {
+  for _ in 0 ..< n * 100 {
     for elt in existentialArray {
       if !elt.doIt()  {
         fatalError("expected true")
@@ -539,9 +539,9 @@ func run_Array_method1x(_ N: Int) {
   }
 }
 
-func run_Array_method2x(_ N: Int) {
+func run_Array_method2x(_ n: Int) {
   let existentialArray = array!
-  for _ in 0 ..< N * 100 {
+  for _ in 0 ..< n * 100 {
     for elt in existentialArray {
       if !elt.doIt() || !elt.reallyDoIt() {
         fatalError("expected true")
@@ -550,9 +550,9 @@ func run_Array_method2x(_ N: Int) {
   }
 }
 
-func run_ArrayMutating(_ N: Int) {
+func run_ArrayMutating(_ n: Int) {
   var existentialArray = array!
-  for _ in 0 ..< N * 500 {
+  for _ in 0 ..< n * 500 {
     for i in 0 ..< existentialArray.count {
       if !existentialArray[i].mutateIt()  {
         fatalError("expected true")
@@ -561,18 +561,18 @@ func run_ArrayMutating(_ N: Int) {
   }
 }
 
-func run_ArrayShift(_ N: Int) {
+func run_ArrayShift(_ n: Int) {
   var existentialArray = array!
-  for _ in 0 ..< N * 25 {
+  for _ in 0 ..< n * 25 {
     for i in 0 ..< existentialArray.count-1 {
       existentialArray.swapAt(i, i+1)
     }
   }
 }
 
-func run_ArrayConditionalShift(_ N: Int) {
+func run_ArrayConditionalShift(_ n: Int) {
   var existentialArray = array!
-  for _ in 0 ..< N * 25 {
+  for _ in 0 ..< n * 25 {
     for i in 0 ..< existentialArray.count-1 {
       let curr = existentialArray[i]
       if curr.doIt() {

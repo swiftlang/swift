@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,7 +17,7 @@
 //     Create a sorted sparse RGB histogram from an array of 300 RGB values.
 import TestsUtils
 
-public let RGBHistogram = [
+public let benchmarks = [
   BenchmarkInfo(name: "RGBHistogram",
     runFunction: run_RGBHistogram,
     tags: [.validation, .algorithm],
@@ -29,15 +29,15 @@ public let RGBHistogram = [
 ]
 
 @inline(never)
-public func run_RGBHistogram(_ N: Int) {
+public func run_RGBHistogram(_ n: Int) {
     var histogram = [(key: rrggbb_t, value: Int)]()
-    for _ in 1...10*N {
+    for _ in 1...10*n {
         histogram = createSortedSparseRGBHistogram(samples)
         if !isCorrectHistogram(histogram) {
             break
         }
     }
-    CheckResults(isCorrectHistogram(histogram))
+    check(isCorrectHistogram(histogram))
 }
 
 typealias rrggbb_t = UInt32
@@ -167,13 +167,13 @@ func createSortedSparseRGBHistogramOfObjects<S : Sequence>(
 }
 
 @inline(never)
-public func run_RGBHistogramOfObjects(_ N: Int) {
+public func run_RGBHistogramOfObjects(_ n: Int) {
     var histogram = [(key: Box<rrggbb_t>, value: Box<Int>)]()
-    for _ in 1...N {
+    for _ in 1...n {
         histogram = createSortedSparseRGBHistogramOfObjects(samples)
         if !isCorrectHistogramOfObjects(histogram) {
             break
         }
     }
-    CheckResults(isCorrectHistogramOfObjects(histogram))
+    check(isCorrectHistogramOfObjects(histogram))
 }

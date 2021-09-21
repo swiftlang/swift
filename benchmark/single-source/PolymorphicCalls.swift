@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,11 +22,13 @@ applying a jump-threading in combination with the speculative devirtualization.
 
 import TestsUtils
 
-public let PolymorphicCalls = BenchmarkInfo(
-  name: "PolymorphicCalls",
-  runFunction: run_PolymorphicCalls,
-  tags: [.abstraction, .cpubench]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "PolymorphicCalls",
+    runFunction: run_PolymorphicCalls,
+    tags: [.abstraction, .cpubench]
+  ),
+]
 
 public class A {
     let b: B
@@ -250,9 +252,9 @@ public class F3 : B3 {
 // Test the cost of polymorphic method invocation
 // on a class without any subclasses
 @inline(never)
-func test(_ a:A, _ UPTO: Int) -> Int64 {
+func test(_ a:A, _ upTo: Int) -> Int64 {
     var cnt: Int64 = 0
-    for _ in 0..<UPTO {
+    for _ in 0..<upTo {
         cnt += Int64(a.run2())
     }
     return cnt
@@ -261,9 +263,9 @@ func test(_ a:A, _ UPTO: Int) -> Int64 {
 // Test the cost of polymorphic method invocation
 // on a class with 1 subclass
 @inline(never)
-func test(_ a:A1, _ UPTO: Int) -> Int64 {
+func test(_ a:A1, _ upTo: Int) -> Int64 {
     var cnt: Int64 = 0
-    for _ in 0..<UPTO {
+    for _ in 0..<upTo {
         cnt += Int64(a.run2())
     }
     return cnt
@@ -272,9 +274,9 @@ func test(_ a:A1, _ UPTO: Int) -> Int64 {
 // Test the cost of polymorphic method invocation
 // on a class with 2 subclasses
 @inline(never)
-func test(_ a:A2, _ UPTO: Int) -> Int64 {
+func test(_ a:A2, _ upTo: Int) -> Int64 {
     var cnt: Int64 = 0
-    for _ in 0..<UPTO {
+    for _ in 0..<upTo {
         cnt += Int64(a.run2())
     }
     return cnt
@@ -284,9 +286,9 @@ func test(_ a:A2, _ UPTO: Int) -> Int64 {
 // on a class with 2 subclasses on objects
 // of different subclasses
 @inline(never)
-func test(_ a2_c2:A2, _ a2_d2:A2,  _ UPTO: Int) -> Int64 {
+func test(_ a2_c2:A2, _ a2_d2:A2,  _ upTo: Int) -> Int64 {
     var cnt: Int64 = 0
-    for _ in 0..<UPTO/2 {
+    for _ in 0..<upTo/2 {
         cnt += Int64(a2_c2.run2())
         cnt += Int64(a2_d2.run2())
     }
@@ -297,9 +299,9 @@ func test(_ a2_c2:A2, _ a2_d2:A2,  _ UPTO: Int) -> Int64 {
 // on a class with 4 subclasses on objects
 // of different subclasses
 @inline(never)
-func test(_ a3_c3: A3, _ a3_d3: A3, _ a3_e3: A3, _ a3_f3: A3, _ UPTO: Int) -> Int64 {
+func test(_ a3_c3: A3, _ a3_d3: A3, _ a3_e3: A3, _ a3_f3: A3, _ upTo: Int) -> Int64 {
     var cnt: Int64  = 0
-    for _ in 0..<UPTO/4 {
+    for _ in 0..<upTo/4 {
         cnt += Int64(a3_c3.run2())
         cnt += Int64(a3_d3.run2())
         cnt += Int64(a3_e3.run2())
@@ -320,10 +322,10 @@ let a3_f3 = A3(b:F3(x:1))
 
 @inline(never)
 public func run_PolymorphicCalls(_ N:Int) {
-    let UPTO = 10_000 * N
-    _ = test(a, UPTO)
-    _ = test(a1, UPTO)
-    _ = test(a2, UPTO)
-    _ = test(a2_c2, a2_d2, UPTO)
-    _ = test(a3_c3, a3_d3, a3_e3, a3_f3, UPTO)
+    let upTo = 10_000 * N
+    _ = test(a, upTo)
+    _ = test(a1, upTo)
+    _ = test(a2, upTo)
+    _ = test(a2_c2, a2_d2, upTo)
+    _ = test(a3_c3, a3_d3, a3_e3, a3_f3, upTo)
 }

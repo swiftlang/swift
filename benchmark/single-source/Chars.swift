@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,12 +13,13 @@
 // This test tests the performance of ASCII Character comparison.
 import TestsUtils
 
-public let Chars = BenchmarkInfo(
-  name: "Chars2",
-  runFunction: run_Chars,
-  tags: [.validation, .api, .String],
-  setUpFunction: { blackHole(alphabetInput) },
-  legacyFactor: 50)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "Chars2",
+    runFunction: run_Chars,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(alphabetInput) },
+    legacyFactor: 50)
 
 let alphabetInput: [Character] = [
     "A", "B", "C", "D", "E", "F", "G",
@@ -30,11 +31,11 @@ let alphabetInput: [Character] = [
     ]
 
 @inline(never)
-public func run_Chars(_ N: Int) {
+public func run_Chars(_ n: Int) {
   // Permute some characters.
   let alphabet: [Character] = alphabetInput
 
-  for _ in 0..<N {
+  for _ in 0..<n {
     for firstChar in alphabet {
       for lastChar in alphabet {
         blackHole(firstChar < lastChar)
