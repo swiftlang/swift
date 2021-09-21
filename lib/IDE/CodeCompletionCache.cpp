@@ -102,7 +102,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 2;
+static constexpr uint32_t onDiskCompletionCacheVersion = 3; // Removed "source file path".
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -209,7 +209,6 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto numBytesToErase = static_cast<unsigned>(*cursor++);
     auto chunkIndex = read32le(cursor);
     auto moduleIndex = read32le(cursor);
-    auto sourceFilePathIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
     auto diagMessageIndex = read32le(cursor);
 
@@ -221,7 +220,6 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 
     CodeCompletionString *string = getCompletionString(chunkIndex);
     auto moduleName = getString(moduleIndex);
-    auto sourceFilePath = getString(sourceFilePathIndex);
     auto briefDocComment = getString(briefDocIndex);
     auto diagMessage = getString(diagMessageIndex);
 
@@ -229,7 +227,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     if (kind == CodeCompletionResult::Declaration) {
       result = new (*V.Sink.Allocator) CodeCompletionResult(
           context, CodeCompletionFlair(), numBytesToErase, string,
-          declKind, isSystem, moduleName, sourceFilePath, notRecommended,
+          declKind, isSystem, moduleName, notRecommended,
           diagSeverity, diagMessage, briefDocComment,
           copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
           CodeCompletionResult::Unknown, opKind);
@@ -369,7 +367,6 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
       LE.write(addString(R->getModuleName()));      // index into strings
-      LE.write(addString(R->getSourceFilePath()));  // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
       LE.write(addString(R->getDiagnosticMessage())); // index into strings
 
