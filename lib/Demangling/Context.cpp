@@ -16,6 +16,7 @@
 
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
 namespace swift {
@@ -76,7 +77,7 @@ std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
 static llvm::StringRef stripSuffix(llvm::StringRef Name) {
   // A suffix always ends with a digit. Do this quick check to avoid scanning through the whole
   // symbol name if the symbol has no suffix (= the common case).
-  if (isdigit(Name.back())) {
+  if (swift::Mangle::isDigit(Name.back())) {
     size_t dotPos = Name.find('.');
     if (dotPos != StringRef::npos) {
       Name = Name.substr(0, dotPos);
