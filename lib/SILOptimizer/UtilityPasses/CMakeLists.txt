@@ -25,6 +25,7 @@ target_sources(swiftSILOptimizer PRIVATE
   LoopInfoPrinter.cpp
   LoopRegionPrinter.cpp
   MemBehaviorDumper.cpp
+  ModulePrinter.cpp
   RCIdentityDumper.cpp
   SerializeSILPass.cpp
   SILDebugInfoGenerator.cpp
