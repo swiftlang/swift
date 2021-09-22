@@ -350,6 +350,9 @@ void IRGenModule::addVTableTypeMetadata(
   } else if (AS.isPrivate() || AS.isInternal()) {
     var->setVCallVisibilityMetadata(
       llvm::GlobalObject::VCallVisibility::VCallVisibilityLinkageUnit);
+  } else if (getOptions().InternalizeAtLink) {
+    var->setVCallVisibilityMetadata(
+      llvm::GlobalObject::VCallVisibility::VCallVisibilityLinkageUnit);
   } else {
     var->setVCallVisibilityMetadata(
       llvm::GlobalObject::VCallVisibility::VCallVisibilityPublic);
@@ -1756,8 +1759,9 @@ namespace {
 
       // Emit method dispatch thunk if the class is resilient.
       auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
-      if (Resilient &&
-          func->getEffectiveAccess() >= AccessLevel::Public) {
+
+      if ((Resilient && func->getEffectiveAccess() >= AccessLevel::Public) ||
+          IGM.getOptions().VirtualFunctionElimination) {
         IGM.emitDispatchThunk(fn);
       }
     }
@@ -1782,9 +1786,10 @@ namespace {
       // method for external clients.
       
       // Emit method dispatch thunk.
-      if (hasPublicVisibility(fn.getLinkage(NotForDefinition))) {
-        IGM.emitDispatchThunk(fn);
-      }
+     if (hasPublicVisibility(fn.getLinkage(NotForDefinition)) ||
+         IGM.getOptions().VirtualFunctionElimination) {
+       IGM.emitDispatchThunk(fn);
+     }
 
       if (IGM.getOptions().VirtualFunctionElimination) {
         auto offset = B.getNextOffsetFromGlobal() +

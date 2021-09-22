@@ -438,7 +438,8 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation) {
 void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
   for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
     swiftscan_string_dispose(set->strings[SI]);
-  delete[] set->strings;
+  if (set->count > 0)
+    delete[] set->strings;
   delete set;
 }
 
@@ -508,8 +509,10 @@ swiftscan_compiler_supported_arguments_query() {
 
 swiftscan_string_set_t *
 swiftscan_compiler_supported_features_query() {
-  // TODO: We are yet to figure out how "Features" will be organized.
-  return nullptr;
+  std::vector<std::string> allFeatures;
+  allFeatures.emplace_back("library-level");
+  allFeatures.emplace_back("emit-abi-descriptor");
+  return create_set(allFeatures);
 }
 
 int invoke_swift_compiler(int argc, const char **argv) {

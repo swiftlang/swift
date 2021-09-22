@@ -1528,6 +1528,8 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
 
   Opts.IsInstallAPI = Args.hasArg(OPT_tbd_is_installapi);
 
+  Opts.VirtualFunctionElimination = Args.hasArg(OPT_enable_llvm_vfe);
+
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     Opts.CompatibilityVersion = A->getValue();
   }
@@ -1906,6 +1908,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_llvm_vfe)) {
     Opts.VirtualFunctionElimination = true;
+  }
+
+  if (Args.hasArg(OPT_enable_llvm_wme)) {
+    Opts.WitnessMethodElimination = true;
+  }
+
+  if (Args.hasArg(OPT_internalize_at_link)) {
+    Opts.InternalizeAtLink = true;
   }
 
   // Default to disabling swift async extended frame info on anything but

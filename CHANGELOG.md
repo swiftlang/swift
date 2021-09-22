@@ -5,6 +5,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 
 Swift 5.6
 ---------
+
 * [SE-0315][]:
 
   Type expressions and annotations can now include "type placeholders" which
@@ -33,6 +34,8 @@ Swift 5.6
 
 Swift 5.5
 ---------
+
+### 2021-09-20 (Xcode 13.0)
 
 * [SE-0313][]:
 

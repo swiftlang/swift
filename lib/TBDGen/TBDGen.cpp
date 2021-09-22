@@ -934,7 +934,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     void addMethod(SILDeclRef method) {
       assert(method.getDecl()->getDeclContext() == CD);
 
-      if (CD->hasResilientMetadata()) {
+      if (TBD.Opts.VirtualFunctionElimination || CD->hasResilientMetadata()) {
         if (FirstTime) {
           FirstTime = false;
 

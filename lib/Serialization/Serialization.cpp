@@ -36,6 +36,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/APIDigester/ModuleAnalyzerNodes.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
@@ -803,6 +804,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, MODULE_NAME);
   BLOCK_RECORD(control_block, TARGET);
   BLOCK_RECORD(control_block, SDK_NAME);
+  BLOCK_RECORD(control_block, REVISION);
 
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
@@ -949,11 +951,12 @@ void Serializer::writeBlockInfoBlock() {
 
 void Serializer::writeHeader(const SerializationOptions &options) {
   {
-    BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
+    BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 4);
     control_block::ModuleNameLayout ModuleName(Out);
     control_block::MetadataLayout Metadata(Out);
     control_block::TargetLayout Target(Out);
     control_block::SDKNameLayout SDKName(Out);
+    control_block::RevisionLayout Revision(Out);
 
     ModuleName.emit(ScratchRecord, M->getName().str());
 
@@ -991,6 +994,18 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       SDKName.emit(ScratchRecord, options.SDKName);
 
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
+
+    // Write the producer's Swift revision only for resilient modules.
+    if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
+      auto revision = version::getSwiftRevision();
+
+      static const char* forcedDebugRevision =
+        ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
+      if (forcedDebugRevision)
+        revision = forcedDebugRevision;
+
+      Revision.emit(ScratchRecord, revision);
+    }
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
@@ -5610,6 +5625,17 @@ bool Serializer::allowCompilerErrors() const {
   return getASTContext().LangOpts.AllowModuleWithCompilerErrors;
 }
 
+
+static void emitABIDescriptor(ModuleOrSourceFile DC,
+                              const SerializationOptions &options) {
+  if (!options.ABIDescriptorPath.empty()) {
+    if (DC.is<ModuleDecl*>()) {
+      swift::ide::api::dumpModuleContent(DC.get<ModuleDecl*>(),
+                                         options.ABIDescriptorPath, true);
+    }
+  }
+}
+
 void swift::serializeToBuffers(
   ModuleOrSourceFile DC, const SerializationOptions &options,
   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
@@ -5633,6 +5659,7 @@ void swift::serializeToBuffers(
     });
     if (hadError)
       return;
+    emitABIDescriptor(DC, options);
     if (moduleBuffer)
       *moduleBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
                         std::move(buf), options.OutputPath);
@@ -5737,4 +5764,5 @@ void swift::serialize(ModuleOrSourceFile DC,
       symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
     }
   }
+  emitABIDescriptor(DC, options);
 }

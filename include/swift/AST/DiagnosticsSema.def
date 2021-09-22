@@ -766,6 +766,10 @@ ERROR(serialization_module_too_old,Fatal,
       "compiled module was created by an older version of the compiler; "
       "rebuild %0 and try again: %1",
       (Identifier, StringRef))
+ERROR(serialization_module_incompatible_revision,Fatal,
+      "compiled module was created by a different version of the compiler; "
+      "rebuild %0 and try again: %1",
+      (Identifier, StringRef))
 ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,Fatal,

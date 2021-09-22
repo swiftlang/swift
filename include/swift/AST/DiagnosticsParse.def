@@ -500,6 +500,12 @@ ERROR(expected_sil_tuple_index,none,
 ERROR(invalid_index_subset,none,
       "invalid index subset; expected '[SU]+' where 'S' represents set indices "
       "and 'U' represents unset indices", ())
+ERROR(sil_invalid_attribute_for_instruction,none,
+      "The attribute '%0' is invalid for the instruction '%1'.", 
+      (StringRef, StringRef))
+ERROR(sil_invalid_attribute_for_expected,none,
+      "Invalid attribute '%0' (expected '%1').", 
+      (StringRef, StringRef))
 
 // SIL Values
 ERROR(sil_value_redefinition,none,

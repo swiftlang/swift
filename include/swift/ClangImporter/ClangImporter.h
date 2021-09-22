@@ -410,7 +410,9 @@ public:
   ///
   /// \returns \c true if an error occurred, \c false otherwise
   bool addBridgingHeaderDependencies(
-      StringRef moduleName, ModuleDependenciesCache &cache);
+      StringRef moduleName,
+      ModuleDependenciesKind moduleKind,
+      ModuleDependenciesCache &cache);
 
   clang::TargetInfo &getTargetInfo() const override;
   clang::ASTContext &getClangASTContext() const override;

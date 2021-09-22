@@ -1103,7 +1103,8 @@ void Remangler::mangleNamedEntity(Node *node, char basicKind,
   Buffer << entityKind;
   
   auto privateDiscriminator = ctx.takeAnonymousContextDiscriminator();
-  if (!privateDiscriminator.empty() && isdigit(privateDiscriminator[0]))
+  if (!privateDiscriminator.empty() &&
+      swift::Mangle::isDigit(privateDiscriminator[0]))
     privateDiscriminator = "_" + privateDiscriminator;
   if (!artificialPrivateDiscriminator.empty())
     privateDiscriminator.append(artificialPrivateDiscriminator.data(),
