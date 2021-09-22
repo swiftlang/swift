@@ -43,8 +43,8 @@ static llvm::cl::opt<bool>
     SILViewCFG("sil-view-cfg", llvm::cl::init(false),
                llvm::cl::desc("Enable the sil cfg viewer pass"));
 
-static llvm::cl::opt<bool> SILViewGuaranteedCFG(
-    "sil-view-guaranteed-cfg", llvm::cl::init(false),
+static llvm::cl::opt<bool> SILViewCanonicalCFG(
+    "sil-view-canonical-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass after diagnostics"));
 
 static llvm::cl::opt<bool> SILViewSILGenCFG(
@@ -187,8 +187,8 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
   // Otherwise run the rest of diagnostics.
   addMandatoryDiagnosticOptPipeline(P);
 
-  if (SILViewGuaranteedCFG) {
-    addCFGPrinterPipeline(P, "SIL View Guaranteed CFG");
+  if (SILViewCanonicalCFG) {
+    addCFGPrinterPipeline(P, "SIL View Canonical CFG");
   }
   return P;
 }
