@@ -275,7 +275,7 @@ public:
   ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                        ManagedValue base) && override;
 
-  struct AccessedStorage {
+  struct AccessStorage {
     AbstractStorageDecl *Storage;
     bool IsSuper;
     const PreparedArguments *Indices;
@@ -283,7 +283,7 @@ public:
   };
 
   /// Get the storage accessed by this component.
-  virtual Optional<AccessedStorage> getAccessedStorage() const = 0;
+  virtual Optional<AccessStorage> getAccessStorage() const = 0;
 
   /// Perform a writeback on the property.
   ///
@@ -313,7 +313,7 @@ protected:
   }
 
 public:
-  Optional<AccessedStorage> getAccessedStorage() const override {
+  Optional<AccessStorage> getAccessStorage() const override {
     return None;
   }
 

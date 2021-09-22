@@ -67,19 +67,19 @@ using namespace swift;
 namespace swift {
 /// Information about each dynamic access with valid storage.
 ///
-/// This is a pass-specific subclass of AccessedStorage with identical layout.
+/// This is a pass-specific subclass of AccessStorage with identical layout.
 /// An instance is created for each BeginAccess in the current function. In
 /// additional to identifying the access' storage location, it associates that
 /// access with pass-specific data in reserved bits. The reserved bits do not
 /// participate in equality or hash lookup.
-class DomAccessedStorage : public AccessedStorage {
+class DomAccessStorage : public AccessStorage {
 public:
-  DomAccessedStorage() {}
+  DomAccessStorage() {}
 
-  explicit DomAccessedStorage(const AccessedStorage &storage)
-      : AccessedStorage(storage) {
-    Bits.DomAccessedStorage.isInner = false;
-    Bits.DomAccessedStorage.containsRead = false;
+  explicit DomAccessStorage(const AccessStorage &storage)
+      : AccessStorage(storage) {
+    Bits.DomAccessStorage.isInner = false;
+    Bits.DomAccessStorage.containsRead = false;
   }
 
   // Is this dynamic, identifiable access scope potentially contained within any
@@ -91,18 +91,18 @@ public:
   // A3: [dynamic] [modify]
   //
   // A2 cannot be promoted to modify if its scope overlaps with A1.
-  bool isInner() const { return Bits.DomAccessedStorage.isInner; }
+  bool isInner() const { return Bits.DomAccessStorage.isInner; }
 
-  void setIsInner() { Bits.DomAccessedStorage.isInner = true; }
+  void setIsInner() { Bits.DomAccessStorage.isInner = true; }
 
   /// Is this dynamic, identifiable access scope a [read], and does it
   /// potentially contain another non-distinct [read] access of any kind?
-  bool containsRead() const { return Bits.DomAccessedStorage.containsRead; }
+  bool containsRead() const { return Bits.DomAccessStorage.containsRead; }
 
-  void setContainsRead() { Bits.DomAccessedStorage.containsRead = true; }
+  void setContainsRead() { Bits.DomAccessStorage.containsRead = true; }
 
   void dump() const {
-    AccessedStorage::dump();
+    AccessStorage::dump();
     llvm::dbgs() << "<" << (isInner() ? "" : "inner")
                  << (containsRead() ? "" : "containsRead") << ">\n";
   }
@@ -111,7 +111,7 @@ public:
 
 namespace {
 // An analysis that maps each valid dynamic BeginAccess to
-// DomAccessedStorage. Performs a trivial data flow analysis to populate the map
+// DomAccessStorage. Performs a trivial data flow analysis to populate the map
 // with information about nested accesses. Data flow is needed to track open
 // access scopes, but only flow-insensitive information is recorded in the
 // result.
@@ -123,14 +123,14 @@ namespace {
 // AccessEnforcementOpts. The optimization that merges accesses would also
 // benefit.
 //
-// TODO: This could be made more precise by querying AccessedStorageAnalysis.
+// TODO: This could be made more precise by querying AccessStorageAnalysis.
 class DominatedAccessAnalysis {
 public:
   // The result records information for all dynamic accesses in this
   // function. If an UnpairedAccess exists, then the result will be
   // consevatively empty.
   struct Result {
-    llvm::SmallDenseMap<BeginAccessInst *, DomAccessedStorage, 32> accessMap;
+    llvm::SmallDenseMap<BeginAccessInst *, DomAccessStorage, 32> accessMap;
   };
 
 private:
@@ -244,17 +244,17 @@ DominatedAccessAnalysis::Result DominatedAccessAnalysis::analyze() && {
 }
 
 // The data flow transfer function for BeginAccess. Creates the
-// DomAccessedStorage for this access and inserts it in the result.
+// DomAccessStorage for this access and inserts it in the result.
 void DominatedAccessAnalysis::analyzeAccess(BeginAccessInst *BAI,
                                             BBState &state) {
-  DomAccessedStorage domStorage;
+  DomAccessStorage domStorage;
   // Only track dynamic access in the result. Static accesses still need to be
   // tracked by data flow, but they can't be optimized as "dominating".
   if (BAI->getEnforcement() == SILAccessEnforcement::Dynamic) {
-    auto storage = AccessedStorage::compute(BAI->getSource());
-    // Copy the AccessStorage into DomAccessedStorage. All pass-specific bits
+    auto storage = AccessStorage::compute(BAI->getSource());
+    // Copy the AccessStorage into DomAccessStorage. All pass-specific bits
     // are initialized to zero.
-    domStorage = DomAccessedStorage(storage);
+    domStorage = DomAccessStorage(storage);
   }
   // Continue to handle both untracked access and invalid domStorage
   // conservatively below...
@@ -319,7 +319,7 @@ class DominatedAccessRemoval {
     DominatingAccess(BeginAccessInst *beginAccess, DomTreeNode *domNode)
         : beginAccess(beginAccess), domNode(domNode) {}
   };
-  using StorageToDomMap = llvm::DenseMap<AccessedStorage, DominatingAccess>;
+  using StorageToDomMap = llvm::DenseMap<AccessStorage, DominatingAccess>;
 
   SILFunction &func;
   DominanceInfo *domInfo;
@@ -344,12 +344,12 @@ public:
 protected:
   void visitBeginAccess(BeginAccessInst *BAI);
   bool checkDominatedAccess(BeginAccessInst *BAI,
-                            DomAccessedStorage currDomStorage);
+                            DomAccessStorage currDomStorage);
   bool optimizeDominatedAccess(BeginAccessInst *currBegin,
-                               DomAccessedStorage currDomStorage,
+                               DomAccessStorage currDomStorage,
                                const DominatingAccess &domAccess);
   void tryInsertLoopPreheaderAccess(BeginAccessInst *BAI,
-                                    DomAccessedStorage currDomStorage);
+                                    DomAccessStorage currDomStorage);
 };
 } // namespace
 
@@ -376,7 +376,7 @@ void DominatedAccessRemoval::visitBeginAccess(BeginAccessInst *BAI) {
   if (BAI->getEnforcement() != SILAccessEnforcement::Dynamic)
     return;
 
-  DomAccessedStorage currDomStorage = DAA.accessMap.lookup(BAI);
+  DomAccessStorage currDomStorage = DAA.accessMap.lookup(BAI);
   if (!currDomStorage)
     return;
 
@@ -391,13 +391,13 @@ void DominatedAccessRemoval::visitBeginAccess(BeginAccessInst *BAI) {
 // Track this identifiable dynamic access in storageToDomMap, and optimize it if
 // possible. Return true if the optimization suceeds.
 bool DominatedAccessRemoval::checkDominatedAccess(
-    BeginAccessInst *BAI, DomAccessedStorage currDomStorage) {
+    BeginAccessInst *BAI, DomAccessStorage currDomStorage) {
   // Attempt to add this access to storageToDomMap using its base storage
   // location as the key.
   //
-  // Cast this DomAccessedStorage back to a plain storage location. The
+  // Cast this DomAccessStorage back to a plain storage location. The
   // pass-specific bits will be ignored, but reset them anyway for sanity.
-  AccessedStorage storage = static_cast<AccessedStorage>(currDomStorage);
+  AccessStorage storage = static_cast<AccessStorage>(currDomStorage);
   storage.resetSubclassData();
   auto iterAndInserted =
       storageToDomMap.try_emplace(storage, DominatingAccess(BAI, currDomNode));
@@ -471,7 +471,7 @@ bool DominatedAccessRemoval::checkDominatedAccess(
 // cause any pervasive usability problem where programs have stronger
 // enforcement only when optimized.
 bool DominatedAccessRemoval::optimizeDominatedAccess(
-    BeginAccessInst *BAI, DomAccessedStorage currAccessInfo,
+    BeginAccessInst *BAI, DomAccessStorage currAccessInfo,
     const DominatingAccess &domAccess) {
   // 1. and 2. If any nondistinct scopes are open, it must remain dynamic.
   if (currAccessInfo.isInner())
@@ -484,7 +484,7 @@ bool DominatedAccessRemoval::optimizeDominatedAccess(
   // 4. Promoting a read to a modify is only safe with no nested reads.
   if (domAccess.beginAccess->getAccessKind() == SILAccessKind::Read
       && BAI->getAccessKind() == SILAccessKind::Modify) {
-    DomAccessedStorage domStorage = DAA.accessMap[domAccess.beginAccess];
+    DomAccessStorage domStorage = DAA.accessMap[domAccess.beginAccess];
     if (domStorage.containsRead() || domStorage.isInner())
       return false;
 
@@ -529,7 +529,7 @@ bool DominatedAccessRemoval::optimizeDominatedAccess(
 //
 // 4. The access' source operand is available in the loop preheader.
 void DominatedAccessRemoval::tryInsertLoopPreheaderAccess(
-    BeginAccessInst *BAI, DomAccessedStorage currAccessInfo) {
+    BeginAccessInst *BAI, DomAccessStorage currAccessInfo) {
   // 2. the current access may be enclosed.
   if (currAccessInfo.isInner())
     return;
@@ -572,11 +572,11 @@ void DominatedAccessRemoval::tryInsertLoopPreheaderAccess(
   if (!currAccessInfo.isFormalAccessBase())
     return;
 
-  AccessedStorage storage = static_cast<AccessedStorage>(currAccessInfo);
+  AccessStorage storage = static_cast<AccessStorage>(currAccessInfo);
   storage.resetSubclassData();
 
-  // Create a DomAccessedStorage for the new access with no flags set.
-  DAA.accessMap.try_emplace(newBegin, DomAccessedStorage(storage));
+  // Create a DomAccessStorage for the new access with no flags set.
+  DAA.accessMap.try_emplace(newBegin, DomAccessStorage(storage));
 
   // Track the new access as long as no other accesses from the same storage are
   // already tracked. This also necessarily replaces the current access, which

@@ -1,9 +1,9 @@
 # SIL utilities for modeling memory access
 
-The `AccessBase`, `AccessedStorage` and `AccessPath` types formalize
+The `AccessBase`, `AccessStorage` and `AccessPath` types formalize
 memory access in SIL. Given an address-typed SIL value, it is possible
 to reliably identify the storage location of the accessed
-memory. `AccessedStorage` identifies an accessed storage
+memory. `AccessStorage` identifies an accessed storage
 location. `AccessPath` contains both a storage location and the
 "access path" within that memory object. The relevant API details are
 documented in MemAccessUtils.h
@@ -30,17 +30,17 @@ address is immutable for the duration of its access scope
 
 ## Access path def-use relationship
 
-Computing `AccessedStorage` and `AccessPath` for any given SIL address
+Computing `AccessStorage` and `AccessPath` for any given SIL address
 involves a use-def traversal to determine the origin of the
 address. It may traverse operations on values of type address,
 Builtin.RawPointer, box, and reference. The logic that
 formalizes which SIL operations may be involved in the def-use chain
 is encapsulated with the `AccessUseDefChainVisitor`. The traversal can
 be customized by implementing this visitor. Customization is not
-expected to change the meaning of AccessedStorage or
+expected to change the meaning of AccessStorage or
 AccessPath. Rather, it is intended for additional pass-specific
 book-keeping or for higher-level convenience APIs that operate on the
-use-def chain bypassing AccessedStorage completely.
+use-def chain bypassing AccessStorage completely.
 
 Access def-use chains are divided by four points: the object "root", the
 access "base", the outer-most "access" scope, and the "address" of a
@@ -114,13 +114,13 @@ bb3(%a : $A):
 
 Each object property and its tail storage is considered a separate
 formal access base. The reference root is only one component of an
-`AccessedStorage` location. AccessedStorage also identifies the class
+`AccessStorage` location. AccessStorage also identifies the class
 property being accessed within that object.
 
 A reference root may be borrowed, so the use-def path from the base to
 the root may cross a borrow scope. This means that uses of one base
 may not be replaced with a different base even if it has the same
-AccessedStorage because they may not be contained within the same
+AccessStorage because they may not be contained within the same
 borrow scope. However, this is the only part of the access path that
 may be borrowed. Address uses with the same base can be substituted
 without checking the borrow scope.
@@ -132,7 +132,7 @@ produced by an instruction that directly identifies the kind of
 storage being accessed without further use-def traversal. Common
 access bases are `alloc_stack`, `global_addr`,
 `ref_element_addr`, `project_box`, and function arguments (see
-`AccessedStorage::Kind`).
+`AccessStorage::Kind`).
 
 The access base is the same as the "root" SILValue for all storage
 kinds except global and reference storage. Reference storage includes
@@ -155,7 +155,7 @@ and the memory operation cannot cross an access scope.
 Typically, the base is the address-type source operand of a
 `begin_access`. However, the path from the access base to the
 `begin_access` may include *storage casts* (see
-`isAccessedStorageCast`). It may involve address an pointer
+`isAccessStorageCast`). It may involve address an pointer
 types, and may traverse phis. For some kinds of storage, the base may
 itself even be a non-address pointer. For phis that cannot be uniquely
 resolved, the base may even be a box type.
@@ -186,14 +186,14 @@ allows for a class of storage optimizations, such as bitfields, in
 which address storage is always uniquely determined. Currently, if a
 (non-address) phi on the access path from `base` to `access` does not
 have a common base, then it is considered an invalid access (the
-AccessedStorage object is not valid). SIL verification ensures that a
-formal access always has valid AccessedStorage (WIP). In other words,
+AccessStorage object is not valid). SIL verification ensures that a
+formal access always has valid AccessStorage (WIP). In other words,
 the source of a `begin_access` marker must be a single, non-phi
 base. In the future, for further simplicity, we may also disallow
 pointer phis unless they have a common base.
 
 Not all SIL memory access is part of a formal access, but the
-`AccessedStorage` and `AccessPath` abstractions are universally
+`AccessStorage` and `AccessPath` abstractions are universally
 applicable. Non-formal access still has an access base, even though
 the use-def search does not begin at a `begin_access` marker. For
 non-formal access, SIL verification is not as strict. An invalid
@@ -264,7 +264,7 @@ end_access %outerAccess : $*Int
 
 For most purposes, the inner access scopes are irrelevant. When we ask
 for the "accessed storage" for `%innerAccess`, we get an
-`AccessedStorage` value of "Stack" kind with base `%var =
+`AccessStorage` value of "Stack" kind with base `%var =
 alloc_stack`. If instead of finding the original accessed storage, we
 want to identify the enclosing formal access scope, we need to use a
 different API that supports the special `Nested` storage kind. This is
@@ -371,9 +371,9 @@ bb3(%p3 : $Builtin.RawPointer):
   load %field : $*Int64
 ```
 
-## AccessedStorage
+## AccessStorage
 
-`AccessedStorage` identifies an accessed storage location, be it a
+`AccessStorage` identifies an accessed storage location, be it a
 box, stack location, class property, global variable, or argument. It
 is implemented as a value object that requires no compile-time memory
 allocation and can be used as the hash key for that location. Extra
@@ -383,9 +383,9 @@ accessed and information about the location's uniqueness or whether it
 is distinct from other storage.
 
 Two __uniquely identified__ storage locations may only alias if their
-AccessedStorage objects are identical.
+AccessStorage objects are identical.
 
-`AccessedStorage` records the "root" SILValue of the access. The root is
+`AccessStorage` records the "root" SILValue of the access. The root is
 the same as the access base for all storage kinds except global and
 class storage. For class properties, the storage root is the reference
 root of the object, not the base of the property. Multiple
@@ -396,11 +396,11 @@ instructions may reference the same variable. To find all global uses,
 the client must independently find all global variable references
 within the function. Clients that need to know which SILValue base was
 discovered during use-def traversal in all cases can make use of
-`AccessedStorageWithBase` or `AccessPathWithBase`. 
+`AccessStorageWithBase` or `AccessPathWithBase`. 
 
 ### AccessPath
 
-`AccessPath` extends `AccessedStorage` to include the path components
+`AccessPath` extends `AccessStorage` to include the path components
 that determine the address of a subobject within the access base. The
 access path is a string of index offsets and subobject projection
 indices.
