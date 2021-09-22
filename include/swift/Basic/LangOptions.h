@@ -230,14 +230,6 @@ namespace swift {
     /// Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
 
-    /// Whether to include initializers when code-completing a postfix
-    /// expression.
-    bool CodeCompleteInitsInPostfixExpr = false;
-
-    /// Whether to use heuristics to decide whether to show call-pattern
-    /// completions.
-    bool CodeCompleteCallPatternHeuristics = false;
-
     ///
     /// Flags for use by tests
     ///
