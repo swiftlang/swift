@@ -16,8 +16,8 @@ struct MyStruct : TheProtocol {
 
 // CHECK:         @"$s4main8MyStructVAA11TheProtocolAAWP" =
 // CHECK-SAME:    i8* bitcast (%swift.protocol_conformance_descriptor* @"$s4main8MyStructVAA11TheProtocolAAMc" to i8*)
-// CHECK-SAME:    i8* bitcast (void (%T4main8MyStructV*, %swift.type*, i8**)* @"$s4main8MyStructVAA11TheProtocolA2aDP10func1_liveyyFTW" to i8*)
-// CHECK-SAME:    i8* bitcast (void (%T4main8MyStructV*, %swift.type*, i8**)* @"$s4main8MyStructVAA11TheProtocolA2aDP10func2_deadyyFTW" to i8*)
+// CHECK-SAME:    i8* bitcast ({{.*}} @"$s4main8MyStructVAA11TheProtocolA2aDP10func1_liveyyFTW{{(.ptrauth)?}}" to i8*)
+// CHECK-SAME:    i8* bitcast ({{.*}} @"$s4main8MyStructVAA11TheProtocolA2aDP10func2_deadyyFTW{{(.ptrauth)?}}" to i8*)
 // CHECK-64-SAME: align 8, !type !0, !type !1, !vcall_visibility !2
 // CHECK-32-SAME: align 4, !type !0, !type !1, !vcall_visibility !2
 
