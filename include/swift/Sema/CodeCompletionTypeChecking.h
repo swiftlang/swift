@@ -69,7 +69,7 @@ namespace swift {
                                        CodeCompletionExpr *CompletionExpr)
       : DC(DC), CompletionExpr(CompletionExpr) {}
 
-    /// Get the results collected from any sawSolutions() callbacks recevied so
+    /// Get the results collected from any sawSolutions() callbacks received so
     /// far.
     ArrayRef<Result> getResults() const { return Results; }
 

@@ -314,7 +314,7 @@ public:
   /// lifetimes of the operands of \c inst once it is deleted. This function
   /// will not clean up dead code resulting from the instruction's removal. To
   /// do so, invoke the method \c cleanupDeadCode of this instance, once the SIL
-  /// of the contaning function is made consistent.
+  /// of the containing function is made consistent.
   ///
   /// \pre the instruction to be deleted must not have any use other than
   /// incidental uses.
@@ -335,7 +335,7 @@ public:
   /// Clean up dead instructions that are tracked by this instance and all
   /// instructions that transitively become dead.
   ///
-  /// \pre the function contaning dead instructions must be consistent (i.e., no
+  /// \pre the function containing dead instructions must be consistent (i.e., no
   /// under or over releases). Note that if \c forceDelete call leaves the
   /// function body in an inconsistent state, it needs to be made consistent
   /// before this method is invoked.

@@ -8,7 +8,7 @@
 
 
 """
-Temporary module with functionaly used to migrate away from build-script-impl.
+Temporary module with functionally used to migrate away from build-script-impl.
 """
 
 

@@ -5767,7 +5767,7 @@ class SetDeallocatingInst
 
 /// ObjectInst - Represents a object value type.
 ///
-/// This instruction can only appear at the end of a gobal variable's
+/// This instruction can only appear at the end of a global variable's
 /// static initializer list.
 class ObjectInst final : public InstructionBaseWithTrailingOperands<
                              SILInstructionKind::ObjectInst, ObjectInst,
@@ -9176,7 +9176,7 @@ public:
   }
 };
 
-/// LinearFunctionInst - given a function, its derivative and traspose functions,
+/// LinearFunctionInst - given a function, its derivative and transpose functions,
 /// create an `@differentiable(_linear)` function that represents a bundle of these.
 class LinearFunctionInst final
     : public InstructionBaseWithTrailingOperands<

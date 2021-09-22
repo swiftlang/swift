@@ -79,7 +79,7 @@ AVAILABILITY_NODES = [
     Node('VersionTuple', kind='Syntax',
          description='''
          A version number of the form major.minor.patch in which the minor
-         and patch part may be ommited.
+         and patch part may be omitted.
          ''',
          children=[
              Child('MajorMinor', kind='Syntax',

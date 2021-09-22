@@ -274,7 +274,7 @@ enum class FixKind : uint8_t {
   /// Allow key path to be bound to a function type with more than 1 argument
   AllowMultiArgFuncKeyPathMismatch,
 
-  /// Specify key path root type when it cannot be infered from context.
+  /// Specify key path root type when it cannot be inferred from context.
   SpecifyKeyPathRootType,
 
   /// Unwrap optional base on key path application.

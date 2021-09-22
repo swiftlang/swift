@@ -257,7 +257,7 @@ enum class AccessUseType { Exact, Inner, Overlapping };
 ///     begin_access.
 ///
 /// Note that the SILValue that represents a storage object is not
-/// necessarilly an address type. It may instead be a SILBoxType. So, even
+/// necessarily an address type. It may instead be a SILBoxType. So, even
 /// though address phis are not allowed, finding the base of an access may
 /// require traversing phis.
 ///
@@ -368,7 +368,7 @@ protected:
     // Define bits for use in the AccessEnforcementOpts pass. Each begin_access
     // in the function is mapped to one instance of this subclass.  Reserve a
     // bit for a seenNestedConflict flag, which is the per-begin-access result
-    // of pass-specific analysis. The remaning bits are sufficient to index all
+    // of pass-specific analysis. The remaining bits are sufficient to index all
     // begin_[unpaired_]access instructions.
     //
     // `AccessedStorage` refers to the AccessedStorageBitfield defined above,
@@ -809,7 +809,7 @@ namespace swift {
 /// The index of ref_element_addr is part of the storage identity and does
 /// not contribute to the access path indices.
 ///
-/// A well-formed path has at most one offset component at the begining of the
+/// A well-formed path has at most one offset component at the beginning of the
 /// path (chained index_addrs are merged into one offset). In other words,
 /// taking an offset from a subobject projection is not well-formed access
 /// path. However, it is possible (however undesirable) for programmers to
@@ -1027,7 +1027,7 @@ public:
 
 // Encapsulate the result of computing an AccessPath. AccessPath does not store
 // the base address of the formal access because it does not always uniquely
-// indentify the access, but AccessPath users may use the base address to to
+// identify the access, but AccessPath users may use the base address to to
 // recover the def-use chain for a specific global_addr or ref_element_addr.
 struct AccessPathWithBase {
   AccessPath accessPath;

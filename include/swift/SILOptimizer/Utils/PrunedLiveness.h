@@ -24,7 +24,7 @@
 /// Dead, LiveWithin, LiveOut.
 ///
 /// A LiveWithin block has a liveness boundary within the block. The client can
-/// determine the boundary's intruction position by searching for the last use.
+/// determine the boundary's instruction position by searching for the last use.
 ///
 /// LiveOut indicates that liveness extends into a successor edges, therefore,
 /// no uses within that block can be on the liveness boundary, unless that use
@@ -172,7 +172,7 @@ protected:
 /// interesting uses that are "lifetime-ending" are flagged. These uses must be
 /// on the liveness boundary by their nature, regardless of any other uses. It
 /// is up to the client to determine which uses are lifetime-ending. In OSSA,
-/// the lifetime-ending property might be detemined by
+/// the lifetime-ending property might be determined by
 /// OwnershipConstraint::isLifetimeEnding(). In non-OSSA, it might be determined
 /// by deallocation.
 ///
