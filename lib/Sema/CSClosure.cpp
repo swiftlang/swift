@@ -769,30 +769,57 @@ private:
   }
 
   void visitReturnStmt(ReturnStmt *returnStmt) {
-    Type resultType;
+    auto contextualTy = cs.getClosureType(closure)->getResult();
 
-    if (returnStmt->hasResult()) {
+    // Single-expression closures are effectively a `return` statement,
+    // so let's give them a special locator as to indicate that.
+    if (closure->hasSingleExpressionBody()) {
       auto *expr = returnStmt->getResult();
-      assert(expr && "non-empty result without expression?");
+      assert(expr && "single expression closure without expression?");
 
-      // FIXME: Use SolutionApplicationTarget?
       expr = cs.generateConstraints(expr, closure, /*isInputExpression=*/false);
       if (!expr) {
         hadError = true;
         return;
       }
 
-      resultType = cs.getType(expr);
-    } else {
-      resultType = cs.getASTContext().getVoidDecl()->getDeclaredInterfaceType();
+      cs.addConstraint(
+          ConstraintKind::Conversion, cs.getType(expr), contextualTy,
+          cs.getConstraintLocator(
+              closure, LocatorPathElt::ClosureBody(
+                           /*hasReturn=*/!returnStmt->isImplicit())));
+      return;
     }
 
-    // FIXME: Locator should point at the return statement?
-    bool hasReturn = hasExplicitResult(closure);
-    cs.addConstraint(ConstraintKind::Conversion, resultType,
-                     cs.getClosureType(closure)->getResult(),
-                     cs.getConstraintLocator(
-                         closure, LocatorPathElt::ClosureBody(hasReturn)));
+    Expr *resultExpr;
+
+    if (returnStmt->hasResult()) {
+      resultExpr = returnStmt->getResult();
+      assert(resultExpr && "non-empty result without expression?");
+    } else {
+      auto &ctx = closure->getASTContext();
+      // If this is simplify `return`, let's create an empty tuple
+      // which is also useful if contextual turns out to be e.g. `Void?`.
+      resultExpr = TupleExpr::createEmpty(ctx,
+                                          /*LParenLoc=*/SourceLoc(),
+                                          /*RParenLoc=*/SourceLoc(),
+                                          /*Implicit=*/true);
+      resultExpr->setType(ctx.TheEmptyTupleType);
+    }
+
+    SolutionApplicationTarget target(resultExpr, closure, CTP_ReturnStmt,
+                                     contextualTy,
+                                     /*isDiscarded=*/false);
+
+    // FIXME: Use SolutionApplicationTarget?
+    if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+      hadError = true;
+      return;
+    }
+
+    cs.setContextualType(target.getAsExpr(), TypeLoc::withoutLoc(contextualTy),
+                         CTP_ReturnStmt);
+    cs.setSolutionApplicationTarget(returnStmt, target);
   }
 
   bool isSupportedMultiStatementClosure() const {
@@ -1205,33 +1232,23 @@ private:
 
   ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
     if (!returnStmt->hasResult()) {
+      // If contextual is not optional, there is nothing to do here.
+      if (resultType->isVoid())
+        return returnStmt;
+
       // It's possible to infer e.g. `Void?` for cases where
       // `return` doesn't have an expression. If contextual
       // type is `Void` wrapped into N optional types, let's
       // add an implicit `()` expression and let it be injected
       // into optional required number of times.
-      auto &ctx = closure->getASTContext();
-
-      // If contextual is not optional, there is nothing to do here.
-      if (resultType->isVoid())
-        return returnStmt;
 
       assert(resultType->getOptionalObjectType() &&
              resultType->lookThroughAllOptionalTypes()->isVoid());
 
       auto &cs = solution.getConstraintSystem();
 
-      // Build an implicit empty tuple to represent `Void` return
-      auto *emptyTuple = TupleExpr::createEmpty(ctx,
-                                                /*LParenLoc=*/SourceLoc(),
-                                                /*RParenLoc=*/SourceLoc(),
-                                                /*Implicit=*/true);
-      emptyTuple->setType(ctx.TheEmptyTupleType);
-      // Cache the type of this new expression in the constraint system
-      // for the future reference.
-      cs.cacheExprTypes(emptyTuple);
-
-      returnStmt->setResult(emptyTuple);
+      auto target = *cs.getSolutionApplicationTarget(returnStmt);
+      returnStmt->setResult(target.getAsExpr());
     }
 
     auto *resultExpr = returnStmt->getResult();
