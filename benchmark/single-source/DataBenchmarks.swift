@@ -262,7 +262,7 @@ public let benchmarks = [
     runFunction: { append($0*50, data: large, to: medium) }, tags: d,
     legacyFactor: 200),
   BenchmarkInfo(name: "DataAppendDataLargeToLarge",
-    runFunction: { append($0*50, data: large, to: large) }, tags: d,
+    runFunction: { append($0*50, data: large, to: large) }, tags: d + [.unstable],
     legacyFactor: 200),
 
   BenchmarkInfo(name: "DataToStringEmpty",
