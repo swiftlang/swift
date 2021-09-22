@@ -613,6 +613,10 @@ bool swift::ide::CompletionInstance::performOperation(
     std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
 
+  // Always disable source location resolutions from .swiftsourceinfo file
+  // because they're somewhat heavy operations and aren't needed for completion.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;

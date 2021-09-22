@@ -686,7 +686,6 @@ public:
 private:
   CodeCompletionString *CompletionString;
   StringRef ModuleName;
-  StringRef SourceFilePath;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
   unsigned TypeDistance : 3;
@@ -797,7 +796,7 @@ public:
                        CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        CodeCompletionDeclKind DeclKind, bool IsSystem,
-                       StringRef ModuleName, StringRef SourceFilePath,
+                       StringRef ModuleName,
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
                        CodeCompletionDiagnosticSeverity diagSeverity,
                        StringRef DiagnosticMessage, StringRef BriefDocComment,
@@ -806,10 +805,10 @@ public:
                        CodeCompletionOperatorKind KnownOperatorKind)
       : Kind(ResultKind::Declaration),
         KnownOperatorKind(unsigned(KnownOperatorKind)),
-        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
-        NotRecommended(unsigned(NotRecReason)), IsSystem(IsSystem),
-        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        ModuleName(ModuleName), SourceFilePath(SourceFilePath),
+        SemanticContext(unsigned(SemanticContext)),
+        Flair(unsigned(Flair.toRaw())), NotRecommended(unsigned(NotRecReason)),
+        IsSystem(IsSystem), NumBytesToErase(NumBytesToErase),
+        CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
         TypeDistance(TypeDistance), DiagnosticSeverity(unsigned(diagSeverity)),
         DiagnosticMessage(DiagnosticMessage) {
@@ -907,10 +906,6 @@ public:
     return AssociatedUSRs;
   }
 
-  void setSourceFilePath(StringRef value) {
-    SourceFilePath = value;
-  }
-
   void setDiagnostics(CodeCompletionDiagnosticSeverity severity, StringRef message) {
     DiagnosticSeverity = static_cast<unsigned>(severity);
     DiagnosticMessage = message;
@@ -922,12 +917,6 @@ public:
 
   StringRef getDiagnosticMessage() const {
     return DiagnosticMessage;
-  }
-
-  /// Returns the source file path where the associated decl was declared.
-  /// Returns an empty string if the information is not available.
-  StringRef getSourceFilePath() const {
-    return SourceFilePath;
   }
 
   /// Print a debug representation of the code completion result to \p OS.
@@ -942,15 +931,6 @@ public:
   static bool getDeclIsSystem(const Decl *D);
 };
 
-/// A pair of a file path and its up-to-date-ness.
-struct SourceFileAndUpToDate {
-  StringRef FilePath;
-  bool IsUpToDate;
-
-  SourceFileAndUpToDate(StringRef FilePath, bool IsUpToDate)
-      : FilePath(FilePath), IsUpToDate(IsUpToDate) {}
-};
-
 struct CodeCompletionResultSink {
   using AllocatorPtr = std::shared_ptr<llvm::BumpPtrAllocator>;
 
@@ -963,13 +943,11 @@ struct CodeCompletionResultSink {
 
   /// Whether to annotate the results with XML.
   bool annotateResult = false;
-  bool requiresSourceFileInfo = false;
 
   /// Whether to emit object literals if desired.
   bool includeObjectLiterals = true;
 
   std::vector<CodeCompletionResult *> Results;
-  std::vector<SourceFileAndUpToDate> SourceFiles;
 
   /// A single-element cache for module names stored in Allocator, keyed by a
   /// clang::Module * or swift::ModuleDecl *.
@@ -1040,9 +1018,6 @@ public:
   void setAnnotateResult(bool flag) { CurrentResults.annotateResult = flag; }
   bool getAnnotateResult() const { return CurrentResults.annotateResult; }
 
-  void setRequiresSourceFileInfo(bool flag) { CurrentResults.requiresSourceFileInfo = flag; }
-  bool requiresSourceFileInfo() const { return CurrentResults.requiresSourceFileInfo; }
-
   void setIncludeObjectLiterals(bool flag) {
     CurrentResults.includeObjectLiterals = flag;
   }
@@ -1098,7 +1073,6 @@ class PrintingCodeCompletionConsumer
   bool IncludeComments;
   bool IncludeSourceText;
   bool PrintAnnotatedDescription;
-  bool RequiresSourceFileInfo = false;
 
 public:
  PrintingCodeCompletionConsumer(llvm::raw_ostream &OS,
