@@ -23,6 +23,28 @@
 using namespace swift;
 using namespace rewriting;
 
+Optional<Symbol> Rule::isPropertyRule() const {
+  auto property = LHS.back();
+
+  if (!property.isProperty())
+    return None;
+
+  if (LHS.size() - 1 != RHS.size())
+    return None;
+
+  if (!std::equal(RHS.begin(), RHS.end(), LHS.begin()))
+    return None;
+
+  return property;
+}
+
+bool Rule::isProtocolConformanceRule() const {
+  if (auto property = isPropertyRule())
+    return property->getKind() == Symbol::Kind::Protocol;
+
+  return false;
+}
+
 void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
   if (deleted)

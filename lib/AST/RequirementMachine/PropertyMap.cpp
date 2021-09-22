@@ -1043,23 +1043,16 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
     if (rule.isDeleted())
       continue;
 
-    auto lhs = rule.getLHS();
-    auto rhs = rule.getRHS();
-
     // Collect all rules of the form T.[p] => T where T is canonical.
-    auto property = lhs.back();
-    if (!property.isProperty())
+    auto property = rule.isPropertyRule();
+    if (!property)
       continue;
 
-    if (lhs.size() - 1 != rhs.size())
-      continue;
-
-    if (!std::equal(rhs.begin(), rhs.end(), lhs.begin()))
-      continue;
-
-    if (rhs.size() >= properties.size())
-      properties.resize(rhs.size() + 1);
-    properties[rhs.size()].emplace_back(rhs, property);
+    auto rhs = rule.getRHS();
+    unsigned length = rhs.size();
+    if (length >= properties.size())
+      properties.resize(length + 1);
+    properties[length].emplace_back(rhs, *property);
   }
 
   // Merging multiple superclass or concrete type rules can induce new rules

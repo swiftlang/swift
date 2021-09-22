@@ -50,6 +50,10 @@ public:
   const Term &getLHS() const { return LHS; }
   const Term &getRHS() const { return RHS; }
 
+  Optional<Symbol> isPropertyRule() const;
+
+  bool isProtocolConformanceRule() const;
+
   /// Returns if the rule was deleted.
   bool isDeleted() const {
     return deleted;
