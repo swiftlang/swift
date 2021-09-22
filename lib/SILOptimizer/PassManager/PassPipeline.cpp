@@ -479,7 +479,7 @@ static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
 static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("PrepareOptimizationPasses");
 
-  // Verify AccessedStorage once in OSSA before optimizing.
+  // Verify AccessStorage once in OSSA before optimizing.
 #ifndef NDEBUG
   P.addAccessPathVerification();
 #endif
@@ -734,7 +734,7 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // A loop might have only one dynamic access now, i.e. hoistable
   P.addLICM();
 
-  // Verify AccessedStorage once again after optimizing and lowering OSSA.
+  // Verify AccessStorage once again after optimizing and lowering OSSA.
 #ifndef NDEBUG
   P.addAccessPathVerification();
 #endif

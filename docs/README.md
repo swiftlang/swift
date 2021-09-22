@@ -123,6 +123,8 @@ documentation, please create a thread on the Swift forums under the
     Describes how to maintain compatibility when changing the serialization
     format.
 - SIL and SIL Optimizations:
+  - [SILFunctionConventions.md](/docs/SILFunctionConventions.md):
+  - [SILMemoryAccess.md](/docs/SILMemoryAccess.md):
   - [SILProgrammersManual.md](/docs/SILProgrammersManual.md):
     Provides an overview of the implementation of SIL in the compiler.
   - [OptimizerDesign.md](/docs/OptimizerDesign.md):

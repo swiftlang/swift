@@ -5334,7 +5334,7 @@ public:
     return RValue(SGF, ManagedValue::forUnmanaged(unowned), refType);
   }
 
-  Optional<AccessedStorage> getAccessedStorage() const override {
+  Optional<AccessStorage> getAccessStorage() const override {
     return None;
   }
 

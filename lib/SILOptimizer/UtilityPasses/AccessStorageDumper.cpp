@@ -1,4 +1,4 @@
-//===--- AccessedStorageDumper.cpp - Dump accessed storage ----------------===//
+//===--- AccessStorageDumper.cpp - Dump accessed storage ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -24,20 +24,20 @@
 using namespace swift;
 
 static llvm::cl::opt<bool> EnableDumpUses(
-    "enable-accessed-storage-dump-uses", llvm::cl::init(false),
+    "enable-access-storage-dump-uses", llvm::cl::init(false),
     llvm::cl::desc("With --sil-access-storage-dumper, dump all uses"));
 
 namespace {
 
 /// Dumps sorage information for each access.
-class AccessedStorageDumper : public SILModuleTransform {
+class AccessStorageDumper : public SILModuleTransform {
   llvm::SmallVector<Operand *, 32> uses;
 
-  void dumpAccessedStorage(Operand *operand) {
+  void dumpAccessStorage(Operand *operand) {
     SILFunction *function = operand->getParentFunction();
     // Print storage itself first, for comparison against AccessPath. They can
     // differ in rare cases of unidentified storage with phis.
-    AccessedStorage::compute(operand->get()).print(llvm::outs());
+    AccessStorage::compute(operand->get()).print(llvm::outs());
     // Now print the access path and base.
     auto pathAndBase = AccessPathWithBase::compute(operand->get());
     pathAndBase.print(llvm::outs());
@@ -94,7 +94,7 @@ class AccessedStorageDumper : public SILModuleTransform {
           if (inst.mayReadOrWriteMemory()) {
             llvm::outs() << "###For MemOp: " << inst;
             visitAccessedAddress(&inst, [this](Operand *operand) {
-              dumpAccessedStorage(operand);
+              dumpAccessStorage(operand);
             });
           }
         }
@@ -105,6 +105,6 @@ class AccessedStorageDumper : public SILModuleTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createAccessedStorageDumper() {
-  return new AccessedStorageDumper();
+SILTransform *swift::createAccessStorageDumper() {
+  return new AccessStorageDumper();
 }
