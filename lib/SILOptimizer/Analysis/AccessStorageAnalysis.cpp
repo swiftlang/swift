@@ -1,4 +1,4 @@
-//===--- AccessedStorageAnalysis.cpp  - Accessed Storage Analysis ---------===//
+//===--- AccessStorageAnalysis.cpp  - Accessed Storage Analysis ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,7 @@
 
 #define DEBUG_TYPE "sil-sea"
 
-#include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AccessStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -23,23 +23,23 @@ using namespace swift;
 // MARK: Accessing the results.
 // -----------------------------------------------------------------------------
 
-bool AccessedStorageResult::hasNoNestedConflict(
-    const AccessedStorage &otherStorage) const {
+bool AccessStorageResult::hasNoNestedConflict(
+    const AccessStorage &otherStorage) const {
   assert(otherStorage.isUniquelyIdentified());
   assert(!hasUnidentifiedAccess());
 
   return getStorageAccessInfo(otherStorage).hasNoNestedConflict();
 }
 
-bool AccessedStorageResult::mayConflictWith(
-    SILAccessKind otherAccessKind, const AccessedStorage &otherStorage) const {
+bool AccessStorageResult::mayConflictWith(
+    SILAccessKind otherAccessKind, const AccessStorage &otherStorage) const {
   if (hasUnidentifiedAccess()
       && accessKindMayConflict(otherAccessKind,
                                unidentifiedAccess.getValue())) {
     return true;
   }
   for (auto &storageAccess : storageAccessSet) {
-    assert(storageAccess && "FunctionAccessedStorage mapped invalid storage.");
+    assert(storageAccess && "FunctionAccessStorage mapped invalid storage.");
 
     if (!accessKindMayConflict(otherAccessKind, storageAccess.getAccessKind()))
       continue;
@@ -50,10 +50,10 @@ bool AccessedStorageResult::mayConflictWith(
   return false;
 }
 
-StorageAccessInfo AccessedStorageResult::getStorageAccessInfo(
-    const AccessedStorage &otherStorage) const {
+StorageAccessInfo AccessStorageResult::getStorageAccessInfo(
+    const AccessStorage &otherStorage) const {
   // Construct a fake StorageAccessInfo to do a hash lookup for the real
-  // StorageAccessInfo. The DenseSet key is limited to the AccessedStorage base
+  // StorageAccessInfo. The DenseSet key is limited to the AccessStorage base
   // class members.
   StorageAccessInfo storageKey(otherStorage, SILAccessKind::Read, false);
   auto iter = storageAccessSet.find(storageKey);
@@ -103,7 +103,7 @@ bool StorageAccessInfo::mergeFrom(const StorageAccessInfo &RHS) {
   return changed;
 }
 
-bool AccessedStorageResult::updateUnidentifiedAccess(SILAccessKind accessKind) {
+bool AccessStorageResult::updateUnidentifiedAccess(SILAccessKind accessKind) {
   if (unidentifiedAccess == None) {
     unidentifiedAccess = accessKind;
     return true;
@@ -111,16 +111,16 @@ bool AccessedStorageResult::updateUnidentifiedAccess(SILAccessKind accessKind) {
   return updateAccessKind(unidentifiedAccess.getValue(), accessKind);
 }
 
-// Merge the given AccessedStorageResult in `other` into this
-// AccessedStorageResult. Use the given `transformStorage` to map `other`
-// AccessedStorage into this context. If `other` is from a callee, argument
+// Merge the given AccessStorageResult in `other` into this
+// AccessStorageResult. Use the given `transformStorage` to map `other`
+// AccessStorage into this context. If `other` is from a callee, argument
 // substitution will be performed if possible. However, there's no guarantee
 // that the merged access values will belong to this region.
 //
 // Return true if these results changed, requiring further propagation through
 // the call graph.
-bool AccessedStorageResult::mergeAccesses(
-    const AccessedStorageResult &other,
+bool AccessStorageResult::mergeAccesses(
+    const AccessStorageResult &other,
     std::function<StorageAccessInfo(const StorageAccessInfo &)>
         transformStorage) {
 
@@ -141,8 +141,8 @@ bool AccessedStorageResult::mergeAccesses(
   // invalidates the iterator. We still need to propagate and merge in that case
   // because arguments can be recursively dependent. The alternative would be
   // treating all self-recursion conservatively.
-  const AccessedStorageResult *otherRegionAccesses = &other;
-  AccessedStorageResult regionAccessCopy;
+  const AccessStorageResult *otherRegionAccesses = &other;
+  AccessStorageResult regionAccessCopy;
   if (this == &other) {
     regionAccessCopy = other;
     otherRegionAccesses = &regionAccessCopy;
@@ -158,18 +158,18 @@ bool AccessedStorageResult::mergeAccesses(
     if (!otherStorageInfo)
       continue;
 
-    if (otherStorageInfo.getKind() == AccessedStorage::Unidentified) {
+    if (otherStorageInfo.getKind() == AccessStorage::Unidentified) {
       changed |= updateUnidentifiedAccess(otherStorageInfo.getAccessKind());
       continue;
     }
-    // Attempt to add identified AccessedStorage to this map.
+    // Attempt to add identified AccessStorage to this map.
     auto result = insertStorageAccess(otherStorageInfo);
     if (result.second) {
-      // A new AccessedStorage key was added to this map.
+      // A new AccessStorage key was added to this map.
       changed = true;
       continue;
     }
-    // Merge StorageAccessInfo into already-mapped AccessedStorage.
+    // Merge StorageAccessInfo into already-mapped AccessStorage.
     changed |= result.first->mergeFrom(otherStorageInfo);
   }
   if (other.unidentifiedAccess != None)
@@ -178,7 +178,7 @@ bool AccessedStorageResult::mergeAccesses(
   return changed;
 }
 
-bool AccessedStorageResult::mergeFrom(const AccessedStorageResult &other) {
+bool AccessStorageResult::mergeFrom(const AccessStorageResult &other) {
   // Merge accesses from other. Both `this` and `other` are either from the same
   // function or are both callees of the same call site, so their parameters
   // indices coincide. transformStorage is the identity function.
@@ -208,7 +208,7 @@ static SILValue getCallerArg(FullApplySite fullApply, unsigned paramIndex) {
   return SILValue();
 }
 
-/// Transform AccessedStorage from a callee into the caller context. If this is
+/// Transform AccessStorage from a callee into the caller context. If this is
 /// uniquely identified local storage, then return an invalid storage object.
 ///
 /// For correctness, AccessEnforcementOpts relies on all Argument access to
@@ -224,7 +224,7 @@ transformCalleeStorage(const StorageAccessInfo &storage,
                        FullApplySite fullApply) {
   if (storage.isLocal()) {
     // Do not merge local storage.
-    return StorageAccessInfo(AccessedStorage(), storage);
+    return StorageAccessInfo(AccessStorage(), storage);
   }
   // Remap reference storage. The caller's argument becomes the new object. The
   // old storage info is inherited.
@@ -242,29 +242,29 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     return storage;
   }
   switch (storage.getKind()) {
-  case AccessedStorage::Box:
-  case AccessedStorage::Class:
-  case AccessedStorage::Tail:
-  case AccessedStorage::Stack:
+  case AccessStorage::Box:
+  case AccessStorage::Class:
+  case AccessStorage::Tail:
+  case AccessStorage::Stack:
     llvm_unreachable("Handled immediately above");
-  case AccessedStorage::Nested:
+  case AccessStorage::Nested:
     llvm_unreachable("Nested storage should not be used here");
-  case AccessedStorage::Global:
+  case AccessStorage::Global:
     // Global accesses is universal.
     return storage;
-  case AccessedStorage::Yield:
+  case AccessStorage::Yield:
     // Continue to hold on to yields from the callee because we don't have
     // any better placeholder in the callee.
     return storage;
-  case AccessedStorage::Unidentified:
+  case AccessStorage::Unidentified:
     // For unidentified storage, continue to reference the value in the callee
     // because we don't have any better placeholder for a callee-defined object.
     return storage;
-  case AccessedStorage::Argument: {
+  case AccessStorage::Argument: {
     // Transitively search for the storage base in the caller.
     if (SILValue argVal = getCallerArg(fullApply, storage.getParamIndex())) {
       // Remap the argument source value and inherit the old storage info.
-      if (auto calleeStorage = AccessedStorage::compute(argVal))
+      if (auto calleeStorage = AccessStorage::compute(argVal))
         return StorageAccessInfo(calleeStorage, storage);
     }
     // If the argument can't be transformed, demote it to an unidentified
@@ -272,36 +272,36 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     //
     // This is an untested bailout. It is only reachable if the call graph
     // contains an edge that getCallerArg is unable to analyze OR if
-    // AccessedStorage::compute returns an invalid SILValue, which won't
+    // AccessStorage::compute returns an invalid SILValue, which won't
     // pass SIL verification.
     //
     // TODO: To handle invalid argVal, consider allowing Unidentified access for
     // invalid values. This may be useful for partially invalidating results.
     return StorageAccessInfo(
-      AccessedStorage(storage.getValue(), AccessedStorage::Unidentified),
+      AccessStorage(storage.getValue(), AccessStorage::Unidentified),
       storage);
   }
   }
   llvm_unreachable("unhandled kind");
 }
 
-bool AccessedStorageResult::mergeFromApply(
-    const AccessedStorageResult &calleeAccess, FullApplySite fullApply) {
+bool AccessStorageResult::mergeFromApply(
+    const AccessStorageResult &calleeAccess, FullApplySite fullApply) {
   // Merge accesses from calleeAccess. Transform any Argument type
-  // AccessedStorage into the caller context to be added to `this` storage map.
+  // AccessStorage into the caller context to be added to `this` storage map.
   return mergeAccesses(calleeAccess, [&fullApply](const StorageAccessInfo &s) {
     return transformCalleeStorage(s, fullApply);
   });
 }
 
 template <typename B>
-void AccessedStorageResult::visitBeginAccess(B *beginAccess) {
+void AccessStorageResult::visitBeginAccess(B *beginAccess) {
   if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
     return;
 
-  auto storage = AccessedStorage::compute(beginAccess->getSource());
+  auto storage = AccessStorage::compute(beginAccess->getSource());
 
-  if (storage.getKind() == AccessedStorage::Unidentified) {
+  if (storage.getKind() == AccessStorage::Unidentified) {
     // This also catches invalid storage.
     updateOptionalAccessKind(unidentifiedAccess, beginAccess->getAccessKind());
     return;
@@ -312,7 +312,7 @@ void AccessedStorageResult::visitBeginAccess(B *beginAccess) {
     result.first->mergeFrom(storageAccess);
 }
 
-void AccessedStorageResult::analyzeInstruction(SILInstruction *I) {
+void AccessStorageResult::analyzeInstruction(SILInstruction *I) {
   assert(!FullApplySite::isa(I) && "caller should merge");
 
   if (auto *BAI = dyn_cast<BeginAccessInst>(I))
@@ -325,12 +325,12 @@ void StorageAccessInfo::print(raw_ostream &os) const {
   os << "  [" << getSILAccessKindName(getAccessKind()) << "] ";
   if (hasNoNestedConflict())
     os << "[no_nested_conflict] ";
-  AccessedStorage::print(os);
+  AccessStorage::print(os);
 }
 
 void StorageAccessInfo::dump() const { print(llvm::dbgs()); }
 
-void AccessedStorageResult::print(raw_ostream &os) const {
+void AccessStorageResult::print(raw_ostream &os) const {
   for (auto &storageAccess : storageAccessSet)
     storageAccess.print(os);
 
@@ -340,14 +340,14 @@ void AccessedStorageResult::print(raw_ostream &os) const {
   }
 }
 
-void AccessedStorageResult::dump() const { print(llvm::dbgs()); }
+void AccessStorageResult::dump() const { print(llvm::dbgs()); }
 
 // -----------------------------------------------------------------------------
-// MARK: FunctionAccessedStorage, implementation of
+// MARK: FunctionAccessStorage, implementation of
 // GenericFunctionEffectAnalysis.
 // -----------------------------------------------------------------------------
 
-bool FunctionAccessedStorage::summarizeFunction(SILFunction *F) {
+bool FunctionAccessStorage::summarizeFunction(SILFunction *F) {
   assert(accessResult.isEmpty() && "expected uninitialized results.");
 
   if (F->isDefinition())
@@ -380,6 +380,6 @@ bool FunctionAccessedStorage::summarizeFunction(SILFunction *F) {
   return true;
 }
 
-SILAnalysis *swift::createAccessedStorageAnalysis(SILModule *) {
-  return new AccessedStorageAnalysis();
+SILAnalysis *swift::createAccessStorageAnalysis(SILModule *) {
+  return new AccessStorageAnalysis();
 }

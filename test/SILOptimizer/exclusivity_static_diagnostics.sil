@@ -1017,7 +1017,7 @@ class SomeClass {}
 // need a test for this.
 //
 // Check that this doesn't trigger the DiagnoseStaticExclusivity
-// assert that all accesses have a valid AccessedStorage source.
+// assert that all accesses have a valid AccessStorage source.
 sil [ossa] @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
 bb0(%0 : $UnsafeMutablePointer<Any>):
   %2 = struct_extract %0 : $UnsafeMutablePointer<Any>, #UnsafeMutablePointer._rawValue

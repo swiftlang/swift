@@ -1,4 +1,4 @@
-//===--- AccessedStorageAnalysisDumper.cpp - accessed storage anlaysis ----===//
+//===--- AccessStorageAnalysisDumper.cpp - accessed storage anlaysis ----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AccessStorageAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/Support/Debug.h"
@@ -25,10 +25,10 @@ using namespace swift;
 namespace {
 
 /// Dumps per-function information on dynamically enforced formal accesses.
-class AccessedStorageAnalysisDumper : public SILModuleTransform {
+class AccessStorageAnalysisDumper : public SILModuleTransform {
 
   void run() override {
-    auto *analysis = PM->getAnalysis<AccessedStorageAnalysis>();
+    auto *analysis = PM->getAnalysis<AccessStorageAnalysis>();
 
     for (auto &fn : *getModule()) {
       llvm::outs() << "@" << fn.getName() << "\n";
@@ -36,7 +36,7 @@ class AccessedStorageAnalysisDumper : public SILModuleTransform {
         llvm::outs() << "<unknown>\n";
         continue;
       }
-      const FunctionAccessedStorage &summary = analysis->getEffects(&fn);
+      const FunctionAccessStorage &summary = analysis->getEffects(&fn);
       summary.print(llvm::outs());
     }
   }
@@ -44,6 +44,6 @@ class AccessedStorageAnalysisDumper : public SILModuleTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createAccessedStorageAnalysisDumper() {
-  return new AccessedStorageAnalysisDumper();
+SILTransform *swift::createAccessStorageAnalysisDumper() {
+  return new AccessStorageAnalysisDumper();
 }

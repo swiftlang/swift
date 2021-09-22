@@ -24,7 +24,7 @@
 #endif
 
 ANALYSIS(AccessSummary)
-ANALYSIS(AccessedStorage)
+ANALYSIS(AccessStorage)
 ANALYSIS(Alias)
 ANALYSIS(BasicCallee)
 ANALYSIS(Caller)

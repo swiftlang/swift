@@ -797,23 +797,23 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
 BorrowedAddress::BorrowedAddress(SILValue address) {
   assert(address->getType().isAddress());
 
-  auto storageWithBase = AccessedStorageWithBase::compute(address);
+  auto storageWithBase = AccessStorageWithBase::compute(address);
   switch (storageWithBase.storage.getKind()) {
-  case AccessedStorage::Argument:
-  case AccessedStorage::Stack:
-  case AccessedStorage::Global:
+  case AccessStorage::Argument:
+  case AccessStorage::Stack:
+  case AccessStorage::Global:
   // Unidentified storage is from an "escaped pointer", so it need not be
   // restricted to a borrow scope.
-  case AccessedStorage::Unidentified:
+  case AccessStorage::Unidentified:
     this->mayBeBorrowed = false;
     return;
-  case AccessedStorage::Box:
-  case AccessedStorage::Yield:
-  case AccessedStorage::Class:
-  case AccessedStorage::Tail:
+  case AccessStorage::Box:
+  case AccessStorage::Yield:
+  case AccessStorage::Class:
+  case AccessStorage::Tail:
     // The base object might be within a borrow scope.
     break;
-  case AccessedStorage::Nested:
+  case AccessStorage::Nested:
     llvm_unreachable("unexpected storage");
   };
   auto base = storageWithBase.base;
