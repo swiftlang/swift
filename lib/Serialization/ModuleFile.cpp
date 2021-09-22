@@ -149,8 +149,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
       return error(status);
   }
 
-  auto clientSDK = ctx.LangOpts.SDKName;
   StringRef moduleSDK = Core->SDKName;
+  StringRef clientSDK = ctx.LangOpts.SDKName;
   if (ctx.SearchPathOpts.EnableSameSDKCheck &&
       !moduleSDK.empty() && !clientSDK.empty() &&
       moduleSDK != clientSDK) {
