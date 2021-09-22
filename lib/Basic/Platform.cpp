@@ -370,44 +370,56 @@ Optional<llvm::VersionTuple>
 swift::getSwiftRuntimeCompatibilityVersionForTarget(
     const llvm::Triple &Triple) {
   unsigned Major, Minor, Micro;
-
-  if (Triple.getArchName() == "arm64e")
-    return llvm::VersionTuple(5, 3);
+  #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
   if (Triple.isMacOSX()) {
     Triple.getMacOSXVersion(Major, Minor, Micro);
+
+    auto floorFor64e = [&Triple](llvm::VersionTuple v) {
+      if (Triple.getArchName() != "arm64e") return v;
+      // macOS got first arm64e support in 11.0, i.e. VersionTuple(5, 3)
+      return MAX(v, llvm::VersionTuple(5, 3));
+    };
+
     if (Major == 10) {
       if (Triple.isAArch64() && Minor <= 16)
-        return llvm::VersionTuple(5, 3);
+        return floorFor64e(llvm::VersionTuple(5, 3));
 
       if (Minor <= 14) {
-        return llvm::VersionTuple(5, 0);
+        return floorFor64e(llvm::VersionTuple(5, 0));
       } else if (Minor <= 15) {
         if (Micro <= 3) {
-          return llvm::VersionTuple(5, 1);
+          return floorFor64e(llvm::VersionTuple(5, 1));
         } else {
-          return llvm::VersionTuple(5, 2);
+          return floorFor64e(llvm::VersionTuple(5, 2));
         }
       }
     } else if (Major == 11) {
-      return llvm::VersionTuple(5, 3);
+      return floorFor64e(llvm::VersionTuple(5, 3));
     }
   } else if (Triple.isiOS()) { // includes tvOS
     Triple.getiOSVersion(Major, Minor, Micro);
+
+    auto floorFor64e = [&Triple](llvm::VersionTuple v) {
+      if (Triple.getArchName() != "arm64e") return v;
+      // iOS got first arm64e support in 12.0, which has a Swift runtime version
+      // older than 5.0, so let's floor at VersionTuple(5, 0) instead.
+      return MAX(v, llvm::VersionTuple(5, 0));
+    };
 
     // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
     // with Swift 5.3
     if (Triple.isAArch64() && Major <= 14 &&
         (Triple.isSimulatorEnvironment() || Triple.isMacCatalystEnvironment()))
-      return llvm::VersionTuple(5, 3);
+      return floorFor64e(llvm::VersionTuple(5, 3));
 
     if (Major <= 12) {
-      return llvm::VersionTuple(5, 0);
+      return floorFor64e(llvm::VersionTuple(5, 0));
     } else if (Major <= 13) {
       if (Minor <= 3) {
-        return llvm::VersionTuple(5, 1);
+        return floorFor64e(llvm::VersionTuple(5, 1));
       } else {
-        return llvm::VersionTuple(5, 2);
+        return floorFor64e(llvm::VersionTuple(5, 2));
       }
     }
   } else if (Triple.isWatchOS()) {
