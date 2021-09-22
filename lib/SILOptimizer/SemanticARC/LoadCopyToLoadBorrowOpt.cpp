@@ -190,7 +190,7 @@ public:
 
   void visitGlobalAccess(SILValue global) {
     return answer(
-        !AccessedStorage(global, AccessedStorage::Global).isLetAccess());
+        !AccessStorage(global, AccessStorage::Global).isLetAccess());
   }
 
   void visitClassAccess(RefElementAddrInst *field) {
@@ -252,7 +252,7 @@ public:
   }
 
   // TODO: Handle other access kinds?
-  void visitBase(SILValue base, AccessedStorage::Kind kind) {
+  void visitBase(SILValue base, AccessStorage::Kind kind) {
     return answer(true);
   }
 
