@@ -27,7 +27,7 @@ public let benchmarks = [
     setUpFunction: { blackHole(_comparison) }),
   BenchmarkInfo(name: "SubstringEqualString", runFunction: run_SubstringEqualString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringEquatable", runFunction: run_SubstringEquatable, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringFromLongString", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringFromLongString2", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringFromLongStringGeneric", runFunction: run_SubstringFromLongStringGeneric, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringTrimmingASCIIWhitespace", runFunction: run_SubstringTrimmingASCIIWhitespace, tags: [.validation, .api, .String]),
 ]
@@ -43,7 +43,7 @@ let quiteLong = String(repeating: "0", count: 10_000)[...]
 public func run_SubstringFromLongString(_ n: Int) {
   var s = longWide
   s += "!" // ensure the string has a real buffer
-  for _ in 1...n*500 {
+  for _ in 1...n*5000 {
     blackHole(Substring(s))
   }
 }
@@ -292,7 +292,6 @@ let _trimmableSubstrings = "pineapple,🍍,  pineapple\t,\r\n\r\n\r\n, 🍍 ,".s
 @inline(never)
 public func run_SubstringTrimmingASCIIWhitespace(_ n: Int) {
   let substrings = _trimmableSubstrings // bringing this alias from above
-  var count = 0
   for _ in 1...n*100 {
     for substring in substrings {
       blackHole(substring.trimWhitespace())
