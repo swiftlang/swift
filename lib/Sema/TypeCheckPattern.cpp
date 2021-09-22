@@ -84,9 +84,21 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
   for (const LookupResultEntry &result : foundElements) {
     ValueDecl *e = result.getValueDecl();
     assert(e);
-    if (e->isInvalid()) {
+
+    // Check `isInvalid` only if the declaration has been
+    // verified, otherwise this would cause a problem if
+    // this declaration is found in the body of a result
+    // builder because it wouldn't have a type set until
+    // whole body is type-checked, and `isInvalid` would
+    // trigger a separate type-check that interfers with
+    // result builder transformation and causes crashes.
+    //
+    // Note: This check cannot simply be removed because
+    // enums with re-declarationed members would trigger
+    // an ambiguity assertion below.
+    if (e->hasInterfaceType() && e->isInvalid())
       continue;
-    }
+
     // Skip if the enum element was referenced as an instance member
     if (unqualifiedLookup) {
       if (!result.getBaseDecl() ||
