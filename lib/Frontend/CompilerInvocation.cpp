@@ -1724,6 +1724,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.UseTypeLayoutValueHandling = false;
   }
 
+  Opts.ForceStructTypeLayouts = Args.hasArg(OPT_force_struct_type_layouts) &&
+                                Opts.UseTypeLayoutValueHandling;
+
   // This is set to true by default.
   Opts.UseIncrementalLLVMCodeGen &=
     !Args.hasArg(OPT_disable_incremental_llvm_codegeneration);
