@@ -35,8 +35,6 @@ extern "C" {
 
 // Input/output <stdio.h>
 SWIFT_RUNTIME_STDLIB_INTERNAL
-int _swift_stdlib_putchar_unlocked(int c);
-SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
                                            __swift_size_t nitems);
 
