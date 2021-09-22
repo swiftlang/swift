@@ -2,6 +2,9 @@
 // RUN: %empty-directory(%t/build)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
+/// Unsupported on Windows for the use of env vars.
+// UNSUPPORTED: OS=windows-msvc
+
 /// 1. Compile Lib.swift as non-resilient untagged, resilient untagged, and resilient tagged
 // BEGIN Lib.swift
 public func foo() {}
