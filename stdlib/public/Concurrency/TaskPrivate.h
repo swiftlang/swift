@@ -27,6 +27,16 @@
 
 #include "../runtime/StackAllocator.h"
 
+#if HAVE_PTHREAD_H
+#include <pthread.h>
+#endif
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRA_LEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
+
 namespace swift {
 
 // Set to 1 to enable helpful debug spew to stderr
@@ -40,6 +50,20 @@ namespace swift {
 #else
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
 #endif
+
+#if defined(_WIN32)
+using ThreadID = decltype(GetCurrentThreadId());
+#else
+using ThreadID = decltype(pthread_self());
+#endif
+
+inline ThreadID _swift_get_thread_id() {
+#if defined(_WIN32)
+  return GetCurrentThreadId();
+#else
+  return pthread_self();
+#endif
+}
 
 class AsyncTask;
 class TaskGroup;
