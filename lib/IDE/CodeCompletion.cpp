@@ -34,7 +34,6 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
-#include "swift/IDE/ModuleSourceFileInfo.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -636,9 +635,9 @@ CodeCompletionResult::withFlair(CodeCompletionFlair newFlair,
     return new (*Sink.Allocator) CodeCompletionResult(
         getSemanticContext(), newFlair, getNumBytesToErase(),
         getCompletionString(), getAssociatedDeclKind(), isSystem(),
-        getModuleName(), getSourceFilePath(), getNotRecommendedReason(),
-        getDiagnosticSeverity(), getDiagnosticMessage(),
-        getBriefDocComment(), getAssociatedUSRs(), getExpectedTypeRelation(),
+        getModuleName(), getNotRecommendedReason(), getDiagnosticSeverity(),
+        getDiagnosticMessage(), getBriefDocComment(), getAssociatedUSRs(),
+        getExpectedTypeRelation(),
         isOperator() ? getOperatorKind() : CodeCompletionOperatorKind::None);
   } else {
     return new (*Sink.Allocator) CodeCompletionResult(
@@ -1303,8 +1302,6 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         ModuleName, NotRecReason, copyString(*Sink.Allocator, BriefDocComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
         ExpectedTypeRelation);
-    if (!result->isSystem())
-      result->setSourceFilePath(getSourceFilePathForDecl(AssociatedDecl));
     if (NotRecReason != NotRecommendedReason::None) {
       // FIXME: We should generate the message lazily.
       if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
@@ -6575,37 +6572,6 @@ static void postProcessResults(MutableArrayRef<CodeCompletionResult *> results,
   }
 }
 
-static void copyAllKnownSourceFileInfo(
-    ASTContext &Ctx, CodeCompletionResultSink &Sink) {
-  assert(Sink.SourceFiles.empty());
-
-  SmallVector<ModuleDecl *, 8> loadedModules;
-  loadedModules.reserve(Ctx.getNumLoadedModules());
-  for (auto &entry : Ctx.getLoadedModules())
-    loadedModules.push_back(entry.second);
-
-  auto &result = Sink.SourceFiles;
-  for (auto *M : loadedModules) {
-    // We don't need to check system modules.
-    if (M->isSystemModule())
-      continue;
-
-    M->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
-      if (info.getFilePath().empty())
-        return;
-      
-      bool isUpToDate = false;
-      if (info.isFromSourceFile()) {
-        // 'SourceFile' is always "up-to-date" because we've just loaded.
-        isUpToDate = true;
-      } else {
-        isUpToDate = isSourceFileUpToDate(info, Ctx);
-      }
-      result.emplace_back(copyString(*Sink.Allocator, info.getFilePath()), isUpToDate);
-    });
-  }
-}
-
 static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                                      CompletionLookup &Lookup,
                                      DeclContext *DC,
@@ -6724,10 +6690,6 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
   postProcessResults(CompletionContext.getResultSink().Results,
                      CompletionContext.CodeCompletionKind, DC,
                      /*Sink=*/nullptr);
-
-  if (CompletionContext.requiresSourceFileInfo())
-    copyAllKnownSourceFileInfo(SF.getASTContext(),
-                               CompletionContext.getResultSink());
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
 }
@@ -7447,16 +7409,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
 void PrintingCodeCompletionConsumer::handleResults(
     CodeCompletionContext &context) {
-  if (context.requiresSourceFileInfo() &&
-      !context.getResultSink().SourceFiles.empty()) {
-    OS << "Known module source files\n";
-    for (auto &entry : context.getResultSink().SourceFiles) {
-      OS << (entry.IsUpToDate ? " + "  : " - ");
-      OS << entry.FilePath;
-      OS << "\n";
-    }
-    this->RequiresSourceFileInfo = true;
-  }
   auto results = context.takeResults();
   handleResults(results);
 }
@@ -7501,13 +7453,6 @@ void PrintingCodeCompletionConsumer::handleResults(
     StringRef comment = Result->getBriefDocComment();
     if (IncludeComments && !comment.empty()) {
       OS << "; comment=" << comment;
-    }
-
-    if (RequiresSourceFileInfo) {
-      StringRef sourceFilePath = Result->getSourceFilePath();
-      if (!sourceFilePath.empty()) {
-        OS << "; source=" << sourceFilePath;
-      }
     }
 
     if (Result->getDiagnosticSeverity() !=

@@ -471,12 +471,6 @@ CodeCOmpletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::cat(Category),
                               llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-CodeCompletionSourceFileInfo("code-completion-sourcefileinfo",
-                             llvm::cl::desc("print module source file information"),
-                             llvm::cl::cat(Category),
-                             llvm::cl::init(false));
-
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
   llvm::cl::desc("A discriminator to prefer in lookups"),
@@ -926,7 +920,6 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             bool CodeCompletionKeywords,
                             bool CodeCompletionComments,
                             bool CodeCompletionAnnotateResults,
-                            bool CodeCompletionSourceFileInfo,
                             bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
@@ -936,7 +929,6 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
-  CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
 
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
@@ -1133,7 +1125,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionKeywords,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
-                                 bool CodeCompletionSourceFileInfo,
                                  bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
@@ -1276,7 +1267,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
           // Consumer.
           ide::CodeCompletionContext CompletionContext(CompletionCache);
           CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
-          CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
           std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
               ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                       *Consumer));
@@ -4068,7 +4058,6 @@ int main(int argc, char *argv[]) {
                                      options::CodeCompletionKeywords,
                                      options::CodeCompletionComments,
                                      options::CodeCOmpletionAnnotateResults,
-                                     options::CodeCompletionSourceFileInfo,
                                      options::CodeCompletionSourceText);
     break;
 
@@ -4085,7 +4074,6 @@ int main(int argc, char *argv[]) {
                                 options::CodeCompletionKeywords,
                                 options::CodeCompletionComments,
                                 options::CodeCOmpletionAnnotateResults,
-                                options::CodeCompletionSourceFileInfo,
                                 options::CodeCompletionSourceText);
     break;
 
