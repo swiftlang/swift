@@ -105,6 +105,16 @@ public:
     Simplified = true;
   }
 
+  void markPermanent() {
+    assert(!Permanent);
+    Permanent = true;
+  }
+
+  void markRedundant() {
+    assert(!Redundant);
+    Redundant = true;
+  }
+
   /// Returns the length of the left hand side.
   unsigned getDepth() const {
     return LHS.size();
@@ -329,7 +339,8 @@ public:
   /// Return the object recording information about known protocols.
   const ProtocolGraph &getProtocols() const { return Protos; }
 
-  void initialize(std::vector<std::pair<MutableTerm, MutableTerm>> &&rules,
+  void initialize(std::vector<std::pair<MutableTerm, MutableTerm>> &&assocaitedTypeRules,
+                  std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
                   ProtocolGraph &&protos);
 
   Symbol simplifySubstitutionsInSuperclassOrConcreteSymbol(Symbol symbol) const;

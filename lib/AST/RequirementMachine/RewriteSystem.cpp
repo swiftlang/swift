@@ -64,11 +64,18 @@ RewriteSystem::~RewriteSystem() {
 }
 
 void RewriteSystem::initialize(
-    std::vector<std::pair<MutableTerm, MutableTerm>> &&rules,
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&associatedTypeRules,
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
     ProtocolGraph &&graph) {
   Protos = graph;
 
-  for (const auto &rule : rules)
+  for (const auto &rule : associatedTypeRules) {
+    bool added = addRule(rule.first, rule.second);
+    if (added)
+      Rules.back().markPermanent();
+  }
+
+  for (const auto &rule : requirementRules)
     addRule(rule.first, rule.second);
 }
 
