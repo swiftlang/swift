@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "clang-decl-finder"
+
 #include "IRGenModule.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
@@ -82,6 +84,116 @@ clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
   return nullptr;
 }
 
+auto walkCallGraphFromCtor(
+    const clang::CXXConstructorDecl *toplevelCtor,
+    llvm::SmallPtrSet<const clang::Decl *, 8> visited,
+    llvm::SmallPtrSet<const clang::Decl *, 8> &functionDecls) {
+
+  llvm::SmallVector<clang::Stmt *, 8> stack;
+  auto recurseStmt = [&stack](clang::Stmt *s) {
+    if (s) {
+      stack.push_back(s);
+      return true;
+    }
+    return false;
+  };
+
+  // Keep track of decls we have already walked over so that we don't re-walk
+  // over them redundantly. Returns true if the insertion took place.
+  auto visitDecl = [&visited](const clang::Decl *decl) {
+    return decl ? visited.insert(decl).second : false;
+  };
+
+  auto handleCtor = [&recurseStmt,
+                     &functionDecls](const clang::CXXConstructorDecl *ctor) {
+    functionDecls.insert(ctor);
+    if (ctor->getParent()->getDestructor())
+      functionDecls.insert(ctor->getParent()->getDestructor());
+    recurseStmt(ctor->getBody());
+    for (auto *init : ctor->inits()) {
+      recurseStmt(init->getInit());
+      if (clang::FieldDecl *field = init->getMember())
+        recurseStmt(field->getInClassInitializer());
+    }
+  };
+
+  auto handleFunctionDecl = [&recurseStmt, &functionDecls](
+                                clang::FunctionDecl *functionDecl) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "HANDLE FUNCTION DECL:\n";
+      llvm::dbgs() << "IS INLINE "
+                   << (functionDecl->isInlineSpecified() ? "YES" : "NO")
+                   << "\n";
+      llvm::dbgs() << "IS TEMPLATE INST "
+                   << (functionDecl->isTemplateInstantiation() ? "YES" : "NO")
+                   << "\n";
+    });
+
+    if (functionDecl->isInlineSpecified() ||     // is 'inline' specified
+        functionDecl->isInlined() ||             // is inlined or constexpr
+        functionDecl->isTemplateInstantiation()) // is template instance
+      functionDecls.insert(functionDecl);
+
+    // Even if this function is not inlined or a template instance we want to
+    // recurse on it in case it calls something or calls something that calls
+    // something that is.
+    recurseStmt(functionDecl->getBody());
+  };
+
+  handleCtor(toplevelCtor);
+
+  while (!stack.empty()) {
+    auto *back = stack.pop_back_val();
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "\nClang Decl Walker Candidate:\n";
+      back->dump(llvm::dbgs(), toplevelCtor->getASTContext());
+    });
+
+    // Handle if the expression is a callsite or a ExprWithCleanups.
+    if (auto *fn = dyn_cast<clang::MemberExpr>(back)) {
+      if (visitDecl(fn->getMemberDecl()))
+        recurseStmt(fn->getMemberDecl()->getBody());
+    } else if (auto *fn = dyn_cast<clang::CallExpr>(back)) {
+      auto *memberCall = dyn_cast<clang::CXXMemberCallExpr>(back);
+      if (memberCall && visitDecl(memberCall->getMethodDecl())) {
+        functionDecls.insert(memberCall->getMethodDecl());
+        recurseStmt(memberCall->getMethodDecl()->getBody());
+      }
+
+      if (visitDecl(fn->getCalleeDecl())) {
+        functionDecls.insert(fn->getCalleeDecl());
+        recurseStmt(fn->getCalleeDecl()->getBody());
+      }
+    } else if (auto *fn = dyn_cast<clang::CXXConstructExpr>(back)) {
+
+      // Use the constructor expression to traverse corresponding destructors.
+      // This is done because default destructor decls are empty and have very
+      // little to traverse.
+      if (auto *dtor = fn->getConstructor() && fn->getConstructor()->getParent()
+                           ? fn->getConstructor()->getParent()->getDestructor()
+                           : nullptr) {
+        handleFunctionDecl(dtor);
+        if (dtor->getBody())
+          recurseStmt(dtor->getBody());
+      }
+
+      for (auto *child : fn->children())
+        recurseStmt(child);
+
+      if (visitDecl(fn->getConstructor()))
+        handleCtor(fn->getConstructor());
+    } else if (auto *declRef = dyn_cast<clang::DeclRefExpr>(back)) {
+      if (auto *fn = dyn_cast_or_null<clang::FunctionDecl>(declRef->getDecl()))
+        handleFunctionDecl(fn);
+    }
+
+    // Walk the expression's children.
+    for (clang::Stmt *child : back->children())
+      recurseStmt(child);
+  }
+}
+
 } // end anonymous namespace
 
 void IRGenModule::emitClangDecl(const clang::Decl *decl) {
@@ -118,6 +230,26 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
       return;
     }
     stack.push_back(D);
+  });
+
+  std::vector<const clang::Decl *> ctors;
+  llvm::copy_if(stack, std::back_inserter(ctors), [](const clang::Decl *decl) {
+    return isa<clang::CXXConstructorDecl>(decl);
+  });
+
+  llvm::SmallPtrSet<const clang::Decl *, 8> visited;
+  llvm::SmallPtrSet<const clang::Decl *, 8> functionDecls;
+  for (auto *ctor : ctors)
+    walkCallGraphFromCtor(cast<clang::CXXConstructorDecl>(ctor), visited,
+                          functionDecls);
+  llvm::copy(functionDecls, std::back_inserter(stack));
+
+  LLVM_DEBUG({
+    llvm::dbgs()
+        << "\nAdditional Function/Method decls found on constructor path:\n";
+    for (auto *functionDecl : functionDecls)
+      functionDecl->dump(llvm::dbgs());
+    llvm::dbgs() << "\n";
   });
 
   while (!stack.empty()) {

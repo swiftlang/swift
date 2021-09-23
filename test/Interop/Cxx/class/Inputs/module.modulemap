@@ -87,3 +87,8 @@ module InvalidNestedStruct {
   header "invalid-nested-struct.h"
   requires cplusplus
 }
+
+module InitializerFromInline {
+  header "initializer-from-inline.h"
+  requires cplusplus
+}
