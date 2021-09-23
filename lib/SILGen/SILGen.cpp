@@ -327,24 +327,15 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   return SwiftModule->lookupConformance(type, proto);
 }
 
-static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
-                                            Optional<FuncDecl*> &cache,
-                                            StringRef name) {
+static FuncDecl *lookupIntrinsic(ModuleDecl &module,
+                                 Optional<FuncDecl *> &cache, Identifier name) {
   if (cache)
     return *cache;
-  
-  auto *module = C.getLoadedModule(C.Id_Concurrency);
-  if (!module) {
-    cache = nullptr;
-    return nullptr;
-  }
-  
-  SmallVector<ValueDecl *, 1> decls;
-  module->lookupQualified(module,
-                     DeclNameRef(C.getIdentifier(name)),
-                     NL_QualifiedDefault | NL_IncludeUsableFromInline,
-                     decls);
 
+  SmallVector<ValueDecl *, 1> decls;
+  module.lookupQualified(&module, DeclNameRef(name),
+                         NL_QualifiedDefault | NL_IncludeUsableFromInline,
+                         decls);
   if (decls.size() != 1) {
     cache = nullptr;
     return nullptr;
@@ -352,6 +343,18 @@ static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
   auto func = dyn_cast<FuncDecl>(decls[0]);
   cache = func;
   return func;
+}
+
+static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
+                                            Optional<FuncDecl *> &cache,
+                                            StringRef name) {
+  auto *module = C.getLoadedModule(C.Id_Concurrency);
+  if (!module) {
+    cache = nullptr;
+    return nullptr;
+  }
+
+  return lookupIntrinsic(*module, cache, C.getIdentifier(name));
 }
 
 FuncDecl *
