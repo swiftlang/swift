@@ -29,9 +29,9 @@ func testCaseTrivialValue() {
   // We only emit a warning here since we use the last write.
   //
   // TODO: Should we emit for all writes?
-  i.addOne() // expected-warning {{'i' mutated after capture by concurrent closure}}
+  i.addOne() // expected-warning {{'i' mutated after capture by sendable closure}}
              // expected-note @-14 {{variable defined here}}
-             // expected-note @-14 {{variable captured by concurrent closure}}
+             // expected-note @-14 {{variable captured by sendable closure}}
              // expected-note @-14 {{capturing use}}
              // expected-note @-14 {{capturing use}}
              // expected-note @-14 {{capturing use}}
@@ -46,9 +46,9 @@ func testCaseTrivialValue2() {
   }
 
   i2 = 20
-  i2 += 21 // expected-warning {{'i2' mutated after capture by concurrent closure}}
+  i2 += 21 // expected-warning {{'i2' mutated after capture by sendable closure}}
              // expected-note @-9 {{variable defined here}}
-             // expected-note @-9 {{variable captured by concurrent closure}}
+             // expected-note @-9 {{variable captured by sendable closure}}
              // expected-note @-9 {{capturing use}}
              // expected-note @-9 {{capturing use}}
              // expected-note @-9 {{capturing use}}
@@ -62,9 +62,9 @@ func testCaseTrivialValue3() {
     print(i3 + 19)
   }
 
-  i3 = 20 // expected-warning {{'i3' mutated after capture by concurrent closure}}
+  i3 = 20 // expected-warning {{'i3' mutated after capture by sendable closure}}
           // expected-note @-8 {{variable defined here}}
-          // expected-note @-8 {{variable captured by concurrent closure}}
+          // expected-note @-8 {{variable captured by sendable closure}}
           // expected-note @-8 {{capturing use}}
           // expected-note @-8 {{capturing use}}
           // expected-note @-8 {{capturing use}}
@@ -78,9 +78,9 @@ func testCaseTrivialValue4() {
     print(i4 + 19)
   }
 
-  inoutUserInt(&i4) // expected-warning {{'i4' mutated after capture by concurrent closure}}
+  inoutUserInt(&i4) // expected-warning {{'i4' mutated after capture by sendable closure}}
                     // expected-note @-8 {{variable defined here}}
-                    // expected-note @-8 {{variable captured by concurrent closure}}
+                    // expected-note @-8 {{variable captured by sendable closure}}
                     // expected-note @-8 {{capturing use}}
                     // expected-note @-8 {{capturing use}}
                     // expected-note @-8 {{capturing use}}
@@ -98,9 +98,9 @@ func testCaseClass() {
     print(i)
   }
 
-  i = Klass() // expected-warning {{'i' mutated after capture by concurrent closure}}
+  i = Klass() // expected-warning {{'i' mutated after capture by sendable closure}}
               // expected-note @-6 {{variable defined here}}
-              // expected-note @-6 {{variable captured by concurrent closure}}
+              // expected-note @-6 {{variable captured by sendable closure}}
               // expected-note @-6 {{capturing use}}
 }
 
@@ -109,9 +109,9 @@ func testCaseClassInout() {
   f {
     print(i2)
   }
-  inoutUserKlass(&i2) // expected-warning {{'i2' mutated after capture by concurrent closure}}
+  inoutUserKlass(&i2) // expected-warning {{'i2' mutated after capture by sendable closure}}
                       // expected-note @-5 {{variable defined here}}
-                      // expected-note @-5 {{variable captured by concurrent closure}}
+                      // expected-note @-5 {{variable captured by sendable closure}}
                       // expected-note @-5 {{capturing use}}
 }
 
@@ -154,9 +154,9 @@ func testCaseNonTrivialValue() {
   // We only emit a warning here since we use the last write.
   //
   // TODO: Should we emit for all writes?
-  i.i.addOne() // expected-warning {{'i' mutated after capture by concurrent closure}}
+  i.i.addOne() // expected-warning {{'i' mutated after capture by sendable closure}}
                // expected-note @-14 {{variable defined here}}
-               // expected-note @-14 {{variable captured by concurrent closure}}
+               // expected-note @-14 {{variable captured by sendable closure}}
                // expected-note @-14 {{capturing use}}
                // expected-note @-14 {{capturing use}}
                // expected-note @-14 {{capturing use}}
@@ -170,9 +170,9 @@ func testCaseNonTrivialValueInout() {
   }
 
   // We only emit a warning here since we use the last write.
-  inoutUserOptKlass(&i.k) // expected-warning {{'i' mutated after capture by concurrent closure}}
+  inoutUserOptKlass(&i.k) // expected-warning {{'i' mutated after capture by sendable closure}}
                           // expected-note @-8 {{variable defined here}}
-                          // expected-note @-8 {{variable captured by concurrent closure}}
+                          // expected-note @-8 {{variable captured by sendable closure}}
                           // expected-note @-8 {{capturing use}}
                           // expected-note @-8 {{capturing use}}
 }
@@ -190,9 +190,9 @@ func testCaseAddressOnlyAllocBoxToStackable<T : MyProt & Sendable>(i : T) {
   }
 
   // TODO: Make sure we emit these once we support address only types!
-  inoutUserOptKlass(&i2.k) // xpected-warning {{'i2' mutated after capture by concurrent closure}}
+  inoutUserOptKlass(&i2.k) // xpected-warning {{'i2' mutated after capture by sendable closure}}
                            // xpected-note @-8 {{variable defined here}}
-                           // xpected-note @-8 {{variable captured by concurrent closure}}
+                           // xpected-note @-8 {{variable captured by sendable closure}}
                            // xpected-note @-8 {{capturing use}}
                            // xpected-note @-8 {{capturing use}}
 }
@@ -208,9 +208,9 @@ func testCaseAddressOnlyNoAllocBoxToStackable<T : MyProt & Sendable>(i : T) {
   }
 
   // TODO: Make sure we emit these once we support address only types!
-  inoutUserOptKlass(&i2.k) // xpected-warning {{'i2' mutated after capture by concurrent closure}}
+  inoutUserOptKlass(&i2.k) // xpected-warning {{'i2' mutated after capture by sendable closure}}
                            // xpected-note @-8 {{variable defined here}}
-                           // xpected-note @-8 {{variable captured by concurrent closure}}
+                           // xpected-note @-8 {{variable captured by sendable closure}}
                            // xpected-note @-8 {{capturing use}}
                            // xpected-note @-8 {{capturing use}}
 }

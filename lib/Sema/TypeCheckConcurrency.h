@@ -218,7 +218,7 @@ void checkOverrideActorIsolation(ValueDecl *value);
 /// as async functions or actors.
 bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 
-/// Diagnose the presence of any non-concurrent types when referencing a
+/// Diagnose the presence of any non-sendable types when referencing a
 /// given declaration from a particular declaration context.
 ///
 /// This function should be invoked any time that the given declaration
