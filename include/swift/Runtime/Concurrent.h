@@ -63,7 +63,7 @@ template <class ElemTy> struct ConcurrentList {
 
   /// Remove all of the links in the chain. This method leaves
   /// the list at a usable state and new links can be added.
-  /// Notice that this operation is non-concurrent because
+  /// Notice that this operation is non-sendable because
   /// we have no way of ensuring that no one is currently
   /// traversing the list.
   void clear() {
