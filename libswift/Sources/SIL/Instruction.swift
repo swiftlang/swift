@@ -30,7 +30,7 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   }
 
   final public var description: String {
-    SILNode_debugDescription(bridgedNode).takeString()
+    SILNode_debugDescription(bridgedNode).string
   }
   
   final public var operands: OperandArray {
@@ -132,7 +132,7 @@ public class SingleValueInstruction : Instruction, Value {
 
 public final class MultipleValueInstructionResult : Value {
   final public var description: String {
-    SILNode_debugDescription(bridgedNode).takeString()
+    SILNode_debugDescription(bridgedNode).string
   }
 
   public var definingInstruction: Instruction? {

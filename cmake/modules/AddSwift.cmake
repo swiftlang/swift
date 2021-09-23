@@ -722,10 +722,15 @@ endfunction()
 # This is a temporary workaround until it's possible to compile libswift with
 # cmake's builtin swift support.
 function(add_libswift name)
+  set(libswift_compile_options
+      "-target" "x86_64-apple-macosx10.15" # TODO: remove this once #38675 lands.
+      "-Xfrontend" "-validate-tbd-against-ir=none"
+      "-Xfrontend" "-enable-cxx-interop")
+
   if(CMAKE_BUILD_TYPE STREQUAL Debug)
-    set(libswift_compile_options "-g")
+    list(APPEND libswift_compile_options "-g")
   else()
-    set(libswift_compile_options "-O" "-cross-module-optimization")
+    list(APPEND libswift_compile_options "-O" "-cross-module-optimization")
   endif()
 
   set(build_dir ${CMAKE_CURRENT_BINARY_DIR})
