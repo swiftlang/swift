@@ -133,6 +133,11 @@ import SubE
 // CHECK-NEXT: "-module-name",
 // CHECK-NEXT: "C"
 
+// CHECK: "capturedPCMArgs": [
+// CHECK-NEXT:   "-Xcc",
+// CHECK-NEXT:   "-fapinotes-swift-version=4"
+// CHECK-NEXT: ]
+
 /// --------Swift module E
 // CHECK: "swift": "E"
 // CHECK-LABEL: modulePath": "E.swiftmodule"

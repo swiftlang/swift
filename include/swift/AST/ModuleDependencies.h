@@ -247,16 +247,22 @@ public:
   /// The file dependencies
   const std::vector<std::string> fileDependencies;
 
+  /// The swift-specific PCM arguments captured by this dependencies object
+  /// as found by the scanning action that discovered it
+  const std::vector<std::string> capturedPCMArgs;
+
   ClangModuleDependenciesStorage(
       const std::string &moduleMapFile,
       const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
-      const std::vector<std::string> &fileDependencies
+      const std::vector<std::string> &fileDependencies,
+      const std::vector<std::string> &capturedPCMArgs
   ) : ModuleDependenciesStorageBase(ModuleDependenciesKind::Clang),
       moduleMapFile(moduleMapFile),
       contextHash(contextHash),
       nonPathCommandLine(nonPathCommandLine),
-      fileDependencies(fileDependencies) { }
+      fileDependencies(fileDependencies),
+      capturedPCMArgs(capturedPCMArgs) {}
 
   ModuleDependenciesStorageBase *clone() const override {
     return new ClangModuleDependenciesStorage(*this);
@@ -361,10 +367,12 @@ public:
       const std::string &moduleMapFile,
       const std::string &contextHash,
       const std::vector<std::string> &nonPathCommandLine,
-      const std::vector<std::string> &fileDependencies) {
+      const std::vector<std::string> &fileDependencies,
+      const std::vector<std::string> &capturedPCMArgs) {
     return ModuleDependencies(
         std::make_unique<ClangModuleDependenciesStorage>(
-          moduleMapFile, contextHash, nonPathCommandLine, fileDependencies));
+          moduleMapFile, contextHash, nonPathCommandLine,
+          fileDependencies, capturedPCMArgs));
   }
 
   /// Describe a placeholder dependency swift module.
