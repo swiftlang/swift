@@ -781,8 +781,9 @@ importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-march=z13");
   }
 
-  if (triple.isOSLinux() && triple.getArch() == llvm::Triple::x86_64) {
-    // Enable double wide atomic intrinsics for x86_64 archs on Linux.
+  if (triple.getArch() == llvm::Triple::x86_64) {
+    // Enable double wide atomic intrinsics on every x86_64 target.
+    // (This is the default on Darwin, but not so on other platforms.)
     invocationArgStrs.push_back("-mcx16");
   }
 
