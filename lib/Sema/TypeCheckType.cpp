@@ -74,7 +74,6 @@ TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
                              HandlePlaceholderTypeReprFn placeholderHandler) {
   TypeResolution result(dc, TypeResolutionStage::Interface, options,
                         unboundTyOpener, placeholderHandler);
-  result.genericSig = dc->getGenericSignatureOfContext();
   return result;
 }
 
@@ -100,7 +99,6 @@ TypeResolution::forContextual(DeclContext *dc, GenericEnvironment *genericEnv,
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
   TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler);
   result.genericEnv = genericEnv;
-  result.genericSig = genericSig;
   return result;
 }
 
@@ -109,20 +107,14 @@ ASTContext &TypeResolution::getASTContext() const {
 }
 
 GenericSignature TypeResolution::getGenericSignature() const {
-  switch (stage) {
-  case TypeResolutionStage::Contextual:
-    return dc->getGenericSignatureOfContext();
+  assert(
+      stage > TypeResolutionStage::Structural &&
+      "Structural resolution shouldn't require generic signature computation");
 
-  case TypeResolutionStage::Interface:
-    if (genericSig)
-      return genericSig;
+  if (genericEnv)
+    return genericEnv->getGenericSignature();
 
-    return dc->getGenericSignatureOfContext();
-
-  case TypeResolutionStage::Structural:
-    return GenericSignature();
-  }
-  llvm_unreachable("unhandled stage");
+  return dc->getGenericSignatureOfContext();
 }
 
 bool TypeResolution::usesArchetypes() const {
@@ -330,16 +322,17 @@ bool TypeResolution::areSameType(Type type1, Type type2) const {
     return false;
   }
 
-  // If we have a generic signature, canonicalize using it.
-  if (auto genericSig = getGenericSignature()) {
-    // If both are type parameters, we can use a cheaper check
-    // that avoids transforming the type and computing anchors.
-    if (type1->isTypeParameter() &&
-        type2->isTypeParameter()) {
-      return genericSig->areSameTypeParameterInContext(type1, type2);
+  if (stage == TypeResolutionStage::Interface) {
+    // If we have a generic signature, canonicalize using it.
+    if (auto genericSig = getGenericSignature()) {
+      // If both are type parameters, we can use a cheaper check
+      // that avoids transforming the type and computing anchors.
+      if (type1->isTypeParameter() && type2->isTypeParameter()) {
+        return genericSig->areSameTypeParameterInContext(type1, type2);
+      }
+      return genericSig.getCanonicalTypeInContext(type1) ==
+             genericSig.getCanonicalTypeInContext(type2);
     }
-    return genericSig.getCanonicalTypeInContext(type1) ==
-           genericSig.getCanonicalTypeInContext(type2);
   }
 
   // Otherwise, perform a structural check.

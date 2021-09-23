@@ -303,9 +303,6 @@ private:
   /// The generic environment used to map to archetypes.
   GenericEnvironment *genericEnv;
 
-  /// The generic signature to use for type resolution.
-  GenericSignature genericSig;
-
   TypeResolution(DeclContext *dc, TypeResolutionStage stage,
                  TypeResolutionOptions options,
                  OpenUnboundGenericTypeFn unboundTyOpener,
