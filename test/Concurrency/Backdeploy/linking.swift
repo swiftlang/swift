@@ -8,6 +8,7 @@
 // RUN: otool -L %t/linking_rpath_old | %FileCheck -check-prefix CHECK-RPATH %s
 
 // REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 // CHECK-DIRECT: /usr/lib/swift/libswift_Concurrency.dylib
 // CHECK-RPATH: @rpath/libswift_Concurrency.dylib
