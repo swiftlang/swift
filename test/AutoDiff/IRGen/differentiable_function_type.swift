@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -g %s -requirement-machine=off
+// RUN: %target-swift-frontend -emit-ir -g %s
 
 import _Differentiation
 
