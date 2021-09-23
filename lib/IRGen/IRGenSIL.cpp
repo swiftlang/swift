@@ -2181,11 +2181,15 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
   auto funcTy = CurSILFn->getLoweredFunctionType();
-  if (funcTy->isAsync() && funcTy->getLanguage() == SILFunctionLanguage::Swift) {
+  bool isAsyncFn = funcTy->isAsync();
+  if (isAsyncFn && funcTy->getLanguage() == SILFunctionLanguage::Swift) {
     emitAsyncFunctionPointer(IGM,
                              CurFn,
                              LinkEntity::forSILFunction(CurSILFn),
                              getAsyncContextLayout(*this).getSize());
+  }
+  if (isAsyncFn) {
+    IGM.noteSwiftAsyncFunctionDef();
   }
 
   // Configure the dominance resolver.

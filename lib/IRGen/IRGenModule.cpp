@@ -1644,6 +1644,7 @@ bool IRGenModule::finalize() {
   if (!ClangCodeGen->GetModule())
     return false;
 
+  emitSwiftAsyncExtendedFrameInfoWeakRef();
   emitAutolinkInfo();
   emitGlobalLists();
   if (DebugInfo)
@@ -1775,4 +1776,31 @@ TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
 
 const TypeLayoutEntry &IRGenModule::getTypeLayoutEntry(SILType T) {
   return Types.getTypeLayoutEntry(T);
+}
+
+
+void IRGenModule::emitSwiftAsyncExtendedFrameInfoWeakRef() {
+  if (!hasSwiftAsyncFunctionDef || extendedFramePointerFlagsWeakRef)
+    return;
+  if (IRGen.Opts.SwiftAsyncFramePointer !=
+      SwiftAsyncFramePointerKind::Auto)
+    return;
+  if (isConcurrencyAvailable())
+    return;
+
+  // Emit a weak reference to the `swift_async_extendedFramePointerFlags` symbol
+  // needed by Swift async functions.
+  auto symbolName = "swift_async_extendedFramePointerFlags";
+  if ((extendedFramePointerFlagsWeakRef = Module.getGlobalVariable(symbolName)))
+    return;
+  extendedFramePointerFlagsWeakRef = new llvm::GlobalVariable(Module, Int8PtrTy, false,
+                                         llvm::GlobalValue::ExternalWeakLinkage, nullptr,
+                                         symbolName);
+}
+
+bool IRGenModule::isConcurrencyAvailable() {
+  auto &ctx = getSwiftModule()->getASTContext();
+  auto deploymentAvailability =
+    AvailabilityContext::forDeploymentTarget(ctx);
+  return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
 }

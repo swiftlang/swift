@@ -1230,13 +1230,6 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
   }
 }
 
-/// Determine whether concurrency support is available in the runtime.
-static bool isConcurrencyAvailable(ASTContext &ctx) {
-  auto deploymentAvailability =
-    AvailabilityContext::forDeploymentTarget(ctx);
-  return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
-}
-
 namespace {
   /// A visitor class for emitting a reference to a metatype object.
   /// This implements a "raw" access, useful for implementing cache
@@ -1598,7 +1591,7 @@ namespace {
         }
 
         auto *getMetadataFn = type->getGlobalActor()
-            ? (isConcurrencyAvailable(IGF.getSwiftModule()->getASTContext())
+            ? (IGF.IGM.isConcurrencyAvailable()
                ? IGF.IGM.getGetFunctionMetadataGlobalActorFn()
                : IGF.IGM.getGetFunctionMetadataGlobalActorBackDeployFn())
             : type->isDifferentiable()

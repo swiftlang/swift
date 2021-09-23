@@ -21,3 +21,7 @@ public func someAsyncFunction() async {
 // NEVER: s31swift_async_extended_frame_info17someAsyncFunctionyyYaF:
 // NEVER-NOT:	_swift_async_extendedFramePointerFlags
 // NEVER-NOT: btsq	$60
+
+// AUTO: .weak_reference _swift_async_extendedFramePointerFlags
+// NEVER-NOT: .weak_reference _swift_async_extendedFramePointerFlags
+// ALWAYS-NOT: .weak_reference _swift_async_extendedFramePointerFlags
