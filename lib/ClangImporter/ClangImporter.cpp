@@ -4340,3 +4340,18 @@ bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
   return isa<clang::CXXConstructorDecl>(method) || !method->isConst() ||
          method->getParent()->hasMutableFields();
 }
+
+SwiftLookupTable *
+ClangImporter::findLookupTable(const clang::Module *clangModule) {
+  return Impl.findLookupTable(clangModule);
+}
+
+/// Determine the effective Clang context for the given Swift nominal type.
+EffectiveClangContext
+ClangImporter::getEffectiveClangContext(const NominalTypeDecl *nominal) {
+  return Impl.getEffectiveClangContext(nominal);
+}
+
+Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
+  return Impl.importDecl(decl, Impl.CurrentVersion);
+}
