@@ -49,7 +49,7 @@ public:
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
-  /// The map of aliases and underlying names of imported modules.
+  /// The map of aliases and underlying names of imported or referenced modules.
   llvm::StringMap<StringRef> ModuleAliasMap;
 
   /// The name of the module that the frontend is building.
