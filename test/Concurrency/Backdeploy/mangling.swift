@@ -16,6 +16,9 @@
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
 
+// rdar://83465277 - failing when using OS stdlib on 10.15 and earlier.
+// UNSUPPORTED: use_os_stdlib
+
 protocol MyProtocol {
   associatedtype AssocSendable
   associatedtype AssocAsync
