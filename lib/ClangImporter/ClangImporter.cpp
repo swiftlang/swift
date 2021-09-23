@@ -781,6 +781,11 @@ importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-march=z13");
   }
 
+  if (triple.isOSLinux() && triple.getArch() == llvm::Triple::x86_64) {
+    // Enable double wide atomic intrinsics for x86_64 archs on Linux.
+    invocationArgStrs.push_back("-mcx16");
+  }
+
   if (!importerOpts.Optimization.empty()) {
     invocationArgStrs.push_back(importerOpts.Optimization);
   }
