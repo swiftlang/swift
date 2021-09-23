@@ -18,8 +18,8 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringMap.h"
 
-#include <map>
 #include <string>
 #include <vector>
 
@@ -50,7 +50,7 @@ public:
   std::string ImplicitObjCHeaderPath;
 
   /// The map of aliases and underlying names of imported modules.
-  std::map<StringRef, StringRef> ModuleAliasMap;
+  llvm::StringMap<StringRef> ModuleAliasMap;
 
   /// The name of the module that the frontend is building.
   std::string ModuleName;

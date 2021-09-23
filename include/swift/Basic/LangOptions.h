@@ -31,7 +31,6 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/raw_ostream.h"
-#include <map>
 #include <string>
 #include <vector>
 
@@ -196,9 +195,6 @@ namespace swift {
 
     /// Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
-
-    /// A map of aliases and underlying names of imported modules.
-    std::map<StringRef, StringRef> ModuleAliasMap;
 
     /// Enable the MemoryBufferSerializedModuleImporter.
     /// Only used by lldb-moduleimport-test.

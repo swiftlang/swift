@@ -212,7 +212,6 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   // and single file builds.
   Invocation.getLangOptions().RecordRequestReferences
     = !isWholeModuleCompilation();
-  Invocation.getLangOptions().ModuleAliasMap = Invocation.getFrontendOptions().ModuleAliasMap;
 
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
