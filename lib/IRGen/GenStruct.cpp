@@ -913,18 +913,13 @@ private:
     addOpaqueField(Size(0), TotalStride);
   }
 
-  static bool isImportOfClangField(VarDecl *swiftField,
-                                   const clang::FieldDecl *clangField) {
-    assert(swiftField->hasClangNode());
-    return (swiftField->getClangNode().castAsDecl() == clangField);
-  }
-
   void collectStructFields() {
     auto cfi = ClangDecl->field_begin(), cfe = ClangDecl->field_end();
     auto swiftProperties = SwiftDecl->getStoredProperties();
-    auto sfi = swiftProperties.begin(), sfe = swiftProperties.end();
 
+    unsigned clangFieldsCount = 0;
     while (cfi != cfe) {
+      clangFieldsCount++;
       const clang::FieldDecl *clangField = *cfi++;
 
       // Bitfields are currently never mapped, but that doesn't mean
@@ -956,16 +951,12 @@ private:
         continue;
       }
 
-      VarDecl *swiftField;
-      if (sfi != sfe) {
-        swiftField = *sfi;
-        if (isImportOfClangField(swiftField, clangField)) {
-          ++sfi;
-        } else {
-          swiftField = nullptr;
+      VarDecl *swiftField = nullptr;
+      for (auto *sfi : swiftProperties) {
+        if (sfi->getClangDecl() == clangField) {
+          swiftField = sfi;
+          break;
         }
-      } else {
-        swiftField = nullptr;
       }
 
       // Try to position this field.  If this fails, it's because we
@@ -973,7 +964,8 @@ private:
       addStructField(clangField, swiftField);
     }
 
-    assert(sfi == sfe && "more Swift fields than there were Clang fields?");
+    assert(swiftProperties.size() <= clangFieldsCount &&
+           "more Swift fields than there were Clang fields?");
 
     // We never take advantage of tail padding, because that would prevent
     // us from passing the address of the object off to C, which is a pretty
