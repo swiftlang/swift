@@ -582,6 +582,26 @@ func testSwitch(_ e: E) {
   }
 }
 
+func testExistingPatternsInCaseStatements() {
+  tuplify(true) { c in
+    switch false {
+    case (c): 1 // Ok
+    default:  0
+    }
+  }
+
+  var arr: [Int] = []
+
+  tuplify(true) { c in
+    let n = arr.endIndex
+
+    switch arr.startIndex {
+    case (n): 1 // Ok
+    default:  0
+    }
+  }
+}
+
 // CHECK: testSwitch
 // CHECK-SAME: first(main.Either<Swift.String, (Swift.Int, Swift.String)>.first("a"))
 testSwitch(getE(0))
