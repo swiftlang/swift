@@ -1067,6 +1067,10 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
       // Check the version number specified via -user-module-version.
       StringRef current(args[I]), next(args[I + 1]);
       if (current == "-user-module-version") {
+        // Sanitize versions that are too long
+        while(next.count('.') > 3) {
+          next = next.rsplit('.').first;
+        }
         result.tryParse(next);
         break;
       }
