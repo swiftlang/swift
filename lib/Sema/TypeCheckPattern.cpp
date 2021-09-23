@@ -84,9 +84,7 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
   for (const LookupResultEntry &result : foundElements) {
     ValueDecl *e = result.getValueDecl();
     assert(e);
-    if (e->isInvalid()) {
-      continue;
-    }
+
     // Skip if the enum element was referenced as an instance member
     if (unqualifiedLookup) {
       if (!result.getBaseDecl() ||
@@ -96,8 +94,10 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
     }
 
     if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
-      // Ambiguities should be ruled out by parsing.
-      assert(!foundElement && "ambiguity in enum case name lookup?!");
+      // Note that there could be multiple elements with the same
+      // name, such results in a re-declaration error, so let's
+      // just always pick the last element, just like in `foundConstant`
+      // case.
       foundElement = oe;
       continue;
     }
