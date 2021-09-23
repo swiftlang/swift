@@ -3,6 +3,9 @@
 // RUN: %target-swift-frontend -enable-type-layout -force-struct-type-layouts -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=FORCE-OPT --check-prefix=FORCE-OPT-%target-ptrsize
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
 
+// https://bugs.swift.org/browse/SR-15237
+// UNSUPPORTED: CPU=arm64e
+
 public struct B<T> {
   var x: T
   var y: T
