@@ -412,6 +412,68 @@ void UnqualifiedLookupRequest::writeDependencySink(
   track.addTopLevelName(desc.Name.getBaseName());
 }
 
+// The following clang importer requests have some definitions here to prevent
+// linker errors when building lib syntax parser (which doesn't link with the
+// clang importer).
+
+//----------------------------------------------------------------------------//
+// ClangDirectLookupRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ClangDirectLookupDescriptor &desc) {
+  out << "Looking up ";
+  simple_display(out, desc.name);
+  out << " in ";
+  simple_display(out, desc.decl);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc) {
+  return extractNearestSourceLoc(desc.decl);
+}
+
+//----------------------------------------------------------------------------//
+// CXXNamespaceMemberLookup computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const CXXNamespaceMemberLookupDescriptor &desc) {
+  out << "Looking up ";
+  simple_display(out, desc.name);
+  out << " in ";
+  simple_display(out, desc.namespaceDecl);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const CXXNamespaceMemberLookupDescriptor &desc) {
+  return extractNearestSourceLoc(desc.namespaceDecl);
+}
+
+//----------------------------------------------------------------------------//
+// ClangRecordMemberLookup computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ClangRecordMemberLookupDescriptor &desc) {
+  out << "Looking up ";
+  simple_display(out, desc.name);
+  out << " in ";
+  simple_display(out, desc.recordDecl);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const ClangRecordMemberLookupDescriptor &desc) {
+  return extractNearestSourceLoc(desc.recordDecl);
+}
+
+// Implement the clang importer type zone.
+#define SWIFT_TYPEID_ZONE ClangImporter
+#define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"
+#include "swift/Basic/ImplementTypeIDZone.h"
+#undef SWIFT_TYPEID_ZONE
+#undef SWIFT_TYPEID_HEADER
+
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \

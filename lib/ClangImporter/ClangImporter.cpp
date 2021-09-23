@@ -26,12 +26,14 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
@@ -4015,6 +4017,141 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   for (auto baseName : baseNames) {
     lookupObjCMembers(table, baseName.toDeclBaseName(SwiftContext), consumer);
   }
+}
+
+static SmallVector<SwiftLookupTable::SingleEntry, 4>
+lookupInClassTemplateSpecialization(
+    ASTContext &ctx, const clang::ClassTemplateSpecializationDecl *clangDecl,
+    DeclName name) {
+  // TODO: we could make this faster if we can cache class templates in the
+  // lookup table as well.
+  // Import all the names to figure out which ones we're looking for.
+  SmallVector<SwiftLookupTable::SingleEntry, 4> found;
+  for (auto member : clangDecl->decls()) {
+    auto namedDecl = dyn_cast<clang::NamedDecl>(member);
+    if (!namedDecl)
+      continue;
+
+    auto memberName = ctx.getClangModuleLoader()->importName(namedDecl);
+    if (!memberName)
+      continue;
+
+    // Use the base names here because *sometimes* our input name won't have
+    // any arguments.
+    if (name.getBaseName().compare(memberName.getBaseName()) == 0)
+      found.push_back(namedDecl);
+  }
+
+  return found;
+}
+
+SmallVector<SwiftLookupTable::SingleEntry, 4>
+ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
+                                   ClangDirectLookupDescriptor desc) const {
+  auto &ctx = desc.decl->getASTContext();
+  auto *clangDecl = desc.decl->getClangDecl();
+  // Class templates aren't in the lookup table.
+  if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
+    return lookupInClassTemplateSpecialization(ctx, spec, desc.name);
+
+  auto *clangModule =
+      getClangOwningModule(clangDecl, clangDecl->getASTContext());
+  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
+
+  auto *swiftDeclContext = desc.decl->getInnermostDeclContext();
+  auto *declContextTypeDecl = swiftDeclContext->getSelfNominalTypeDecl();
+  auto effectiveClangContext =
+      ctx.getClangModuleLoader()->getEffectiveClangContext(declContextTypeDecl);
+
+  auto foundDecls = lookupTable->lookup(
+      SerializedSwiftName(desc.name.getBaseName()), effectiveClangContext);
+  // TODO: in `SwiftLookupTable::lookup` the `searchContext` is only a string.
+  // This is problematic because we might have two nested search contexts with
+  // the same name. The search context needs to be updated to be a decl (or
+  // decl context), but that will be a larger, seperate refactor. When that
+  // happens we can remove the below logic.
+  //
+  // We filter here by ensuring that each decl and all of its parents have the
+  // same name as `clangDecl` and its parents. This is prefered to checking the
+  // decl context pointer is equal to `clangDecl` because we may have a forward
+  // declared struct, multiple redecls of a namespace, or transparent contexts.
+  auto deepCompareDeclContexts = [](auto first, auto second) {
+    while (first->getParent() && second->getParent()) {
+      first = first->getParent();
+      second = second->getParent();
+
+      // Look through transparent contexts. If we have one (or more) extern C++
+      // contexts, that is the same as none.
+      while (first->isTransparentContext())
+        first = first->getParent();
+      while (second->isTransparentContext())
+        second = second->getParent();
+
+      auto firstName = dyn_cast<clang::NamedDecl>(first);
+      auto secondName = dyn_cast<clang::NamedDecl>(second);
+
+      if (!firstName || !secondName) {
+        if (firstName != secondName)
+          return false;
+        continue;
+      }
+
+      if (firstName->getName() != secondName->getName())
+        return false;
+    }
+    return !first->getParent() && !second->getParent();
+  };
+  SmallVector<SwiftLookupTable::SingleEntry, 4> filteredDecls;
+  llvm::copy_if(
+      foundDecls, std::back_inserter(filteredDecls),
+      [&deepCompareDeclContexts, dc = cast<clang::DeclContext>(clangDecl)](
+          SwiftLookupTable::SingleEntry decl) {
+        return deepCompareDeclContexts(
+            decl.get<clang::NamedDecl *>()->getDeclContext(), dc);
+      });
+  return filteredDecls;
+}
+
+TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
+    Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const {
+  EnumDecl *namespaceDecl = desc.namespaceDecl;
+  DeclName name = desc.name;
+
+  auto &ctx = namespaceDecl->getASTContext();
+  auto allResults = evaluateOrDefault(
+      ctx.evaluator, ClangDirectLookupRequest({namespaceDecl, name}), {});
+
+  TinyPtrVector<ValueDecl *> result;
+  for (auto found : allResults) {
+    auto clangMember = found.get<clang::NamedDecl *>();
+    if (auto import =
+            ctx.getClangModuleLoader()->importDeclDirectly(clangMember))
+      result.push_back(cast<ValueDecl>(import));
+  }
+
+  return result;
+}
+
+TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
+    Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
+  StructDecl *recordDecl = desc.recordDecl;
+  DeclName name = desc.name;
+
+  auto &ctx = recordDecl->getASTContext();
+  auto allResults = evaluateOrDefault(
+      ctx.evaluator, ClangDirectLookupRequest({recordDecl, name}), {});
+
+  // Find the results that are actually a member of "recordDecl".
+  TinyPtrVector<ValueDecl *> result;
+  for (auto found : allResults) {
+    auto named = found.get<clang::NamedDecl *>();
+    if (dyn_cast<clang::Decl>(named->getDeclContext()) ==
+        recordDecl->getClangDecl())
+      if (auto import = ctx.getClangModuleLoader()->importDeclDirectly(named))
+        result.push_back(cast<ValueDecl>(import));
+  }
+
+  return result;
 }
 
 TinyPtrVector<ValueDecl *>
