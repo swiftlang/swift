@@ -100,6 +100,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncStream.cpp
   Deque.swift
   ${swift_concurrency_extra_sources}
+  linker-support/magic-symbols-for-install-name.c
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
