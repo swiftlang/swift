@@ -1731,9 +1731,11 @@ namespace {
       };
 
       // If a contextual type exists for this expression, apply it directly.
-      Optional<Type> arrayElementType;
-      if (contextualType &&
-          (arrayElementType = ConstraintSystem::isArrayType(contextualType))) {
+      if (contextualType && ConstraintSystem::isArrayType(contextualType)) {
+        contextualType = CS.replaceInferableTypesWithTypeVars(
+            contextualType, CS.getConstraintLocator(expr));
+        Optional<Type> arrayElementType =
+            ConstraintSystem::isArrayType(contextualType);
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
                          locator);
@@ -1841,9 +1843,11 @@ namespace {
 
       // If a contextual type exists for this expression and is a dictionary
       // type, apply it directly.
-      Optional<std::pair<Type, Type>> dictionaryKeyValue;
-      if (openedType && (dictionaryKeyValue =
-                             ConstraintSystem::isDictionaryType(openedType))) {
+      if (openedType && ConstraintSystem::isDictionaryType(openedType)) {
+        openedType = CS.replaceInferableTypesWithTypeVars(
+            openedType, CS.getConstraintLocator(expr));
+        Optional<std::pair<Type, Type>> dictionaryKeyValue =
+            ConstraintSystem::isDictionaryType(openedType);
         Type contextualDictionaryKeyType;
         Type contextualDictionaryValueType;
         std::tie(contextualDictionaryKeyType,
