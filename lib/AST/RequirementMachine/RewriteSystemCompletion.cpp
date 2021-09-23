@@ -369,8 +369,7 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                                    std::vector<std::pair<MutableTerm,
                                                          MutableTerm>> &pairs,
                                    std::vector<RewritePath> &paths,
-                                   std::vector<std::pair<MutableTerm,
-                                                         RewritePath>> &loops) const {
+                                   std::vector<HomotopyGenerator> &loops) const {
   auto end = lhs.getLHS().end();
   if (from + rhs.getLHS().size() < end) {
     // lhs == TUV -> X, rhs == U -> Y.
@@ -495,7 +494,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
   std::vector<std::pair<MutableTerm, MutableTerm>> resolvedCriticalPairs;
   std::vector<RewritePath> resolvedPaths;
-  std::vector<std::pair<MutableTerm, RewritePath>> resolvedLoops;
+  std::vector<HomotopyGenerator> resolvedLoops;
 
   do {
     // For every rule, looking for other rules that overlap with this rule.
@@ -571,7 +570,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
               llvm::dbgs() << rhs << ":\n";
 
               llvm::dbgs() << "$$ Loop: ";
-              loop.second.dump(llvm::dbgs(), loop.first, *this);
+              loop.Path.dump(llvm::dbgs(), loop.Basepoint, *this);
               llvm::dbgs() << "\n\n";
 
               // Record the trivial loop.

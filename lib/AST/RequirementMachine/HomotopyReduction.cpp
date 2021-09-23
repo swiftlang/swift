@@ -505,12 +505,12 @@ void RewriteSystem::minimizeRewriteSystem() {
       const auto &loop = HomotopyGenerators[loopID];
 
       SmallVector<unsigned> redundancyCandidates =
-          loop.second.findRulesAppearingOnceInEmptyContext();
+          loop.Path.findRulesAppearingOnceInEmptyContext();
       if (redundancyCandidates.empty())
         continue;
 
       auto ruleID = redundancyCandidates.front();
-      RewritePath replacementPath = loop.second.splitCycleAtRule(ruleID);
+      RewritePath replacementPath = loop.Path.splitCycleAtRule(ruleID);
 
       deletedRules.insert(ruleID);
       deletedHomotopyGenerators.insert(loopID);
@@ -538,30 +538,30 @@ void RewriteSystem::minimizeRewriteSystem() {
         continue;
 
       auto &loop = HomotopyGenerators[loopID];
-      bool changed = loop.second.replaceRuleWithPath(ruleID, replacementPath);
+      bool changed = loop.Path.replaceRuleWithPath(ruleID, replacementPath);
 
       if (changed) {
-        unsigned size = loop.second.size();
+        unsigned size = loop.Path.size();
 
         bool changed;
         do {
           changed = false;
-          changed |= loop.second.computeFreelyReducedPath();
-          changed |= loop.second.computeCyclicallyReducedLoop(loop.first, *this);
-          changed |= loop.second.computeLeftCanonicalForm(*this);
+          changed |= loop.Path.computeFreelyReducedPath();
+          changed |= loop.Path.computeCyclicallyReducedLoop(loop.Basepoint, *this);
+          changed |= loop.Path.computeLeftCanonicalForm(*this);
         } while (changed);
 
         if (Debug.contains(DebugFlags::HomotopyReduction)) {
-          if (size != loop.second.size()) {
-            llvm::dbgs() << "** Note: Cyclically reduced the loop to eliminate "
-                         << (size - loop.second.size()) << " steps\n";
+          if (size != loop.Path.size()) {
+            llvm::dbgs() << "** Note: Reducing the loop eliminated "
+                         << (size - loop.Path.size()) << " steps\n";
           }
         }
 
         if (Debug.contains(DebugFlags::HomotopyReduction)) {
           llvm::dbgs() << "** Updated homotopy generator: ";
-          llvm::dbgs() << "- " << loop.first << ": ";
-          loop.second.dump(llvm::dbgs(), loop.first, *this);
+          llvm::dbgs() << "- " << loop.Basepoint << ": ";
+          loop.Path.dump(llvm::dbgs(), loop.Basepoint, *this);
           llvm::dbgs() << "\n";
         }
       }
@@ -587,16 +587,16 @@ void RewriteSystem::minimizeRewriteSystem() {
         continue;
 
       const auto &loop = HomotopyGenerators[loopID];
-      if (loop.second.empty())
+      if (loop.Path.empty())
         continue;
 
       llvm::dbgs() << "(#" << loopID << ") ";
-      llvm::dbgs() << loop.first << ": ";
-      loop.second.dump(llvm::dbgs(), loop.first, *this);
+      llvm::dbgs() << loop.Basepoint << ": ";
+      loop.Path.dump(llvm::dbgs(), loop.Basepoint, *this);
       llvm::dbgs() << "\n";
 
-      MutableTerm basepoint = loop.first;
-      for (auto step : loop.second) {
+      MutableTerm basepoint = loop.Basepoint;
+      for (auto step : loop.Path) {
         step.apply(basepoint, *this);
         llvm::dbgs() << "- " << basepoint << "\n";
       }
@@ -608,15 +608,15 @@ void RewriteSystem::minimizeRewriteSystem() {
 void RewriteSystem::verifyHomotopyGenerators() const {
 #ifndef NDEBUG
   for (const auto &loop : HomotopyGenerators) {
-    auto term = loop.first;
+    auto term = loop.Basepoint;
 
-    for (const auto &step : loop.second) {
+    for (const auto &step : loop.Path) {
       step.apply(term, *this);
     }
 
-    if (term != loop.first) {
+    if (term != loop.Basepoint) {
       llvm::errs() << "Not a loop: ";
-      loop.second.dump(llvm::errs(), loop.first, *this);
+      loop.Path.dump(llvm::errs(), loop.Basepoint, *this);
       llvm::errs() << "\n";
       abort();
     }

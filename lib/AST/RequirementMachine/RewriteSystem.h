@@ -266,6 +266,29 @@ struct RewritePath {
             const RewriteSystem &system) const;
 };
 
+/// A loop (3-cell) that rewrites the basepoint back to the basepoint.
+class HomotopyGenerator {
+public:
+  MutableTerm Basepoint;
+  RewritePath Path;
+
+private:
+  bool Deleted;
+
+public:
+  HomotopyGenerator(MutableTerm basepoint, RewritePath path)
+    : Basepoint(basepoint), Path(path), Deleted(false) {}
+
+  bool isDeleted() const {
+    return Deleted;
+  }
+
+  void markDeleted() {
+    assert(!Deleted);
+    Deleted = true;
+  }
+};
+
 /// A term rewrite system for working with types in a generic signature.
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
@@ -320,7 +343,7 @@ class RewriteSystem final {
   /// loop around a base point.
   ///
   /// This data informs the generic signature minimization algorithm.
-  std::vector<std::pair<MutableTerm, RewritePath>> HomotopyGenerators;
+  std::vector<HomotopyGenerator> HomotopyGenerators;
 
   DebugOptions Debug;
 
@@ -401,7 +424,7 @@ private:
       const Rule &lhs, const Rule &rhs,
       std::vector<std::pair<MutableTerm, MutableTerm>> &pairs,
       std::vector<RewritePath> &paths,
-      std::vector<std::pair<MutableTerm, RewritePath>> &loops) const;
+      std::vector<HomotopyGenerator> &loops) const;
 
   void processMergedAssociatedTypes();
 

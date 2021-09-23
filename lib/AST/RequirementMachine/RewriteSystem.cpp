@@ -428,8 +428,8 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "}\n";
   out << "Homotopy generators: {\n";
   for (const auto &loop : HomotopyGenerators) {
-    out << "- " << loop.first << ": ";
-    loop.second.dump(out, loop.first, *this);
+    out << "- " << loop.Basepoint << ": ";
+    loop.Path.dump(out, loop.Basepoint, *this);
     out << "\n";
   }
   out << "}\n";
