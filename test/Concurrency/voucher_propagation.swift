@@ -12,6 +12,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://83459813 - assertion failure in TaskGroup.cpp
+// REQUIRES: OS=macosx
+
 import Darwin
 import Dispatch
 import StdlibUnittest
