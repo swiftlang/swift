@@ -1167,12 +1167,12 @@ Completion *CompletionBuilder::finish() {
 
     if (current.getKind() == SwiftResult::Declaration) {
       base = SwiftResult(
-          semanticContext, flair, current.getNumBytesToErase(), completionString,
-          current.getAssociatedDeclKind(), current.isSystem(),
-          current.getModuleName(), current.getSourceFilePath(),
-          current.getNotRecommendedReason(), current.getDiagnosticSeverity(),
-          current.getDiagnosticMessage(), current.getBriefDocComment(),
-          current.getAssociatedUSRs(), typeRelation, opKind);
+          semanticContext, flair, current.getNumBytesToErase(),
+          completionString, current.getAssociatedDeclKind(), current.isSystem(),
+          current.getModuleName(), current.getNotRecommendedReason(),
+          current.getDiagnosticSeverity(), current.getDiagnosticMessage(),
+          current.getBriefDocComment(), current.getAssociatedUSRs(),
+          typeRelation, opKind);
     } else {
       base = SwiftResult(current.getKind(), semanticContext, flair,
                          current.getNumBytesToErase(), completionString,

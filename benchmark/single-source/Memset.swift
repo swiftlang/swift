@@ -16,7 +16,7 @@ public let benchmarks =
   BenchmarkInfo(
     name: "Memset",
     runFunction: run_Memset,
-    tags: [.validation])
+    tags: [.validation, .unstable])
 
 @inline(never)
 func memset(_ a: inout [Int], _ c: Int) {

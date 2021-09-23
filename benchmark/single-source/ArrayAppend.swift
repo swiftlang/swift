@@ -16,7 +16,7 @@ import TestsUtils
 
 let t: [BenchmarkCategory] = [.validation, .api, .Array]
 public let benchmarks = [
-  BenchmarkInfo(name: "ArrayAppend", runFunction: run_ArrayAppend, tags: t, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppend", runFunction: run_ArrayAppend, tags: t + [.unstable], legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendArrayOfInt", runFunction: run_ArrayAppendArrayOfInt, tags: t,
     setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendAscii", runFunction: run_ArrayAppendAscii, tags: t, legacyFactor: 34),

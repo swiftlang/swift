@@ -20,7 +20,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AccessStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
@@ -513,7 +513,7 @@ class LoopTreeOptimization {
   DominanceInfo *DomTree;
   PostDominanceAnalysis *PDA;
   PostDominanceInfo *postDomTree = nullptr;
-  AccessedStorageAnalysis *ASA;
+  AccessStorageAnalysis *ASA;
   bool Changed;
 
   /// True if LICM is done on high-level SIL, i.e. semantic calls are not
@@ -542,7 +542,7 @@ public:
   LoopTreeOptimization(SILLoop *TopLevelLoop, SILLoopInfo *LI,
                        AliasAnalysis *AA, SideEffectAnalysis *SEA,
                        DominanceInfo *DT, PostDominanceAnalysis *PDA,
-                       AccessedStorageAnalysis *ASA,
+                       AccessStorageAnalysis *ASA,
                        bool RunsOnHighLevelSil)
       : LoopInfo(LI), AA(AA), SEA(SEA), DomTree(DT), PDA(PDA), ASA(ASA),
         Changed(false), RunsOnHighLevelSIL(RunsOnHighLevelSil) {
@@ -752,27 +752,27 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
                                SmallVector<BeginAccessInst *, 8> &BeginAccesses,
                                SmallVector<FullApplySite, 8> &fullApplies,
                                InstSet &SideEffectInsts,
-                               AccessedStorageAnalysis *ASA,
+                               AccessStorageAnalysis *ASA,
                                DominanceInfo *DT) {
-  auto storage = AccessedStorage::compute(BI->getSource());
+  auto storage = AccessStorage::compute(BI->getSource());
   if (!storage) {
     return false;
   }
 
-  auto BIAccessedStorageNonNested = AccessedStorage::compute(BI);
+  auto BIAccessStorageNonNested = AccessStorage::compute(BI);
   auto safeBeginPred = [&](BeginAccessInst *OtherBI) {
     if (BI == OtherBI) {
       return true;
     }
-    return BIAccessedStorageNonNested.isDistinctFrom(
-        AccessedStorage::compute(OtherBI));
+    return BIAccessStorageNonNested.isDistinctFrom(
+        AccessStorage::compute(OtherBI));
   };
 
   if (!std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred))
     return false;
 
   for (auto fullApply : fullApplies) {
-    FunctionAccessedStorage callSiteAccesses;
+    FunctionAccessStorage callSiteAccesses;
     ASA->getCallSiteEffects(callSiteAccesses, fullApply);
     SILAccessKind accessKind = BI->getAccessKind();
     if (!callSiteAccesses.mayConflictWith(accessKind, storage))
@@ -787,8 +787,8 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
 
   // Check may releases
   // Only class and global access that may alias would conflict
-  const AccessedStorage::Kind kind = storage.getKind();
-  if (kind != AccessedStorage::Class && kind != AccessedStorage::Global) {
+  const AccessStorage::Kind kind = storage.getKind();
+  if (kind != AccessStorage::Class && kind != AccessStorage::Global) {
     return true;
   }
   // TODO Introduce "Pure Swift" deinitializers
@@ -1470,7 +1470,7 @@ public:
     PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
     AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>(F);
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
-    AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();
+    AccessStorageAnalysis *ASA = getAnalysis<AccessStorageAnalysis>();
     DominanceInfo *DomTree = nullptr;
 
     LLVM_DEBUG(llvm::dbgs() << "Processing loops in " << F->getName() << "\n");

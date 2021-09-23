@@ -1,4 +1,4 @@
-//===--- AccessedStorageAnalysis.h - Accessed Storage Analysis --*- C++ -*-===//
+//===--- AccessStorageAnalysis.h - Accessed Storage Analysis --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,13 +16,13 @@
 // dynamic checks based on whole module analysis.
 //
 // This analysis may return conservative results by setting
-// FunctionAccessedStorage.unidentifiedAccess. This does not imply that all
-// accesses within the function have Unidentified AccessedStorage.
+// FunctionAccessStorage.unidentifiedAccess. This does not imply that all
+// accesses within the function have Unidentified AccessStorage.
 //
 // Note: This interprocedural analysis can be easily augmented to simultaneously
 // compute FunctionSideEffects, without using a separate analysis, by adding
-// FunctionSideEffects as a member of FunctionAccessedStorage. However, passes
-// that use AccessedStorageAnalysis do not currently need SideEffectAnalysis.
+// FunctionSideEffects as a member of FunctionAccessStorage. However, passes
+// that use AccessStorageAnalysis do not currently need SideEffectAnalysis.
 //
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H
@@ -36,25 +36,25 @@
 namespace swift {
 
 /// Information about a formal access within a function pertaining to a
-/// particular AccessedStorage location.
-class StorageAccessInfo : public AccessedStorage {
+/// particular AccessStorage location.
+class StorageAccessInfo : public AccessStorage {
 public:
-  StorageAccessInfo(AccessedStorage storage, SILAccessKind accessKind,
+  StorageAccessInfo(AccessStorage storage, SILAccessKind accessKind,
                     bool noNestedConflict)
-    : AccessedStorage(storage) {
+    : AccessStorage(storage) {
     Bits.StorageAccessInfo.accessKind = unsigned(accessKind);
     Bits.StorageAccessInfo.noNestedConflict = noNestedConflict;
     Bits.StorageAccessInfo.storageIndex = 0;
   }
 
-  // Initialize AccessedStorage from the given storage argument and fill in
+  // Initialize AccessStorage from the given storage argument and fill in
   // subclass fields from otherStorageInfo.
-  StorageAccessInfo(AccessedStorage storage, StorageAccessInfo otherStorageInfo)
+  StorageAccessInfo(AccessStorage storage, StorageAccessInfo otherStorageInfo)
       : StorageAccessInfo(storage, otherStorageInfo.getAccessKind(),
                           otherStorageInfo.hasNoNestedConflict()) {}
 
   template <typename B>
-  StorageAccessInfo(AccessedStorage storage, B *beginAccess)
+  StorageAccessInfo(AccessStorage storage, B *beginAccess)
       : StorageAccessInfo(storage, beginAccess->getAccessKind(),
                           beginAccess->hasNoNestedConflict()) {
     // Currently limited to dynamic Read/Modify access.
@@ -99,32 +99,32 @@ public:
 } // namespace swift
 
 namespace llvm {
-// Use the same DenseMapInfo for StorageAccessInfo as for AccessedStorage. None
+// Use the same DenseMapInfo for StorageAccessInfo as for AccessStorage. None
 // of the subclass bitfields participate in the Key.
 template <> struct DenseMapInfo<swift::StorageAccessInfo> {
   static swift::StorageAccessInfo getEmptyKey() {
-    auto key = DenseMapInfo<swift::AccessedStorage>::getEmptyKey();
+    auto key = DenseMapInfo<swift::AccessStorage>::getEmptyKey();
     return static_cast<swift::StorageAccessInfo &>(key);
   }
 
   static swift::StorageAccessInfo getTombstoneKey() {
-    auto key = DenseMapInfo<swift::AccessedStorage>::getTombstoneKey();
+    auto key = DenseMapInfo<swift::AccessStorage>::getTombstoneKey();
     return static_cast<swift::StorageAccessInfo &>(key);
   }
   static unsigned getHashValue(swift::StorageAccessInfo storage) {
-    return DenseMapInfo<swift::AccessedStorage>::getHashValue(storage);
+    return DenseMapInfo<swift::AccessStorage>::getHashValue(storage);
   }
   static bool isEqual(swift::StorageAccessInfo LHS,
                       swift::StorageAccessInfo RHS) {
-    return DenseMapInfo<swift::AccessedStorage>::isEqual(LHS, RHS);
+    return DenseMapInfo<swift::AccessStorage>::isEqual(LHS, RHS);
   }
 };
 }
 
 namespace swift {
-using AccessedStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
+using AccessStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
 
-/// Records each unique AccessedStorage in a set of StorageAccessInfo
+/// Records each unique AccessStorage in a set of StorageAccessInfo
 /// objects. Hashing and equality only sees the AccesedStorage data. The
 /// additional StorageAccessInfo bits are recorded as results of this analysis.
 ///
@@ -132,18 +132,18 @@ using AccessedStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
 /// property. This property may also be used to conservatively summarize
 /// results, either because the call graph is unknown or the access sets are too
 /// large. It does not imply that all accesses have Unidentified
-/// AccessedStorage, which is never allowed for class or global access.
-class AccessedStorageResult {
-  AccessedStorageSet storageAccessSet;
+/// AccessStorage, which is never allowed for class or global access.
+class AccessStorageResult {
+  AccessStorageSet storageAccessSet;
   Optional<SILAccessKind> unidentifiedAccess;
 
 public:
-  AccessedStorageResult() {}
+  AccessStorageResult() {}
 
   // ---------------------------------------------------------------------------
   // Accessing the results.
 
-  const AccessedStorageSet &getStorageSet() const { return storageAccessSet; }
+  const AccessStorageSet &getStorageSet() const { return storageAccessSet; }
 
   bool isEmpty() const {
     return storageAccessSet.empty() && !unidentifiedAccess;
@@ -156,16 +156,16 @@ public:
   ///
   /// Only call this if there is no unidentifiedAccess in the region and the
   /// given storage is uniquely identified.
-  bool hasNoNestedConflict(const AccessedStorage &otherStorage) const;
+  bool hasNoNestedConflict(const AccessStorage &otherStorage) const;
 
-  /// Does any of the accesses represented by this AccessedStorageResult
+  /// Does any of the accesses represented by this AccessStorageResult
   /// object conflict with the given access kind and storage.
   bool mayConflictWith(SILAccessKind otherAccessKind,
-                       const AccessedStorage &otherStorage) const;
+                       const AccessStorage &otherStorage) const;
 
-  /// Raw access to the result for a given AccessedStorage location.
+  /// Raw access to the result for a given AccessStorage location.
   StorageAccessInfo
-  getStorageAccessInfo(const AccessedStorage &otherStorage) const;
+  getStorageAccessInfo(const AccessStorage &otherStorage) const;
 
   // ---------------------------------------------------------------------------
   // Constructing the results.
@@ -188,17 +188,17 @@ public:
   void setUnidentifiedAccess(SILAccessKind kind) { unidentifiedAccess = kind; }
 
   /// Merge effects directly from \p RHS.
-  bool mergeFrom(const AccessedStorageResult &other);
+  bool mergeFrom(const AccessStorageResult &other);
 
   /// Merge the effects represented in calleeAccess into this
-  /// FunctionAccessedStorage object. calleeAccess must correspond to at least
+  /// FunctionAccessStorage object. calleeAccess must correspond to at least
   /// one callee at the apply site `fullApply`. Merging drops any local effects,
   /// and translates parameter effects into effects on the caller-side
   /// arguments.
   ///
   /// The full caller-side effects at a call site can be obtained with
-  /// AccessedStorageAnalysis::getCallSiteEffects().
-  bool mergeFromApply(const AccessedStorageResult &calleeAccess,
+  /// AccessStorageAnalysis::getCallSiteEffects().
+  bool mergeFromApply(const AccessStorageResult &calleeAccess,
                       FullApplySite fullApply);
 
   /// Record any access scopes entered by the given single SIL instruction. 'I'
@@ -209,7 +209,7 @@ public:
   void dump() const;
 
 protected:
-  std::pair<AccessedStorageSet::iterator, bool>
+  std::pair<AccessStorageSet::iterator, bool>
   insertStorageAccess(StorageAccessInfo storageAccess) {
     storageAccess.setStorageIndex(storageAccessSet.size());
     return storageAccessSet.insert(storageAccess);
@@ -217,7 +217,7 @@ protected:
 
   bool updateUnidentifiedAccess(SILAccessKind accessKind);
 
-  bool mergeAccesses(const AccessedStorageResult &other,
+  bool mergeAccesses(const AccessStorageResult &other,
                      std::function<StorageAccessInfo(const StorageAccessInfo &)>
                          transformStorage);
 
@@ -226,17 +226,17 @@ protected:
 } // namespace swift
 
 namespace swift {
-/// The per-function result of AccessedStorageAnalysis.
-class FunctionAccessedStorage {
-  AccessedStorageResult accessResult;
+/// The per-function result of AccessStorageAnalysis.
+class FunctionAccessStorage {
+  AccessStorageResult accessResult;
 
 public:
-  FunctionAccessedStorage() {}
+  FunctionAccessStorage() {}
 
   // ---------------------------------------------------------------------------
   // Accessing the results.
 
-  const AccessedStorageResult &getResult() const { return accessResult; }
+  const AccessStorageResult &getResult() const { return accessResult; }
 
   bool hasUnidentifiedAccess() const {
     return accessResult.hasUnidentifiedAccess();
@@ -247,20 +247,20 @@ public:
   ///
   /// Only call this if there is no unidentifiedAccess in the function and the
   /// given storage is uniquely identified.
-  bool hasNoNestedConflict(const AccessedStorage &otherStorage) const {
+  bool hasNoNestedConflict(const AccessStorage &otherStorage) const {
     return accessResult.hasNoNestedConflict(otherStorage);
   }
 
-  /// Does any of the accesses represented by this FunctionAccessedStorage
+  /// Does any of the accesses represented by this FunctionAccessStorage
   /// object conflict with the given access kind and storage.
   bool mayConflictWith(SILAccessKind otherAccessKind,
-                       const AccessedStorage &otherStorage) const {
+                       const AccessStorage &otherStorage) const {
     return accessResult.mayConflictWith(otherAccessKind, otherStorage);
   }
 
-  /// Raw access to the result for a given AccessedStorage location.
+  /// Raw access to the result for a given AccessStorage location.
   StorageAccessInfo
-  getStorageAccessInfo(const AccessedStorage &otherStorage) const {
+  getStorageAccessInfo(const AccessStorage &otherStorage) const {
     return accessResult.getStorageAccessInfo(otherStorage);
   }
 
@@ -276,7 +276,7 @@ public:
   /// function.
   void setWorstEffects() { accessResult.setWorstEffects(); }
 
-  /// Summarize the given function's effects using this FunctionAccessedStorage
+  /// Summarize the given function's effects using this FunctionAccessStorage
   /// object.
   //
   // Return true if the function's' effects have been fully summarized without
@@ -284,7 +284,7 @@ public:
   bool summarizeFunction(SILFunction *F);
 
   /// Summarize the callee side effects of a call instruction using this
-  /// FunctionAccessedStorage object without analyzing the callee function
+  /// FunctionAccessStorage object without analyzing the callee function
   /// bodies or scheduling the callees for bottom-up propagation.
   ///
   /// The side effects are represented from the callee's perspective. Parameter
@@ -301,19 +301,19 @@ public:
   }
 
   /// Merge effects directly from \p RHS.
-  bool mergeFrom(const FunctionAccessedStorage &RHS) {
+  bool mergeFrom(const FunctionAccessStorage &RHS) {
     return accessResult.mergeFrom(RHS.accessResult);
   }
 
   /// Merge the effects represented in calleeAccess into this
-  /// FunctionAccessedStorage object. calleeAccess must correspond to at least
+  /// FunctionAccessStorage object. calleeAccess must correspond to at least
   /// one callee at the apply site `fullApply`. Merging drops any local effects,
   /// and translates parameter effects into effects on the caller-side
   /// arguments.
   ///
   /// The full caller-side effects at a call site can be obtained with
-  /// AccessedStorageAnalysis::getCallSiteEffects().
-  bool mergeFromApply(const FunctionAccessedStorage &calleeAccess,
+  /// AccessStorageAnalysis::getCallSiteEffects().
+  bool mergeFromApply(const FunctionAccessStorage &calleeAccess,
                       FullApplySite fullApply) {
     return accessResult.mergeFromApply(calleeAccess.accessResult, fullApply);
   }
@@ -343,15 +343,15 @@ public:
 /// Use the GenericFunctionEffectAnalysis API to get the results of the analysis:
 /// - geEffects(SILFunction*)
 /// - getCallSiteEffects(FunctionEffects &callEffects, FullApplySite fullApply)
-class AccessedStorageAnalysis
-    : public GenericFunctionEffectAnalysis<FunctionAccessedStorage> {
+class AccessStorageAnalysis
+    : public GenericFunctionEffectAnalysis<FunctionAccessStorage> {
 public:
-  AccessedStorageAnalysis()
-      : GenericFunctionEffectAnalysis<FunctionAccessedStorage>(
-            SILAnalysisKind::AccessedStorage) {}
+  AccessStorageAnalysis()
+      : GenericFunctionEffectAnalysis<FunctionAccessStorage>(
+            SILAnalysisKind::AccessStorage) {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::AccessedStorage;
+    return S->getKind() == SILAnalysisKind::AccessStorage;
   }
 };
 
