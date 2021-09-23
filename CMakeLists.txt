@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.19.6)
 
+
+#  set_property(GLOBAL PROPERTY GLOBAL_DEPENDS_DEBUG_MODE 1)
+
 # TODO: Fix RPATH usage to be CMP0068 compliant
 # Disable Policy CMP0068 for CMake 3.9
 # rdar://37725888
@@ -196,9 +199,13 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
     no effect on the target libraries (the standard library and the runtime).")
 
 # NOTE: We do not currently support building libswift with the Xcode generator.
-cmake_dependent_option(SWIFT_TOOLS_ENABLE_LIBSWIFT
-  "Enable building libswift and linking libswift into the compiler itself." FALSE
-  "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" FALSE)
+cmake_dependent_option(LIBSWIFT_BUILD_MODE "How to build libswift. Possible values are
+    OFF:           the compiler is built without libswift
+    HOSTTOOLS:     libswift is built with a pre-installed toolchain
+    BOOTSTRAPPING: libswift is built with a 2-stage bootstrapping process
+    BOOTSTRAPPING-WITH-HOSTLIBS:   libswift is built with a 2-stage bootstrapping process,
+                   but the compiler links against the host system swift libs (macOS only)"
+  OFF "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" OFF)
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
@@ -589,6 +596,13 @@ set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+  set(SWIFT_EXEC_FOR_LIBSWIFT "${CMAKE_Swift_COMPILER}")
+elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING" OR LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+  # If cross-compiling we don't have to bootstrap. We can just use the previously
+  # built native swiftc to build libswift.
+  message(STATUS "Building libswift with native host tools instead of bootstrapping")
+  set(LIBSWIFT_BUILD_MODE "HOSTTOOLS")
+  set(SWIFT_EXEC_FOR_LIBSWIFT "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
 endif()
 
 # This setting causes all CMakeLists.txt to automatically have
@@ -933,7 +947,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
   message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
   message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
-  message(STATUS "  libswift:       ${SWIFT_TOOLS_ENABLE_LIBSWIFT}")
+  message(STATUS "  libswift:       ${LIBSWIFT_BUILD_MODE}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")
@@ -1039,6 +1053,9 @@ endif()
 if(SWIFT_ENABLE_DISPATCH)
   include(Libdispatch)
 endif()
+
+add_bootstrapping_target(0)
+add_bootstrapping_target(1)
 
 # Add all of the subdirectories, where we actually do work.
 
