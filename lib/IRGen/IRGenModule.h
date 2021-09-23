@@ -1698,6 +1698,7 @@ private:
   /// symbol needed by Swift async functions.
   void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
+  bool isConcurrencyAvailable();
   void noteSwiftAsyncFunctionDef() {
     hasSwiftAsyncFunctionDef = true;
   }

@@ -1744,28 +1744,6 @@ const TypeLayoutEntry &IRGenModule::getTypeLayoutEntry(SILType T) {
   return Types.getTypeLayoutEntry(T);
 }
 
-/// Return whether FrameLowering should always set the "extended frame
-/// present" bit in FP, or set it based on a symbol in the runtime.
-static bool isSwiftAsyncContextIsDynamicallySet(llvm::Triple TT) {
-  // Older OS versions (particularly system unwinders) are confused by the
-  // Swift extended frame, so when building code that might be run on them we
-  // must dynamically query the concurrency library to determine whether
-  // extended frames should be flagged as present.
-  unsigned Major, Minor, Micro;
-  TT.getOSVersion(Major, Minor, Micro);
-  switch(TT.getOS()) {
-  default:
-    return false;
-  case llvm::Triple::IOS:
-  case llvm::Triple::TvOS:
-    return Major < 15;
-  case llvm::Triple::WatchOS:
-    return Major < 8;
-  case llvm::Triple::MacOSX:
-  case llvm::Triple::Darwin:
-    return Major < 12;
-  }
-}
 
 void IRGenModule::emitSwiftAsyncExtendedFrameInfoWeakRef() {
   if (!hasSwiftAsyncFunctionDef || extendedFramePointerFlagsWeakRef)
@@ -1773,7 +1751,7 @@ void IRGenModule::emitSwiftAsyncExtendedFrameInfoWeakRef() {
   if (IRGen.Opts.SwiftAsyncFramePointer !=
       SwiftAsyncFramePointerKind::Auto)
     return;
-  if (!isSwiftAsyncContextIsDynamicallySet(Triple))
+  if (isConcurrencyAvailable())
     return;
 
   // Emit a weak reference to the `swift_async_extendedFramePointerFlags` symbol
@@ -1784,4 +1762,11 @@ void IRGenModule::emitSwiftAsyncExtendedFrameInfoWeakRef() {
   extendedFramePointerFlagsWeakRef = new llvm::GlobalVariable(Module, Int8PtrTy, false,
                                          llvm::GlobalValue::ExternalWeakLinkage, nullptr,
                                          symbolName);
+}
+
+bool IRGenModule::isConcurrencyAvailable() {
+  auto &ctx = getSwiftModule()->getASTContext();
+  auto deploymentAvailability =
+    AvailabilityContext::forDeploymentTarget(ctx);
+  return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
 }
