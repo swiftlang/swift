@@ -603,7 +603,7 @@ func checkLocalFunctions() async {
   local1()
   local2()
 
-  // Non-concurrent closures don't cause problems.
+  // non-sendable closures don't cause problems.
   acceptClosure {
     local1()
     local2()

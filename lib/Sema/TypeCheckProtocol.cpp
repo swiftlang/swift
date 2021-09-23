@@ -2932,7 +2932,7 @@ bool ConformanceChecker::checkActorIsolation(
       witnessGlobalActor->isEqual(requirementGlobalActor))
     return false;
 
-  // For cross-actor references, check for non-concurrent types.
+  // For cross-actor references, check for non-sendable types.
   if (isCrossActor) {
     // If the requirement was imported from Objective-C, it may not have been
     // annotated appropriately. Allow the mismatch.
