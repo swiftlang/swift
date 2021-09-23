@@ -19,6 +19,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;

@@ -36,6 +36,7 @@ SemaTest::SemaTest()
 
   registerParseRequestFunctions(Context.evaluator);
   registerTypeCheckerRequestFunctions(Context.evaluator);
+  registerClangImporterRequestFunctions(Context.evaluator);
 
   Context.addModuleLoader(ImplicitSerializedModuleLoader::create(Context));
   Context.addModuleLoader(ClangImporter::create(Context), /*isClang=*/true);

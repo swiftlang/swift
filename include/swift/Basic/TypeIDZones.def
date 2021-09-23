@@ -33,5 +33,7 @@
  SWIFT_TYPEID_ZONE(IDETypes, 136)
  SWIFT_TYPEID_ZONE(IDE, 137)
 
+SWIFT_TYPEID_ZONE(ClangImporter, 139)
+
  // N.B. This is not a formal zone and exists solely to support the unit tests.
  SWIFT_TYPEID_ZONE(ArithmeticEvaluator, 255)
