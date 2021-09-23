@@ -494,25 +494,6 @@ void RewritePath::dump(llvm::raw_ostream &out,
 /// Use the 3-cells to delete rewrite rules, updating and simplifying existing
 /// 3-cells as each rule is deleted.
 void RewriteSystem::minimizeRewriteSystem() {
-  for (auto loop : HomotopyGenerators) {
-    SmallVector<unsigned> redundancyCandidates =
-        loop.second.findRulesAppearingOnceInEmptyContext();
-    if (Debug.contains(DebugFlags::HomotopyReduction)) {
-      if (!redundancyCandidates.empty()) {
-        llvm::dbgs() << "* Candidate 3-cell:\n";
-        loop.second.dump(llvm::dbgs(), loop.first, *this);
-        llvm::dbgs() << "\n";
-        llvm::dbgs() << "Rules appearing once in empty context:\n";
-
-        for (auto ruleID : redundancyCandidates) {
-          const auto &rule = getRule(ruleID);
-          rule.dump(llvm::dbgs());
-          llvm::dbgs() << "\n";
-        }
-      }
-    }
-  }
-
   llvm::SmallDenseSet<unsigned> deletedRules;
   llvm::SmallDenseSet<unsigned> deletedHomotopyGenerators;
 
