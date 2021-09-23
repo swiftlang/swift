@@ -193,12 +193,15 @@ static ClangModuleDependenciesCacheImpl *getOrCreateClangImpl(
 void ClangImporter::recordModuleDependencies(
     ModuleDependenciesCache &cache,
     const FullDependenciesResult &clangDependencies) {
-  struct ModuleInfo {
-    std::string PCMPath;
-    std::string ModuleMapPath;
-  };
   auto &ctx = Impl.SwiftContext;
   auto currentSwiftSearchPathSet = ctx.getAllModuleSearchPathsSet();
+
+  // This scanner invocation's already-captured APINotes version
+  std::vector<std::string> capturedPCMArgs = {
+    "-Xcc",
+    ("-fapinotes-swift-version=" +
+     ctx.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString())
+  };
 
   for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
     // If we've already cached this information, we're done.
@@ -293,7 +296,8 @@ void ClangImporter::recordModuleDependencies(
         clangModuleDep.ClangModuleMapFile,
         clangModuleDep.ContextHash,
         swiftArgs,
-        fileDeps);
+        fileDeps,
+        capturedPCMArgs);
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
       dependencies.addModuleDependency(moduleName.ModuleName, &alreadyAddedModules);
     }

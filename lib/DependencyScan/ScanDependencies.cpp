@@ -716,6 +716,10 @@ static void writeJSON(llvm::raw_ostream &out,
 
       // Command line.
       writeJSONSingleField(out, "commandLine", clangDeps->command_line, 5,
+                           /*trailingComma=*/true);
+
+      // Captured PCM arguments.
+      writeJSONSingleField(out, "capturedPCMArgs", clangDeps->captured_pcm_args, 5,
                            /*trailingComma=*/false);
     }
 
@@ -841,7 +845,6 @@ generateFullDependencyGraph(CompilerInstance &instance,
         // TODO: Once the clients are taught about the new dependency kind,
         // switch to using a bespoke kind here.
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
-
         details->swift_textual_details = {
             moduleInterfacePath,
             create_empty_set(),
@@ -870,7 +873,9 @@ generateFullDependencyGraph(CompilerInstance &instance,
         details->clang_details = {
             create_clone(clangDeps->moduleMapFile.c_str()),
             create_clone(clangDeps->contextHash.c_str()),
-            create_set(clangDeps->nonPathCommandLine)};
+            create_set(clangDeps->nonPathCommandLine),
+            create_set(clangDeps->capturedPCMArgs)
+        };
       }
       return details;
     };
