@@ -1809,7 +1809,7 @@ namespace {
       }
 
       if (result == AsyncMarkingResult::FoundAsync) {
-        // Check for non-concurrent types.
+        // Check for non-sendable types.
         bool problemFound =
             diagnoseNonConcurrentTypesInReference(
               concDeclRef, getDeclContext(), declLoc,
