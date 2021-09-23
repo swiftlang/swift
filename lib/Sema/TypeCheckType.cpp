@@ -72,8 +72,18 @@ TypeResolution
 TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
                              OpenUnboundGenericTypeFn unboundTyOpener,
                              HandlePlaceholderTypeReprFn placeholderHandler) {
+  return forInterface(dc, dc->getGenericEnvironmentOfContext(), options,
+                      unboundTyOpener, placeholderHandler);
+}
+
+TypeResolution
+TypeResolution::forInterface(DeclContext *dc, GenericEnvironment *genericEnv,
+                             TypeResolutionOptions options,
+                             OpenUnboundGenericTypeFn unboundTyOpener,
+                             HandlePlaceholderTypeReprFn placeholderHandler) {
   TypeResolution result(dc, TypeResolutionStage::Interface, options,
                         unboundTyOpener, placeholderHandler);
+  result.genericEnv = genericEnv;
   return result;
 }
 

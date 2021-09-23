@@ -328,6 +328,14 @@ public:
                OpenUnboundGenericTypeFn unboundTyOpener,
                HandlePlaceholderTypeReprFn placeholderHandler);
 
+  /// Form a type resolution for an interface type, which is a complete
+  /// description of the type using generic parameters.
+  static TypeResolution
+  forInterface(DeclContext *dc, GenericEnvironment *genericEnv,
+               TypeResolutionOptions opts,
+               OpenUnboundGenericTypeFn unboundTyOpener,
+               HandlePlaceholderTypeReprFn placeholderHandler);
+
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given declaration
   /// context.
