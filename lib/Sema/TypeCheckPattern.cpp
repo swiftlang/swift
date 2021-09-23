@@ -1124,8 +1124,6 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Named: {
     NamedPattern *NP = cast<NamedPattern>(P);
     VarDecl *var = NP->getDecl();
-    if (var->hasInterfaceType() && var->isInvalid())
-      type = ErrorType::get(Context);
 
     // In SIL mode, VarDecls are written as having reference storage types.
     type = type->getReferenceStorageReferent();
@@ -1692,9 +1690,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P,
   // Local function to check whether type of given parameter
   // should be coerced to a given contextual type or not.
   auto shouldOverwriteParam = [&](ParamDecl *param) -> bool {
-    if (param->isInvalid())
-      return true;
-
     return !isValidType(param->getType());
   };
 
