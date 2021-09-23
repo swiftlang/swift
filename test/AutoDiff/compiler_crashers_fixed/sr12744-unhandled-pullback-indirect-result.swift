@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s -requirement-machine=off
+// RUN: %target-swift-frontend -emit-sil -verify -requirement-machine=off %s
 
 // SR-12744: Pullback generation crash for unhandled indirect result.
 // May be due to inconsistent derivative function type calculation logic in

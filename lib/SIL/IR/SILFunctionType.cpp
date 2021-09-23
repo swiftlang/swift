@@ -26,6 +26,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -360,6 +361,41 @@ getSemanticResults(SILFunctionType *functionType, IndexSubset *parameterIndices,
       IndexSubset::get(C, parameterIndices->getCapacity(), inoutParamIndices);
 }
 
+static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignature sig,
+                                                               CanType tanType) {
+  if (!sig)
+    return sig;
+
+  llvm::DenseSet<CanType> types;
+
+  auto &ctx = tanType->getASTContext();
+
+  (void) tanType.findIf([&](Type t) -> bool {
+    if (auto *dmt = t->getAs<DependentMemberType>()) {
+      if (dmt->getName() == ctx.Id_TangentVector)
+        types.insert(dmt->getBase()->getCanonicalType());
+    }
+
+    return false;
+  });
+
+  SmallVector<Requirement, 2> reqs;
+  auto *proto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+  assert(proto != nullptr);
+
+  for (auto type : types) {
+    if (!sig->requiresProtocol(type, proto)) {
+      reqs.push_back(Requirement(RequirementKind::Conformance, type,
+                                 proto->getDeclaredInterfaceType()));
+    }
+  }
+
+  return evaluateOrDefault(
+      ctx.evaluator,
+      AbstractGenericSignatureRequest{sig.getPointer(), {}, reqs},
+      GenericSignature()).getCanonicalSignature();
+}
+
 /// Returns the differential type for the given original function type,
 /// parameter indices, and result index.
 static CanSILFunctionType getAutoDiffDifferentialType(
@@ -371,10 +407,11 @@ static CanSILFunctionType getAutoDiffDifferentialType(
   auto getTangentParameterConvention =
       [&](CanType tanType,
           ParameterConvention origParamConv) -> ParameterConvention {
-    tanType =
-        tanType->getCanonicalType(originalFnTy->getSubstGenericSignature());
-    AbstractionPattern pattern(originalFnTy->getSubstGenericSignature(),
-                               tanType);
+    auto sig = buildDifferentiableGenericSignature(
+      originalFnTy->getSubstGenericSignature(), tanType);
+
+    tanType = tanType->getCanonicalType(sig);
+    AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
     // When the tangent type is address only, we must ensure that the tangent
@@ -398,10 +435,11 @@ static CanSILFunctionType getAutoDiffDifferentialType(
   auto getTangentResultConvention =
       [&](CanType tanType,
           ResultConvention origResConv) -> ResultConvention {
-    tanType =
-        tanType->getCanonicalType(originalFnTy->getSubstGenericSignature());
-    AbstractionPattern pattern(originalFnTy->getSubstGenericSignature(),
-                               tanType);
+    auto sig = buildDifferentiableGenericSignature(
+      originalFnTy->getSubstGenericSignature(), tanType);
+
+    tanType = tanType->getCanonicalType(sig);
+    AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
     // When the tangent type is address only, we must ensure that the tangent
@@ -530,10 +568,11 @@ static CanSILFunctionType getAutoDiffPullbackType(
   auto getTangentParameterConventionForOriginalResult =
       [&](CanType tanType,
           ResultConvention origResConv) -> ParameterConvention {
-    tanType =
-        tanType->getCanonicalType(originalFnTy->getSubstGenericSignature());
-    AbstractionPattern pattern(originalFnTy->getSubstGenericSignature(),
-                               tanType);
+    auto sig = buildDifferentiableGenericSignature(
+      originalFnTy->getSubstGenericSignature(), tanType);
+
+    tanType = tanType->getCanonicalType(sig);
+    AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
     ParameterConvention conv;
@@ -560,10 +599,11 @@ static CanSILFunctionType getAutoDiffPullbackType(
   auto getTangentResultConventionForOriginalParameter =
       [&](CanType tanType,
           ParameterConvention origParamConv) -> ResultConvention {
-    tanType =
-        tanType->getCanonicalType(originalFnTy->getSubstGenericSignature());
-    AbstractionPattern pattern(originalFnTy->getSubstGenericSignature(),
-                               tanType);
+    auto sig = buildDifferentiableGenericSignature(
+      originalFnTy->getSubstGenericSignature(), tanType);
+
+    tanType = tanType->getCanonicalType(sig);
+    AbstractionPattern pattern(sig, tanType);
     auto &tl =
         TC.getTypeLowering(pattern, tanType, TypeExpansionContext::minimal());
     ResultConvention conv;
