@@ -754,7 +754,7 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  /// Emit tailored diagnostics for no-escape/non-concurrent parameter
+  /// Emit tailored diagnostics for no-escape/non-sendable parameter
   /// conversions e.g. passing such parameter as an @escaping or @Sendable
   /// argument, or trying to assign it to a variable which expects @escaping
   /// or @Sendable function.
