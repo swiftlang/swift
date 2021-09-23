@@ -800,7 +800,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 ///
 
 RequirementCheckResult TypeChecker::checkGenericArguments(
-    DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
+    ModuleDecl *module, SourceLoc loc, SourceLoc noteLoc, Type owner,
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
@@ -815,7 +815,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   SmallVector<RequirementSet, 8> pendingReqs;
   pendingReqs.push_back({requirements, {}});
 
-  auto *module = dc->getParentModule();
   ASTContext &ctx = module->getASTContext();
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
@@ -824,14 +823,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       auto req = rawReq;
       if (current.Parents.empty()) {
         auto substed = rawReq.subst(
-            [&](SubstitutableType *type) -> Type {
-              auto substType = substitutions(type);
-              if (substType->hasTypeParameter())
-                return dc->mapTypeIntoContext(substType);
-              return substType;
-            },
-            LookUpConformanceInModule(module),
-            options);
+            substitutions, LookUpConformanceInModule(module), options);
         if (!substed) {
           // Another requirement will fail later; just continue.
           valid = false;

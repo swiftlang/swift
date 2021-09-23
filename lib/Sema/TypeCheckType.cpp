@@ -569,17 +569,12 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   return BGT->getGenericArgs().front()->isVoid();
 }
 
-/// Even if the type is not generic, it might be inside of a generic
-/// context or have a free-standing 'where' clause, so we need to
-/// those check requirements too.
-///
-/// Return true on success.
 bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
-                                              Type parentTy,
-                                              SourceLoc loc,
-                                              DeclContext *dc) {
-  if (!parentTy || parentTy->hasUnboundGenericType() ||
-      parentTy->hasTypeVariable()) {
+                                              Type parentTy, SourceLoc loc,
+                                              ModuleDecl *module,
+                                              GenericSignature contextSig) {
+  assert(parentTy && "expected a parent type");
+  if (parentTy->hasUnboundGenericType() || parentTy->hasTypeVariable()) {
     return true;
   }
 
@@ -599,12 +594,16 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
       noteLoc = loc;
   }
 
+  if (contextSig) {
+    parentTy = contextSig.getGenericEnvironment()->mapTypeIntoContext(parentTy);
+  }
+
   const auto subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
   const auto genericSig = decl->getGenericSignature();
 
   const auto result =
     TypeChecker::checkGenericArguments(
-        dc, loc, noteLoc,
+        module, loc, noteLoc,
         decl->getDeclaredInterfaceType(),
         genericSig.getGenericParams(),
         genericSig.getRequirements(),
@@ -679,7 +678,13 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       return type;
     }
 
-    if (TypeChecker::checkContextualRequirements(decl, parentTy, loc, dc))
+    if (!parentTy) {
+      return type;
+    }
+
+    if (TypeChecker::checkContextualRequirements(
+            decl, parentTy, loc, dc->getParentModule(),
+            resolution.getGenericSignature()))
       return type;
 
     return ErrorType::get(resolution.getASTContext());
@@ -872,10 +877,6 @@ Type TypeResolution::applyUnboundGenericArguments(
     }
   }
 
-  SourceLoc noteLoc = decl->getLoc();
-  if (noteLoc.isInvalid())
-    noteLoc = loc;
-
   // Realize the types of the generic arguments and add them to the
   // substitution map.
   for (unsigned i = 0, e = genericArgs.size(); i < e; ++i) {
@@ -895,11 +896,25 @@ Type TypeResolution::applyUnboundGenericArguments(
   auto *module = getDeclContext()->getParentModule();
 
   if (!skipRequirementsCheck && getStage() > TypeResolutionStage::Structural) {
+    TypeSubstitutionMap contextualSubs = subs;
+    if (getStage() == TypeResolutionStage::Interface) {
+      if (const auto contextSig = getGenericSignature()) {
+        auto *genericEnv = contextSig.getGenericEnvironment();
+        for (auto &pair : contextualSubs) {
+          pair.second = genericEnv->mapTypeIntoContext(pair.second);
+        }
+      }
+    }
+
+    SourceLoc noteLoc = decl->getLoc();
+    if (noteLoc.isInvalid())
+      noteLoc = loc;
+
     auto result = TypeChecker::checkGenericArguments(
-        getDeclContext(), loc, noteLoc,
+        module, loc, noteLoc,
         UnboundGenericType::get(decl, parentTy, getASTContext()),
         genericSig.getGenericParams(), genericSig.getRequirements(),
-        QueryTypeSubstitutionMap{subs});
+        QueryTypeSubstitutionMap{contextualSubs});
 
     switch (result) {
     case RequirementCheckResult::Failure:

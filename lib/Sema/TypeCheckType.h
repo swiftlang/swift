@@ -312,10 +312,6 @@ private:
         placeholderHandler(placeholderHandler),
         genericEnv(nullptr) {}
 
-  /// Retrieves the generic signature for the context, or NULL if there is
-  /// no generic signature to resolve types.
-  GenericSignature getGenericSignature() const;
-
 public:
   /// Form a type resolution for the structure of a type, which does not
   /// attempt to resolve member types of type parameters to a particular
@@ -372,6 +368,10 @@ public:
   HandlePlaceholderTypeReprFn getPlaceholderHandler() const {
     return placeholderHandler;
   }
+
+  /// Retrieves the generic signature for the context, or NULL if there is
+  /// no generic signature to resolve types.
+  GenericSignature getGenericSignature() const;
 
   /// Resolves a TypeRepr to a type.
   ///
