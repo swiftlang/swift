@@ -1661,6 +1661,14 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   // Build a constraint system in which we can check the body of the function.
   ConstraintSystem cs(func, options);
 
+  if (cs.isDebugMode()) {
+    auto &log = llvm::errs();
+
+    log << "--- Applying result builder to function ---\n";
+    func->dump(log);
+    log << '\n';
+  }
+
   if (auto result = cs.matchResultBuilder(
           func, builderType, resultContextType, resultConstraintKind,
           cs.getConstraintLocator(func->getBody()))) {
