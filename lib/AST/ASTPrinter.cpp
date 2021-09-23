@@ -991,7 +991,7 @@ public:
       }
     }
 
-    
+
     Printer.callPrintDeclPre(D, Options.BracketOptions);
 
     bool haveFeatureChecks = Options.PrintCompatibilityFeatureChecks &&
@@ -2784,14 +2784,14 @@ static bool usesFeatureImplicitSelfCapture(Decl *decl) {
 /// want a baseline version.
 static std::vector<Feature> getFeaturesUsed(Decl *decl) {
   std::vector<Feature> features;
-  
+
   // Go through each of the features, checking whether the declaration uses that
   // feature. This also ensures that the resulting set is in sorted order.
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
   if (usesFeature##FeatureName(decl))                                 \
     features.push_back(Feature::FeatureName);
 #include "swift/Basic/Features.def"
-  
+
   return features;
 }
 
@@ -2852,7 +2852,7 @@ bool swift::printCompatibilityFeatureChecksPre(
   if (features.empty())
     return false;
 
-  printer.printNewline();  
+  printer.printNewline();
   printer << "#if compiler(>=5.3) && ";
   llvm::interleave(features.begin(), features.end(),
     [&](Feature feature) {
@@ -2977,7 +2977,7 @@ void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
   if (PDD->isError()) {
     Printer << tok::pound_error;
   } else {
-    Printer << tok::pound_warning; 
+    Printer << tok::pound_warning;
   }
 
   Printer << "(\"" << PDD->getMessage()->getValue() << "\")";
@@ -3609,7 +3609,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   }
 
   printBodyIfNecessary(decl);
-  
+
   // If the function has an opaque result type, print the opaque type decl.
   if (auto opaqueResult = decl->getOpaqueResultTypeDecl()) {
     Printer.printNewline();
@@ -4939,7 +4939,7 @@ public:
                });
     Printer << ">";
   }
-  
+
   void visitGenericFunctionType(GenericFunctionType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
     SWIFT_DEFER {
@@ -5021,7 +5021,7 @@ public:
                             PrintAST::PrintRequirements);
       Printer << " ";
     }
-  
+
     // If this is a substituted function type, then its generic signature is
     // independent of the enclosing context, and defines the parameters active
     // in the interface params and results. Unsubstituted types use the existing
@@ -5044,7 +5044,7 @@ public:
                                  PrintAST::PrintRequirements);
       sub->Printer << " ";
     }
-  
+
     // Capture list used here to ensure we don't print anything using `this`
     // printer, but only the sub-Printer.
     [T, sub, &subOptions] {
@@ -5226,7 +5226,7 @@ public:
       Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
     visit(T->getOpenedExistentialType());
   }
-  
+
   void printArchetypeCommon(ArchetypeType *T,
                             const AbstractTypeParamDecl *Decl) {
     if (Options.AlternativeTypeNames) {
@@ -5251,11 +5251,11 @@ public:
     visitParentType(T->getParent());
     printArchetypeCommon(T, T->getAssocType());
   }
-  
+
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
     printArchetypeCommon(T, T->getInterfaceType()->getDecl());
   }
-  
+
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
     switch (Options.OpaqueReturnTypePrinting) {
     case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
@@ -5272,14 +5272,14 @@ public:
       // type.
       Printer << "@_opaqueReturnTypeOf(";
       OpaqueTypeDecl *decl = T->getDecl();
-      
+
       Printer.printEscapedStringLiteral(
                                    decl->getOpaqueReturnTypeIdentifier().str());
-      
+
       Printer << ", " << T->getInterfaceType()
                           ->castTo<GenericTypeParamType>()
                           ->getIndex();
-      
+
       // The identifier after the closing parenthesis is irrelevant and can be
       // anything. It just needs to be there for the @_opaqueReturnTypeOf
       // attribute to apply to, but the attribute alone references the opaque
@@ -5433,7 +5433,7 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
     break;
   }
 }
-  
+
 void LayoutConstraint::dump() const {
   if (!*this) {
     llvm::errs() << "(null)\n";
