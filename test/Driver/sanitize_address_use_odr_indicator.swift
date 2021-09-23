@@ -1,6 +1,9 @@
 // REQUIRES: asan_runtime
 // RUN: %swiftc_driver -driver-print-jobs -sanitize=address -sanitize-address-use-odr-indicator %s 2>&1 | %FileCheck %s
 
+// rdar://83458140
+// REQUIRES: OS=macosx
+
 // CHECK: swift
 // CHECK-DAG: -sanitize=address
 // CHECK-DAG: -sanitize-address-use-odr-indicator
