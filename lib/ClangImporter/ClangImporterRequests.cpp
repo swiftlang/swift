@@ -23,7 +23,6 @@ using namespace swift;
 
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *clangImporterRequestFunctions[] = {
-  nullptr // TODO: remove this whenever a request is actually added.
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/ClangImporter/ClangImporterTypeIDZone.def"
