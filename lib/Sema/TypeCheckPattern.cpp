@@ -85,20 +85,6 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
     ValueDecl *e = result.getValueDecl();
     assert(e);
 
-    // Check `isInvalid` only if the declaration has been
-    // verified, otherwise this would cause a problem if
-    // this declaration is found in the body of a result
-    // builder because it wouldn't have a type set until
-    // whole body is type-checked, and `isInvalid` would
-    // trigger a separate type-check that interfers with
-    // result builder transformation and causes crashes.
-    //
-    // Note: This check cannot simply be removed because
-    // enums with re-declarationed members would trigger
-    // an ambiguity assertion below.
-    if (e->hasInterfaceType() && e->isInvalid())
-      continue;
-
     // Skip if the enum element was referenced as an instance member
     if (unqualifiedLookup) {
       if (!result.getBaseDecl() ||
@@ -108,8 +94,10 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
     }
 
     if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
-      // Ambiguities should be ruled out by parsing.
-      assert(!foundElement && "ambiguity in enum case name lookup?!");
+      // Note that there could be multiple elements with the same
+      // name, such results in a re-declaration error, so let's
+      // just always pick the last element, just like in `foundConstant`
+      // case.
       foundElement = oe;
       continue;
     }
