@@ -34,7 +34,9 @@
 #include "swift/Runtime/ThreadLocalStorage.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
+#ifndef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
 #include "llvm/Config/config.h"
+#endif
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
 #include "VoucherSupport.h"
