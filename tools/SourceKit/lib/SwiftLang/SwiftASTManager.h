@@ -75,6 +75,7 @@
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTASTMANAGER_H
 
 #include "SourceKit/Core/LLVM.h"
+#include "SourceKit/Support/CancellationToken.h"
 #include "SwiftInvocation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -244,9 +245,16 @@ public:
   void
   processASTAsync(SwiftInvocationRef Invok, SwiftASTConsumerRef ASTConsumer,
                   const void *OncePerASTToken,
+                  SourceKitCancellationToken CancellationToken,
                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
                   ArrayRef<ImmutableTextSnapshotRef> Snapshots =
                       ArrayRef<ImmutableTextSnapshotRef>());
+
+  /// Request the \c SwiftASTConsumer with the given \p CancellationToken to be
+  /// cancelled. If \p CancellationToken is \c nullptr or no consumer with the
+  /// given cancellation token exists (e.g. because the consumer already
+  /// finished), this is a no-op.
+  void cancelASTConsumer(SourceKitCancellationToken CancellationToken);
 
   std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
                                                       std::string &Error);

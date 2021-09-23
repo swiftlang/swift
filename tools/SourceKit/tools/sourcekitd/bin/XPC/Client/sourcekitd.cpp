@@ -106,6 +106,14 @@ sourcekitd_set_notification_handler(sourcekitd_response_receiver_t receiver) {
 // sourcekitd_request_sync
 //===----------------------------------------------------------------------===//
 
+/// Create a new SourceKit request handle. Each call of this method is
+/// guaranteed to return a new, unique handle.
+static sourcekitd_request_handle_t create_request_handle(void) {
+  static std::atomic<size_t> handle(1);
+  return reinterpret_cast<sourcekitd_request_handle_t>(
+      handle.fetch_add(1, std::memory_order_relaxed));
+}
+
 static xpc_connection_t getGlobalConnection();
 
 static bool ConnectionInterrupted = false;
@@ -126,7 +134,7 @@ sourcekitd_response_t sourcekitd_send_request_sync(sourcekitd_object_t req) {
   xpc_array_append_value(contents, req);
 
   xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
-  xpc_dictionary_set_value(msg, "msg", contents);
+  xpc_dictionary_set_value(msg, xpc::KeyMsg, contents);
   xpc_release(contents);
 
   xpc_object_t reply = xpc_connection_send_message_with_reply_sync(Conn, msg);
@@ -153,7 +161,11 @@ sourcekitd_response_t sourcekitd_send_request_sync(sourcekitd_object_t req) {
 void sourcekitd_send_request(sourcekitd_object_t req,
                              sourcekitd_request_handle_t *out_handle,
                              sourcekitd_response_receiver_t receiver) {
-  // FIXME: Implement request handle.
+  sourcekitd_request_handle_t request_handle = nullptr;
+  if (out_handle) {
+    request_handle = create_request_handle();
+    *out_handle = request_handle;
+  }
 
   LOG_SECTION("sourcekitd_send_request-before", InfoHighPrio) {
     // Requests will be printed in Requests.cpp, print them out here as well.
@@ -171,7 +183,11 @@ void sourcekitd_send_request(sourcekitd_object_t req,
   xpc_array_append_value(contents, req);
 
   xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
-  xpc_dictionary_set_value(msg, "msg", contents);
+  xpc_dictionary_set_value(msg, xpc::KeyMsg, contents);
+  if (request_handle) {
+    xpc_dictionary_set_uint64(msg, xpc::KeyCancelToken,
+                              reinterpret_cast<uint64_t>(request_handle));
+  }
   xpc_release(contents);
 
   dispatch_queue_t queue
@@ -201,7 +217,14 @@ void sourcekitd_send_request(sourcekitd_object_t req,
 }
 
 void sourcekitd_cancel_request(sourcekitd_request_handle_t handle) {
-  // FIXME: Implement cancelling.
+  xpc_connection_t conn = getGlobalConnection();
+  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr, 0);
+  xpc_dictionary_set_uint64(msg, xpc::KeyCancelRequest,
+                            reinterpret_cast<uint64_t>(handle));
+
+  xpc_connection_send_message(conn, msg);
+
+  xpc_release(msg);
 }
 
 /// To avoid repeated crashes, used to notify the service to delay typechecking

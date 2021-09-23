@@ -580,9 +580,17 @@ struct SwiftASTManager::Implementation {
   /// Since we only keep a reference to the consumers to cancel them, the
   /// reference to the consumer itself is weak - if it's already deallocated,
   /// there is no need to cancel it anymore.
+  /// The \c CancellationToken that allows cancellation of this consumer.
+  /// Multiple consumers might share the same \c CancellationToken if they were
+  /// created from the same SourceKit request. E.g. a \c CursorInfoConsumer
+  /// might schedule a second \c CursorInfoConsumer if it discovers that the AST
+  /// that was used to serve the first request is not up-to-date enough.
+  /// If \c CancellationToken is \c nullptr, the consumer can't be cancelled
+  /// using a cancellation token.
   struct ScheduledConsumer {
     SwiftASTConsumerWeakRef Consumer;
     const void *OncePerASTToken;
+    SourceKitCancellationToken CancellationToken;
   };
 
   llvm::sys::Mutex ScheduledConsumersMtx;
@@ -739,7 +747,7 @@ SwiftInvocationRef SwiftASTManager::getInvocation(
 
 void SwiftASTManager::processASTAsync(
     SwiftInvocationRef InvokRef, SwiftASTConsumerRef ASTConsumer,
-    const void *OncePerASTToken,
+    const void *OncePerASTToken, SourceKitCancellationToken CancellationToken,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
     ArrayRef<ImmutableTextSnapshotRef> Snapshots) {
   assert(fileSystem);
@@ -758,11 +766,30 @@ void SwiftASTManager::processASTAsync(
         }
       }
     }
-    Impl.ScheduledConsumers.push_back({ASTConsumer, OncePerASTToken});
+    Impl.ScheduledConsumers.push_back(
+        {ASTConsumer, OncePerASTToken, CancellationToken});
   }
 
   Producer->enqueueConsumer(ASTConsumer, fileSystem, Snapshots,
                             shared_from_this());
+}
+
+void SwiftASTManager::cancelASTConsumer(
+    SourceKitCancellationToken CancellationToken) {
+  if (!CancellationToken) {
+    return;
+  }
+  Impl.cleanDeletedConsumers();
+  llvm::sys::ScopedLock L(Impl.ScheduledConsumersMtx);
+  for (auto ScheduledConsumer : Impl.ScheduledConsumers) {
+    if (ScheduledConsumer.CancellationToken == CancellationToken) {
+      if (auto Consumer = ScheduledConsumer.Consumer.lock()) {
+        Consumer->requestCancellation();
+        // Multiple consumers might share the same cancellation token (see
+        // documentation on ScheduledConsumer), so we can't break here.
+      }
+    }
+  }
 }
 
 void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {
