@@ -1040,7 +1040,7 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
   SmallVector<std::vector<std::pair<Term, Symbol>>, 4> properties;
 
   for (const auto &rule : Rules) {
-    if (rule.isDeleted())
+    if (rule.isSimplified())
       continue;
 
     // Collect all rules of the form T.[p] => T where T is canonical.

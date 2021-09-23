@@ -501,7 +501,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     // For every rule, looking for other rules that overlap with this rule.
     for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
       const auto &lhs = getRule(i);
-      if (lhs.isDeleted())
+      if (lhs.isSimplified())
         continue;
 
       // Look up every suffix of this rule in the trie using findAll(). This
@@ -519,7 +519,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
             return;
 
           const auto &rhs = getRule(j);
-          if (rhs.isDeleted())
+          if (rhs.isSimplified())
             return;
 
           if (from == lhs.getLHS().begin()) {

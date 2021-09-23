@@ -47,8 +47,12 @@ bool Rule::isProtocolConformanceRule() const {
 
 void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
-  if (deleted)
-    out << " [deleted]";
+  if (Permanent)
+    out << " [permanent]";
+  if (Simplified)
+    out << " [simplified]";
+  if (Redundant)
+    out << " [redundant]";
 }
 
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
@@ -221,7 +225,7 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
       auto ruleID = Trie.find(from, end);
       if (ruleID) {
         const auto &rule = getRule(*ruleID);
-        if (!rule.isDeleted()) {
+        if (!rule.isSimplified()) {
           auto to = from + rule.getLHS().size();
           assert(std::equal(from, to, rule.getLHS().begin()));
 
@@ -271,7 +275,7 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 void RewriteSystem::simplifyRewriteSystem() {
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
-    if (rule.isDeleted())
+    if (rule.isSimplified())
       continue;
 
     // First, see if the left hand side of this rule can be reduced using
@@ -286,7 +290,7 @@ void RewriteSystem::simplifyRewriteSystem() {
           continue;
 
         // Ignore other deleted rules.
-        if (getRule(*otherRuleID).isDeleted())
+        if (getRule(*otherRuleID).isSimplified())
           continue;
 
         if (Debug.contains(DebugFlags::Completion)) {
@@ -296,13 +300,13 @@ void RewriteSystem::simplifyRewriteSystem() {
                        << "\n";
         }
 
-        rule.markDeleted();
+        rule.markSimplified();
         break;
       }
     }
 
     // If the rule was deleted above, skip the rest.
-    if (rule.isDeleted())
+    if (rule.isSimplified())
       continue;
 
     // Now, try to reduce the right hand side.
@@ -312,7 +316,7 @@ void RewriteSystem::simplifyRewriteSystem() {
       continue;
 
     // We're adding a new rule, so the old rule won't apply anymore.
-    rule.markDeleted();
+    rule.markSimplified();
 
     unsigned newRuleID = Rules.size();
 
@@ -359,7 +363,7 @@ void RewriteSystem::verifyRewriteRules() const {
   }
 
   for (const auto &rule : Rules) {
-    if (rule.isDeleted())
+    if (rule.isSimplified())
       continue;
 
     const auto &lhs = rule.getLHS();

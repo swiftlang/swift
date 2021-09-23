@@ -41,11 +41,37 @@ class RewriteSystem;
 class Rule final {
   Term LHS;
   Term RHS;
-  bool deleted;
+
+  /// Associated type introduction rules are 'permanent', meaning they cannot
+  /// be deleted by homotopy reduction. This is because they do not correspond
+  /// to generic requirements and are re-added when the rewrite system is
+  /// built, so by leaving them in place we can find other redundancies
+  /// instead.
+  unsigned Permanent : 1;
+
+  /// A 'simplified' rule was eliminated by simplifyRewriteSystem() if one of two
+  /// things happen:
+  /// - The rule's left hand side can be reduced via some other rule, in which
+  ///   case completion will have filled in the missing edge if necessary.
+  /// - The rule's right hand side can be reduced, in which case the reduced
+  ///   rule is added when simplifying the rewrite system.
+  ///
+  /// Simplified rules do not participate in term rewriting, because other rules
+  /// can be used to derive an equivalent rewrite path.
+  unsigned Simplified : 1;
+
+  /// A 'redundant' rule was eliminated by homotopy reduction. Redundant rules
+  /// still participate in term rewriting, but they are not part of the minimal
+  /// set of requirements in a generic signature.
+  unsigned Redundant : 1;
 
 public:
   Rule(Term lhs, Term rhs)
-      : LHS(lhs), RHS(rhs), deleted(false) {}
+      : LHS(lhs), RHS(rhs) {
+    Permanent = false;
+    Simplified = false;
+    Redundant = false;
+  }
 
   const Term &getLHS() const { return LHS; }
   const Term &getRHS() const { return RHS; }
@@ -54,9 +80,19 @@ public:
 
   bool isProtocolConformanceRule() const;
 
-  /// Returns if the rule was deleted.
-  bool isDeleted() const {
-    return deleted;
+  /// See above for an explanation.
+  bool isPermanent() const {
+    return Permanent;
+  }
+
+  /// See above for an explanation.
+  bool isSimplified() const {
+    return Simplified;
+  }
+
+  /// See above for an explanation.
+  bool isRedundant() const {
+    return Redundant;
   }
 
   /// Deletes the rule, which removes it from consideration in term
@@ -64,9 +100,9 @@ public:
   /// such instead of being physically removed from the rules vector
   /// in the rewrite system, to ensure that indices remain valid across
   /// deletion.
-  void markDeleted() {
-    assert(!deleted);
-    deleted = true;
+  void markSimplified() {
+    assert(!Simplified);
+    Simplified = true;
   }
 
   /// Returns the length of the left hand side.
