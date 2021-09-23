@@ -3590,20 +3590,6 @@ namespace {
           }
         }
 
-        // If we encounter an IndirectFieldDecl, ensure that its parent is
-        // importable before attempting to import it because they are dependent
-        // when it comes to getter/setter generation.
-        if (const auto *ind = dyn_cast<clang::IndirectFieldDecl>(nd)) {
-          const clang::CXXRecordDecl *parentUnion =
-              (ind->getChainingSize() >= 2)
-                  ? dyn_cast<clang::CXXRecordDecl>(
-                        ind->getAnonField()->getParent())
-                  : nullptr;
-          if (parentUnion && parentUnion->isAnonymousStructOrUnion() &&
-              parentUnion->isUnion() && !isCxxRecordImportable(parentUnion))
-            continue;
-        }
-
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
@@ -3629,16 +3615,8 @@ namespace {
           methods.push_back(MD);
           continue;
         }
-        auto VD = cast<VarDecl>(member);
 
-        if (isa<clang::IndirectFieldDecl>(nd) || decl->isUnion()) {
-          // Don't import unavailable fields that have no associated storage.
-          if (VD->getAttrs().isUnavailable(Impl.SwiftContext)) {
-            continue;
-          }
-        }
-
-        members.push_back(VD);
+        members.push_back(cast<VarDecl>(member));
       }
 
       for (auto nestedType : nestedTypes) {
@@ -3977,6 +3955,14 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // If we encounter an IndirectFieldDecl, ensure that its parent is
+      // importable before attempting to import it because they are dependent
+      // when it comes to getter/setter generation.
+      if (auto parent =
+              dyn_cast<clang::CXXRecordDecl>(decl->getAnonField()->getParent()))
+        if (!isCxxRecordImportable(parent))
+          return nullptr;
+
       auto importedType =
           Impl.importType(decl->getType(), ImportTypeKind::Variable,
                           isInSystemModule(dc), Bridgeability::None);
@@ -4001,6 +3987,12 @@ namespace {
       // If this is a compatibility stub, mark is as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
+
+      // Don't import unavailable fields that have no associated storage.
+      // TODO: is there any way we could bail here before we allocate/construct
+      // the VarDecl?
+      if (result->getAttrs().isUnavailable(Impl.SwiftContext))
+        return nullptr;
 
       return result;
     }
