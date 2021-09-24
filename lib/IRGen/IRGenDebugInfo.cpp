@@ -2558,12 +2558,14 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
         AlignInBits = SizeOfByte;
 
       // Sanity checks.
+#ifndef NDEBUG
       assert(SizeInBits && "zero-sized piece");
       if (getSizeInBits(Var)) {
         assert(SizeInBits < getSizeInBits(Var) && "piece covers entire var");
         assert(OffsetInBits + SizeInBits <= getSizeInBits(Var) &&
                "pars > totum");
       }
+#endif
 
       // Add the piece DWARF expression.
       Operands.push_back(llvm::dwarf::DW_OP_LLVM_fragment);
