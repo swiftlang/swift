@@ -52,7 +52,7 @@ public var myEmptyGlobal = MyEmptyStruct()
 // CHECK:         global_addr @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
 // CHECK:         return
 
-// CHECK-OPT-LABEL: sil private [global_init_once_fn] @{{.*}}WZ
+// CHECK-OPT-LABEL: sil private [global_init_once_fn] {{.*}}@{{.*}}WZ
 // CHECK-OPT:     alloc_global @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
 // CHECK-OPT:     return
 

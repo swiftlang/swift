@@ -14,7 +14,7 @@ public class MyGizmo {
      gizmo = Gizmo()
   }
 
-   // CHECK-LABEL: sil @$s8outliner7MyGizmoC11usePropertyyyF :
+   // CHECK-LABEL: sil {{.*}}@$s8outliner7MyGizmoC11usePropertyyyF :
    // CHECK: [[P_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTepb_
    // CHECK: apply [[P_FUN]]({{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
    // CHECK-NOT: return

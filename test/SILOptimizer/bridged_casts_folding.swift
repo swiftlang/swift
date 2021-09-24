@@ -632,7 +632,7 @@ public func testForcedCastFromGeneric<T>(_ x: T) -> NSString {
   return set
 }
 
-// CHECK-LABEL: sil [noinline] @$s21bridged_casts_folding23testForcedCastToGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil [noinline] {{.*}}@$s21bridged_casts_folding23testForcedCastToGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK: unconditional_checked
 // CHECK: return
 @inline(never)
@@ -650,7 +650,7 @@ public func testCondCastFromGeneric<T>(_ x: T) -> NSString? {
   return setOpt
 }
 
-// CHECK-LABEL: sil [noinline] @$s21bridged_casts_folding21testCondCastToGeneric{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil [noinline] {{.*}}@$s21bridged_casts_folding21testCondCastToGeneric{{[_0-9a-zA-Z]*}}F
 // CHECK: checked_cast_addr_br
 // CHECK: return
 @inline(never)

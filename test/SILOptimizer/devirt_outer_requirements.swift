@@ -33,7 +33,7 @@ public func takesBase<T, V>(_ b: Base<T>, _ v: V) where T : P {
   b.foo(v)
 }
 
-// CHECK-LABEL: sil @$s25devirt_outer_requirements12takesDerivedyyAA0E0CyxG_q_tAA1QRzr0_lF : $@convention(thin) <T, V where T : Q> (@guaranteed Derived<T>, @in_guaranteed V) -> () {
+// CHECK-LABEL: sil {{.*}}@$s25devirt_outer_requirements12takesDerivedyyAA0E0CyxG_q_tAA1QRzr0_lF : $@convention(thin) <T, V where T : Q> (@guaranteed Derived<T>, @in_guaranteed V) -> () {
 public func takesDerived<T, V>(_ d: Derived<T>, _ v: V) where T : Q {
   // CHECK: function_ref @$s25devirt_outer_requirements12takesDerivedyyAA0E0CyxG_q_tAA1QRzr0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Q> (@guaranteed Derived<τ_0_0>, @in_guaranteed τ_0_1) -> ()
   takesDerived(d, v)
