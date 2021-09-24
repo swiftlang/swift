@@ -3,9 +3,6 @@
 // RUN: %target-swift-frontend -enable-type-layout -force-struct-type-layouts -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=FORCE-OPT --check-prefix=FORCE-OPT-%target-ptrsize
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
 
-// https://bugs.swift.org/browse/SR-15237
-// UNSUPPORTED: CPU=arm64e
-
 public struct B<T> {
   var x: T
   var y: T
@@ -130,7 +127,7 @@ public enum ForwardEnum<T> {
 // FORCE-OPT:  [[CASTED:%.*]] = bitcast i8* [[OFFSET]] to %T30typelayout_based_value_witness1CC**
 // FORCE-OPT:  %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** [[CASTED]]
 // FORCE-OPT:  [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, {{(i64|i32)}} 0, i32 0
-// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]]) #6
+// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]])
 // FORCE-OPT:  ret void
 // FORCE-OPT:}
 
@@ -151,7 +148,7 @@ public enum ForwardEnum<T> {
 // FORCE-OPT:  [[CASTED:%.*]] = bitcast i8* [[OFFSET]] to %T30typelayout_based_value_witness1CC**
 // FORCE-OPT:  %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** [[CASTED]]
 // FORCE-OPT:  [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, {{(i64|i32)}} 0, i32 0
-// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]]) #6
+// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]])
 // FORCE-OPT:  ret void
 // FORCE-OPT:}
 
