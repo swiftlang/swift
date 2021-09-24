@@ -16,6 +16,8 @@ func foo<T : Generic<U>, U>(_: T, _: U) {
 // CHECK-NEXT: - τ_0_0.[superclass: Generic<τ_0_0> with <τ_0_1>] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[layout: AnyObject] => τ_0_0
 // CHECK-NEXT: }
+// CHECK-NEXT: Homotopy generators: {
+// CHECK-NEXT: }
 // CHECK-NEXT: Property map: {
 // CHECK-NEXT:   τ_0_0 => { layout: AnyObject superclass: [superclass: Generic<τ_0_0> with <τ_0_1>] }
 // CHECK-NEXT: }
