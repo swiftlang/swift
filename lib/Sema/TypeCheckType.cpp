@@ -1916,6 +1916,28 @@ namespace {
   };
 } // end anonymous namespace
 
+Type TypeResolution::resolveContextualType(
+    TypeRepr *TyR, DeclContext *dc, TypeResolutionOptions opts,
+    OpenUnboundGenericTypeFn unboundTyOpener,
+    HandlePlaceholderTypeReprFn placeholderHandler,
+    GenericParamList *silParams) {
+  return resolveContextualType(TyR, dc, dc->getGenericEnvironmentOfContext(),
+                               opts, unboundTyOpener, placeholderHandler);
+}
+
+Type TypeResolution::resolveContextualType(
+    TypeRepr *TyR, DeclContext *dc, GenericEnvironment *genericEnv,
+    TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
+    HandlePlaceholderTypeReprFn placeholderHandler,
+    GenericParamList *silParams) {
+  const auto resolution = TypeResolution::forInterface(
+      dc, genericEnv, opts, unboundTyOpener, placeholderHandler);
+  const auto ty = resolution.resolveType(TyR, silParams);
+
+  return GenericEnvironment::mapTypeIntoContext(
+      resolution.getGenericSignature().getGenericEnvironment(), ty);
+}
+
 Type TypeResolution::resolveType(TypeRepr *TyR,
                                  GenericParamList *silParams) const {
   auto &ctx = getASTContext();
@@ -2936,10 +2958,10 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     auto *genericParams = repr->getGenericParams();
 
     if (genericParams) {
-      fieldResolution = TypeResolution::forContextual(
-          getDeclContext(), genericEnv, options,
-          resolution.getUnboundTypeOpener(),
-          resolution.getPlaceholderHandler());
+      fieldResolution =
+          TypeResolution::forInterface(getDeclContext(), genericEnv, options,
+                                       resolution.getUnboundTypeOpener(),
+                                       resolution.getPlaceholderHandler());
     }
 
     TypeResolver fieldResolver{fieldResolution,
@@ -2954,11 +2976,6 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
   CanGenericSignature genericSig;
   if (auto *genericEnv = repr->getGenericEnvironment()) {
     genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
-
-    for (auto &field : fields) {
-      auto transTy = field.getLoweredType()->mapTypeOutOfContext();
-      field = {transTy->getCanonicalType(), field.isMutable()};
-    }
   }
   
   // Resolve the generic arguments.
@@ -3020,14 +3037,6 @@ NeverNullType TypeResolver::resolveSILFunctionType(
       : genericEnv;
 
   {
-    TypeResolution functionResolution{resolution};
-    if (componentTypeEnv) {
-      functionResolution = TypeResolution::forContextual(
-          getDeclContext(), componentTypeEnv, options,
-          resolution.getUnboundTypeOpener(),
-          resolution.getPlaceholderHandler());
-    }
-    
     auto argsTuple = repr->getArgsTypeRepr();
     // SIL functions cannot be variadic.
     if (argsTuple->hasEllipsis()) {
@@ -3037,6 +3046,14 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     for (auto &element : argsTuple->getElements()) {
       if (element.UnderscoreLoc.isValid())
         diagnose(element.UnderscoreLoc, diag::sil_function_input_label);
+    }
+
+    TypeResolution functionResolution{resolution};
+    if (componentTypeEnv) {
+      functionResolution = TypeResolution::forInterface(
+          getDeclContext(), componentTypeEnv, options,
+          resolution.getUnboundTypeOpener(),
+          resolution.getPlaceholderHandler());
     }
 
     TypeResolver silResolver{functionResolution, componentGenericParams};
@@ -3088,9 +3105,9 @@ NeverNullType TypeResolver::resolveSILFunctionType(
   if (!repr->getPatternSubstitutions().empty()) {
     if (genericEnv) {
       auto resolveSILParameters =
-          TypeResolution::forContextual(getDeclContext(), genericEnv, options,
-                                        resolution.getUnboundTypeOpener(),
-                                        resolution.getPlaceholderHandler());
+          TypeResolution::forInterface(getDeclContext(), genericEnv, options,
+                                       resolution.getUnboundTypeOpener(),
+                                       resolution.getPlaceholderHandler());
       patternSubs = resolveSubstitutions(repr->getPatternGenericEnvironment(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolveSILParameters,
@@ -3116,53 +3133,6 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     return ErrorType::get(getASTContext());
   }
 
-  CanGenericSignature genericSig =
-    genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
-               : CanGenericSignature();
-
-
-  // FIXME: Remap the parsed context types to interface types.
-  SmallVector<SILParameterInfo, 4> interfaceParams;
-  SmallVector<SILYieldInfo, 4> interfaceYields;
-  SmallVector<SILResultInfo, 4> interfaceResults;
-  Optional<SILResultInfo> interfaceErrorResult;
-  if (componentTypeEnv) {
-    for (auto &param : params) {
-      auto transParamType = param.getInterfaceType()->mapTypeOutOfContext()
-          ->getCanonicalType();
-      interfaceParams.push_back(param.getWithInterfaceType(transParamType));
-    }
-    for (auto &yield : yields) {
-      auto transYieldType = yield.getInterfaceType()->mapTypeOutOfContext()
-          ->getCanonicalType();
-      interfaceYields.push_back(yield.getWithInterfaceType(transYieldType));
-    }
-    for (auto &result : results) {
-      auto transResultType = result.getInterfaceType()->mapTypeOutOfContext()
-          ->getCanonicalType();
-      interfaceResults.push_back(result.getWithInterfaceType(transResultType));
-    }
-
-    if (errorResult) {
-      auto transErrorResultType = errorResult->getInterfaceType()
-          ->mapTypeOutOfContext()
-          ->getCanonicalType();
-      interfaceErrorResult =
-        errorResult->getWithInterfaceType(transErrorResultType);
-    }
-  } else {
-    interfaceParams = params;
-    interfaceYields = yields;
-    interfaceResults = results;
-    interfaceErrorResult = errorResult;
-  }
-
-  SubstitutionMap interfacePatternSubs = patternSubs;
-  if (interfacePatternSubs && repr->getGenericEnvironment()) {
-    interfacePatternSubs =
-      interfacePatternSubs.mapReplacementTypesOutOfContext();
-  }
-
   ProtocolConformanceRef witnessMethodConformance;
   if (witnessMethodProtocol) {
     auto resolved = resolveType(witnessMethodProtocol, options);
@@ -3179,7 +3149,11 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     if (invocationSubs) {
       selfType = selfType.subst(invocationSubs);
     }
-    
+
+    // Only once we've done all the necessary substitutions, map the type
+    // into the function's environment.
+    selfType = GenericEnvironment::mapTypeIntoContext(genericEnv, selfType);
+
     // The Self type can be nested in a few layers of metatypes (etc.).
     while (auto metatypeType = selfType->getAs<MetatypeType>()) {
       auto next = metatypeType->getInstanceType();
@@ -3201,16 +3175,19 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     assert(results.size() <= 1 && yields.size() == 0 &&
            "C functions and blocks have at most 1 result and 0 yields.");
     auto result = results.empty() ? Optional<SILResultInfo>() : results[0];
-    clangFnType = getASTContext().getCanonicalClangFunctionType(
-        interfaceParams, result, representation);
+    clangFnType = getASTContext().getCanonicalClangFunctionType(params, result,
+                                                                representation);
     extInfoBuilder = extInfoBuilder.withClangFunctionType(clangFnType);
   }
 
+  CanGenericSignature genericSig =
+      genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
+                 : CanGenericSignature();
+
   return SILFunctionType::get(genericSig, extInfoBuilder.build(), coroutineKind,
-                              callee, interfaceParams, interfaceYields,
-                              interfaceResults, interfaceErrorResult,
-                              interfacePatternSubs, invocationSubs,
-                              getASTContext(), witnessMethodConformance);
+                              callee, params, yields, results, errorResult,
+                              patternSubs, invocationSubs, getASTContext(),
+                              witnessMethodConformance);
 }
 
 SILYieldInfo TypeResolver::resolveSILYield(TypeAttributes &attrs,
@@ -3955,9 +3932,9 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
     };
   }
 
-  const auto type = TypeResolution::forContextual(dc, options, unboundTyOpener,
-                                                  /*placeholderHandler*/nullptr)
-                        .resolveType(attr->getTypeRepr());
+  const auto type = TypeResolution::resolveContextualType(
+      attr->getTypeRepr(), dc, options, unboundTyOpener,
+      /*placeholderHandler*/ nullptr);
 
   // We always require the type to resolve to a nominal type. If the type was
   // not a nominal type, we should have already diagnosed an error via

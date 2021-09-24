@@ -353,6 +353,19 @@ public:
                 OpenUnboundGenericTypeFn unboundTyOpener,
                 HandlePlaceholderTypeReprFn placeholderHandler);
 
+  static Type
+  resolveContextualType(TypeRepr *TyR, DeclContext *dc,
+                        TypeResolutionOptions opts,
+                        OpenUnboundGenericTypeFn unboundTyOpener,
+                        HandlePlaceholderTypeReprFn placeholderHandler,
+                        GenericParamList *silParams = nullptr);
+
+  static Type resolveContextualType(
+      TypeRepr *TyR, DeclContext *dc, GenericEnvironment *genericEnv,
+      TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
+      HandlePlaceholderTypeReprFn placeholderHandler,
+      GenericParamList *silParams = nullptr);
+
 public:
   TypeResolution withOptions(TypeResolutionOptions opts) const;
 

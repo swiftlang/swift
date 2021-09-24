@@ -485,8 +485,8 @@ public:
     auto *repr = IdentTypeRepr::create(Context, components);
 
     // See if the repr resolves to a type.
-    const auto resolution = TypeResolution::forContextual(
-        DC, options,
+    const auto ty = TypeResolution::resolveContextualType(
+        repr, DC, options,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -495,7 +495,7 @@ public:
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get);
-    const auto ty = resolution.resolveType(repr);
+
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
       return nullptr;
@@ -751,9 +751,9 @@ validateTypedPattern(TypedPattern *TP, DeclContext *dc,
     return named->getDecl()->getDeclContext()->mapTypeIntoContext(opaqueTy);
   }
 
-  auto ty = TypeResolution::forContextual(dc, options, unboundTyOpener,
-                                          placeholderHandler)
-                .resolveType(Repr);
+  const auto ty = TypeResolution::resolveContextualType(
+      Repr, dc, options, unboundTyOpener, placeholderHandler);
+
   if (ty->hasError()) {
     return ErrorType::get(Context);
   }
