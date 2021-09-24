@@ -431,16 +431,11 @@ SymbolGraph::recordRequirementRelationships(Symbol S) {
 void SymbolGraph::recordOptionalRequirementRelationships(Symbol S) {
   const auto VD = S.getSymbolDecl();
   if (const auto *Protocol = dyn_cast<ProtocolDecl>(VD->getDeclContext())) {
-    if (VD->isProtocolRequirement()) {
-      if (const auto *ClangDecl = VD->getClangDecl()) {
-        if (const auto *Method = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
-          if (Method->isOptional()) {
-            recordEdge(Symbol(this, VD, nullptr),
-                       Symbol(this, Protocol, nullptr),
-                       RelationshipKind::OptionalRequirementOf());
-          }
-        }
-      }
+    if (VD->isProtocolRequirement() &&
+        VD->getAttrs().hasAttribute<OptionalAttr>()) {
+      recordEdge(Symbol(this, VD, nullptr),
+                 Symbol(this, Protocol, nullptr),
+                 RelationshipKind::OptionalRequirementOf());
     }
   }
 }
