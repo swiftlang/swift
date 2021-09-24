@@ -1700,52 +1700,62 @@ public:
     // Mangled types for building metadata don't contain sugared types
     return BuiltType();
   }
-  
+
   const WitnessTable *
   createConcreteProtocolConformance(const Metadata *conformingType,
                                     const ProtocolConformanceDescriptor *conformanceDecl,
                                     llvm::ArrayRef<const WitnessTable *> args) {
     if (args.size() != conformanceDecl->getConditionalRequirements().size())
       return nullptr;
-    
+
     auto argsPtr = (const void * const *)args.data();
     return swift_getWitnessTable(conformanceDecl, conformingType, argsPtr);
   }
-  
+
   const WitnessTable *
   createDependentProtocolConformanceRoot(const Metadata *conformingType,
                                          ProtocolDescriptorRef requirement,
                                          unsigned index) {
     return substWitnessTable(conformingType, index);
   }
-  
+
   const WitnessTable *
   createDependentProtocolConformanceAssociated(const WitnessTable *base,
                                                const Metadata *conformingType,
                                                ProtocolDescriptorRef requirement,
                                                unsigned index) {
-    
+    return substWitnessTable(conformingType, index);
   }
-  
+
   const WitnessTable *
   createDependentProtocolConformanceInherited(const WitnessTable *base,
                                               ProtocolDescriptorRef requirement,
-                                              unsigned index);
-  
+                                              unsigned index) {
+    return substWitnessTable(base->getDescription()->getCanonicalTypeMetadata(),
+                             index);
+  }
+
   const ProtocolConformanceDescriptor *
   createProtocolConformanceDeclInTypeModule(const Metadata *conformingType,
                                             ProtocolDescriptorRef protocol) {
-    
+    return swift_getConformanceDescriptor(conformingType,
+                                          protocol.getSwiftProtocol());
   }
-  
+
   const ProtocolConformanceDescriptor *
   createProtocolConformanceDeclInProtocolModule(const Metadata *conformingType,
-                                                ProtocolDescriptorRef protocol);
+                                                ProtocolDescriptorRef protocol) {
+    return swift_getConformanceDescriptor(conformingType,
+                                          protocol.getSwiftProtocol());
+  }
 
   const ProtocolConformanceDescriptor *
   createProtocolConformanceDeclRetroactive(const Metadata *conformingType,
                                            ProtocolDescriptorRef protocol,
-                                           StringRef moduleName);
+                                           StringRef moduleName) {
+    return swift_getConformanceDescriptor(conformingType,
+                                          protocol.getSwiftProtocol());
+  }
 };
 
 }
