@@ -136,6 +136,11 @@ typedef struct {
   SwiftObject obj;
 } BridgedMultiValueResult;
 
+typedef struct {
+  const unsigned char * _Nullable message;
+  SwiftInt position;
+} BridgedParsingError;
+
 // Must be in sync with SILInstruction::MemoryBehavior
 // TODO: do this less hacky.
 typedef enum {
