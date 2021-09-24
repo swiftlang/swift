@@ -463,7 +463,7 @@ namespace swift {
 
     /// Whether the new experimental generics implementation is enabled.
     RequirementMachineMode EnableRequirementMachine =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Enabled;
 
     /// Enables dumping rewrite systems from the requirement machine.
     bool DumpRequirementMachine = false;
