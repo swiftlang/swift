@@ -190,11 +190,11 @@ bool isAddressOfArrayElement(SILValue addr);
 /// Move an ApplyInst's FuncRef so that it dominates the call site.
 void placeFuncRef(ApplyInst *ai, DominanceInfo *dt);
 
-/// Add an argument, \p val, to the branch-edge that is pointing into
+/// Add arguments, \p vals, to the branch-edge that is pointing into
 /// block \p Dest. Return a new instruction and do not erase the old
 /// instruction.
-TermInst *addArgumentToBranch(SILValue val, SILBasicBlock *dest,
-                              TermInst *branch);
+TermInst *addArgumentsToBranch(ArrayRef<SILValue> vals, SILBasicBlock *dest,
+                               TermInst *branch);
 
 /// Get the linkage to be used for specializations of a function with
 /// the given linkage.
