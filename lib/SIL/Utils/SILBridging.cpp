@@ -77,8 +77,6 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
 
   // Handle the important non Node classes.
   StringRef clName = getStringRef(className);
-  if (clName == "Function")
-    return SILFunction::registerBridgedMetatype(metatype);
   if (clName == "BasicBlock")
     return SILBasicBlock::registerBridgedMetatype(metatype);
   if (clName == "GlobalVariable")

@@ -11,6 +11,7 @@ add_swift_compiler_module(SIL
   Argument.swift
   BasicBlock.swift
   Builder.swift
+  Effects.swift
   Function.swift
   GlobalVariable.swift
   Instruction.swift

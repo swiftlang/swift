@@ -146,6 +146,7 @@ namespace sil_block {
     SIL_DIFFERENTIABILITY_WITNESS,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
+    SIL_ARG_EFFECTS_ATTR,
     SIL_PROPERTY,
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR,
@@ -299,7 +300,7 @@ namespace sil_block {
                      GenericSignatureIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
-                     // followed by specialize attributes
+                     // followed by specialize and argument effects attributes
                      // followed by generic param list, if any
                      >;
 
@@ -312,6 +313,12 @@ namespace sil_block {
                      DeclIDField,  // SPIGroup or 0.
                      DeclIDField, // SPIGroup Module name id.
                      BC_AVAIL_TUPLE // Availability
+                     >;
+
+  using SILArgEffectsAttrLayout =
+      BCRecordLayout<SIL_ARG_EFFECTS_ATTR,
+                     IdentifierIDField, // argument effects string
+                     BCFixed<1>         // isDerived
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.

@@ -163,7 +163,29 @@ typedef enum {
 #include "swift/AST/Builtins.def"
 } BridgedBuiltinID;
 
+enum {
+  EffectsFlagEscape = 0x1,
+  EffectsFlagDerived = 0x2
+};
+
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
+
+typedef void (* _Nonnull FunctionRegisterFn)(BridgedFunction f,
+                                        void * _Nonnull data,
+                                        SwiftInt size);
+typedef void (* _Nonnull FunctionWriteFn)(BridgedFunction,
+                                          BridgedOStream, SwiftInt);
+typedef BridgedParsingError (* _Nonnull FunctionParseFn)(BridgedFunction,
+                         BridgedStringRef, SwiftInt, SwiftInt, BridgedArrayRef);
+typedef SwiftInt (* _Nonnull FunctionCopyEffectsFn)(BridgedFunction,
+                                                    BridgedFunction);
+typedef SwiftInt (* _Nonnull FunctionGetEffectFlagsFn)(BridgedFunction, SwiftInt);
+
+void Function_register(SwiftMetatype metatype,
+            FunctionRegisterFn initFn, FunctionRegisterFn destroyFn,
+            FunctionWriteFn writeFn, FunctionParseFn parseFn,
+            FunctionCopyEffectsFn copyEffectsFn,
+            FunctionGetEffectFlagsFn hasEffectsFn);
 
 void OStream_write(BridgedOStream os, BridgedStringRef str);
 

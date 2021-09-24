@@ -1090,6 +1090,30 @@ from the command line.
 The specified memory effects of the function.
 ::
 
+  sil-function-attribute ::= '[' 'escapes' escape-list ']'
+  sil-function-attribute ::= '[' 'defined_escapes' escape-list ']'
+  escape-list ::= (escape-list ',')? escape
+  escape ::= '!' arg-selection                 // not-escaping
+  escape ::= arg-selection '=>' arg-selection  // exclusive escaping
+  escape ::= arg-selection '->' arg-selection  // not-exclusive escaping
+  arg-selection ::= arg-or-return ('.' projection-path)?
+  arg-or-return ::= '%' [0-9]+
+  arg-or-return ::= '%r'
+  projection-path ::= (projection-path '.')? path-component
+  path-component ::= 's' [0-9]+        // struct field
+  path-component ::= 'c' [0-9]+        // class field
+  path-component ::= 'ct'              // class tail element
+  path-component ::= 'e' [0-9]+        // enum case
+  path-component ::= [0-9]+            // tuple element
+  path-component ::= 'v**'             // any value fields
+  path-component ::= 'c*'              // any class field
+  path-component ::= '**'              // anything
+
+The escaping effects for function arguments. For details see the documentation
+in ``SwiftCompilerSources/Sources/SIL/Effects.swift``.
+
+::
+
   sil-function-attribute ::= '[_semantics "' [A-Za-z._0-9]+ '"]'
 
 The specified high-level semantics of the function. The optimizer can use this

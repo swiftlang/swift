@@ -230,6 +230,79 @@ For example:
 
 This effect is not used by the compiler.
 
+### `@_effects(notEscaping <selection>)`
+
+Tells the compiler that a function argument does not escape.
+The _selection_ specifies which argument or which "projection" of an argument
+does not escape. The _selection_ consists of the argument name or `self` and
+an optional projection path.
+
+The projection path consists of field names or one of the following wildcards:
+
+* `class*`: selects any class field, including tail allocated elements
+* `value**`: selects any number and any kind of struct, tuple or enum
+             fields/payload-cases.
+* `**`: selects any number of any fields
+
+For example:
+
+```swift
+struct Inner {
+  let i: Class
+}
+struct Str {
+	let a: Inner
+	let b: Class
+}
+
+@_effects(notEscaping s.b)    // s.b does not escape, but s.a.i can escape
+func foo1(_ s: Str) { ... }
+
+@_effects(notEscaping s.v**)  // s.b and s.a.i do not escape
+func foo2(_ s: Str) { ... }
+
+@_effects(notEscaping s.**)   // s.b, s.a.i and all transitively reachable
+                              // references from there do not escape
+func foo3(_ s: Str) { ... }
+```
+
+### `@_effects(escaping <from-selection> => <to-selection>)`
+
+Defines that an argument escapes to another argument or to the return value,
+but not otherwise.
+The _to-selection_ can also refer to `return`.
+
+For example:
+
+```swift
+@_effects(escapes s.b => return)
+func foo1(_ s: Str) -> Class {
+  return s.b
+}
+
+@_effects(escapes s.b => o.a.i)
+func foo2(_ s: Str, o: inout Str) {
+  o.a.i = s.b
+}
+```
+
+### `@_effects(escaping <from-selection> -> <to-selection>)`
+
+This variant of an escaping effect defines a "non-exclusive" escape. This means
+that not only the _from-selection_, but also other values
+can escape to the _to-selection_.
+
+For example:
+
+```swift
+var g: Class
+
+@_effects(escapes s.b -> return)
+func foo1(_ s: Str, _ cond: Bool) -> Class {
+  return cond ? s.b : g
+}
+```
+
 ## `@_exported`
 
 Re-exports all declarations from an imported module.

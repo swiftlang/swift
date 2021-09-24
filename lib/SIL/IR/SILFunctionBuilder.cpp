@@ -15,6 +15,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 
 using namespace swift;
@@ -115,7 +116,37 @@ void SILFunctionBuilder::addFunctionAttributes(
     }
   }
 
-  // TODO: handle custom effects.
+  if (!customEffects.empty()) {
+    llvm::SmallVector<StringRef, 8> paramNames;
+    auto *fnDecl = cast<AbstractFunctionDecl>(constant.getDecl());
+    if (ParameterList *paramList = fnDecl->getParameters()) {
+      for (ParamDecl *pd : *paramList) {
+        // Give up on tuples. Their elements are added as individual
+        // argumenst. It destroys the 1-1 relation ship between parameters
+        // and arguments.
+        if (isa<TupleType>(CanType(pd->getType())))
+          break;
+        // First try the "local" parameter name. If there is none, use the
+        // API name. E.g. `foo(apiName localName: Type) {}`
+        StringRef name = pd->getName().str();
+        if (name.empty())
+          name = pd->getArgumentName().str();
+        if (!name.empty())
+          paramNames.push_back(name);
+      }
+    }
+    for (const EffectsAttr *effectsAttr : llvm::reverse(customEffects)) {
+      auto error = F->parseEffects(effectsAttr->getCustomString(),
+                            /*fromSIL*/ false, /*isDerived*/ false, paramNames);
+      if (error.first) {
+        SourceLoc loc = effectsAttr->getCustomStringLocation();
+        if (loc.isValid())
+          loc = loc.getAdvancedLoc(error.second);
+        mod.getASTContext().Diags.diagnose(loc,
+                    diag::warning_in_effects_attribute, StringRef(error.first));
+      }
+    }
+  }
 
   if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
     F->setOptimizationMode(OA->getMode());
