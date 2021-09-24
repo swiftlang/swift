@@ -7,6 +7,9 @@
 // CHECK: @_effects(readnone) public func illiterate(){{$}}
 @_effects(readnone) public func illiterate() {}
 
+// CHECK: @_effects(notEscaping arg1.**) public func escapeEffects(arg1: Swift.Int){{$}}
+@_effects(notEscaping arg1.**) public func escapeEffects(arg1: Int) {}
+
 // CHECK-LABEL: @frozen public struct Point {
 @frozen public struct Point {
   // CHECK-NEXT: public var x: Swift.Int

@@ -2531,8 +2531,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_Effects: {
       auto *theAttr = cast<EffectsAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[EffectsDeclAttrLayout::Code];
+      IdentifierID customStringID = 0;
+      if (theAttr->getKind() == EffectsKind::Custom) {
+        customStringID = S.addUniquedStringRef(theAttr->getCustomString());
+      }
       EffectsDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                       (unsigned)theAttr->getKind());
+                                        (unsigned)theAttr->getKind(),
+                                        customStringID);
       return;
     }
 

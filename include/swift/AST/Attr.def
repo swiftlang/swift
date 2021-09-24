@@ -323,7 +323,7 @@ CONTEXTUAL_DECL_ATTR(weak, ReferenceOwnership,
 CONTEXTUAL_DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
 DECL_ATTR(_effects, Effects,
   OnAbstractFunction |
-  UserInaccessible |
+  AllowMultipleAttributes | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   50)
 DECL_ATTR(__objc_bridged, ObjCBridged,

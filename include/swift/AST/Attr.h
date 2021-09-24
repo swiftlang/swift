@@ -1227,14 +1227,36 @@ public:
 
 /// Represents the side effects attribute.
 class EffectsAttr : public DeclAttribute {
+  StringRef customString;
+  SourceLoc customStringLoc;
+
 public:
   EffectsAttr(SourceLoc atLoc, SourceRange range, EffectsKind kind)
       : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false) {
     Bits.EffectsAttr.kind = unsigned(kind);
   }
 
+  EffectsAttr(SourceLoc atLoc, SourceRange range, StringRef customString,
+              SourceLoc customStringLoc)
+      : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false),
+        customString(customString), customStringLoc(customStringLoc) {
+    Bits.EffectsAttr.kind = unsigned(EffectsKind::Custom);
+  }
+
   EffectsAttr(EffectsKind kind)
   : EffectsAttr(SourceLoc(), SourceRange(), kind) {}
+
+  EffectsAttr(StringRef customString)
+  : EffectsAttr(SourceLoc(), SourceRange(), customString, SourceLoc()) {}
+
+  StringRef getCustomString() const {
+    assert(getKind() == EffectsKind::Custom);
+    return customString;
+  }
+  
+  SourceLoc getCustomStringLocation() const {
+    return customStringLoc;
+  }
 
   EffectsKind getKind() const { return EffectsKind(Bits.EffectsAttr.kind); }
   static bool classof(const DeclAttribute *DA) {

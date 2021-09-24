@@ -13,6 +13,7 @@
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SemanticAttrs.h"
 
@@ -97,6 +98,24 @@ void SILFunctionBuilder::addFunctionAttributes(
           spiGroupIdent, attributedFuncDecl->getModuleContext(), availability));
     }
   }
+
+  llvm::SmallVector<const EffectsAttr *, 8> customEffects;
+  for (auto *attr : Attrs.getAttributes<EffectsAttr>()) {
+    auto *effectsAttr = cast<EffectsAttr>(attr);
+    if (effectsAttr->getKind() == EffectsKind::Custom) {
+      customEffects.push_back(effectsAttr);
+    } else {
+      if (F->getEffectsKind() != EffectsKind::Unspecified &&
+          F->getEffectsKind() != effectsAttr->getKind()) {
+        mod.getASTContext().Diags.diagnose(effectsAttr->getLocation(),
+            diag::warning_in_effects_attribute, "mismatching function effects");
+      } else {
+        F->setEffectsKind(effectsAttr->getKind());
+      }
+    }
+  }
+
+  // TODO: handle custom effects.
 
   if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
     F->setOptimizationMode(OA->getMode());
@@ -213,10 +232,6 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       constant.isTransparent() ? IsTransparent : IsNotTransparent;
   IsSerialized_t IsSer = constant.isSerialized();
 
-  EffectsKind EK = constant.hasEffectsAttribute()
-                       ? constant.getEffectsAttribute()
-                       : EffectsKind::Unspecified;
-
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())
     inlineStrategy = NoInline;
@@ -240,7 +255,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
                                 IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
                                 IsDistributed, IsNotExactSelfClass,
                                 IsNotThunk, constant.getSubclassScope(),
-                                inlineStrategy, EK);
+                                inlineStrategy);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
 
   if (constant.isGlobal())

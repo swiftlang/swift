@@ -4426,9 +4426,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::Effects_DECL_ATTR: {
         unsigned kind;
-        serialization::decls_block::EffectsDeclAttrLayout::readRecord(scratch,
-                                                                      kind);
-        Attr = new (ctx) EffectsAttr((EffectsKind)kind);
+        IdentifierID customStringID;
+        serialization::decls_block::EffectsDeclAttrLayout::
+          readRecord(scratch, kind, customStringID);
+        if (customStringID) {
+          assert((EffectsKind)kind == EffectsKind::Custom);
+          Attr = new (ctx) EffectsAttr(MF.getIdentifier(customStringID).str());
+        } else {
+          Attr = new (ctx) EffectsAttr((EffectsKind)kind);
+        }
         break;
       }
       case decls_block::OriginallyDefinedIn_DECL_ATTR: {
