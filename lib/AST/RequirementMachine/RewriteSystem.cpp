@@ -23,6 +23,38 @@
 using namespace swift;
 using namespace rewriting;
 
+Optional<Symbol> Rule::isPropertyRule() const {
+  auto property = LHS.back();
+
+  if (!property.isProperty())
+    return None;
+
+  if (LHS.size() - 1 != RHS.size())
+    return None;
+
+  if (!std::equal(RHS.begin(), RHS.end(), LHS.begin()))
+    return None;
+
+  return property;
+}
+
+bool Rule::isProtocolConformanceRule() const {
+  if (auto property = isPropertyRule())
+    return property->getKind() == Symbol::Kind::Protocol;
+
+  return false;
+}
+
+void Rule::dump(llvm::raw_ostream &out) const {
+  out << LHS << " => " << RHS;
+  if (Permanent)
+    out << " [permanent]";
+  if (Simplified)
+    out << " [simplified]";
+  if (Redundant)
+    out << " [redundant]";
+}
+
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
     : Context(ctx), Debug(ctx.getDebugOptions()) {}
 
@@ -31,18 +63,19 @@ RewriteSystem::~RewriteSystem() {
                         Context.RuleTrieRootHistogram);
 }
 
-void Rule::dump(llvm::raw_ostream &out) const {
-  out << LHS << " => " << RHS;
-  if (deleted)
-    out << " [deleted]";
-}
-
 void RewriteSystem::initialize(
-    std::vector<std::pair<MutableTerm, MutableTerm>> &&rules,
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&associatedTypeRules,
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
     ProtocolGraph &&graph) {
   Protos = graph;
 
-  for (const auto &rule : rules)
+  for (const auto &rule : associatedTypeRules) {
+    bool added = addRule(rule.first, rule.second);
+    if (added)
+      Rules.back().markPermanent();
+  }
+
+  for (const auto &rule : requirementRules)
     addRule(rule.first, rule.second);
 }
 
@@ -58,37 +91,76 @@ Symbol RewriteSystem::simplifySubstitutionsInSuperclassOrConcreteSymbol(
     }, Context);
 }
 
-bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
+/// Adds a rewrite rule, returning true if the new rule was non-trivial.
+///
+/// If both sides simplify to the same term, the rule is trivial and discarded,
+/// and this method returns false.
+///
+/// If \p path is non-null, the new rule is derived from existing rules in the
+/// rewrite system; the path records a series of rewrite steps which transform
+/// \p lhs to \p rhs.
+bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
+                            const RewritePath *path) {
   assert(!lhs.empty());
   assert(!rhs.empty());
 
   if (Debug.contains(DebugFlags::Add)) {
-    llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n";
+    llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n\n";
   }
-
-  // First, simplify terms appearing inside concrete substitutions before
-  // doing anything else.
-  if (lhs.back().isSuperclassOrConcreteType())
-    lhs.back() = simplifySubstitutionsInSuperclassOrConcreteSymbol(lhs.back());
-  else if (rhs.back().isSuperclassOrConcreteType())
-    rhs.back() = simplifySubstitutionsInSuperclassOrConcreteSymbol(rhs.back());
 
   // Now simplify both sides as much as possible with the rules we have so far.
   //
   // This avoids unnecessary work in the completion algorithm.
-  simplify(lhs);
-  simplify(rhs);
+  RewritePath lhsPath;
+  RewritePath rhsPath;
+
+  simplify(lhs, &lhsPath);
+  simplify(rhs, &rhsPath);
+
+  RewritePath loop;
+  if (path) {
+    // Produce a path from the simplified lhs to the simplified rhs.
+
+    // (1) First, apply lhsPath in reverse to produce the original lhs.
+    lhsPath.invert();
+    loop.append(lhsPath);
+
+    // (2) Now, apply the path from the original lhs to the original rhs
+    // given to us by the completion procedure.
+    loop.append(*path);
+
+    // (3) Finally, apply rhsPath to produce the simplified rhs, which
+    // is the same as the simplified lhs.
+    loop.append(rhsPath);
+  }
 
   // If the left hand side and right hand side are already equivalent, we're
   // done.
   int result = lhs.compare(rhs, Protos);
-  if (result == 0)
+  if (result == 0) {
+    // If this rule is a consequence of existing rules, add a homotopy
+    // generator.
+    if (path) {
+      // We already have a loop, since the simplified lhs is identical to the
+      // simplified rhs.
+      HomotopyGenerators.emplace_back(lhs, loop);
+
+      if (Debug.contains(DebugFlags::Add)) {
+        llvm::dbgs() << "## Recorded trivial loop at " << lhs << ": ";
+        loop.dump(llvm::dbgs(), lhs, *this);
+        llvm::dbgs() << "\n\n";
+      }
+    }
+
     return false;
+  }
 
   // Orient the two terms so that the left hand side is greater than the
   // right hand side.
-  if (result < 0)
+  if (result < 0) {
     std::swap(lhs, rhs);
+    loop.invert();
+  }
 
   assert(lhs.compare(rhs, Protos) > 0);
 
@@ -96,16 +168,30 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
     llvm::dbgs() << "## Simplified and oriented rule " << lhs << " => " << rhs << "\n\n";
   }
 
-  unsigned i = Rules.size();
+  unsigned newRuleID = Rules.size();
 
   auto uniquedLHS = Term::get(lhs, Context);
   auto uniquedRHS = Term::get(rhs, Context);
   Rules.emplace_back(uniquedLHS, uniquedRHS);
 
-  auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), i);
+  if (path) {
+    // We have a rewrite path from the simplified lhs to the simplified rhs;
+    // add a rewrite step applying the new rule in reverse to close the loop.
+    loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
+                                         newRuleID, /*inverse=*/true));
+    HomotopyGenerators.emplace_back(lhs, loop);
+
+    if (Debug.contains(DebugFlags::Add)) {
+      llvm::dbgs() << "## Recorded non-trivial loop at " << lhs << ": ";
+      loop.dump(llvm::dbgs(), lhs, *this);
+      llvm::dbgs() << "\n\n";
+    }
+  }
+
+  auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), newRuleID);
   if (oldRuleID) {
     llvm::errs() << "Duplicate rewrite rule!\n";
-    const auto &oldRule = Rules[*oldRuleID];
+    const auto &oldRule = getRule(*oldRuleID);
     llvm::errs() << "Old rule #" << *oldRuleID << ": ";
     oldRule.dump(llvm::errs());
     llvm::errs() << "\nTrying to replay what happened when I simplified this term:\n";
@@ -123,11 +209,18 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.
-bool RewriteSystem::simplify(MutableTerm &term) const {
+///
+/// If \p path is non-null, records the series of rewrite steps taken.
+bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
   bool changed = false;
 
+  MutableTerm original;
+  RewritePath forDebug;
   if (Debug.contains(DebugFlags::Simplify)) {
-    llvm::dbgs() << "= Term " << term << "\n";
+
+    original = term;
+    if (!path)
+      path = &forDebug;
   }
 
   while (true) {
@@ -138,19 +231,19 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
     while (from < end) {
       auto ruleID = Trie.find(from, end);
       if (ruleID) {
-        const auto &rule = Rules[*ruleID];
-        if (!rule.isDeleted()) {
-          if (Debug.contains(DebugFlags::Simplify)) {
-            llvm::dbgs() << "== Rule #" << *ruleID << ": " << rule << "\n";
-          }
-
+        const auto &rule = getRule(*ruleID);
+        if (!rule.isSimplified()) {
           auto to = from + rule.getLHS().size();
           assert(std::equal(from, to, rule.getLHS().begin()));
 
+          unsigned startOffset = (unsigned)(from - term.begin());
+          unsigned endOffset = term.size() - rule.getLHS().size() - startOffset;
+
           term.rewriteSubTerm(from, to, rule.getRHS());
 
-          if (Debug.contains(DebugFlags::Simplify)) {
-            llvm::dbgs() << "=== Result " << term << "\n";
+          if (path) {
+            path->add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
+                                                  /*inverse=*/false));
           }
 
           changed = true;
@@ -166,6 +259,17 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
       break;
   }
 
+  if (Debug.contains(DebugFlags::Simplify)) {
+    if (changed) {
+      llvm::dbgs() << "= Simplified " << term << ": ";
+      forDebug.dump(llvm::dbgs(), original, *this);
+      llvm::dbgs() << "\n";
+    } else {
+      llvm::dbgs() << "= Irreducible term: " << term << "\n";
+    }
+  }
+
+  assert(path == nullptr || changed != path->empty());
   return changed;
 }
 
@@ -176,9 +280,9 @@ bool RewriteSystem::simplify(MutableTerm &term) const {
 /// Must be run after the completion procedure, since the deletion of
 /// rules is only valid to perform if the rewrite system is confluent.
 void RewriteSystem::simplifyRewriteSystem() {
-  for (auto ruleID : indices(Rules)) {
-    auto &rule = Rules[ruleID];
-    if (rule.isDeleted())
+  for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
+    auto &rule = getRule(ruleID);
+    if (rule.isSimplified())
       continue;
 
     // First, see if the left hand side of this rule can be reduced using
@@ -193,36 +297,68 @@ void RewriteSystem::simplifyRewriteSystem() {
           continue;
 
         // Ignore other deleted rules.
-        if (Rules[*otherRuleID].isDeleted())
+        if (getRule(*otherRuleID).isSimplified())
           continue;
 
         if (Debug.contains(DebugFlags::Completion)) {
-          const auto &otherRule = Rules[ruleID];
+          const auto &otherRule = getRule(ruleID);
           llvm::dbgs() << "$ Deleting rule " << rule << " because "
                        << "its left hand side contains " << otherRule
                        << "\n";
         }
 
-        rule.markDeleted();
+        rule.markSimplified();
         break;
       }
     }
 
     // If the rule was deleted above, skip the rest.
-    if (rule.isDeleted())
+    if (rule.isSimplified())
       continue;
 
     // Now, try to reduce the right hand side.
+    RewritePath rhsPath;
     MutableTerm rhs(rule.getRHS());
-    if (!simplify(rhs))
+    if (!simplify(rhs, &rhsPath))
       continue;
 
-    // If the right hand side was further reduced, update the rule.
-    rule = Rule(rule.getLHS(), Term::get(rhs, Context));
+    // We're adding a new rule, so the old rule won't apply anymore.
+    rule.markSimplified();
+
+    unsigned newRuleID = Rules.size();
+
+    // Add a new rule with the simplified right hand side.
+    Rules.emplace_back(lhs, Term::get(rhs, Context));
+    auto oldRuleID = Trie.insert(lhs.begin(), lhs.end(), newRuleID);
+    assert(oldRuleID == ruleID);
+    (void) oldRuleID;
+
+    // Produce a loop at the simplified rhs.
+    RewritePath loop;
+
+    // (1) First, apply rhsPath in reverse to produce the original rhs.
+    rhsPath.invert();
+    loop.append(rhsPath);
+
+    // (2) Next, apply the original rule in reverse to produce the
+    // original lhs.
+    loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
+                                         ruleID, /*inverse=*/true));
+
+    // (3) Finally, apply the new rule to produce the simplified rhs.
+    loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
+                                         newRuleID, /*inverse=*/false));
+
+    if (Debug.contains(DebugFlags::Completion)) {
+      llvm::dbgs() << "$ Right hand side simplification recorded a loop: ";
+      loop.dump(llvm::dbgs(), rhs, *this);
+    }
+
+    HomotopyGenerators.emplace_back(rhs, loop);
   }
 }
 
-void RewriteSystem::verify() const {
+void RewriteSystem::verifyRewriteRules() const {
 #ifndef NDEBUG
 
 #define ASSERT_RULE(expr) \
@@ -234,7 +370,7 @@ void RewriteSystem::verify() const {
   }
 
   for (const auto &rule : Rules) {
-    if (rule.isDeleted())
+    if (rule.isSimplified())
       continue;
 
     const auto &lhs = rule.getLHS();
@@ -288,6 +424,13 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "Rewrite system: {\n";
   for (const auto &rule : Rules) {
     out << "- " << rule << "\n";
+  }
+  out << "}\n";
+  out << "Homotopy generators: {\n";
+  for (const auto &loop : HomotopyGenerators) {
+    out << "- " << loop.Basepoint << ": ";
+    loop.Path.dump(out, loop.Basepoint, *this);
+    out << "\n";
   }
   out << "}\n";
 }

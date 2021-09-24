@@ -33,7 +33,8 @@ struct RewriteSystemBuilder {
   bool Dump;
 
   ProtocolGraph Protocols;
-  std::vector<std::pair<MutableTerm, MutableTerm>> Rules;
+  std::vector<std::pair<MutableTerm, MutableTerm>> AssociatedTypeRules;
+  std::vector<std::pair<MutableTerm, MutableTerm>> RequirementRules;
 
   CanType getConcreteSubstitutionSchema(CanType concreteType,
                                         const ProtocolDecl *proto,
@@ -126,7 +127,7 @@ void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
   MutableTerm rhs;
   rhs.add(Symbol::forAssociatedType(proto, type->getName(), Context));
 
-  Rules.emplace_back(lhs, rhs);
+  AssociatedTypeRules.emplace_back(lhs, rhs);
 }
 
 /// Lowers a generic requirement to a rewrite rule.
@@ -187,7 +188,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     constraintTerm = subjectTerm;
     constraintTerm.add(Symbol::forSuperclass(otherType, substitutions,
                                              Context));
-    Rules.emplace_back(subjectTerm, constraintTerm);
+    RequirementRules.emplace_back(subjectTerm, constraintTerm);
 
     constraintTerm = subjectTerm;
     auto layout =
@@ -233,7 +234,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   }
   }
 
-  Rules.emplace_back(subjectTerm, constraintTerm);
+  RequirementRules.emplace_back(subjectTerm, constraintTerm);
 }
 
 void RequirementMachine::verify(const MutableTerm &term) const {
@@ -366,7 +367,8 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 
   // Add the initial set of rewrite rules to the rewrite system, also
   // providing the protocol graph to use for the linear order on terms.
-  System.initialize(std::move(builder.Rules),
+  System.initialize(std::move(builder.AssociatedTypeRules),
+                    std::move(builder.RequirementRules),
                     std::move(builder.Protocols));
 
   computeCompletion();
@@ -413,7 +415,8 @@ void RequirementMachine::computeCompletion() {
     checkCompletionResult();
 
     // Check invariants.
-    System.verify();
+    System.verifyRewriteRules();
+    System.verifyHomotopyGenerators();
 
     // Build the property map, which also performs concrete term
     // unification; if this added any new rules, run the completion
@@ -446,4 +449,8 @@ void RequirementMachine::computeCompletion() {
 
 bool RequirementMachine::isComplete() const {
   return Complete;
+}
+
+void RequirementMachine::computeMinimalRequirements(const ProtocolDecl *proto) {
+  System.minimizeRewriteSystem();
 }
