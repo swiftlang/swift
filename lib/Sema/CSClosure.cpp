@@ -1429,6 +1429,8 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
     return true;
 
   TypeChecker::checkClosureAttributes(closure);
+  TypeChecker::checkParameterList(closure->getParameters(), closure);
+
   closure->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
   return false;
 }
