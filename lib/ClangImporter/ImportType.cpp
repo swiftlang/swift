@@ -1918,6 +1918,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // Import the parameter type into Swift.
     Type swiftParamTy;
     bool isParamTypeImplicitlyUnwrapped = false;
+    bool isInOut = false;
 
     auto referenceType = dyn_cast<clang::ReferenceType>(paramTy);
     if (referenceType &&
@@ -1937,6 +1938,10 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       swiftParamTy =
           findGenericTypeInGenericDecls(templateParamType, genericParams);
     } else {
+      if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
+        paramTy = refType->getPointeeType();
+        isInOut = true;
+      }
       auto importedType = importType(paramTy, importKind, allowNSUIntegerAsInt,
                                      Bridgeability::Full, OptionalityOfParam);
       if (!importedType)
@@ -1968,7 +1973,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         param, AccessLevel::Private, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
         ImportedHeaderUnit);
-    paramInfo->setSpecifier(ParamSpecifier::Default);
+    paramInfo->setSpecifier(isInOut ? ParamSpecifier::InOut
+                                    : ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
     recordUnsafeConcurrencyForDecl(
