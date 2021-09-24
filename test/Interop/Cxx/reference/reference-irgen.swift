@@ -32,9 +32,7 @@ public func getConstCxxRvalueRef() -> UnsafePointer<CInt> {
 
 public func setCxxRef() {
   var val: CInt = 21
-  withUnsafeMutablePointer(to: &val) {
-    setStaticIntRef($0)
-  }
+  setStaticIntRef(&val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main9setCxxRefyyF"()
@@ -42,9 +40,7 @@ public func setCxxRef() {
 
 public func setCxxConstRef() {
   var val: CInt = 21
-  withUnsafePointer(to: &val) {
-    setConstStaticIntRef($0)
-  }
+  setConstStaticIntRef(&val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main14setCxxConstRefyyF"()
@@ -52,9 +48,7 @@ public func setCxxConstRef() {
 
 public func setCxxRvalueRef() {
   var val: CInt = 21
-  withUnsafeMutablePointer(to: &val) {
-    setStaticIntRvalueRef($0)
-  }
+  setStaticIntRvalueRef(&val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main15setCxxRvalueRefyyF"()
@@ -62,9 +56,7 @@ public func setCxxRvalueRef() {
 
 public func setCxxConstRvalueRef() {
   var val: CInt = 21
-  withUnsafePointer(to: &val) {
-    setConstStaticIntRvalueRef($0)
-  }
+  setConstStaticIntRvalueRef(&val)
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main20setCxxConstRvalueRefyyF"()
