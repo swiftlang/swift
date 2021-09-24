@@ -423,14 +423,20 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
       }
     }
   } else if (Triple.isWatchOS()) {
+    auto floorFor64bits = [&Triple](llvm::VersionTuple v) {
+      if (!Triple.isArch64Bit()) return v;
+      // 64-bit watchOS was introduced with Swift 5.3
+      return MAX(v, llvm::VersionTuple(5, 3));
+    };
+
     Triple.getWatchOSVersion(Major, Minor, Micro);
     if (Major <= 5) {
-      return llvm::VersionTuple(5, 0);
+      return floorFor64bits(llvm::VersionTuple(5, 0));
     } else if (Major <= 6) {
       if (Minor <= 1) {
-        return llvm::VersionTuple(5, 1);
+        return floorFor64bits(llvm::VersionTuple(5, 1));
       } else {
-        return llvm::VersionTuple(5, 2);
+        return floorFor64bits(llvm::VersionTuple(5, 2));
       }
     }
   }
