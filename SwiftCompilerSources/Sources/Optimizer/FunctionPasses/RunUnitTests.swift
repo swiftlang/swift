@@ -18,4 +18,7 @@ let runUnitTests = FunctionPass(name: "run-unit-tests", {
   (function: Function, context: PassContext) in
 
   print("--- Run unit tests ---")
+  
+  print("test ProjectionPath")
+  SmallProjectionPath.runUnitTests()
 })
