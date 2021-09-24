@@ -322,8 +322,8 @@ extension _StringGutsSlice {
     with other: _StringGutsSlice,
     expecting: _StringComparisonResult
   ) -> Bool {
-    var iter1 = Substring(self).nfc.makeIterator()
-    var iter2 = Substring(other).nfc.makeIterator()
+    var iter1 = Substring(self)._nfc.makeIterator()
+    var iter2 = Substring(other)._nfc.makeIterator()
 
     var scalar1: Unicode.Scalar? = nil
     var scalar2: Unicode.Scalar? = nil

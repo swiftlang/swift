@@ -174,6 +174,7 @@ set(SWIFTLIB_ESSENTIAL
   ThreadLocalStorage.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift
+  UnicodeData.swift
   UnicodeEncoding.swift
   UnicodeHelpers.swift
   UnicodeParser.swift

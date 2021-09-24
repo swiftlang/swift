@@ -279,7 +279,7 @@ public enum Optional<Wrapped>: ExpressibleByNilLiteral {
   ///
   /// - Returns: The wrapped value being stored in this instance. If this
   ///   instance is `nil`, returns `nil`.
-  internal mutating func take() -> Wrapped? {
+  internal mutating func _take() -> Wrapped? {
     switch self {
     case .some(let wrapped):
       self = nil
