@@ -2597,6 +2597,60 @@ bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
   return false;
 }
 
+void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
+    Type boundTy, Type ty, ConstraintLocator *locator) {
+  // NOTE: If we use other locator kinds for these disjunctions, we
+  // need to account for it in solution scores for forced-unwraps.
+  assert(locator->getPath().back().getKind() ==
+             ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
+         locator->getPath().back().getKind() ==
+             ConstraintLocator::DynamicLookupResult);
+
+  // Create the constraint to bind to the optional type and make it the favored
+  // choice.
+  auto *bindToOptional =
+      Constraint::create(*this, ConstraintKind::Bind, boundTy, ty, locator);
+  bindToOptional->setFavored();
+
+  Type underlyingType;
+  if (auto *fnTy = ty->getAs<AnyFunctionType>())
+    underlyingType = replaceFinalResultTypeWithUnderlying(fnTy);
+  else if (auto *typeVar =
+               ty->getWithoutSpecifierType()->getAs<TypeVariableType>()) {
+    auto *locator = typeVar->getImpl().getLocator();
+
+    // If `ty` hasn't been resolved yet, we need to allocate a type variable to
+    // represent an object type of a future optional, and add a constraint
+    // between `ty` and `underlyingType` to model it.
+    underlyingType = createTypeVariable(
+        getConstraintLocator(locator, LocatorPathElt::GenericArgument(0)),
+        TVO_PrefersSubtypeBinding | TVO_CanBindToLValue |
+            TVO_CanBindToNoEscape);
+
+    // Using a `typeVar` here because l-value is going to be applied
+    // to the underlying type below.
+    addConstraint(ConstraintKind::OptionalObject, typeVar, underlyingType,
+                  locator);
+  } else {
+    underlyingType = ty->getWithoutSpecifierType()->getOptionalObjectType();
+  }
+
+  assert(underlyingType);
+
+  if (ty->is<LValueType>())
+    underlyingType = LValueType::get(underlyingType);
+  assert(!ty->is<InOutType>());
+
+  auto *bindToUnderlying = Constraint::create(*this, ConstraintKind::Bind,
+                                              boundTy, underlyingType, locator);
+
+  llvm::SmallVector<Constraint *, 2> choices = {bindToOptional,
+                                                bindToUnderlying};
+
+  // Create the disjunction
+  addDisjunctionConstraint(choices, locator, RememberChoice);
+}
+
 void ConstraintSystem::bindOverloadType(
     const SelectedOverload &overload, Type boundType,
     ConstraintLocator *locator, DeclContext *useDC,
