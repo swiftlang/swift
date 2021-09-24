@@ -127,7 +127,7 @@ public enum ForwardEnum<T> {
 // FORCE-OPT:  [[CASTED:%.*]] = bitcast i8* [[OFFSET]] to %T30typelayout_based_value_witness1CC**
 // FORCE-OPT:  %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** [[CASTED]]
 // FORCE-OPT:  [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, {{(i64|i32)}} 0, i32 0
-// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]]) #6
+// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]])
 // FORCE-OPT:  ret void
 // FORCE-OPT:}
 
@@ -148,7 +148,7 @@ public enum ForwardEnum<T> {
 // FORCE-OPT:  [[CASTED:%.*]] = bitcast i8* [[OFFSET]] to %T30typelayout_based_value_witness1CC**
 // FORCE-OPT:  %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** [[CASTED]]
 // FORCE-OPT:  [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, {{(i64|i32)}} 0, i32 0
-// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]]) #6
+// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]])
 // FORCE-OPT:  ret void
 // FORCE-OPT:}
 

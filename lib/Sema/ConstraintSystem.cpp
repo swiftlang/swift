@@ -2947,6 +2947,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       }
     }
 
+    if (isa<AbstractFunctionDecl>(decl) || isa<TypeDecl>(decl)) {
+      if (choice.getFunctionRefKind() == FunctionRefKind::Unapplied) {
+        increaseScore(SK_UnappliedFunction);
+      }
+    }
+
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
       // Check whether applying this overload would result in invalid
       // partial function application e.g. partial application of

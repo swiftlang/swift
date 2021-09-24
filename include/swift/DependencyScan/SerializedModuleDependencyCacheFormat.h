@@ -46,7 +46,6 @@ const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 0;
 using IdentifierIDField = BCVBR<13>;
 using FileIDField = IdentifierIDField;
 using ModuleIDField = IdentifierIDField;
-using CompilerFlagField = IdentifierIDField;
 using ContextHashField = IdentifierIDField;
 
 /// A bit that indicates whether or not a module is a framework
@@ -166,7 +165,8 @@ using ClangModuleDetailsLayout =
                    FileIDField,               // moduleMapPath
                    ContextHashField,          // contextHash
                    FlagIDArrayIDField,        // commandLine
-                   FileIDArrayIDField         // fileDependencies
+                   FileIDArrayIDField,        // fileDependencies
+                   FlagIDArrayIDField         // capturedPCMArgs
                    >;
 } // namespace graph_block
 

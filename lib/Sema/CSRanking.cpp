@@ -90,6 +90,9 @@ static StringRef getScoreKindName(ScoreKind kind) {
 
   case SK_ImplicitValueConversion:
     return "value-to-value conversion";
+
+  case SK_UnappliedFunction:
+    return "overloaded unapplied function";
   }
 }
 

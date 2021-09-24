@@ -5,6 +5,9 @@
 // RUN: %swiftc_driver -driver-print-jobs -sanitize=address %s 2>&1 | %FileCheck -check-prefix=ASAN_WITHOUT_RECOVER --implicit-check-not='-sanitize-recover=address' %s
 // REQUIRES: asan_runtime
 
+// rdar://83458140
+// REQUIRES: OS=macosx
+
 // SAN_RECOVER_INVALID_ARG: unsupported argument 'foo' to option '-sanitize-recover='
 // SAN_RECOVER_UNSUPPORTED_ARG: unsupported argument 'thread' to option '-sanitize-recover='
 

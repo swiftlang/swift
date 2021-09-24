@@ -9,6 +9,9 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://83246843 This tet is failing non-deterministically in CI.
+// REQUIRES: rdar83246843
+
 func fib(_ n: Int) -> Int {
   var first = 0
   var second = 1

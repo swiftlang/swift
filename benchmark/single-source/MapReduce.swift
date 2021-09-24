@@ -77,7 +77,7 @@ public func run_MapReduce(_ n: Int) {
   var c = 0
   for _ in 1...n*100 {
     numbers = numbers.map { $0 &+ 5 }
-    c += numbers.reduce(0, &+)
+    c = c &+ numbers.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -89,7 +89,7 @@ public func run_MapReduceAnyCollection(_ n: Int) {
   var c = 0
   for _ in 1...n*100 {
     let mapped = numbers.map { $0 &+ 5 }
-    c += mapped.reduce(0, &+)
+    c = c &+ mapped.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -101,7 +101,7 @@ public func run_MapReduceAnyCollectionShort(_ n: Int) {
   var c = 0
   for _ in 1...n*1_000 {
     let mapped = numbers.map { $0 &+ 5 }
-    c += mapped.reduce(0, &+)
+    c = c &+ mapped.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -113,7 +113,7 @@ public func run_MapReduceShort(_ n: Int) {
   var c = 0
   for _ in 1...n*1_000 {
     numbers = numbers.map { $0 &+ 5 }
-    c += numbers.reduce(0, &+)
+    c = c &+ numbers.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -125,7 +125,7 @@ public func run_MapReduceSequence(_ n: Int) {
   var c = 0
   for _ in 1...n*100 {
     let mapped = numbers.map { $0 &+ 5 }
-    c += mapped.reduce(0, &+)
+    c = c &+ mapped.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -137,7 +137,7 @@ public func run_MapReduceLazySequence(_ n: Int) {
   var c = 0
   for _ in 1...n*100 {
     let mapped = numbers.lazy.map { $0 &+ 5 }
-    c += mapped.reduce(0, &+)
+    c = c &+ mapped.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -149,7 +149,7 @@ public func run_MapReduceLazyCollection(_ n: Int) {
   var c = 0
   for _ in 1...n*100 {
     let mapped = numbers.lazy.map { $0 &+ 5 }
-    c += mapped.reduce(0, &+)
+    c = c &+ mapped.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -161,7 +161,7 @@ public func run_MapReduceLazyCollectionShort(_ n: Int) {
   var c = 0
   for _ in 1...n*10000 {
     let mapped = numbers.lazy.map { $0 &+ 5 }
-    c += mapped.reduce(0, &+)
+    c = c &+ mapped.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -172,7 +172,7 @@ public func run_MapReduceString(_ n: Int) {
 
   var c: UInt64 = 0
   for _ in 1...n*100 {
-    c += s.utf8.map { UInt64($0 &+ 5) }.reduce(0, &+)
+    c = c &+ s.utf8.map { UInt64($0 &+ 5) }.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -183,7 +183,7 @@ public func run_MapReduceShortString(_ n: Int) {
 
   var c: UInt64 = 0
   for _ in 1...n*100 {
-    c += s.utf8.map { UInt64($0 &+ 5) }.reduce(0, &+)
+    c = c &+ s.utf8.map { UInt64($0 &+ 5) }.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -196,7 +196,7 @@ public func run_MapReduceNSDecimalNumber(_ n: Int) {
   var c = 0
   for _ in 1...n*10 {
     let mapped = numbers.map { $0.intValue &+ 5 }
-    c += mapped.reduce(0, &+)
+    c = c &+ mapped.reduce(0, &+)
   }
   check(c != 0)
 #endif
@@ -210,7 +210,7 @@ public func run_MapReduceNSDecimalNumberShort(_ n: Int) {
   var c = 0
   for _ in 1...n*1_000 {
     let mapped = numbers.map { $0.intValue &+ 5 }
-    c += mapped.reduce(0, &+)
+    c = c &+ mapped.reduce(0, &+)
   }
   check(c != 0)
 #endif
@@ -224,7 +224,7 @@ public func run_MapReduceClass(_ n: Int) {
   var c = 0
   for _ in 1...n*10 {
     let mapped = numbers.map { $0.v &+ 5 }
-    c += mapped.reduce(0, &+)
+    c = c &+ mapped.reduce(0, &+)
   }
   check(c != 0)
 }
@@ -236,7 +236,7 @@ public func run_MapReduceClassShort(_ n: Int) {
   var c = 0
   for _ in 1...n*1_000 {
     let mapped = numbers.map { $0.v &+ 5 }
-    c += mapped.reduce(0, &+)
+    c = c &+ mapped.reduce(0, &+)
   }
   check(c != 0)
 }

@@ -84,9 +84,7 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
   for (const LookupResultEntry &result : foundElements) {
     ValueDecl *e = result.getValueDecl();
     assert(e);
-    if (e->isInvalid()) {
-      continue;
-    }
+
     // Skip if the enum element was referenced as an instance member
     if (unqualifiedLookup) {
       if (!result.getBaseDecl() ||
@@ -96,8 +94,10 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
     }
 
     if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
-      // Ambiguities should be ruled out by parsing.
-      assert(!foundElement && "ambiguity in enum case name lookup?!");
+      // Note that there could be multiple elements with the same
+      // name, such results in a re-declaration error, so let's
+      // just always pick the last element, just like in `foundConstant`
+      // case.
       foundElement = oe;
       continue;
     }
@@ -1124,8 +1124,6 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Named: {
     NamedPattern *NP = cast<NamedPattern>(P);
     VarDecl *var = NP->getDecl();
-    if (var->hasInterfaceType() && var->isInvalid())
-      type = ErrorType::get(Context);
 
     // In SIL mode, VarDecls are written as having reference storage types.
     type = type->getReferenceStorageReferent();
@@ -1692,9 +1690,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P,
   // Local function to check whether type of given parameter
   // should be coerced to a given contextual type or not.
   auto shouldOverwriteParam = [&](ParamDecl *param) -> bool {
-    if (param->isInvalid())
-      return true;
-
     return !isValidType(param->getType());
   };
 
