@@ -11,3 +11,11 @@ actor A { }  // expected-error{{concurrency is only available in}}
 // Allow this without any availability for Historical Reasons.
 public func swift_deletedAsyncMethodError() async {
 }
+
+// Ensure that our synthesis of the actor's unownedExecutor does not cause
+// availability errors.
+@available(macOS 12.0, *)
+struct S {
+  actor A {
+  }
+}
