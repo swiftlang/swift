@@ -1671,7 +1671,7 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
   auto runningOS =
     TypeChecker::overApproximateAvailabilityAtLocation(
       ReferenceRange.Start, ReferenceDC);
-  auto availability = ctx.getConcurrencyAvailability();
+  auto availability = ctx.getBackDeployedConcurrencyAvailability();
   if (!runningOS.isContainedIn(availability)) {
     diagnosePotentialConcurrencyUnavailability(
       ReferenceRange, ReferenceDC,

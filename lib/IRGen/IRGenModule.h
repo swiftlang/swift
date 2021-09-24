@@ -1691,7 +1691,17 @@ private:
   void addLazyConformances(const IterableDeclContext *idc);
 
 //--- Global context emission --------------------------------------------------
+  bool hasSwiftAsyncFunctionDef = false;
+  llvm::Value *extendedFramePointerFlagsWeakRef = nullptr;
+
+  /// Emit a weak reference to the `swift_async_extendedFramePointerFlags`
+  /// symbol needed by Swift async functions.
+  void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
+  bool isConcurrencyAvailable();
+  void noteSwiftAsyncFunctionDef() {
+    hasSwiftAsyncFunctionDef = true;
+  }
   void emitRuntimeRegistration();
   void emitVTableStubs();
   void emitTypeVerifier();

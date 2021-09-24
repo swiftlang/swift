@@ -731,6 +731,9 @@ public:
   /// Get the runtime availability of support for concurrency.
   AvailabilityContext getConcurrencyAvailability();
 
+  /// Get the back-deployed availability for concurrency.
+  AvailabilityContext getBackDeployedConcurrencyAvailability();
+
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 
@@ -749,6 +752,11 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.5
   /// compiler for the target platform.
   AvailabilityContext getSwift55Availability();
+
+  // Note: Update this function if you add a new getSwiftXYAvailability above.
+  /// Get the runtime availability for a particular version of Swift (5.0+).
+  AvailabilityContext
+  getSwift5PlusAvailability(llvm::VersionTuple swiftVersion);
 
   /// Get the runtime availability of features that have been introduced in the
   /// Swift compiler for future versions of the target platform.

@@ -34,6 +34,14 @@
 #include "swift/Runtime/ThreadLocalStorage.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
+#ifndef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
+#include "llvm/Config/config.h"
+#else
+// All platforms where we care about back deployment have a known
+// configurations.
+#define HAVE_PTHREAD_H 1
+#define SWIFT_OBJC_INTEROP 1
+#endif
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
 #include "VoucherSupport.h"
@@ -61,6 +69,11 @@
 
 #if HAVE_PTHREAD_H
 #include <pthread.h>
+
+// Only use __has_include since HAVE_PTHREAD_NP_H is not provided.
+#if __has_include(<pthread_np.h>)
+#include <pthread_np.h>
+#endif
 #endif
 
 #if defined(_WIN32)

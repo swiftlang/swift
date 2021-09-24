@@ -56,6 +56,7 @@ EXPECTED_DEFAULTS = {
     'benchmark_num_onone_iterations': 3,
     'build_android': False,
     'build_args': [],
+    'build_backdeployconcurrency': False,
     'build_benchmarks': True,
     'build_clang_tools_extra': True,
     'build_cygwin': True,
@@ -165,6 +166,7 @@ EXPECTED_DEFAULTS = {
     'only_executable_test': False,
     'only_non_executable_test': False,
     'infer_dependencies': False,
+    'install_backdeployconcurrency': False,
     'install_prefix': targets.install_prefix(),
     'install_symroot': None,
     'install_destdir': None,
@@ -195,6 +197,7 @@ EXPECTED_DEFAULTS = {
     'native_llvm_tools_path': None,
     'native_swift_tools_path': None,
     'dump_config': False,
+    'reconfigure': False,
     'relocate_xdg_cache_home_under_build_subdir': False,
     'show_sdks': False,
     'skip_build': False,
@@ -465,6 +468,9 @@ EXPECTED_OPTIONS = [
     SetOption('--skip-tvos', dest='tvos', value=False),
     SetOption('--skip-watchos', dest='watchos', value=False),
 
+    SetTrueOption('--back-deploy-concurrency', dest='build_backdeployconcurrency'),
+    SetTrueOption('--install-back-deploy-concurrency',
+                  dest='install_backdeployconcurrency'),
     SetTrueOption('--benchmark'),
     SetTrueOption('--clean'),
     SetTrueOption('--dry-run'),
@@ -500,6 +506,7 @@ EXPECTED_OPTIONS = [
 
     SetTrueOption('--legacy-impl', dest='legacy_impl'),
     SetTrueOption('--infer', dest='infer_dependencies'),
+    SetTrueOption('--reconfigure'),
 
     EnableOption('--android'),
     EnableOption('--build-external-benchmarks'),

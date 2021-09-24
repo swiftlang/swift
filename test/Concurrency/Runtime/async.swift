@@ -4,7 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-// UNSUPPORTED: use_os_stdlib
+// rdar://82123254
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 import StdlibUnittest

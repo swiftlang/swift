@@ -10,6 +10,10 @@
 // Enable with rdar://81617749
 // UNSUPPORTED: CPU=i386 && OS=watchos
 
+// rdar://82123254
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 func run(on object: PFXObject) async throws {
   // CHECK: performSingleFlaggy1
   print(try await object.performSingleFlaggy1()?())

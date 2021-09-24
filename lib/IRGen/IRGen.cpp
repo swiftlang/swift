@@ -187,6 +187,18 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
     break;
   }
 
+  switch (Opts.SwiftAsyncFramePointer) {
+  case SwiftAsyncFramePointerKind::Never:
+    TargetOpts.SwiftAsyncFramePointer = SwiftAsyncFramePointerMode::Never;
+    break;
+  case SwiftAsyncFramePointerKind::Auto:
+    TargetOpts.SwiftAsyncFramePointer = SwiftAsyncFramePointerMode::DeploymentBased;
+    break;
+  case SwiftAsyncFramePointerKind::Always:
+    TargetOpts.SwiftAsyncFramePointer = SwiftAsyncFramePointerMode::Always;
+    break;
+  }
+
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
   return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
 }

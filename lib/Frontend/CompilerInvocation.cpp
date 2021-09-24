@@ -350,6 +350,13 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   interleave(RenderedArgs,
              [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
              [&] { OS << " "; });
+
+  // Backward-compatibility hack: disable availability checking in the
+  // _Concurrency module, so that older (Swift 5.5) compilers that did not
+  // support back deployment of concurrency do not complain about 'async'
+  // with older availability.
+  if (FOpts.ModuleName == "_Concurrency")
+    OS << " -disable-availability-checking";
 }
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
@@ -394,6 +401,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
+
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
@@ -1733,6 +1741,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
       } else if (version.equals("5.1")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 1);
+      } else if (version.equals("5.5")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 5);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);
@@ -1755,6 +1765,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         getRuntimeCompatVersion();
   }
 
+  if (!Args.hasArg(
+          options::OPT_disable_autolinking_runtime_compatibility_concurrency)) {
+    Opts.AutolinkRuntimeCompatibilityConcurrencyLibraryVersion =
+        getRuntimeCompatVersion();
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
@@ -1765,6 +1781,26 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.NumThreads = 1;
       Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
                      "-num-threads");
+    }
+  }
+
+  // Default to disabling swift async extended frame info on anything but
+  // darwin. Other platforms are unlikely to have support for extended frame
+  // pointer information.
+  if (!Triple.isOSDarwin()) {
+    Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
+  }
+  if (const Arg *A = Args.getLastArg(OPT_swift_async_frame_pointer_EQ)) {
+    StringRef mode(A->getValue());
+    if (mode == "auto")
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Auto;
+    else if (mode == "always")
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Always;
+    else if (mode == "never")
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
+    else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
     }
   }
 

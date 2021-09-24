@@ -4,24 +4,23 @@
 
 # REQUIRES: standalone_build
 
-# Build and install the SwiftPM dependencies first.
-#
-# CHECK: --- Installing cmark ---
-# CHECK: --- Installing llvm ---
-# CHECK: --- Installing swift ---
-# CHECK: --- Installing llbuild ---
-
 # Just make sure we compute the build graph/emit output.
 #
 # CHECK: -- Build Graph Inference --
 # CHECK: Initial Product List:
-# CHECK:     cmark
 # CHECK:     llvm
 # CHECK:     swift
 # CHECK: Final Build Order:
 # CHECK:     cmark
 # CHECK:     llvm
 # CHECK:     swift
+
+# Build and install the SwiftPM dependencies first.
+#
+# CHECK: --- Installing cmark ---
+# CHECK: --- Installing llvm ---
+# CHECK: --- Installing swift ---
+# CHECK: --- Installing llbuild ---
 
 # Then make sure we are installing/building SwiftPM last.
 #

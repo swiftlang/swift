@@ -10,11 +10,13 @@
 #
 #===----------------------------------------------------------------------===#
 
-set(LLVM_OPTIONAL_SOURCES
-  ${swift_concurrency_objc_sources})
+if(NOT swift_concurrency_extra_sources)
+  set(swift_concurrency_extra_sources)
+endif()
 
-set(swift_concurrency_link_libraries
-  swiftCore)
+if(NOT swift_concurrency_install_component)
+  set(swift_concurrency_install_component stdlib)
+endif()
 
 if(SWIFT_CONCURRENCY_USES_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
@@ -27,15 +29,6 @@ if(SWIFT_CONCURRENCY_USES_DISPATCH)
     list(APPEND swift_concurrency_link_libraries
       dispatch)
   endif()
-endif()
-
-# Linux requires us to link an atomic library to use atomics.
-# Frustratingly, in many cases this isn't necessary because the
-# sequence is inlined, but we have some code that's just subtle
-# enough to turn into runtime calls.
-if(SWIFT_HOST_VARIANT STREQUAL "android")
-  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS
-    -latomic)
 endif()
 
 set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
@@ -106,7 +99,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncStream.cpp
   Deque.swift
   YieldingContinuation.swift
-  ${swift_concurrency_objc_sources}
+  ${swift_concurrency_extra_sources}
+  linker-support/magic-symbols-for-install-name.c
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
@@ -124,8 +118,9 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
     -Xfrontend -define-availability
-    -Xfrontend \"SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0\"
+    -Xfrontend "SwiftStdlib 5.5:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0"
     ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
   LINK_FLAGS "${SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS}"
-  INSTALL_IN_COMPONENT stdlib
+  ${swift_concurrency_options}
+  INSTALL_IN_COMPONENT ${swift_concurrency_install_component}
 )

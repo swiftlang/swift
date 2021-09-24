@@ -13,6 +13,10 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
 
+// rdar://82123254
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 func run(on object: PFXObject) async throws {
   // CHECK: passSync
   let cl1 = try await object.continuePassSync()

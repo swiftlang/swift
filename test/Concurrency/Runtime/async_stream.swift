@@ -3,7 +3,7 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: executable_test
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 
 // https://bugs.swift.org/browse/SR-14466
 // UNSUPPORTED: OS=windows-msvc

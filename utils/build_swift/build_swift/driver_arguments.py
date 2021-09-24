@@ -282,6 +282,9 @@ def create_argument_parser():
            help='instead of building, write JSON to stdout containing '
                 'various values used to build in this configuration')
 
+    option(['--reconfigure'], store_true,
+           help="Reconfigure all projects as we build")
+
     option('--legacy-impl', store_true('legacy_impl'),
            help='use legacy implementation')
 
@@ -585,6 +588,13 @@ def create_argument_parser():
 
     option(['-b', '--llbuild'], toggle_true('build_llbuild'),
            help='build llbuild')
+
+    option(['--back-deploy-concurrency'], toggle_true('build_backdeployconcurrency'),
+           help='build back-deployment support for concurrency')
+
+    option(['--install-back-deploy-concurrency'],
+           toggle_true('install_backdeployconcurrency'),
+           help='install back-deployment support libraries for concurrency')
 
     option(['--libcxx'], toggle_true('build_libcxx'),
            help='build libcxx')
