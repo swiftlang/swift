@@ -2605,6 +2605,16 @@ void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
              ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
          locator->getPath().back().getKind() ==
              ConstraintLocator::DynamicLookupResult);
+  assert(!ty->is<InOutType>());
+  auto rvalueTy = ty->getWithoutSpecifierType();
+
+  // If the type to bind is a placeholder, we can propagate it, as we don't know
+  // whether it can be optional or non-optional, and we would have already
+  // recorded a fix for it.
+  if (rvalueTy->isPlaceholder()) {
+    addConstraint(ConstraintKind::Bind, boundTy, ty, locator);
+    return;
+  }
 
   // Create the constraint to bind to the optional type and make it the favored
   // choice.
@@ -2615,8 +2625,7 @@ void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
   Type underlyingType;
   if (auto *fnTy = ty->getAs<AnyFunctionType>())
     underlyingType = replaceFinalResultTypeWithUnderlying(fnTy);
-  else if (auto *typeVar =
-               ty->getWithoutSpecifierType()->getAs<TypeVariableType>()) {
+  else if (auto *typeVar = rvalueTy->getAs<TypeVariableType>()) {
     auto *locator = typeVar->getImpl().getLocator();
 
     // If `ty` hasn't been resolved yet, we need to allocate a type variable to
@@ -2632,14 +2641,13 @@ void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
     addConstraint(ConstraintKind::OptionalObject, typeVar, underlyingType,
                   locator);
   } else {
-    underlyingType = ty->getWithoutSpecifierType()->getOptionalObjectType();
+    underlyingType = rvalueTy->getOptionalObjectType();
   }
 
   assert(underlyingType);
 
   if (ty->is<LValueType>())
     underlyingType = LValueType::get(underlyingType);
-  assert(!ty->is<InOutType>());
 
   auto *bindToUnderlying = Constraint::create(*this, ConstraintKind::Bind,
                                               boundTy, underlyingType, locator);
