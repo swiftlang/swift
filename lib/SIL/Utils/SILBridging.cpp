@@ -148,6 +148,10 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
 //                            Bridging C functions
 //===----------------------------------------------------------------------===//
 
+void OStream_write(BridgedOStream os, BridgedStringRef str) {
+  static_cast<raw_ostream *>(os.streamAddr)->write((const char*)(str.data), str.length);
+}
+
 /// Frees a string which was allocated by getCopiedBridgedStringRef.
 void freeBridgedStringRef(BridgedStringRef str) {
   llvm::MallocAllocator().Deallocate(str.data, str.length);
@@ -181,6 +185,18 @@ OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function) {
   if (f->empty())
     return {nullptr};
   return {&*f->rbegin()};
+}
+
+SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function) {
+  return castToFunction(function)->getLoweredFunctionType()->
+          getNumIndirectFormalResults();
+}
+
+SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function) {
+  CanSILFunctionType fTy = castToFunction(function)->getLoweredFunctionType();
+  if (!fTy->hasSelfParam())
+    return -1;
+  return fTy->getNumParameters() + fTy->getNumIndirectFormalResults() - 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -299,6 +315,10 @@ BridgedInstruction Operand_getUser(BridgedOperand operand) {
   return {castToOperand(operand)->getUser()->asSILNode()};
 }
 
+SwiftInt Operand_isTypeDependent(BridgedOperand operand) {
+  return castToOperand(operand)->isTypeDependent() ? 1 : 0;
+}
+
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value) {
   return {*castToSILValue(value)->use_begin()};
 }
@@ -313,6 +333,10 @@ BridgedType SILValue_getType(BridgedValue value) {
 
 SwiftInt SILType_isAddress(BridgedType type) {
   return castToSILType(type).isAddress();
+}
+
+SwiftInt SILType_isTrivial(BridgedType type, BridgedFunction function) {
+  return castToSILType(type).isTrivial(*castToFunction(function));
 }
 
 //===----------------------------------------------------------------------===//
@@ -461,6 +485,11 @@ SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se) {
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx) {
   return getCaseIndex(castToInst<SwitchEnumInst>(se)->getCase(idx).first);
 }
+
+SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store) {
+  return (SwiftInt)castToInst<StoreInst>(store)->getOwnershipQualifier();
+}
+
 
 //===----------------------------------------------------------------------===//
 //                                SILBuilder
