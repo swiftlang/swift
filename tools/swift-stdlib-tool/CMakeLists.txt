@@ -6,4 +6,3 @@ set_target_properties(swift-stdlib-tool PROPERTIES
   CXX_STANDARD 17
   CXX_STANDARD_REQUIRED ON)
 
-target_link_libraries(swift-stdlib-tool PRIVATE)

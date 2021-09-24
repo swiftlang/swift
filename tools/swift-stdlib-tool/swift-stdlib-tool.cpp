@@ -424,7 +424,7 @@ ssize_t pread_all(int fd, void *buf, size_t count, off_t offset)
 
 template <typename T> 
 int parse_macho(int fd, uint32_t offset, uint32_t size, 
-void (^dylibVisitor)(std::filesystem::path const &path),
+                void (^dylibVisitor)(std::filesystem::path const &path),
                 void (^uuidVisitor)(uuid_t const uuid))
 {
     ssize_t readed;
@@ -681,7 +681,7 @@ std::vector<uint8_t> readToEOF(int fd) {
 }
 
 // Runs a tool with `xcrun`. 
-// Returns NSTask.terminationStatus.
+// Returns the tool's termination status.
 // Prints the tool's command line if we are verbose.
 // Prints the tool's stdout and stderr if terminationStatus is non-zero
 //   or if we are very verbose.
@@ -745,6 +745,7 @@ int xcrunToolCommand(std::vector<std::string> commandAndArguments, XcrunToolBloc
 
     int status = 0;
     waitpid(childPid, &status, 0);
+    status = WIFSIGNALED(status) ? WTERMSIG(status) : (WIFEXITED(status) ? WEXITSTATUS(status) : 0);
     
     // Task is finished and we have its stdout and stderr output.
 
@@ -780,7 +781,7 @@ copyFile(std::filesystem::path src, std::filesystem::path dst, bool stripBitcode
     if (stripBitcode) {
         copyAndStripBitcode(src, dst);
     } else {
-        if (rename(src.c_str(), dst.c_str()) != 0) {
+        if (!std::filesystem::copy_file(src, dst)) {
             fail("Couldn't copy %s to %s: %s", src.c_str(), dst.c_str(), strerror(errno));
         }
    }
@@ -1019,7 +1020,7 @@ int main(int argc, const char *argv[])
         worklist.push_back(lib);
     }
     while (worklist.size()) {
-        auto const &lib = worklist.back();
+        auto const lib = worklist.back();
         worklist.pop_back();
         auto const path = src_dir/lib;
         process(path,
@@ -1054,7 +1055,7 @@ int main(int argc, const char *argv[])
         worklist.push_back(lib);
     }
     while (worklist.size()) {
-        auto const &lib = worklist.back();
+        auto const lib = worklist.back();
         worklist.pop_back();
         auto const path = src_dir/lib;
         process(path,
@@ -1150,7 +1151,7 @@ int main(int argc, const char *argv[])
 
             // Other codesign flags come later
             // so they can override the default flags.
-            std::move(otherCodesignFlags.begin(), otherCodesignFlags.end(),
+            std::copy(otherCodesignFlags.begin(), otherCodesignFlags.end(),
                       std::back_inserter(commandAndArguments));
 
             commandAndArguments.push_back(dst);
