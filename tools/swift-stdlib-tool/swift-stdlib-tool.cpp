@@ -1170,7 +1170,7 @@ int main(int argc, const char *argv[])
             // If we have an existing code signature data, query the new one and compare
             // it with the code signature of the file before we re-signed it.
             // If they are the same, use the original file instead.  This preserves
-            // the contents of t1e file and mtime for use with delta installs.
+            // the contents of the file and mtime for use with delta installs.
             if (!oldSignatureData.empty()) {
                 auto const newSignatureData = query_code_signature(dst);
 
