@@ -98,7 +98,7 @@ func fn_j() {}
 #endif
 fn_j() // OK
 
-#if foo || bar || nonExistent() // expected-error {{expected only one argument to platform condition}}
+#if foo || bar || nonExistent() // expected-error {{expected argument to platform condition}}
 #endif
 
 #if FOO = false
@@ -171,5 +171,5 @@ if true {}
 
 // rdar://83017601 Make sure we don't crash
 #if canImport()
-// expected-error@-1 {{expected only one argument to platform condition}}
+// expected-error@-1 {{expected argument to platform condition}}
 #endif
