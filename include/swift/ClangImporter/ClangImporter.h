@@ -62,12 +62,14 @@ class ClangModuleUnit;
 class ClangNode;
 class Decl;
 class DeclContext;
+class EffectiveClangContext;
 class EnumDecl;
 class ImportDecl;
 class IRGenOptions;
 class ModuleDecl;
 class NominalTypeDecl;
 class StructDecl;
+class SwiftLookupTable;
 class TypeDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
@@ -457,11 +459,12 @@ public:
   /// Given a Clang module, decide whether this module is imported already.
   static bool isModuleImported(const clang::Module *M);
 
-  DeclName importName(const clang::NamedDecl *D,
-                      clang::DeclarationName givenName);
+  DeclName importName(
+      const clang::NamedDecl *D,
+      clang::DeclarationName givenName = clang::DeclarationName()) override;
 
   Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
-                                DeclContext *dc) override;
+                                 DeclContext *dc) override;
 
   Optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
@@ -493,6 +496,19 @@ public:
                                  SubstitutionMap subst) override;
 
   bool isCXXMethodMutating(const clang::CXXMethodDecl *method) override;
+
+  /// Find the lookup table that corresponds to the given Clang module.
+  ///
+  /// \param clangModule The module, or null to indicate that we're talking
+  /// about the directly-parsed headers.
+  SwiftLookupTable *findLookupTable(const clang::Module *clangModule) override;
+
+  /// Determine the effective Clang context for the given Swift nominal type.
+  EffectiveClangContext
+  getEffectiveClangContext(const NominalTypeDecl *nominal) override;
+
+  /// Imports a clang decl directly, rather than looking up it's name.
+  Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
