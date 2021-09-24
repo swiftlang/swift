@@ -33,6 +33,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("completion", DebugFlags::Completion)
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
+      .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
@@ -290,6 +291,23 @@ Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
     // An unresolved type can appear if we have invalid requirements.
     if (symbol.getKind() == Symbol::Kind::Name) {
       result = DependentMemberType::get(result, symbol.getName());
+      continue;
+    }
+
+    // We can end up with an unsimplified term like this:
+    //
+    // X.[P].[P:X]
+    //
+    // Simplification will rewrite X.[P] to X, so just ignore a protocol symbol
+    // in the middle of a term.
+    if (symbol.getKind() == Symbol::Kind::Protocol) {
+#ifndef NDEBUG
+      // Ensure that the domain of the suffix contains P.
+      if (begin + 1 < end) {
+        auto protos = (begin + 1)->getProtocols();
+        assert(std::find(protos.begin(), protos.end(), symbol.getProtocol()));
+      }
+#endif
       continue;
     }
 

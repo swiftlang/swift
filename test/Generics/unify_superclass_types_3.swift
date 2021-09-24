@@ -38,7 +38,10 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK-NEXT: - τ_0_0.[P2:A2].[concrete: Int] => τ_0_0.[P2:A2]
 // CHECK-NEXT: - τ_0_0.[P1:A1].[concrete: String] => τ_0_0.[P1:A1]
 // CHECK-NEXT: - τ_0_0.[P2:B2] => τ_0_0.[P1:B1]
+// CHECK-NEXT: - τ_0_0.B2 => τ_0_0.[P1:B1]
 // CHECK-NEXT: }
+// CHECK-NEXT: Homotopy generators: {
+// CHECK:      }
 // CHECK-NEXT: Property map: {
 // CHECK-NEXT:   [P1:X] => { layout: _NativeClass superclass: [superclass: Derived<τ_0_0, τ_0_1> with <[P1:A1], [P1:B1]>] }
 // CHECK-NEXT:   [P2:X] => { layout: _NativeClass superclass: [superclass: Generic<τ_0_0, String, τ_0_1> with <[P2:A2], [P2:B2]>] }

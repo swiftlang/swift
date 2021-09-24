@@ -40,6 +40,8 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK-NEXT: - τ_0_0.[P1&P2:X].[superclass: Base<τ_0_0> with <τ_0_0.[P1:A1]>] => τ_0_0.[P1&P2:X]
 // CHECK-NEXT: - τ_0_0.[P2:A2].[Q:T] => τ_0_0.[P1:A1]
 // CHECK-NEXT: }
+// CHECK-NEXT: Homotopy generators: {
+// CHECK:      }
 // CHECK-NEXT: Property map: {
 // CHECK-NEXT:   [P1:X] => { layout: _NativeClass superclass: [superclass: Base<τ_0_0> with <[P1:A1]>] }
 // CHECK-NEXT:   [P2:A2] => { conforms_to: [Q] }
