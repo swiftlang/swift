@@ -5202,6 +5202,7 @@ static void collectInterestingNestedDeclarations(
     Serializer::ObjCMethodTable &objcMethods,
     Serializer::NestedTypeDeclsTable &nestedTypeDecls,
     Serializer::UniquedDerivativeFunctionConfigTable &derivativeConfigs,
+    Serializer::DeclFingerprintsTable &declFingerprints,
     bool isLocal = false) {
   const NominalTypeDecl *nominalParent = nullptr;
 
@@ -5269,10 +5270,15 @@ static void collectInterestingNestedDeclarations(
 
     // Recurse into nested declarations.
     if (auto iterable = dyn_cast<IterableDeclContext>(member)) {
+      if (auto bodyFP = iterable->getBodyFingerprint()) {
+        declFingerprints.insert({S.addDeclRef(member), *bodyFP});
+      }
+
       collectInterestingNestedDeclarations(S, iterable->getAllMembers(),
                                            operatorMethodDecls,
                                            objcMethods, nestedTypeDecls,
                                            derivativeConfigs,
+                                           declFingerprints,
                                            isLocal);
     }
   }
@@ -5354,7 +5360,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         collectInterestingNestedDeclarations(*this, IDC->getAllMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
-                                             uniquedDerivativeConfigs);
+                                             uniquedDerivativeConfigs,
+                                             declFingerprints);
       }
     }
 
@@ -5388,6 +5395,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
                                              uniquedDerivativeConfigs,
+                                             declFingerprints,
                                              /*isLocal=*/true);
       }
     }
