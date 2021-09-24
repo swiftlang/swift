@@ -643,6 +643,17 @@ public:
   id _quickLookObjectForPointer(void *value);
 #endif
 
+  /// Retrieve a conformance descriptor given a type and protocol.
+  /// Note that this DOES NOT take into account generic arguments.
+  ///
+  /// \param type The type we're considering.
+  /// \param protocol The protocol to which the type may conform.
+  ///
+  /// \returns a protocol conformance descriptor, or nullptr if none found.
+  const ProtocolConformanceDescriptor *
+  swift_getConformanceDescriptor(const Metadata * const type,
+                                 const ProtocolDescriptor *protocol);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

@@ -217,6 +217,12 @@ OVERRIDE_FOREIGN(dynamicCastForeignClassUnconditional, const void *, , , swift::
 
 #endif
 
+OVERRIDE_PROTOCOLCONFORMANCE(getConformanceDescriptor,
+                             const ProtocolConformanceDescriptor *, , , swift::,
+                             (const Metadata * const type,
+                              const ProtocolDescriptor *protocol),
+                             (type, protocol))
+
 #undef OVERRIDE
 #undef OVERRIDE_METADATALOOKUP
 #undef OVERRIDE_CASTING
