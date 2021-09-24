@@ -449,8 +449,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
     SINGLE_VALUE_INST_RANGE(AllocationInst, AllocStackInst, AllocExistentialBoxInst)
 
   ABSTRACT_SINGLE_VALUE_INST(IndexingInst, SingleValueInstruction)
-    SINGLE_VALUE_INST(IndexAddrInst, index_addr,
-                      IndexingInst, None, DoesNotRelease)
+    BRIDGED_SINGLE_VALUE_INST(IndexAddrInst, index_addr,
+                              IndexingInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(TailAddrInst, tail_addr,
                       IndexingInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(IndexRawPointerInst, index_raw_pointer,
@@ -481,16 +481,16 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   // Dynamic Dispatch
   ABSTRACT_SINGLE_VALUE_INST(MethodInst, SingleValueInstruction)
-    SINGLE_VALUE_INST(ClassMethodInst, class_method,
-                      MethodInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(SuperMethodInst, super_method,
-                      MethodInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(ObjCMethodInst, objc_method,
-                      MethodInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(ObjCSuperMethodInst, objc_super_method,
-                      MethodInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(WitnessMethodInst, witness_method,
-                      MethodInst, None, DoesNotRelease)
+    BRIDGED_SINGLE_VALUE_INST(ClassMethodInst, class_method,
+                              MethodInst, None, DoesNotRelease)
+    BRIDGED_SINGLE_VALUE_INST(SuperMethodInst, super_method,
+                              MethodInst, None, DoesNotRelease)
+    BRIDGED_SINGLE_VALUE_INST(ObjCMethodInst, objc_method,
+                              MethodInst, None, DoesNotRelease)
+    BRIDGED_SINGLE_VALUE_INST(ObjCSuperMethodInst, objc_super_method,
+                              MethodInst, None, DoesNotRelease)
+    BRIDGED_SINGLE_VALUE_INST(WitnessMethodInst, witness_method,
+                              MethodInst, None, DoesNotRelease)
     SINGLE_VALUE_INST_RANGE(MethodInst, ClassMethodInst, WitnessMethodInst)
 
   // Conversions
@@ -499,7 +499,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     BRIDGED_SINGLE_VALUE_INST(AddressToPointerInst, address_to_pointer,
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(PointerToAddressInst, pointer_to_address,
+    BRIDGED_SINGLE_VALUE_INST(PointerToAddressInst, pointer_to_address,
                       ConversionInst, None, DoesNotRelease)
     BRIDGED_SINGLE_VALUE_INST(UncheckedRefCastInst, unchecked_ref_cast,
                       ConversionInst, None, DoesNotRelease)
@@ -531,8 +531,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(RefToBridgeObjectInst, ref_to_bridge_object,
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(BridgeObjectToRefInst, bridge_object_to_ref,
-                      ConversionInst, None, DoesNotRelease)
+    BRIDGED_SINGLE_VALUE_INST(BridgeObjectToRefInst, bridge_object_to_ref,
+                              ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(BridgeObjectToWordInst, bridge_object_to_word,
                       ConversionInst, None, DoesNotRelease)
     BRIDGED_SINGLE_VALUE_INST(ThinToThickFunctionInst, thin_to_thick_function,
@@ -599,8 +599,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(IsUniqueInst, is_unique,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
-  SINGLE_VALUE_INST(EndCOWMutationInst, end_cow_mutation,
-                    SingleValueInstruction, None, DoesNotRelease)
+  BRIDGED_SINGLE_VALUE_INST(EndCOWMutationInst, end_cow_mutation,
+                            SingleValueInstruction, None, DoesNotRelease)
 
   SINGLE_VALUE_INST(IsEscapingClosureInst, is_escaping_closure,
                     SingleValueInstruction, MayRead, DoesNotRelease)
@@ -687,26 +687,26 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
 
   // Protocol and Protocol Composition Types
-  SINGLE_VALUE_INST(InitExistentialAddrInst, init_existential_addr,
-                    SingleValueInstruction, MayWrite, DoesNotRelease)
-  SINGLE_VALUE_INST(InitExistentialValueInst, init_existential_value,
-                    SingleValueInstruction, MayWrite, DoesNotRelease)
-  SINGLE_VALUE_INST(OpenExistentialAddrInst, open_existential_addr,
-                    SingleValueInstruction, MayRead, DoesNotRelease)
+  BRIDGED_SINGLE_VALUE_INST(InitExistentialAddrInst, init_existential_addr,
+                            SingleValueInstruction, MayWrite, DoesNotRelease)
+  BRIDGED_SINGLE_VALUE_INST(InitExistentialValueInst, init_existential_value,
+                            SingleValueInstruction, MayWrite, DoesNotRelease)
+  BRIDGED_SINGLE_VALUE_INST(OpenExistentialAddrInst, open_existential_addr,
+                            SingleValueInstruction, MayRead, DoesNotRelease)
   BRIDGED_SINGLE_VALUE_INST(InitExistentialRefInst, init_existential_ref,
-                    SingleValueInstruction, None, DoesNotRelease)
+                            SingleValueInstruction, None, DoesNotRelease)
   BRIDGED_SINGLE_VALUE_INST(OpenExistentialRefInst, open_existential_ref,
-                    SingleValueInstruction, None, DoesNotRelease)
+                            SingleValueInstruction, None, DoesNotRelease)
   BRIDGED_SINGLE_VALUE_INST(InitExistentialMetatypeInst, init_existential_metatype,
-                    SingleValueInstruction, None, DoesNotRelease)
+                            SingleValueInstruction, None, DoesNotRelease)
   BRIDGED_SINGLE_VALUE_INST(OpenExistentialMetatypeInst, open_existential_metatype,
-                    SingleValueInstruction, None, DoesNotRelease)
-  SINGLE_VALUE_INST(OpenExistentialBoxInst, open_existential_box,
-                    SingleValueInstruction, MayRead, DoesNotRelease)
-  SINGLE_VALUE_INST(OpenExistentialValueInst, open_existential_value,
-                    SingleValueInstruction, MayRead, DoesNotRelease)
-  SINGLE_VALUE_INST(OpenExistentialBoxValueInst, open_existential_box_value,
-                    SingleValueInstruction, MayRead, DoesNotRelease)
+                            SingleValueInstruction, None, DoesNotRelease)
+  BRIDGED_SINGLE_VALUE_INST(OpenExistentialBoxInst, open_existential_box,
+                            SingleValueInstruction, MayRead, DoesNotRelease)
+  BRIDGED_SINGLE_VALUE_INST(OpenExistentialValueInst, open_existential_value,
+                            SingleValueInstruction, MayRead, DoesNotRelease)
+  BRIDGED_SINGLE_VALUE_INST(OpenExistentialBoxValueInst, open_existential_box_value,
+                            SingleValueInstruction, MayRead, DoesNotRelease)
 
   // Blocks
   SINGLE_VALUE_INST(ProjectBlockStorageInst, project_block_storage,
