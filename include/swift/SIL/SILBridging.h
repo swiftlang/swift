@@ -51,6 +51,10 @@ typedef struct {
 } BridgedPassContext;
 
 typedef struct {
+  void * _Nonnull streamAddr;
+} BridgedOStream;
+
+typedef struct {
   void * _Null_unspecified word0;
   void * _Null_unspecified word1;
   void * _Null_unspecified word2;
@@ -139,6 +143,8 @@ typedef long SwiftInt;
 
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
 
+void OStream_write(BridgedOStream os, BridgedStringRef str);
+
 void freeBridgedStringRef(BridgedStringRef str);
 
 void PassContext_notifyChanges(BridgedPassContext passContext,
@@ -155,6 +161,8 @@ BridgedStringRef SILFunction_getName(BridgedFunction function);
 std::string SILFunction_debugDescription(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function);
+SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function);
+SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function);
 
 BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
@@ -175,12 +183,14 @@ BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ);
 BridgedValue Operand_getValue(BridgedOperand);
 OptionalBridgedOperand Operand_nextUse(BridgedOperand);
 BridgedInstruction Operand_getUser(BridgedOperand);
+SwiftInt Operand_isTypeDependent(BridgedOperand);
 
 std::string SILNode_debugDescription(BridgedNode node);
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
 BridgedType SILValue_getType(BridgedValue value);
 
 SwiftInt SILType_isAddress(BridgedType);
+SwiftInt SILType_isTrivial(BridgedType, BridgedFunction);
 
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);
 
@@ -216,6 +226,7 @@ SwiftInt TryApplyInst_numArguments(BridgedInstruction ai);
 BridgedBasicBlock BranchInst_getTargetBlock(BridgedInstruction bi);
 SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se);
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx);
+SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store);
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedInstruction insertionPoint,

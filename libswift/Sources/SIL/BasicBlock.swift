@@ -67,6 +67,7 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
 }
 
 public func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
+public func != (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs !== rhs }
 
 public struct ArgumentArray : RandomAccessCollection {
   fileprivate let block: BasicBlock
