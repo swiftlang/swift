@@ -13,7 +13,7 @@
 // INVALID_MODULE_ALIAS3: error: duplicate module alias; the name "baz" is already used for a module alias or an underlying name
 
 // RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-alias.swift -module-name foo -module-alias bar 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_ALIAS4 %s
-// INVALID_MODULE_ALIAS4: error: invalid module alias "bar"; make sure to use the format '-module-alias alias_name=underlying_name'
+// INVALID_MODULE_ALIAS4: error: invalid module alias format "bar"; make sure to use the format '-module-alias alias_name=underlying_name'
 
 // RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-alias.swift -module-name foo -module-alias bar=c-a.t 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_NAME %s
 // INVALID_MODULE_NAME: error: module name "c-a.t" is not a valid identifier
