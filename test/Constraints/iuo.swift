@@ -238,3 +238,12 @@ struct CurriedIUO {
     let _: Int = CurriedIUO.silly(self)()
   }
 }
+
+// SR-15219 (rdar://83352038): Make sure we don't crash if an IUO param becomes
+// a placeholder.
+func rdar83352038() {
+  func foo(_: UnsafeRawPointer) -> Undefined {} // expected-error {{cannot find type 'Undefined' in scope}}
+  let _ = { (cnode: AlsoUndefined!) -> UnsafeMutableRawPointer in // expected-error {{cannot find type 'AlsoUndefined' in scope}}
+    return foo(cnode)
+  }
+}
