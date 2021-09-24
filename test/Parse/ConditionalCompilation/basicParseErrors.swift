@@ -168,3 +168,8 @@ undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 #else
 if true {}
 #endif // OK
+
+// rdar://83017601 Make sure we don't crash
+#if canImport()
+// expected-error@-1 {{expected only one argument to platform condition}}
+#endif

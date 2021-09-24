@@ -116,6 +116,9 @@ static llvm::VersionTuple getCanImportVersion(ArgumentList *args,
 
 static Expr *getSingleSubExp(ArgumentList *args, StringRef kindName,
                              DiagnosticEngine *D) {
+  if (args->empty())
+    return nullptr;
+
   if (auto *unary = args->getUnlabeledUnaryExpr())
     return unary;
 
