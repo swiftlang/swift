@@ -62,6 +62,14 @@ class Product(object):
         raise NotImplementedError
 
     @classmethod
+    def is_before_build_script_impl_product(cls):
+        """is_before_build_script_impl_product -> bool
+
+        Whether this product is build before any build-script-impl products.
+        """
+        return False
+
+    @classmethod
     def is_ignore_install_all_product(cls):
         """is_ignore_install_all_product -> bool
 
