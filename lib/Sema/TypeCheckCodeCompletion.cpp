@@ -1057,6 +1057,11 @@ fallbackTypeCheck(DeclContext *DC) {
 }
 
 static Type getTypeForCompletion(const constraints::Solution &S, Expr *E) {
+  if (!S.hasType(E)) {
+    assert(false && "Expression wasn't type checked?");
+    return nullptr;
+  }
+
   auto &CS = S.getConstraintSystem();
 
   // To aid code completion, we need to attempt to convert type placeholders
