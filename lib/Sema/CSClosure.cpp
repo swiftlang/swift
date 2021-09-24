@@ -302,6 +302,14 @@ public:
   }
 
 private:
+  /// This method handles both pattern and the sequence expression
+  /// associated with `for-in` loop because types in this situation
+  /// flow in both directions:
+  ///
+  /// - From pattern to sequence, informing its element type e.g.
+  ///   `for i: Int8 in 0 ..< 8`
+  ///
+  /// - From sequence to pattern, when pattern has no type information.
   void visitForEachPattern(Pattern *pattern, ForEachStmt *forEachStmt) {
     auto &ctx = cs.getASTContext();
 
@@ -340,10 +348,26 @@ private:
       return;
     }
 
-    // Type of the sequence associated with for-each statement, should
-    // be determined already.
+    // Let's generate constraints for sequence associated with `for-in`
+    // statement. We can't do that separately because pattern can inform
+    // a type of the sequence e.g. `for in i: Int8 in 0 ..< 8 { ... }`
+
     auto *sequenceExpr = forEachStmt->getSequence();
     auto *sequenceLocator = cs.getConstraintLocator(sequenceExpr);
+
+    {
+      SolutionApplicationTarget target(
+          sequenceExpr, closure, CTP_ForEachSequence,
+          sequenceProto->getDeclaredInterfaceType(),
+          /*isDiscarded=*/false);
+
+      if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
+        hadError = true;
+        return;
+      }
+
+      cs.setSolutionApplicationTarget(sequenceExpr, target);
+    }
 
     Type sequenceType =
         cs.createTypeVariable(sequenceLocator, TVO_CanBindToNoEscape);
@@ -597,31 +621,19 @@ private:
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: ForEach");
 
-    bool isAsync = forEachStmt->getAwaitLoc().isValid();
-
     auto *stmtLoc = cs.getConstraintLocator(locator);
-
-    auto *sequenceProto = getSequenceProtocol(
-        cs.getASTContext(), forEachStmt->getForLoc(), isAsync);
-    if (!sequenceProto) {
-      hadError = true;
-      return;
-    }
 
     SmallVector<ElementInfo, 4> elements;
 
-    // Sequence expression.
-    {
-      elements.push_back(makeElement(
-          forEachStmt->getSequence(), stmtLoc,
-          {sequenceProto->getDeclaredInterfaceType(), CTP_ForEachSequence}));
-    }
-
     // For-each pattern.
+    //
+    // Note that we don't record a sequence here, it would
+    // be handled together with pattern because pattern can
+    // inform a type of sequence element e.g. `for i: Int8 in 0 ..< 8`
     {
       Pattern *pattern =
           TypeChecker::resolvePattern(forEachStmt->getPattern(), closure,
-                                      /*isStmtCondition*/ false);
+                                      /*isStmtCondition=*/false);
 
       if (!pattern) {
         hadError = true;
