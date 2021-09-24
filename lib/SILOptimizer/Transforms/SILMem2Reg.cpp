@@ -163,7 +163,9 @@ static void replaceLoad(LoadInst *li, SILValue newValue, AllocStackInst *asi,
 
   while (op != asi) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
-           isa<TupleElementAddrInst>(op));
+           isa<TupleElementAddrInst>(op) &&
+               "found instruction that should have been skipped in "
+               "isLoadFromStack");
     auto *inst = cast<SingleValueInstruction>(op);
     projections.push_back(Projection(inst));
     op = inst->getOperand(0);
