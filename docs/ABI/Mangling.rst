@@ -835,6 +835,20 @@ fixed position. An index of 1 ("0\_") is used to indicate "unknown"; all other
 values are adjusted by 2. That these indexes are not 0-based is a bug that's
 now codified into the ABI; the index 0 is therefore reserved.
 
+For example, if we have a conformance ``C: Collection``, and we're mangling
+the path required to extract ``C.Iterator: IteratorProtocol``, the path would
+be::
+
+  C: Collection -> C: Sequence -> C.Iterator: IteratorProtocol
+
+So we mangle::
+
+  <C> <Collection> 'HD' <index>
+  <Sequence> 'HI' <index>
+  <C.Iterator> <IteratorProtocol> 'HA' <index>
+
+(where items in angle brackets are themselves to be mangled).
+
 ::
 
   generic-signature ::= requirement* 'l'     // one generic parameter
