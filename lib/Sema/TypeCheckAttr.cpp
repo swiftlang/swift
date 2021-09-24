@@ -2756,13 +2756,13 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    return TypeResolution::forContextual(PD, None,
-                                         // Unbound generics and placeholders
-                                         // are not allowed within this
-                                         // attribute.
-                                         /*unboundTyOpener*/ nullptr,
-                                         /*placeholderHandler*/ nullptr)
-        .resolveType(typeEraserRepr);
+    return TypeResolution::resolveContextualType(
+        typeEraserRepr, PD, None,
+        // Unbound generics and placeholders
+        // are not allowed within this
+        // attribute.
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -2939,9 +2939,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
   Type T = attr->getProtocolType();
   if (!T && attr->getProtocolTypeRepr()) {
-    T = TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
-            .resolveType(attr->getProtocolTypeRepr());
+    T = TypeResolution::resolveContextualType(attr->getProtocolTypeRepr(), DC,
+                                              None, /*unboundTyOpener*/ nullptr,
+                                              /*placeholderHandler*/ nullptr);
   }
 
   // Definite error-types were already diagnosed in resolveType.
@@ -4741,11 +4741,10 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
     const auto options =
         TypeResolutionOptions(None) | TypeResolutionFlags::AllowModule;
-    baseType =
-        TypeResolution::forContextual(derivative->getDeclContext(), options,
-                                      /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
-            .resolveType(baseTypeRepr);
+    baseType = TypeResolution::resolveContextualType(
+        baseTypeRepr, derivative->getDeclContext(), options,
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
   }
   if (baseType && baseType->hasError())
     return true;
@@ -5334,10 +5333,10 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 
   Type baseType;
   if (attr->getBaseTypeRepr()) {
-    baseType = TypeResolution::forContextual(transpose->getDeclContext(), None,
-                                             /*unboundTyOpener*/ nullptr,
-                                             /*placeholderHandler*/ nullptr)
-                   .resolveType(attr->getBaseTypeRepr());
+    baseType = TypeResolution::resolveContextualType(
+        attr->getBaseTypeRepr(), transpose->getDeclContext(), None,
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
   }
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions

@@ -1349,11 +1349,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
     auto type =
-        TypeResolution::forContextual(useDC, TypeResolverContext::InExpression,
-                                      /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
+        TypeResolution::forInterface(useDC, TypeResolverContext::InExpression,
+                                     /*unboundTyOpener*/ nullptr,
+                                     /*placeholderHandler*/ nullptr)
             .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,
                                   /*isSpecialized=*/false);
+    type = useDC->mapTypeIntoContext(type);
 
     checkNestedTypeConstraints(*this, type, locator);
 
@@ -2393,11 +2394,10 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
       while (auto isp = dyn_cast<IsPattern>(pattern)) {
         Type castType;
         if (auto castTypeRepr = isp->getCastTypeRepr()) {
-          castType = TypeResolution::forContextual(
-                         DC, TypeResolverContext::InExpression,
-                         /*unboundTyOpener*/ nullptr,
-                         /*placeholderHandler*/ nullptr)
-                         .resolveType(castTypeRepr);
+          castType = TypeResolution::resolveContextualType(
+              castTypeRepr, DC, TypeResolverContext::InExpression,
+              /*unboundTyOpener*/ nullptr,
+              /*placeholderHandler*/ nullptr);
         } else {
           castType = isp->getCastType();
         }

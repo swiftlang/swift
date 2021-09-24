@@ -599,7 +599,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
           if (typeContext->getSelfClassDecl())
             SelfType = DynamicSelfType::get(SelfType, Context);
-          SelfType = DC->mapTypeIntoContext(SelfType);
           return new (Context)
               TypeExpr(new (Context) FixedTypeRepr(SelfType, Loc));
         }
@@ -1505,10 +1504,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // Fold 'T.U' into a nested type.
   if (auto *ITR = dyn_cast<IdentTypeRepr>(InnerTypeRepr)) {
     // Resolve the TypeRepr to get the base type for the lookup.
-    const auto options =
-        TypeResolutionOptions(TypeResolverContext::InExpression);
-    const auto resolution = TypeResolution::forContextual(
-        DC, options,
+    const auto BaseTy = TypeResolution::resolveContextualType(
+        InnerTypeRepr, DC, TypeResolverContext::InExpression,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -1517,7 +1514,6 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get);
-    const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy->mayHaveMembers()) {
       // See if there is a member type with this name.
@@ -2060,8 +2056,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         TypeResolutionOptions(TypeResolverContext::InExpression) |
         TypeResolutionFlags::SilenceErrors;
 
-    const auto resolution = TypeResolution::forContextual(
-        DC, options,
+    const auto result = TypeResolution::resolveContextualType(
+        typeExpr->getTypeRepr(), DC, options,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -2070,13 +2066,13 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get);
-    const auto result = resolution.resolveType(typeExpr->getTypeRepr());
+
     if (result->hasError())
       return nullptr;
     castTy = result;
   }
 
-  if (!castTy || !castTy->getAnyNominal())
+  if (!castTy->getAnyNominal())
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.

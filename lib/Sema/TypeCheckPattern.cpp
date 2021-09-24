@@ -606,18 +606,17 @@ public:
       auto *prefixRepr = IdentTypeRepr::create(Context, components);
 
       // See first if the entire repr resolves to a type.
-      const Type enumTy =
-          TypeResolution::forContextual(
-              DC, options,
-              [](auto unboundTy) {
-                // FIXME: Don't let unbound generic types escape type
-                // resolution. For now, just return the unbound generic type.
-                return unboundTy;
-              },
-              // FIXME: Don't let placeholder types escape type resolution.
-              // For now, just return the placeholder type.
-              PlaceholderType::get)
-              .resolveType(prefixRepr);
+      const Type enumTy = TypeResolution::resolveContextualType(
+          prefixRepr, DC, options,
+          [](auto unboundTy) {
+            // FIXME: Don't let unbound generic types escape type
+            // resolution. For now, just return the unbound generic type.
+            return unboundTy;
+          },
+          // FIXME: Don't let placeholder types escape type resolution.
+          // For now, just return the placeholder type.
+          PlaceholderType::get);
+
       auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
       if (!enumDecl)
         return nullptr;
@@ -1307,14 +1306,13 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     auto IP = cast<IsPattern>(P);
 
     // Type-check the type parameter.
-    const auto castType =
-        TypeResolution::forContextual(dc, TypeResolverContext::InExpression,
-                                      // FIXME: Should we really unconditionally
-                                      // complain about unbound generics and
-                                      // placeholders here?
-                                      /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
-            .resolveType(IP->getCastTypeRepr());
+    const auto castType = TypeResolution::resolveContextualType(
+        IP->getCastTypeRepr(), dc, TypeResolverContext::InExpression,
+        // FIXME: Should we really unconditionally
+        // complain about unbound generics and
+        // placeholders here?
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
     if (castType->hasError())
       return nullptr;
     IP->setCastType(castType);
