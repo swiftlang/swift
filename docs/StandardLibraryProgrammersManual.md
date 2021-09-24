@@ -72,16 +72,27 @@ For historical reasons, the existing codebase generally uses `internal` as the c
 
 Every entry point in the standard library that has an ABI impact must be applied an `@available` attribute that describes the earliest ABI-stable OS releases that it can be deployed on. (Currently this only applies to macOS, iOS, watchOS and tvOS, since Swift isn't ABI stable on other platforms yet.)
 
-Unlike access control modifiers, we prefer to put `@available` attributes on the extension context rather than duplicating them on every individual entry point. This is an effort to fight against information overload: the `@available` attribute is information dense and it's generally easier to review/maintain if applied to a group of entry points all at once.
+Just like access control modifiers, we prefer to put `@available` attributes on each individual access point, rather than just the extension in which they are defined. 
 
 ```swift
-// 👍
+// 😢👎
 @available(macOS 10.6, iOS 10, watchOS 3, tvOS 12, *)
 extension String {
   public func blanch() { ... }
   public func roast() { ... }
 }
+
+// 🥲👍
+extension String {
+  @available(macOS 10.6, iOS 10, watchOS 3, tvOS 12, *)
+  public func blanch() { ... }
+
+  @available(macOS 10.6, iOS 10, watchOS 3, tvOS 12, *)
+  public func roast() { ... }
+}
 ```
+
+This coding style is enforced by the ABI checker -- it will complain if an extension member declaration that needs an availability doesn't have it directly attached.
 
 Features under development that haven't been released yet must be marked with the placeholder version number `9999`. This special version is always considered available in custom builds of the Swift toolchain (including development snapshots), but not in any ABI-stable production release.
 
