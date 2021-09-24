@@ -113,7 +113,7 @@ public class Other {
      self.s = s;
    }
 
-// CHECK-LABEL: sil [noinline] @$s25sil_combine_protocol_conf5OtherC11doWorkClassSiyF : $@convention(method) (@guaranteed Other) -> Int {
+// CHECK-LABEL: sil [noinline] {{.*}}@$s25sil_combine_protocol_conf5OtherC11doWorkClassSiyF : $@convention(method) (@guaranteed Other) -> Int {
 // CHECK: bb0
 // CHECK: debug_value
 // CHECK: integer_literal
@@ -234,7 +234,7 @@ public class OtherClass {
      self.arg4 = arg4
   }
 
-// CHECK-LABEL: sil [noinline] @$s25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF : $@convention(method) (@guaranteed OtherClass) -> Int {
+// CHECK-LABEL: sil [noinline] {{.*}}@$s25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF : $@convention(method) (@guaranteed OtherClass) -> Int {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK: debug_value
 // CHECK: [[R1:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg1
@@ -335,7 +335,7 @@ public class OtherKlass {
      self.arg2 = arg2
   }
 
-// CHECK-LABEL: sil [noinline] @$s25sil_combine_protocol_conf10OtherKlassC10doWorkEnumSiyF : $@convention(method) (@guaranteed OtherKlass) -> Int {
+// CHECK-LABEL: sil [noinline] {{.*}}@$s25sil_combine_protocol_conf10OtherKlassC10doWorkEnumSiyF : $@convention(method) (@guaranteed OtherKlass) -> Int {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK: debug_value
 // CHECK: integer_literal

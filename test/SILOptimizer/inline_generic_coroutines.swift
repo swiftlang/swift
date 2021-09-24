@@ -8,7 +8,7 @@ func useit<T>(_ t: T) {
 
 // Check that we inline the Array.subscript.read coroutine
 
-// CHECK-LABEL: sil @{{.*}}testit
+// CHECK-LABEL: sil {{.*@.*}}testit
 // CHECK-NOT:     begin_apply
 // CHECK-NOT:     end_apply
 // CHECK:       } // end sil function {{.*}}testit

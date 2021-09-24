@@ -34,7 +34,7 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @process
+// CHECK-LABEL: sil {{.*}}@process
 // CHECK: bb0
 // CHECK-NOT: try_apply
 // CHECK-NOT: unreachable
@@ -241,7 +241,7 @@ bb0(%0 : $Int32):
 // was not aware of the opened archetype definition that becomes unused and gets removed
 // after the inlining.
 //
-// CHECK-LABEL: sil @check_removal_of_unregistered_archetype_def
+// CHECK-LABEL: sil {{.*}}@check_removal_of_unregistered_archetype_def
 // CHECK-NOT: init_existential
 // CHECK-NOT: open_existential
 // CHECK-NOT: function_ref
@@ -274,7 +274,7 @@ class C {
   init()
 }
 
-// CHECK-SIMPLIFY-CFG-LABEL: sil @test_infinite_loop_in_unreachable_block
+// CHECK-SIMPLIFY-CFG-LABEL: sil {{.*}}@test_infinite_loop_in_unreachable_block
 // CHECK-SIMPLIFY-CFG: bb0
 // CHECK-SIMPLIFY-CFG-NOT: bb1
 // CHECK-SIMPLIFY-CFG: end sil function 'test_infinite_loop_in_unreachable_block'

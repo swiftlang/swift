@@ -5,7 +5,7 @@
 
 import objc_generics
 
-// CHECK-LABEL: sil [noinline] @$s26cast_folding_objc_generics26testObjCGenericParamChangeySo12GenericClassCySo8NSStringCGADySo15NSMutableStringCGF : $@convention(thin) (@guaranteed GenericClass<NSMutableString>) -> @owned GenericClass<NSString> {
+// CHECK-LABEL: sil [noinline] {{.*}}@$s26cast_folding_objc_generics26testObjCGenericParamChangeySo12GenericClassCySo8NSStringCGADySo15NSMutableStringCGF : $@convention(thin) (@guaranteed GenericClass<NSMutableString>) -> @owned GenericClass<NSString> {
 // CHECK:         upcast
 // CHECK-NOT:     int_trap
 // CHECK: } // end sil function '$s26cast_folding_objc_generics26testObjCGenericParamChangeySo12GenericClassCySo8NSStringCGADySo15NSMutableStringCGF'
@@ -23,7 +23,7 @@ public func testObjCGenericParamChangeSubclass(_ a: GenericClass<NSMutableString
   return a as! GenericSubclass<NSString>
 }
 
-// CHECK-LABEL: sil [noinline] @$s26cast_folding_objc_generics36testObjCGenericParamChangeSuperclassySo12GenericClassCySo8NSStringCGSo0K8SubclassCySo15NSMutableStringCGF : $@convention(thin) (@guaranteed GenericSubclass<NSMutableString>) -> @owned GenericClass<NSString> {
+// CHECK-LABEL: sil [noinline] {{.*}}@$s26cast_folding_objc_generics36testObjCGenericParamChangeSuperclassySo12GenericClassCySo8NSStringCGSo0K8SubclassCySo15NSMutableStringCGF : $@convention(thin) (@guaranteed GenericSubclass<NSMutableString>) -> @owned GenericClass<NSString> {
 // CHECK:         upcast
 // CHECK-NOT:     int_trap
 // CHECK: } // end sil function '$s26cast_folding_objc_generics36testObjCGenericParamChangeSuperclassySo12GenericClassCySo8NSStringCGSo0K8SubclassCySo15NSMutableStringCGF'
