@@ -56,7 +56,7 @@ func asyncFunc() async {
 
 // CHECK-SIL:       // function_ref async_Main
 // CHECK-SIL-NEXT:  %2 = function_ref @async_Main : $@convention(thin) @async () -> ()
-// CHECK-SIL-NEXT:  %3 = integer_literal $Builtin.Int64, 21
+// CHECK-SIL-NEXT:  %3 = integer_literal $Builtin.Int64, 2048
 // CHECK-SIL-NEXT:  %4 = struct $Int (%3 : $Builtin.Int64)
 // CHECK-SIL-NEXT:  %5 = metatype $@thick ().Type
 // CHECK-SIL-NEXT:  %6 = init_existential_metatype %5 : $@thick ().Type, $@thick Any.Type
