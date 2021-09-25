@@ -23,6 +23,12 @@
 using namespace swift;
 using namespace rewriting;
 
+/// If this is a rule of the form T.[p] => T where [p] is a property symbol,
+/// returns the symbol. Otherwise, returns None.
+///
+/// Note that this is meant to be used with a simplified rewrite system,
+/// where the right hand sides of rules are canonical, since this also means
+/// that T is canonical.
 Optional<Symbol> Rule::isPropertyRule() const {
   auto property = LHS.back();
 
@@ -38,6 +44,8 @@ Optional<Symbol> Rule::isPropertyRule() const {
   return property;
 }
 
+/// If this is a rule of the form T.[p] => T where [p] is a protocol symbol,
+/// return true, otherwise return false.
 bool Rule::isProtocolConformanceRule() const {
   if (auto property = isPropertyRule())
     return property->getKind() == Symbol::Kind::Protocol;
@@ -418,8 +426,8 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "}\n";
   out << "Homotopy generators: {\n";
   for (const auto &loop : HomotopyGenerators) {
-    out << "- " << loop.Basepoint << ": ";
-    loop.Path.dump(out, loop.Basepoint, *this);
+    out << "- ";
+    loop.dump(out, *this);
     out << "\n";
   }
   out << "}\n";

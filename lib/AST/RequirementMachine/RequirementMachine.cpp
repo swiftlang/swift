@@ -322,13 +322,14 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   System.dump(out);
   Map.dump(out);
 
-  out << "\nConformance access paths:\n";
+  out << "Conformance access paths: {\n";
   for (auto pair : ConformanceAccessPaths) {
     out << "- " << pair.first.first << " : ";
     out << pair.first.second->getName() << " => ";
     pair.second.print(out);
     out << "\n";
   }
+  out << "}\n";
 }
 
 RequirementMachine::RequirementMachine(RewriteContext &ctx)
