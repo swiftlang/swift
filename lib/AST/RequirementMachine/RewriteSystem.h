@@ -366,8 +366,6 @@ public:
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
                   ProtocolGraph &&protos);
 
-  Symbol simplifySubstitutionsInSuperclassOrConcreteSymbol(Symbol symbol) const;
-
   unsigned getRuleID(const Rule &rule) const {
     assert((unsigned)(&rule - &*Rules.begin()) < Rules.size());
     return (unsigned)(&rule - &*Rules.begin());

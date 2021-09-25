@@ -79,18 +79,6 @@ void RewriteSystem::initialize(
     addRule(rule.first, rule.second);
 }
 
-Symbol RewriteSystem::simplifySubstitutionsInSuperclassOrConcreteSymbol(
-    Symbol symbol) const {
-  return symbol.transformConcreteSubstitutions(
-    [&](Term term) -> Term {
-      MutableTerm mutTerm(term);
-      if (!simplify(mutTerm))
-        return term;
-
-      return Term::get(mutTerm, Context);
-    }, Context);
-}
-
 /// Adds a rewrite rule, returning true if the new rule was non-trivial.
 ///
 /// If both sides simplify to the same term, the rule is trivial and discarded,
