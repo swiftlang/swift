@@ -367,8 +367,6 @@ bool CrossModuleSerializationSetup::canSerialize(SILType type) {
         // Exclude types which are defined in an @_implementationOnly imported
         // module. Such modules are not transitively available.
         if (!mod->canBeUsedForCrossModuleOptimization(subNT)) {
-          llvm::dbgs() << " === " << mod->getName() << ", " <<
-            subNT->getParentModule()->getName() << ", " << subNT->getName() << '\n';
           return true;
         }
       }

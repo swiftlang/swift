@@ -40,36 +40,28 @@ ReferenceTestSuite.test("write-rvalue-reference") {
 ReferenceTestSuite.test("pass-lvalue-reference") {
   expectNotEqual(21, getStaticInt())
   var val: CInt = 21
-  withUnsafeMutablePointer(to: &val) {
-    setStaticIntRef($0)
-  }
+  setStaticIntRef(&val)
   expectEqual(21, getStaticInt())
 }
 
 ReferenceTestSuite.test("pass-const-lvalue-reference") {
   expectNotEqual(22, getStaticInt())
   var val: CInt = 22
-  withUnsafePointer(to: &val) {
-    setConstStaticIntRef($0)
-  }
+  setConstStaticIntRef(&val)
   expectEqual(22, getStaticInt())
 }
 
 ReferenceTestSuite.test("pass-rvalue-reference") {
   expectNotEqual(52, getStaticInt())
   var val: CInt = 52
-  withUnsafeMutablePointer(to: &val) {
-    setStaticIntRvalueRef($0)
-  }
+  setStaticIntRvalueRef(&val)
   expectEqual(52, getStaticInt())
 }
 
 ReferenceTestSuite.test("pass-const-rvalue-reference") {
   expectNotEqual(53, getStaticInt())
   var val: CInt = 53
-  withUnsafePointer(to: &val) {
-    setConstStaticIntRvalueRef($0)
-  }
+  setConstStaticIntRvalueRef(&val)
   expectEqual(53, getStaticInt())
 }
 

@@ -6,10 +6,10 @@
 // CHECK: func getConstStaticIntRef() -> UnsafePointer<Int32>
 // CHECK: func getConstStaticIntRvalueRef() -> UnsafePointer<Int32>
 // CHECK: func setStaticInt(_: Int32)
-// CHECK: func setStaticIntRef(_: UnsafeMutablePointer<Int32>)
-// CHECK: func setStaticIntRvalueRef(_: UnsafeMutablePointer<Int32>)
-// CHECK: func setConstStaticIntRef(_: UnsafePointer<Int32>)
-// CHECK: func setConstStaticIntRvalueRef(_: UnsafePointer<Int32>)
+// CHECK: func setStaticIntRef(_: inout Int32)
+// CHECK: func setStaticIntRvalueRef(_: inout Int32)
+// CHECK: func setConstStaticIntRef(_: inout Int32)
+// CHECK: func setConstStaticIntRvalueRef(_: inout Int32)
 // CHECK: func getFuncRef() -> @convention(c) () -> Int32
 // CHECK: func getFuncRvalueRef() -> @convention(c) () -> Int32
 

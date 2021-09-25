@@ -463,7 +463,7 @@ namespace swift {
 
     /// Whether the new experimental generics implementation is enabled.
     RequirementMachineMode EnableRequirementMachine =
-        RequirementMachineMode::Disabled;
+        RequirementMachineMode::Enabled;
 
     /// Enables dumping rewrite systems from the requirement machine.
     bool DumpRequirementMachine = false;
@@ -670,6 +670,10 @@ namespace swift {
   /// Options for controlling the behavior of the Clang importer.
   class ClangImporterOptions final {
   public:
+    /// The path to the Clang compiler executable.
+    /// Used to detect the default include paths.
+    std::string clangPath = "clang";
+
     /// The module cache path which the Clang importer should use.
     std::string ModuleCachePath;
 

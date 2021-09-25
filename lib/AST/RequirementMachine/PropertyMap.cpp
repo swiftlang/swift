@@ -162,11 +162,6 @@ static Type getTypeFromSubstitutionSchema(Type schema,
         // Skip creation of a new MutableTerm in the case where the
         // prefix is empty.
         return ctx.getTypeForTerm(substitution, genericParams, protos);
-      } else if (substitution.size() == 1 &&
-                 substitution[0].getKind() == Symbol::Kind::Protocol) {
-        // If the prefix is non-empty and the substitution is the
-        // protocol 'Self' type for some protocol, just use the prefix.
-        return ctx.getTypeForTerm(prefix, genericParams, protos);
       } else {
         // Otherwise build a new term by appending the substitution
         // to the prefix.
@@ -1045,26 +1040,19 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
   SmallVector<std::vector<std::pair<Term, Symbol>>, 4> properties;
 
   for (const auto &rule : Rules) {
-    if (rule.isDeleted())
+    if (rule.isSimplified())
       continue;
-
-    auto lhs = rule.getLHS();
-    auto rhs = rule.getRHS();
 
     // Collect all rules of the form T.[p] => T where T is canonical.
-    auto property = lhs.back();
-    if (!property.isProperty())
+    auto property = rule.isPropertyRule();
+    if (!property)
       continue;
 
-    if (lhs.size() - 1 != rhs.size())
-      continue;
-
-    if (!std::equal(rhs.begin(), rhs.end(), lhs.begin()))
-      continue;
-
-    if (rhs.size() >= properties.size())
-      properties.resize(rhs.size() + 1);
-    properties[rhs.size()].emplace_back(rhs, property);
+    auto rhs = rule.getRHS();
+    unsigned length = rhs.size();
+    if (length >= properties.size())
+      properties.resize(length + 1);
+    properties[length].emplace_back(rhs, *property);
   }
 
   // Merging multiple superclass or concrete type rules can induce new rules

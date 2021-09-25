@@ -33,6 +33,24 @@ final public class Function : CustomStringConvertible {
     return ReverseList(startAt: SILFunction_lastBlock(bridged).block)
   }
 
+  public var arguments: LazyMapSequence<ArgumentArray, FunctionArgument> {
+    entryBlock.arguments.lazy.map { $0 as! FunctionArgument }
+  }
+  
+  public var numIndirectResultArguments: Int {
+    SILFunction_numIndirectResultArguments(bridged)
+  }
+  
+  public var hasSelfArgument: Bool {
+    SILFunction_getSelfArgumentIndex(bridged) >= 0
+  }
+  
+  public var selfArgumentIndex: Int {
+    let selfIdx = SILFunction_getSelfArgumentIndex(bridged)
+    assert(selfIdx >= 0)
+    return selfIdx
+  }
+
   public var bridged: BridgedFunction { BridgedFunction(obj: SwiftObject(self)) }
 }
 

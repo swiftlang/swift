@@ -22,6 +22,8 @@ extension P where Self : Derived {
 // CHECK-NEXT: - τ_0_0.[P] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[superclass: Base] => τ_0_0
 // CHECK-NEXT: }
+// CHECK-NEXT: Homotopy generators: {
+// CHECK:      }
 // CHECK-NEXT: Property map: {
 // CHECK-NEXT:   [P] => { layout: _NativeClass superclass: [superclass: Base] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Derived] }
