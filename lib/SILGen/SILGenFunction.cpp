@@ -900,6 +900,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   // Emit the CreateAsyncTask builtin
   TaskCreateFlags taskCreationFlagMask(0);
+  taskCreationFlagMask.setInheritContext(true);
   SILValue taskFlags =
       emitWrapIntegerLiteral(moduleLoc, getLoweredType(ctx.getIntType()),
                              taskCreationFlagMask.getOpaqueValue());
