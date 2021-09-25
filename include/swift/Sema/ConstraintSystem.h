@@ -4037,9 +4037,12 @@ public:
   /// parent type by introducing fresh type variables for generic parameters
   /// and constructing a bound generic type from these type variables.
   ///
+  /// \param isTypeResolution Whether we are in the process of resolving a type.
+  ///
   /// \returns The opened type.
   Type openUnboundGenericType(GenericTypeDecl *decl, Type parentTy,
-                              ConstraintLocatorBuilder locator);
+                              ConstraintLocatorBuilder locator,
+                              bool isTypeResolution);
 
   /// Replace placeholder types with fresh type variables, and unbound generic
   /// types with bound generic types whose generic args are fresh type
@@ -5275,7 +5278,8 @@ public:
 
   Type operator()(UnboundGenericType *unboundTy) const {
     return cs.openUnboundGenericType(unboundTy->getDecl(),
-                                     unboundTy->getParent(), locator);
+                                     unboundTy->getParent(), locator,
+                                     /*isTypeResolution=*/true);
   }
 };
 

@@ -628,8 +628,10 @@ Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
   return None;
 }
 
-Type ConstraintSystem::openUnboundGenericType(
-    GenericTypeDecl *decl, Type parentTy, ConstraintLocatorBuilder locator) {
+Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
+                                              Type parentTy,
+                                              ConstraintLocatorBuilder locator,
+                                              bool isTypeResolution) {
   if (parentTy) {
     parentTy = replaceInferableTypesWithTypeVars(parentTy, locator);
   }
@@ -642,7 +644,15 @@ Type ConstraintSystem::openUnboundGenericType(
   recordOpenedTypes(locator, replacements);
 
   if (parentTy) {
-    auto subs = parentTy->getContextSubstitutions(decl->getDeclContext());
+    const auto parentTyInContext =
+        isTypeResolution
+            // Type resolution produces interface types, so we have to map
+            // the parent type into context before binding type variables.
+            ? DC->mapTypeIntoContext(parentTy)
+            : parentTy;
+
+    const auto subs =
+        parentTyInContext->getContextSubstitutions(decl->getDeclContext());
     for (auto pair : subs) {
       auto found = replacements.find(
         cast<GenericTypeParamType>(pair.first));
@@ -670,9 +680,17 @@ Type ConstraintSystem::openUnboundGenericType(
   // pointing at a generic TypeAliasDecl here. If we find a way to
   // handle generic TypeAliases elsewhere, this can just become a
   // call to BoundGenericType::get().
-  return TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr,
-                                       /*placeholderHandler*/ nullptr)
-      .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
+  auto result =
+      TypeResolution::forInterface(
+          DC, None,
+          [](auto) -> Type { llvm_unreachable("should not be used"); },
+          [](auto &, auto) -> Type { llvm_unreachable("should not be used"); })
+          .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
+  if (!parentTy && !isTypeResolution) {
+    result = DC->mapTypeIntoContext(result);
+  }
+
+  return result;
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
@@ -756,15 +774,13 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 
 Type ConstraintSystem::replaceInferableTypesWithTypeVars(
     Type type, ConstraintLocatorBuilder locator) {
-  assert(!type->getCanonicalType()->hasTypeParameter());
-
   if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
     return type;
 
   type = type.transform([&](Type type) -> Type {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
-                                      locator);
+                                      locator, /*isTypeResolution=*/false);
       } else if (auto *placeholderTy = type->getAs<PlaceholderType>()) {
         if (auto *placeholderRepr = placeholderTy->getOriginator()
                                         .dyn_cast<PlaceholderTypeRepr *>()) {
