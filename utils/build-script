@@ -142,8 +142,6 @@ def print_xcodebuild_versions(file=sys.stdout):
 
 
 def validate_xcode_compatibility():
-    return
-
     if sys.platform != 'darwin':
         return
 
