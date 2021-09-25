@@ -526,6 +526,8 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
 }
 bool FrontendOptions::canActionEmitABIDescriptor(ActionType action) {
   switch (action) {
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
   case ActionType::CompileModuleFromInterface:
     return true;
   case ActionType::NoneAction:
@@ -550,8 +552,6 @@ bool FrontendOptions::canActionEmitABIDescriptor(ActionType action) {
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
   case ActionType::PrintFeature:
-  case ActionType::MergeModules:
-  case ActionType::EmitModuleOnly:
   case ActionType::EmitSIL:
   case ActionType::EmitSIBGen:
   case ActionType::EmitSIB:

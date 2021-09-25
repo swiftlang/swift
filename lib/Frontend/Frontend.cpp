@@ -155,7 +155,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
-  
+  serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
+
   if (opts.EmitSymbolGraph) {
     if (!opts.SymbolGraphOutputDir.empty()) {
       serializationOpts.SymbolGraphOutputDir = opts.SymbolGraphOutputDir;
