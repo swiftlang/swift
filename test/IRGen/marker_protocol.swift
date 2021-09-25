@@ -32,3 +32,15 @@ public func testGeneric(i: Int, array: [Int]) {
   generic(i)
   generic(array)
 }
+
+// Forming an existential involving a marker protocol would crash the compiler
+protocol SelfConstrainedProtocol {
+  static var shared: Self { get }
+}
+
+struct Foo: SelfConstrainedProtocol {
+  let x: P
+  static var shared: Self {
+    Foo(x: 123)
+  }
+}
