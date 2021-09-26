@@ -1104,6 +1104,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                            TyID2, TyCategory2,
                                            ValID);
     break;
+  case SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR:
+    SILOneTypeOneOperandExtraAttributeLayout::readRecord(scratch, RawOpCode,
+                                                         Attr, TyID, TyCategory,
+                                                         TyID2, TyCategory2,
+                                                         ValID);
+    break;
   case SIL_INIT_EXISTENTIAL:
     SILInitExistentialLayout::readRecord(scratch, RawOpCode,
                                          TyID, TyCategory,
@@ -1217,12 +1223,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()), None,
         /*bool hasDynamicLifetime*/ Attr != 0);
     break;
-  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocStackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    bool hasDynamicLifetime = Attr & 0x1;
+    bool isLexical = (Attr >> 1) & 0x1;
     ResultInst = Builder.createAllocStack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        None, /*bool hasDynamicLifetime*/ Attr != 0);
+        None, hasDynamicLifetime, isLexical);
     break;
+  }
   case SILInstructionKind::MetatypeInst:
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultInst = Builder.createMetatype(
@@ -1358,16 +1367,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
   case SILInstructionKind::PointerToAddressInst: {
-    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR &&
            "Layout should be OneTypeOneOperand.");
-    bool isStrict = Attr & 0x01;
-    bool isInvariant = Attr & 0x02;
+    auto alignment = llvm::decodeMaybeAlign(Attr & 0xFF);
+    bool isStrict = Attr & 0x100;
+    bool isInvariant = Attr & 0x200;
     ResultInst = Builder.createPointerToAddress(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID2),
                                         (SILValueCategory)TyCategory2, Fn)),
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        isStrict, isInvariant);
+        isStrict, isInvariant, alignment);
     break;
   }
   case SILInstructionKind::DeallocExistentialBoxInst: {
@@ -1846,6 +1856,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
   UNARY_INSTRUCTION(CopyValue)
+  UNARY_INSTRUCTION(MoveValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
@@ -1875,12 +1886,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   case SILInstructionKind::BeginBorrowInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
-    unsigned defined = Attr;
+    bool isLexical = Attr & 0x1;
     ResultInst = Builder.createBeginBorrow(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID),
                                         (SILValueCategory)TyCategory, Fn)),
-        defined == 1);
+        isLexical);
     break;
   }
 

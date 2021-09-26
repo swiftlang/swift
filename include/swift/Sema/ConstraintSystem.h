@@ -768,8 +768,18 @@ enum ScoreKind {
   SK_ValueToPointerConversion,
   /// A closure/function conversion to an autoclosure parameter.
   SK_FunctionToAutoClosureConversion,
+  /// An unapplied reference to a function. The purpose of this
+  /// score bit is to prune overload choices that are functions
+  /// when a solution has already been found using property.
+  ///
+  /// \Note The solver only prefers variables over functions
+  /// to resolve ambiguities, so please be sure that any score
+  /// kind added after this is truly less impactful. Only other
+  /// ambiguity tie-breakers should go after this; anything else
+  /// should be added above.
+  SK_UnappliedFunction,
 
-  SK_LastScoreKind = SK_FunctionToAutoClosureConversion,
+  SK_LastScoreKind = SK_UnappliedFunction,
 };
 
 /// The number of score kinds.
@@ -4517,60 +4527,8 @@ public:
   // Build a disjunction that attempts both T? and T for a particular
   // type binding. The choice of T? is preferred, and we will not
   // attempt T if we can type check with T?
-  void
-  buildDisjunctionForOptionalVsUnderlying(Type boundTy, Type type,
-                                          ConstraintLocator *locator) {
-    // NOTE: If we use other locator kinds for these disjunctions, we
-    // need to account for it in solution scores for forced-unwraps.
-    assert(locator->getPath().back().getKind() ==
-               ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
-           locator->getPath().back().getKind() ==
-               ConstraintLocator::DynamicLookupResult);
-
-    // Create the constraint to bind to the optional type and make it
-    // the favored choice.
-    auto *bindToOptional =
-      Constraint::create(*this, ConstraintKind::Bind, boundTy, type, locator);
-    bindToOptional->setFavored();
-
-    Type underlyingType;
-    if (auto *fnTy = type->getAs<AnyFunctionType>())
-      underlyingType = replaceFinalResultTypeWithUnderlying(fnTy);
-    else if (auto *typeVar =
-                 type->getWithoutSpecifierType()->getAs<TypeVariableType>()) {
-      auto *locator = typeVar->getImpl().getLocator();
-
-      // If `type` hasn't been resolved yet, we need to allocate a type
-      // variable to represent an object type of a future optional, and
-      // add a constraint beetween `type` and `underlyingType` to model it.
-      underlyingType = createTypeVariable(
-          getConstraintLocator(locator, LocatorPathElt::GenericArgument(0)),
-          TVO_PrefersSubtypeBinding | TVO_CanBindToLValue |
-              TVO_CanBindToNoEscape);
-
-      // Using a `typeVar` here because l-value is going to be applied
-      // to the underlying type below.
-      addConstraint(ConstraintKind::OptionalObject, typeVar, underlyingType,
-                    locator);
-    } else {
-      underlyingType = type->getWithoutSpecifierType()->getOptionalObjectType();
-    }
-
-    assert(underlyingType);
-
-    if (type->is<LValueType>())
-      underlyingType = LValueType::get(underlyingType);
-    assert(!type->is<InOutType>());
-
-    auto *bindToUnderlying = Constraint::create(
-        *this, ConstraintKind::Bind, boundTy, underlyingType, locator);
-
-    llvm::SmallVector<Constraint *, 2> choices = {bindToOptional,
-                                                  bindToUnderlying};
-
-    // Create the disjunction
-    addDisjunctionConstraint(choices, locator, RememberChoice);
-  }
+  void buildDisjunctionForOptionalVsUnderlying(Type boundTy, Type ty,
+                                               ConstraintLocator *locator);
 
   // Build a disjunction for types declared IUO.
   void

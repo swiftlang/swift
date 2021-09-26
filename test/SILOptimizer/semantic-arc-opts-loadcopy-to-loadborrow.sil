@@ -56,6 +56,11 @@ final class Klass {
 extension Klass : MyFakeAnyObject {
   func myFakeMethod()
 }
+
+struct NonTrivialStruct {
+  var val: Klass
+}
+
 sil @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
 sil @guaranteed_fakeoptional_klass_user : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
 sil @guaranteed_fakeoptional_classlet_user : $@convention(thin) (@guaranteed FakeOptional<ClassLet>) -> ()
@@ -1496,3 +1501,16 @@ bb3:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Make sure we don't crash on this code. We used to crash for @out args on the access path to the load
+sil [ossa] @test_opt_out_arg : $@convention(thin)(@in NonTrivialStruct) -> (@out NonTrivialStruct) {
+bb0(%0 : $*NonTrivialStruct, %1 : $*NonTrivialStruct):
+  copy_addr %1 to [initialization] %0 : $*NonTrivialStruct
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %ld = load [copy] %ele : $*Klass
+  destroy_value %ld : $Klass
+  destroy_addr %1 : $*NonTrivialStruct
+  %9999 = tuple()
+  return %9999 : $()
+} 
+

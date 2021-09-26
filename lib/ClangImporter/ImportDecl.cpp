@@ -3590,20 +3590,6 @@ namespace {
           }
         }
 
-        // If we encounter an IndirectFieldDecl, ensure that its parent is
-        // importable before attempting to import it because they are dependent
-        // when it comes to getter/setter generation.
-        if (const auto *ind = dyn_cast<clang::IndirectFieldDecl>(nd)) {
-          const clang::CXXRecordDecl *parentUnion =
-              (ind->getChainingSize() >= 2)
-                  ? dyn_cast<clang::CXXRecordDecl>(
-                        ind->getAnonField()->getParent())
-                  : nullptr;
-          if (parentUnion && parentUnion->isAnonymousStructOrUnion() &&
-              parentUnion->isUnion() && !isCxxRecordImportable(parentUnion))
-            continue;
-        }
-
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
@@ -3629,16 +3615,8 @@ namespace {
           methods.push_back(MD);
           continue;
         }
-        auto VD = cast<VarDecl>(member);
 
-        if (isa<clang::IndirectFieldDecl>(nd) || decl->isUnion()) {
-          // Don't import unavailable fields that have no associated storage.
-          if (VD->getAttrs().isUnavailable(Impl.SwiftContext)) {
-            continue;
-          }
-        }
-
-        members.push_back(VD);
+        members.push_back(cast<VarDecl>(member));
       }
 
       for (auto nestedType : nestedTypes) {
@@ -3977,6 +3955,14 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // If we encounter an IndirectFieldDecl, ensure that its parent is
+      // importable before attempting to import it because they are dependent
+      // when it comes to getter/setter generation.
+      if (auto parent =
+              dyn_cast<clang::CXXRecordDecl>(decl->getAnonField()->getParent()))
+        if (!isCxxRecordImportable(parent))
+          return nullptr;
+
       auto importedType =
           Impl.importType(decl->getType(), ImportTypeKind::Variable,
                           isInSystemModule(dc), Bridgeability::None);
@@ -4001,6 +3987,12 @@ namespace {
       // If this is a compatibility stub, mark is as such.
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
+
+      // Don't import unavailable fields that have no associated storage.
+      // TODO: is there any way we could bail here before we allocate/construct
+      // the VarDecl?
+      if (result->getAttrs().isUnavailable(Impl.SwiftContext))
+        return nullptr;
 
       return result;
     }
@@ -4087,6 +4079,30 @@ namespace {
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
       auto selfIdx = importedName.getSelfIndex();
 
+      auto underlyingTypeIsSame = [](const clang::Type *a,
+                                     clang::TemplateTypeParmDecl *b) {
+        while (a->isPointerType() || a->isReferenceType())
+          a = a->getPointeeType().getTypePtr();
+        return a == b->getTypeForDecl();
+      };
+
+      auto templateParamTypeUsedInSignature =
+          [underlyingTypeIsSame,
+           decl](clang::TemplateTypeParmDecl *type) -> bool {
+        // TODO(SR-13809): we will want to update this to handle dependent
+        // types when those are supported.
+        if (underlyingTypeIsSame(decl->getReturnType().getTypePtr(), type))
+          return true;
+
+        for (unsigned i : range(0, decl->getNumParams())) {
+          if (underlyingTypeIsSame(
+                  decl->getParamDecl(i)->getType().getTypePtr(), type))
+            return true;
+        }
+
+        return false;
+      };
+
       ImportedType importedType;
       bool selfIsInOut = false;
       ParameterList *bodyParams = nullptr;
@@ -4095,6 +4111,22 @@ namespace {
       if (funcTemplate) {
         unsigned i = 0;
         for (auto param : *funcTemplate->getTemplateParameters()) {
+          auto templateTypeParam = cast<clang::TemplateTypeParmDecl>(param);
+          // If the template type parameter isn't used in the signature then we
+          // won't be able to deduce what it is when the function template is
+          // called in Swift code. This is OK if there's a defaulted type we can
+          // use (in which case we just don't add a correspond generic). This
+          // also means sometimes we will import a function template as a
+          // "normal" (non-generic) Swift function.
+          //
+          // If the defaulted template type parameter is used in the signature,
+          // then still add a generic so that it can be overrieded.
+          // TODO(SR-14837): in the future we might want to import two overloads
+          // in this case so that the default type could still be used.
+          if (templateTypeParam->hasDefaultArgument() &&
+              !templateParamTypeUsedInSignature(templateTypeParam))
+            continue;
+
           auto *typeParam = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
               param, AccessLevel::Public, dc,
               Impl.SwiftContext.getIdentifier(param->getName()), SourceLoc(), 0,
@@ -4102,8 +4134,9 @@ namespace {
           templateParams.push_back(typeParam);
           (void)++i;
         }
-        genericParams = GenericParamList::create(Impl.SwiftContext, SourceLoc(),
-                                                 templateParams, SourceLoc());
+        if (!templateParams.empty())
+          genericParams = GenericParamList::create(
+              Impl.SwiftContext, SourceLoc(), templateParams, SourceLoc());
       }
 
       if (!dc->isModuleScopeContext() && !isa<clang::CXXMethodDecl>(decl)) {
@@ -4562,16 +4595,6 @@ namespace {
     }
 
     Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
-      // When loading a namespace's sub-decls, we won't add template
-      // specilizations, so make sure to do that here.
-      for (auto spec : decl->specializations()) {
-        if (auto importedSpec = Impl.importDecl(spec, getVersion())) {
-          if (auto namespaceDecl =
-                  dyn_cast<EnumDecl>(importedSpec->getDeclContext()))
-            namespaceDecl->addMember(importedSpec);
-        }
-      }
-
       ImportedName importedName;
       std::tie(importedName, std::ignore) = importFullName(decl);
       auto name = importedName.getDeclName().getBaseIdentifier();

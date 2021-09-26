@@ -17,6 +17,18 @@ public func foo() { }
 // TRC-API: (root versions=[10.10.0,+Inf)
 // TRC-API:   (decl versions=[10.12,+Inf) decl=foo()
 
+struct S {
+  fileprivate var actual: [String] = [] {
+    didSet {
+      if #available(macOS 10.15, *) {
+        foo()
+      }
+    }
+  }
+}
+// TRC-API:  (condition_following_availability versions=[10.15,+Inf)
+// TRC-API:  (if_then versions=[10.15,+Inf)
+
 @inlinable public func inlinableFunc() {
     if #available(macOS 10.12, *) {
         foo()

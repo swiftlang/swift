@@ -36,6 +36,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/APIDigester/ModuleAnalyzerNodes.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
@@ -802,6 +803,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, METADATA);
   BLOCK_RECORD(control_block, MODULE_NAME);
   BLOCK_RECORD(control_block, TARGET);
+  BLOCK_RECORD(control_block, SDK_NAME);
+  BLOCK_RECORD(control_block, REVISION);
 
   BLOCK(OPTIONS_BLOCK);
   BLOCK_RECORD(options_block, SDK_PATH);
@@ -890,6 +893,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_INST_WITNESS_METHOD);
   BLOCK_RECORD(sil_block, SIL_SPECIALIZE_ATTR);
   BLOCK_RECORD(sil_block, SIL_ONE_OPERAND_EXTRA_ATTR);
+  BLOCK_RECORD(sil_block, SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
 
   // These layouts can exist in both decl blocks and sil blocks.
@@ -947,10 +951,12 @@ void Serializer::writeBlockInfoBlock() {
 
 void Serializer::writeHeader(const SerializationOptions &options) {
   {
-    BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
+    BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 4);
     control_block::ModuleNameLayout ModuleName(Out);
     control_block::MetadataLayout Metadata(Out);
     control_block::TargetLayout Target(Out);
+    control_block::SDKNameLayout SDKName(Out);
+    control_block::RevisionLayout Revision(Out);
 
     ModuleName.emit(ScratchRecord, M->getName().str());
 
@@ -984,7 +990,22 @@ void Serializer::writeHeader(const SerializationOptions &options) {
                   userModuleSubminor, userModuleBuild,
                   versionString.str());
 
+    if (!options.SDKName.empty())
+      SDKName.emit(ScratchRecord, options.SDKName);
+
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
+
+    // Write the producer's Swift revision only for resilient modules.
+    if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
+      auto revision = version::getSwiftRevision();
+
+      static const char* forcedDebugRevision =
+        ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
+      if (forcedDebugRevision)
+        revision = forcedDebugRevision;
+
+      Revision.emit(ScratchRecord, revision);
+    }
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
@@ -5259,6 +5280,7 @@ static void collectInterestingNestedDeclarations(
     Serializer::ObjCMethodTable &objcMethods,
     Serializer::NestedTypeDeclsTable &nestedTypeDecls,
     Serializer::UniquedDerivativeFunctionConfigTable &derivativeConfigs,
+    Serializer::DeclFingerprintsTable &declFingerprints,
     bool isLocal = false) {
   const NominalTypeDecl *nominalParent = nullptr;
 
@@ -5326,10 +5348,15 @@ static void collectInterestingNestedDeclarations(
 
     // Recurse into nested declarations.
     if (auto iterable = dyn_cast<IterableDeclContext>(member)) {
+      if (auto bodyFP = iterable->getBodyFingerprint()) {
+        declFingerprints.insert({S.addDeclRef(member), *bodyFP});
+      }
+
       collectInterestingNestedDeclarations(S, iterable->getAllMembers(),
                                            operatorMethodDecls,
                                            objcMethods, nestedTypeDecls,
                                            derivativeConfigs,
+                                           declFingerprints,
                                            isLocal);
     }
   }
@@ -5411,7 +5438,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         collectInterestingNestedDeclarations(*this, IDC->getAllMembers(),
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
-                                             uniquedDerivativeConfigs);
+                                             uniquedDerivativeConfigs,
+                                             declFingerprints);
       }
     }
 
@@ -5445,6 +5473,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
                                              operatorMethodDecls, objcMethods,
                                              nestedTypeDecls,
                                              uniquedDerivativeConfigs,
+                                             declFingerprints,
                                              /*isLocal=*/true);
       }
     }
@@ -5604,6 +5633,17 @@ bool Serializer::allowCompilerErrors() const {
   return getASTContext().LangOpts.AllowModuleWithCompilerErrors;
 }
 
+
+static void emitABIDescriptor(ModuleOrSourceFile DC,
+                              const SerializationOptions &options) {
+  if (!options.ABIDescriptorPath.empty()) {
+    if (DC.is<ModuleDecl*>()) {
+      swift::ide::api::dumpModuleContent(DC.get<ModuleDecl*>(),
+                                         options.ABIDescriptorPath, true);
+    }
+  }
+}
+
 void swift::serializeToBuffers(
   ModuleOrSourceFile DC, const SerializationOptions &options,
   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
@@ -5627,6 +5667,7 @@ void swift::serializeToBuffers(
     });
     if (hadError)
       return;
+    emitABIDescriptor(DC, options);
     if (moduleBuffer)
       *moduleBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
                         std::move(buf), options.OutputPath);
@@ -5731,4 +5772,5 @@ void swift::serialize(ModuleOrSourceFile DC,
       symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
     }
   }
+  emitABIDescriptor(DC, options);
 }

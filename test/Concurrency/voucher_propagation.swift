@@ -9,8 +9,11 @@
 // Use objc_interop as a proxy for voucher support in the OS.
 // REQUIRES: objc_interop
 
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+
+// rdar://83459813 - assertion failure in TaskGroup.cpp
+// REQUIRES: OS=macosx
 
 import Darwin
 import Dispatch

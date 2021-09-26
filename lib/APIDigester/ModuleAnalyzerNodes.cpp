@@ -2233,6 +2233,9 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
 
   auto &Ctx = CI.getASTContext();
 
+  // Don't check if the stdlib was build with the same SDK as what is loaded
+  // here as some tests rely on using a different stdlib.
+  Ctx.SearchPathOpts.EnableSameSDKCheck = false;
 
   // Load standard library so that Clang importer can use it.
   auto *Stdlib = Ctx.getStdlibModule(/*loadIfAbsent=*/true);

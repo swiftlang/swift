@@ -781,6 +781,12 @@ importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-march=z13");
   }
 
+  if (triple.getArch() == llvm::Triple::x86_64) {
+    // Enable double wide atomic intrinsics on every x86_64 target.
+    // (This is the default on Darwin, but not so on other platforms.)
+    invocationArgStrs.push_back("-mcx16");
+  }
+
   if (!importerOpts.Optimization.empty()) {
     invocationArgStrs.push_back(importerOpts.Optimization);
   }
@@ -958,7 +964,7 @@ ClangImporter::getClangArguments(ASTContext &ctx) {
   std::vector<std::string> invocationArgStrs;
   // Clang expects this to be like an actual command line. So we need to pass in
   // "clang" for argv[0]
-  invocationArgStrs.push_back("clang");
+  invocationArgStrs.push_back(ctx.ClangImporterOpts.clangPath);
   switch (ctx.ClangImporterOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
   case ClangImporterOptions::Modes::PrecompiledModule:
@@ -4339,4 +4345,19 @@ ClangImporter::instantiateCXXClassTemplate(
 bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
   return isa<clang::CXXConstructorDecl>(method) || !method->isConst() ||
          method->getParent()->hasMutableFields();
+}
+
+SwiftLookupTable *
+ClangImporter::findLookupTable(const clang::Module *clangModule) {
+  return Impl.findLookupTable(clangModule);
+}
+
+/// Determine the effective Clang context for the given Swift nominal type.
+EffectiveClangContext
+ClangImporter::getEffectiveClangContext(const NominalTypeDecl *nominal) {
+  return Impl.getEffectiveClangContext(nominal);
+}
+
+Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
+  return Impl.importDecl(decl, Impl.CurrentVersion);
 }

@@ -676,9 +676,9 @@ WARNING(semantic_function_improper_nesting, none, "'@_semantics' function calls 
 
 // Capture promotion diagnostics
 WARNING(capturepromotion_concurrentcapture_mutation, none,
-        "'%0' mutated after capture by concurrent closure", (StringRef))
+        "'%0' mutated after capture by sendable closure", (StringRef))
 NOTE(capturepromotion_concurrentcapture_closure_here, none,
-     "variable captured by concurrent closure", ())
+     "variable captured by sendable closure", ())
 NOTE(capturepromotion_concurrentcapture_capturinguse_here, none,
      "capturing use", ())
 NOTE(capturepromotion_variable_defined_here,none,

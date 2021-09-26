@@ -15,7 +15,7 @@
 
 import TestsUtils
 
-public let FloatingPointPrinting = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "FloatingPointPrinting_Float_description_small",
     runFunction: run_FloatingPointPrinting_Float_description_small,
@@ -83,9 +83,9 @@ public let FloatingPointPrinting = [
 // the decimal:
 
 @inline(never)
-public func run_FloatingPointPrinting_Float_description_small(_ N: Int) {
+public func run_FloatingPointPrinting_Float_description_small(_ n: Int) {
   let count = 1_000
-  for _ in 0..<N {
+  for _ in 0..<n {
     for i in 1...count {
       let f = Float(i) / 101.0
       blackHole(f.description)
@@ -94,9 +94,9 @@ public func run_FloatingPointPrinting_Float_description_small(_ N: Int) {
 }
 
 @inline(never)
-public func run_FloatingPointPrinting_Double_description_small(_ N: Int) {
+public func run_FloatingPointPrinting_Double_description_small(_ n: Int) {
   let count = 1_000
-  for _ in 0..<N {
+  for _ in 0..<n {
     for i in 1...count {
       let f = Double(i) / 101.0
       blackHole(f.description)
@@ -105,13 +105,13 @@ public func run_FloatingPointPrinting_Double_description_small(_ N: Int) {
 }
 
 @inline(never)
-public func run_FloatingPointPrinting_Float80_description_small(_ N: Int) {
+public func run_FloatingPointPrinting_Float80_description_small(_ n: Int) {
 #if canImport(Darwin) || os(Linux)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
   let count = 1_000
-  for _ in 0..<N {
+  for _ in 0..<n {
     for i in 1...count {
       let f = Float80(i) / 101.0
       blackHole(f.description)
@@ -125,10 +125,10 @@ public func run_FloatingPointPrinting_Float80_description_small(_ N: Int) {
 // the full range of the type:
 
 @inline(never)
-public func run_FloatingPointPrinting_Float_description_uniform(_ N: Int) {
+public func run_FloatingPointPrinting_Float_description_uniform(_ n: Int) {
   let count = 1_000
   let step = UInt32.max / UInt32(count)
-  for _ in 0..<N {
+  for _ in 0..<n {
     for i in 0..<count {
       let raw = UInt32(i) * step
       let f = Float(bitPattern: raw)
@@ -138,10 +138,10 @@ public func run_FloatingPointPrinting_Float_description_uniform(_ N: Int) {
 }
 
 @inline(never)
-public func run_FloatingPointPrinting_Double_description_uniform(_ N: Int) {
+public func run_FloatingPointPrinting_Double_description_uniform(_ n: Int) {
   let count = 1_000
   let step = UInt64.max / UInt64(count)
-  for _ in 0..<N {
+  for _ in 0..<n {
     for i in 0..<count {
       let raw = UInt64(i) * step
       let f = Double(bitPattern: raw)
@@ -151,14 +151,14 @@ public func run_FloatingPointPrinting_Double_description_uniform(_ N: Int) {
 }
 
 @inline(never)
-public func run_FloatingPointPrinting_Float80_description_uniform(_ N: Int) {
+public func run_FloatingPointPrinting_Float80_description_uniform(_ n: Int) {
 #if canImport(Darwin) || os(Linux)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
   let count = 1_000
   let step = UInt64.max / UInt64(count)
-  for _ in 0..<N {
+  for _ in 0..<n {
     for i in 0..<count {
       let fraction = UInt64(i) * step
       let exponent = UInt(i) % 32768
@@ -175,10 +175,10 @@ public func run_FloatingPointPrinting_Float80_description_uniform(_ N: Int) {
 // result.
 
 @inline(never)
-public func run_FloatingPointPrinting_Float_interpolated(_ N: Int) {
+public func run_FloatingPointPrinting_Float_interpolated(_ n: Int) {
   let count = 500
   let step = UInt32.max / UInt32(count)
-  for _ in 0..<N {
+  for _ in 0..<n {
     for i in 0..<count {
       let raw = UInt32(i) * step
       let f = Float(bitPattern: raw)
@@ -188,10 +188,10 @@ public func run_FloatingPointPrinting_Float_interpolated(_ N: Int) {
 }
 
 @inline(never)
-public func run_FloatingPointPrinting_Double_interpolated(_ N: Int) {
+public func run_FloatingPointPrinting_Double_interpolated(_ n: Int) {
   let count = 500
   let step = UInt64.max / UInt64(count)
-  for _ in 0..<N {
+  for _ in 0..<n {
     for i in 0..<count {
       let raw = UInt64(i) * step
       let f = Double(bitPattern: raw)
@@ -201,14 +201,14 @@ public func run_FloatingPointPrinting_Double_interpolated(_ N: Int) {
 }
 
 @inline(never)
-public func run_FloatingPointPrinting_Float80_interpolated(_ N: Int) {
+public func run_FloatingPointPrinting_Float80_interpolated(_ n: Int) {
 #if canImport(Darwin) || os(Linux)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 // On Linux, Float80 is at aleast available on x86.
 #if arch(x86_64) || arch(i386)
   let count = 500
   let step = UInt64.max / UInt64(count)
-  for _ in 0..<N {
+  for _ in 0..<n {
     for i in 0..<count {
       let fraction = UInt64(i) * step
       let exponent = UInt(i) % 32768

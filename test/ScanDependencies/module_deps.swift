@@ -127,11 +127,16 @@ import SubE
 // CHECK-NEXT: "-frontend"
 // CHECK-NEXT: "-only-use-extra-clang-opts"
 // CHECK-NEXT: "-Xcc"
-// CHECK-NEXT: "clang"
+// CHECK-NEXT: "BUILD_DIR/bin/clang"
 // CHECK:      "-fsystem-module",
 // CHECK-NEXT: "-emit-pcm",
 // CHECK-NEXT: "-module-name",
 // CHECK-NEXT: "C"
+
+// CHECK: "capturedPCMArgs": [
+// CHECK-NEXT:   "-Xcc",
+// CHECK-NEXT:   "-fapinotes-swift-version=4"
+// CHECK-NEXT: ]
 
 /// --------Swift module E
 // CHECK: "swift": "E"

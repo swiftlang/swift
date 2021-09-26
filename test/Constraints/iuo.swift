@@ -229,3 +229,21 @@ let _: Int = r
 // SR-11998 / rdar://problem/58455441
 class C<T> {}
 var sub: C! = C<Int>()
+
+// FIXME: We probably shouldn't support this, we don't support other
+// 'direct call' features such as default arguments for curried calls.
+struct CurriedIUO {
+  func silly() -> Int! { nil }
+  func testSilly() {
+    let _: Int = CurriedIUO.silly(self)()
+  }
+}
+
+// SR-15219 (rdar://83352038): Make sure we don't crash if an IUO param becomes
+// a placeholder.
+func rdar83352038() {
+  func foo(_: UnsafeRawPointer) -> Undefined {} // expected-error {{cannot find type 'Undefined' in scope}}
+  let _ = { (cnode: AlsoUndefined!) -> UnsafeMutableRawPointer in // expected-error {{cannot find type 'AlsoUndefined' in scope}}
+    return foo(cnode)
+  }
+}

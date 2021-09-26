@@ -3,11 +3,9 @@
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 
-// REQUIRES: rdar82734785
-
 // rdar://76038845
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 
 // Disabled until test hang can be looked at.
 // UNSUPPORTED: OS=windows-msvc

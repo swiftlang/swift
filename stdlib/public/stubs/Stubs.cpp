@@ -202,6 +202,8 @@ uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 }
 #endif
 
+#if SWIFT_STDLIB_HAS_STDIN
+
 /// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
 /// line.  Can be NULL if no characters were read. This buffer should be
 /// freed by the caller.
@@ -265,16 +267,21 @@ swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 #endif
 }
 
-#if defined(__CYGWIN__) || defined(_WIN32)
-  #define strcasecmp _stricmp
-#endif
+#endif  // SWIFT_STDLIB_HAS_STDIN
 
 static bool swift_stringIsSignalingNaN(const char *nptr) {
   if (nptr[0] == '+' || nptr[0] == '-') {
     ++nptr;
   }
 
-  return strcasecmp(nptr, "snan") == 0;
+  if ((nptr[0] == 's' || nptr[0] == 'S') &&
+      (nptr[1] == 'n' || nptr[1] == 'N') &&
+      (nptr[2] == 'a' || nptr[2] == 'A') &&
+      (nptr[3] == 'n' || nptr[3] == 'N') && (nptr[4] == '\0')) {
+    return true;
+  }
+
+  return false;
 }
 
 // This implementation should only be used on platforms without the

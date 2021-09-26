@@ -766,6 +766,10 @@ ERROR(serialization_module_too_old,Fatal,
       "compiled module was created by an older version of the compiler; "
       "rebuild %0 and try again: %1",
       (Identifier, StringRef))
+ERROR(serialization_module_incompatible_revision,Fatal,
+      "compiled module was created by a different version of the compiler; "
+      "rebuild %0 and try again: %1",
+      (Identifier, StringRef))
 ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,Fatal,
@@ -782,6 +786,9 @@ ERROR(serialization_name_mismatch_repl,none,
 ERROR(serialization_target_incompatible,Fatal,
       "module %0 was created for incompatible target %1: %2",
       (Identifier, StringRef, StringRef))
+ERROR(serialization_sdk_mismatch,Fatal,
+      "cannot load module %0 built with SDK '%1' when using SDK '%2': %3",
+      (Identifier, StringRef, StringRef, StringRef))
 ERROR(serialization_target_incompatible_repl,none,
       "module %0 was created for incompatible target %1: %2",
       (Identifier, StringRef, StringRef))
@@ -1937,7 +1944,7 @@ NOTE(nonsendable_tuple_type,none,
      "a tuple type must be composed of 'Sendable' elements to conform to "
      "'Sendable'", ())
 NOTE(non_sendable_nominal,none,
-     "%0 %1 does not conform to the `Sendable` protocol",
+     "%0 %1 does not conform to the 'Sendable' protocol",
       (DescriptiveDeclKind, DeclName))
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
@@ -2960,7 +2967,7 @@ WARNING(differentiable_immutable_wrapper_implicit_noderivative_fixit,none,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(by:)' requirement for %0 "
-      "requires all stored properties not marked with `@noDerivative` to be "
+      "requires all stored properties not marked with '@noDerivative' to be "
       "mutable or have a non-mutating 'move(by:)'; use 'var' instead, or "
       "add an explicit '@noDerivative' attribute "
       "%select{|, or conform %0 to 'AdditiveArithmetic'}1",
@@ -3876,28 +3883,28 @@ NOTE(silence_debug_description_in_interpolation_segment_call,none,
      "use 'String(describing:)' to silence this warning", ())
 
 NOTE(noescape_parameter,none,
-    "parameter %1 is implicitly %select{non-escaping|non-concurrent}0",
+    "parameter %1 is implicitly %select{non-escaping|non-sendable}0",
      (unsigned, Identifier))
 NOTE(generic_parameters_always_escaping,none,
      "generic parameters are always considered '@escaping'", ())
 
 ERROR(passing_noattrfunc_to_attrfunc,none,
-      "passing %select{non-escaping|non-concurrent}0 parameter %1 to function "
+      "passing %select{non-escaping|non-sendable}0 parameter %1 to function "
       "expecting %select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noespace_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
 ERROR(assigning_noattrfunc_to_attrfunc,none,
-      "assigning %select{non-escaping|non-concurrent}0 parameter %1 to "
+      "assigning %select{non-escaping|non-sendable}0 parameter %1 to "
       "%select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(general_noattrfunc_to_attr,none,
-      "using %select{non-escaping|non-concurrent}0 parameter %1 in a context "
+      "using %select{non-escaping|non-sendable}0 parameter %1 in a context "
       "expecting %select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noattrfunc_to_type,none,
-      "converting %select{non-escaping|non-concurrent function}0 value to %1 "
+      "converting %select{non-escaping|non-sendable function}0 value to %1 "
       "may %select{allow it to escape|introduce data races}0",
       (unsigned, Type))
 NOTE(escape_expected_at_parameter_position,none,
@@ -4533,10 +4540,10 @@ ERROR(concurrent_value_outside_source_file,none,
       "%0 %1; use '@unchecked Sendable' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_nonfinal_class,none,
-      "non-final class %0 cannot conform to `Sendable`; "
-      "use `@unchecked Sendable`", (DeclName))
+      "non-final class %0 cannot conform to 'Sendable'; "
+      "use '@unchecked Sendable'", (DeclName))
 ERROR(concurrent_value_inherit,none,
-      "`Sendable` class %1 cannot inherit from another class"
+      "'Sendable' class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
 ERROR(non_sendable_type,none,

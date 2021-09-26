@@ -1591,7 +1591,9 @@ namespace {
         }
 
         auto *getMetadataFn = type->getGlobalActor()
-            ? IGF.IGM.getGetFunctionMetadataGlobalActorFn()
+            ? (IGF.IGM.isConcurrencyAvailable()
+               ? IGF.IGM.getGetFunctionMetadataGlobalActorFn()
+               : IGF.IGM.getGetFunctionMetadataGlobalActorBackDeployFn())
             : type->isDifferentiable()
               ? IGF.IGM.getGetFunctionMetadataDifferentiableFn()
               : IGF.IGM.getGetFunctionMetadataFn();

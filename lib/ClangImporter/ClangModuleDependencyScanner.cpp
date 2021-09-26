@@ -193,12 +193,15 @@ static ClangModuleDependenciesCacheImpl *getOrCreateClangImpl(
 void ClangImporter::recordModuleDependencies(
     ModuleDependenciesCache &cache,
     const FullDependenciesResult &clangDependencies) {
-  struct ModuleInfo {
-    std::string PCMPath;
-    std::string ModuleMapPath;
-  };
   auto &ctx = Impl.SwiftContext;
   auto currentSwiftSearchPathSet = ctx.getAllModuleSearchPathsSet();
+
+  // This scanner invocation's already-captured APINotes version
+  std::vector<std::string> capturedPCMArgs = {
+    "-Xcc",
+    ("-fapinotes-swift-version=" +
+     ctx.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString())
+  };
 
   for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
     // If we've already cached this information, we're done.
@@ -293,7 +296,8 @@ void ClangImporter::recordModuleDependencies(
         clangModuleDep.ClangModuleMapFile,
         clangModuleDep.ContextHash,
         swiftArgs,
-        fileDeps);
+        fileDeps,
+        capturedPCMArgs);
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
       dependencies.addModuleDependency(moduleName.ModuleName, &alreadyAddedModules);
     }
@@ -351,18 +355,28 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
 
 bool ClangImporter::addBridgingHeaderDependencies(
     StringRef moduleName,
+    ModuleDependenciesKind moduleKind,
     ModuleDependenciesCache &cache) {
   auto &ctx = Impl.SwiftContext;
   auto currentSwiftSearchPathSet = ctx.getAllModuleSearchPathsSet();
+  
   auto targetModule = *cache.findDependencies(
               moduleName,
-              {ModuleDependenciesKind::SwiftTextual,currentSwiftSearchPathSet});
+              {moduleKind,
+               currentSwiftSearchPathSet});
 
   // If we've already recorded bridging header dependencies, we're done.
-  auto swiftDeps = targetModule.getAsSwiftTextualModule();
-  if (!swiftDeps->bridgingSourceFiles.empty() ||
-      !swiftDeps->bridgingModuleDependencies.empty())
-    return false;
+  if (auto swiftInterfaceDeps = targetModule.getAsSwiftInterfaceModule()) {
+    if (!swiftInterfaceDeps->textualModuleDetails.bridgingSourceFiles.empty() ||
+        !swiftInterfaceDeps->textualModuleDetails.bridgingModuleDependencies.empty())
+      return false;
+  } else if (auto swiftSourceDeps = targetModule.getAsSwiftSourceModule()) {
+    if (!swiftSourceDeps->textualModuleDetails.bridgingSourceFiles.empty() ||
+        !swiftSourceDeps->textualModuleDetails.bridgingModuleDependencies.empty())
+      return false;
+  } else {
+    llvm_unreachable("Unexpected module dependency kind");
+  }
 
   // Retrieve or create the shared state.
   auto clangImpl = getOrCreateClangImpl(cache);
@@ -404,7 +418,7 @@ bool ClangImporter::addBridgingHeaderDependencies(
 
   // Update the cache with the new information for the module.
   cache.updateDependencies(
-     {moduleName.str(), ModuleDependenciesKind::SwiftTextual},
+     {moduleName.str(), moduleKind},
      std::move(targetModule));
 
   return false;

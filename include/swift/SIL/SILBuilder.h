@@ -365,13 +365,14 @@ public:
 
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
                                    Optional<SILDebugVariable> Var = None,
-                                   bool hasDynamicLifetime = false) {
+                                   bool hasDynamicLifetime = false,
+                                   bool isLexical = false) {
     Loc.markAsPrologue();
     assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocStackInst::create(getSILDebugLocation(Loc), elementType,
-                                         getFunction(),
-                                         Var, hasDynamicLifetime));
+                                         getFunction(), Var, hasDynamicLifetime,
+                                         isLexical));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
@@ -714,10 +715,10 @@ public:
   }
 
   BeginBorrowInst *createBeginBorrow(SILLocation Loc, SILValue LV,
-                                     bool defined = false) {
+                                     bool isLexical = false) {
     assert(!LV->getType().isAddress());
     return insert(new (getModule())
-                      BeginBorrowInst(getSILDebugLocation(Loc), LV, defined));
+                      BeginBorrowInst(getSILDebugLocation(Loc), LV, isLexical));
   }
 
   /// Convenience function for creating a load_borrow on non-trivial values and
@@ -1064,12 +1065,12 @@ public:
         getSILDebugLocation(Loc), Op, Ty));
   }
 
-  PointerToAddressInst *createPointerToAddress(SILLocation Loc, SILValue Op,
-                                               SILType Ty,
-                                               bool isStrict,
-                                               bool isInvariant = false){
+  PointerToAddressInst *
+  createPointerToAddress(SILLocation Loc, SILValue Op, SILType Ty,
+                         bool isStrict, bool isInvariant = false,
+                         llvm::MaybeAlign alignment = llvm::MaybeAlign()) {
     return insert(new (getModule()) PointerToAddressInst(
-                    getSILDebugLocation(Loc), Op, Ty, isStrict, isInvariant));
+        getSILDebugLocation(Loc), Op, Ty, isStrict, isInvariant, alignment));
   }
 
   UncheckedRefCastInst *createUncheckedRefCast(SILLocation Loc, SILValue Op,
@@ -1230,6 +1231,14 @@ public:
            "emitDestroyValueOperation");
     return insert(new (getModule()) DestroyValueInst(getSILDebugLocation(Loc),
                                                      operand, poisonRefs));
+  }
+
+  MoveValueInst *createMoveValue(SILLocation loc, SILValue operand) {
+    assert(!operand->getType().isTrivial(getFunction()) &&
+           "Should not be passing trivial values to this api. Use instead "
+           "emitMoveValueOperation");
+    return insert(new (getModule())
+                  MoveValueInst(getSILDebugLocation(loc), operand));
   }
 
   UnconditionalCheckedCastInst *
@@ -2464,6 +2473,17 @@ public:
     if (v->getType().isObject())
       return emitDestroyValueOperation(loc, v);
     createDestroyAddr(loc, v);
+  }
+
+  /// Convenience function that is a no-op for trivial values and inserts a
+  /// move_value on non-trivial instructions.
+  SILValue emitMoveValueOperation(SILLocation Loc, SILValue v) {
+    assert(!v->getType().isAddress());
+    if (v->getType().isTrivial(*getInsertionBB()->getParent()))
+      return v;
+    assert(v.getOwnershipKind() == OwnershipKind::Owned &&
+           "move_value consumes its argument");
+    return createMoveValue(Loc, v);
   }
 
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,

@@ -2645,7 +2645,7 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
       genericParams = canSig.getGenericParams();
       requirements = canSig.getRequirements();
     } else {
-      requirementsBuffer = canSig->requirementsNotSatisfiedBy(contextSig);
+      requirementsBuffer = canSig.requirementsNotSatisfiedBy(contextSig);
       requirements = requirementsBuffer;
     }
   } else {

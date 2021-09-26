@@ -1166,8 +1166,8 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
     }
   }
 
-  bool needsParensInside = exprNeedsParensBeforeAddingAs(anchor);
-  bool needsParensOutside = exprNeedsParensAfterAddingAs(anchor);
+  bool needsParensInside = exprNeedsParensBeforeAddingAs(anchor, DC);
+  bool needsParensOutside = exprNeedsParensAfterAddingAs(anchor, DC);
 
   llvm::SmallString<2> insertBefore;
   llvm::SmallString<32> insertAfter;
@@ -2870,6 +2870,30 @@ bool ContextualFailure::tryIntegerCastFixIts(
         return true;
       }
     }
+  }
+
+  // bridge to prevent roundabout error message
+  // See rdar://problem/82828226
+  if (TypeChecker::isObjCBridgedTo(fromType, toType, getDC())) {
+    auto *ac = castToExpr(getAnchor());
+    bool needsParensInside = exprNeedsParensBeforeAddingAs(ac, getDC());
+    bool needsParensOutside = exprNeedsParensAfterAddingAs(ac, getDC());
+    llvm::SmallString<2> insertBefore;
+    llvm::SmallString<32> insertAfter;
+    if (needsParensOutside) {
+      insertBefore += "(";
+    }
+    if (needsParensInside) {
+      insertBefore += "(";
+      insertAfter += ")";
+    }
+    insertAfter += " as ";
+    insertAfter += toType->getWithoutParens()->getString();
+    if (needsParensOutside)
+      insertAfter += ")";
+    diagnostic.fixItInsert(exprRange.Start, insertBefore);
+    diagnostic.fixItInsertAfter(exprRange.End, insertAfter);
+    return true;
   }
 
   // Add a wrapping integer cast.
@@ -7698,7 +7722,7 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseConditionalCastExpr() const {
   return true;
 }
 
-bool AlwaysSucceedCheckedCastFailure::diagnoseIfExpr() const {
+bool NoopCheckedCast::diagnoseIfExpr() const {
   auto *expr = getAsExpr<IsExpr>(CastExpr);
   if (!expr)
     return false;
@@ -7707,7 +7731,7 @@ bool AlwaysSucceedCheckedCastFailure::diagnoseIfExpr() const {
   return true;
 }
 
-bool AlwaysSucceedCheckedCastFailure::diagnoseConditionalCastExpr() const {
+bool NoopCheckedCast::diagnoseConditionalCastExpr() const {
   auto *expr = getAsExpr<ConditionalCheckedCastExpr>(CastExpr);
   if (!expr)
     return false;
@@ -7717,7 +7741,7 @@ bool AlwaysSucceedCheckedCastFailure::diagnoseConditionalCastExpr() const {
   return true;
 }
 
-bool AlwaysSucceedCheckedCastFailure::diagnoseForcedCastExpr() const {
+bool NoopCheckedCast::diagnoseForcedCastExpr() const {
   auto *expr = getAsExpr<ForcedCheckedCastExpr>(CastExpr);
   if (!expr)
     return false;
@@ -7742,7 +7766,7 @@ bool AlwaysSucceedCheckedCastFailure::diagnoseForcedCastExpr() const {
   return true;
 }
 
-bool AlwaysSucceedCheckedCastFailure::diagnoseAsError() {
+bool NoopCheckedCast::diagnoseAsError() {
   if (diagnoseIfExpr())
     return true;
 

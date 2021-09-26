@@ -839,6 +839,10 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_old, ModuleName,
                        moduleBufferID);
     break;
+  case serialization::Status::RevisionIncompatible:
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_revision,
+                       ModuleName, moduleBufferID);
+    break;
   case serialization::Status::Malformed:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_malformed_module,
                        moduleBufferID);
@@ -976,6 +980,13 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleOSInfo.second, moduleBufferID);
     break;
   }
+
+  case serialization::Status::SDKMismatch:
+    auto currentSDK = Ctx.LangOpts.SDKName;
+    auto moduleSDK = loadInfo.sdkName;
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_sdk_mismatch,
+                       ModuleName, moduleSDK, currentSDK, moduleBufferID);
+    break;
   }
 }
 
@@ -1056,6 +1067,10 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
       // Check the version number specified via -user-module-version.
       StringRef current(args[I]), next(args[I + 1]);
       if (current == "-user-module-version") {
+        // Sanitize versions that are too long
+        while(next.count('.') > 3) {
+          next = next.rsplit('.').first;
+        }
         result.tryParse(next);
         break;
       }

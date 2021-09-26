@@ -2597,6 +2597,68 @@ bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
   return false;
 }
 
+void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
+    Type boundTy, Type ty, ConstraintLocator *locator) {
+  // NOTE: If we use other locator kinds for these disjunctions, we
+  // need to account for it in solution scores for forced-unwraps.
+  assert(locator->getPath().back().getKind() ==
+             ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
+         locator->getPath().back().getKind() ==
+             ConstraintLocator::DynamicLookupResult);
+  assert(!ty->is<InOutType>());
+  auto rvalueTy = ty->getWithoutSpecifierType();
+
+  // If the type to bind is a placeholder, we can propagate it, as we don't know
+  // whether it can be optional or non-optional, and we would have already
+  // recorded a fix for it.
+  if (rvalueTy->isPlaceholder()) {
+    addConstraint(ConstraintKind::Bind, boundTy, ty, locator);
+    return;
+  }
+
+  // Create the constraint to bind to the optional type and make it the favored
+  // choice.
+  auto *bindToOptional =
+      Constraint::create(*this, ConstraintKind::Bind, boundTy, ty, locator);
+  bindToOptional->setFavored();
+
+  Type underlyingType;
+  if (auto *fnTy = ty->getAs<AnyFunctionType>())
+    underlyingType = replaceFinalResultTypeWithUnderlying(fnTy);
+  else if (auto *typeVar = rvalueTy->getAs<TypeVariableType>()) {
+    auto *locator = typeVar->getImpl().getLocator();
+
+    // If `ty` hasn't been resolved yet, we need to allocate a type variable to
+    // represent an object type of a future optional, and add a constraint
+    // between `ty` and `underlyingType` to model it.
+    underlyingType = createTypeVariable(
+        getConstraintLocator(locator, LocatorPathElt::GenericArgument(0)),
+        TVO_PrefersSubtypeBinding | TVO_CanBindToLValue |
+            TVO_CanBindToNoEscape);
+
+    // Using a `typeVar` here because l-value is going to be applied
+    // to the underlying type below.
+    addConstraint(ConstraintKind::OptionalObject, typeVar, underlyingType,
+                  locator);
+  } else {
+    underlyingType = rvalueTy->getOptionalObjectType();
+  }
+
+  assert(underlyingType);
+
+  if (ty->is<LValueType>())
+    underlyingType = LValueType::get(underlyingType);
+
+  auto *bindToUnderlying = Constraint::create(*this, ConstraintKind::Bind,
+                                              boundTy, underlyingType, locator);
+
+  llvm::SmallVector<Constraint *, 2> choices = {bindToOptional,
+                                                bindToUnderlying};
+
+  // Create the disjunction
+  addDisjunctionConstraint(choices, locator, RememberChoice);
+}
+
 void ConstraintSystem::bindOverloadType(
     const SelectedOverload &overload, Type boundType,
     ConstraintLocator *locator, DeclContext *useDC,
@@ -2944,6 +3006,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
           const auto &param = subscriptTy->getParams()[index];
           verifyThatArgumentIsHashable(index, param.getParameterType(), locator);
         }
+      }
+    }
+
+    if (isa<AbstractFunctionDecl>(decl) || isa<TypeDecl>(decl)) {
+      if (choice.getFunctionRefKind() == FunctionRefKind::Unapplied) {
+        increaseScore(SK_UnappliedFunction);
       }
     }
 
@@ -3885,7 +3953,7 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
         if (fixLocator->isForContextualType())
           return true;
 
-        if (!(fix.second->getKind() == FixKind::ContextualMismatch ||
+        if (!(fix.second->getKind() == FixKind::IgnoreContextualType ||
               fix.second->getKind() == FixKind::AllowTupleTypeMismatch))
           return false;
 

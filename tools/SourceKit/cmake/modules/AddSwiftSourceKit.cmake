@@ -238,6 +238,7 @@ macro(add_sourcekit_framework name)
 
   if(SOURCEKITFW_MODULEMAP)
     set(modulemap "${CMAKE_CURRENT_SOURCE_DIR}/${SOURCEKITFW_MODULEMAP}")
+    set_property(TARGET ${name} APPEND PROPERTY LINK_DEPENDS "${modulemap}")
     if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
       set(modules_dir "${framework_location}/Versions/A/Modules")
       add_custom_command(TARGET ${name} PRE_BUILD

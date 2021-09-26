@@ -15,6 +15,10 @@
 // REQUIRES: swift_stdlib_asserts
 // REQUIRES: foundation
 
+// Test is crashing with older runtimes. rdar://82125328
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import Foundation
 import StdlibUnittest
 

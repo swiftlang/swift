@@ -46,7 +46,7 @@ actor MySuperActor {
   }
 }
 
-class Point { // expected-note{{class 'Point' does not conform to the `Sendable` protocol}}
+class Point { // expected-note{{class 'Point' does not conform to the 'Sendable' protocol}}
   var x : Int = 0
   var y : Int = 0
 }
@@ -603,7 +603,7 @@ func checkLocalFunctions() async {
   local1()
   local2()
 
-  // Non-concurrent closures don't cause problems.
+  // non-sendable closures don't cause problems.
   acceptClosure {
     local1()
     local2()

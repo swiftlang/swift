@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,11 +22,12 @@ import Foundation
 //  7% objc_msgSend
 //  5% _swift_release_
 //  2% _swift_retain_
-public let SevenBoom = BenchmarkInfo(
-  name: "SevenBoom",
-  runFunction: run_SevenBoom,
-  tags: [.runtime, .exceptions, .bridging, .cpubench]
-)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "SevenBoom",
+    runFunction: run_SevenBoom,
+    tags: [.runtime, .exceptions, .bridging, .cpubench]
+  )
 
 @inline(never)
 func filter_seven(_ input : Int) throws {
@@ -36,9 +37,9 @@ func filter_seven(_ input : Int) throws {
 }
 
 @inline(never)
-public func run_SevenBoom(_ N: Int) {
+public func run_SevenBoom(_ n: Int) {
   var c = 0
-  for i in 1...N*5000 {
+  for i in 1...n*5000 {
     do {
       try filter_seven(i)
       c += 1
@@ -46,6 +47,6 @@ public func run_SevenBoom(_ N: Int) {
     catch _ {
     }
   }
-  CheckResults(c == 1)
+  check(c == 1)
 }
 

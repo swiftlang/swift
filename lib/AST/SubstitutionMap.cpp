@@ -295,7 +295,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 
   // The generic parameter may not be canonical. Retrieve the canonical
   // type, which will be dependent.
-  CanType canonicalType = genericSig->getCanonicalTypeInContext(genericParam);
+  CanType canonicalType = genericSig.getCanonicalTypeInContext(genericParam);
 
   // If nothing changed, we don't have a replacement.
   if (canonicalType == type) return Type();

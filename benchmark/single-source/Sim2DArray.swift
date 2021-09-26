@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 import TestsUtils
 
-public let Sim2DArray = BenchmarkInfo(
-  name: "Sim2DArray",
-  runFunction: run_Sim2DArray,
-  tags: [.validation, .api, .Array])
+public let benchmarks =
+  BenchmarkInfo(
+    name: "Sim2DArray",
+    runFunction: run_Sim2DArray,
+    tags: [.validation, .api, .Array])
 
 struct Array2D {
   var storage : [Int]
@@ -40,9 +41,9 @@ func workload_2DArrayTest(_ A: inout Array2D) {
 }
 
 @inline(never)
-public func run_Sim2DArray(_ N: Int) {
-  for _ in 0 ..< N {
-    var A = Array2D(numRows:2048, numCols:32)
-    workload_2DArrayTest(&A)
+public func run_Sim2DArray(_ n: Int) {
+  for _ in 0 ..< n {
+    var a = Array2D(numRows:2048, numCols:32)
+    workload_2DArrayTest(&a)
   }
 }

@@ -299,6 +299,39 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
     case control_block::TARGET:
       result.targetTriple = blobData;
       break;
+    case control_block::SDK_NAME: {
+      result.sdkName = blobData;
+      break;
+    }
+    case control_block::REVISION: {
+      // Tagged compilers should load only resilient modules if they were
+      // produced by the exact same version.
+
+      // Disable this restriction for compiler testing by setting this
+      // env var to any value.
+      static const char* ignoreRevision =
+        ::getenv("SWIFT_DEBUG_IGNORE_SWIFTMODULE_REVISION");
+      if (ignoreRevision)
+        break;
+
+      // Override this env var for testing, forcing the behavior of a tagged
+      // compiler and using the env var value to override this compiler's
+      // revision.
+      static const char* forcedDebugRevision =
+        ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
+
+      bool isCompilerTagged = forcedDebugRevision ||
+-        !version::Version::getCurrentCompilerVersion().empty();
+
+      StringRef moduleRevision = blobData;
+      if (isCompilerTagged && !moduleRevision.empty()) {
+        StringRef compilerRevision = forcedDebugRevision ?
+          forcedDebugRevision : version::getSwiftRevision();
+        if (moduleRevision != compilerRevision)
+          result.status = Status::RevisionIncompatible;
+      }
+      break;
+    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -1210,6 +1243,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       }
       Name = info.name;
       TargetTriple = info.targetTriple;
+      SDKName = info.sdkName;
       CompatibilityVersion = info.compatibilityVersion;
       UserModuleVersion = info.userModuleVersion;
       Bits.ArePrivateImportsEnabled = extInfo.arePrivateImportsEnabled();

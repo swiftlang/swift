@@ -39,6 +39,7 @@
 #include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Portability.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -288,7 +289,7 @@ reportOnCrash(uint32_t flags, const char *message)
   char *oldMessage = (char *)CRGetCrashLogMessage();
   char *newMessage;
   if (oldMessage) {
-    asprintf(&newMessage, "%s%s", oldMessage, message);
+    swift_asprintf(&newMessage, "%s%s", oldMessage, message);
     if (malloc_size(oldMessage)) free(oldMessage);
   } else {
     newMessage = strdup(message);
@@ -365,26 +366,6 @@ void swift::swift_reportError(uint32_t flags,
 #endif
   reportNow(flags, message);
   reportOnCrash(flags, message);
-}
-
-static int swift_vasprintf(char **strp, const char *fmt, va_list ap) {
-#if defined(_WIN32)
-  int len = _vscprintf(fmt, ap);
-  if (len < 0)
-    return -1;
-  char *buffer = reinterpret_cast<char *>(malloc(len + 1));
-  if (!buffer)
-    return -1;
-  int result = vsprintf(buffer, fmt, ap);
-  if (result < 0) {
-    free(buffer);
-    return -1;
-  }
-  *strp = buffer;
-  return result;
-#else
-  return vasprintf(strp, fmt, ap);
-#endif
 }
 
 // Report a fatal error to system console, stderr, and crash logs, then abort.

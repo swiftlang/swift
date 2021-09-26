@@ -29,8 +29,11 @@ In contrast to LLVM IR, SIL is a generally target-independent format
 representation that can be used for code distribution, but it can also express
 target-specific concepts as well as LLVM can.
 
-For more information on developing the implementation of SIL and SIL passes, see
-`SILProgrammersManual.md <SILProgrammersManual.md>`_.
+For more information on developing the implementation of SIL and SIL passes, see:
+
+- `SILProgrammersManual.md <SILProgrammersManual.md>`_.
+- `SILFunctionConventions.md <SILFunctionConventions.md>`_.
+- `SILMemoryAccess.md <SILMemoryAccess.md>`_.
 
 SIL in the Swift Compiler
 -------------------------
@@ -3079,7 +3082,7 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? '[lexical]'? sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
   // %1 has type $*T
@@ -3101,6 +3104,9 @@ deallocated in last-in, first-out stack order.
 The ``dynamic_lifetime`` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time.
 This is the case, e.g. for conditionally initialized objects.
+
+The optional ``lexical`` attribute specifies that the operand corresponds to a
+local variable in the Swift source.
 
 The memory is not retainable. To allocate a retainable box for a value
 type, use ``alloc_box``.
@@ -3668,7 +3674,7 @@ begin_borrow
 
 ::
 
-   sil-instruction ::= 'begin_borrow' '[defined]'? sil-operand
+   sil-instruction ::= 'begin_borrow' '[lexical]'? sil-operand
 
    %1 = begin_borrow %0 : $T
 
@@ -3681,7 +3687,7 @@ region in between this borrow and its lifetime ending use, ``%0`` must be
 live. This makes sense semantically since ``%1`` is modeling a new value with a
 dependent lifetime on ``%0``.
 
-The optional ``defined`` attribute specifies that the operand corresponds to a
+The optional ``lexical`` attribute specifies that the operand corresponds to a
 local variable in the Swift source, so special care must be taken when moving
 the end_borrow.
 
@@ -5245,6 +5251,34 @@ independent of the operand. In terms of specific types:
 In ownership qualified functions, a ``copy_value`` produces a +1 value that must
 be consumed at most once along any path through the program.
 
+move_value
+``````````
+
+::
+
+   sil-instruction ::= 'move_value' sil-operand
+
+   %1 = move_value %0 : $@_moveOnly A
+
+Performs a move of the operand, ending its lifetime. When ownership is enabled,
+it always takes in an `@owned T` and produces a new `@owned @_moveOnly T`. 
+
+1. For trivial types, this is equivalent to just propagating through the trivial
+   value.
+2. For reference types, this is equivalent to ending the lifetime of the
+   operand, beginning a new lifetime for the result and setting the result to
+   the value of the operand.
+3. For aggregates, the operation is equivalent to performing a move_value on
+   each of its fields recursively.
+
+After ownership is lowered, we leave in the move_value to provide a place for
+IRGenSIL to know to store a potentially new variable (in case the move was
+associated with a let binding).
+
+NOTE: This instruction is used in an experimental feature called 'move only
+values'. A move_value instruction is an instruction that introduces (or injects)
+a type `T` into the move only value space.
+
 release_value
 `````````````
 
@@ -6166,7 +6200,8 @@ pointer_to_address
 ``````````````````
 ::
 
-  sil-instruction ::= 'pointer_to_address' sil-operand 'to' ('[' 'strict' ']')? sil-type
+  sil-instruction ::= 'pointer_to_address' sil-operand 'to' ('[' 'strict' ']')? ('[' 'invariant' ']')? ('[' 'alignment' '=' alignment ']')? sil-type
+  alignment ::= [0-9]+
 
   %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
   // %1 will be of type $*T
@@ -6186,6 +6221,12 @@ type. A memory access from an address that is not strict cannot have
 its address substituted with a strict address, even if other nearby
 memory accesses at the same location are strict.
 
+The ``invariant`` flag is set if loading from the returned address
+always produces the same value.
+
+The ``alignment`` integer value specifies the byte alignment of the
+address. ``alignment=0`` is the default, indicating the natural
+alignment of ``T``.
 
 unchecked_ref_cast
 ``````````````````

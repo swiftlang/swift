@@ -150,6 +150,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   serializationOpts.PublicDependentLibraries =
       getIRGenOptions().PublicLinkLibraries;
+  serializationOpts.SDKName = getLangOptions().SDKName;
+  serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
 
   if (opts.EmitSymbolGraph) {
     if (!opts.SymbolGraphOutputDir.empty()) {

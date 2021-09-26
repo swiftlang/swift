@@ -1448,11 +1448,14 @@ public:
                                                      bool isDestroyer,
                                                      bool isForeign,
                                                      ForDefinition_t forDefinition);
-  llvm::GlobalValue *defineTypeMetadata(CanType concreteType,
-                                        bool isPattern,
-                                        bool isConstant,
-                                        ConstantInitFuture init,
-                                        llvm::StringRef section = {});
+  void addVTableTypeMetadata(
+      ClassDecl *decl, llvm::GlobalVariable *var,
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries);
+
+  llvm::GlobalValue *defineTypeMetadata(
+      CanType concreteType, bool isPattern, bool isConstant,
+      ConstantInitFuture init, llvm::StringRef section = {},
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
@@ -1688,7 +1691,17 @@ private:
   void addLazyConformances(const IterableDeclContext *idc);
 
 //--- Global context emission --------------------------------------------------
+  bool hasSwiftAsyncFunctionDef = false;
+  llvm::Value *extendedFramePointerFlagsWeakRef = nullptr;
+
+  /// Emit a weak reference to the `swift_async_extendedFramePointerFlags`
+  /// symbol needed by Swift async functions.
+  void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
+  bool isConcurrencyAvailable();
+  void noteSwiftAsyncFunctionDef() {
+    hasSwiftAsyncFunctionDef = true;
+  }
   void emitRuntimeRegistration();
   void emitVTableStubs();
   void emitTypeVerifier();

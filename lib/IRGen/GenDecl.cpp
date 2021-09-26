@@ -880,6 +880,29 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
                                              fromAnonymousContext);
 }
 
+static void markGlobalAsUsedBasedOnLinkage(IRGenModule &IGM, LinkInfo &link,
+    llvm::GlobalValue *global) {
+  // If we're internalizing public symbols at link time, don't make globals
+  // unconditionally externally visible.
+  if (IGM.getOptions().InternalizeAtLink)
+    return;
+
+  // Everything externally visible is considered used in Swift.
+  // That mostly means we need to be good at not marking things external.
+  if (link.isUsed())
+    IGM.addUsedGlobal(global);
+}
+
+bool LinkInfo::isUsed(IRLinkage IRL) {
+  // Everything externally visible is considered used in Swift.
+  // That mostly means we need to be good at not marking things external.
+  return IRL.Linkage == llvm::GlobalValue::ExternalLinkage &&
+         (IRL.Visibility == llvm::GlobalValue::DefaultVisibility ||
+          IRL.Visibility == llvm::GlobalValue::ProtectedVisibility) &&
+         (IRL.DLLStorage == llvm::GlobalValue::DefaultStorageClass ||
+          IRL.DLLStorage == llvm::GlobalValue::DLLExportStorageClass);
+}
+
 /// Add the given global value to @llvm.used.
 ///
 /// This value must have a definition by the time the module is finalized.
@@ -2041,10 +2064,8 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
                    ForDefinition, weakImported, isKnownLocal);
   ApplyIRLinkage(IRL).to(global);
 
-  // Everything externally visible is considered used in Swift.
-  // That mostly means we need to be good at not marking things external.
-  if (LinkInfo::isUsed(IRL))
-    IGM.addUsedGlobal(global);
+  LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
+  markGlobalAsUsedBasedOnLinkage(IGM, link, global);
 }
 
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
@@ -2143,23 +2164,9 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
   if (!updatedAttrs.isEmpty())
     fn->setAttributes(updatedAttrs);
 
-  // Everything externally visible is considered used in Swift.
-  // That mostly means we need to be good at not marking things external.
-  if (linkInfo.isUsed()) {
-    IGM.addUsedGlobal(fn);
-  }
+  markGlobalAsUsedBasedOnLinkage(IGM, linkInfo, fn);
 
   return fn;
-}
-
-bool LinkInfo::isUsed(IRLinkage IRL) {
-  // Everything externally visible is considered used in Swift.
-  // That mostly means we need to be good at not marking things external.
-  return IRL.Linkage == llvm::GlobalValue::ExternalLinkage &&
-         (IRL.Visibility == llvm::GlobalValue::DefaultVisibility ||
-          IRL.Visibility == llvm::GlobalValue::ProtectedVisibility) &&
-         (IRL.DLLStorage == llvm::GlobalValue::DefaultStorageClass ||
-          IRL.DLLStorage == llvm::GlobalValue::DLLExportStorageClass);
 }
 
 /// Get or create an LLVM global variable with these linkage rules.
@@ -2191,11 +2198,7 @@ llvm::GlobalVariable *swift::irgen::createVariable(
       .to(var, linkInfo.isForDefinition());
   var->setAlignment(llvm::MaybeAlign(alignment.getValue()));
 
-  // Everything externally visible is considered used in Swift.
-  // That mostly means we need to be good at not marking things external.
-  if (linkInfo.isUsed()) {
-    IGM.addUsedGlobal(var);
-  }
+  markGlobalAsUsedBasedOnLinkage(IGM, linkInfo, var);
 
   if (IGM.DebugInfo && !DbgTy.isNull() && linkInfo.isForDefinition())
     IGM.DebugInfo->emitGlobalVariableDeclaration(
@@ -3682,7 +3685,7 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
     llvm_unreachable("Don't know how to emit protocols for "
                      "the selected object format.");
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_protos, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_protos, regular";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
@@ -3743,7 +3746,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     llvm_unreachable("Don't know how to emit protocol conformances for "
                      "the selected object format.");
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_proto, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_proto, regular";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
@@ -3769,7 +3772,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_types, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_types, regular";
     break;
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:
@@ -4161,9 +4164,7 @@ llvm::GlobalValue *IRGenModule::defineAlias(LinkEntity entity,
   ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
       .to(alias);
 
-  if (link.isUsed()) {
-    addUsedGlobal(alias);
-  }
+  markGlobalAsUsedBasedOnLinkage(*this, link, alias);
 
   // Replace an existing external declaration for the address point.
   if (entry) {
@@ -4202,11 +4203,10 @@ llvm::GlobalValue *IRGenModule::defineAlias(LinkEntity entity,
 /// public symbol for the metadata references. This function will rewrite any
 /// existing external declaration to the address point as an alias into the
 /// full metadata object.
-llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
-                                                   bool isPattern,
-                                                   bool isConstant,
-                                                   ConstantInitFuture init,
-                                                   llvm::StringRef section) {
+llvm::GlobalValue *IRGenModule::defineTypeMetadata(
+    CanType concreteType, bool isPattern, bool isConstant,
+    ConstantInitFuture init, llvm::StringRef section,
+    SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries) {
   assert(init);
 
   auto isPrespecialized = concreteType->getAnyGeneric() &&
@@ -4241,9 +4241,14 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (!section.empty())
     var->setSection(section);
 
+  if (getOptions().VirtualFunctionElimination) {
+    if (auto classDecl = concreteType->getClassOrBoundGenericClass()) {
+      addVTableTypeMetadata(classDecl, var, vtableEntries);
+    }
+  }
+
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
-  if (link.isUsed())
-    addUsedGlobal(var);
+  markGlobalAsUsedBasedOnLinkage(*this, link, var);
 
   /// For concrete metadata, we want to use the initializer on the
   /// "full metadata", and define the "direct" address point as an alias.

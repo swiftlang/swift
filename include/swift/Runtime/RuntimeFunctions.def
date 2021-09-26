@@ -634,6 +634,24 @@ FUNCTION(GetFunctionMetadataGlobalActor,
               TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// Metadata *
+// swift_getFunctionTypeMetadataGlobalActorBackDeploy(unsigned long flags,
+//                                                    unsigned long diffKind,
+//                                               const Metadata **parameters,
+//                                               const uint32_t *parameterFlags,
+//                                               const Metadata *result,
+//                                               const Metadata *globalActor);
+FUNCTION(GetFunctionMetadataGlobalActorBackDeploy,
+         swift_getFunctionTypeMetadataGlobalActorBackDeploy,
+         C_CC, OpaqueTypeAvailability,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy,
+              SizeTy,
+              TypeMetadataPtrTy->getPointerTo(0),
+              Int32Ty->getPointerTo(0),
+              TypeMetadataPtrTy,
+              TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
 
 // Metadata *swift_getFunctionTypeMetadata0(unsigned long flags,
 //                                          const Metadata *resultMetadata);

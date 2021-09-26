@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 // With a non-optimized stdlib the test takes very long.
 // REQUIRES: optimized_stdlib

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,7 +23,7 @@ let prefixCount = sequenceCount - 1024
 let sumCount = prefixCount * (prefixCount - 1) / 2
 let array: [Int] = Array(0..<sequenceCount)
 
-public let Prefix = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "PrefixCountableRange",
     runFunction: run_PrefixCountableRange,
@@ -85,157 +85,157 @@ public let Prefix = [
 ]
 
 @inline(never)
-public func run_PrefixCountableRange(_ N: Int) {
+public func run_PrefixCountableRange(_ n: Int) {
   let s = 0..<sequenceCount
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixSequence(_ N: Int) {
+public func run_PrefixSequence(_ n: Int) {
   let s = sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySequence(_ N: Int) {
+public func run_PrefixAnySequence(_ n: Int) {
   let s = AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySeqCntRange(_ N: Int) {
+public func run_PrefixAnySeqCntRange(_ n: Int) {
   let s = AnySequence(0..<sequenceCount)
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySeqCRangeIter(_ N: Int) {
+public func run_PrefixAnySeqCRangeIter(_ n: Int) {
   let s = AnySequence((0..<sequenceCount).makeIterator())
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnyCollection(_ N: Int) {
+public func run_PrefixAnyCollection(_ n: Int) {
   let s = AnyCollection(0..<sequenceCount)
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixArray(_ N: Int) {
+public func run_PrefixArray(_ n: Int) {
   let s = array
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixCountableRangeLazy(_ N: Int) {
+public func run_PrefixCountableRangeLazy(_ n: Int) {
   let s = (0..<sequenceCount).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixSequenceLazy(_ N: Int) {
+public func run_PrefixSequenceLazy(_ n: Int) {
   let s = (sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySequenceLazy(_ N: Int) {
+public func run_PrefixAnySequenceLazy(_ n: Int) {
   let s = (AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySeqCntRangeLazy(_ N: Int) {
+public func run_PrefixAnySeqCntRangeLazy(_ n: Int) {
   let s = (AnySequence(0..<sequenceCount)).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnySeqCRangeIterLazy(_ N: Int) {
+public func run_PrefixAnySeqCRangeIterLazy(_ n: Int) {
   let s = (AnySequence((0..<sequenceCount).makeIterator())).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixAnyCollectionLazy(_ N: Int) {
+public func run_PrefixAnyCollectionLazy(_ n: Int) {
   let s = (AnyCollection(0..<sequenceCount)).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 @inline(never)
-public func run_PrefixArrayLazy(_ N: Int) {
+public func run_PrefixArrayLazy(_ n: Int) {
   let s = (array).lazy
-  for _ in 1...20*N {
+  for _ in 1...20*n {
     var result = 0
     for element in s.prefix(prefixCount) {
       result += element
     }
-    CheckResults(result == sumCount)
+    check(result == sumCount)
   }
 }
 

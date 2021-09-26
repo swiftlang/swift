@@ -68,6 +68,11 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
       Path, FrontendOpts.UseSharedResourceFolder, LibPath);
   setRuntimeResourcePath(LibPath.str());
 
+  llvm::SmallString<128> clangPath(Path);
+  llvm::sys::path::remove_filename(clangPath);
+  llvm::sys::path::append(clangPath, "clang");
+  ClangImporterOpts.clangPath = std::string(clangPath);
+
   llvm::SmallString<128> DiagnosticDocsPath(Path);
   llvm::sys::path::remove_filename(DiagnosticDocsPath); // Remove /swift
   llvm::sys::path::remove_filename(DiagnosticDocsPath); // Remove /bin
@@ -429,6 +434,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
+  Opts.EnableExperimentalLexicalLifetimes |=
+      Args.hasArg(OPT_enable_experimental_lexical_lifetimes);
+
   Opts.EnableExperimentalNamedOpaqueTypes |=
       Args.hasArg(OPT_enable_experimental_named_opaque_types);
 
@@ -774,6 +782,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  // Get the SDK name.
+  if (Arg *A = Args.getLastArg(options::OPT_target_sdk_name)) {
+    Opts.SDKName = A->getValue();
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_entry_point_function_name)) {
     Opts.entryPointFunctionName = A->getValue();
   }
@@ -981,6 +994,18 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
                                    DiagnosticEngine &Diags,
                                    StringRef workingDirectory) {
   using namespace options;
+
+  if (const Arg *a = Args.getLastArg(OPT_tools_directory)) {
+    // If a custom tools directory is specified, try to find Clang there.
+    // This is useful when the Swift executable is located in a different
+    // directory than the Clang/LLVM executables, for example, when building
+    // the Swift project itself.
+    llvm::SmallString<128> clangPath(a->getValue());
+    llvm::sys::path::append(clangPath, "clang");
+    if (llvm::sys::fs::exists(clangPath)) {
+      Opts.clangPath = std::string(clangPath);
+    }
+  }
 
   if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
     Opts.ModuleCachePath = A->getValue();
@@ -1520,6 +1545,8 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
 
   Opts.IsInstallAPI = Args.hasArg(OPT_tbd_is_installapi);
 
+  Opts.VirtualFunctionElimination = Args.hasArg(OPT_enable_llvm_vfe);
+
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     Opts.CompatibilityVersion = A->getValue();
   }
@@ -1714,6 +1741,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.UseTypeLayoutValueHandling = false;
   }
 
+  Opts.ForceStructTypeLayouts = Args.hasArg(OPT_force_struct_type_layouts) &&
+                                Opts.UseTypeLayoutValueHandling;
+
   // This is set to true by default.
   Opts.UseIncrementalLLVMCodeGen &=
     !Args.hasArg(OPT_disable_incremental_llvm_codegeneration);
@@ -1894,6 +1924,38 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Triple.getArch() == llvm::Triple::aarch64 &&
       Triple.getArchName() != "arm64e") {
     Opts.EnableGlobalISel = true;
+  }
+
+  if (Args.hasArg(OPT_enable_llvm_vfe)) {
+    Opts.VirtualFunctionElimination = true;
+  }
+
+  if (Args.hasArg(OPT_enable_llvm_wme)) {
+    Opts.WitnessMethodElimination = true;
+  }
+
+  if (Args.hasArg(OPT_internalize_at_link)) {
+    Opts.InternalizeAtLink = true;
+  }
+
+  // Default to disabling swift async extended frame info on anything but
+  // darwin. Other platforms are unlikely to have support for extended frame
+  // pointer information.
+  if (!Triple.isOSDarwin()) {
+    Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
+  }
+  if (const Arg *A = Args.getLastArg(OPT_swift_async_frame_pointer_EQ)) {
+    StringRef mode(A->getValue());
+    if (mode == "auto")
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Auto;
+    else if (mode == "always")
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Always;
+    else if (mode == "never")
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
+    else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
   }
 
   return false;

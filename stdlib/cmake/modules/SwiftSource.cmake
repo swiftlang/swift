@@ -280,6 +280,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_RUNTIME_OS_VERSIONING")
   endif()
 
+  if(SWIFT_STDLIB_HAS_STDIN)
+    list(APPEND result "-D" "SWIFT_STDLIB_HAS_STDIN")
+  endif()
+
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -402,6 +406,10 @@ function(_compile_swift_files
 
   compute_library_subdir(library_subdir
     "${library_subdir_sdk}" "${SWIFTFILE_ARCHITECTURE}")
+
+  if(NOT "${SWIFT_NATIVE_CLANG_TOOLS_PATH}" STREQUAL "")
+    list(APPEND swift_flags "-tools-directory" "${SWIFT_NATIVE_CLANG_TOOLS_PATH}")
+  endif()
 
   # If we have a custom module cache path, use it.
   if (SWIFT_MODULE_CACHE_PATH)
@@ -788,6 +796,8 @@ function(_compile_swift_files
       ${command_touch_standard_outputs}
       OUTPUT ${standard_outputs}
       DEPENDS
+        "${line_directive_tool}"
+        "${file_path}"
         ${swift_compiler_tool_dep}
         ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
@@ -827,6 +837,8 @@ function(_compile_swift_files
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS
+          "${line_directive_tool}"
+          "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
@@ -883,6 +895,8 @@ function(_compile_swift_files
         OUTPUT
           ${maccatalyst_module_outputs}
         DEPENDS
+          "${line_directive_tool}"
+          "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files}
           ${SWIFTFILE_DEPENDS}
@@ -909,6 +923,8 @@ function(_compile_swift_files
         ${command_touch_sib_outputs}
         OUTPUT ${sib_outputs}
         DEPENDS
+          "${line_directive_tool}"
+          "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}
@@ -926,6 +942,8 @@ function(_compile_swift_files
         ${command_touch_sibopt_outputs}
         OUTPUT ${sibopt_outputs}
         DEPENDS
+          "${line_directive_tool}"
+          "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}
@@ -944,6 +962,8 @@ function(_compile_swift_files
         ${command_touch_sibgen_outputs}
         OUTPUT ${sibgen_outputs}
         DEPENDS
+          "${line_directive_tool}"
+          "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${create_dirs_dependency_target}

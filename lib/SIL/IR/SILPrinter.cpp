@@ -1260,6 +1260,8 @@ public:
   void visitAllocStackInst(AllocStackInst *AVI) {
     if (AVI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
+    if (AVI->isLexical())
+      *this << "[lexical] ";
     *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo(),
                   &AVI->getModule().getASTContext().SourceMgr);
@@ -1506,8 +1508,8 @@ public:
   }
 
   void visitBeginBorrowInst(BeginBorrowInst *LBI) {
-    if (LBI->isDefined()) {
-      *this << "[defined] ";
+    if (LBI->isLexical()) {
+      *this << "[lexical] ";
     }
     *this << getIDAndType(LBI->getOperand());
   }
@@ -1751,6 +1753,8 @@ public:
       *this << "[strict] ";
     if (CI->isInvariant())
       *this << "[invariant] ";
+    if (CI->alignment())
+      *this << "[align=" << CI->alignment()->value() << "] ";
     *this << CI->getType();
   }
   void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {
@@ -1823,6 +1827,10 @@ public:
   }
 
   void visitCopyValueInst(CopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMoveValueInst(MoveValueInst *I) {
     *this << getIDAndType(I->getOperand());
   }
 
@@ -3698,17 +3706,8 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   if (genericEnv)
     genericSig = genericEnv->getGenericSignature();
 
-  ArrayRef<Requirement> requirements;
-  SmallVector<Requirement, 4> requirementsScratch;
-  if (auto specializedSig = getSpecializedSignature()) {
-    if (genericSig) {
-      requirementsScratch = specializedSig->requirementsNotSatisfiedBy(
-          genericSig);
-      requirements = requirementsScratch;
-    } else {
-      requirements = specializedSig.getRequirements();
-    }
-  }
+  auto requirements =
+      getSpecializedSignature().requirementsNotSatisfiedBy(genericSig);
   if (targetFunction) {
     OS << "target: \"" << targetFunction->getName() << "\", ";
   }

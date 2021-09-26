@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,7 +13,7 @@
 import TestsUtils
 
 
-public let Dictionary = [
+public let benchmarks = [
   BenchmarkInfo(name: "Dictionary", runFunction: run_Dictionary,
     tags: [.validation, .api, .Dictionary],
     setUpFunction: { blackHole(half) },
@@ -134,30 +134,30 @@ let half: Dictionary<String, Bool> = {
 }()
 
 @inline(never)
-public func run_Dictionary(N: Int) {
+public func run_Dictionary(n: Int) {
   var dict: Dictionary<String, Bool> = [:]
 
   // Check performance of filling the dictionary:
-  for _ in 1...N {
+  for _ in 1...n {
     dict = [:]
     for word in text {
       dict[word] = true
     }
   }
-  CheckResults(dict.count == 270)
+  check(dict.count == 270)
 
   // Check performance of searching in the dictionary:
   dict = half
   // Count number of words from the first half in the entire text
   var count = 0
-  for _ in 1...N {
+  for _ in 1...n {
     for word in text {
       if dict[word] != nil {
         count += 1
       }
     }
   }
-  CheckResults(count == N*541)
+  check(count == n*541)
 }
 
 class Box<T : Hashable> : Hashable {
@@ -187,28 +187,28 @@ let halfObjects: Dictionary<Box<String>, Box<Bool>> = {
 }()
 
 @inline(never)
-public func run_DictionaryOfObjects(N: Int) {
+public func run_DictionaryOfObjects(n: Int) {
   var dict: Dictionary<Box<String>, Box<Bool>> = [:]
 
   // Check performance of filling the dictionary:
-  for _ in 1...N {
+  for _ in 1...n {
     dict = [:]
     for word in text {
       dict[Box(word)] = Box(true)
     }
   }
-  CheckResults(dict.count == 270)
+  check(dict.count == 270)
 
   // Check performance of searching in the dictionary:
   dict = halfObjects
   // Count number of words from the first half in the entire text
   var count = 0
-  for _ in 1...N {
+  for _ in 1...n {
     for word in text {
       if dict[Box(word)] != nil {
         count += 1
       }
     }
   }
-  CheckResults(count == N*541)
+  check(count == n*541)
 }

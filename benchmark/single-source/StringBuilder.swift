@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let StringBuilder = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "StringAdder",
     runFunction: run_StringAdder,
@@ -70,15 +70,15 @@ func buildString(_ i: String, reservingCapacity: Bool = false) -> String {
 }
 
 @inline(never)
-public func run_StringBuilder(_ N: Int) {
-  for _ in 1...5000*N {
+public func run_StringBuilder(_ n: Int) {
+  for _ in 1...5000*n {
     blackHole(buildString("a"))
   }
 }
 
 @inline(never)
-public func run_StringBuilderSmallReservingCapacity(_ N: Int) {
-  for _ in 1...5000*N {
+public func run_StringBuilderSmallReservingCapacity(_ n: Int) {
+  for _ in 1...5000*n {
     blackHole(buildString("a", reservingCapacity: true))
   }
 }
@@ -90,8 +90,8 @@ func addString(_ i: String) -> String {
 }
 
 @inline(never)
-public func run_StringAdder(_ N: Int) {
-  for _ in 1...5000*N {
+public func run_StringAdder(_ n: Int) {
+  for _ in 1...5000*n {
     blackHole(addString("a"))
   }
 }
@@ -115,15 +115,15 @@ func buildStringFromSmallSubstrings(_ i: String) -> String {
 }
 
 @inline(never)
-public func run_StringUTF16Builder(_ N: Int) {
-  for _ in 1...500*N {
+public func run_StringUTF16Builder(_ n: Int) {
+  for _ in 1...500*n {
     blackHole(buildStringUTF16("a"))
   }
 }
 
 @inline(never)
-public func run_StringUTF16SubstringBuilder(_ N: Int) {
-  for _ in 1...500*N {
+public func run_StringUTF16SubstringBuilder(_ n: Int) {
+  for _ in 1...500*n {
     blackHole(buildStringFromSmallSubstrings("a"))
   }
 }
@@ -158,15 +158,15 @@ func buildStringWithLongSubstring(_ i: String) -> String {
 }
 
 @inline(never)
-public func run_StringBuilderLong(_ N: Int) {
-  for _ in 1...500*N {
+public func run_StringBuilderLong(_ n: Int) {
+  for _ in 1...500*n {
     blackHole(buildStringLong("👻"))
   }
 }
 
 @inline(never)
-public func run_StringBuilderWithLongSubstring(_ N: Int) {
-  for _ in 1...500*N {
+public func run_StringBuilderWithLongSubstring(_ n: Int) {
+  for _ in 1...500*n {
     blackHole(buildStringWithLongSubstring("👻"))
   }
 }
@@ -189,16 +189,16 @@ func buildString(
 }
 
 @inline(never)
-public func run_StringWordBuilder(_ N: Int) {
-  for _ in 1...N {
+public func run_StringWordBuilder(_ n: Int) {
+  for _ in 1...n {
     blackHole(buildString(
       word: "bumfuzzle", count: 5_000, reservingCapacity: false))
   }
 }
 
 @inline(never)
-public func run_StringWordBuilderReservingCapacity(_ N: Int) {
-  for _ in 1...N {
+public func run_StringWordBuilderReservingCapacity(_ n: Int) {
+  for _ in 1...n {
     blackHole(buildString(
       word: "bumfuzzle", count: 5_000, reservingCapacity: true))
   }

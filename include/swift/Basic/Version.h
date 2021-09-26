@@ -181,7 +181,7 @@ std::string getSwiftFullVersion(Version effectiveLanguageVersion =
 
 /// Retrieves the repository revision number (or identifier) from which
 /// this Swift was built.
-std::string getSwiftRevision();
+StringRef getSwiftRevision();
 
 } // end namespace version
 } // end namespace swift

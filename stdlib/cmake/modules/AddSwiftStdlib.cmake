@@ -329,6 +329,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC=0")
   endif()
 
+  if(SWIFT_STDLIB_HAS_STDIN)
+    list(APPEND result "-DSWIFT_STDLIB_HAS_STDIN")
+  endif()
+
   if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
     list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
   endif()
@@ -1220,6 +1224,7 @@ function(_add_swift_target_library_single target name)
         "${PLIST_INFO_PLIST_OUT}"
         @ONLY
         NEWLINE_STYLE UNIX)
+    set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
 
     # If Application Extensions are enabled, pass the linker flag marking
     # the dylib as safe.

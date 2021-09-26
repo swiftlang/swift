@@ -1871,8 +1871,9 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // If the whole body is being ignored due to a pre-check failure,
     // let's not record a fix about result type since there is
     // just not enough context to infer it without a body.
-    if (cs.hasFixFor(cs.getConstraintLocator(closure),
-                     FixKind::IgnoreInvalidResultBuilderBody))
+    auto *closureLoc = cs.getConstraintLocator(closure);
+    if (cs.hasFixFor(closureLoc, FixKind::IgnoreInvalidResultBuilderBody) ||
+        cs.hasFixFor(closureLoc, FixKind::IgnoreResultBuilderWithReturnStmts))
       return None;
 
     ConstraintFix *fix = SpecifyClosureReturnType::create(cs, dstLocator);
@@ -1927,6 +1928,24 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   if (Binding.hasDefaultedLiteralProtocol()) {
     type = cs.replaceInferableTypesWithTypeVars(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
+  }
+
+  // If type variable has been marked as a possible hole due to
+  // e.g. reference to a missing member. Let's propagate that
+  // information to the object type of the optional type it's
+  // about to be bound to.
+  //
+  // In some situations like pattern bindings e.g. `if let x = base?.member`
+  // - if `member` doesn't exist, `x` cannot be determined either, which
+  // leaves `OptionalEvaluationExpr` representing outer type of `base?.member`
+  // without any contextual information, so even though `x` would get
+  // bound to result type of the chain, underlying type variable wouldn't
+  // be resolved, so we need to propagate holes up the conversion chain.
+  if (TypeVar->getImpl().canBindToHole()) {
+    if (auto objectTy = type->getOptionalObjectType()) {
+      if (auto *typeVar = objectTy->getAs<TypeVariableType>())
+        cs.recordPotentialHole(typeVar);
+    }
   }
 
   ConstraintSystem::TypeMatchOptions options;

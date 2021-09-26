@@ -269,16 +269,45 @@ static constexpr size_t globalQueueCacheCount =
     static_cast<size_t>(JobPriority::UserInteractive) + 1;
 static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
 
+#ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
+extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
+#endif
+
 static dispatch_queue_t getGlobalQueue(JobPriority priority) {
   size_t numericPriority = static_cast<size_t>(priority);
   if (numericPriority >= globalQueueCacheCount)
     swift_Concurrency_fatalError(0, "invalid job priority %#zx");
 
+#ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
+  std::memory_order loadOrder = std::memory_order_acquire;
+#else
+  std::memory_order loadOrder = std::memory_order_relaxed;
+#endif
+
   auto *ptr = &globalQueueCache[numericPriority];
-  auto queue = ptr->load(std::memory_order_relaxed);
+  auto queue = ptr->load(loadOrder);
   if (SWIFT_LIKELY(queue))
     return queue;
 
+#ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
+  const int DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS = -3;
+
+  // Create a new cooperative concurrent queue and swap it in.
+  dispatch_queue_attr_t newQueueAttr = dispatch_queue_attr_make_with_qos_class(
+      DISPATCH_QUEUE_CONCURRENT, (dispatch_qos_class_t)priority, 0);
+  dispatch_queue_t newQueue = dispatch_queue_create(
+      "Swift global concurrent queue", newQueueAttr);
+  dispatch_queue_set_width(newQueue, DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS);
+
+  if (!ptr->compare_exchange_strong(queue, newQueue,
+                                    /*success*/ std::memory_order_release,
+                                    /*failure*/ std::memory_order_acquire)) {
+    dispatch_release(newQueue);
+    return queue;
+  }
+
+  return newQueue;
+#else
   // If we don't have a queue cached for this priority, cache it now. This may
   // race with other threads doing this at the same time for this priority, but
   // that's OK, they'll all end up writing the same value.
@@ -288,6 +317,7 @@ static dispatch_queue_t getGlobalQueue(JobPriority priority) {
   // Unconditionally store it back in the cache. If we raced with another
   // thread, we'll just overwrite the entry with the same value.
   ptr->store(queue, std::memory_order_relaxed);
+#endif
 
   return queue;
 }

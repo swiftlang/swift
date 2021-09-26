@@ -1662,7 +1662,11 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     if (!isUnderlyingClangModule) {
       if (auto found = cache.findDependencies(
               moduleName,
-              {ModuleDependenciesKind::SwiftTextual, searchPathSet}))
+              {ModuleDependenciesKind::SwiftSource, searchPathSet}))
+        return found;
+      if (auto found = cache.findDependencies(
+              moduleName,
+              {ModuleDependenciesKind::SwiftInterface, searchPathSet}))
         return found;
       if (auto found = cache.findDependencies(
               moduleName, {ModuleDependenciesKind::SwiftBinary, searchPathSet}))
@@ -5159,9 +5163,9 @@ bool ASTContext::overrideGenericSignatureReqsSatisfied(
 
   switch (direction) {
   case OverrideGenericSignatureReqCheck::BaseReqSatisfiedByDerived:
-    return sig->requirementsNotSatisfiedBy(derivedSig).empty();
+    return sig.requirementsNotSatisfiedBy(derivedSig).empty();
   case OverrideGenericSignatureReqCheck::DerivedReqSatisfiedByBase:
-    return derivedSig->requirementsNotSatisfiedBy(sig).empty();
+    return derivedSig.requirementsNotSatisfiedBy(sig).empty();
   }
   llvm_unreachable("Unhandled OverrideGenericSignatureReqCheck in switch");
 }

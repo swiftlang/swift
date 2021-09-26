@@ -2148,7 +2148,7 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
                                             ASTContext &ctx) {
   bool hadError = false;
 
-  auto specializedReqs = specializedSig->requirementsNotSatisfiedBy(originalSig);
+  auto specializedReqs = specializedSig.requirementsNotSatisfiedBy(originalSig);
   for (auto specializedReq : specializedReqs) {
     if (!specializedReq.getFirstType()->is<GenericTypeParamType>()) {
       ctx.Diags.diagnose(attr->getLocation(),
@@ -4007,9 +4007,7 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
 /// `checkGenericSignature` is used to check generic signatures, if specified.
 /// Otherwise, generic signatures are checked for equality.
 static bool checkFunctionSignature(
-    CanAnyFunctionType required, CanType candidate,
-    Optional<std::function<bool(GenericSignature, GenericSignature)>>
-        checkGenericSignature = None) {
+    CanAnyFunctionType required, CanType candidate) {
   // Check that candidate is actually a function.
   auto candidateFnTy = dyn_cast<AnyFunctionType>(candidate);
   if (!candidateFnTy)
@@ -4022,23 +4020,9 @@ static bool checkFunctionSignature(
   // Check that generic signatures match.
   auto requiredGenSig = required.getOptGenericSignature();
   auto candidateGenSig = candidateFnTy.getOptGenericSignature();
-  // Call generic signature check function, if specified.
-  // Otherwise, check that generic signatures are equal.
-  if (!checkGenericSignature) {
-    if (candidateGenSig != requiredGenSig)
-      return false;
-  } else if (!(*checkGenericSignature)(requiredGenSig, candidateGenSig)) {
+  if (!candidateGenSig.requirementsNotSatisfiedBy(requiredGenSig).empty()) {
     return false;
   }
-
-  // Map type into the required function type's generic signature, if it exists.
-  // This is significant when the required generic signature has same-type
-  // requirements while the candidate generic signature does not.
-  auto mapType = [&](Type type) {
-    if (!requiredGenSig)
-      return type->getCanonicalType();
-    return requiredGenSig->getCanonicalTypeInContext(type);
-  };
 
   // Check that parameter types match, disregarding labels.
   if (required->getNumParams() != candidateFnTy->getNumParams())
@@ -4048,14 +4032,16 @@ static bool checkFunctionSignature(
                   [&](AnyFunctionType::Param x, AnyFunctionType::Param y) {
                     auto xInstanceTy = x.getOldType()->getMetatypeInstanceType();
                     auto yInstanceTy = y.getOldType()->getMetatypeInstanceType();
-                    return xInstanceTy->isEqual(mapType(yInstanceTy));
+                    return xInstanceTy->isEqual(
+                        requiredGenSig.getCanonicalTypeInContext(yInstanceTy));
                   }))
     return false;
 
   // If required result type is not a function type, check that result types
   // match exactly.
   auto requiredResultFnTy = dyn_cast<AnyFunctionType>(required.getResult());
-  auto candidateResultTy = mapType(candidateFnTy.getResult());
+  auto candidateResultTy =
+      requiredGenSig.getCanonicalTypeInContext(candidateFnTy.getResult());
   if (!requiredResultFnTy) {
     auto requiredResultTupleTy = dyn_cast<TupleType>(required.getResult());
     auto candidateResultTupleTy = dyn_cast<TupleType>(candidateResultTy);
@@ -4684,22 +4670,6 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   auto *originalFnType =
       getDerivativeOriginalFunctionType(derivativeInterfaceType);
 
-  // Returns true if the generic parameters in `source` satisfy the generic
-  // requirements in `target`.
-  std::function<bool(GenericSignature, GenericSignature)>
-      checkGenericSignatureSatisfied = [&](GenericSignature source,
-                                           GenericSignature target) {
-        // If target is null, then its requirements are satisfied.
-        if (!target)
-          return true;
-        // If source is null but target is not null, then target's
-        // requirements are not satisfied.
-        if (!source)
-          return false;
-
-        return target->requirementsNotSatisfiedBy(source).empty();
-      };
-
   // Returns true if the derivative function and original function candidate are
   // defined in compatible type contexts. If the derivative function and the
   // original function candidate have different parents, return false.
@@ -4732,8 +4702,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     // Error if the original candidate does not have the expected type.
     if (!checkFunctionSignature(
             cast<AnyFunctionType>(originalFnType->getCanonicalType()),
-            originalCandidate->getInterfaceType()->getCanonicalType(),
-            checkGenericSignatureSatisfied))
+            originalCandidate->getInterfaceType()->getCanonicalType()))
       return AbstractFunctionDeclLookupErrorKind::CandidateTypeMismatch;
     return None;
   };
@@ -5323,29 +5292,12 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     return;
   }
 
-  // Returns true if the generic parameters in `source` satisfy the generic
-  // requirements in `target`.
-  std::function<bool(GenericSignature, GenericSignature)>
-      checkGenericSignatureSatisfied = [&](GenericSignature source,
-                                           GenericSignature target) {
-        // If target is null, then its requirements are satisfied.
-        if (!target)
-          return true;
-        // If source is null but target is not null, then target's
-        // requirements are not satisfied.
-        if (!source)
-          return false;
-
-        return target->requirementsNotSatisfiedBy(source).empty();
-      };
-
   auto isValidOriginalCandidate = [&](AbstractFunctionDecl *originalCandidate)
       -> Optional<AbstractFunctionDeclLookupErrorKind> {
     // Error if the original candidate does not have the expected type.
     if (!checkFunctionSignature(
             cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
-            originalCandidate->getInterfaceType()->getCanonicalType(),
-            checkGenericSignatureSatisfied))
+            originalCandidate->getInterfaceType()->getCanonicalType()))
       return AbstractFunctionDeclLookupErrorKind::CandidateTypeMismatch;
     return None;
   };

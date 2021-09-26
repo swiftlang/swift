@@ -283,6 +283,11 @@ static llvm::cl::list<std::string>
 SwiftVersion("swift-version", llvm::cl::desc("Swift version"),
              llvm::cl::cat(Category));
 
+static llvm::cl::opt<std::string>
+ToolsDirectory("tools-directory",
+               llvm::cl::desc("Path to external executables (ld, clang, binutils)"),
+               llvm::cl::cat(Category));
+
 static llvm::cl::list<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
                 llvm::cl::cat(Category));
@@ -470,12 +475,6 @@ CodeCOmpletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::desc("annotate completion results with XML"),
                               llvm::cl::cat(Category),
                               llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-CodeCompletionSourceFileInfo("code-completion-sourcefileinfo",
-                             llvm::cl::desc("print module source file information"),
-                             llvm::cl::cat(Category),
-                             llvm::cl::init(false));
 
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
@@ -926,7 +925,6 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             bool CodeCompletionKeywords,
                             bool CodeCompletionComments,
                             bool CodeCompletionAnnotateResults,
-                            bool CodeCompletionSourceFileInfo,
                             bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
@@ -936,7 +934,6 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
-  CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
 
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
@@ -1133,7 +1130,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionKeywords,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
-                                 bool CodeCompletionSourceFileInfo,
                                  bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
@@ -1276,7 +1272,6 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
           // Consumer.
           ide::CodeCompletionContext CompletionContext(CompletionCache);
           CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
-          CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
           std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
               ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                       *Consumer));
@@ -3924,6 +3919,12 @@ int main(int argc, char *argv[]) {
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
   }
+  if (!options::ToolsDirectory.empty()) {
+    SmallString<128> toolsDir(options::ToolsDirectory);
+    llvm::sys::path::append(toolsDir, "clang");
+    InitInvok.getClangImporterOptions().clangPath =
+        std::string(toolsDir);
+  }
   if (!options::ModuleCachePath.empty()) {
     // Honor the *last* -module-cache-path specified.
     InitInvok.getClangImporterOptions().ModuleCachePath =
@@ -4068,7 +4069,6 @@ int main(int argc, char *argv[]) {
                                      options::CodeCompletionKeywords,
                                      options::CodeCompletionComments,
                                      options::CodeCOmpletionAnnotateResults,
-                                     options::CodeCompletionSourceFileInfo,
                                      options::CodeCompletionSourceText);
     break;
 
@@ -4085,7 +4085,6 @@ int main(int argc, char *argv[]) {
                                 options::CodeCompletionKeywords,
                                 options::CodeCompletionComments,
                                 options::CodeCOmpletionAnnotateResults,
-                                options::CodeCompletionSourceFileInfo,
                                 options::CodeCompletionSourceText);
     break;
 

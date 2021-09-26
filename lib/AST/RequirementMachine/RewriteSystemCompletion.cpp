@@ -235,7 +235,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
 
     // Look for conformance requirements on [P1:T] and [P2:T].
     auto visitRule = [&](unsigned ruleID) {
-      const auto &otherRule = Rules[ruleID];
+      const auto &otherRule = getRule(ruleID);
       const auto &otherLHS = otherRule.getLHS();
       if (otherLHS.size() == 2 &&
           otherLHS[1].getKind() == Symbol::Kind::Protocol) {
@@ -367,7 +367,9 @@ bool
 RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                                    const Rule &lhs, const Rule &rhs,
                                    std::vector<std::pair<MutableTerm,
-                                                         MutableTerm>> &result) const {
+                                                         MutableTerm>> &pairs,
+                                   std::vector<RewritePath> &paths,
+                                   std::vector<HomotopyGenerator> &loops) const {
   auto end = lhs.getLHS().end();
   if (from + rhs.getLHS().size() < end) {
     // lhs == TUV -> X, rhs == U -> Y.
@@ -377,41 +379,96 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     //
     // In this case, T and V are both empty.
 
-    // Compute the term TYV.
+    // Compute the terms T and V.
     MutableTerm t(lhs.getLHS().begin(), from);
-    t.append(rhs.getRHS());
-    t.append(from + rhs.getLHS().size(), lhs.getLHS().end());
+    MutableTerm v(from + rhs.getLHS().size(), lhs.getLHS().end());
 
-    if (lhs.getRHS().size() == t.size() &&
-        std::equal(lhs.getRHS().begin(), lhs.getRHS().end(),
-                   t.begin())) {
+    // Compute the term TYV.
+    MutableTerm tyv(t);
+    tyv.append(rhs.getRHS());
+    tyv.append(v);
+
+    MutableTerm x(lhs.getRHS());
+
+    // Compute a path from X to TYV: (X => TUV) ⊗ T.(U => Y).V
+    RewritePath path;
+
+    // (1) First, apply the left hand side rule in the reverse direction:
+    //
+    //     (X => TUV)
+    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
+                                         /*endOffset=*/0,
+                                         getRuleID(lhs),
+                                         /*inverse=*/true));
+    // (2) Now, apply the right hand side in the forward direction:
+    //
+    //     T.(U => Y).V 
+    path.add(RewriteStep::forRewriteRule(t.size(), v.size(),
+                                         getRuleID(rhs),
+                                         /*inverse=*/false));
+
+    // If X == TYV, we have a trivial overlap.
+    if (x == tyv) {
+      loops.emplace_back(x, path);
       return false;
     }
 
-    result.emplace_back(MutableTerm(lhs.getRHS()), t);
+    // Add the pair (X, TYV).
+    pairs.emplace_back(x, tyv);
+    paths.push_back(path);
   } else {
     // lhs == TU -> X, rhs == UV -> Y.
 
-    // Compute the term T.
+    // Compute the terms T and V.
     MutableTerm t(lhs.getLHS().begin(), from);
+    MutableTerm v(rhs.getLHS().begin() + (lhs.getLHS().end() - from),
+                  rhs.getLHS().end());
 
     // Compute the term XV.
     MutableTerm xv(lhs.getRHS());
-    xv.append(rhs.getLHS().begin() + (lhs.getLHS().end() - from),
-              rhs.getLHS().end());
+    xv.append(v);
 
-    if (xv.back().isSuperclassOrConcreteType()) {
+    // Compute the term TY.
+    MutableTerm ty(t);
+    ty.append(rhs.getRHS());
+
+    // Compute a path from XV to TY: (X => TU).V ⊗ (σ - T) ⊗ T.(UV => Y)
+    RewritePath path;
+
+    // (1) First, apply the left hand side rule in the reverse direction:
+    //
+    //     (X => TU).V
+    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0, v.size(),
+                                         getRuleID(lhs),
+                                         /*inverse=*/true));
+
+    // (2) Next, if the right hand side rule ends with a concrete type symbol,
+    // perform the concrete type adjustment:
+    //
+    //     (σ - T)
+    if (xv.back().isSuperclassOrConcreteType() && t.size() > 0) {
+      path.add(RewriteStep::forAdjustment(t.size(), /*inverse=*/true));
+
       xv.back() = xv.back().prependPrefixToConcreteSubstitutions(
           t, Context);
     }
 
-    // Compute the term TY.
-    t.append(rhs.getRHS());
+    // (3) Finally, apply the right hand side in the forward direction:
+    //
+    //     T.(UV => Y)
+    path.add(RewriteStep::forRewriteRule(t.size(), /*endOffset=*/0,
+                                         getRuleID(rhs),
+                                         /*inverse=*/false));
 
-    if (xv == t)
+    // If XV == TY, we have a trivial overlap.
+    if (xv == ty) {
+      loops.emplace_back(xv, path);
       return false;
+    }
 
-    result.emplace_back(xv, t);
+    // Add the pair (XV, TY).
+    pairs.emplace_back(xv, ty);
+    paths.push_back(path);
   }
 
   return true;
@@ -435,13 +492,15 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
   bool again = false;
 
-  do {
-    std::vector<std::pair<MutableTerm, MutableTerm>> resolvedCriticalPairs;
+  std::vector<std::pair<MutableTerm, MutableTerm>> resolvedCriticalPairs;
+  std::vector<RewritePath> resolvedPaths;
+  std::vector<HomotopyGenerator> resolvedLoops;
 
+  do {
     // For every rule, looking for other rules that overlap with this rule.
     for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
-      const auto &lhs = Rules[i];
-      if (lhs.isDeleted())
+      const auto &lhs = getRule(i);
+      if (lhs.isSimplified())
         continue;
 
       // Look up every suffix of this rule in the trie using findAll(). This
@@ -458,8 +517,8 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           if (!CheckedOverlaps.insert(std::make_pair(i, j)).second)
             return;
 
-          const auto &rhs = Rules[j];
-          if (rhs.isDeleted())
+          const auto &rhs = getRule(j);
+          if (rhs.isSimplified())
             return;
 
           if (from == lhs.getLHS().begin()) {
@@ -480,9 +539,13 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           }
 
           // Try to repair the confluence violation by adding a new rule.
-          if (computeCriticalPair(from, lhs, rhs, resolvedCriticalPairs)) {
+          if (computeCriticalPair(from, lhs, rhs,
+                                  resolvedCriticalPairs,
+                                  resolvedPaths,
+                                  resolvedLoops)) {
             if (Debug.contains(DebugFlags::Completion)) {
               const auto &pair = resolvedCriticalPairs.back();
+              const auto &path = resolvedPaths.back();
 
               llvm::dbgs() << "$ Overlapping rules: (#" << i << ") ";
               llvm::dbgs() << lhs << "\n";
@@ -492,13 +555,26 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
                            << pair.first << "\n";
               llvm::dbgs() << "$$ Second term of critical pair is "
                            << pair.second << "\n\n";
+
+              llvm::dbgs() << "$$ Resolved via path: ";
+              path.dump(llvm::dbgs(), pair.first, *this);
+              llvm::dbgs() << "\n\n";
             }
           } else {
             if (Debug.contains(DebugFlags::Completion)) {
+              const auto &loop = resolvedLoops.back();
+
               llvm::dbgs() << "$ Trivially overlapping rules: (#" << i << ") ";
               llvm::dbgs() << lhs << "\n";
-              llvm::dbgs() << "                -vs- (#" << j << ") ";
+              llvm::dbgs() << "                          -vs- (#" << j << ") ";
               llvm::dbgs() << rhs << ":\n";
+
+              llvm::dbgs() << "$$ Loop: ";
+              loop.Path.dump(llvm::dbgs(), loop.Basepoint, *this);
+              llvm::dbgs() << "\n\n";
+
+              // Record the trivial loop.
+              HomotopyGenerators.push_back(loop);
             }
           }
         });
@@ -509,13 +585,18 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
     simplifyRewriteSystem();
 
+    assert(resolvedCriticalPairs.size() == resolvedPaths.size());
+
     again = false;
-    for (const auto &pair : resolvedCriticalPairs) {
+    for (unsigned index : indices(resolvedCriticalPairs)) {
+      const auto &pair = resolvedCriticalPairs[index];
+      const auto &path = resolvedPaths[index];
+
       // Check if we've already done too much work.
       if (Rules.size() > maxIterations)
         return std::make_pair(CompletionResult::MaxIterations, steps);
 
-      if (!addRule(pair.first, pair.second))
+      if (!addRule(pair.first, pair.second, &path))
         continue;
 
       // Check if the new rule is too long.
@@ -526,6 +607,9 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       ++steps;
       again = true;
     }
+
+    resolvedCriticalPairs.clear();
+    resolvedPaths.clear();
 
     // If the added rules merged any associated types, process the merges now
     // before we continue with the completion procedure. This is important
