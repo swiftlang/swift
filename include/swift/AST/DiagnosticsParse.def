@@ -1347,10 +1347,6 @@ ERROR(expr_selector_expected_property_expr,PointsToFirstBadToken,
 ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#selector' expression", ())
 
-// Type-of expressions.
-ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
-      "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
-
 // '#assert'
 ERROR(pound_assert_disabled,PointsToFirstBadToken,
       "#assert is an experimental feature that is currently disabled", ())
