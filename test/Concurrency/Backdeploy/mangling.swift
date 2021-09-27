@@ -15,9 +15,6 @@
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
 
-// rdar://83576231 - link failures on arm64
-// UNSUPPORTED: CPU=arm64
-
 protocol MyProtocol {
   associatedtype AssocSendable
   associatedtype AssocAsync
