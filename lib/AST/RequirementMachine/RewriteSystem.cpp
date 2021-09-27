@@ -358,7 +358,7 @@ void RewriteSystem::simplifyRewriteSystem() {
   }
 }
 
-void RewriteSystem::verifyRewriteRules() const {
+void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 #ifndef NDEBUG
 
 #define ASSERT_RULE(expr) \
@@ -396,10 +396,12 @@ void RewriteSystem::verifyRewriteRules() const {
     for (unsigned index : indices(rhs)) {
       auto symbol = rhs[index];
 
-      // FIXME: This is only true if the input requirements were valid.
-      // On invalid code, we'll need to skip this assertion (and instead
-      // assert that we diagnosed an error!)
-      ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
+      // This is only true if the input requirements were valid.
+      if (policy == DisallowInvalidRequirements) {
+        ASSERT_RULE(symbol.getKind() != Symbol::Kind::Name);
+      } else {
+        // FIXME: Assert that we diagnosed an error
+      }
 
       ASSERT_RULE(symbol.getKind() != Symbol::Kind::Layout);
       ASSERT_RULE(!symbol.isSuperclassOrConcreteType());

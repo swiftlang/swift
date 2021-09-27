@@ -406,7 +406,12 @@ public:
 
   void minimizeRewriteSystem();
 
-  void verifyRewriteRules() const;
+  enum ValidityPolicy {
+    AllowInvalidRequirements,
+    DisallowInvalidRequirements
+  };
+
+  void verifyRewriteRules(ValidityPolicy policy) const;
 
   void verifyHomotopyGenerators() const;
 
