@@ -2548,7 +2548,11 @@ static char *copyGenericClassObjCName(ClassMetadata *theClass) {
   auto globalNode = Dem.createNode(Demangle::Node::Kind::Global);
   globalNode->addChild(typeNode, Dem);
 
-  llvm::StringRef string = Demangle::mangleNodeOld(globalNode, Dem);
+  auto mangling = Demangle::mangleNodeOld(globalNode, Dem);
+  if (!mangling.isSuccess()) {
+    return nullptr;
+  }
+  llvm::StringRef string = mangling.result();
 
   // If the class is in the Swift module, add a $ to the end of the ObjC
   // name. The old and new Swift libraries must be able to coexist in
@@ -6085,26 +6089,33 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   // us stress test the mangler/demangler and type lookup machinery.
   if (!swift::runtime::environment::SWIFT_ENABLE_MANGLED_NAME_VERIFICATION())
     return;
-  
+
   Demangle::StackAllocatedDemangler<1024> Dem;
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
   // If the mangled node involves types in an AnonymousContext, then by design,
   // it cannot be looked up by name.
   if (referencesAnonymousContext(node))
     return;
-  
-  auto mangledName = Demangle::mangleNode(node);
-  auto result =
-    swift_getTypeByMangledName(MetadataState::Abstract,
-                          mangledName,
-                          nullptr,
-                          [](unsigned, unsigned){ return nullptr; },
-                          [](const Metadata *, unsigned) { return nullptr; })
-      .getType().getMetadata();
-  if (metadata != result)
+
+  auto mangling = Demangle::mangleNode(node);
+  if (!mangling.isSuccess()) {
     swift::warning(RuntimeErrorFlagNone,
-                   "Metadata mangled name failed to roundtrip: %p -> %s -> %p\n",
-                   metadata, mangledName.c_str(), (const Metadata *)result);
+                   "Metadata mangled name failed to roundtrip: %p couldn't be mangled\n",
+                   metadata);
+  } else {
+    std::string mangledName = mangling.result();
+    auto result =
+      swift_getTypeByMangledName(MetadataState::Abstract,
+                                 mangledName,
+                                 nullptr,
+                                 [](unsigned, unsigned){ return nullptr; },
+                                 [](const Metadata *, unsigned) { return nullptr; })
+      .getType().getMetadata();
+    if (metadata != result)
+      swift::warning(RuntimeErrorFlagNone,
+                     "Metadata mangled name failed to roundtrip: %p -> %s -> %p\n",
+                     metadata, mangledName.c_str(), (const Metadata *)result);
+  }
 }
 #endif
 

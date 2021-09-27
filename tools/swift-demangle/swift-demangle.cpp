@@ -151,7 +151,14 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       // mangling and demangling tests.
       remangled = name.str();
     } else {
-      remangled = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "Error: (" << mangling.error().code << ":"
+                     << mangling.error().line << ") unable to re-mangle "
+                     << name << '\n';
+        exit(1);
+      }
+      remangled = mangling.result();
       unsigned prefixLen = swift::Demangle::getManglingPrefixLength(remangled);
       assert(prefixLen > 0);
       // Replace the prefix if we remangled with a different prefix.
@@ -163,7 +170,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
                       remangled.substr(prefixLen);
       }
       if (name != remangled) {
-        llvm::errs() << "\nError: re-mangled name \n  " << remangled
+        llvm::errs() << "Error: re-mangled name \n  " << remangled
                      << "\ndoes not match original name\n  " << name << '\n';
         exit(1);
       }
@@ -174,23 +181,45 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   } else if (RemangleRtMode) {
     std::string remangled = name.str();
     if (pointer) {
-      remangled = swift::Demangle::mangleNodeOld(pointer);
+      auto mangling = swift::Demangle::mangleNodeOld(pointer);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "Error: (" << mangling.error().code << ":"
+                     << mangling.error().line << ") unable to re-mangle "
+                     << name << '\n';
+        exit(1);
+      }
+      remangled = mangling.result();
     }
     llvm::outs() << remangled;
+    return;
   }
   if (!TreeOnly) {
     if (RemangleNew) {
       if (!pointer) {
-        llvm::errs() << "Can't de-mangle " << name << '\n';
+        llvm::errs() << "Error: unable to de-mangle " << name << '\n';
         exit(1);
       }
-      std::string remangled = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "Error: (" << mangling.error().code << ":"
+                     << mangling.error().line << ") unable to re-mangle "
+                     << name << '\n';
+        exit(1);
+      }
+      std::string remangled = mangling.result();
       llvm::outs() << remangled;
       return;
     }
     if (StripSpecialization) {
       stripSpecialization(pointer);
-      std::string remangled = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "Error: (" << mangling.error().code << ":"
+                     << mangling.error().line << ") unable to re-mangle "
+                     << name << '\n';
+        exit(1);
+      }
+      std::string remangled = mangling.result();
       llvm::outs() << remangled;
       return;
     }

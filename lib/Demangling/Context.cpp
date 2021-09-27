@@ -217,7 +217,11 @@ std::string Context::getModuleName(llvm::StringRef mangledName) {
     }
     default:
       if (isSpecialized(node)) {
-        node = getUnspecialized(node, *D);
+        auto unspec = getUnspecialized(node, *D);
+        if (!unspec.isSuccess())
+          node = nullptr;
+        else
+          node = unspec.result();
         break;
       }
       if (isContext(node->getKind())) {

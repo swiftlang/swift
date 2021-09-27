@@ -608,8 +608,14 @@ protected:
       return decodeMangledType(genericArgs->getChild(0), depth + 1);
     }
     case NodeKind::BuiltinTypeName: {
-      auto mangledName = Demangle::mangleNode(Node);
-      return Builder.createBuiltinType(Node->getText().str(), mangledName);
+      auto mangling = Demangle::mangleNode(Node);
+      if (!mangling.isSuccess()) {
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "failed to mangle node (%d:%u)",
+                                    mangling.error().code,
+                                    mangling.error().line);
+      }
+      return Builder.createBuiltinType(Node->getText().str(), mangling.result());
     }
     case NodeKind::Metatype:
     case NodeKind::ExistentialMetatype: {
@@ -1373,7 +1379,11 @@ private:
         parent = decodeMangledType(parentContext, depth + 1).getType();
         // Remove any generic arguments from the context node, producing a
         // node that references the nominal type declaration.
-        declNode = Demangle::getUnspecialized(node, Builder.getNodeFactory());
+        auto unspec =
+            Demangle::getUnspecialized(node, Builder.getNodeFactory());
+        if (!unspec.isSuccess())
+          return TypeLookupError("Failed to unspecialize type");
+        declNode = unspec.result();
         break;
       }
     }
