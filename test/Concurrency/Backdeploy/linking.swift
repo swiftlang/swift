@@ -9,6 +9,9 @@
 
 // REQUIRES: OS=macosx
 
+// rdar://83576231 - link failures on arm64
+// UNSUPPORTED: CPU=arm64
+
 // CHECK-DIRECT: /usr/lib/swift/libswift_Concurrency.dylib
 // CHECK-RPATH: @rpath/libswift_Concurrency.dylib
 
