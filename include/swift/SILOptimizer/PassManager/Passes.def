@@ -446,6 +446,8 @@ PASS(MoveFunctionCanonicalization, "sil-move-function-canon",
      "function checking.")
 PASS(DebugInfoCanonicalizer, "sil-onone-debuginfo-canonicalizer",
      "Canonicalize debug info at -Onone by propagating debug info into coroutine funclets")
+PASS(PartialApplySimplification, "partial-apply-simplification",
+     "Transform partial_apply instructions into explicit closure box constructions")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)

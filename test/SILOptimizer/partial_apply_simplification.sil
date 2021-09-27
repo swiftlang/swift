@@ -1,0 +1,95 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -partial-apply-simplification | %FileCheck %s
+
+import Swift
+
+// CHECK-LABEL: sil private @closure_common_uses
+// CHECK-SAME:    : $@convention(method) (Int, @guaranteed { let Int }) -> Int {
+// CHECK:      bb0([[X:%.*]] : $Int, [[BOX:%.*]] : ${ let Int }):
+// CHECK-NEXT:   [[BOX_0:%.*]] = project_box [[BOX]] : ${ let Int }, 0
+// CHECK-NEXT:   [[Y:%.*]] = load [[BOX_0]] : $*Int
+// CHECK-NEXT:   return [[Y]]
+sil private @closure_common_uses : $@convention(thin) (Int, Int) -> Int {
+entry(%x : $Int, %y : $Int):
+  return %y : $Int
+}
+
+// CHECK-LABEL: sil @closure_common_uses_user_a
+// CHECK:       bb0([[Y:%.*]] : $Int):
+// CHECK:         [[F:%.*]] = function_ref @closure_common_uses
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box ${ let Int }
+// CHECK-NEXT:    [[BOX_0:%.*]] = project_box [[BOX]] : ${ let Int }, 0
+// CHECK-NEXT:    store [[Y]] to [[BOX_0]]
+// CHECK-NEXT:    [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[BOX]])
+sil @closure_common_uses_user_a : $@convention(thin) (Int) -> @owned @callee_guaranteed (Int) -> Int {
+entry(%y : $Int):
+  %f = function_ref @closure_common_uses : $@convention(thin) (Int, Int) -> Int
+  %c = partial_apply [callee_guaranteed] %f(%y) : $@convention(thin) (Int, Int) -> Int
+  return %c : $@callee_guaranteed (Int) -> Int
+}
+
+// CHECK-LABEL: sil @closure_common_uses_user_b
+// CHECK:       bb0([[Y:%.*]] : $Int):
+// CHECK:         [[F:%.*]] = function_ref @closure_common_uses
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box ${ let Int }
+// CHECK-NEXT:    [[BOX_0:%.*]] = project_box [[BOX]] : ${ let Int }, 0
+// CHECK-NEXT:    store [[Y]] to [[BOX_0]]
+// CHECK-NEXT:    [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[BOX]])
+sil @closure_common_uses_user_b : $@convention(thin) (Int) -> @owned @callee_guaranteed (Int) -> Int {
+entry(%y : $Int):
+  %f = function_ref @closure_common_uses : $@convention(thin) (Int, Int) -> Int
+  %c = partial_apply [callee_guaranteed] %f(%y) : $@convention(thin) (Int, Int) -> Int
+  return %c : $@callee_guaranteed (Int) -> Int
+}
+
+// CHECK-LABEL: sil private @closure_common_uses_owned
+// CHECK-SAME:    : $@convention(method) (Int, @owned { let Int }) -> Int {
+// CHECK:      bb0([[X:%.*]] : $Int, [[BOX:%.*]] : ${ let Int }):
+// CHECK-NEXT:   [[BOX_0:%.*]] = project_box [[BOX]] : ${ let Int }, 0
+// CHECK-NEXT:   [[Y:%.*]] = load [[BOX_0]] : $*Int
+// CHECK-NEXT:   strong_release [[BOX]]
+// CHECK-NEXT:   return [[Y]]
+sil private @closure_common_uses_owned : $@convention(thin) (Int, Int) -> Int {
+entry(%x : $Int, %y : $Int):
+  return %y : $Int
+}
+
+sil @closure_common_uses_owned_user_a : $@convention(thin) (Int) -> @owned @callee_owned (Int) -> Int {
+entry(%y : $Int):
+  %f = function_ref @closure_common_uses_owned : $@convention(thin) (Int, Int) -> Int
+  %c = partial_apply %f(%y) : $@convention(thin) (Int, Int) -> Int
+  return %c : $@callee_owned (Int) -> Int
+}
+
+sil @closure_common_uses_owned_user_b : $@convention(thin) (Int) -> @owned @callee_owned (Int) -> Int {
+entry(%y : $Int):
+  %f = function_ref @closure_common_uses_owned : $@convention(thin) (Int, Int) -> Int
+  %c = partial_apply %f(%y) : $@convention(thin) (Int, Int) -> Int
+  return %c : $@callee_owned (Int) -> Int
+}
+
+// CHECK-LABEL: sil private @closure_out_param
+// CHECK-SAME:    : $@convention(method) (Int, @guaranteed { let Int }) -> @out Int {
+// CHECK:      bb0([[R:%.*]] : $*Int, [[X:%.*]] : $Int, [[BOX:%.*]] : ${ let Int }):
+// CHECK-NEXT:   [[BOX_0:%.*]] = project_box [[BOX]] : ${ let Int }, 0
+// CHECK-NEXT:   [[Y:%.*]] = load [[BOX_0]] : $*Int
+// CHECK-NEXT:   store [[Y]] to [[R]]
+// CHECK-NEXT:   return
+sil private @closure_out_param : $@convention(thin) (Int, Int) -> @out Int {
+entry(%r : $*Int, %x : $Int, %y : $Int):
+  store %y to %r : $*Int
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @closure_out_param_user
+// CHECK:       bb0([[Y:%.*]] : $Int):
+// CHECK:         [[F:%.*]] = function_ref @closure_out_param
+// CHECK-NEXT:    [[BOX:%.*]] = alloc_box ${ let Int }
+// CHECK-NEXT:    [[BOX_0:%.*]] = project_box [[BOX]] : ${ let Int }, 0
+// CHECK-NEXT:    store [[Y]] to [[BOX_0]]
+// CHECK-NEXT:    [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]([[BOX]])
+sil @closure_out_param_user : $@convention(thin) (Int) -> @owned @callee_guaranteed (Int) -> @out Int {
+entry(%y : $Int):
+  %f = function_ref @closure_out_param : $@convention(thin) (Int, Int) -> @out Int
+  %c = partial_apply [callee_guaranteed] %f(%y) : $@convention(thin) (Int, Int) -> @out Int
+  return %c : $@callee_guaranteed (Int) -> @out Int
+}
