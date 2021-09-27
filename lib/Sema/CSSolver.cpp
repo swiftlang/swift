@@ -1605,8 +1605,7 @@ ConstraintSystem::filterDisjunction(
     // be attempted in-place because that would also try to operate on that
     // constraint, so instead let's keep the disjunction, but disable all
     // unviable choices.
-    if (choice->getOverloadChoice().getKind() ==
-        OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+    if (choice->getOverloadChoice().isKeyPathDynamicMemberLookup()) {
       // Early simplification of the "keypath dynamic member lookup" choice
       // is impossible because it requires constraints associated with
       // subscript index expression to be present.
