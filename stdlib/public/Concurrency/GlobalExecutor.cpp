@@ -103,7 +103,7 @@ static DelayedJob *DelayedJobQueue = nullptr;
 
 /// Get the next-in-queue storage slot.
 static Job *&nextInQueue(Job *cur) {
-  return reinterpret_cast<Job*&>(&cur->SchedulerPrivate[NextWaitingTaskIndex]);
+  return reinterpret_cast<Job*&>(cur->SchedulerPrivate[Job::NextWaitingTaskIndex]);
 }
 
 /// Insert a job into the cooperative global queue.
@@ -448,13 +448,9 @@ void swift::swift_task_enqueueOnDispatchQueue(Job *job,
 }
 #endif
 
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-static HeapObject _swift_mainExecutorIdentity;
-#endif
-
 ExecutorRef swift::swift_task_getMainExecutor() {
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-  return ExecutorRef::forOrdinary(&_swift_mainExecutorIdentity, nullptr);
+  return ExecutorRef::generic();
 #else
   return ExecutorRef::forOrdinary(
            reinterpret_cast<HeapObject*>(&_dispatch_main_q),
@@ -464,7 +460,7 @@ ExecutorRef swift::swift_task_getMainExecutor() {
 
 bool ExecutorRef::isMainExecutor() const {
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-  return Identity == &_swift_mainExecutorIdentity;
+  return isGeneric();
 #else
   return Identity == reinterpret_cast<HeapObject*>(&_dispatch_main_q);
 #endif
