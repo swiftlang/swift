@@ -1880,7 +1880,8 @@ public:
       
       for (auto proto : upperBound->getConformsTo()) {
         // Find the DeclContext providing the conformance for the type.
-        auto nomConformance = moduleDecl->lookupConformance(substType, proto);
+        auto nomConformance = moduleDecl->lookupConformance(
+            substType, proto, /*allowMissing=*/true);
         if (!nomConformance)
           return CanType();
         if (nomConformance.isAbstract())
@@ -1916,7 +1917,8 @@ public:
             if (substTy->isTypeParameter()) {
               substConformance = ProtocolConformanceRef(proto);
             } else {
-              substConformance = moduleDecl->lookupConformance(substTy, proto);
+              substConformance = moduleDecl->lookupConformance(
+                  substTy, proto, /*allowMissing=*/true);
             }
             
             LLVM_DEBUG(llvm::dbgs() << "\n` adds conformance for subst type\n";
@@ -2040,7 +2042,8 @@ public:
           newConformances.push_back(ProtocolConformanceRef(proto));
         } else {
           auto newConformance
-            = moduleDecl->lookupConformance(newSubstTy, proto);
+            = moduleDecl->lookupConformance(
+                  newSubstTy, proto, /*allowMissing=*/true);
           if (!newConformance)
             return CanType();
           newConformances.push_back(newConformance);
