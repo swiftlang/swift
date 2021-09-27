@@ -9,6 +9,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://83576231 - link failures on arm64
+// UNSUPPORTED: CPU=arm64
+
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/ConcurrencyTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect) -target x86_64-apple-macosx12.0
