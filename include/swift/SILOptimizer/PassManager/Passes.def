@@ -308,6 +308,8 @@ PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
      "Eliminate Ownership Annotation of SIL")
+PASS(ModulePrinter, "module-printer",
+     "Print the module")
 PASS(NestedSemanticFunctionCheck, "nested-semantic-function-check",
      "Diagnose improperly nested '@_semantics' functions")
 PASS(NonTransparentFunctionOwnershipModelEliminator,
