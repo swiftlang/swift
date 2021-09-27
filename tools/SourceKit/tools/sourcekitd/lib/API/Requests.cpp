@@ -1541,8 +1541,8 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
   return RespBuilder.createResponse();
 }
 
-static std::string mangleSimpleClass(StringRef moduleName,
-                                     StringRef className) {
+static ManglingErrorOr<std::string> mangleSimpleClass(StringRef moduleName,
+                                                      StringRef className) {
   using namespace swift::Demangle;
   Demangler Dem;
   auto moduleNode = Dem.createNode(Node::Kind::Module, moduleName);
@@ -1565,7 +1565,15 @@ mangleSimpleClassNames(ArrayRef<std::pair<StringRef, StringRef>> ModuleClassPair
   ResponseBuilder RespBuilder;
   auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
   for (auto &pair : ModuleClassPairs) {
-    std::string Result = mangleSimpleClass(pair.first, pair.second);
+    auto Mangling = mangleSimpleClass(pair.first, pair.second);
+    if (!Mangling.isSuccess()) {
+      std::string message = "name mangling failed for ";
+      message += pair.first.str();
+      message += ".";
+      message += pair.second.str();
+      return createErrorRequestFailed(message);
+    }
+    std::string Result = Mangling.result();
     auto Entry = Arr.appendDictionary();
     Entry.set(KeyName, Result.c_str());
   }

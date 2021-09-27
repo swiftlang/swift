@@ -933,7 +933,11 @@ public:
       if (!node || node->getKind() != Node::Kind::Type)
         return BuiltType();
 
-      auto name = Demangle::mangleNode(node);
+      auto mangling = Demangle::mangleNode(node);
+      if (!mangling.isSuccess())
+        return BuiltType();
+      auto name = mangling.result();
+
       auto BuiltForeign = Builder.createForeignClassType(std::move(name));
       TypeCache[MetadataAddress] = BuiltForeign;
       return BuiltForeign;

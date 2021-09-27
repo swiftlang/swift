@@ -547,7 +547,11 @@ std::string ASTMangler::mangleSILDifferentiabilityWitness(StringRef originalName
     Demangler demangler;
     auto *node = mangleSILDifferentiabilityWitnessAsNode(
         originalName, kind, config, demangler);
-    return mangleNode(node);
+    auto mangling = mangleNode(node);
+    if (!mangling.isSuccess()) {
+      llvm_unreachable("unexpected mangling failure");
+    }
+    return mangling.result();
   }
   beginManglingWithoutPrefix();
   appendOperator(originalName);
@@ -721,8 +725,11 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   TyMangling->addChild(Ty, Dem);
   Node *NewGlobal = Dem.createNode(Node::Kind::Global);
   NewGlobal->addChild(TyMangling, Dem);
-  std::string OldName = mangleNodeOld(NewGlobal);
-  return OldName;
+  auto mangling = mangleNodeOld(NewGlobal);
+  if (!mangling.isSuccess()) {
+    llvm_unreachable("unexpected mangling failure");
+  }
+  return mangling.result();
 #endif
 }
 

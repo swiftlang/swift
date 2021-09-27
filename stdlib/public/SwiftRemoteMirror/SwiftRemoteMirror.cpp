@@ -636,19 +636,24 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
   } else {
     TI->dump(stdout);
     Demangle::Demangler Dem;
-    std::string MangledName = mangleNode(TR->getDemangling(Dem));
-    fprintf(stdout, "Mangled name: %s%s\n", MANGLING_PREFIX_STR,
-            MangledName.c_str());
+    auto Mangling = mangleNode(TR->getDemangling(Dem));
+    std::string MangledName;
+    if (Mangling.isSuccess()) {
+      MangledName = Mangling.result();
+      fprintf(stdout, "Mangled name: %s%s\n", MANGLING_PREFIX_STR,
+              MangledName.c_str());
+    } else {
+      MangledName = "<failed to mangle name>";
+      fprintf(stdout, "Failed to get mangled name: Node %p, error %d:%u\n",
+              Mangling.error().node,
+              Mangling.error().code,
+              Mangling.error().line);
+    }
 
     char *DemangledName =
       swift_reflection_copyDemangledNameForTypeRef(ContextRef, OpaqueTypeRef);
     fprintf(stdout, "Demangled name: %s\n", DemangledName);
     free(DemangledName);
-
-#ifndef NDEBUG
-    assert(mangleNode(TR->getDemangling(Dem)) == MangledName &&
-           "round-trip diff");
-#endif
   }
 }
 
