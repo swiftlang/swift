@@ -297,6 +297,11 @@ public:
 
   bool isInContext() const;
 
+  void findProtocolConformanceRules(
+      SmallVectorImpl<unsigned> &notInContext,
+      SmallVectorImpl<std::pair<MutableTerm, unsigned>> &inContext,
+      const RewriteSystem &system) const;
+
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
 };
 
@@ -447,11 +452,41 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
-  Optional<unsigned> findRuleToDelete(RewritePath &replacementPath);
+  Optional<unsigned>
+  findRuleToDelete(RewritePath &replacementPath,
+                   const llvm::DenseSet<unsigned> *redundantConformances);
+
+  void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
 
   void minimizeRewriteSystem();
 
   void verifyHomotopyGenerators() const;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Generating conformances
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term,
+      SmallVectorImpl<unsigned> &result) const;
+
+  void computeCandidateConformancePaths(
+      llvm::MapVector<unsigned,
+                      std::vector<SmallVector<unsigned, 2>>>
+          &conformancePaths) const;
+
+  bool isValidConformancePath(
+      llvm::SmallDenseSet<unsigned, 4> &visited,
+      llvm::DenseSet<unsigned> &redundantConformances,
+      const llvm::SmallVectorImpl<unsigned> &path,
+      const llvm::MapVector<unsigned,
+                            std::vector<SmallVector<unsigned, 2>>>
+          &conformancePaths) const;
+
+  void computeGeneratingConformances(
+      llvm::DenseSet<unsigned> &redundantConformances);
 
   //////////////////////////////////////////////////////////////////////////////
   ///

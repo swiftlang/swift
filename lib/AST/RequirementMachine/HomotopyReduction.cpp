@@ -534,8 +534,9 @@ void HomotopyGenerator::dump(llvm::raw_ostream &out,
     out << " [deleted]";
 }
 
-Optional<unsigned>
-RewriteSystem::findRuleToDelete(RewritePath &replacementPath) {
+Optional<unsigned> RewriteSystem::
+findRuleToDelete(RewritePath &replacementPath,
+                 const llvm::DenseSet<unsigned> *redundantConformances) {
   for (auto &loop : HomotopyGenerators) {
     if (loop.isDeleted())
       continue;
@@ -563,8 +564,13 @@ RewriteSystem::findRuleToDelete(RewritePath &replacementPath) {
 
           // Protocol conformance rules are eliminated via a different
           // algorithm which computes "generating conformances".
-          if (rule.isProtocolConformanceRule())
-            return false;
+          if (rule.isProtocolConformanceRule()) {
+            if (!redundantConformances)
+              return false;
+
+            if (!redundantConformances->count(ruleID))
+              return false;
+          }
 
           return true;
         });
@@ -585,75 +591,88 @@ RewriteSystem::findRuleToDelete(RewritePath &replacementPath) {
   return None;
 }
 
-/// Use the 3-cells to delete rewrite rules, updating and simplifying existing
-/// 3-cells as each rule is deleted.
-void RewriteSystem::minimizeRewriteSystem() {
-  auto deleteRule = [&](unsigned ruleID, RewritePath replacementPath) {
+void RewriteSystem::deleteRule(unsigned ruleID,
+                               const RewritePath &replacementPath) {
+  if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    const auto &rule = getRule(ruleID);
+    llvm::dbgs() << "* Deleting rule ";
+    rule.dump(llvm::dbgs());
+    llvm::dbgs() << " (#" << ruleID << ")\n";
+    llvm::dbgs() << "* Replacement path: ";
+    MutableTerm mutTerm(rule.getLHS());
+    replacementPath.dump(llvm::dbgs(), mutTerm, *this);
+    llvm::dbgs() << "\n";
+  }
+
+  // Replace all occurrences of the rule with the replacement path and
+  // normalize all 3-cells.
+  for (auto &loop : HomotopyGenerators) {
+    if (loop.isDeleted())
+      continue;
+
+    bool changed = loop.Path.replaceRuleWithPath(ruleID, replacementPath);
+    if (!changed)
+      continue;
+
+    unsigned size = loop.Path.size();
+
+    loop.normalize(*this);
+
     if (Debug.contains(DebugFlags::HomotopyReduction)) {
-      const auto &rule = getRule(ruleID);
-      llvm::dbgs() << "* Deleting rule ";
-      rule.dump(llvm::dbgs());
-      llvm::dbgs() << " (#" << ruleID << ")\n";
-      llvm::dbgs() << "* Replacement path: ";
-      MutableTerm mutTerm(rule.getLHS());
-      replacementPath.dump(llvm::dbgs(), mutTerm, *this);
-      llvm::dbgs() << "\n";
+      if (size != loop.Path.size()) {
+        llvm::dbgs() << "** Note: 3-cell normalization eliminated "
+                     << (size - loop.Path.size()) << " steps\n";
+      }
     }
 
-    // Replace all occurrences of the rule with the replacement path and
-    // normalize all 3-cells.
-    for (auto &loop : HomotopyGenerators) {
-      if (loop.isDeleted())
-        continue;
-
-      bool changed = loop.Path.replaceRuleWithPath(ruleID, replacementPath);
-      if (!changed)
-        continue;
-
-      unsigned size = loop.Path.size();
-
-      loop.normalize(*this);
-
+    if (loop.Path.empty()) {
       if (Debug.contains(DebugFlags::HomotopyReduction)) {
-        if (size != loop.Path.size()) {
-          llvm::dbgs() << "** Note: 3-cell normalization eliminated "
-                       << (size - loop.Path.size()) << " steps\n";
-        }
+        llvm::dbgs() << "** Deleting trivial 3-cell at basepoint ";
+        llvm::dbgs() << loop.Basepoint << "\n";
       }
 
-      if (loop.Path.empty()) {
-        if (Debug.contains(DebugFlags::HomotopyReduction)) {
-          llvm::dbgs() << "** Deleting trivial 3-cell at basepoint ";
-          llvm::dbgs() << loop.Basepoint << "\n";
-        }
+      loop.markDeleted();
+      continue;
+    }
 
-        loop.markDeleted();
-        continue;
-      }
-
-      // FIXME: Is this correct?
-      if (loop.isInContext()) {
-        if (Debug.contains(DebugFlags::HomotopyReduction)) {
-          llvm::dbgs() << "** Deleting 3-cell in context: ";
-          loop.dump(llvm::dbgs(), *this);
-          llvm::dbgs() << "\n";
-        }
-
-        loop.markDeleted();
-        continue;
-      }
-
+    // FIXME: Is this correct?
+    if (loop.isInContext()) {
       if (Debug.contains(DebugFlags::HomotopyReduction)) {
-        llvm::dbgs() << "** Updated 3-cell: ";
+        llvm::dbgs() << "** Deleting 3-cell in context: ";
         loop.dump(llvm::dbgs(), *this);
         llvm::dbgs() << "\n";
       }
+
+      loop.markDeleted();
+      continue;
     }
-  };
+
+    if (Debug.contains(DebugFlags::HomotopyReduction)) {
+      llvm::dbgs() << "** Updated 3-cell: ";
+      loop.dump(llvm::dbgs(), *this);
+      llvm::dbgs() << "\n";
+    }
+  }
+}
+
+/// Use the 3-cells to delete rewrite rules, updating and simplifying existing
+/// 3-cells as each rule is deleted.
+void RewriteSystem::minimizeRewriteSystem() {
+  while (true) {
+    RewritePath replacementPath;
+    if (auto optRuleID = findRuleToDelete(replacementPath, nullptr))
+      deleteRule(*optRuleID, replacementPath);
+    else
+      break;
+  }
+
+  llvm::DenseSet<unsigned> redundantConformances;
+  computeGeneratingConformances(redundantConformances);
 
   while (true) {
     RewritePath replacementPath;
-    if (auto optRuleID = findRuleToDelete(replacementPath))
+    if (auto optRuleID = findRuleToDelete(replacementPath,
+                                          &redundantConformances))
       deleteRule(*optRuleID, replacementPath);
     else
       break;
