@@ -8,6 +8,7 @@
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: single_threaded_runtime
 
 import _Concurrency
 import Dispatch
@@ -58,14 +59,14 @@ actor MyActor {
 struct Runner {
   static func main() async {
     print("Launching a main-actor task")
-    // CHECK: warning: data race detected: @MainActor function at main/data_race_detection.swift:22 was not called on the main thread
+    // CHECK: warning: data race detected: @MainActor function at main/data_race_detection.swift:23 was not called on the main thread
     launchFromMainThread()
     sleep(1)
 
     let actor = MyActor()
     let actorFn = await actor.getTaskOnMyActor()
     print("Launching an actor-instance task")
-    // CHECK: warning: data race detected: actor-isolated function at main/data_race_detection.swift:51 was not called on the same actor
+    // CHECK: warning: data race detected: actor-isolated function at main/data_race_detection.swift:52 was not called on the same actor
     launchTask(actorFn)
 
     sleep(1)
