@@ -19,12 +19,13 @@
 #ifndef SWIFT_DEMANGLING_DEMANGLE_H
 #define SWIFT_DEMANGLING_DEMANGLE_H
 
-#include <memory>
-#include <string>
+#include "swift/Demangling/NamespaceMacros.h"
+#include "swift/Runtime/Config.h"
+#include "llvm/ADT/StringRef.h"
 #include <cassert>
 #include <cstdint>
-#include "llvm/ADT/StringRef.h"
-#include "swift/Demangling/NamespaceMacros.h"
+#include <memory>
+#include <string>
 
 namespace llvm {
   class raw_ostream;
@@ -512,8 +513,76 @@ enum class OperatorKind {
   Infix,
 };
 
+/// A mangling error, which consists of an error code and a Node pointer
+struct SWIFT_NODISCARD ManglingError {
+  enum Code {
+    Success = 0,
+    AssertionFailed,
+    Uninitialized,
+    TooComplex,
+    BadNodeKind,
+    BadNominalTypeKind,
+    NotAStorageNode,
+    UnsupportedNodeKind,
+    UnexpectedBuiltinVectorType,
+    UnexpectedBuiltinType,
+    MultipleChildNodes,
+    WrongNodeType,
+    WrongDependentMemberType,
+    BadDirectness,
+    UnknownEncoding,
+    InvalidImplCalleeConvention,
+    InvalidImplDifferentiability,
+    InvalidImplFunctionAttribute,
+    InvalidImplParameterConvention,
+    InvalidMetatypeRepresentation,
+    MultiByteRelatedEntity,
+    BadValueWitnessKind,
+    NotAContextNode,
+  };
+
+  Code        code;
+  NodePointer node;
+  unsigned    line;
+
+  ManglingError() : code(Uninitialized), node(nullptr) {}
+  ManglingError(Code c) : code(c), node(nullptr), line(0) {}
+  ManglingError(Code c, NodePointer n, unsigned l) : code(c), node(n), line(l) {}
+
+  bool isSuccess() const { return code == Success; }
+};
+
+#define MANGLING_ERROR(c,n)     ManglingError((c), (n), __LINE__)
+
+/// Used as a return type for mangling functions that may fail
+template <typename T>
+class SWIFT_NODISCARD ManglingErrorOr {
+private:
+  ManglingError err_;
+  T             value_;
+
+public:
+  ManglingErrorOr() : err_() {}
+  ManglingErrorOr(ManglingError::Code code,
+                  NodePointer node = nullptr,
+                  unsigned line = 0)
+  : err_(code, node, line) {}
+  ManglingErrorOr(const ManglingError &err) : err_(err) {}
+  ManglingErrorOr(const T &t) : err_(ManglingError::Success), value_(t) {}
+  ManglingErrorOr(T &&t) : err_(ManglingError::Success), value_(std::move(t)) {}
+
+  bool isSuccess() const { return err_.code == ManglingError::Success; }
+
+  const ManglingError &error() const { return err_; }
+
+  const T &result() const {
+    assert(isSuccess());
+    return value_;
+  }
+};
+
 /// Remangle a demangled parse tree.
-std::string mangleNode(NodePointer root);
+ManglingErrorOr<std::string> mangleNode(NodePointer root);
 
 using SymbolicResolver =
   llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
@@ -521,33 +590,36 @@ using SymbolicResolver =
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
-std::string mangleNode(NodePointer root, SymbolicResolver resolver);
+ManglingErrorOr<std::string> mangleNode(NodePointer root, SymbolicResolver resolver);
 
 /// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
 ///
 /// The returned string is owned by \p Factory. This means \p Factory must stay
 /// alive as long as the returned string is used.
-llvm::StringRef mangleNode(NodePointer root, SymbolicResolver resolver,
-                           NodeFactory &Factory);
+ManglingErrorOr<llvm::StringRef> mangleNode(NodePointer root,
+                                            SymbolicResolver resolver,
+                                            NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names.
-std::string mangleNodeOld(NodePointer root);
+ManglingErrorOr<std::string> mangleNodeOld(NodePointer root);
 
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names.
 /// The returned string is owned by \p Factory. This means \p Factory must stay
 /// alive as long as the returned string is used.
-llvm::StringRef mangleNodeOld(NodePointer node, NodeFactory &Factory);
+ManglingErrorOr<llvm::StringRef> mangleNodeOld(NodePointer node,
+                                               NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme and embed the name in "_Tt<name>_".
 ///
 /// The returned string is null terminated and owned by \p Factory. This means
 /// \p Factory must stay alive as long as the returned string is used.
-const char *mangleNodeAsObjcCString(NodePointer node, NodeFactory &Factory);
+ManglingErrorOr<const char *> mangleNodeAsObjcCString(NodePointer node,
+                                                      NodeFactory &Factory);
 
 /// Transform the node structure to a string.
 ///
@@ -626,7 +698,7 @@ bool nodeConsumesGenericArgs(Node *node);
 
 bool isSpecialized(Node *node);
 
-NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
+ManglingErrorOr<NodePointer> getUnspecialized(Node *node, NodeFactory &Factory);
 
 /// Returns true if the node \p kind refers to a context node, e.g. a nominal
 /// type or a function.

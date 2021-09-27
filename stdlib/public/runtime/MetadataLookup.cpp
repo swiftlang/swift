@@ -325,7 +325,10 @@ _findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
     node = node->getChild(0);
   }
   if (Demangle::isSpecialized(node)) {
-    node = Demangle::getUnspecialized(node, demangler);
+    auto unspec = Demangle::getUnspecialized(node, demangler);
+    if (!unspec.isSuccess())
+      return nullptr;
+    node = unspec.result();
   }
 
   return _findContextDescriptor(node, demangler);
@@ -724,8 +727,14 @@ _findContextDescriptor(Demangle::NodePointer node,
   if (symbolicNode->getKind() == Node::Kind::DependentGenericParamType)
     return nullptr;
 
-  StringRef mangledName =
+  auto mangling =
     Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+
+  if (!mangling.isSuccess())
+    return nullptr;
+
+  StringRef mangledName = mangling.result();
+
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -880,8 +889,13 @@ _findProtocolDescriptor(NodePointer node,
     return cast<ProtocolDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
 
-  mangledName =
-    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem).str();
+  auto mangling =
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
+
+  if (!mangling.isSuccess())
+    return nullptr;
+
+  mangledName = mangling.result().str();
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -1348,9 +1362,12 @@ public:
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
     // is used for Objective-C entities.
-    const char *objcMangledName = mangleNodeAsObjcCString(node, demangler);
-    if (auto protocol = objc_getProtocol(objcMangledName))
-      return ProtocolDescriptorRef::forObjC(protocol);
+    auto mangling = mangleNodeAsObjcCString(node, demangler);
+    if (mangling.isSuccess()) {
+      const char *objcMangledName = mangling.result();
+      if (auto protocol = objc_getProtocol(objcMangledName))
+        return ProtocolDescriptorRef::forObjC(protocol);
+    }
 #endif
 
     return ProtocolDescriptorRef();
