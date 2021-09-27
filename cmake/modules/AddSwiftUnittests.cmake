@@ -49,6 +49,13 @@ function(add_swift_unittest test_dirname)
       _ENABLE_EXTENDED_ALIGNED_STORAGE)
   endif()
 
+  # some headers switch their inline implementations based on
+  # SWIFT_STDLIB_SINGLE_THREADED_RUNTIME definition
+  if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+    target_compile_definitions("${test_dirname}" PRIVATE
+      SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  endif()
+
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     if(SWIFT_USE_LINKER)
       target_link_options(${test_dirname} PRIVATE
