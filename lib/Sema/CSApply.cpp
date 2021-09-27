@@ -5150,7 +5150,7 @@ namespace {
           ctx, ref, args, resolvedTy, ctx.AllocateCopy(conformances));
       components.push_back(comp);
 
-      if (shouldForceUnwrapResult(overload.choice, locator))
+      if (shouldForceUnwrapResult(overload.choice, memberLoc))
         buildKeyPathOptionalForceComponent(components);
     }
 
