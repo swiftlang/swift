@@ -43,9 +43,13 @@ static llvm::cl::opt<bool>
     SILViewCFG("sil-view-cfg", llvm::cl::init(false),
                llvm::cl::desc("Enable the sil cfg viewer pass"));
 
-static llvm::cl::opt<bool> SILViewGuaranteedCFG(
-    "sil-view-guaranteed-cfg", llvm::cl::init(false),
+static llvm::cl::opt<bool> SILViewCanonicalCFG(
+    "sil-view-canonical-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass after diagnostics"));
+
+static llvm::cl::opt<bool> SILPrintCanonicalModule(
+    "sil-print-canonical-module", llvm::cl::init(false),
+    llvm::cl::desc("Print the textual SIL module after diagnostics"));
 
 static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
@@ -62,6 +66,12 @@ static llvm::cl::opt<bool>
 static void addCFGPrinterPipeline(SILPassPipelinePlan &P, StringRef Name) {
   P.startPipeline(Name);
   P.addCFGPrinter();
+}
+
+static void addModulePrinterPipeline(SILPassPipelinePlan &plan,
+                                     StringRef name) {
+  plan.startPipeline(name);
+  plan.addModulePrinter();
 }
 
 static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
@@ -187,8 +197,11 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
   // Otherwise run the rest of diagnostics.
   addMandatoryDiagnosticOptPipeline(P);
 
-  if (SILViewGuaranteedCFG) {
-    addCFGPrinterPipeline(P, "SIL View Guaranteed CFG");
+  if (SILViewCanonicalCFG) {
+    addCFGPrinterPipeline(P, "SIL View Canonical CFG");
+  }
+  if (SILPrintCanonicalModule) {
+    addModulePrinterPipeline(P, "SIL Print Canonical Module");
   }
   return P;
 }
