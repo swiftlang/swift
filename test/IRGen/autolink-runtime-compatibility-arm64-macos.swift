@@ -1,7 +1,5 @@
+// REQUIRES: rdar81115750
 // REQUIRES: CPU=arm64,OS=macosx
-
-// rdar://83576231 - link failures on arm64
-// REQUIRES: rdar83576231
 
 // Doesn't autolink compatibility library because target OS doesn't need it
 // RUN: %target-swift-frontend -target arm64-apple-macosx10.14  -emit-ir -parse-stdlib %s | %FileCheck -check-prefix=NO-FORCE-LOAD %s

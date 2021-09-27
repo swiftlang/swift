@@ -12,11 +12,9 @@
 // RUN: %target-build-swift -target x86_64-apple-macosx10.15 %s -o %t/test_mangling -Xfrontend -disable-availability-checking
 // RUN: %target-run %t/test_mangling
 
+// REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
-
-// rdar://83576231 - link failures on arm64
-// UNSUPPORTED: CPU=arm64
 
 protocol MyProtocol {
   associatedtype AssocSendable

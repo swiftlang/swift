@@ -3,14 +3,12 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-
-// rdar://83576231 - link failures on arm64
-// UNSUPPORTED: CPU=arm64
 
 // RUN: %empty-directory(%t)
 

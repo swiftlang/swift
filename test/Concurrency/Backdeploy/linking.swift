@@ -8,9 +8,7 @@
 // RUN: otool -L %t/linking_rpath_old | %FileCheck -check-prefix CHECK-RPATH %s
 
 // REQUIRES: OS=macosx
-
-// rdar://83576231 - link failures on arm64
-// UNSUPPORTED: CPU=arm64
+// REQUIRES: CPU=x86_64
 
 // CHECK-DIRECT: /usr/lib/swift/libswift_Concurrency.dylib
 // CHECK-RPATH: @rpath/libswift_Concurrency.dylib
