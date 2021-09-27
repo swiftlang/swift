@@ -6,19 +6,8 @@ import StdlibUnittest
 import StdlibCollectionUnittest
 import SwiftPrivate
 
-
 var Algorithm = TestSuite("Algorithm")
 
-// FIXME(prext): remove this conformance.
-extension String.UnicodeScalarView : Equatable {}
-
-// FIXME(prext): remove this function.
-public func == (
-  lhs: String.UnicodeScalarView, rhs: String.UnicodeScalarView) -> Bool {
-  return Array(lhs) == Array(rhs)
-}
-
-// FIXME(prext): move this struct to the point of use.
 Algorithm.test("min,max") {
   // Identities are unique in this set.
   let a1 = MinimalComparableValue(0, identity: 1)
@@ -72,6 +61,29 @@ Algorithm.test("min,max") {
   expectEqual(c1.identity, max(b1, c2, c1, b2).identity)
   expectEqual(c1.identity, max(a1, b1, b2, c1).identity)
   expectEqual(c1.identity, max(a1, b1, c2, c1).identity)
+}
+
+Algorithm.test("median") {
+  forAllPermutations([0, 1, 2]) { permutation in
+    let expected = 1
+    let actual = median(permutation[0], permutation[1], permutation[2])
+    expectEqual(expected, actual, "permutation: \(permutation)")
+  }
+
+  forAllPermutations([0.0, 1.0, 2.0]) { permutation in
+    let expected = 1.0
+    let actual = median(permutation[0], permutation[1], permutation[2])
+    expectEqual(expected, actual, "permutation: \(permutation)")
+  }
+
+  forAllPermutations(["0", "1", "2"]) { permutation in
+    let expected = "1"
+    let actual = median(permutation[0], permutation[1], permutation[2])
+    expectEqual(expected, actual, "permutation: \(permutation)")
+  }
+
+  expectEqual(.negativeZero, median(.nan, -0.0, +0.0).floatingPointClass)
+  expectEqual(.positiveZero, median(-0.0, +0.0, .nan).floatingPointClass)
 }
 
 Algorithm.test("sorted/strings") {

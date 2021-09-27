@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -73,6 +73,31 @@ public func max<T: Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
     maxValue = value
   }
   return maxValue
+}
+
+/// Returns the middle of three comparable values.
+///
+/// - Parameters:
+///   - x: A value to compare.
+///   - y: Another value to compare.
+///   - z: A third value to compare.
+///
+/// - Returns: Neither the least value, nor the greatest value.
+@_alwaysEmitIntoClient
+public func median<T: Comparable>(_ x: T, _ y: T, _ z: T) -> T {
+  var (x, y, z) = (x, y, z)
+  // Compare (and swap) each pair of adjacent variables.
+  if x > y {
+    (x, y) = (y, x)
+  }
+  if y > z {
+    (y, z) = (z, y)
+  }
+  if x > y {
+    (x, y) = (y, x)
+  }
+  // Now `x` has the least value, and `z` has the greatest value.
+  return y
 }
 
 /// An enumeration of the elements of a sequence or collection.
