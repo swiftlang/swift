@@ -52,6 +52,9 @@ class RewriteContext final {
   /// Cache for merged associated type symbols.
   llvm::DenseMap<std::pair<Symbol, Symbol>, Symbol> MergedAssocTypes;
 
+  /// Requirement machines built from generic signatures.
+  llvm::DenseMap<GenericSignature, RequirementMachine *> Machines;
+
   ASTContext &Context;
 
   DebugOptions Debug;
@@ -101,6 +104,9 @@ public:
 
   Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs,
                               const ProtocolGraph &protos);
+
+  RequirementMachine *getRequirementMachine(CanGenericSignature sig);
+  bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);
 
   ~RewriteContext();
 };

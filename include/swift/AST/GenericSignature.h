@@ -265,6 +265,8 @@ class alignas(1 << TypeAlignInBits) GenericSignatureImpl final
 
   GenericEnvironment *GenericEnv = nullptr;
 
+  rewriting::RequirementMachine *Machine = nullptr;
+
   // Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
