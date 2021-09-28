@@ -784,6 +784,37 @@ extension Unsafe${Mutable}RawBufferPointer {
     defer { Builtin.rebindMemory(s._rawValue, binding) }
     return try body(.init(start: .init(s._rawValue), count: n))
   }
+
+  /// Returns a typed buffer to the memory referenced by this buffer,
+  /// assuming that the memory is already bound to the specified type.
+  ///
+  /// Use this method when you have a raw buffer to memory that has *already*
+  /// been bound to the specified type. The memory starting at this pointer
+  /// must be bound to the type `T`. Accessing memory through the returned
+  /// pointer is undefined if the memory has not been bound to `T`. To bind
+  /// memory to `T`, use `bindMemory(to:capacity:)` instead of this method.
+  ///
+  /// - Note: The buffer's base address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
+  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  ///   must equal zero.
+  ///
+  /// - Parameter to: The type `T` that the memory has already been bound to.
+  /// - Returns: A typed pointer to the same memory as this raw pointer.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func assumingMemoryBound<T>(
+    to: T.Type
+  ) -> Unsafe${Mutable}BufferPointer<T> {
+    guard let s = _position else {
+      return .init(start: nil, count: 0)
+    }
+    // initializer ensures _end is nil only when _position is nil.
+    _internalInvariant(_end != nil)
+    let c = _assumeNonNegative(s.distance(to: _end._unsafelyUnwrappedUnchecked))
+    let n = c / MemoryLayout<T>.stride
+    return .init(start: .init(s._rawValue), count: n)
+  }
 }
 
 extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
