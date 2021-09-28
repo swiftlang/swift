@@ -658,6 +658,7 @@ void RewriteSystem::deleteRule(unsigned ruleID,
 /// Use the 3-cells to delete rewrite rules, updating and simplifying existing
 /// 3-cells as each rule is deleted.
 void RewriteSystem::minimizeRewriteSystem() {
+  // First, eliminate all redundant rules that are not conformance rules.
   while (true) {
     RewritePath replacementPath;
     if (auto optRuleID = findRuleToDelete(replacementPath, nullptr))
@@ -666,9 +667,15 @@ void RewriteSystem::minimizeRewriteSystem() {
       break;
   }
 
+  // Now find a minimal set of generating conformances.
+  //
+  // FIXME: For now this just produces a set of redundant conformances, but
+  // it should actually compute the full generating conformance basis, since
+  // we want to use the same information for finding conformance access paths.
   llvm::DenseSet<unsigned> redundantConformances;
   computeGeneratingConformances(redundantConformances);
 
+  // Now, eliminate all redundant conformance rules.
   while (true) {
     RewritePath replacementPath;
     if (auto optRuleID = findRuleToDelete(replacementPath,

@@ -65,15 +65,18 @@ void HomotopyGenerator::findProtocolConformanceRules(
     step.apply(term, system);
   }
 
-  assert(notInContext.empty() || !inContext.empty() &&
-         "A conformance rule not based on another conformance rule?");
+  if (notInContext.size() == 1 && inContext.empty()) {
+    llvm::errs() << "A conformance rule not based on another conformance rule?\n";
+    dump(llvm::errs(), system);
+    llvm::errs() << "\n";
+    abort();
+  }
 }
 
 /// Write the term as a product of left hand sides of protocol conformance
 /// rules.
 ///
-/// The term should already be simplified, except for a protocol symbol
-/// at the end.
+/// The term should be irreducible, except for a protocol symbol at the end.
 void
 RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
     MutableTerm term, SmallVectorImpl<unsigned> &result) const {
@@ -97,27 +100,54 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
   assert(step.EndOffset == 0);
   assert(!step.Inverse);
 
-  const auto &rule = getRule(step.RuleID);
-  assert(rule.isProtocolConformanceRule());
-
   // If |U| > 0, recurse with the term U.[domain(V)]. Since T is
   // canonical, we know that U is canonical as well.
   if (step.StartOffset > 0) {
     // Build the term U.
     MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
 
-    // Compute domain(V).
-    const auto &lhs = rule.getLHS();
-    auto protocols = lhs[0].getProtocols();
-    assert(protocols.size() == 1);
+    decomposeTermIntoConformanceRuleLeftHandSides(prefix, step.RuleID, result);
+  } else {
+    result.push_back(step.RuleID);
+  }
+}
 
-    // Build the term U.[domain(V)].
-    prefix.add(Symbol::forProtocol(protocols[0], Context));
+/// Given a term U and a rule (V.[P] => V), write U.[domain(V)] as a
+/// product of left hand sdies of conformance rules. The term U should
+/// be irreducible.
+void
+RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
+    MutableTerm term, unsigned ruleID,
+    SmallVectorImpl<unsigned> &result) const {
+  const auto &rule = getRule(ruleID);
+  assert(rule.isProtocolConformanceRule());
 
-    decomposeTermIntoConformanceRuleLeftHandSides(prefix, result);
+  // Compute domain(V).
+  const auto &lhs = rule.getLHS();
+  auto protocols = lhs[0].getProtocols();
+  assert(protocols.size() == 1);
+  auto protocol = Symbol::forProtocol(protocols[0], Context);
+
+  // A same-type requirement of the form 'Self.Foo == Self' can induce a
+  // conformance rule [P].[P] => [P], and we can end up with a generating
+  // conformance decomposition of the form
+  //
+  //   (V.[Q] => V) := [P].(V'.[Q] => V'),
+  //
+  // where domain(V) == [P]. Don't recurse on [P].[P] here since it won't
+  // yield anything useful, instead just return with (V'.[Q] => V').
+  if (term.size() == 1 && term[0] == protocol) {
+    result.push_back(ruleID);
+    return;
   }
 
-  result.push_back(step.RuleID);
+  // Build the term U.[domain(V)].
+  term.add(protocol);
+
+  decomposeTermIntoConformanceRuleLeftHandSides(term, result);
+
+  // Add the rule V => V.[P].
+  result.push_back(ruleID);
 }
 
 /// Use homotopy information to discover all ways of writing the left hand side
@@ -222,29 +252,16 @@ void RewriteSystem::computeCandidateConformancePaths(
     SmallVector<SmallVector<unsigned, 2>, 2> candidatePaths;
     for (auto pair : inContext) {
       // We have a term U, and a rule V.[P] => V.
-      const auto &rule = getRule(pair.second);
-      assert(rule.isProtocolConformanceRule());
-
       SmallVector<unsigned, 2> conformancePath;
 
       // Simplify U to get U'.
       MutableTerm term = pair.first;
       (void) simplify(term);
 
-      // Compute domain(V).
-      const auto &lhs = rule.getLHS();
-      auto protocols = lhs[0].getProtocols();
-      assert(protocols.size() == 1);
-
-      // Build the term U'.[domain(V)].
-      term.add(Symbol::forProtocol(protocols[0], Context));
-
       // Write U'.[domain(V)] as a product of left hand sides of protocol
       // conformance rules.
-      decomposeTermIntoConformanceRuleLeftHandSides(term, conformancePath);
-
-      // Add the rule V => V.[P].
-      conformancePath.push_back(pair.second);
+      decomposeTermIntoConformanceRuleLeftHandSides(term, pair.second,
+                                                    conformancePath);
 
       candidatePaths.push_back(conformancePath);
     }

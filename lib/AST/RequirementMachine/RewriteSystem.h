@@ -471,6 +471,9 @@ public:
   void decomposeTermIntoConformanceRuleLeftHandSides(
       MutableTerm term,
       SmallVectorImpl<unsigned> &result) const;
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term, unsigned ruleID,
+      SmallVectorImpl<unsigned> &result) const;
 
   void computeCandidateConformancePaths(
       llvm::MapVector<unsigned,
