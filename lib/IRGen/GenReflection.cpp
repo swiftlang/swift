@@ -174,6 +174,18 @@ public:
 
 Optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
+  // The Swift 5.5 runtime is the first version able to demangle types
+  // related to concurrency.
+  bool needsConcurrency = type.findIf([](CanType t) -> bool {
+    if (auto fn = dyn_cast<AnyFunctionType>(t)) {
+      return fn->isAsync() || fn->isSendable() || fn->hasGlobalActor();
+    }
+    return false;
+  });
+  if (needsConcurrency) {
+    return llvm::VersionTuple(5, 5);
+  }
+
   // Associated types of opaque types weren't mangled in a usable form by the
   // Swift 5.1 runtime, so we needed to add a new mangling in 5.2.
   if (type->hasOpaqueArchetype()) {
@@ -190,16 +202,6 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     // declarations that use them are already covered by availability
     // guards, so we don't need to limit availability of mangled names
     // involving them.
-  }
-
-  bool needsConcurrency = type.findIf([](CanType t) -> bool {
-    if (auto fn = dyn_cast<AnyFunctionType>(t)) {
-      return fn->isAsync() || fn->isSendable() || fn->hasGlobalActor();
-    }
-    return false;
-  });
-  if (needsConcurrency) {
-    return llvm::VersionTuple(5, 5);
   }
 
   return None;
