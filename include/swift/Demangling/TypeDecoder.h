@@ -20,6 +20,7 @@
 
 #include "TypeLookupError.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/RequirementBase.h"
@@ -470,9 +471,30 @@ class TypeDecoder {
 public:
   explicit TypeDecoder(BuilderType &Builder) : Builder(Builder) {}
 
+  /// Given a demangle tree, attempt to turn it into a type.
+  TypeLookupErrorOr<BuiltType> decodeMangledType(NodePointer Node) {
+    return decodeMangledType(Node, 0);
+  }
+
   /// Given a demangle tree, attempt to turn it into a protocol conformance.
   BuiltProtocolConformance decodeMangledProtocolConformance(NodePointer Node) {
-    if (!Node) return BuiltProtocolConformance();
+    return decodeMangledProtocolConformance(Node, 0);
+  }
+
+  /// Given a demangle tree, attempt to turn it into a conformance decl.
+  BuiltProtocolConformanceDecl
+  decodeMangledProtocolConformanceDecl(BuiltType ConformingType,
+                                       NodePointer Node) {
+    return decodeMangledProtocolConformanceDecl(ConformingType, Node, 0);
+  }
+
+protected:
+  static const unsigned MaxDepth = 1024;
+
+  BuiltProtocolConformance decodeMangledProtocolConformance(NodePointer Node,
+                                                            unsigned depth) {
+    if (!Node || depth > TypeDecoder::MaxDepth)
+      return BuiltProtocolConformance();
 
     using NodeKind = Demangle::Node::Kind;
     switch (Node->getKind()) {
@@ -480,19 +502,22 @@ public:
       if (Node->getNumChildren() < 1)
         return BuiltProtocolConformance();
 
-      return decodeMangledProtocolConformance(Node->getChild(0));
+      return decodeMangledProtocolConformance(Node->getChild(0), depth + 1);
 
     case NodeKind::ConcreteProtocolConformance: {
       if (Node->getNumChildren() < 3)
         return BuiltProtocolConformance();
 
-      auto conformingType = decodeMangledType(Node->getChild(0));
-      if (!conformingType)
+      auto conformingTypeOrError = decodeMangledType(Node->getChild(0),
+                                                     depth + 1);
+      if (conformingTypeOrError.isError())
         return BuiltProtocolConformance();
 
+      auto conformingType = conformingTypeOrError.getValue();
       auto conformanceDecl
         = decodeMangledProtocolConformanceDecl(conformingType,
-                                               Node->getChild(1));
+                                               Node->getChild(1),
+                                               depth + 1);
 
       if (!conformanceDecl)
         return BuiltProtocolConformance();
@@ -503,7 +528,7 @@ public:
         return BuiltProtocolConformance();
 
       for (auto mangledArg : *Node->getChild(2)) {
-        auto arg = decodeMangledProtocolConformance(mangledArg);
+        auto arg = decodeMangledProtocolConformance(mangledArg, depth + 1);
         if (!arg)
           return BuiltProtocolConformance();
         conformanceArgs.push_back(arg);
@@ -518,11 +543,14 @@ public:
       if (Node->getNumChildren() < 3)
         return BuiltProtocolConformance();
 
-      auto conformingType = decodeMangledType(Node->getChild(0));
-      if (!conformingType)
+      auto conformingTypeOrError = decodeMangledType(Node->getChild(0),
+                                                     depth + 1);
+      if (conformingTypeOrError.isError())
         return BuiltProtocolConformance();
 
-      auto conformingRequirement = decodeMangledProtocolType(Node->getChild(1));
+      auto conformingType = conformingTypeOrError.getValue();
+      auto conformingRequirement = decodeMangledProtocolType(Node->getChild(1),
+                                                             depth + 1);
       if (!conformingRequirement)
         return BuiltProtocolConformance();
 
@@ -540,7 +568,7 @@ public:
       if (Node->getNumChildren() < 3)
         return BuiltProtocolConformance();
 
-      auto base = decodeMangledProtocolConformance(Node->getChild(0));
+      auto base = decodeMangledProtocolConformance(Node->getChild(0), depth + 1);
       if (!base)
         return BuiltProtocolConformance();
 
@@ -549,10 +577,13 @@ public:
       if (Node->getChild(1)->getNumChildren() < 2)
         return BuiltProtocolConformance();
 
-      auto conformingType = decodeMangledType(Node->getChild(1)->getChild(0));
-      if (!conformingType)
+      auto conformingTypeOrError
+        = decodeMangledType(Node->getChild(1)->getChild(0), depth + 1);
+      if (conformingTypeOrError.isError())
         return BuiltProtocolConformance();
-      auto conformingRequirement = decodeMangledProtocolType(Node->getChild(1)->getChild(1));
+      auto conformingType = conformingTypeOrError.getValue();
+      auto conformingRequirement
+        = decodeMangledProtocolType(Node->getChild(1)->getChild(1), depth + 1);
       if (!conformingRequirement)
         return BuiltProtocolConformance();
 
@@ -571,11 +602,12 @@ public:
       if (Node->getNumChildren() < 3)
         return BuiltProtocolConformance();
 
-      auto base = decodeMangledProtocolConformance(Node->getChild(0));
+      auto base = decodeMangledProtocolConformance(Node->getChild(0), depth + 1);
       if (!base)
         return BuiltProtocolConformance();
 
-      auto superRequirement = decodeMangledProtocolType(Node->getChild(1));
+      auto superRequirement = decodeMangledProtocolType(Node->getChild(1),
+                                                        depth + 1);
       if (!superRequirement)
         return BuiltProtocolConformance();
 
@@ -589,14 +621,23 @@ public:
                                                                  index);
     }
 
+    case NodeKind::AssociatedConformanceProtocolRelativeAccessor:
+    case NodeKind::AssociatedConformanceTypeRelativeAccessor: {
+      auto witnessFn = reinterpret_cast<AssociatedWitnessTableAccessFunction *>(
+        Node->getIndex());
+      return Builder.createProtocolConformanceFromAccessor(witnessFn);
+    }
     default:
       return BuiltProtocolConformance();
     }
   }
 
-  BuiltProtocolConformanceDecl decodeMangledProtocolConformanceDecl(BuiltType ConformingType,
-                                                                    NodePointer Node) {
-    if (!Node) return BuiltProtocolConformanceDecl();
+  BuiltProtocolConformanceDecl
+  decodeMangledProtocolConformanceDecl(BuiltType ConformingType,
+                                       NodePointer Node,
+                                       unsigned depth) {
+    if (!Node || depth > TypeDecoder::MaxDepth)
+      return BuiltProtocolConformanceDecl();
 
     using NodeKind = Demangle::Node::Kind;
     switch (Node->getKind()) {
@@ -604,7 +645,8 @@ public:
       if (Node->getNumChildren() < 1)
         return BuiltProtocolConformanceDecl();
 
-      auto protocolRequirement = decodeMangledProtocolType(Node->getChild(0));
+      auto protocolRequirement = decodeMangledProtocolType(Node->getChild(0),
+                                                           depth + 1);
       if (!protocolRequirement)
         return BuiltProtocolConformanceDecl();
 
@@ -616,7 +658,8 @@ public:
       if (Node->getNumChildren() < 1)
         return BuiltProtocolConformanceDecl();
 
-      auto protocolRequirement = decodeMangledProtocolType(Node->getChild(0));
+      auto protocolRequirement = decodeMangledProtocolType(Node->getChild(0),
+                                                           depth + 1);
       if (!protocolRequirement)
         return BuiltProtocolConformanceDecl();
 
@@ -628,7 +671,8 @@ public:
       if (Node->getNumChildren() < 2)
         return BuiltProtocolConformanceDecl();
 
-      auto protocolRequirement = decodeMangledProtocolType(Node->getChild(0));
+      auto protocolRequirement = decodeMangledProtocolType(Node->getChild(0),
+                                                           depth + 1);
       if (!protocolRequirement)
         return BuiltProtocolConformanceDecl();
 
@@ -639,24 +683,17 @@ public:
                                                               moduleName);
     }
 
-    /*
-    case NodeKind::ProtocolConformanceSymbolicReference:
-      return Builder.createSymbolicProtocolConformanceDecl(ConformingType,
-                                                           Node);
-     */
+    case NodeKind::ProtocolConformanceDescriptorRef:
+    case NodeKind::AssociatedConformanceDescriptorRef: {
+      auto desc = reinterpret_cast<ProtocolConformanceDescriptor *>(
+        Node->getIndex());
+      return Builder.createProtocolConformanceDeclFromDescriptor(desc);
+    }
 
     default:
-      return BuiltProtocolConformance();
+      return BuiltProtocolConformanceDecl();
     }
   }
-
-  /// Given a demangle tree, attempt to turn it into a type.
-  TypeLookupErrorOr<BuiltType> decodeMangledType(NodePointer Node) {
-    return decodeMangledType(Node, 0);
-  }
-
-protected:
-  static const unsigned MaxDepth = 1024;
 
   TypeLookupErrorOr<BuiltType> decodeMangledType(NodePointer Node,
                                                  unsigned depth) {

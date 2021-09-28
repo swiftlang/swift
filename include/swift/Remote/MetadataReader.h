@@ -442,10 +442,24 @@ public:
           
         return buildContextMangling(context, dem);
       }
+      case Demangle::SymbolicReferenceKind::AssociatedConformanceProtocolRelativeAccessor:
+      case Demangle::SymbolicReferenceKind::AssociatedConformanceTypeRelativeAccessor:
       case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
         // The symbolic reference points at a resolver function, but we can't
         // execute code in the target process to resolve it from here.
         return nullptr;
+      }
+      case Demangle::SymbolicReferenceKind::ProtocolConformanceDescriptor: {
+        return dem.createNode(
+          Node::Kind::ProtocolConformanceDescriptor,
+          remoteAddress
+        );
+      }
+      case Demangle::SymbolicReferenceKind::AssociatedConformanceDescriptor: {
+        return dem.createNode(
+          Node::Kind::AssociatedConformanceDescriptor,
+          remoteAddress
+        );
       }
       }
 

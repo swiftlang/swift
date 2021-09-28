@@ -87,8 +87,16 @@ static uintptr_t resolveSymbolicReferenceOffset(SymbolicReferenceKind kind,
         *(const TargetSignedContextPointer<InProcess> *)ptr;
       return (uintptr_t)contextPtr;
     }
+    case SymbolicReferenceKind::AssociatedConformanceProtocolRelativeAccessor:
+    case SymbolicReferenceKind::AssociatedConformanceTypeRelativeAccessor:
     case SymbolicReferenceKind::AccessorFunctionReference: {
       swift_unreachable("should not be indirectly referenced");
+    }
+    case SymbolicReferenceKind::ProtocolConformanceDescriptor:
+    case SymbolicReferenceKind::AssociatedConformanceDescriptor: {
+      const ProtocolConformanceDescriptor *descriptor =
+        *(const ProtocolConformanceDescriptor **)ptr;
+      return reinterpret_cast<uintptr_t>(descriptor);
     }
     }
     swift_unreachable("unknown symbolic reference kind");
@@ -109,7 +117,7 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
   Node::Kind nodeKind;
   bool isType;
   switch (kind) {
-  case Demangle::SymbolicReferenceKind::Context: {
+  case SymbolicReferenceKind::Context: {
     auto descriptor = (const ContextDescriptor *)ptr;
     switch (descriptor->getKind()) {
     case ContextDescriptorKind::Protocol:
@@ -134,7 +142,7 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
     }
     break;
   }
-  case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
+  case SymbolicReferenceKind::AccessorFunctionReference: {
     // Save the pointer to the accessor function. We can't demangle it any
     // further as AST, but the consumer of the demangle tree may be able to
     // invoke the function to resolve the thing they're trying to access.
@@ -147,8 +155,34 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
 #endif
     break;
   }
+  case SymbolicReferenceKind::AssociatedConformanceProtocolRelativeAccessor:
+    nodeKind = Node::Kind::AssociatedConformanceProtocolRelativeAccessor;
+    isType = false;
+#if SWIFT_PTRAUTH
+    // The pointer refers to an accessor function, which we need to sign.
+    ptr = (uintptr_t)ptrauth_sign_unauthenticated((void*)ptr,
+      ptrauth_key_function_pointer, 0);
+#endif
+    break;
+  case SymbolicReferenceKind::AssociatedConformanceTypeRelativeAccessor:
+    nodeKind = Node::Kind::AssociatedConformanceTypeRelativeAccessor;
+    isType = false;
+#if SWIFT_PTRAUTH
+    // The pointer refers to an accessor function, which we need to sign.
+    ptr = (uintptr_t)ptrauth_sign_unauthenticated((void*)ptr,
+      ptrauth_key_function_pointer, 0);
+#endif
+    break;
+  case SymbolicReferenceKind::ProtocolConformanceDescriptor:
+    nodeKind = Node::Kind::ProtocolConformanceDescriptorRef;
+    isType = false;
+    break;
+  case SymbolicReferenceKind::AssociatedConformanceDescriptor:
+    nodeKind = Node::Kind::AssociatedConformanceDescriptorRef;
+    isType = false;
+    break;
   }
-  
+
   auto node = Dem.createNode(nodeKind, ptr);
   if (isType) {
     auto typeNode = Dem.createNode(Node::Kind::Type);
@@ -174,11 +208,35 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
 #endif
     return Dem.createNode(Node::Kind::AccessorFunctionReference,
                           (uintptr_t)resolvedReference);
+  case SymbolicReferenceKind::AssociatedConformanceProtocolRelativeAccessor:
+#if SWIFT_PTRAUTH
+    // The pointer refers to an accessor function, which we need to sign.
+    resolvedReference = ptrauth_sign_unauthenticated(resolvedReference,
+      ptrauth_key_function_pointer, 0);
+#endif
+    return Dem.createNode(
+      Node::Kind::AssociatedConformanceProtocolRelativeAccessor,
+      (uintptr_t)resolvedReference
+    );
+  case SymbolicReferenceKind::AssociatedConformanceTypeRelativeAccessor:
+#if SWIFT_PTRAUTH
+    // The pointer refers to an accessor function, which we need to sign.
+    resolvedReference = ptrauth_sign_unauthenticated(resolvedReference,
+      ptrauth_key_function_pointer, 0);
+#endif
+    return Dem.createNode(Node::Kind::AssociatedConformanceTypeRelativeAccessor,
+                          (uintptr_t)resolvedReference);
+  case SymbolicReferenceKind::ProtocolConformanceDescriptor:
+    return Dem.createNode(Node::Kind::ProtocolConformanceDescriptorRef,
+                          (uintptr_t)resolvedReference);
+  case SymbolicReferenceKind::AssociatedConformanceDescriptor:
+    return Dem.createNode(Node::Kind::AssociatedConformanceDescriptorRef,
+                          (uintptr_t)resolvedReference);
   }
-  
+
   swift_unreachable("invalid symbolic reference kind");
 }
-  
+
 NodePointer
 ResolveToDemanglingForContext::operator()(SymbolicReferenceKind kind,
                                           Directness isIndirect,
@@ -1277,6 +1335,11 @@ _findOpaqueTypeDescriptor(NodePointer demangleNode,
   return nullptr;
 }
 
+/// Callback used to provide arguments to an associated witness table accessor
+/// function
+using WitnessAccessorCallerFn =
+  std::function<const WitnessTable *(AssociatedWitnessTableAccessFunction)>;
+
 /// Constructs metadata by decoding a mangled type name, for use with
 /// \c TypeDecoder.
 class DecodedMetadataBuilder {
@@ -1290,16 +1353,22 @@ private:
   /// Substitute dependent witness tables.
   SubstDependentWitnessTableFn substWitnessTable;
 
+  /// Witness accessor caller.
+  WitnessAccessorCallerFn witnessAccessorCaller;
+  
   /// Ownership information related to the metadata we are trying to lookup.
   TypeReferenceOwnership ReferenceOwnership;
 
 public:
   DecodedMetadataBuilder(Demangler &demangler,
                          SubstGenericParameterFn substGenericParameter,
-                         SubstDependentWitnessTableFn substWitnessTable)
+                         SubstDependentWitnessTableFn substWitnessTable,
+                         WitnessAccessorCallerFn witnessAccessorCaller)
     : demangler(demangler),
       substGenericParameter(substGenericParameter),
-      substWitnessTable(substWitnessTable) { }
+      substWitnessTable(substWitnessTable),
+      witnessAccessorCaller(witnessAccessorCaller)
+    { }
 
   using BuiltType = const Metadata *;
   using BuiltTypeDecl = const ContextDescriptor *;
@@ -1735,6 +1804,11 @@ public:
                              index);
   }
 
+  const WitnessTable *
+  createProtocolConformanceFromAccessor(AssociatedWitnessTableAccessFunction fn) {
+    return witnessAccessorCaller ? witnessAccessorCaller(fn) : nullptr;
+  }
+
   const ProtocolConformanceDescriptor *
   createProtocolConformanceDeclInTypeModule(const Metadata *conformingType,
                                             ProtocolDescriptorRef protocol) {
@@ -1756,8 +1830,52 @@ public:
     return swift_getConformanceDescriptor(conformingType,
                                           protocol.getSwiftProtocol());
   }
+
+  const ProtocolConformanceDescriptor *
+  createProtocolConformanceDeclFromDescriptor(
+    const ProtocolConformanceDescriptor *desc
+  ) {
+    return desc;
+  }
 };
 
+}
+
+const WitnessTable *
+swift::_getAssocWitnessTableFromMangledName(StringRef mangledName,
+                                            const Metadata *conformingType,
+                                            const Metadata *assocType,
+                                            const WitnessTable *wtable) {
+    Demangle::StackAllocatedDemangler<1024> Dem;
+  auto node = Dem.demangleConformance(mangledName,
+                                      ResolveAsSymbolicReference(Dem));
+
+  // The generic parameters are those of the conforming type, but we may need
+  // to chase the superclass chain until we find the type that specified the
+  // conformance
+  const ProtocolConformanceDescriptor *conformance = wtable->getDescription();
+  auto originalConformingType = findConformingSuperclass(conformingType,
+                                                         conformance);
+
+  // Use DecodedMetadataBuilder to find the witness table
+  SubstGenericParametersFromMetadata substitutions(originalConformingType);
+  DecodedMetadataBuilder builder(Dem,
+        [&substitutions](unsigned depth, unsigned index) {
+          return substitutions.getMetadata(depth, index);
+        },
+        [&substitutions](const Metadata *type, unsigned index) {
+          return substitutions.getWitnessTable(type, index);
+        },
+        [assocType, conformingType, wtable](AssociatedWitnessTableAccessFunction fn) {
+          return fn(assocType, conformingType, wtable);
+        });
+
+  auto decoded = Demangle::decodeMangledProtocolConformance(builder, node);
+  if (decoded.isError()) {
+    swift_unreachable("Invalid mangled associate conformance");
+  }
+
+  return decoded.getValue();
 }
 
 SWIFT_CC(swift)
@@ -1784,7 +1902,7 @@ swift_getTypeByMangledNodeImpl(MetadataRequest request, Demangler &demangler,
   // TODO: propagate the request down to the builder instead of calling
   // swift_checkMetadataState after the fact.
   DecodedMetadataBuilder builder(demangler, substGenericParam,
-                                 substWitnessTable);
+                                 substWitnessTable, nullptr);
   auto type = Demangle::decodeMangledType(builder, node);
   if (type.isError()) {
     return *type.getError();

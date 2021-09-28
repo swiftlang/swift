@@ -340,6 +340,13 @@ enum class SymbolicReferenceKind : uint8_t {
   /// A symbolic reference to a context descriptor, representing the
   /// (unapplied generic) context.
   Context,
+  /// A protocol conformance descriptor.
+  ProtocolConformanceDescriptor,
+  /// An associated conformance descriptor.
+  AssociatedConformanceDescriptor,
+  /// An associated conformance access function.
+  AssociatedConformanceProtocolRelativeAccessor,
+  AssociatedConformanceTypeRelativeAccessor,
   /// A symbolic reference to an accessor function, which can be executed in
   /// the process to get a pointer to the referenced entity.
   AccessorFunctionReference,
@@ -618,6 +625,21 @@ public:
   NodePointer demangleType(StringRef MangledName,
             std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver
               = nullptr);
+
+  /// Demangle the given protocol conformance and return the parse tree.
+  ///
+  /// \param MangledName The mangled conformance string, which does _not_ start
+  /// with the mangling prefix $S.
+  /// \param SymbolicReferenceResolver A function invoked to resolve symbolic references in
+  /// the string. If null, then symbolic references will cause the demangle to fail.
+  ///
+  /// \returns A parse tree for the demangled string - or a null pointer
+  /// on failure.
+  /// The lifetime of the returned node tree ends with the lifetime of the
+  /// Demangler or with a call of clear().
+  NodePointer demangleConformance(StringRef MangledName,
+            std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver
+              = nullptr);
 };
 
 /// A demangler which uses stack space for its initial memory.
@@ -634,6 +656,7 @@ public:
 
 NodePointer demangleOldSymbolAsNode(StringRef MangledName,
                                     NodeFactory &Factory);
+
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
 } // end namespace swift

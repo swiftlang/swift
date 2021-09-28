@@ -590,6 +590,15 @@ public:
   const Metadata *
   _getSimpleProtocolTypeMetadata(const ProtocolDescriptor *protocol);
 
+  /// Obtain a witness table for an associated type by demangling a conformance
+  /// string
+  const WitnessTable *_getAssocWitnessTableFromMangledName(
+    StringRef mangledName,
+    const Metadata *conformingType,
+    const Metadata *assocType,
+    const WitnessTable *wtable
+  );
+
   /// Given a type that we know can be used with the given conformance, find
   /// the superclass that introduced the conformance.
   const Metadata *findConformingSuperclass(
