@@ -1671,6 +1671,7 @@ function(add_swift_target_library name)
   # behavior for their requirements.
   if (SWIFTLIB_IS_STDLIB)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
   endif()
 
   if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE AND
