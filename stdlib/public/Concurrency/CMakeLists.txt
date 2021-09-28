@@ -35,6 +35,11 @@ endif()
 set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS)
 
+if(NOT SWIFT_CONCURRENCY_USES_DISPATCH)
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+    "-DSWIFT_CONCURRENCY_ENABLE_DISPATCH=0")
+endif()
+
 if(NOT swift_concurrency_async_fp_mode)
   set(swift_concurrency_async_fp_mode "always")
 endif()
