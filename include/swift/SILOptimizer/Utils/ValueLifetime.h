@@ -45,12 +45,14 @@ namespace swift {
 /// lastUser or boundaryEdge. But with infinite loops, it is possible for both
 /// lastUsers and boundaryEdges to be empty even if there are uses within the
 /// loop.
+///
+/// TODO: combine this with PrunedLivenessBoundary.
 struct ValueLifetimeBoundary {
   SmallVector<SILInstruction *, 8> lastUsers;
   SmallVector<SILBasicBlock *, 8> boundaryEdges;
 
   /// Visit the point at which a lifetime-ending instruction must be inserted,
-  /// exclusing dead-end blocks. This is only useful when it is known that none
+  /// excluding dead-end blocks. This is only useful when it is known that none
   /// of the lastUsers ends the lifetime, for example when creating a new borrow
   /// scope to enclose all uses.
   void visitInsertionPoints(
