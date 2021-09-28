@@ -80,7 +80,8 @@ class RequirementMachine final {
   void addGenericSignature(CanGenericSignature sig);
 
   bool isComplete() const;
-  void computeCompletion();
+
+  void computeCompletion(RewriteSystem::ValidityPolicy policy);
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
