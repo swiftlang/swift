@@ -576,6 +576,20 @@ public:
   /// Precondition: isReference() is true.
   SILValue getReference() const;
 
+  /// Return the OSSA root of the reference being accessed.
+  ///
+  /// Precondition: isReference() is true.
+  SILValue getOwnershipReferenceRoot() const {
+    return findOwnershipReferenceRoot(getReference());
+  }
+
+  /// Return the storage root of the reference being accessed.
+  ///
+  /// Precondition: isReference() is true.
+  SILValue getStorageReferenceRoot() const {
+    return findReferenceRoot(getReference());
+  }
+
   /// Return the global variable being accessed.
   ///
   /// Precondition: getKind() == Global
