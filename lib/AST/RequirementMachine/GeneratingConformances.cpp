@@ -16,6 +16,24 @@
 // (Vi.[Pi]), where each Vi.[Pi] is a left hand side of a generating
 // conformance.
 //
+// A "conformance-valid" rewrite system is one where if we can write
+// T == U.V for arbitrary non-empty U and V, then U.[domain(V)] is joinable
+// with U.
+//
+// If this holds, then starting with a term T.[P] that is joinable with T, we
+// can reduce T to canonical form T', and find the unique rule (V.[P] => V) such
+// that T' == U.V. Then we repeat this process with U.[domain(V)], which is
+// known to be joinable with U, since T is conformance-valid.
+//
+// Iterating this process produces a decomposition of T.[P] as a product of
+// left hand sides of conformance rules. Some of those rules are not minimal;
+// they are added by completion, or they are redundant rules written by the
+// user.
+//
+// Using the 3-cells that generate the homotopy relation on rewrite paths,
+// decompositions can be found for all "derived" conformance rules, producing
+// a minimal set of generating conformances.
+//
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Defer.h"
@@ -30,6 +48,9 @@
 using namespace swift;
 using namespace rewriting;
 
+/// Finds all protocol conformance rules appearing in a 3-cell, both without
+/// context, and with a non-empty left context. Applications of rules with a
+/// non-empty right context are ignored.
 void HomotopyGenerator::findProtocolConformanceRules(
     SmallVectorImpl<unsigned> &notInContext,
     SmallVectorImpl<std::pair<MutableTerm, unsigned>> &inContext,
@@ -287,6 +308,14 @@ void RewriteSystem::computeCandidateConformancePaths(
   }
 }
 
+/// Determines if \p path can be expressed without any of the conformance
+/// rules appearing in \p redundantConformances, by possibly substituting
+/// any occurrences of the redundant rules with alternate definitions
+/// appearing in \p conformancePaths.
+///
+/// The \p conformancePaths map sends conformance rules to a list of
+/// disjunctions, where each disjunction is a product of other conformance
+/// rules.
 bool RewriteSystem::isValidConformancePath(
     llvm::SmallDenseSet<unsigned, 4> &visited,
     llvm::DenseSet<unsigned> &redundantConformances,
@@ -325,6 +354,9 @@ bool RewriteSystem::isValidConformancePath(
   return true;
 }
 
+/// Computes a minimal set of generating conformances, assuming that homotopy
+/// reduction has already eliminated all redundant rewrite rules that are not
+/// conformance rules.
 void RewriteSystem::computeGeneratingConformances(
     llvm::DenseSet<unsigned> &redundantConformances) {
   llvm::MapVector<unsigned, std::vector<SmallVector<unsigned, 2>>> conformancePaths;

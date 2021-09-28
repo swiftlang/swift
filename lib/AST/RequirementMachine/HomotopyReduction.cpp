@@ -9,6 +9,46 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// A confluent rewrite system together with a set of 3-cells that generate the
+// homotopy relation on 2-cells (rewrite paths) is known as a 'coherent
+// presentation'.
+//
+// If a rewrite rule appears exactly once in a 3-cell and without context, the
+// 3-cell witnesses a redundancy; the rewrite rule is equivalent to traveling
+// around the loop "in the other direction". This rewrite rule and the
+// corresponding 3-cell can be deleted from the coherent presentation via a
+// Tietze transformation.
+//
+// Any occurrence of the rule in the remaining 3-cells is replaced with the
+// alternate definition obtained by splitting the 3-cell that witnessed the
+// redundancy. After substitution, every 3-cell is normalized to a cyclically
+// reduced left-canonical form. The 3-cell witnessing the redundancy normalizes
+// to the empty loop and is deleted.
+//
+// Iterating this process eventually produces a minimal presentation.
+//
+// For a description of the general algorithm, see "A Homotopical Completion
+// Procedure with Applications to Coherence of Monoids",
+// https://hal.inria.fr/hal-00818253.
+//
+// The idea of computing a left-canonical form for 2-cells is from
+// "Homotopy reduction systems for monoid presentations",
+// https://www.sciencedirect.com/science/article/pii/S0022404997000959
+//
+// Note that in the world of Swift, rewrite rules for introducing associated
+// type symbols are marked 'permanent'; they are always re-added when a new
+// rewrite system is built from a minimal generic signature, so instead of
+// deleting them it is better to leave them in place in case it allows other
+// rules to be deleted instead.
+//
+// Also, for a conformance rule (V.[P] => V) to be redundant, a stronger
+// condition is needed than appearing once in a 3-cell and without context;
+// the rule must not be a _generating conformance_. The algorithm for computing
+// a minimal set of generating conformances is implemented in
+// GeneratingConformances.cpp.
+//
+//===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -655,8 +695,9 @@ void RewriteSystem::deleteRule(unsigned ruleID,
   }
 }
 
-/// Use the 3-cells to delete rewrite rules, updating and simplifying existing
-/// 3-cells as each rule is deleted.
+/// Use the 3-cells to delete redundant rewrite rules via a series of Tietze
+/// transformations, updating and simplifying existing 3-cells as each rule
+/// is deleted.
 void RewriteSystem::minimizeRewriteSystem() {
   // First, eliminate all redundant rules that are not conformance rules.
   while (true) {
