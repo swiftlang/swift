@@ -87,25 +87,6 @@ TypeResolution::forInterface(DeclContext *dc, GenericEnvironment *genericEnv,
   return result;
 }
 
-TypeResolution
-TypeResolution::forContextual(DeclContext *dc, TypeResolutionOptions options,
-                              OpenUnboundGenericTypeFn unboundTyOpener,
-                              HandlePlaceholderTypeReprFn placeholderHandler) {
-  return forContextual(dc, dc->getGenericEnvironmentOfContext(), options,
-                       unboundTyOpener, placeholderHandler);
-}
-
-TypeResolution
-TypeResolution::forContextual(DeclContext *dc, GenericEnvironment *genericEnv,
-                              TypeResolutionOptions options,
-                              OpenUnboundGenericTypeFn unboundTyOpener,
-                              HandlePlaceholderTypeReprFn placeholderHandler) {
-  TypeResolution result(dc, TypeResolutionStage::Contextual, options,
-                        unboundTyOpener, placeholderHandler);
-  result.genericEnv = genericEnv;
-  return result;
-}
-
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
   TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler);
   result.genericEnv = genericEnv;
@@ -125,30 +106,6 @@ GenericSignature TypeResolution::getGenericSignature() const {
     return genericEnv->getGenericSignature();
 
   return dc->getGenericSignatureOfContext();
-}
-
-bool TypeResolution::usesArchetypes() const {
-  switch (stage) {
-  case TypeResolutionStage::Structural:
-  case TypeResolutionStage::Interface:
-    return false;
-
-  case TypeResolutionStage::Contextual:
-    return true;
-  }
-  llvm_unreachable("unhandled stage");
-}
-
-Type TypeResolution::mapTypeIntoContext(Type type) const {
-  switch (stage) {
-  case TypeResolutionStage::Structural:
-  case TypeResolutionStage::Interface:
-    return type;
-
-  case TypeResolutionStage::Contextual:
-    return GenericEnvironment::mapTypeIntoContext(genericEnv, type);
-  }
-  llvm_unreachable("unhandled stage");
 }
 
 // FIXME: It would be nice to have a 'DescriptiveTypeKind' abstraction instead.
@@ -174,12 +131,12 @@ Type TypeResolution::resolveDependentMemberType(
   case TypeResolutionStage::Structural:
     return DependentMemberType::get(baseTy, refIdentifier);
 
-  case TypeResolutionStage::Contextual:
-    llvm_unreachable("Dependent type after archetype substitution");
-
   case TypeResolutionStage::Interface:
     // Handled below.
     break;
+
+  case TypeResolutionStage::Contextual:
+    llvm_unreachable("Use TypeResolution::resolveContextualType instead");
   }
 
   assert(stage == TypeResolutionStage::Interface);
@@ -273,12 +230,12 @@ Type TypeResolution::resolveSelfAssociatedType(Type baseTy,
   case TypeResolutionStage::Structural:
     return DependentMemberType::get(baseTy, name);
 
-  case TypeResolutionStage::Contextual:
-    llvm_unreachable("Dependent type after archetype substitution");
-
   case TypeResolutionStage::Interface:
     // Handled below.
     break;
+
+  case TypeResolutionStage::Contextual:
+    llvm_unreachable("Use TypeResolution::resolveContextualType instead");
   }
 
   assert(stage == TypeResolutionStage::Interface);
@@ -327,9 +284,7 @@ bool TypeResolution::areSameType(Type type1, Type type2) const {
     break;
 
   case TypeResolutionStage::Contextual:
-    // Contextual types have already been uniqued, so the isEqual() result
-    // above is complete.
-    return false;
+    llvm_unreachable("Use TypeResolution::resolveContextualType instead");
   }
 
   if (stage == TypeResolutionStage::Interface) {
@@ -395,7 +350,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
-    return mapTypeIntoContext(genericParam->getDeclaredInterfaceType());
+    return genericParam->getDeclaredInterfaceType();
   }
 
   if (!isSpecialized) {
@@ -407,13 +362,12 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
            parentDC = parentDC->getParentForLookup()) {
         auto *parentNominal = parentDC->getSelfNominalTypeDecl();
         if (parentNominal == nominalType)
-          return mapTypeIntoContext(parentDC->getDeclaredInterfaceType());
+          return parentDC->getDeclaredInterfaceType();
         if (isa<ExtensionDecl>(parentDC)) {
           auto *extendedType = parentNominal;
           while (extendedType != nullptr) {
             if (extendedType == nominalType)
-              return mapTypeIntoContext(
-                  extendedType->getDeclaredInterfaceType());
+              return extendedType->getDeclaredInterfaceType();
             extendedType = extendedType->getParent()->getSelfNominalTypeDecl();
           }
         }
@@ -436,8 +390,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
                     aliasDecl->getUnderlyingTypeRepr() != nullptr) {
                   return aliasDecl->getStructuralType();
                 }
-                return mapTypeIntoContext(
-                    aliasDecl->getDeclaredInterfaceType());
+                return aliasDecl->getDeclaredInterfaceType();
               }
 
               extendedType = unboundGeneric->getParent();
@@ -451,7 +404,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
                   aliasDecl->getUnderlyingTypeRepr() != nullptr) {
                 return aliasDecl->getStructuralType();
               }
-              return mapTypeIntoContext(aliasDecl->getDeclaredInterfaceType());
+              return aliasDecl->getDeclaredInterfaceType();
             }
             extendedType = aliasType->getParent();
             continue;
@@ -476,7 +429,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
           aliasDecl->getUnderlyingTypeRepr() != nullptr) {
         return aliasDecl->getStructuralType();
       }
-      return mapTypeIntoContext(aliasDecl->getDeclaredInterfaceType());
+      return aliasDecl->getDeclaredInterfaceType();
     }
 
     // When a nominal type used outside its context, return the unbound
@@ -503,11 +456,11 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
     if (!foundDC->getDeclaredInterfaceType())
       return ErrorType::get(ctx);
 
-    selfType = mapTypeIntoContext(foundDC->getDeclaredInterfaceType());
+    selfType = foundDC->getDeclaredInterfaceType();
   } else {
     // Otherwise, we want the protocol 'Self' type for
     // substituting into alias types and associated types.
-    selfType = mapTypeIntoContext(foundDC->getSelfInterfaceType());
+    selfType = foundDC->getSelfInterfaceType();
 
     if (selfType->is<GenericTypeParamType>()) {
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
@@ -551,7 +504,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
   // Finally, substitute the base type into the member type.
   return TypeChecker::substMemberTypeWithBase(
-      fromDC->getParentModule(), typeDecl, selfType, usesArchetypes());
+      fromDC->getParentModule(), typeDecl, selfType, /*useArchetypes=*/false);
 }
 
 static TypeResolutionOptions
@@ -880,16 +833,13 @@ Type TypeResolution::applyUnboundGenericArguments(
   } else if (auto genericSig =
                  decl->getDeclContext()->getGenericSignatureOfContext()) {
     for (auto gp : genericSig.getGenericParams()) {
-      subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-          (usesArchetypes()
-           ? genericSig.getGenericEnvironment()->mapTypeIntoContext(gp)
-           : gp);
+      subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] = gp;
     }
   }
 
   // Realize the types of the generic arguments and add them to the
   // substitution map.
-  for (unsigned i = 0, e = genericArgs.size(); i < e; ++i) {
+  for (const unsigned i : indices(genericArgs)) {
     auto origTy = genericSig.getInnermostGenericParams()[i];
     auto substTy = genericArgs[i];
 
@@ -906,13 +856,15 @@ Type TypeResolution::applyUnboundGenericArguments(
   auto *module = getDeclContext()->getParentModule();
 
   if (!skipRequirementsCheck && getStage() > TypeResolutionStage::Structural) {
+    // Check the generic arguments against the requirements of the declaration's
+    // generic signature.
+
+    // First, map substitutions into context.
     TypeSubstitutionMap contextualSubs = subs;
-    if (getStage() == TypeResolutionStage::Interface) {
-      if (const auto contextSig = getGenericSignature()) {
-        auto *genericEnv = contextSig.getGenericEnvironment();
-        for (auto &pair : contextualSubs) {
-          pair.second = genericEnv->mapTypeIntoContext(pair.second);
-        }
+    if (const auto contextSig = getGenericSignature()) {
+      auto *genericEnv = contextSig.getGenericEnvironment();
+      for (auto &pair : contextualSubs) {
+        pair.second = genericEnv->mapTypeIntoContext(pair.second);
       }
     }
 
@@ -1121,12 +1073,10 @@ static Type diagnoseUnknownType(TypeResolution resolution,
           diags.diagnose(comp->getNameLoc(), diag::dynamic_self_invalid, name)
             .fixItReplace(comp->getNameLoc().getSourceRange(), name);
 
-          auto type = resolution.mapTypeIntoContext(
-            dc->getInnermostTypeContext()->getSelfInterfaceType());
-
           comp->overwriteNameRef(DeclNameRef(nominal->getName()));
           comp->setValue(nominal, nominalDC->getParent());
-          return type;
+
+          return dc->getInnermostTypeContext()->getSelfInterfaceType();
         } else {
           diags.diagnose(comp->getNameLoc(), diag::cannot_find_type_in_scope,
                          comp->getNameRef());
@@ -1438,8 +1388,7 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
       // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
       // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
       // while the 'Self' type is more than just a reference to a TypeDecl.
-      auto selfType = resolution.mapTypeIntoContext(
-        typeDC->getSelfInterfaceType());
+      auto selfType = typeDC->getSelfInterfaceType();
 
       // Check if we can reference 'Self' here, and if so, what kind of Self it is.
       auto selfTypeKind = getSelfTypeKind(DC, options);

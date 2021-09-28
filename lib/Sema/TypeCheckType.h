@@ -337,22 +337,8 @@ public:
                HandlePlaceholderTypeReprFn placeholderHandler);
 
   /// Form a type resolution for a contextual type, which is a complete
-  /// description of the type using the archetypes of the given declaration
-  /// context.
-  static TypeResolution
-  forContextual(DeclContext *dc, TypeResolutionOptions opts,
-                OpenUnboundGenericTypeFn unboundTyOpener,
-                HandlePlaceholderTypeReprFn placeholderHandler);
-
-  /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given generic
   /// environment.
-  static TypeResolution
-  forContextual(DeclContext *dc, GenericEnvironment *genericEnv,
-                TypeResolutionOptions opts,
-                OpenUnboundGenericTypeFn unboundTyOpener,
-                HandlePlaceholderTypeReprFn placeholderHandler);
-
   static Type
   resolveContextualType(TypeRepr *TyR, DeclContext *dc,
                         TypeResolutionOptions opts,
@@ -405,12 +391,6 @@ public:
   /// \returns A well-formed type that is never null, or an \c ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR,
                    GenericParamList *silParams=nullptr) const;
-
-  /// Whether this type resolution uses archetypes (vs. generic parameters).
-  bool usesArchetypes() const;
-
-  /// Map the given type (that involves generic parameters)
-  Type mapTypeIntoContext(Type type) const;
 
   /// Resolve a reference to a member type of the given (dependent) base and
   /// name.
