@@ -502,7 +502,7 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
 bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
                                    DeclContext *dc,
                                    Optional<TypeResolutionStage> stage) {
-  if (stage && stage != TypeResolutionStage::Contextual)
+  if (stage)
     type = dc->mapTypeIntoContext(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
       LookUpConformanceInModule(dc->getParentModule()));

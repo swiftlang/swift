@@ -965,9 +965,6 @@ RequirementRequest::evaluate(Evaluator &evaluator,
                                               /*unboundTyOpener*/ nullptr,
                                               /*placeholderHandler*/ nullptr);
     break;
-
-  case TypeResolutionStage::Contextual:
-    llvm_unreachable("No clients care about this. Use mapTypeIntoContext()");
   }
 
   auto &reqRepr = getRequirement();

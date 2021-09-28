@@ -99,7 +99,7 @@ ASTContext &TypeResolution::getASTContext() const {
 
 GenericSignature TypeResolution::getGenericSignature() const {
   assert(
-      stage > TypeResolutionStage::Structural &&
+      stage == TypeResolutionStage::Interface &&
       "Structural resolution shouldn't require generic signature computation");
 
   if (genericEnv)
@@ -134,9 +134,6 @@ Type TypeResolution::resolveDependentMemberType(
   case TypeResolutionStage::Interface:
     // Handled below.
     break;
-
-  case TypeResolutionStage::Contextual:
-    llvm_unreachable("Use TypeResolution::resolveContextualType instead");
   }
 
   assert(stage == TypeResolutionStage::Interface);
@@ -233,9 +230,6 @@ Type TypeResolution::resolveSelfAssociatedType(Type baseTy,
   case TypeResolutionStage::Interface:
     // Handled below.
     break;
-
-  case TypeResolutionStage::Contextual:
-    llvm_unreachable("Use TypeResolution::resolveContextualType instead");
   }
 
   assert(stage == TypeResolutionStage::Interface);
@@ -274,17 +268,9 @@ bool TypeResolution::areSameType(Type type1, Type type2) const {
   if (type1->isEqual(type2))
     return true;
 
-  switch (stage) {
-  case TypeResolutionStage::Structural:
-  case TypeResolutionStage::Interface:
-    // If neither type has a type parameter, we're done.
-    if (!type1->hasTypeParameter() && !type2->hasTypeParameter())
-      return false;
-
-    break;
-
-  case TypeResolutionStage::Contextual:
-    llvm_unreachable("Use TypeResolution::resolveContextualType instead");
+  // If neither type has a type parameter, we're done.
+  if (!type1->hasTypeParameter() && !type2->hasTypeParameter()) {
+    return false;
   }
 
   if (stage == TypeResolutionStage::Interface) {
@@ -855,7 +841,7 @@ Type TypeResolution::applyUnboundGenericArguments(
   // generic signature.
   auto *module = getDeclContext()->getParentModule();
 
-  if (!skipRequirementsCheck && getStage() > TypeResolutionStage::Structural) {
+  if (!skipRequirementsCheck && getStage() == TypeResolutionStage::Interface) {
     // Check the generic arguments against the requirements of the declaration's
     // generic signature.
 
