@@ -8711,15 +8711,17 @@ void ClangImporter::Implementation::importAttributes(
         AnyUnavailable = true;
       }
 
-      if (isUsingMacroName(getClangASTContext().getSourceManager(),
-                            avail->getLoc(), "SPI_AVAILABLE") ||
-           isUsingMacroName(getClangASTContext().getSourceManager(),
-                            avail->getLoc(), "__SPI_AVAILABLE")) {
-        // The decl has been marked as SPI in the header by using the SPI macro,
-        // thus we add the SPI attribute to it with a default group name.
-        MappedDecl->getAttrs().add(SPIAccessControlAttr::create(SwiftContext,
-          SourceLoc(), SourceRange(),
-          SwiftContext.getIdentifier(CLANG_MODULE_DEFUALT_SPI_GROUP_NAME)));
+      if (EnableClangSPI) {
+        if (isUsingMacroName(getClangASTContext().getSourceManager(),
+                              avail->getLoc(), "SPI_AVAILABLE") ||
+             isUsingMacroName(getClangASTContext().getSourceManager(),
+                              avail->getLoc(), "__SPI_AVAILABLE")) {
+          // The decl has been marked as SPI in the header by using the SPI macro,
+          // thus we add the SPI attribute to it with a default group name.
+          MappedDecl->getAttrs().add(SPIAccessControlAttr::create(SwiftContext,
+            SourceLoc(), SourceRange(),
+            SwiftContext.getIdentifier(CLANG_MODULE_DEFUALT_SPI_GROUP_NAME)));
+        }
       }
 
       StringRef message = avail->getMessage();
