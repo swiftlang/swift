@@ -1210,8 +1210,11 @@ extension Collection {
 
       for offset in 0..<n {
         (buffer.baseAddress! + offset).initialize(to: try transform(self[i]))
-        resultCount &+= 1
         formIndex(after: &i)
+
+        // `resultCount` needs to keep pace with the number of initialized
+        // elements, in case `transform` throws.
+        resultCount &+= 1
       }
 
       _expectEnd(of: self, is: i)
