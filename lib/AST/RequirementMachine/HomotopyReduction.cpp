@@ -684,6 +684,22 @@ void RewriteSystem::minimizeRewriteSystem() {
     else
       break;
   }
+
+  // Assert if homotopy reduction failed to eliminate a redundant conformance,
+  // since this suggests a misunderstanding on my part.
+  for (unsigned ruleID : redundantConformances) {
+    const auto &rule = getRule(ruleID);
+    assert(rule.isProtocolConformanceRule() &&
+           "Redundant conformance is not a conformance rule?");
+
+    if (!rule.isRedundant()) {
+      llvm::errs() << "Homotopy reduction did not eliminate redundant "
+                   << "conformance?\n";
+      llvm::errs() << "(#" << ruleID << ") " << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
 }
 
 /// Verify that each 3-cell is a valid loop around its basepoint.
