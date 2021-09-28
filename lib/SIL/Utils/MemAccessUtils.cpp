@@ -642,6 +642,30 @@ const ValueDecl *AccessBase::getDecl() const {
   }
 }
 
+bool AccessBase::hasLocalOwnershipLifetime() const {
+  switch (getKind()) {
+  case AccessBase::Argument:
+  case AccessBase::Stack:
+  case AccessBase::Global:
+    return false;
+  case AccessBase::Unidentified:
+    // Unidentified storage may be nested within object access, but this is an
+    // "escaped pointer", so it is not restricted to the object's borrow scope.
+    return false;
+  case AccessBase::Yield:
+    // Yielded values have a local apply scope, but they never have the same
+    // storage as yielded values from a different scope, so there is no need to
+    // consider their local scope during substitution.
+    return false;
+  case AccessBase::Box:
+  case AccessBase::Class:
+  case AccessBase::Tail:
+    return getReference()->getOwnershipKind() != OwnershipKind::None;
+  case AccessBase::Nested:
+    llvm_unreachable("unexpected storage");
+  };
+}
+
 void AccessBase::print(raw_ostream &os) const {
   AccessRepresentation::print(os);
   switch (getKind()) {
@@ -833,17 +857,6 @@ void AccessStorage::visitRoots(
       }
     }
   }
-}
-
-bool AccessStorage::isGuaranteedForFunction() const {
-  if (getKind() == AccessStorage::Argument) {
-    return getArgument()->getArgumentConvention().isGuaranteedConvention();
-  }
-  if (isObjectAccess()) {
-    return getRoot().getOwnershipKind() == OwnershipKind::Guaranteed
-           && isa<SILFunctionArgument>(getRoot());
-  }
-  return false;
 }
 
 const ValueDecl *AccessStorage::getDecl() const {

@@ -610,6 +610,16 @@ public:
   /// determined. Otherwise returns null.
   const ValueDecl *getDecl() const;
 
+  /// Return true if this base address may be derived from a reference that is
+  /// only valid within a locally scoped OSSA lifetime. This is not true for
+  /// scoped storage such as alloc_stack and @in argument. It can be
+  /// independently assumed that addresses are only used within the scope of the
+  /// storage object.
+  ///
+  /// Useful to determine whether addresses with the same AccessStorage are in
+  /// fact substitutable without fixing OSSA lifetime.
+  bool hasLocalOwnershipLifetime() const;
+
   void print(raw_ostream &os) const;
   void dump() const;
 };
@@ -744,10 +754,6 @@ public:
   bool hasIdenticalStorage(const AccessStorage &other) const {
     return hasIdenticalAccessInfo(other);
   }
-
-  /// Return true if this storage is valid for all uses in a function without
-  /// checking its lifetime.
-  bool isGuaranteedForFunction() const;
 
   /// Returns the ValueDecl for the underlying storage, if it can be
   /// determined. Otherwise returns null.
