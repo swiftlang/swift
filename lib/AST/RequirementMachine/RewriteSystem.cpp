@@ -264,8 +264,8 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 
   if (Debug.contains(DebugFlags::Simplify)) {
     if (changed) {
-      llvm::dbgs() << "= Simplified " << term << ": ";
-      forDebug.dump(llvm::dbgs(), original, *this);
+      llvm::dbgs() << "= Simplified " << original << " to " << term << " via ";
+      (path == nullptr ? &forDebug : path)->dump(llvm::dbgs(), original, *this);
       llvm::dbgs() << "\n";
     } else {
       llvm::dbgs() << "= Irreducible term: " << term << "\n";
