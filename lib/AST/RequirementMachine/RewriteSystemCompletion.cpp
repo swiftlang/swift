@@ -570,7 +570,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
               llvm::dbgs() << rhs << ":\n";
 
               llvm::dbgs() << "$$ Loop: ";
-              loop.Path.dump(llvm::dbgs(), loop.Basepoint, *this);
+              loop.dump(llvm::dbgs(), *this);
               llvm::dbgs() << "\n\n";
 
               // Record the trivial loop.

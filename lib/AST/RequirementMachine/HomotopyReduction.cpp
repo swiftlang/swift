@@ -158,7 +158,7 @@ RewritePath::findRulesAppearingOnceInEmptyContext() const {
   for (auto step : Steps) {
     switch (step.Kind) {
     case RewriteStep::ApplyRewriteRule: {
-      if (step.StartOffset == 0 && step.EndOffset == 0)
+      if (!step.isInContext())
         rulesInEmptyContext.insert(step.RuleID);
 
       ++ruleMultiplicity[step.RuleID];
@@ -216,8 +216,7 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
         break;
 
       assert(!sawRule && "Rule appears more than once?");
-      assert(step.StartOffset == 0 || step.EndOffset == 0 &&
-             "Rule appears in context?");
+      assert(!step.isInContext() && "Rule appears in context?");
 
       ruleWasInverted = step.Inverse;
       sawRule = true;
@@ -460,6 +459,7 @@ bool RewritePath::computeCyclicallyReducedLoop(MutableTerm &basepoint,
   return count > 0;
 }
 
+/// Apply the interchange rule until fixed point (see maybeSwapRewriteSteps()).
 bool RewritePath::computeLeftCanonicalForm(const RewriteSystem &system) {
   bool changed = false;
 
@@ -491,116 +491,191 @@ void RewritePath::dump(llvm::raw_ostream &out,
   }
 }
 
+/// Compute cyclically-reduced left-canonical normal form of a 3-cell.
+void HomotopyGenerator::normalize(const RewriteSystem &system) {
+  // FIXME: This can be more efficient.
+  bool changed;
+  do {
+    changed = false;
+    changed |= Path.computeFreelyReducedPath();
+    changed |= Path.computeCyclicallyReducedLoop(Basepoint, system);
+    changed |= Path.computeLeftCanonicalForm(system);
+  } while (changed);
+}
+
+/// A 3-cell is "in context" if every rewrite step has a left or right whisker.
+bool HomotopyGenerator::isInContext() const {
+  unsigned minStartOffset = (unsigned) -1;
+  unsigned minEndOffset = (unsigned) -1;
+
+  for (const auto &step : Path) {
+    switch (step.Kind) {
+    case RewriteStep::ApplyRewriteRule:
+      minStartOffset = std::min(minStartOffset, step.StartOffset);
+      minEndOffset = std::min(minEndOffset, step.EndOffset);
+      break;
+
+    case RewriteStep::AdjustConcreteType:
+      break;
+    }
+
+    if (minStartOffset == 0 && minEndOffset == 0)
+      break;
+  }
+
+  return (minStartOffset > 0 || minEndOffset > 0);
+}
+
+void HomotopyGenerator::dump(llvm::raw_ostream &out,
+                             const RewriteSystem &system) const {
+  out << Basepoint << ": ";
+  Path.dump(out, Basepoint, system);
+  if (isDeleted())
+    out << " [deleted]";
+}
+
+Optional<unsigned> RewriteSystem::
+findRuleToDelete(RewritePath &replacementPath,
+                 const llvm::DenseSet<unsigned> *redundantConformances) {
+  for (auto &loop : HomotopyGenerators) {
+    if (loop.isDeleted())
+      continue;
+
+    SmallVector<unsigned> redundancyCandidates =
+        loop.Path.findRulesAppearingOnceInEmptyContext();
+
+    auto found = std::find_if(
+        redundancyCandidates.begin(),
+        redundancyCandidates.end(),
+        [&](unsigned ruleID) -> bool {
+          const auto &rule = getRule(ruleID);
+
+          // We should not find a rule that has already been marked redundant
+          // here; it should have already been replaced with a rewrite path
+          // in all homotopy generators.
+          assert(!rule.isRedundant());
+
+          // Associated type introduction rules are 'permanent'. They're
+          // not worth eliminating since they are re-added every time; it
+          // is better to find other candidates to eliminate in the same
+          // 3-cell instead.
+          if (rule.isPermanent())
+            return false;
+
+          // Protocol conformance rules are eliminated via a different
+          // algorithm which computes "generating conformances".
+          if (rule.isProtocolConformanceRule()) {
+            if (!redundantConformances)
+              return false;
+
+            if (!redundantConformances->count(ruleID))
+              return false;
+          }
+
+          return true;
+        });
+
+    if (found == redundancyCandidates.end())
+      continue;
+
+    auto ruleID = *found;
+    assert(replacementPath.empty());
+    replacementPath = loop.Path.splitCycleAtRule(ruleID);
+
+    loop.markDeleted();
+    getRule(ruleID).markRedundant();
+
+    return ruleID;
+  }
+
+  return None;
+}
+
+void RewriteSystem::deleteRule(unsigned ruleID,
+                               const RewritePath &replacementPath) {
+  if (Debug.contains(DebugFlags::HomotopyReduction)) {
+    const auto &rule = getRule(ruleID);
+    llvm::dbgs() << "* Deleting rule ";
+    rule.dump(llvm::dbgs());
+    llvm::dbgs() << " (#" << ruleID << ")\n";
+    llvm::dbgs() << "* Replacement path: ";
+    MutableTerm mutTerm(rule.getLHS());
+    replacementPath.dump(llvm::dbgs(), mutTerm, *this);
+    llvm::dbgs() << "\n";
+  }
+
+  // Replace all occurrences of the rule with the replacement path and
+  // normalize all 3-cells.
+  for (auto &loop : HomotopyGenerators) {
+    if (loop.isDeleted())
+      continue;
+
+    bool changed = loop.Path.replaceRuleWithPath(ruleID, replacementPath);
+    if (!changed)
+      continue;
+
+    unsigned size = loop.Path.size();
+
+    loop.normalize(*this);
+
+    if (Debug.contains(DebugFlags::HomotopyReduction)) {
+      if (size != loop.Path.size()) {
+        llvm::dbgs() << "** Note: 3-cell normalization eliminated "
+                     << (size - loop.Path.size()) << " steps\n";
+      }
+    }
+
+    if (loop.Path.empty()) {
+      if (Debug.contains(DebugFlags::HomotopyReduction)) {
+        llvm::dbgs() << "** Deleting trivial 3-cell at basepoint ";
+        llvm::dbgs() << loop.Basepoint << "\n";
+      }
+
+      loop.markDeleted();
+      continue;
+    }
+
+    // FIXME: Is this correct?
+    if (loop.isInContext()) {
+      if (Debug.contains(DebugFlags::HomotopyReduction)) {
+        llvm::dbgs() << "** Deleting 3-cell in context: ";
+        loop.dump(llvm::dbgs(), *this);
+        llvm::dbgs() << "\n";
+      }
+
+      loop.markDeleted();
+      continue;
+    }
+
+    if (Debug.contains(DebugFlags::HomotopyReduction)) {
+      llvm::dbgs() << "** Updated 3-cell: ";
+      loop.dump(llvm::dbgs(), *this);
+      llvm::dbgs() << "\n";
+    }
+  }
+}
+
 /// Use the 3-cells to delete rewrite rules, updating and simplifying existing
 /// 3-cells as each rule is deleted.
 void RewriteSystem::minimizeRewriteSystem() {
-  llvm::SmallDenseSet<unsigned> deletedRules;
-  llvm::SmallDenseSet<unsigned> deletedHomotopyGenerators;
-
-  auto findRuleToDelete = [&]() -> Optional<std::pair<unsigned, RewritePath>> {
-    for (unsigned loopID : indices(HomotopyGenerators)) {
-      if (deletedHomotopyGenerators.count(loopID))
-        continue;
-
-      const auto &loop = HomotopyGenerators[loopID];
-
-      SmallVector<unsigned> redundancyCandidates =
-          loop.Path.findRulesAppearingOnceInEmptyContext();
-      if (redundancyCandidates.empty())
-        continue;
-
-      auto ruleID = redundancyCandidates.front();
-      RewritePath replacementPath = loop.Path.splitCycleAtRule(ruleID);
-
-      deletedRules.insert(ruleID);
-      deletedHomotopyGenerators.insert(loopID);
-
-      return std::make_pair(ruleID, replacementPath);
-    }
-
-    return None;
-  };
-
-  auto deleteRule = [&](unsigned ruleID, RewritePath replacementPath) {
-    if (Debug.contains(DebugFlags::HomotopyReduction)) {
-      const auto &rule = getRule(ruleID);
-      llvm::dbgs() << "* Deleting rule ";
-      rule.dump(llvm::dbgs());
-      llvm::dbgs() << " (#" << ruleID << ")\n";
-      llvm::dbgs() << "* Replacement path: ";
-      MutableTerm mutTerm(rule.getLHS());
-      replacementPath.dump(llvm::dbgs(), mutTerm, *this);
-      llvm::dbgs() << "\n";
-    }
-
-    for (unsigned loopID : indices(HomotopyGenerators)) {
-      if (deletedHomotopyGenerators.count(loopID))
-        continue;
-
-      auto &loop = HomotopyGenerators[loopID];
-      bool changed = loop.Path.replaceRuleWithPath(ruleID, replacementPath);
-
-      if (changed) {
-        unsigned size = loop.Path.size();
-
-        bool changed;
-        do {
-          changed = false;
-          changed |= loop.Path.computeFreelyReducedPath();
-          changed |= loop.Path.computeCyclicallyReducedLoop(loop.Basepoint, *this);
-          changed |= loop.Path.computeLeftCanonicalForm(*this);
-        } while (changed);
-
-        if (Debug.contains(DebugFlags::HomotopyReduction)) {
-          if (size != loop.Path.size()) {
-            llvm::dbgs() << "** Note: Reducing the loop eliminated "
-                         << (size - loop.Path.size()) << " steps\n";
-          }
-        }
-
-        if (Debug.contains(DebugFlags::HomotopyReduction)) {
-          llvm::dbgs() << "** Updated homotopy generator: ";
-          llvm::dbgs() << "- " << loop.Basepoint << ": ";
-          loop.Path.dump(llvm::dbgs(), loop.Basepoint, *this);
-          llvm::dbgs() << "\n";
-        }
-      }
-    }
-  };
-
-  while (auto pair = findRuleToDelete()) {
-    deleteRule(pair->first, pair->second);
+  while (true) {
+    RewritePath replacementPath;
+    if (auto optRuleID = findRuleToDelete(replacementPath, nullptr))
+      deleteRule(*optRuleID, replacementPath);
+    else
+      break;
   }
 
-  if (Debug.contains(DebugFlags::HomotopyReduction)) {
-    llvm::dbgs() << "Minimized rewrite system:\n";
-    for (unsigned ruleID : indices(Rules)) {
-      if (deletedRules.count(ruleID))
-        continue;
+  llvm::DenseSet<unsigned> redundantConformances;
+  computeGeneratingConformances(redundantConformances);
 
-      llvm::dbgs() << "(#" << ruleID << ") " << getRule(ruleID) << "\n";
-    }
-
-    llvm::dbgs() << "Minimized homotopy generators:\n";
-    for (unsigned loopID : indices(HomotopyGenerators)) {
-      if (deletedHomotopyGenerators.count(loopID))
-        continue;
-
-      const auto &loop = HomotopyGenerators[loopID];
-      if (loop.Path.empty())
-        continue;
-
-      llvm::dbgs() << "(#" << loopID << ") ";
-      llvm::dbgs() << loop.Basepoint << ": ";
-      loop.Path.dump(llvm::dbgs(), loop.Basepoint, *this);
-      llvm::dbgs() << "\n";
-
-      MutableTerm basepoint = loop.Basepoint;
-      for (auto step : loop.Path) {
-        step.apply(basepoint, *this);
-        llvm::dbgs() << "- " << basepoint << "\n";
-      }
-    }
+  while (true) {
+    RewritePath replacementPath;
+    if (auto optRuleID = findRuleToDelete(replacementPath,
+                                          &redundantConformances))
+      deleteRule(*optRuleID, replacementPath);
+    else
+      break;
   }
 }
 
@@ -616,7 +691,7 @@ void RewriteSystem::verifyHomotopyGenerators() const {
 
     if (term != loop.Basepoint) {
       llvm::errs() << "Not a loop: ";
-      loop.Path.dump(llvm::errs(), loop.Basepoint, *this);
+      loop.dump(llvm::errs(), *this);
       llvm::errs() << "\n";
       abort();
     }
