@@ -258,7 +258,15 @@ class FindAccessBaseVisitor
   using SuperTy = FindAccessVisitorImpl<FindAccessBaseVisitor>;
 
 protected:
-  Optional<SILValue> base;
+  // If the optional baseVal is set, then a result was found. If the SILValue
+  // within the optional is invalid, then there are multiple inconsistent base
+  // addresses (this may currently happen with RawPointer phis).
+  Optional<SILValue> baseVal;
+  // If the kind optional is set, then 'baseVal' is a valid
+  // AccessBase. 'baseVal' may be a valid SILValue while kind optional has no
+  // value if an invalid address producer was detected, via a call to
+  // visitNonAccess.
+  Optional<AccessBase::Kind> kindVal;
 
 public:
   FindAccessBaseVisitor(NestedAccessType nestedAccessTy,
@@ -266,27 +274,39 @@ public:
       : FindAccessVisitorImpl(nestedAccessTy, storageCastTy) {}
 
   // Returns the accessed address or an invalid SILValue.
-  SILValue findBase(SILValue sourceAddr) && {
+  SILValue findPossibleBaseAddress(SILValue sourceAddr) && {
     reenterUseDef(sourceAddr);
-    return base.getValueOr(SILValue());
+    return baseVal.getValueOr(SILValue());
+  }
+
+  AccessBase findBase(SILValue sourceAddr) && {
+    reenterUseDef(sourceAddr);
+    if (!baseVal || !kindVal)
+      return AccessBase();
+
+    return AccessBase(baseVal.getValue(), kindVal.getValue());
   }
 
   void setResult(SILValue foundBase) {
-    if (!base)
-      base = foundBase;
-    else if (base.getValue() != foundBase)
-      base = SILValue();
+    if (!baseVal)
+      baseVal = foundBase;
+    else if (baseVal.getValue() != foundBase)
+      baseVal = SILValue();
   }
 
   // MARK: AccessPhiVisitor::UseDefVisitor implementation.
 
-  bool isResultValid() const { return base && bool(base.getValue()); }
+  // Keep going as long as baseVal is valid regardless of kindVal.
+  bool isResultValid() const { return baseVal && bool(baseVal.getValue()); }
 
-  void invalidateResult() { base = SILValue(); }
+  void invalidateResult() {
+    baseVal = SILValue();
+    kindVal = None;
+  }
 
-  Optional<SILValue> saveResult() const { return base; }
+  Optional<SILValue> saveResult() const { return baseVal; }
 
-  void restoreResult(Optional<SILValue> result) { base = result; }
+  void restoreResult(Optional<SILValue> result) { baseVal = result; }
 
   void addUnknownOffset() { return; }
 
@@ -294,11 +314,18 @@ public:
 
   SILValue visitBase(SILValue base, AccessStorage::Kind kind) {
     setResult(base);
+    if (!baseVal.getValue()) {
+      kindVal = None;
+    } else {
+      assert(!kindVal || kindVal.getValue() == kind);
+      kindVal = kind;
+    }
     return SILValue();
   }
 
   SILValue visitNonAccess(SILValue value) {
     setResult(value);
+    kindVal = None;
     return SILValue();
   }
 
@@ -322,7 +349,7 @@ SILValue swift::getTypedAccessAddress(SILValue address) {
   SILValue accessAddress =
       FindAccessBaseVisitor(NestedAccessType::StopAtAccessBegin,
                             StopAtStorageCast)
-          .findBase(address);
+          .findPossibleBaseAddress(address);
   assert(accessAddress->getType().isAddress());
   return accessAddress;
 }
@@ -334,14 +361,14 @@ SILValue swift::getAccessScope(SILValue address) {
   assert(address->getType().isAddress());
   return FindAccessBaseVisitor(NestedAccessType::StopAtAccessBegin,
                                IgnoreStorageCast)
-      .findBase(address);
+      .findPossibleBaseAddress(address);
 }
 
 // This is allowed to be called on a non-address pointer type.
 SILValue swift::getAccessBase(SILValue address) {
   return FindAccessBaseVisitor(NestedAccessType::IgnoreAccessBegin,
                                IgnoreStorageCast)
-      .findBase(address);
+      .findPossibleBaseAddress(address);
 }
 
 static bool isLetForBase(SILValue base) {
@@ -509,6 +536,12 @@ void AccessRepresentation::print(raw_ostream &os) const {
 //===----------------------------------------------------------------------===//
 //                              MARK: AccessBase
 //===----------------------------------------------------------------------===//
+
+AccessBase AccessBase::compute(SILValue sourceAddress) {
+  return FindAccessBaseVisitor(NestedAccessType::IgnoreAccessBegin,
+                               IgnoreStorageCast)
+      .findBase(sourceAddress);
+}
 
 AccessBase::AccessBase(SILValue base, Kind kind)
   : AccessRepresentation(base, kind)

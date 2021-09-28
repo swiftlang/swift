@@ -546,6 +546,17 @@ private:
 /// require traversing phis.
 class AccessBase : public AccessRepresentation {
 public:
+  /// Return an AccessBase for the formally accessed variable pointed to by \p
+  /// sourceAddress.
+  ///
+  /// \p sourceAddress may be an address type or Builtin.RawPointer.
+  ///
+  /// If \p sourceAddress is within a formal access scope, which does not have
+  /// "Unsafe" enforcement, then this always returns the valid base.
+  ///
+  /// If \p sourceAddress is not within a formal access scope, or within an
+  /// "Unsafe" scope, then this finds the formal base if possible,
+  /// otherwise returning an invalid base.
   static AccessBase compute(SILValue sourceAddress);
 
   // Do not add any members to this class. AccessBase can be copied as
