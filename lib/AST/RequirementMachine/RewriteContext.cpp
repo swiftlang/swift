@@ -397,4 +397,9 @@ RewriteContext::~RewriteContext() {
     llvm::dbgs() << "\n* Property trie root fanout:\n";
     PropertyTrieRootHistogram.dump(llvm::dbgs());
   }
+
+  for (const auto &pair : Machines)
+    delete pair.second;
+
+  Machines.clear();
 }
