@@ -864,8 +864,8 @@ void swift::placeFuncRef(ApplyInst *ai, DominanceInfo *domInfo) {
 /// Add an argument, \p val, to the branch-edge that is pointing into
 /// block \p Dest. Return a new instruction and do not erase the old
 /// instruction.
-TermInst *swift::addArgumentToBranch(SILValue val, SILBasicBlock *dest,
-                                     TermInst *branch) {
+TermInst *swift::addArgumentsToBranch(ArrayRef<SILValue> vals,
+                                      SILBasicBlock *dest, TermInst *branch) {
   SILBuilderWithScope builder(branch);
 
   if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
@@ -879,10 +879,12 @@ TermInst *swift::addArgumentToBranch(SILValue val, SILBasicBlock *dest,
       falseArgs.push_back(arg);
 
     if (dest == cbi->getTrueBB()) {
-      trueArgs.push_back(val);
+      for (auto val : vals)
+        trueArgs.push_back(val);
       assert(trueArgs.size() == dest->getNumArguments());
     } else {
-      falseArgs.push_back(val);
+      for (auto val : vals)
+        falseArgs.push_back(val);
       assert(falseArgs.size() == dest->getNumArguments());
     }
 
@@ -898,7 +900,8 @@ TermInst *swift::addArgumentToBranch(SILValue val, SILBasicBlock *dest,
     for (auto arg : bi->getArgs())
       args.push_back(arg);
 
-    args.push_back(val);
+    for (auto val : vals)
+      args.push_back(val);
     assert(args.size() == dest->getNumArguments());
     return builder.createBranch(bi->getLoc(), bi->getDestBB(), args);
   }
