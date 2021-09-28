@@ -1510,8 +1510,8 @@ static ApplyInst *getAsOSLogMessageInit(SILInstruction *inst) {
 }
 
 /// Return true iff the SIL function \c fun is a method of the \c OSLogMessage
-/// type.
-bool isMethodOfOSLogMessage(SILFunction &fun) {
+/// type or a type that has the @_semantics("oslog.message.type") annotation.
+static bool isMethodOfOSLogMessage(SILFunction &fun) {
   DeclContext *declContext = fun.getDeclContext();
   if (!declContext)
     return false;
@@ -1527,7 +1527,8 @@ bool isMethodOfOSLogMessage(SILFunction &fun) {
   NominalTypeDecl *typeDecl = parentContext->getSelfNominalTypeDecl();
   if (!typeDecl)
     return false;
-  return typeDecl->getName() == fun.getASTContext().Id_OSLogMessage;
+  return typeDecl->getName() == fun.getASTContext().Id_OSLogMessage
+    || typeDecl->hasSemanticsAttr(semantics::OSLOG_MESSAGE_TYPE);
 }
 
 class OSLogOptimization : public SILFunctionTransform {

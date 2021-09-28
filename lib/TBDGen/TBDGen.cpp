@@ -1362,15 +1362,24 @@ public:
       return;
 
     apigen::APIAvailability availability;
+    auto access = apigen::APIAccess::Public;
     if (source.kind == SymbolSource::Kind::SIL) {
       auto ref = source.getSILDeclRef();
-      if (ref.hasDecl())
+      if (ref.hasDecl()) {
         availability = getAvailability(ref.getDecl());
+        if (ref.getDecl()->isSPI())
+          access = apigen::APIAccess::Private;
+      }
+    } else if (source.kind == SymbolSource::Kind::IR) {
+      auto ref = source.getIRLinkEntity();
+      if (ref.hasDecl()) {
+        if (ref.getDecl()->isSPI())
+          access = apigen::APIAccess::Private;
+      }
     }
 
     api.addSymbol(symbol, moduleLoc, apigen::APILinkage::Exported,
-                  apigen::APIFlags::None, apigen::APIAccess::Public,
-                  availability);
+                  apigen::APIFlags::None, access, availability);
   }
 
   void addObjCInterface(const ClassDecl *decl) override {
@@ -1383,15 +1392,19 @@ public:
     StringRef name = getSelectorName(method, buffer);
     apigen::APIAvailability availability;
     bool isInstanceMethod = true;
-    if (auto *decl = method.getDecl()) {
-      availability = getAvailability(decl);
-      if (decl->getDescriptiveKind() == DescriptiveDeclKind::ClassMethod)
+    auto access = apigen::APIAccess::Public;
+    if (method.hasDecl()) {
+      availability = getAvailability(method.getDecl());
+      if (method.getDecl()->getDescriptiveKind() ==
+          DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
+      if (method.getDecl()->isSPI())
+        access = apigen::APIAccess::Private;
     }
 
     auto *clsRecord = addOrGetObjCInterface(cls);
-    api.addObjCMethod(clsRecord, name, moduleLoc, apigen::APIAccess::Public,
-                      isInstanceMethod, false, availability);
+    api.addObjCMethod(clsRecord, name, moduleLoc, access, isInstanceMethod,
+                      false, availability);
   }
 
 private:
@@ -1439,11 +1452,12 @@ private:
     if (auto *super = decl->getSuperclassDecl())
       superCls = super->getObjCRuntimeName(buffer);
     apigen::APIAvailability availability = getAvailability(decl);
-    apigen::APIAccess access = decl->getFormalAccess() == AccessLevel::Public
-                                   ? apigen::APIAccess::Public
-                                   : apigen::APIAccess::Private;
-    apigen::APILinkage linkage = decl->isObjC() ? apigen::APILinkage::Exported
-                                                : apigen::APILinkage::Internal;
+    apigen::APIAccess access =
+        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+    apigen::APILinkage linkage =
+        decl->getFormalAccess() == AccessLevel::Public && decl->isObjC()
+            ? apigen::APILinkage::Exported
+            : apigen::APILinkage::Internal;
     auto cls = api.addObjCClass(name, linkage, moduleLoc, access, availability,
                                 superCls);
     classMap.try_emplace(decl, cls);

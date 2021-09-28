@@ -39,7 +39,10 @@ enum class DebugFlags : unsigned {
   ConcretizeNestedTypes = (1<<5),
 
   /// Print debug output from the homotopy reduction algorithm.
-  HomotopyReduction = (1<<6)
+  HomotopyReduction = (1<<6),
+
+  /// Print debug output from the generating conformances algorithm.
+  GeneratingConformances = (1<<7),
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

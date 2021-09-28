@@ -284,7 +284,8 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
   }
   // If this is OSLogMessage, it should be a string-interpolation literal.
   Identifier declName = nominalDecl->getName();
-  if (declName == astContext.Id_OSLogMessage) {
+  if (declName == astContext.Id_OSLogMessage ||
+      nominalDecl->hasSemanticsAttr(semantics::OSLOG_MESSAGE_TYPE)) {
     diags.diagnose(errorLoc, diag::oslog_message_must_be_string_interpolation);
     return;
   }

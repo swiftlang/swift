@@ -1266,6 +1266,10 @@ public:
   std::string mangleAsString() const;
   SILLinkage getLinkage(ForDefinition_t isDefinition) const;
 
+  bool hasDecl() const {
+    return isDeclKind(getKind());
+  }
+
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
