@@ -27,3 +27,11 @@ enum E {
 let _: (E.Type) -> (E) -> () = { s in { e in s.f(e) } }
 // expected-warning@-1 {{will never be executed}}
 // expected-note@-2 {{'e' is of type 'E' which cannot be constructed because it is an enum with no cases}}
+
+func empty_product(_ xs: (Int, String, Never)) { // expected-note {{'xs' is of type '(Int, String, Never)' which cannot be constructed because it contains 'Never' which is an enum with no cases}}
+  print() // expected-warning{{will never be executed}}
+}
+func empty_custom_product(_ xs: (E, Int)) { // expected-note {{'xs' is of type '(E, Int)' which cannot be constructed because it contains 'E' which is an enum with no cases}}
+  print() // expected-warning{{will never be executed}}
+}
+
