@@ -59,7 +59,7 @@
 #include "TaskPrivate.h"
 #include "Error.h"
 
-#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
+#if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 #include <dispatch/dispatch.h>
 
 #if !defined(_WIN32)
@@ -178,20 +178,14 @@ static Job *claimNextFromJobQueue() {
   }
 }
 
-void swift::
-swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
-                                             void *conditionContext) {
+void swift::donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
+                                              void *conditionContext) {
   while (!condition(conditionContext)) {
     auto job = claimNextFromJobQueue();
     if (!job) return;
     swift_job_run(job, ExecutorRef::generic());
   }
 }
-
-#elif !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-
-// No implementation.  The expectation is that integrators in this
-// configuration will hook all the appropriate functions.
 
 #else
 
@@ -336,9 +330,6 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   insertIntoJobQueue(job);
-#elif !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-  swift_reportError(0, "operation unsupported without libdispatch: "
-                       "swift_task_enqueueGlobal");
 #else
   // We really want four things from the global execution service:
   //  - Enqueuing work should have minimal runtime and memory overhead.
@@ -394,9 +385,6 @@ static void swift_task_enqueueGlobalWithDelayImpl(unsigned long long delay,
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   insertIntoDelayedJobQueue(delay, job);
-#elif !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-  swift_reportError(0, "operation unsupported without libdispatch: "
-                       "swift_task_enqueueGlobalWithDelay");
 #else
 
   dispatch_function_t dispatchFunction = &__swift_run_job;
@@ -431,9 +419,6 @@ static void swift_task_enqueueMainExecutorImpl(Job *job) {
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   insertIntoJobQueue(job);
-#elif !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-  swift_reportError(0, "operation unsupported without libdispatch: "
-                       "swift_task_enqueueMainExecutor");
 #else
 
   JobPriority priority = job->getPriority();
@@ -454,7 +439,7 @@ void swift::swift_task_enqueueMainExecutor(Job *job) {
     swift_task_enqueueMainExecutorImpl(job);
 }
 
-#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
+#if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 void swift::swift_task_enqueueOnDispatchQueue(Job *job,
                                               HeapObject *_queue) {
   JobPriority priority = job->getPriority();
@@ -464,8 +449,7 @@ void swift::swift_task_enqueueOnDispatchQueue(Job *job,
 #endif
 
 ExecutorRef swift::swift_task_getMainExecutor() {
-#if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-  // FIXME: this isn't right for the non-cooperative environment
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   return ExecutorRef::generic();
 #else
   return ExecutorRef::forOrdinary(
@@ -475,8 +459,7 @@ ExecutorRef swift::swift_task_getMainExecutor() {
 }
 
 bool ExecutorRef::isMainExecutor() const {
-#if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-  // FIXME: this isn't right for the non-cooperative environment
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   return isGeneric();
 #else
   return Identity == reinterpret_cast<HeapObject*>(&_dispatch_main_q);

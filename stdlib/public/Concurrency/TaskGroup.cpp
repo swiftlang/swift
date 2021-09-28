@@ -34,7 +34,7 @@
 #include "queue" // TODO: remove and replace with usage of our mpsc queue
 #include <atomic>
 #include <assert.h>
-#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
+#if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 #include <dispatch/dispatch.h>
 #endif
 
