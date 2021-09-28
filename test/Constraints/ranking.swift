@@ -270,6 +270,80 @@ extension X where Self : GenericClass<String> {
 }
 
 //--------------------------------------------------------------------
+// Constructor-specific ranking
+//--------------------------------------------------------------------
+
+// We have a special ranking rule that only currently applies to constructors,
+// and compares the concrete parameter types.
+
+protocol Q {
+  init()
+}
+
+struct S1<T : Q> {
+  // We want to prefer the non-optional init over the optional init here.
+  init(_ x: T = .init()) {}
+  init(_ x: T? = nil) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S1V11testRankingACyxGyt_tcfC
+  init(testRanking: Void) {
+    // CHECK: function_ref @$s7ranking2S1VyACyxGxcfC : $@convention(method) <τ_0_0 where τ_0_0 : Q> (@in τ_0_0, @thin S1<τ_0_0>.Type) -> S1<τ_0_0>
+    self.init()
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S1V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S1VyACyxGxcfC : $@convention(method) <τ_0_0 where τ_0_0 : Q> (@in τ_0_0, @thin S1<τ_0_0>.Type) -> S1<τ_0_0>
+    _ = S1<T>()
+  }
+}
+
+protocol R {}
+extension Array : R {}
+extension Int : R {}
+
+struct S2 {
+  init(_ x: R) {}
+  init(_ x: Int...) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S2V15testInitRankingyyF
+  func testInitRanking() {
+    // We currently prefer the non-variadic init due to having
+    // "less effective parameters", and we don't compare the types for ranking due
+    // to the difference in variadic-ness.
+    // CHECK: function_ref @$s7ranking2S2VyAcA1R_pcfC : $@convention(method) (@in R, @thin S2.Type) -> S2
+    _ = S2(0)
+  }
+}
+
+// Very cursed: As a holdover from how we used to represent function inputs,
+// we rank these as tuples and consider (x:x:) to be a subtype of (x:y:). Seems
+// unlikely this is being relied on in the real world, but let's at least have
+// it as a test case to track its behavior.
+struct S3 {
+  init(x _: Int = 0, y _: Int = 0) {}
+  init(x _: Int = 0, x _: Int = 0) {}
+
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S3V1xAdCSi_SitcfC : $@convention(method) (Int, Int, @thin S3.Type) -> S3
+    _ = S3()
+  }
+}
+
+// Also another consequence of having ranked as tuples: we prefer the unlabeled
+// init here.
+struct S4 {
+  init(x: Int = 0, y: Int = 0) {}
+  init(_ x: Int = 0, _ y: Int = 0) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S4V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S4VyACSi_SitcfC : $@convention(method) (Int, Int, @thin S4.Type) -> S4
+    _ = S4()
+  }
+}
+
+//--------------------------------------------------------------------
 // Pointer conversions
 //--------------------------------------------------------------------
 

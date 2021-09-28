@@ -247,3 +247,7 @@ func rdar83352038() {
     return foo(cnode)
   }
 }
+
+// Make sure we reject an attempt at a function conversion.
+func returnsIUO() -> Int! { 0 }
+let _ = (returnsIUO as () -> Int)() // expected-error {{cannot convert value of type '() -> Int?' to type '() -> Int' in coercion}}
