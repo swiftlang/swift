@@ -18,6 +18,7 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringMap.h"
 
 #include <string>
 #include <vector>
@@ -47,6 +48,9 @@ public:
 
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
+
+  /// The map of aliases and underlying names of imported or referenced modules.
+  llvm::StringMap<StringRef> ModuleAliasMap;
 
   /// The name of the module that the frontend is building.
   std::string ModuleName;
