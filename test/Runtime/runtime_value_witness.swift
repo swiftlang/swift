@@ -421,4 +421,28 @@ Tests.test("Archetype Multi Enums") {
   checkCopies(h1, &h2)
 }
 
+Tests.test("Archetype Enums") {
+  @_GenerateLayoutBytecode
+  enum ArchetypeEnum<T: Equatable> : Equatable {
+    case Some(a: T)
+    case None
+  }
+
+  let a = ArchetypeEnum<LifetimeTracked>.Some(a: LifetimeTracked(0))
+  var b = ArchetypeEnum<LifetimeTracked>.Some(a: LifetimeTracked(1))
+  checkCopies(a, &b)
+
+  let b1 = ArchetypeEnum<LifetimeTracked>.Some(a: LifetimeTracked(1))
+  var b2 = ArchetypeEnum<LifetimeTracked>.None
+  checkCopies(b1, &b2)
+
+  let c1 = ArchetypeEnum<LifetimeTracked>.None
+  var c2 = ArchetypeEnum<LifetimeTracked>.Some(a: LifetimeTracked(2))
+  checkCopies(c1, &c2)
+
+  let d1 = ArchetypeEnum<LifetimeTracked>.None
+  var d2 = ArchetypeEnum<LifetimeTracked>.None
+  checkCopies(d1, &d2)
+}
+
 runAllTests()

@@ -120,7 +120,7 @@ enum class LayoutType : char {
 // into an executable/library.
 SWIFT_RUNTIME_EXPORT
 SWIFT_CC(swift)
-const Metadata *_Nullable swift_getTypeByMangledNameInContext(
+const Metadata *swift_getTypeByMangledNameInContext(
     const char *typeNameStart, size_t typeNameLength,
     const TargetContextDescriptor<InProcess> *context,
     const void *const *genericArgs);
@@ -209,6 +209,17 @@ uint32_t extractBits(BitVector mask, BitVector value);
 /// Get the sparebits mask and the offset that it's located at
 BitVector spareBits(const uint8_t *typeLayout, swift::Metadata *metadata);
 size_t computeSize(const uint8_t *typeLayout, swift::Metadata *metadata);
+
+uint32_t getEnumTag(void *addr, const uint8_t *layoutString,
+                    swift::Metadata *metadata);
+uint32_t numExtraInhabitants(const uint8_t *layoutString,
+                             swift::Metadata *metadata);
+
+uint32_t getEnumTagMultiPayload(void *addr, const uint8_t *layoutString,
+                                swift::Metadata *metadata);
+uint32_t getEnumTagSinglePayload(void *addr, const uint8_t *layoutString,
+                                 uint32_t numEmptyPayloads,
+                                 swift::Metadata *metadata);
 
 struct AlignedGroup {
   struct Field {

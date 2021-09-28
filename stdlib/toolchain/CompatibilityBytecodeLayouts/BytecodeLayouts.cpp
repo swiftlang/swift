@@ -282,10 +282,11 @@ SinglePayloadEnum readSinglePayloadEnum(const uint8_t *typeLayout,
   uint32_t payloadSize = computeSize(payloadLayoutPtr, metadata);
 
   BitVector payloadSpareBits = spareBits(payloadLayoutPtr, metadata);
-  uint32_t numExtraInhabitants = payloadSpareBits.countExtraInhabitants();
+  uint32_t payloadExtraInhabitants =
+      numExtraInhabitants(payloadLayoutPtr, metadata);
 
   uint32_t tagsInExtraInhabitants =
-      std::min(numExtraInhabitants, numEmptyPayloads);
+      std::min(payloadExtraInhabitants, numEmptyPayloads);
   uint32_t spilledTags = numEmptyPayloads - tagsInExtraInhabitants;
 
   uint8_t tagSize = spilledTags == 0           ? 0
@@ -603,6 +604,170 @@ uint32_t MultiPayloadEnum::gatherSpareBits(const uint8_t *data,
   return result;
 }
 
+uint32_t getEnumTag(void *addr, const uint8_t *layoutString,
+                    Metadata *metadata) {
+  switch ((LayoutType)layoutString[0]) {
+  case LayoutType::SinglePayloadEnum:
+    return getEnumTagSinglePayload(
+        addr, layoutString,
+        readSinglePayloadEnum(layoutString, metadata).numEmptyPayloads,
+        metadata);
+  case LayoutType::MultiPayloadEnum:
+    return getEnumTagMultiPayload(addr, layoutString, metadata);
+  default:
+    assert(false && "getEnumTag called on non enum");
+    return UINT32_MAX;
+  }
+}
+
+uint32_t getEnumTagMultiPayload(void *addr, const uint8_t *layoutString,
+                                Metadata *metadata) {
+  return 0;
+}
+
+uint32_t getEnumTagSinglePayload(void *addr, const uint8_t *layoutString,
+                                 uint32_t numEmptyPayloads,
+                                 Metadata *metadata) {
+  // In an aligned group, we use the field with the most extra inhabitants,
+  // favouring the earliest field in a tie.
+  switch ((LayoutType)layoutString[0]) {
+  case LayoutType::I8:
+  case LayoutType::I16:
+  case LayoutType::I32:
+  case LayoutType::I64:
+    assert(false && "cannot get enum tag from Int types");
+    return UINT32_MAX;
+  case LayoutType::AlignedGroup: {
+    uint32_t offset = 0;
+    // Pick the field with the most number of extra inhabitants and return that
+    uint32_t tag = UINT32_MAX;
+    uint32_t maxXICount = 0;
+    auto group = readAlignedGroup(layoutString, metadata);
+    for (auto field : group.fields) {
+      uint32_t fieldXI = numExtraInhabitants(field.fieldPtr, metadata);
+      if (fieldXI && fieldXI >= maxXICount) {
+        tag = getEnumTagSinglePayload((void **)addr + offset, field.fieldPtr,
+                                      numEmptyPayloads, metadata);
+        maxXICount = fieldXI;
+      }
+      offset += computeSize(field.fieldPtr, metadata);
+    }
+    return tag;
+  }
+  case LayoutType::ErrorReference:
+  case LayoutType::NativeStrongReference:
+  case LayoutType::NativeUnownedReference:
+  case LayoutType::NativeWeakReference: {
+    // Native heap references may have extra inhabitants of the high and low
+    // bits pointers.
+    uint32_t index =
+        swift_getHeapObjectExtraInhabitantIndex((HeapObject **)addr);
+    if (index == UINT32_MAX)
+      // We have a valid value, thus, we have index 0
+      return 0;
+    return index;
+  }
+  case LayoutType::UnknownUnownedReference:
+  case LayoutType::UnknownWeakReference:
+  case LayoutType::BlockReference:
+  case LayoutType::BridgeReference:
+  case LayoutType::ObjCReference:
+    // Non native references only have one safe extra inhabitant: 0
+    return *(uint32_t **)addr == nullptr ? 1 : UINT32_MAX;
+  case LayoutType::SinglePayloadEnum: {
+    auto e = readSinglePayloadEnum(layoutString, metadata);
+    auto payloadIndex = getEnumTagSinglePayload(addr, e.payloadLayoutPtr,
+                                                e.numEmptyPayloads, metadata);
+    if (payloadIndex >= e.numEmptyPayloads)
+      return payloadIndex - e.numEmptyPayloads;
+    return payloadIndex;
+  }
+  case LayoutType::MultiPayloadEnum:
+    assert(false && "nyi");
+    return UINT32_MAX;
+  case LayoutType::ArcheType: {
+    // Read 'A'
+    // Kind is a pointer sized int at offset 0 of metadata pointer
+    size_t offset = 0;
+    readBytes<uint8_t>(layoutString, offset);
+    uint32_t index = readBytes<uint32_t>(layoutString, offset);
+    return getGenericArgs(metadata)[index]
+        ->getValueWitnesses()
+        ->getEnumTagSinglePayload((const OpaqueValue *)addr, numEmptyPayloads,
+                                  getGenericArgs(metadata)[index]);
+  }
+  case LayoutType::ResilientType:
+    return UINT32_MAX;
+  }
+}
+
+uint32_t numExtraInhabitants(const uint8_t *layoutString, Metadata *metadata) {
+  // In an aligned group, we use the field with the most extra inhabitants,
+  // favouring the earliest field in a tie.
+  switch ((LayoutType)layoutString[0]) {
+  case LayoutType::I8:
+  case LayoutType::I16:
+  case LayoutType::I32:
+  case LayoutType::I64:
+    return 0;
+  case LayoutType::AlignedGroup: {
+    // Pick the field with the most number of extra inhabitants and return that
+    uint32_t maxXICount = 0;
+    auto group = readAlignedGroup(layoutString, metadata);
+    for (auto field : group.fields) {
+      uint32_t fieldXI = numExtraInhabitants(field.fieldPtr, metadata);
+      if (fieldXI >= maxXICount) {
+        maxXICount = fieldXI;
+      }
+    }
+    return maxXICount;
+  }
+  case LayoutType::ErrorReference:
+  case LayoutType::NativeStrongReference:
+  case LayoutType::NativeUnownedReference:
+  case LayoutType::NativeWeakReference: {
+    // Native heap references may have extra inhabitants of the high and low
+    // bits pointers.
+    uint64_t rawCount = heap_object_abi::LeastValidPointerValue >>
+                        heap_object_abi::ObjCReservedLowBits;
+    // The runtime limits the count.
+    return std::min(uint64_t(ValueWitnessFlags::MaxNumExtraInhabitants),
+                    rawCount);
+  }
+  case LayoutType::UnknownUnownedReference:
+  case LayoutType::UnknownWeakReference:
+  case LayoutType::BlockReference:
+  case LayoutType::BridgeReference:
+  case LayoutType::ObjCReference:
+    // Non native references only have one safe extra inhabitant: 0
+    return 1;
+  case LayoutType::SinglePayloadEnum: {
+    // The number of extra inhabitants in a single payload enum is the number of
+    // extra inhabitants of the payload less the number of extra inhabitants we
+    // use up for the enum's tag.
+    auto e = readSinglePayloadEnum(layoutString, metadata);
+    uint32_t payloadXI = numExtraInhabitants(e.payloadLayoutPtr, metadata);
+    return payloadXI - e.tagsInExtraInhabitants;
+  }
+  case LayoutType::MultiPayloadEnum: {
+    auto e = readMultiPayloadEnum(layoutString, metadata);
+    return e.spareBits().countExtraInhabitants();
+  }
+  case LayoutType::ArcheType: {
+    // Read 'A'
+    // Kind is a pointer sized int at offset 0 of metadata pointer
+    size_t offset = 0;
+    readBytes<uint8_t>(layoutString, offset);
+    uint32_t index = readBytes<uint32_t>(layoutString, offset);
+    return getGenericArgs(metadata)[index]
+        ->getValueWitnesses()
+        ->extraInhabitantCount;
+  }
+  case LayoutType::ResilientType:
+    return UINT32_MAX;
+  }
+}
+
 uint32_t extractPayloadTag(const MultiPayloadEnum e, const uint8_t *data) {
   unsigned numPayloads = e.payloadLayoutPtr.size();
   unsigned casesPerTag = (~e.spareBits()).count() >= 32
@@ -697,49 +862,12 @@ swift_generic_destroy(void *address, void *metadata,
            "TODO: Figure out how to link against the blocks and objc runtime");
     return;
   case LayoutType::SinglePayloadEnum: {
-    // A Single Payload Enum is a nonpayload case if any of the spare bits
-    // are set. Here, we determine where the spare bits are, then use that to
-    // mask the given value. If none of the bits are set, then we need to
-    // release the payload.
-    SinglePayloadEnum e = readSinglePayloadEnum(typeLayout, typedMetadata);
-
-    if (e.tagsInExtraInhabitants > 0) {
-      BitVector masked;
-      std::vector<uint8_t> wordVec;
-      for (size_t i = 0; i < e.payloadSize; i++) {
-        wordVec.push_back(addr[i]);
-        if (wordVec.size() == 8) {
-          uint64_t word = *(uint64_t *)wordVec.data();
-          masked.add(word);
-          wordVec.clear();
-        }
-      }
-
-      // If we don't have a multiple of 8 bytes, we need to top off
-      if (!wordVec.empty()) {
-        while (wordVec.size() < 8)
-          wordVec.push_back(0);
-        uint64_t word = *(uint64_t *)wordVec.data();
-        masked.add(word);
-      }
-
-      masked &= e.payloadSpareBits;
-
-      // If any spare bit is set, then we have a non payload case and don't need
-      // to free anything
-      if (masked.any()) {
-        return;
-      }
+    // A Single Payload Enum has a payload iff its index is 0
+    uint32_t enumTag = getEnumTag(addr, typeLayout, typedMetadata);
+    if (enumTag == 0) {
+      auto e = readSinglePayloadEnum(typeLayout, typedMetadata);
+      swift::swift_generic_destroy((void *)addr, metadata, e.payloadLayoutPtr);
     }
-
-    // Likewise, if we have any extra tag bits and any of them are set, then we
-    // have a non payload case and don't need to free anything.
-    for (size_t i = 0; i < e.tagSize; i++) {
-      if (*(addr + e.payloadSize + i))
-        return;
-    }
-
-    swift::swift_generic_destroy((void *)addr, metadata, e.payloadLayoutPtr);
     return;
   }
   case LayoutType::MultiPayloadEnum: {
@@ -871,57 +999,13 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
       return;
 #endif
   case LayoutType::SinglePayloadEnum: {
-    SinglePayloadEnum e = readSinglePayloadEnum(typeLayout, typedMetadata);
-
-    if (e.tagsInExtraInhabitants > 0) {
-      BitVector masked;
-      std::vector<uint8_t> wordVec;
-      for (uint i = 0; i < e.payloadSize; i++) {
-        wordVec.push_back(srcAddr[i]);
-        if (wordVec.size() == 8) {
-          // The data we read will be in little endian, so we need to reverse
-          // it byte wise.
-          for (auto i = wordVec.rbegin(); i != wordVec.rend(); i++) {
-            masked.add(*i);
-          }
-          wordVec.clear();
-        }
-      }
-
-      // If we don't have a multiple of 8 bytes, we need to top off
-      if (!wordVec.empty()) {
-        while (wordVec.size() < 8) {
-          wordVec.push_back(0);
-        }
-        for (auto i = wordVec.rbegin(); i != wordVec.rend(); i++) {
-          masked.add(*i);
-        }
-      }
-
-      masked &= e.payloadSpareBits;
-
-      // If any spare bit is set, we don't have a payload, so it's safe to just
-      // memcpy.
-      if (masked.any()) {
-        memcpy(destAddr, srcAddr, e.size);
-        return;
-      }
+    // We have a payload iff the enum tag is 0
+    auto e = readSinglePayloadEnum(typeLayout, typedMetadata);
+    if (getEnumTag(src, typeLayout, typedMetadata) == 0) {
+      swift::swift_generic_initialize(destAddr, srcAddr, metadata,
+                                      e.payloadLayoutPtr, isTake);
     }
-
-    // Likewise, if we have any extra tag bits and any of them are set, then we
-    // have a non payload case and don't need to free anything.
-    for (size_t i = 0; i < e.tagSize; i++) {
-      if (*(srcAddr + e.payloadSize + i)) {
-        memcpy(destAddr, srcAddr, e.size);
-        return;
-      }
-    }
-
-    swift::swift_generic_initialize(destAddr, srcAddr, metadata,
-                                    e.payloadLayoutPtr, isTake);
-    if (e.tagSize)
-      memcpy(destAddr + e.payloadSize, srcAddr + e.payloadSize, e.tagSize);
-
+    memcpy(destAddr, srcAddr, e.size);
     return;
   }
   case LayoutType::MultiPayloadEnum: {
@@ -930,7 +1014,7 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
 
     BitVector payloadBits;
     std::vector<uint8_t> wordVec;
-    for (uint i = 0; i < e.payloadSize(); i++) {
+    for (size_t i = 0; i < e.payloadSize(); i++) {
       wordVec.push_back(srcAddr[i]);
       if (wordVec.size() == 8) {
         // The data we read will be in little endian, so we need to reverse it
@@ -953,7 +1037,7 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
     }
 
     BitVector tagBits;
-    for (uint i = 0; i < (e.extraTagBitsSpareBits.count() / 8); i++) {
+    for (size_t i = 0; i < (e.extraTagBitsSpareBits.count() / 8); i++) {
       tagBits.add(srcAddr[i]);
     }
 
