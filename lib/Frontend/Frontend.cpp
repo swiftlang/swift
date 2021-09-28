@@ -219,6 +219,9 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getClangImporterOptions(),
       Invocation.getSymbolGraphOptions(),
       SourceMgr, Diagnostics));
+  if (!Invocation.getFrontendOptions().ModuleAliasMap.empty())
+    Context->setModuleAliases(Invocation.getFrontendOptions().ModuleAliasMap);
+
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
   registerSILGenRequestFunctions(Context->evaluator);

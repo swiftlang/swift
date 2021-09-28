@@ -347,6 +347,9 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
+  /// Mapping between aliases and underlying names of modules imported or referenced modules.
+  mutable llvm::DenseMap<Identifier, Identifier> ModuleAliasMap;
+
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
@@ -470,6 +473,12 @@ public:
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
+
+  /// Convert a given alias map to a map of Identifiers between module aliases and underlying names.
+  void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
+
+  /// Retrieve the underlying name given an alias name key.
+  Identifier lookupModuleAlias(Identifier key) const;
 
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,

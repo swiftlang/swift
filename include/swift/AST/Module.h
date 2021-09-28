@@ -171,6 +171,9 @@ class ModuleDecl
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
 
+  /// The underlying name for an alias used for this module (if any).
+  mutable Identifier ModuleUnderlyingName;
+
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -357,6 +360,10 @@ public:
     ModuleABIName = name;
   }
 
+  /// Retrieve the underlying name of the alias (if any) used for this module.
+  /// If no module alias is set, it returns getName().
+  Identifier getUnderlyingName() const;
+
   /// User-defined module version number.
   llvm::VersionTuple UserModuleVersion;
   void setUserModuleVersion(llvm::VersionTuple UserVer) {
@@ -365,6 +372,7 @@ public:
   llvm::VersionTuple getUserModuleVersion() const {
     return UserModuleVersion;
   }
+
 private:
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
@@ -379,6 +387,12 @@ private:
   ///  If this is a traditional (non-cross-import) overlay, get its underlying
   ///  module if one exists.
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
+
+  /// If a module alias is used, set the corresponding underlying name,
+  /// which will be used for contents including metadata and mangling.
+  void setUnderlyingName(Identifier name) {
+    ModuleUnderlyingName = name;
+  }
 
 public:
 
