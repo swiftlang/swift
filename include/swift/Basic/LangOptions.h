@@ -746,6 +746,9 @@ namespace swift {
     /// When set, don't look for or load overlays.
     bool DisableOverlayModules = false;
 
+    /// When set, import SPI_AVAILABLE symbols with Swift SPI attribtues.
+    bool EnableClangSPI = false;
+
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;
 
@@ -773,7 +776,8 @@ namespace swift {
                           DetailedPreprocessingRecord,
                           ImportForwardDeclarations,
                           DisableSwiftBridgeAttr,
-                          DisableOverlayModules);
+                          DisableOverlayModules,
+                          EnableClangSPI);
     }
   };
 
