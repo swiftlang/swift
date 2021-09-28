@@ -290,7 +290,9 @@ ERROR(guard_body_must_not_fallthrough,none,
       " to exit the scope", ())
 WARNING(unreachable_code,none, "will never be executed", ())
 NOTE(unreachable_code_uninhabited_param_note,none,
-	"'%0' is uninhabited, so this function body can never be executed", (StringRef))
+     "'%0' is of type %1 which cannot be constructed because %select{it "
+     "contains %3 which is an enum with no cases|it is an enum with no cases}2",
+     (StringRef, Type, bool, Type))
 NOTE(unreachable_code_branch,none,
      "condition always evaluates to %select{false|true}0", (bool))
 NOTE(call_to_noreturn_note,none,
