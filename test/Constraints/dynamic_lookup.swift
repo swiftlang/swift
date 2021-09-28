@@ -311,6 +311,9 @@ let _: DynamicIUO = o[dyn_iuo]!
 let _: DynamicIUO = o[dyn_iuo]!!
 let _: DynamicIUO? = o[dyn_iuo]
 // FIXME: These should all produce lvalues that we can write through
+o.t = s // expected-error {{cannot assign to property: 'o' is immutable}}
+o.t! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
+o.t!! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
 o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign through subscript: 'o' is immutable}}
 o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
 o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
