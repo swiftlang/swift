@@ -342,7 +342,7 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
 
 RequirementMachine::~RequirementMachine() {}
 
-void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
+void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   Sig = sig;
 
   PrettyStackTraceGenericSignature debugStack("building rewrite system for", sig);
@@ -358,7 +358,6 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
   if (Dump) {
     llvm::dbgs() << "Adding generic signature " << sig << " {\n";
   }
-
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
