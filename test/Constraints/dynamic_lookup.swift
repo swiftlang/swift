@@ -453,3 +453,10 @@ func test_dynamic_subscript_accepts_type_name_argument() {
     // expected-note@-2 {{use '.self' to reference the type object}} {{20-20=.self}}
   }
 }
+
+func testAnyObjectConstruction(_ x: AnyObject) {
+  AnyObject() // expected-error {{protocol type 'AnyObject' cannot be instantiated}}
+
+  // FIXME(SR-15210): This should also be rejected.
+  _ = type(of: x).init()
+}
