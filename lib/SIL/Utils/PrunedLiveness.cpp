@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/PrunedLiveness.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 
 using namespace swift;
@@ -117,7 +119,14 @@ bool PrunedLiveness::updateForBorrowingOperand(Operand *op) {
   return true;
 }
 
-bool PrunedLiveness::isWithinBoundary(SILInstruction *inst) {
+void PrunedLiveness::extendAcrossLiveness(PrunedLiveness &otherLivesness) {
+  // update this liveness for all the interesting users in otherLivesness.
+  for (std::pair<SILInstruction *, bool> userAndEnd : otherLivesness.users) {
+    updateForUse(userAndEnd.first, userAndEnd.second);
+  }
+}
+
+bool PrunedLiveness::isWithinBoundary(SILInstruction *inst) const {
   SILBasicBlock *block = inst->getParent();
   switch (getBlockLiveness(block)) {
   case PrunedLiveBlocks::Dead:
@@ -140,4 +149,117 @@ bool PrunedLiveness::isWithinBoundary(SILInstruction *inst) {
     }
   }
   return false;
+}
+
+bool PrunedLiveness::areUsesWithinBoundary(ArrayRef<Operand *> uses,
+                                           DeadEndBlocks &deadEndBlocks) const {
+  for (auto *use : uses) {
+    auto *user = use->getUser();
+    if (!isWithinBoundary(user) && !deadEndBlocks.isDeadEnd(user->getParent()))
+      return false;
+  }
+  return true;
+}
+
+void PrunedLivenessBoundary::visitInsertionPoints(
+    llvm::function_ref<void(SILBasicBlock::iterator insertPt)> visitor,
+    DeadEndBlocks *deBlocks) {
+  for (SILInstruction *user : lastUsers) {
+    if (!isa<TermInst>(user)) {
+      visitor(std::next(user->getIterator()));
+      continue;
+    }
+    auto *predBB = user->getParent();
+    for (SILBasicBlock *succ : predBB->getSuccessors()) {
+      if (deBlocks && deBlocks->isDeadEnd(succ))
+        continue;
+
+      assert(succ->getSinglePredecessorBlock() == predBB);
+      visitor(succ->begin());
+    }
+  }
+  for (SILBasicBlock *edge : boundaryEdges) {
+    if (deBlocks && deBlocks->isDeadEnd(edge))
+      continue;
+
+    visitor(edge->begin());
+  }
+}
+
+// Use \p liveness to find the last use in \p bb and add it to \p
+// boundary.lastUsers.
+static void findLastUserInBlock(SILBasicBlock *bb,
+                                PrunedLivenessBoundary &boundary,
+                                const PrunedLiveness &liveness) {
+  for (auto instIter = bb->rbegin(), endIter = bb->rend(); instIter != endIter;
+       ++instIter) {
+    auto *inst = &*instIter;
+    if (liveness.isInterestingUser(inst) == PrunedLiveness::NonUser)
+      continue;
+
+    boundary.lastUsers.push_back(inst);
+  }
+  llvm_unreachable("No user in LiveWithin block");
+}
+
+void PrunedLivenessBoundary::compute(const PrunedLiveness &liveness) {
+  for (SILBasicBlock *bb : liveness.getDiscoveredBlocks()) {
+    // Process each block that has not been visited and is not LiveOut.
+    switch (liveness.getBlockLiveness(bb)) {
+    case PrunedLiveBlocks::LiveOut:
+      for (SILBasicBlock *succBB : bb->getSuccessors()) {
+        if (liveness.getBlockLiveness(succBB) == PrunedLiveBlocks::Dead) {
+          boundaryEdges.push_back(succBB);
+        }
+      }
+      break;
+    case PrunedLiveBlocks::LiveWithin: {
+      // The liveness boundary is inside this block. Insert a final destroy
+      // inside the block if it doesn't already have one.
+      findLastUserInBlock(bb, *this, liveness);
+      break;
+    }
+    case PrunedLiveBlocks::Dead:
+      llvm_unreachable("All discovered blocks must be live");
+    }
+  }
+}
+
+void PrunedLivenessBoundary::compute(const PrunedLiveness &liveness,
+                                     ArrayRef<SILBasicBlock *> postDomBlocks) {
+  if (postDomBlocks.empty())
+    return; // all paths must be dead-ends or infinite loops
+
+  BasicBlockWorklist blockWorklist(postDomBlocks[0]->getParent());
+
+  // Visit each post-dominating block as the starting point for a
+  // backward CFG traversal.
+  for (auto *bb : postDomBlocks) {
+    blockWorklist.push(bb);
+  }
+  while (auto *bb = blockWorklist.pop()) {
+    // Process each block that has not been visited and is not LiveOut.
+    switch (liveness.getBlockLiveness(bb)) {
+    case PrunedLiveBlocks::LiveOut:
+      // A lifetimeEndBlock may be determined to be LiveOut after analyzing the
+      // extended liveness. It is irrelevent for finding the boundary.
+      break;
+    case PrunedLiveBlocks::LiveWithin: {
+      // The liveness boundary is inside this block. Insert a final destroy
+      // inside the block if it doesn't already have one.
+      findLastUserInBlock(bb, *this, liveness);
+      break;
+    }
+    case PrunedLiveBlocks::Dead:
+      // Continue searching upward to find the pruned liveness boundary.
+      for (auto *predBB : bb->getPredecessorBlocks()) {
+        if (liveness.getBlockLiveness(predBB) == PrunedLiveBlocks::LiveOut) {
+          boundaryEdges.push_back(bb);
+        } else {
+          blockWorklist.pushIfNotVisited(predBB);
+        }
+      }
+      break;
+    }
+  }
 }
