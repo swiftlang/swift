@@ -1484,10 +1484,10 @@ SILBasicBlock::iterator OwnershipReplaceSingleUseHelper::perform() {
 //===----------------------------------------------------------------------===//
 
 /// Given a phi that has been newly created or converted from terminator
-/// results, check for inner guaranteed operands (which do not introduce a
-/// borrow scope). This is invalid OSSA because the phi is a reborrow, and all
-/// borrow-scope-ending instructions must directly use the BorrowedValue that
-/// introduces the scope.
+/// results, check if any of the phi's operands are inner guaranteed values.
+/// This is invalid OSSA because the phi is a reborrow. Like all
+/// borrow-scope-ending instructions a phi must directly use the BorrowedValue
+/// that introduces the scope.
 ///
 /// Create nested borrow scopes for its operands.
 ///
