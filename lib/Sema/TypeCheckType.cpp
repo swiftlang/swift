@@ -1854,9 +1854,10 @@ namespace {
                            DifferentiabilityKind diffKind =
                                DifferentiabilityKind::NonDifferentiable,
                            Type globalActor = Type());
-    SmallVector<AnyFunctionType::Param, 8> resolveASTFunctionTypeParams(
-        TupleTypeRepr *inputRepr, TypeResolutionOptions options,
-        bool requiresMappingOut, DifferentiabilityKind diffKind);
+    SmallVector<AnyFunctionType::Param, 8>
+    resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
+                                 TypeResolutionOptions options,
+                                 DifferentiabilityKind diffKind);
 
     NeverNullType resolveSILFunctionType(
         FunctionTypeRepr *repr, TypeResolutionOptions options,
@@ -2650,7 +2651,10 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       if (SF->Kind == SourceFileKind::SIL) {
         if (((attrs.has(TAK_sil_weak) || attrs.has(TAK_sil_unmanaged)) &&
              ty->getOptionalObjectType()) ||
-            (!attrs.has(TAK_sil_weak) && ty->hasReferenceSemantics())) {
+            (!attrs.has(TAK_sil_weak) &&
+             GenericEnvironment::mapTypeIntoContext(
+                 resolution.getGenericSignature().getGenericEnvironment(), ty)
+                 ->hasReferenceSemantics())) {
           ty = ReferenceStorageType::get(ty, attrs.getOwnership(),
                                          getASTContext());
           attrs.clearOwnership();
@@ -2710,7 +2714,6 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 SmallVector<AnyFunctionType::Param, 8>
 TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                            TypeResolutionOptions options,
-                                           bool requiresMappingOut,
                                            DifferentiabilityKind diffKind) {
   SmallVector<AnyFunctionType::Param, 8> elements;
   elements.reserve(inputRepr->getNumElements());
@@ -2736,11 +2739,6 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     if (ty->hasError()) {
       elements.emplace_back(ErrorType::get(getASTContext()));
       continue;
-    }
-
-    // Parameters of polymorphic functions speak in terms of interface types.
-    if (requiresMappingOut) {
-      ty = ty->mapTypeOutOfContext();
     }
 
     bool autoclosure = false;
@@ -2878,9 +2876,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   TypeResolutionOptions options = None;
   options |= parentOptions.withoutContext().getFlags();
-  auto params = resolveASTFunctionTypeParams(
-      repr->getArgsTypeRepr(), options,
-      repr->getGenericEnvironment() != nullptr, diffKind);
+  auto params =
+      resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options, diffKind);
 
   auto resultOptions = options.withoutContext();
   resultOptions.setContext(TypeResolverContext::FunctionResult);
@@ -2926,7 +2923,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericEnv = repr->getGenericEnvironment()) {
-    outputTy = outputTy->mapTypeOutOfContext();
     return GenericFunctionType::get(genericEnv->getGenericSignature(),
                                     params, outputTy, extInfo);
   }

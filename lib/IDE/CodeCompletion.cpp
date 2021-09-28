@@ -1580,10 +1580,12 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
         /*GenericParams=*/nullptr,
         CurDeclContext,
         /*ProduceDiagnostics=*/false);
-    ParsedTypeLoc.setType(ty);
-    if (!ParsedTypeLoc.isError()) {
+    if (!ty->hasError()) {
+      ParsedTypeLoc.setType(CurDeclContext->mapTypeIntoContext(ty));
       return true;
     }
+
+    ParsedTypeLoc.setType(ty);
 
     // It doesn't type check as a type, so see if it's a qualifying module name.
     if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
