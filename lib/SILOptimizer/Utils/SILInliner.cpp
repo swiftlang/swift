@@ -443,7 +443,6 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   // Create the return block and set ReturnToBB for use in visitTerminator
   // callbacks.
   SILBasicBlock *callerBlock = Apply.getParent();
-  SILBasicBlock *throwBlock = nullptr;
   SmallVector<SILInstruction *, 1> endBorrowInsertPts;
 
   switch (Apply.getKind()) {
@@ -476,7 +475,7 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
     auto *tai = cast<TryApplyInst>(Apply);
     ReturnToBB = tai->getNormalBB();
     endBorrowInsertPts.push_back(&*ReturnToBB->begin());
-    throwBlock = tai->getErrorBB();
+    endBorrowInsertPts.push_back(&*tai->getErrorBB()->begin());
     break;
   }
   }
@@ -492,11 +491,6 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
       for (auto *insertPt : endBorrowInsertPts) {
         SILBuilderWithScope returnBuilder(insertPt, getBuilder());
         returnBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
-      }
-
-      if (throwBlock) {
-        SILBuilderWithScope throwBuilder(throwBlock->begin(), getBuilder());
-        throwBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
       }
     }
   }
