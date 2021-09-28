@@ -18,7 +18,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#if defined(__ELF__) || defined(__wasm__)
+#if defined(__ELF__)
 
 #include "../SwiftShims/MetadataSections.h"
 #include "ImageInspection.h"

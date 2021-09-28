@@ -53,6 +53,7 @@ set(swift_runtime_sources
     ImageInspectionELF.cpp
     ImageInspectionCOFF.cpp
     ImageInspectionStatic.cpp
+    ImageInspectionWasm.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
     Metadata.cpp
@@ -123,7 +124,7 @@ foreach(sdk IN LISTS SWIFT_SDKS)
     set(image_inspection_shared_file ImageInspectionELF.cpp)
   elseif(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "WASI")
     set(image_inspection_shared_sdk "${sdk}")
-    set(image_inspection_shared_file ImageInspectionELF.cpp)
+    set(image_inspection_shared_file ImageInspectionWasm.cpp)
     # Set default arch
     set(primary_arch "wasm32")
   endif()
