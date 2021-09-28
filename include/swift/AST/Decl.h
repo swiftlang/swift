@@ -4151,6 +4151,8 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
+  friend class StructuralRequirementsRequest;
+  friend class ProtocolDependenciesRequest;
   friend class RequirementSignatureRequest;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
@@ -4337,6 +4339,17 @@ public:
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
+
+  /// Retrieve the original requirements written in source, as structural types.
+  ///
+  /// The requirement machine builds the requirement signature from structural
+  /// requirements. Almost everywhere else should use getRequirementSignature()
+  /// instead.
+  ArrayRef<StructuralRequirement> getStructuralRequirements() const;
+
+  /// Get the list of protocols appearing on the right hand side of conformance
+  /// requirements. Computed from the structural requirements, above.
+  ArrayRef<ProtocolDecl *> getProtocolDependencies() const;
 
   /// Retrieve the requirements that describe this protocol.
   ///
