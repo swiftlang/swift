@@ -170,3 +170,14 @@ func testMirrored(instance: ClassWithAsync) async {
   await instance.protocolMethod()
   await instance.customAsyncName()
 }
+
+@MainActor class MyToolbarButton : NXButton {
+  var count = 5
+
+  func f() {
+    Task {
+      let c = count
+      print(c)
+    }
+  }
+}

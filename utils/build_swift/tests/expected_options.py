@@ -179,6 +179,7 @@ EXPECTED_DEFAULTS = {
     'legacy_impl': False,
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
+    'libswift_mode': None,
     'lit_args': '-sv',
     'llbuild_assertions': True,
     'lldb_assertions': True,
@@ -732,6 +733,11 @@ EXPECTED_OPTIONS = [
     # valid choices
     SetOption('--lto', dest='lto_type'),
     ChoicesOption('--lto', dest='lto_type', choices=['thin', 'full']),
+
+    SetOption('--libswift', dest='libswift_mode'),
+    ChoicesOption('--libswift', dest='libswift_mode',
+                  choices=['off', 'hosttools', 'bootstrapping',
+                           'bootstrapping-with-hostlibs']),
 
     # NOTE: We'll need to manually test the behavior of these since they
     # validate compiler version strings.

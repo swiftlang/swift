@@ -1709,11 +1709,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   case clang::DeclarationName::CXXOperatorName: {
     auto op = D->getDeclName().getCXXOverloadedOperator();
     auto functionDecl = dyn_cast<clang::FunctionDecl>(D);
-    if (!functionDecl) {
-      // This can happen for example for templated operators functions.
-      // We don't support those, yet.
+
+    if (auto functionTemplate = dyn_cast<clang::FunctionTemplateDecl>(D))
+      functionDecl = functionTemplate->getAsFunction();
+
+    if (!functionDecl)
       return ImportedName();
-    }
 
     switch (op) {
     case clang::OverloadedOperatorKind::OO_Plus:
