@@ -705,7 +705,7 @@ static AccessorDecl *makeStructRawValueGetter(
 }
 
 static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
-                                         StructDecl *importedDecl,
+                                         NominalTypeDecl *importedDecl,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
@@ -733,7 +733,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
 }
 
 static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
-                                         StructDecl *importedDecl,
+                                         NominalTypeDecl *importedDecl,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
@@ -875,7 +875,7 @@ static std::pair<AccessorDecl *, AccessorDecl *>
 makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
                            const clang::IndirectFieldDecl *indirectField,
                            ArrayRef<VarDecl *> members,
-                           StructDecl *importedStructDecl,
+                           NominalTypeDecl *importedStructDecl,
                            VarDecl *importedFieldDecl) {
   auto &C = Impl.SwiftContext;
 
@@ -1042,7 +1042,7 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
 /// \returns a pair of the getter and setter function decls.
 static std::pair<AccessorDecl *, AccessorDecl *>
 makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
-                        StructDecl *importedUnionDecl,
+                        NominalTypeDecl *importedUnionDecl,
                         VarDecl *importedFieldDecl) {
   auto &C = Impl.SwiftContext;
 
@@ -1066,7 +1066,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
 
 static clang::DeclarationName
 getAccessorDeclarationName(clang::ASTContext &Ctx,
-                           StructDecl *structDecl,
+                           NominalTypeDecl *structDecl,
                            VarDecl *fieldDecl,
                            const char *suffix) {
   std::string id;
@@ -1094,7 +1094,7 @@ getAccessorDeclarationName(clang::ASTContext &Ctx,
 static std::pair<FuncDecl *, FuncDecl *>
 makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                       clang::RecordDecl *structDecl,
-                      StructDecl *importedStructDecl,
+                      NominalTypeDecl *importedStructDecl,
                       clang::FieldDecl *fieldDecl,
                       VarDecl *importedFieldDecl) {
   clang::ASTContext &Ctx = Impl.getClangASTContext();
@@ -1301,7 +1301,7 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
 /// Create a default constructor that initializes a struct to zero.
 static ConstructorDecl *
 createDefaultConstructor(ClangImporter::Implementation &Impl,
-                         StructDecl *structDecl) {
+                         NominalTypeDecl *structDecl) {
   auto &context = Impl.SwiftContext;
 
   auto emptyPL = ParameterList::createEmpty(context);
@@ -1396,7 +1396,7 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 /// Create a constructor that initializes a struct from its members.
 static ConstructorDecl *
 createValueConstructor(ClangImporter::Implementation &Impl,
-                       StructDecl *structDecl, ArrayRef<VarDecl *> members,
+                       NominalTypeDecl *structDecl, ArrayRef<VarDecl *> members,
                        bool wantCtorParamNames, bool wantBody) {
   auto &context = Impl.SwiftContext;
 
@@ -3276,7 +3276,18 @@ namespace {
       return result;
     }
 
+    static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
+      return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
+               if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+                 return swiftAttr->getAttribute() == "import_as_ref";
+               return false;
+             });
+    }
+
     bool isCxxRecordImportable(const clang::CXXRecordDecl *decl) {
+      if (hasImportAsRefAttr(decl))
+        return true;
+
       if (auto dtor = decl->getDestructor()) {
         if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
           return false;
@@ -3370,7 +3381,7 @@ namespace {
 
       // Create the struct declaration and record it.
       auto name = importedName.getDeclName().getBaseIdentifier();
-      StructDecl *result = nullptr;
+      NominalTypeDecl *result = nullptr;
       // Try to find an already-imported struct. This case happens any time
       // there are nested structs. The "Parent" struct will import the "Child"
       // struct at which point it attempts to import its decl context which is
@@ -3380,9 +3391,15 @@ namespace {
           Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
       if (alreadyImportedResult != Impl.ImportedDecls.end())
         return alreadyImportedResult->second;
-      result = Impl.createDeclWithClangNode<StructDecl>(
-          decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
-          name, Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
+
+      auto loc = Impl.importSourceLoc(decl->getLocation());
+      if (hasImportAsRefAttr(decl))
+        result = Impl.createDeclWithClangNode<ClassDecl>(
+            decl, AccessLevel::Public, loc, name, loc,
+            ArrayRef<InheritedEntry>{}, nullptr, dc, false);
+      else
+        result = Impl.createDeclWithClangNode<StructDecl>(
+            decl, AccessLevel::Public, loc, name, loc, None, nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -3542,16 +3559,23 @@ namespace {
         ctors.push_back(valueCtor);
       }
 
-      // Add ctors directly as they cannot always be looked up from the clang
-      // decl (some are synthesized by Swift).
-      for (auto ctor : ctors) {
-        result->addMember(ctor);
+      // Do not allow Swift to construct foreign reference types (at least, not
+      // yet).
+      if (isa<StructDecl>(result)) {
+        for (auto ctor : ctors) {
+          // Add ctors directly as they cannot always be looked up from the
+          // clang decl (some are synthesized by Swift).
+          result->addMember(ctor);
+        }
       }
 
-      result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
+      if (auto structResult = dyn_cast<StructDecl>(result))
+        structResult->setHasUnreferenceableStorage(hasUnreferenceableStorage);
 
       if (cxxRecordDecl) {
-        result->setIsCxxNonTrivial(!cxxRecordDecl->isTriviallyCopyable());
+        if (auto structResult = dyn_cast<StructDecl>(result))
+          structResult->setIsCxxNonTrivial(
+              !cxxRecordDecl->isTriviallyCopyable());
 
         for (auto &subscriptInfo : Impl.cxxSubscripts) {
           auto declAndParameterType = subscriptInfo.first;
@@ -3865,12 +3889,37 @@ namespace {
     VarDecl *getImplicitProperty(ImportedName importedName,
                                  const clang::FunctionDecl *accessor);
 
+    static bool
+    foreignReferenceTypePassedByRef(const clang::FunctionDecl *decl) {
+      bool anyParamPassesByVal =
+          llvm::any_of(decl->parameters(), [](auto *param) {
+            if (auto recordType = dyn_cast<clang::RecordType>(
+                    param->getType().getCanonicalType()))
+              return hasImportAsRefAttr(recordType->getDecl());
+            return false;
+          });
+
+      if (anyParamPassesByVal)
+        return true;
+
+      if (auto recordType = dyn_cast<clang::RecordType>(
+              decl->getReturnType().getCanonicalType()))
+        return hasImportAsRefAttr(recordType->getDecl());
+
+      return false;
+    }
+
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
       // Import the name of the function.
       ImportedName importedName;
       Optional<ImportedName> correctSwiftName;
       std::tie(importedName, correctSwiftName) = importFullName(decl);
       if (!importedName)
+        return nullptr;
+
+      // Don't import functions that pass a foreign reference type by value
+      // (either as a parameter or return type).
+      if (foreignReferenceTypePassedByRef(decl))
         return nullptr;
 
       AbstractStorageDecl *owningStorage;
@@ -4048,10 +4097,13 @@ namespace {
             selfIdx = None;
           } else {
             selfIdx = 0;
+            // Don't import members of a class decl as mutating.
             // If the method is imported as mutating, this implicitly makes the
             // parameter indirect.
-            selfIsInOut = Impl.SwiftContext.getClangModuleLoader()
-                              ->isCXXMethodMutating(mdecl);
+            selfIsInOut =
+                !isa<ClassDecl>(dc) &&
+                Impl.SwiftContext.getClangModuleLoader()->isCXXMethodMutating(
+                    mdecl);
           }
         }
       }
@@ -4207,6 +4259,14 @@ namespace {
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
+
+      // TODO: do we want to emit a diagnostic here?
+      // Types that are marked as foreign references cannot be stored by value.
+      if (auto recordType =
+              dyn_cast<clang::RecordType>(decl->getType().getCanonicalType())) {
+        if (hasImportAsRefAttr(recordType->getDecl()))
+          return nullptr;
+      }
 
       auto importedType =
           Impl.importType(decl->getType(), ImportTypeKind::RecordField,
@@ -9706,7 +9766,7 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
     E->loadAllMembers();
 }
 
-static void loadAllMembersOfRecordDecl(StructDecl *recordDecl) {
+static void loadAllMembersOfRecordDecl(NominalTypeDecl *recordDecl) {
   auto &ctx = recordDecl->getASTContext();
   auto clangRecord = cast<clang::RecordDecl>(recordDecl->getClangDecl());
 
@@ -9775,8 +9835,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
     // TODO: this is a hack to set member loading as lazy again. It got set to
     // non-lazy when getMembers was called.
-    cast<StructDecl>(D)->setMemberLoader(this, 0);
-    loadAllMembersOfRecordDecl(cast<StructDecl>(D));
+    cast<NominalTypeDecl>(D)->setMemberLoader(this, 0);
+    loadAllMembersOfRecordDecl(cast<NominalTypeDecl>(D));
     return;
   }
 

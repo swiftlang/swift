@@ -28,6 +28,7 @@
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
@@ -37,10 +38,10 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/Located.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <type_traits>
@@ -3900,7 +3901,8 @@ public:
   ///
   /// \see getForeignClassKind
   bool isForeign() const {
-    return getForeignClassKind() != ForeignKind::Normal;
+    return getForeignClassKind() != ForeignKind::Normal ||
+      const_cast<ClassDecl *>(this)->isForeignReferenceType();
   }
 
   /// Whether the class is (known to be) a default actor.
@@ -3935,9 +3937,22 @@ public:
   bool isNativeNSObjectSubclass() const;
 
   /// Whether the class uses the ObjC object model (reference counting,
-  /// allocation, etc.) instead of the Swift model.
-  bool usesObjCObjectModel() const {
-    return checkAncestry(AncestryFlags::ObjCObjectModel);
+  /// allocation, etc.), the Swift model, or has no reference counting at all.
+  ReferenceCounting getObjectModel() {
+    if (isForeignReferenceType())
+      return ReferenceCounting::None;
+
+    if (checkAncestry(AncestryFlags::ObjCObjectModel))
+      return ReferenceCounting::ObjC;
+
+    return ReferenceCounting::Native;
+  }
+
+  LayoutConstraintKind getLayoutConstraintKind() {
+    if (getObjectModel() == ReferenceCounting::ObjC)
+      return LayoutConstraintKind::Class;
+
+    return LayoutConstraintKind::NativeClass;
   }
 
   /// Returns true if the class has designated initializers that are not listed
@@ -4059,6 +4074,11 @@ public:
   bool hasKnownSwiftImplementation() const {
     return !hasClangNode();
   }
+
+  /// Used to determine if this class decl is a foriegn reference type. I.e., a
+  /// non-reference-counted swift reference type that was imported from a C++
+  /// record.
+  bool isForeignReferenceType();
 };
 
 /// A convenience wrapper around the \c SelfReferencePosition::Kind enum.

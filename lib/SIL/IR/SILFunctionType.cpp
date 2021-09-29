@@ -2599,6 +2599,8 @@ public:
       return ResultConvention::Unowned;
     if (FnType->getExtInfo().getProducesResult())
       return ResultConvention::Owned;
+    if (tl.getLoweredType().isForeignReferenceType())
+      return ResultConvention::Unowned;
     return ResultConvention::Autoreleased;
   }
 
@@ -3105,14 +3107,17 @@ CanSILFunctionType TypeConverter::getUncachedSILFunctionTypeForConstant(
                                                  bridgedTypes);
 }
 
-static bool isClassOrProtocolMethod(ValueDecl *vd) {
+static bool isObjCMethod(ValueDecl *vd) {
   if (!vd->getDeclContext())
     return false;
+
   Type contextType = vd->getDeclContext()->getDeclaredInterfaceType();
   if (!contextType)
     return false;
-  return contextType->getClassOrBoundGenericClass()
-    || contextType->isClassExistentialType();
+
+  bool isRefCountedClass = contextType->getClassOrBoundGenericClass() &&
+                           !contextType->isForeignReferenceType();
+  return isRefCountedClass || contextType->isClassExistentialType();
 }
 
 SILFunctionTypeRepresentation
@@ -3123,7 +3128,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
         c.getDecl()->isImportAsMember())
       return SILFunctionTypeRepresentation::CFunctionPointer;
 
-    if (isClassOrProtocolMethod(c.getDecl()) ||
+    if (isObjCMethod(c.getDecl()) ||
         c.kind == SILDeclRef::Kind::IVarInitializer ||
         c.kind == SILDeclRef::Kind::IVarDestroyer)
       return SILFunctionTypeRepresentation::ObjCMethod;

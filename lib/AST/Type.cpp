@@ -758,7 +758,7 @@ Type TypeBase::lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals){
 bool TypeBase::isAnyObject() {
   auto canTy = getCanonicalType();
 
-  if (!canTy.isExistentialType())
+  if (!canTy.isExistentialType() || canTy.isForeignReferenceType())
     return false;
 
   return canTy.getExistentialLayout().isAnyObject();
@@ -5274,12 +5274,6 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
   return ty->getReferenceCounting() == ReferenceCounting::Native;
 }
 
-static ReferenceCounting getClassReferenceCounting(ClassDecl *theClass) {
-  return (theClass->usesObjCObjectModel()
-          ? ReferenceCounting::ObjC
-          : ReferenceCounting::Native);
-}
-
 ReferenceCounting TypeBase::getReferenceCounting() {
   CanType type = getCanonicalType();
   ASTContext &ctx = type->getASTContext();
@@ -5306,13 +5300,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     return ReferenceCounting::Bridge;
 
   case TypeKind::Class:
-    return getClassReferenceCounting(cast<ClassType>(type)->getDecl());
+    return cast<ClassType>(type)->getDecl()->getObjectModel();
   case TypeKind::BoundGenericClass:
-    return getClassReferenceCounting(
-                                  cast<BoundGenericClassType>(type)->getDecl());
+    return cast<BoundGenericClassType>(type)->getDecl()->getObjectModel();
   case TypeKind::UnboundGeneric:
-    return getClassReferenceCounting(
-                    cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()));
+    return cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl())
+        ->getObjectModel();
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
@@ -5522,6 +5515,18 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
 
   // Otherwise, there is no associated tangent space. Return `None`.
   return cache(None);
+}
+
+bool TypeBase::isForeignReferenceType() {
+  if (auto *classDecl = lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
+    return classDecl->isForeignReferenceType();
+  return false;
+}
+
+bool CanType::isForeignReferenceType() {
+  if (auto *classDecl = getPointer()->lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
+    return classDecl->isForeignReferenceType();
+  return false;
 }
 
 // Creates an `AnyFunctionType` from the given parameters, result type,
