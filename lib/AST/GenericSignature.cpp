@@ -194,13 +194,13 @@ GenericSignatureImpl::getGenericSignatureBuilder() const {
 
 rewriting::RequirementMachine *
 GenericSignatureImpl::getRequirementMachine() const {
-  // The requirement machine is associated with the canonical signature.
-  if (!isCanonical())
-    return getCanonicalSignature()->getRequirementMachine();
+  if (Machine)
+    return Machine;
 
-  // Requirement machines are stored on the ASTContext.
-  return getASTContext().getOrCreateRequirementMachine(
-                                             CanGenericSignature(this));
+  const_cast<GenericSignatureImpl *>(this)->Machine
+      = getASTContext().getOrCreateRequirementMachine(
+          getCanonicalSignature());
+  return Machine;
 }
 
 bool GenericSignatureImpl::isEqual(GenericSignature Other) const {

@@ -1052,6 +1052,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
+  Opts.EnableClangSPI |= Args.hasArg(OPT_enable_clang_spi);
+
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {

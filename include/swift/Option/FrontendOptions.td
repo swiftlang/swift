@@ -138,6 +138,10 @@ def disable_testable_attr_requires_testable_module :
   Flag<["-"], "disable-testable-attr-requires-testable-module">,
   HelpText<"Disable checking of @testable">;
 
+def enable_clang_spi :
+  Flag<["-"], "enable-clang-spi">,
+  HelpText<"Import Clang SPIs as Swift SPIs">;
+
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
   HelpText<"Enable checking the target OS of serialized modules">;

@@ -217,6 +217,12 @@ SWIFT_REQUEST(TypeChecker, ProtocolRequiresClassRequest, bool(ProtocolDecl *),
 SWIFT_REQUEST(TypeChecker, RequirementRequest,
               Requirement(WhereClauseOwner, unsigned, TypeResolutionStage),
               Cached, HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, StructuralRequirementsRequest,
+              ArrayRef<StructuralRequirement>(ProtocolDecl *), Cached,
+              HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, ProtocolDependenciesRequest,
+              ArrayRef<ProtocolDecl *>(ProtocolDecl *), Cached,
+              HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, RequirementSignatureRequest,
               ArrayRef<Requirement>(ProtocolDecl *), SeparatelyCached,
               NoLocationInfo)

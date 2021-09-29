@@ -595,6 +595,12 @@ namespace swift {
     /// than this many seconds.
     unsigned ExpressionTimeoutThreshold = 600;
 
+    /// If the shared pointer is not a \c nullptr and the pointee is \c true,
+    /// typechecking should be aborted at the next possible opportunity.
+    /// This is used by SourceKit to cancel requests for which the result is no
+    /// longer of interest.
+    std::shared_ptr<std::atomic<bool>> CancellationFlag = nullptr;
+
     /// If non-zero, abort the switch statement exhaustiveness checker if
     /// the Space::minus function is called more than this many times.
     ///
@@ -740,6 +746,9 @@ namespace swift {
     /// When set, don't look for or load overlays.
     bool DisableOverlayModules = false;
 
+    /// When set, import SPI_AVAILABLE symbols with Swift SPI attribtues.
+    bool EnableClangSPI = false;
+
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;
 
@@ -767,7 +776,8 @@ namespace swift {
                           DetailedPreprocessingRecord,
                           ImportForwardDeclarations,
                           DisableSwiftBridgeAttr,
-                          DisableOverlayModules);
+                          DisableOverlayModules,
+                          EnableClangSPI);
     }
   };
 

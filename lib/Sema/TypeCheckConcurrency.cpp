@@ -3720,7 +3720,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
         if (TypeChecker::conformsToKnownProtocol(
                 classDecl->mapTypeIntoContext(superclass),
                 KnownProtocolKind::Sendable,
-                classModule))
+                classModule, /*allowMissing=*/false))
           return nullptr;
       }
     }
