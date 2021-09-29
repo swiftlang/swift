@@ -38,6 +38,7 @@ class SemaTestBase : public ::testing::Test {
 public:
   LangOptions LangOpts;
   TypeCheckerOptions TypeCheckerOpts;
+  SILOptions SILOpts;
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
