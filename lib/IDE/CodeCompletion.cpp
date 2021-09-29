@@ -3366,7 +3366,7 @@ public:
   void addConstructorCallsForType(Type type, Identifier name,
                                   DeclVisibilityKind Reason,
                                   DynamicLookupInfo dynamicLookupInfo) {
-    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr)
+    if (!Sink.addInitsToTopLevel)
       return;
 
     assert(CurrDeclContext);
@@ -4459,7 +4459,7 @@ public:
     });
 
     // Optionally add object literals.
-    if (CompletionContext->includeObjectLiterals()) {
+    if (Sink.includeObjectLiterals) {
       auto floatType = context.getFloatType();
       addFromProto(LK::ColorLiteral, [&](Builder &builder) {
         builder.addBaseName("#colorLiteral");
@@ -5766,7 +5766,7 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
   CodeCompleteTokenExpr = static_cast<CodeCompletionExpr*>(CodeCompletionE);
 
   ShouldCompleteCallPatternAfterParen = true;
-  if (Context.LangOpts.CodeCompleteCallPatternHeuristics) {
+  if (CompletionContext.getCallPatternHeuristics()) {
     // Lookahead one token to decide what kind of call completions to provide.
     // When it appears that there is already code for the call present, just
     // complete values and/or argument labels.  Otherwise give the entire call
@@ -5908,7 +5908,7 @@ void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
   ShouldCompleteCallPatternAfterParen = false;
   if (isFirst) {
     ShouldCompleteCallPatternAfterParen = true;
-    if (Context.LangOpts.CodeCompleteCallPatternHeuristics) {
+    if (CompletionContext.getCallPatternHeuristics()) {
       // Lookahead one token to decide what kind of call completions to provide.
       // When it appears that there is already code for the call present, just
       // complete values and/or argument labels.  Otherwise give the entire call
@@ -6635,7 +6635,7 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
             SF.hasTestableOrPrivateImport(
                 AccessLevel::Internal, TheModule,
                 SourceFile::ImportQueryKind::PrivateOnly),
-            Ctx.LangOpts.CodeCompleteInitsInPostfixExpr,
+            CompletionContext.getAddInitsToTopLevel(),
             CompletionContext.getAnnotateResult(),
         };
 
@@ -7600,7 +7600,11 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     if (!V.hasValue()) {
       // No cached results found. Fill the cache.
       V = context.Cache.createValue();
-      (*V)->Sink.annotateResult = context.getAnnotateResult();
+      CodeCompletionResultSink &Sink = (*V)->Sink;
+      Sink.annotateResult = context.getAnnotateResult();
+      Sink.addInitsToTopLevel = context.getAddInitsToTopLevel();
+      Sink.enableCallPatternHeuristics = context.getCallPatternHeuristics();
+      Sink.includeObjectLiterals = context.includeObjectLiterals();
       lookupCodeCompletionResultsFromModule(
           (*V)->Sink, R.TheModule, R.Key.AccessPath,
           R.Key.ResultsHaveLeadingDot, SF);
