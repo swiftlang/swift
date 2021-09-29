@@ -5528,13 +5528,13 @@ internal struct _DictionaryCodingKey: CodingKey {
 
 /// A type that can be converted to and from a coding key.
 ///
-/// With a `CodingKeyRepresentable` type, you can convert between a
-/// custom type and a `CodingKey` type without losing the value of
-/// the original `CodingKeyRepresentable` type.
+/// With a `CodingKeyRepresentable` type, you can losslessly convert between a
+/// custom type and a `CodingKey` type.
 ///
 /// Conforming a type to `CodingKeyRepresentable` lets you opt in to encoding and
 /// decoding `Dictionary` values keyed by the conforming type to and from a keyed
-/// container, rather than encoding the dictionary as an unkeyed container of alternating key-value pairs.
+/// container, rather than encoding and decoding the dictionary as an unkeyed container
+/// of alternating key-value pairs.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol CodingKeyRepresentable {
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
