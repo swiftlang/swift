@@ -83,6 +83,58 @@ function(precondition_translate_flag invar outvar)
   set(${outvar} "${${invar}}" PARENT_SCOPE)
 endfunction()
 
+function(get_bootstrapping_path path_var orig_path bootstrapping)
+  if("${bootstrapping}" STREQUAL "")
+    set(${path_var} ${orig_path} PARENT_SCOPE)
+  else()
+    file(RELATIVE_PATH relative_path ${CMAKE_BINARY_DIR} ${orig_path})
+    set(${path_var} "${CMAKE_BINARY_DIR}/bootstrapping${bootstrapping}/${relative_path}" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# When building the stdlib in bootstrapping, return the swift library path
+# from the previous bootstrapping stage.
+function(get_bootstrapping_swift_lib_dir bs_lib_dir bootstrapping)
+  set(bs_lib_dir "")
+  if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
+    set(lib_dir
+        "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    # If building the stdlib with bootstrapping, the compiler has to pick up
+    # the libswift of the previous bootstrapping level (because in the current
+    # lib-directory it's not built yet.
+    if ("${bootstrapping}" STREQUAL "1")
+      get_bootstrapping_path(bs_lib_dir ${lib_dir} "0")
+    elseif("${bootstrapping}" STREQUAL "")
+      get_bootstrapping_path(bs_lib_dir ${lib_dir} "1")
+    endif()
+  endif()
+  set(bs_lib_dir ${bs_lib_dir} PARENT_SCOPE)
+endfunction()
+
+function(add_bootstrapping_target bootstrapping)
+  if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" OR
+     ${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+
+    set(target "bootstrapping${bootstrapping}-all")
+    add_custom_target(${target})
+
+    if(SWIFT_PATH_TO_LIBICU_BUILD)
+      # Need to symlink the libicu libraries to be able to run
+      # the bootstrapping compiler with a custom library path.
+      get_bootstrapping_path(output_dir
+          "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" "${bootstrapping}")
+      if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+        message("TODO: support for copying ICU libraries on Windows")
+      endif()
+      add_custom_command(TARGET "${target}" POST_BUILD
+        COMMAND
+          "ln" "-s" "-f" "${SWIFT_PATH_TO_LIBICU_BUILD}/lib/libicu*" "."
+        WORKING_DIRECTORY "${output_dir}"
+        COMMENT "symlink ICU libraries for bootstrapping stage ${bootstrapping}")
+    endif()
+  endif()
+endfunction()
+
 function(is_build_type_optimized build_type result_var_name)
   if("${build_type}" STREQUAL "Debug")
     set("${result_var_name}" FALSE PARENT_SCOPE)

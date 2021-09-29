@@ -37,6 +37,10 @@
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -f %t/bin/swiftc
 
+// swift-frontend cannot be copied to another location with bootstrapping because
+// it will not find the libswiftCore library with its relative RPATH.
+// UNSUPPORTED: libswift_bootstrapping
+
 // CHECK: {{(bin/)?}}ld{{(.exe)?"? }}
 // CHECK-NO-RUNTIME-NOT: libclang_rt
 // CHECK-MACCATALYST-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.osx.a}}
