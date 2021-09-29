@@ -639,6 +639,12 @@ ManglingError Remangler::mangleNominalTypeDescriptor(Node *node,
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
+ManglingError Remangler::mangleNominalTypeDescriptorRecord(Node *node,
+                                                           unsigned depth) {
+  Buffer << "Hn";
+  return mangleSingleChildNode(node, depth + 1); // type
+}
+
 ManglingError Remangler::manglePropertyDescriptor(Node *node, unsigned depth) {
   // not supported
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
@@ -659,6 +665,12 @@ ManglingError Remangler::mangleProtocolDescriptor(Node *node, unsigned depth) {
   return mangleProtocolWithoutPrefix(node->begin()[0], depth + 1);
 }
 
+ManglingError Remangler::mangleProtocolDescriptorRecord(Node *node,
+                                                        unsigned depth) {
+  Buffer << "Hr";
+  return mangleProtocolWithoutPrefix(node->begin()[0], depth + 1);
+}
+
 ManglingError
 Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node,
                                                     unsigned depth) {
@@ -676,6 +688,13 @@ ManglingError Remangler::mangleProtocolWitnessTablePattern(Node *node,
 ManglingError Remangler::mangleProtocolConformanceDescriptor(Node *node,
                                                              unsigned depth) {
   Buffer << "Mc";
+  return mangleProtocolConformance(node->begin()[0], depth + 1);
+}
+
+ManglingError
+Remangler::mangleProtocolConformanceDescriptorRecord(Node *node,
+                                                     unsigned depth) {
+  Buffer << "Hc";
   return mangleProtocolConformance(node->begin()[0], depth + 1);
 }
 
@@ -2622,6 +2641,10 @@ ManglingError Remangler::mangleOpaqueType(Node *node, unsigned depth) {
 }
 ManglingError Remangler::mangleOpaqueTypeDescriptor(Node *node,
                                                     unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+ManglingError Remangler::mangleOpaqueTypeDescriptorRecord(Node *node,
+                                                          unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError Remangler::mangleOpaqueTypeDescriptorAccessor(Node *node,

@@ -218,9 +218,17 @@ class LinkEntity {
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
 
+    /// The nominal type descriptor runtime record for a nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    NominalTypeDescriptorRecord,
+
     /// The descriptor for an opaque type.
     /// The pointer is an OpaqueTypeDecl*.
     OpaqueTypeDescriptor,
+
+    /// The runtime record for a descriptor for an opaque type.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorRecord,
 
     /// The descriptor accessor for an opaque type used for dynamic functions.
     /// The pointer is an OpaqueTypeDecl*.
@@ -267,6 +275,10 @@ class LinkEntity {
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
+
+    /// The protocol descriptor runtime record for a protocol type.
+    /// The pointer is a ProtocolDecl*.
+    ProtocolDescriptorRecord,
 
     /// The alias referring to the base of the requirements within the
     /// protocol descriptor, which is used to determine the offset of a
@@ -367,6 +379,10 @@ class LinkEntity {
     /// The protocol conformance descriptor for a conformance.
     /// The pointer is a RootProtocolConformance*.
     ProtocolConformanceDescriptor,
+
+    /// The protocol conformance descriptor runtime record for a conformance.
+    /// The pointer is a RootProtocolConformance*.
+    ProtocolConformanceDescriptorRecord,
 
     // These are both type kinds and protocol-conformance kinds.
 
@@ -477,6 +493,7 @@ class LinkEntity {
 
   static bool isRootProtocolConformanceKind(Kind k) {
     return (k == Kind::ProtocolConformanceDescriptor ||
+            k == Kind::ProtocolConformanceDescriptorRecord ||
             k == Kind::ProtocolWitnessTable);
   }
 
@@ -830,9 +847,21 @@ public:
     return entity;
   }
 
+  static LinkEntity forNominalTypeDescriptorRecord(NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::NominalTypeDescriptorRecord, decl);
+    return entity;
+  }
+
   static LinkEntity forOpaqueTypeDescriptor(OpaqueTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::OpaqueTypeDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorRecord(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorRecord, decl);
     return entity;
   }
 
@@ -895,6 +924,12 @@ public:
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ProtocolDescriptor, decl);
+    return entity;
+  }
+
+  static LinkEntity forProtocolDescriptorRecord(ProtocolDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ProtocolDescriptorRecord, decl);
     return entity;
   }
 
@@ -1063,6 +1098,14 @@ public:
   forProtocolConformanceDescriptor(const RootProtocolConformance *C) {
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::ProtocolConformanceDescriptor, C);
+    return entity;
+  }
+
+  static LinkEntity
+  forProtocolConformanceDescriptorRecord(const RootProtocolConformance *C) {
+    LinkEntity entity;
+    entity.setForProtocolConformance(Kind::ProtocolConformanceDescriptorRecord,
+                                     C);
     return entity;
   }
 

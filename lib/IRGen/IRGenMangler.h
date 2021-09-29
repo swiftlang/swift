@@ -191,6 +191,10 @@ public:
   std::string mangleNominalTypeDescriptor(const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
+
+  std::string mangleNominalTypeDescriptorRecord(const NominalTypeDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "Hn");
+  }
   
   std::string mangleOpaqueTypeDescriptorAccessor(const OpaqueTypeDecl *decl) {
     beginMangling();
@@ -293,6 +297,13 @@ public:
     return finalize();
   }
 
+  std::string mangleProtocolDescriptorRecord(const ProtocolDecl *Decl) {
+    beginMangling();
+    appendProtocolName(Decl);
+    appendOperator("Hr");
+    return finalize();
+  }
+
   std::string mangleProtocolRequirementsBaseDescriptor(
                                                     const ProtocolDecl *Decl) {
     beginMangling();
@@ -358,6 +369,8 @@ public:
   }
 
   std::string mangleProtocolConformanceDescriptor(
+                                    const RootProtocolConformance *conformance);
+  std::string mangleProtocolConformanceDescriptorRecord(
                                     const RootProtocolConformance *conformance);
   std::string mangleProtocolConformanceInstantiationCache(
                                     const RootProtocolConformance *conformance);

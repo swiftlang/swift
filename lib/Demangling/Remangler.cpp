@@ -2116,10 +2116,24 @@ ManglingError Remangler::mangleNominalTypeDescriptor(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleNominalTypeDescriptorRecord(Node *node,
+                                                           unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Hn";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleOpaqueTypeDescriptor(Node *node,
                                                     unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MQ";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleOpaqueTypeDescriptorRecord(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Ho";
   return ManglingError::Success;
 }
 
@@ -2419,6 +2433,13 @@ ManglingError Remangler::mangleProtocolDescriptor(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleProtocolDescriptorRecord(Node *node,
+                                                        unsigned depth) {
+  RETURN_IF_ERROR(manglePureProtocol(getSingleChild(node), depth + 1));
+  Buffer << "Hr";
+  return ManglingError::Success;
+}
+
 ManglingError
 Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node,
                                                     unsigned depth) {
@@ -2438,6 +2459,14 @@ ManglingError Remangler::mangleProtocolConformanceDescriptor(Node *node,
                                                              unsigned depth) {
   RETURN_IF_ERROR(mangleProtocolConformance(node->getChild(0), depth + 1));
   Buffer << "Mc";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleProtocolConformanceDescriptorRecord(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(mangleProtocolConformance(node->getChild(0), depth + 1));
+  Buffer << "Hc";
   return ManglingError::Success;
 }
 
