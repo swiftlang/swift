@@ -475,6 +475,9 @@ public:
   Identifier getIdentifier(StringRef Str) const;
 
   /// Convert a given alias map to a map of Identifiers between module aliases and underlying names.
+  /// For example, if '-module-alias A=X -module-alias B=Y' input is passed in, the aliases A and B are
+  /// the names of the imported or referenced modules in source files in the main module, and X and Y
+  /// are the underlying (physical) module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
 
   /// Retrieve the underlying name given an alias name key.

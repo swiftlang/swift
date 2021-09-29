@@ -1645,7 +1645,9 @@ void ASTContext::addModuleInterfaceChecker(
 void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
   for (auto k: aliasMap.keys()) {
     auto val = aliasMap.lookup(k);
-    ModuleAliasMap[getIdentifier(k)] = getIdentifier(val);
+    if (!val.empty()) {
+      ModuleAliasMap[getIdentifier(k)] = getIdentifier(val);
+    }
   }
 }
 
@@ -1654,7 +1656,7 @@ Identifier ASTContext::lookupModuleAlias(Identifier key) const {
   if (found != ModuleAliasMap.end()) {
     return found->second;
   }
-  return Identifier();
+  return key;
 }
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(

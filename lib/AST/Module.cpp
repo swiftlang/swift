@@ -476,7 +476,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   setImplicit();
   setInterfaceType(ModuleType::get(this));
   setAccess(AccessLevel::Public);
-  setUnderlyingName(ctx.lookupModuleAlias(name));
+  setRealName(ctx.lookupModuleAlias(name));
 
   Bits.ModuleDecl.StaticLibrary = 0;
   Bits.ModuleDecl.TestingEnabled = 0;
@@ -1564,9 +1564,9 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   imports.erase(last, imports.end());
 }
 
-Identifier ModuleDecl::getUnderlyingName() const {
-    if (!ModuleUnderlyingName.empty())
-        return ModuleUnderlyingName;
+Identifier ModuleDecl::getRealName() const {
+    if (!ModuleRealName.empty())
+      return ModuleRealName;
     return getName();
 }
 
