@@ -347,7 +347,7 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
-  /// Mapping between aliases and underlying names of modules imported or referenced modules.
+  /// Mapping between aliases and real (physical) names of imported or referenced modules.
   mutable llvm::DenseMap<Identifier, Identifier> ModuleAliasMap;
 
   /// Retrieve the allocator for the given arena.
@@ -474,13 +474,13 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
-  /// Convert a given alias map to a map of Identifiers between module aliases and underlying names.
+  /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
   /// For example, if '-module-alias A=X -module-alias B=Y' input is passed in, the aliases A and B are
   /// the names of the imported or referenced modules in source files in the main module, and X and Y
-  /// are the underlying (physical) module names on disk.
+  /// are the real (physical) module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
 
-  /// Retrieve the underlying name given an alias name key.
+  /// Retrieve the actual module name given a module alias name key.
   Identifier lookupModuleAlias(Identifier key) const;
 
   /// Decide how to interpret two precedence groups.

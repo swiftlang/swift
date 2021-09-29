@@ -171,7 +171,7 @@ class ModuleDecl
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
 
-  /// The underlying name for an alias used for this module (if any).
+  /// The actual module name for an alias used for this module (if any).
   mutable Identifier ModuleRealName;
 
 public:
