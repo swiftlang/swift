@@ -1028,6 +1028,9 @@ private:
   /// annotations like \c strong and \c weak.
   bool isObjCReferenceCountableObjectType(Type ty) {
     if (auto classDecl = ty->getClassOrBoundGenericClass()) {
+      if (classDecl->isForeignReferenceType())
+        return false;
+
       switch (classDecl->getForeignClassKind()) {
       case ClassDecl::ForeignKind::Normal:
       case ClassDecl::ForeignKind::RuntimeOnly:

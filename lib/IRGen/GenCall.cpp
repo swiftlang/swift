@@ -1448,7 +1448,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       auto paramTy = getSILFuncConventions().getSILType(
           param, IGM.getMaximalTypeExpansionContext());
       auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(paramTy));
-      if (AI.getIndirectByVal()) {
+      if (AI.getIndirectByVal() && !paramTy.isForeignReferenceType()) {
         addByvalArgumentAttributes(
             IGM, Attrs, getCurParamIndex(),
             Alignment(AI.getIndirectAlign().getQuantity()),
@@ -3531,6 +3531,20 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
     SILType paramType = silConv.getSILType(
         params[i - firstParam], IGF.IGM.getMaximalTypeExpansionContext());
+
+    // In Swift, values that are foreign references types will always be
+    // pointers. Additionally, we only import functions which use foreign
+    // reference types indirectly (as pointers), so we know in every case, if
+    // the argument type is a foreign reference type, the types will match up
+    // and we can simply use the input directly.
+    if (paramType.isForeignReferenceType()) {
+      auto *arg = in.claimNext();
+      if (isIndirectFormalParameter(params[i - firstParam].getConvention()))
+        arg = IGF.Builder.CreateLoad(arg, IGF.IGM.getPointerAlignment());
+      out.add(arg);
+      continue;
+    }
+
     switch (AI.getKind()) {
     case clang::CodeGen::ABIArgInfo::Extend: {
       bool signExt = clangParamTy->hasSignedIntegerRepresentation();

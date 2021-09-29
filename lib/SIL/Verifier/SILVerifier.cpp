@@ -821,8 +821,10 @@ public:
   // Require that the operand is a non-optional, non-unowned reference-counted
   // type.
   void requireReferenceValue(SILValue value, const Twine &valueDescription) {
-    require(value->getType().isObject(), valueDescription +" must be an object");
-    require(value->getType().isReferenceCounted(F.getModule()),
+    require(value->getType().isObject(),
+            valueDescription + " must be an object");
+    require(value->getType().isReferenceCounted(F.getModule()) ||
+                value->getType().isForeignReferenceType(),
             valueDescription + " must have reference semantics");
     forbidObjectType(UnownedStorageType, value, valueDescription);
   }
@@ -3430,9 +3432,11 @@ public:
             "foreign method cannot be dispatched natively");
     require(!isa<ExtensionDecl>(member.getDecl()->getDeclContext()),
             "extension method cannot be dispatched natively");
-    
-    // The method ought to appear in the class vtable.
-    require(VerifyClassMethodVisitor(member).Seen,
+
+    // The method ought to appear in the class vtable unless it's a foreign
+    // reference type.
+    require(VerifyClassMethodVisitor(member).Seen ||
+            operandType.isForeignReferenceType(),
             "method does not appear in the class's vtable");
   }
 

@@ -660,8 +660,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       if (auto selfType = instTy->getAs<DynamicSelfType>())
         instTy = selfType->getSelfType();
       auto *cl = instTy->getClassOrBoundGenericClass();
-      if ((cl && (cl->usesObjCObjectModel() || cl->isForeign())) ||
-          instTy->isAnyObject())
+      bool isForeign =
+          cl->getObjectModel() == ReferenceCounting::ObjC ||
+          cl->isForeign();
+      if ((cl && isForeign) || instTy->isAnyObject())
         return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
       return RuntimeEffect::MetaData;
     }
@@ -678,7 +680,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData;
     case ExistentialRepresentation::Class: {
       auto *cl = opType.getClassOrBoundGenericClass();
-      if ((cl && cl->usesObjCObjectModel()) || opType.isAnyObject())
+      bool usesObjCModel = cl->getObjectModel() == ReferenceCounting::ObjC;
+      if ((cl && usesObjCModel) || opType.isAnyObject())
         return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
       return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
     }

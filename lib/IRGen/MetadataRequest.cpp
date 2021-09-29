@@ -34,6 +34,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
@@ -2860,6 +2861,15 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
+  if (type->isForeignReferenceType()) {
+    type->getASTContext().Diags.diagnose(
+        type->lookThroughAllOptionalTypes()
+            ->getClassOrBoundGenericClass()
+            ->getLoc(),
+        diag::foreign_reference_types_unsupported.ID, {});
+    exit(1);
+  }
+
   type = IGM.getRuntimeReifiedType(type);
   // Look through any opaque types we're allowed to.
   type = IGM.substOpaqueTypesWithUnderlyingTypes(type);
@@ -3249,6 +3259,9 @@ namespace {
       case ReferenceCounting::Bridge:
       case ReferenceCounting::Error:
         llvm_unreachable("classes shouldn't have this kind of refcounting");
+      case ReferenceCounting::None:
+        llvm_unreachable(
+            "Foreign reference types don't conform to 'AnyClass'.");
       }
 
       llvm_unreachable("Not a valid ReferenceCounting.");
