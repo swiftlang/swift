@@ -139,7 +139,9 @@ RequirementMachine::getRequiredProtocols(Type depType) const {
   return result;
 }
 
-Type RequirementMachine::getSuperclassBound(Type depType) const {
+Type RequirementMachine::
+getSuperclassBound(Type depType,
+                   TypeArrayView<GenericTypeParamType> genericParams) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
   System.simplify(term);
@@ -153,7 +155,7 @@ Type RequirementMachine::getSuperclassBound(Type depType) const {
     return Type();
 
   auto &protos = System.getProtocols();
-  return props->getSuperclassBound({ }, term, protos, Context);
+  return props->getSuperclassBound(genericParams, term, protos, Context);
 }
 
 bool RequirementMachine::isConcreteType(Type depType) const {
@@ -169,7 +171,9 @@ bool RequirementMachine::isConcreteType(Type depType) const {
   return props->isConcreteType();
 }
 
-Type RequirementMachine::getConcreteType(Type depType) const {
+Type RequirementMachine::
+getConcreteType(Type depType,
+                TypeArrayView<GenericTypeParamType> genericParams) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
   System.simplify(term);
@@ -183,7 +187,7 @@ Type RequirementMachine::getConcreteType(Type depType) const {
     return Type();
 
   auto &protos = System.getProtocols();
-  return props->getConcreteType({ }, term, protos, Context);
+  return props->getConcreteType(genericParams, term, protos, Context);
 }
 
 bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
