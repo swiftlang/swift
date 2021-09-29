@@ -1624,7 +1624,8 @@ namespace {
         VTable(IGM.getSILModule().lookUpVTable(getType())),
         Resilient(IGM.hasResilientMetadata(Type, ResilienceExpansion::Minimal)) {
 
-      if (getType()->isForeign()) return;
+      if (getType()->isForeign() || Type->isForeignReferenceType())
+        return;
 
       MetadataLayout = &IGM.getClassMetadataLayout(Type);
 
@@ -1655,6 +1656,10 @@ namespace {
 
     void layout() {
       super::layout();
+
+      if (getType()->isForeignReferenceType())
+        return;
+
       addVTable();
       addOverrideTable();
       addObjCResilientClassStubInfo();
@@ -2430,7 +2435,7 @@ static void emitInitializeValueMetadata(IRGenFunction &IGF,
   auto loweredTy =
     IGF.IGM.getLoweredType(nominalDecl->getDeclaredTypeInContext());
 
-  if (isa<StructDecl>(nominalDecl)) {
+  if (isa<StructDecl>(nominalDecl) || isa<ClassDecl>(nominalDecl)) {
     auto &fixedTI = IGF.IGM.getTypeInfo(loweredTy);
     if (isa<FixedTypeInfo>(fixedTI)) return;
 
@@ -5030,6 +5035,13 @@ namespace {
 
     void emitInitializeMetadata(IRGenFunction &IGF, llvm::Value *metadata,
                                 MetadataDependencyCollector *collector) {
+      if (getTargetType()->isForeignReferenceType()) {
+        emitInitializeValueMetadata(IGF,
+                                    getTargetType().getClassOrBoundGenericClass(),
+                                    metadata, false, collector);
+        return;
+      }
+
       if (!Target->hasSuperclass()) {
         assert(IGM.getOptions().LazyInitializeClassMetadata &&
                "should have superclass if not lazy initializing class metadata");
@@ -5053,6 +5065,12 @@ namespace {
     // Visitor methods.
 
     void addValueWitnessTable() {
+      if (getTargetType()->isForeignReferenceType()) {
+        auto type = getTargetType()->getCanonicalType();
+        B.add(irgen::emitValueWitnessTable(IGM, type, false, false).getValue());
+        return;
+      }
+
       // The runtime will fill in the default VWT during allocation for the
       // foreign class metadata.
       //
@@ -5081,7 +5099,11 @@ namespace {
     }
 
     void addMetadataFlags() {
-      B.addInt(IGM.MetadataKindTy, (unsigned) MetadataKind::ForeignClass);
+      if (getTargetType()->isForeignReferenceType()) {
+        B.addInt(IGM.MetadataKindTy, (unsigned) MetadataKind::Struct);
+      } else {
+        B.addInt(IGM.MetadataKindTy, (unsigned) MetadataKind::ForeignClass);
+      }
     }
 
     void addNominalTypeDescriptor() {
@@ -5173,6 +5195,9 @@ bool irgen::requiresForeignTypeMetadata(CanType type) {
 
 bool irgen::requiresForeignTypeMetadata(NominalTypeDecl *decl) {
   if (auto *clas = dyn_cast<ClassDecl>(decl)) {
+    if (clas->isForeignReferenceType())
+      return true;
+
     switch (clas->getForeignClassKind()) {
     case ClassDecl::ForeignKind::Normal:
     case ClassDecl::ForeignKind::RuntimeOnly:
@@ -5196,7 +5221,8 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
   init.setPacked(true);
 
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-    assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType);
+    assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType ||
+           classDecl->isForeignReferenceType());
 
     ForeignClassMetadataBuilder builder(IGM, classDecl, init);
     builder.layout();

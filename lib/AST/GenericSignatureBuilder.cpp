@@ -4443,11 +4443,8 @@ bool GenericSignatureBuilder::updateSuperclass(
     auto layoutReqSource =
       source.getSource(*this, type)->viaLayout(*this, superclass);
 
-    auto layout =
-      LayoutConstraint::getLayoutConstraint(
-        superclass->getClassOrBoundGenericClass()->usesObjCObjectModel()
-          ? LayoutConstraintKind::Class
-          : LayoutConstraintKind::NativeClass,
+    auto layout = LayoutConstraint::getLayoutConstraint(
+        superclass->getClassOrBoundGenericClass()->getLayoutConstraintKind(),
         getASTContext());
     addLayoutRequirementDirect(type, layout, layoutReqSource);
     return true;
