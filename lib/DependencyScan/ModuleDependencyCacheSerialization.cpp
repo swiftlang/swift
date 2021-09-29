@@ -447,10 +447,11 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
         llvm::report_fatal_error("Unexpected CLANG_MODULE_DETAILS_NODE record");
       cache.configureForTriple(getTriple());
       unsigned moduleMapPathID, contextHashID, commandLineArrayID,
-          fileDependenciesArrayID;
+               fileDependenciesArrayID, capturedPCMArgsArrayID;
       ClangModuleDetailsLayout::readRecord(Scratch, moduleMapPathID,
                                            contextHashID, commandLineArrayID,
-                                           fileDependenciesArrayID);
+                                           fileDependenciesArrayID,
+                                           capturedPCMArgsArrayID);
       auto moduleMapPath = getIdentifier(moduleMapPathID);
       if (!moduleMapPath)
         llvm::report_fatal_error("Bad module map path");
@@ -463,10 +464,15 @@ bool Deserializer::readGraph(GlobalModuleDependenciesCache &cache) {
       auto fileDependencies = getArray(fileDependenciesArrayID);
       if (!fileDependencies)
         llvm::report_fatal_error("Bad file dependencies");
+      auto capturedPCMArgs = getArray(capturedPCMArgsArrayID);
+      if (!capturedPCMArgs)
+        llvm::report_fatal_error("Bad captured PCM Args");
 
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencies::forClangModule(
-          *moduleMapPath, *contextHash, *commandLineArgs, *fileDependencies);
+          *moduleMapPath, *contextHash, *commandLineArgs, *fileDependencies,
+          *capturedPCMArgs);
+
       // Add dependencies of this module
       for (const auto &moduleName : *currentModuleDependencies)
         moduleDep.addModuleDependency(moduleName);
@@ -572,6 +578,7 @@ enum ModuleIdentifierArrayKind : uint8_t {
   BridgingModuleDependencies,
   NonPathCommandLine,
   FileDependencies,
+  CapturedPCMArgs,
   LastArrayKind
 };
 
@@ -846,7 +853,8 @@ void Serializer::writeModuleInfo(ModuleDependencyID moduleID,
         getIdentifier(clangDeps->moduleMapFile),
         getIdentifier(clangDeps->contextHash),
         getArray(moduleID, ModuleIdentifierArrayKind::NonPathCommandLine),
-        getArray(moduleID, ModuleIdentifierArrayKind::FileDependencies));
+        getArray(moduleID, ModuleIdentifierArrayKind::FileDependencies),
+        getArray(moduleID, ModuleIdentifierArrayKind::CapturedPCMArgs));
 
     break;
   }
@@ -1015,6 +1023,8 @@ void Serializer::collectStringsAndArrays(
                    clangDeps->nonPathCommandLine);
           addArray(moduleID, ModuleIdentifierArrayKind::FileDependencies,
                    clangDeps->fileDependencies);
+          addArray(moduleID, ModuleIdentifierArrayKind::CapturedPCMArgs,
+                   clangDeps->capturedPCMArgs);
           break;
         }
         default:
