@@ -254,8 +254,6 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
-  if (Invocation.getLangOptions().Target.isOSBinFormatWasm())
-    Invocation.getLangOptions().EnableObjCInterop = false;
 
   if (EnableObjCInterop == llvm::cl::BOU_UNSET) {
     Invocation.getLangOptions().EnableObjCInterop =
