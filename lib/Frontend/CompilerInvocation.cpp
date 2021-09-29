@@ -1934,6 +1934,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.WitnessMethodElimination = true;
   }
 
+  if (Args.hasArg(OPT_conditional_runtime_records)) {
+    Opts.ConditionalRuntimeRecords = true;
+  }
+
   if (Args.hasArg(OPT_internalize_at_link)) {
     Opts.InternalizeAtLink = true;
   }
