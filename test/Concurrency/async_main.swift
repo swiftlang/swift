@@ -10,17 +10,25 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+@MainActor
+var foo: Int = 42
+
 func asyncFunc() async {
   print("Hello World!")
 }
 
 @main struct MyProgram {
   static func main() async throws {
+    print(foo)
+    foo += 1
     await asyncFunc()
+    print(foo)
   }
 }
 
-// CHECK-EXEC: Hello World!
+// CHECK-EXEC: 42
+// CHECK-EXEC-NEXT: Hello World!
+// CHECK-EXEC-NEXT: 43
 
 // static MyProgram.main()
 // CHECK-SIL-LABEL: sil hidden @$s10async_main9MyProgramV0B0yyYaKFZ : $@convention(method) @async (@thin MyProgram.Type) -> @error Error
