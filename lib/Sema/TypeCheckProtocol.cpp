@@ -5182,9 +5182,10 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
 }
 
 ProtocolConformanceRef
-TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M) {
+TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
+                                bool allowMissing) {
   // Look up conformance in the module.
-  auto lookupResult = M->lookupConformance(T, Proto, /*alllowMissing=*/true);
+  auto lookupResult = M->lookupConformance(T, Proto, allowMissing);
   if (lookupResult.isInvalid()) {
     return ProtocolConformanceRef::forInvalid();
   }
@@ -5212,11 +5213,13 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M) {
   return lookupResult;
 }
 
-bool TypeChecker::conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
-                                          ModuleDecl *module) {
+bool TypeChecker::conformsToKnownProtocol(
+    Type type, KnownProtocolKind protocol, ModuleDecl *module,
+    bool allowMissing) {
   if (auto *proto =
           TypeChecker::getProtocol(module->getASTContext(), SourceLoc(), protocol))
-    return (bool)TypeChecker::conformsToProtocol(type, proto, module);
+    return (bool)TypeChecker::conformsToProtocol(
+        type, proto, module, allowMissing);
   return false;
 }
 
