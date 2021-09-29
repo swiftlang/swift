@@ -41,6 +41,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
 #include <queue>
@@ -402,11 +403,11 @@ class StackAllocationPromoter {
   DeallocStackInst *dsi;
 
   /// All the dealloc_stack instructions.
-  SmallVector<DeallocStackInst *> dsis;
+  llvm::SmallVector<DeallocStackInst *> dsis;
 
   /// The lexical begin_borrow instructions that were created to track the
   /// lexical lifetimes introduced by the alloc_stack, if it is lexical.
-  SmallVector<SILBasicBlock *> lexicalBBIBlocks;
+  llvm::SmallVector<SILBasicBlock *> lexicalBBIBlocks;
 
   /// Dominator info.
   DominanceInfo *domInfo;
@@ -792,7 +793,7 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSetVector &phiBlocks,
 
   LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << *def.copy);
 
-  SmallVector<SILValue> vals;
+  llvm::SmallVector<SILValue> vals;
   vals.push_back(def.stored);
   if (shouldAddLexicalLifetime(asi)) {
     vals.push_back(def.borrow);
