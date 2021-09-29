@@ -109,9 +109,9 @@ public func FailCase_diamond2(_ x: Klass) {
 
 // Loop case. TODO: Needs note saying consume is in a loop.
 public func FailCase_loop(_ x: Klass) {
-    let x2 = Builtin.move(x) // expected-error {{'x2' consumed more than once}}
+    let loopError = Builtin.move(x) // expected-error {{'loopError' consumed more than once}}
     for _ in 0..<1024 {
-        consume(x2) // expected-note {{consuming use}}
+        consume(loopError) // expected-note {{consuming use}}
     }
 }
 
