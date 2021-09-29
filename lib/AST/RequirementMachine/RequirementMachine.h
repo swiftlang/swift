@@ -98,9 +98,11 @@ public:
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
   GenericSignature::RequiredProtocols getRequiredProtocols(Type depType) const;
-  Type getSuperclassBound(Type depType) const;
+  Type getSuperclassBound(Type depType,
+                          TypeArrayView<GenericTypeParamType> genericParams) const;
   bool isConcreteType(Type depType) const;
-  Type getConcreteType(Type depType) const;
+  Type getConcreteType(Type depType,
+                       TypeArrayView<GenericTypeParamType> genericParams) const;
   bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
   bool isCanonicalTypeInContext(Type type) const;
   Type getCanonicalTypeInContext(Type type,
