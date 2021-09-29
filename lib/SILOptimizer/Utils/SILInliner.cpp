@@ -448,8 +448,8 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
             callArg = builder.createCopyValue(Apply.getLoc(), bbi);
             copiedArgs[idx] = true;
           }
+          borrowedArgs[idx] = true;
         }
-        borrowedArgs[idx] = true;
       } else {
         // Insert begin/end borrow for guaranteed arguments.
         if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {

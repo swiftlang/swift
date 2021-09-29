@@ -4,6 +4,8 @@ import Swift
 
 class C {}
 
+struct S {}
+
 ////////////////////////////////////////////////////////////////////////////////
 // apply
 ////////////////////////////////////////////////////////////////////////////////
@@ -19,6 +21,12 @@ entry(%instance : @owned $C):
 
 sil [ossa] [always_inline] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 entry(%instance : @guaranteed $C):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [always_inline] @callee_trivial : $@convention(thin) (S) -> () {
+entry(%instance : $S):
     %retval = tuple ()
     return %retval : $()
 }
@@ -91,6 +99,18 @@ entry(%instance : @guaranteed $C):
     return %result : $()
 }
 
+// CHECK-LABEL: sil [ossa] @caller_trivial_callee_trivial : $@convention(thin) (S) -> () {
+// CHECK:       {{bb[^,]+}}({{%[^,]+}} : $S):
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'caller_trivial_callee_trivial'
+sil [ossa] @caller_trivial_callee_trivial : $@convention(thin) (S) -> () {
+entry(%instance : $S):
+  %callee_trivial = function_ref @callee_trivial : $@convention(thin) (S) -> ()
+  %result = apply %callee_trivial(%instance) : $@convention(thin) (S) -> ()
+  return %result : $()
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // begin_apply
 ////////////////////////////////////////////////////////////////////////////////
@@ -127,6 +147,20 @@ bb1:
 bb2:
   destroy_addr %addr : $*C
   dealloc_stack %addr : $*C
+  unwind
+}
+
+sil hidden [ossa] [always_inline] @callee_coro_trivial : $@yield_once @convention(method) (S) -> @yields @inout S {
+bb0(%instance : $S):
+  %addr = alloc_stack $S
+  store %instance to [trivial] %addr : $*S
+  yield %addr : $*S, resume bb1, unwind bb2
+bb1:
+  dealloc_stack %addr : $*S
+  %result = tuple ()
+  return %result : $()
+bb2:
+  dealloc_stack %addr : $*S
   unwind
 }
 
@@ -242,6 +276,27 @@ bb0(%instance : @guaranteed $C):
   return %retval : $()
 }
 
+// CHECK-LABEL: sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(method) (S) -> () {
+// CHECK:       {{bb[0-9]+}}([[REGISTER_0:%[^,]+]] : $S):
+// CHECK:         [[REGISTER_1:%[^,]+]] = alloc_stack $S
+// CHECK:         store [[REGISTER_0]] to [trivial] [[REGISTER_1]] : $*S
+// CHECK:         dealloc_stack [[REGISTER_1]] : $*S
+// CHECK:         [[REGISTER_4:%[^,]+]] = tuple ()
+// CHECK:         [[REGISTER_5:%[^,]+]] = tuple ()
+// CHECK:         return [[REGISTER_5]] : $()
+// CHECK:       {{bb[0-9]+}}:
+// CHECK:         dealloc_stack [[REGISTER_1]] : $*S
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'caller_trivial_callee_coro_trivial'
+sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(method) (S) -> () {
+bb0(%instance : $S):
+  %callee_coro_trivial = function_ref @callee_coro_trivial : $@yield_once @convention(method) (S) -> @yields @inout S
+  (%addr, %continuation) = begin_apply %callee_coro_trivial(%instance) : $@yield_once @convention(method) (S) -> @yields @inout S
+  end_apply %continuation
+  %retval = tuple ()
+  return %retval : $()
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // try_apply
 ////////////////////////////////////////////////////////////////////////////////
@@ -262,6 +317,16 @@ bb2:
 
 sil [ossa] [always_inline] @callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error {
 bb0(%0 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+bb1:
+  throw undef : $Error
+bb2:
+  %18 = tuple ()
+  return %18 : $()
+}
+
+sil [ossa] @callee_error_trivial : $@convention(thin) (S) -> @error Error {
+bb0(%0 : $S):
   cond_br undef, bb1, bb2
 bb1:
   throw undef : $Error
@@ -378,6 +443,27 @@ sil [ossa] @callee_guaranteed_callee_error_guaranteed : $@convention(thin) (@gua
 bb0(%instance : @guaranteed $C):
   %callee_error_guaranteed = function_ref @callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error
   try_apply %callee_error_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> @error Error, normal bb1, error bb2
+bb1(%9 : $()):
+  %10 = tuple ()
+  return %10 : $()
+bb2(%12 : @owned $Error):
+  throw %12 : $Error
+}
+
+// CHECK-LABEL: sil hidden [ossa] @callee_trivial_callee_error_trivial : $@convention(thin) (S) -> @error Error {
+// CHECK:       {{bb[^,]+}}({{%[^,]+}} : $S):
+// CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
+// CHECK:       [[THROW_BLOCK]]:
+// CHECK:         throw undef
+// CHECK:       [[REGULAR_BLOCK]]:
+// CHECK:         [[ORIGINAL_RETVAL:%[^,]+]] = tuple ()
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'callee_trivial_callee_error_trivial'
+sil hidden [ossa] @callee_trivial_callee_error_trivial : $@convention(thin) (S) -> @error Error {
+bb0(%instance : $S):
+  %callee_error_trivial = function_ref @callee_error_trivial : $@convention(thin) (S) -> @error Error
+  try_apply %callee_error_trivial(%instance) : $@convention(thin) (S) -> @error Error, normal bb1, error bb2
 bb1(%9 : $()):
   %10 = tuple ()
   return %10 : $()
