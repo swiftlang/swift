@@ -73,7 +73,7 @@ enum: uint32_t {
 
 using namespace swift;
 
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING && SWIFT_STDLIB_HAS_DLADDR
 static bool getSymbolNameAddr(llvm::StringRef libraryName,
                               const SymbolInfo &syminfo,
                               std::string &symbolName, uintptr_t &addrOut) {
@@ -136,7 +136,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName,
 
 void swift::dumpStackTraceEntry(unsigned index, void *framePC,
                                 bool shortOutput) {
-#if SWIFT_SUPPORTS_BACKTRACE_REPORTING && !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+#if SWIFT_SUPPORTS_BACKTRACE_REPORTING && SWIFT_STDLIB_HAS_DLADDR
   SymbolInfo syminfo;
 
   // 0 is failure for lookupSymbol

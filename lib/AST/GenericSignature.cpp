@@ -539,7 +539,7 @@ Type GenericSignatureImpl::getSuperclassBound(Type type) const {
 
   auto computeViaRQM = [&]() {
     auto *machine = getRequirementMachine();
-    return machine->getSuperclassBound(type);
+    return machine->getSuperclassBound(type, getGenericParams());
   };
 
   auto &ctx = getASTContext();
@@ -772,7 +772,7 @@ Type GenericSignatureImpl::getConcreteType(Type type) const {
 
   auto computeViaRQM = [&]() {
     auto *machine = getRequirementMachine();
-    return machine->getConcreteType(type);
+    return machine->getConcreteType(type, getGenericParams());
   };
 
   auto &ctx = getASTContext();
