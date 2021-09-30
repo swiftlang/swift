@@ -274,6 +274,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ModuleGroupName = InputArg->getValue();
       break;
 
+    case OPT_id:
+      RequestId = InputArg->getValue();
+      break;
+
     case OPT_interested_usr:
       InterestedUSR = InputArg->getValue();
       break;
@@ -418,6 +422,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_shell:
       ShellExecution = true;
+      break;
+
+    case OPT_cancel:
+      CancelRequest = InputArg->getValue();
       break;
 
     case OPT_disable_implicit_concurrency_module_import:
