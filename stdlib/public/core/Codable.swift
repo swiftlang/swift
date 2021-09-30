@@ -5602,7 +5602,7 @@ extension String: CodingKeyRepresentable {
 extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
   /// Encodes the contents of this dictionary into the given encoder.
   ///
-  /// If the dictionary uses keys that are `String`, `Int` or a type conforming to
+  /// If the dictionary uses keys that are `String`, `Int`, or a type conforming to
   /// `CodingKeyRepresentable`, the contents are encoded in a keyed container.
   /// Otherwise, the contents are encoded as alternating key-value pairs in an unkeyed container.
   ///
