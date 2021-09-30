@@ -171,9 +171,6 @@ class ModuleDecl
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
 
-  /// The actual module name for an alias used for this module (if any).
-  mutable Identifier ModuleRealName;
-
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -392,12 +389,6 @@ private:
   ///  If this is a traditional (non-cross-import) overlay, get its underlying
   ///  module if one exists.
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
-
-  /// If a module alias is used, set the corresponding real name on disk,
-  /// which will be used for contents including metadata and mangling.
-  void setRealName(Identifier name) {
-    ModuleRealName = name;
-  }
 
 public:
 

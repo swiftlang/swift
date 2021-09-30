@@ -476,7 +476,6 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   setImplicit();
   setInterfaceType(ModuleType::get(this));
   setAccess(AccessLevel::Public);
-  setRealName(ctx.lookupModuleAlias(name));
 
   Bits.ModuleDecl.StaticLibrary = 0;
   Bits.ModuleDecl.TestingEnabled = 0;
@@ -1565,9 +1564,8 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
 }
 
 Identifier ModuleDecl::getRealName() const {
-    if (!ModuleRealName.empty())
-      return ModuleRealName;
-    return getName();
+  // This will return the real name for an alias (if used) or getName()
+  return getASTContext().lookupModuleAlias(getName());
 }
 
 Identifier ModuleDecl::getABIName() const {
