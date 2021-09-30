@@ -1651,7 +1651,7 @@ void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
   }
 }
 
-Identifier ASTContext::lookupModuleAlias(Identifier key) const {
+Identifier ASTContext::getRealModuleName(Identifier key) const {
   auto found = ModuleAliasMap.find(key);
   if (found != ModuleAliasMap.end()) {
     return found->second;

@@ -1565,7 +1565,7 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
 
 Identifier ModuleDecl::getRealName() const {
   // This will return the real name for an alias (if used) or getName()
-  return getASTContext().lookupModuleAlias(getName());
+  return getASTContext().getRealModuleName(getName());
 }
 
 Identifier ModuleDecl::getABIName() const {
