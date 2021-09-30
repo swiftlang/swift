@@ -128,7 +128,7 @@ extension _ArrayBuffer {
     } else {
       isUnique = _isNative
     }
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     if isUnique {
       _native.isImmutable = false
     }
@@ -145,7 +145,7 @@ extension _ArrayBuffer {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal mutating func endCOWMutation() {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     _native.isImmutable = true
 #endif
     _storage.endCOWMutation()
