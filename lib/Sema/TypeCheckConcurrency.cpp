@@ -3943,8 +3943,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     DeclContext *conformanceDC = nominal;
     if (attrMakingUnavailable) {
       llvm::VersionTuple NoVersion;
-      auto attr = new (ctx) AvailableAttr(attrMakingUnavailable->AtLoc,
-                                          attrMakingUnavailable->Range,
+      auto attr = new (ctx) AvailableAttr(SourceLoc(), SourceRange(),
                                           PlatformKind::none, "", "", nullptr,
                                           NoVersion, SourceRange(),
                                           NoVersion, SourceRange(),
@@ -3954,8 +3953,11 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
       // Conformance availability is currently tied to the declaring extension.
       // FIXME: This is a hack--we should give conformances real availability.
+      auto inherits = ctx.AllocateCopy(makeArrayRef(
+          InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
+                         /*isUnchecked*/true)));
       auto extension = ExtensionDecl::create(ctx, attrMakingUnavailable->AtLoc,
-                                             nullptr, {},
+                                             nullptr, inherits,
                                              nominal->getModuleScopeContext(),
                                              nullptr);
       extension->setImplicit();
@@ -3966,6 +3968,10 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
       ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
                                 std::move(nominal));
       nominal->addExtension(extension);
+
+      // Make it accessible to getTopLevelDecls()
+      if (auto sf = dyn_cast<SourceFile>(nominal->getModuleScopeContext()))
+        sf->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
 
       conformanceDC = extension;
     }
