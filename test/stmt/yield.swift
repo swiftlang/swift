@@ -92,3 +92,16 @@ struct YieldInDefer {
     }
   }
 }
+
+// SR-15066
+struct InvalidYieldParsing {
+  var property: String {
+    _read {
+      yield(x: "test") // expected-error {{unexpected label in 'yield' statement}} {{13-16=}}
+      yield(x: "test", y:   {0}) // expected-error {{expected 1 yield value(s)}}
+      // expected-error@-1 {{unexpected label in 'yield' statement}} {{13-16=}}
+      // expected-error@-2 {{unexpected label in 'yield' statement}} {{24-29=}}
+      yield(_: "test") // expected-error {{unexpected label in 'yield' statement}} {{13-16=}}
+    }
+  }
+}

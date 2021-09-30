@@ -1030,6 +1030,8 @@ ERROR(expected_await_not_async,none,
 // Yield Statment
 ERROR(expected_expr_yield,PointsToFirstBadToken,
       "expected expression in 'yield' statement", ())
+ERROR(unexpected_label_yield,none,
+      "unexpected label in 'yield' statement", ())
 
 // Defer Statement
 ERROR(expected_lbrace_after_defer,PointsToFirstBadToken,
