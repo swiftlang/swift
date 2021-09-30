@@ -424,17 +424,42 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   SmallVector<SILValue, 4> entryArgs;
   entryArgs.reserve(AppliedArgs.size());
   SmallBitVector borrowedArgs(AppliedArgs.size());
+  SmallBitVector copiedArgs(AppliedArgs.size());
+  auto enableLexicalLifetimes =
+      Apply.getFunction()
+          ->getModule()
+          .getASTContext()
+          .LangOpts.EnableExperimentalLexicalLifetimes;
 
   auto calleeConv = getCalleeFunction()->getConventions();
   for (auto p : llvm::enumerate(AppliedArgs)) {
     SILValue callArg = p.value();
     unsigned idx = p.index();
-    // Insert begin/end borrow for guaranteed arguments.
-    if (idx >= calleeConv.getSILArgIndexOfFirstParam() &&
-        calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
-      if (SILValue newValue = borrowFunctionArgument(callArg, Apply)) {
-        callArg = newValue;
-        borrowedArgs[idx] = true;
+    if (idx >= calleeConv.getSILArgIndexOfFirstParam()) {
+      if (enableLexicalLifetimes) {
+        if (Apply.getFunction()->hasOwnership() &&
+            !callArg->getType().isTrivial(*Apply.getFunction()) &&
+            !callArg->getType().isAddress()) {
+          SILBuilderWithScope builder(Apply.getInstruction(), getBuilder());
+          if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
+            callArg = builder.createBeginBorrow(Apply.getLoc(), callArg,
+                                                /*isLexical*/ true);
+          } else { /*owned*/
+            auto *bbi = builder.createBeginBorrow(Apply.getLoc(), callArg,
+                                                  /*isLexical*/ true);
+            callArg = builder.createCopyValue(Apply.getLoc(), bbi);
+            copiedArgs[idx] = true;
+          }
+          borrowedArgs[idx] = true;
+        }
+      } else {
+        // Insert begin/end borrow for guaranteed arguments.
+        if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
+          if (SILValue newValue = borrowFunctionArgument(callArg, Apply)) {
+            callArg = newValue;
+            borrowedArgs[idx] = true;
+          }
+        }
       }
     }
     entryArgs.push_back(callArg);
@@ -443,7 +468,6 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   // Create the return block and set ReturnToBB for use in visitTerminator
   // callbacks.
   SILBasicBlock *callerBlock = Apply.getParent();
-  SILBasicBlock *throwBlock = nullptr;
   SmallVector<SILInstruction *, 1> endBorrowInsertPts;
 
   switch (Apply.getKind()) {
@@ -476,7 +500,7 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
     auto *tai = cast<TryApplyInst>(Apply);
     ReturnToBB = tai->getNormalBB();
     endBorrowInsertPts.push_back(&*ReturnToBB->begin());
-    throwBlock = tai->getErrorBB();
+    endBorrowInsertPts.push_back(&*tai->getErrorBB()->begin());
     break;
   }
   }
@@ -491,12 +515,23 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
 
       for (auto *insertPt : endBorrowInsertPts) {
         SILBuilderWithScope returnBuilder(insertPt, getBuilder());
-        returnBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
-      }
-
-      if (throwBlock) {
-        SILBuilderWithScope throwBuilder(throwBlock->begin(), getBuilder());
-        throwBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
+        SILValue original;
+        SILValue borrow;
+        if (copiedArgs.test(i)) {
+          auto *cvi =
+              cast<CopyValueInst>(entryArgs[i]->getDefiningInstruction());
+          auto *bbi = cast<BeginBorrowInst>(
+              cvi->getOperand()->getDefiningInstruction());
+          borrow = bbi;
+          original = bbi->getOperand();
+        } else {
+          original = SILValue();
+          borrow = entryArgs[i];
+        }
+        returnBuilder.createEndBorrow(Apply.getLoc(), borrow);
+        if (original) {
+          returnBuilder.createDestroyValue(Apply.getLoc(), original);
+        }
       }
     }
   }

@@ -471,7 +471,7 @@ CodeCompletionSourceText("code-completion-sourcetext",
                          llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-CodeCOmpletionAnnotateResults("code-completion-annotate-results",
+CodeCompletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::desc("annotate completion results with XML"),
                               llvm::cl::cat(Category),
                               llvm::cl::init(false));
@@ -925,6 +925,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             bool CodeCompletionKeywords,
                             bool CodeCompletionComments,
                             bool CodeCompletionAnnotateResults,
+                            bool CodeCompletionAddInitsToTopLevel,
+                            bool CodeCompletionCallPatternHeuristics,
                             bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
@@ -934,6 +936,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
+  CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
+  CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
 
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
@@ -1130,6 +1134,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionKeywords,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
+                                 bool CodeCompletionAddInitsToTopLevel,
+                                 bool CodeCompletionCallPatternHeuristics,
                                  bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
@@ -1272,6 +1278,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
           // Consumer.
           ide::CodeCompletionContext CompletionContext(CompletionCache);
           CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
+          CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
+          CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
           std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
               ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                       *Consumer));
@@ -1652,6 +1660,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
 
     registerParseRequestFunctions(Parser.getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
+    registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
 
     Parser.getDiagnosticEngine().addConsumer(PrintDiags);
 
@@ -1887,6 +1896,7 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   registerParseRequestFunctions(Parser.getParser().Context.evaluator);
   registerTypeCheckerRequestFunctions(
       Parser.getParser().Context.evaluator);
+  registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -3835,7 +3845,7 @@ int main(int argc, char *argv[]) {
         llvm::outs(), options::CodeCompletionKeywords,
         options::CodeCompletionComments,
         options::CodeCompletionSourceText,
-        options::CodeCOmpletionAnnotateResults);
+        options::CodeCompletionAnnotateResults);
     for (StringRef filename : options::InputFilenames) {
       auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(filename);
       if (!resultsOpt) {
@@ -3965,10 +3975,6 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
-  InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
-      options::CodeCompleteInitsInPostfixExpr;
-  InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=
-      options::CodeCompleteCallPatternHeuristics;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
@@ -4076,7 +4082,9 @@ int main(int argc, char *argv[]) {
                                      options::CodeCompletionDiagnostics,
                                      options::CodeCompletionKeywords,
                                      options::CodeCompletionComments,
-                                     options::CodeCOmpletionAnnotateResults,
+                                     options::CodeCompletionAnnotateResults,
+                                     options::CodeCompleteInitsInPostfixExpr,
+                                     options::CodeCompleteCallPatternHeuristics,
                                      options::CodeCompletionSourceText);
     break;
 
@@ -4092,7 +4100,9 @@ int main(int argc, char *argv[]) {
                                 options::CodeCompletionDiagnostics,
                                 options::CodeCompletionKeywords,
                                 options::CodeCompletionComments,
-                                options::CodeCOmpletionAnnotateResults,
+                                options::CodeCompletionAnnotateResults,
+                                options::CodeCompleteInitsInPostfixExpr,
+                                options::CodeCompleteCallPatternHeuristics,
                                 options::CodeCompletionSourceText);
     break;
 

@@ -1083,7 +1083,7 @@ void SILCloner<ImplClass>::visitBeginBorrowInst(BeginBorrowInst *Inst) {
 
   recordClonedInstruction(
       Inst, getBuilder().createBeginBorrow(getOpLocation(Inst->getLoc()),
-                                           getOpValue(Inst->getOperand()), 
+                                           getOpValue(Inst->getOperand()),
                                            Inst->isLexical()));
 }
 

@@ -88,6 +88,12 @@ func testClosures() {
   }
 }
 
+func projectionPlaceholder<T>(@Wrapper _ value: T) {}
+
+func testOmittedProjectionLabel(value: Int) {
+    projectionPlaceholder($_: Projection(value: value))
+}
+
 @propertyWrapper
 struct ProjectionWrapper<Value> {
   var wrappedValue: Value

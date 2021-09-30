@@ -195,6 +195,10 @@ struct RewriteStep {
                        /*ruleID=*/0, inverse);
   }
 
+  bool isInContext() const {
+    return StartOffset > 0 || EndOffset > 0;
+  }
+
   void invert() {
     Inverse = !Inverse;
   }
@@ -218,9 +222,10 @@ struct RewriteStep {
 };
 
 /// Records a sequence of zero or more rewrite rules applied to a term.
-struct RewritePath {
+class RewritePath {
   SmallVector<RewriteStep, 3> Steps;
 
+public:
   bool empty() const {
     return Steps.empty();
   }
@@ -287,6 +292,17 @@ public:
     assert(!Deleted);
     Deleted = true;
   }
+
+  void normalize(const RewriteSystem &system);
+
+  bool isInContext() const;
+
+  void findProtocolConformanceRules(
+      SmallVectorImpl<unsigned> &notInContext,
+      SmallVectorImpl<std::pair<MutableTerm, unsigned>> &inContext,
+      const RewriteSystem &system) const;
+
+  void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
 };
 
 /// A term rewrite system for working with types in a generic signature.
@@ -366,8 +382,6 @@ public:
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
                   ProtocolGraph &&protos);
 
-  Symbol simplifySubstitutionsInSuperclassOrConcreteSymbol(Symbol symbol) const;
-
   unsigned getRuleID(const Rule &rule) const {
     assert((unsigned)(&rule - &*Rules.begin()) < Rules.size());
     return (unsigned)(&rule - &*Rules.begin());
@@ -385,6 +399,12 @@ public:
                const RewritePath *path=nullptr);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Completion
+  ///
+  //////////////////////////////////////////////////////////////////////////////
 
   enum class CompletionResult {
     /// Confluent completion was computed successfully.
@@ -404,18 +424,12 @@ public:
 
   void simplifyRewriteSystem();
 
-  void minimizeRewriteSystem();
+  enum ValidityPolicy {
+    AllowInvalidRequirements,
+    DisallowInvalidRequirements
+  };
 
-  void verifyRewriteRules() const;
-
-  void verifyHomotopyGenerators() const;
-
-  std::pair<CompletionResult, unsigned>
-  buildPropertyMap(PropertyMap &map,
-                   unsigned maxIterations,
-                   unsigned maxDepth);
-
-  void dump(llvm::raw_ostream &out) const;
+  void verifyRewriteRules(ValidityPolicy policy) const;
 
 private:
   bool
@@ -429,6 +443,63 @@ private:
   void processMergedAssociatedTypes();
 
   void checkMergedAssociatedType(Term lhs, Term rhs);
+
+public:
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Homotopy reduction
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  Optional<unsigned>
+  findRuleToDelete(RewritePath &replacementPath,
+                   const llvm::DenseSet<unsigned> *redundantConformances);
+
+  void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
+
+  void minimizeRewriteSystem();
+
+  void verifyHomotopyGenerators() const;
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Generating conformances
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term,
+      SmallVectorImpl<unsigned> &result) const;
+
+  void computeCandidateConformancePaths(
+      llvm::MapVector<unsigned,
+                      std::vector<SmallVector<unsigned, 2>>>
+          &conformancePaths) const;
+
+  bool isValidConformancePath(
+      llvm::SmallDenseSet<unsigned, 4> &visited,
+      llvm::DenseSet<unsigned> &redundantConformances,
+      const llvm::SmallVectorImpl<unsigned> &path,
+      const llvm::MapVector<unsigned,
+                            std::vector<SmallVector<unsigned, 2>>>
+          &conformancePaths) const;
+
+  void computeGeneratingConformances(
+      llvm::DenseSet<unsigned> &redundantConformances);
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///
+  /// Property map
+  ///
+  //////////////////////////////////////////////////////////////////////////////
+
+  std::pair<CompletionResult, unsigned>
+  buildPropertyMap(PropertyMap &map,
+                   unsigned maxIterations,
+                   unsigned maxDepth);
+
+  void dump(llvm::raw_ostream &out) const;
 };
 
 } // end namespace rewriting

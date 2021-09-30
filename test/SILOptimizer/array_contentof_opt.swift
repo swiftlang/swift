@@ -74,8 +74,5 @@ public func dontPropagateContiguousArray(_ a: inout ContiguousArray<UInt8>) {
 // CHECK-NEXT: apply [[F]]
 // CHECK-NOT: apply
 
-// The number of basic blocks should not exceed 20 (ideally there are no more than 16 blocks in this function).
-// CHECK-NOT: bb20:
-
 // CHECK: } // end sil function '$sSa6append10contentsOfyqd__n_t7ElementQyd__RszSTRd__lFSi_SaySiGTg5
 

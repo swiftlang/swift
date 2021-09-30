@@ -173,7 +173,19 @@ public:
 };
 
 Optional<llvm::VersionTuple>
-swift::irgen::getRuntimeVersionThatSupportsDemanglingType(CanType type) {
+getRuntimeVersionThatSupportsDemanglingType(CanType type) {
+  // The Swift 5.5 runtime is the first version able to demangle types
+  // related to concurrency.
+  bool needsConcurrency = type.findIf([](CanType t) -> bool {
+    if (auto fn = dyn_cast<AnyFunctionType>(t)) {
+      return fn->isAsync() || fn->isSendable() || fn->hasGlobalActor();
+    }
+    return false;
+  });
+  if (needsConcurrency) {
+    return llvm::VersionTuple(5, 5);
+  }
+
   // Associated types of opaque types weren't mangled in a usable form by the
   // Swift 5.1 runtime, so we needed to add a new mangling in 5.2.
   if (type->hasOpaqueArchetype()) {
@@ -190,16 +202,6 @@ swift::irgen::getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     // declarations that use them are already covered by availability
     // guards, so we don't need to limit availability of mangled names
     // involving them.
-  }
-
-  bool needsConcurrency = type.findIf([](CanType t) -> bool {
-    if (auto fn = dyn_cast<AnyFunctionType>(t)) {
-      return fn->isAsync() || fn->isSendable() || fn->hasGlobalActor();
-    }
-    return false;
-  });
-  if (needsConcurrency) {
-    return llvm::VersionTuple(5, 5);
   }
 
   return None;
@@ -278,6 +280,20 @@ getTypeRefByFunction(IRGenModule &IGM,
   return {constant, 6};
 }
 
+bool swift::irgen::mangledNameIsUnknownToDeployTarget(IRGenModule &IGM,
+                                                      CanType type) {
+  if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
+          IGM.Context.LangOpts.Target)) {
+    if (auto minimumSupportedRuntimeVersion =
+            getRuntimeVersionThatSupportsDemanglingType(type)) {
+      if (*runtimeCompatVersion < *minimumSupportedRuntimeVersion) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 static std::pair<llvm::Constant *, unsigned>
 getTypeRefImpl(IRGenModule &IGM,
                CanType type,
@@ -294,16 +310,10 @@ getTypeRefImpl(IRGenModule &IGM,
     // If the minimum deployment target's runtime demangler wouldn't understand
     // this mangled name, then fall back to generating a "mangled name" with a
     // symbolic reference with a callback function.
-    if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget
-                                      (IGM.Context.LangOpts.Target)) {
-      if (auto minimumSupportedRuntimeVersion =
-              getRuntimeVersionThatSupportsDemanglingType(type)) {
-        if (*runtimeCompatVersion < *minimumSupportedRuntimeVersion) {
-          return getTypeRefByFunction(IGM, sig, type);
-        }
-      }
+    if (mangledNameIsUnknownToDeployTarget(IGM, type)) {
+      return getTypeRefByFunction(IGM, sig, type);
     }
-      
+
     break;
 
   case MangledTypeRefRole::Reflection:

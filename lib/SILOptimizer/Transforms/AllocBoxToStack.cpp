@@ -533,11 +533,15 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   SILBuilderWithScope Builder(ABI);
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
+  bool isLexical = ABI->getFunction()
+                       ->getModule()
+                       .getASTContext()
+                       .LangOpts.EnableExperimentalLexicalLifetimes;
   auto *ASI = Builder.createAllocStack(
       ABI->getLoc(),
       getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),
                          ABI->getBoxType(), ABI->getModule().Types, 0),
-      ABI->getVarInfo(), ABI->hasDynamicLifetime());
+      ABI->getVarInfo(), ABI->hasDynamicLifetime(), isLexical);
 
   // Transfer a mark_uninitialized if we have one.
   SILValue StackBox = ASI;

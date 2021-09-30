@@ -1118,7 +1118,11 @@ public:
     // Otherwise, we have a statically-dispatched call.
     auto constant = SILDeclRef(e->getDecl());
     if (e->getDecl()->getAttrs().hasAttribute<DistributedActorAttr>()) {
-      constant = constant.asDistributed(true);
+      // we're calling a distributed function, only in cross-actor situations
+      // does this actually need to call the thunk.
+      if (!selfApply) {
+        constant = constant.asDistributed(true);
+      }
     } else {
       constant = constant.asForeign(
                    !isConstructorWithGeneratedAllocatorThunk(e->getDecl())

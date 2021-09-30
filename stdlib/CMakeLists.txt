@@ -71,8 +71,12 @@ option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
        "Support back-deploying compatibility fixes for newer apps running on older runtimes."
        TRUE)
 
-option(SWIFT_RUNTIME_MACHO_NO_DYLD
-       "Build stdlib assuming the runtime environment uses Mach-O but does not support dynamic modules."
+option(SWIFT_STDLIB_HAS_DLADDR
+       "Build stdlib assuming the runtime environment runtime environment provides dladdr API."
+       TRUE)
+
+option(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION
+       "Build stdlib assuming the runtime environment runtime environment only supports a single runtime image with Swift code."
        FALSE)
 
 option(SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC

@@ -7,6 +7,9 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
+// Crash expectations can't be implemented on WASI/WebAssembly.
+// UNSUPPORTED: OS=wasi
+
 // Disabled until test hang can be looked at.
 // UNSUPPORTED: OS=windows-msvc
 

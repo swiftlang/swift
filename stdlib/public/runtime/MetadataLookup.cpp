@@ -1034,7 +1034,7 @@ _gatherGenericParameters(const ContextDescriptor *context,
 
       str += "_gatherGenericParameters: context: ";
 
-#if !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+#if SWIFT_STDLIB_HAS_DLADDR
       SymbolInfo contextInfo;
       if (lookupSymbol(context, &contextInfo)) {
         str += contextInfo.symbolName.get();

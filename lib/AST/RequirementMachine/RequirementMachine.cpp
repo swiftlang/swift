@@ -322,13 +322,14 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   System.dump(out);
   Map.dump(out);
 
-  out << "\nConformance access paths:\n";
+  out << "Conformance access paths: {\n";
   for (auto pair : ConformanceAccessPaths) {
     out << "- " << pair.first.first << " : ";
     out << pair.first.second->getName() << " => ";
     pair.second.print(out);
     out << "\n";
   }
+  out << "}\n";
 }
 
 RequirementMachine::RequirementMachine(RewriteContext &ctx)
@@ -342,7 +343,7 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
 
 RequirementMachine::~RequirementMachine() {}
 
-void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
+void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   Sig = sig;
 
   PrettyStackTraceGenericSignature debugStack("building rewrite system for", sig);
@@ -359,7 +360,6 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
     llvm::dbgs() << "Adding generic signature " << sig << " {\n";
   }
 
-
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
   RewriteSystemBuilder builder(Context, Dump);
@@ -371,7 +371,7 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
                     std::move(builder.RequirementRules),
                     std::move(builder.Protocols));
 
-  computeCompletion();
+  computeCompletion(RewriteSystem::DisallowInvalidRequirements);
 
   if (Dump) {
     llvm::dbgs() << "}\n";
@@ -380,7 +380,7 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 
 /// Attempt to obtain a confluent rewrite system using the completion
 /// procedure.
-void RequirementMachine::computeCompletion() {
+void RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
   while (true) {
     // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
     auto result = System.computeConfluentCompletion(
@@ -415,7 +415,7 @@ void RequirementMachine::computeCompletion() {
     checkCompletionResult();
 
     // Check invariants.
-    System.verifyRewriteRules();
+    System.verifyRewriteRules(policy);
     System.verifyHomotopyGenerators();
 
     // Build the property map, which also performs concrete term

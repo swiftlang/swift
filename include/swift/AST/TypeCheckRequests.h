@@ -368,6 +368,44 @@ public:
   void cacheResult(bool value) const;
 };
 
+class StructuralRequirementsRequest :
+    public SimpleRequest<StructuralRequirementsRequest,
+                         ArrayRef<StructuralRequirement>(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<StructuralRequirement>
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class ProtocolDependenciesRequest :
+    public SimpleRequest<ProtocolDependenciesRequest,
+                         ArrayRef<ProtocolDecl *>(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ProtocolDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Compute the requirements that describe a protocol.
 class RequirementSignatureRequest :
     public SimpleRequest<RequirementSignatureRequest,

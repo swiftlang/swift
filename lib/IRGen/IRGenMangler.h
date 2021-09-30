@@ -634,10 +634,10 @@ protected:
   }
 };
 
-/// Does this type require a special minimum Swift runtime version which
-/// supports demangling it?
-Optional<llvm::VersionTuple>
-getRuntimeVersionThatSupportsDemanglingType(CanType type);
+/// Determines if the minimum deployment target's runtime demangler will not
+/// understand the mangled name for the given type.
+/// \returns true iff the target's runtime does not understand the mangled name.
+bool mangledNameIsUnknownToDeployTarget(IRGenModule &IGM, CanType type);
 
 } // end namespace irgen
 } // end namespace swift

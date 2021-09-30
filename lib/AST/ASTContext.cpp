@@ -67,7 +67,6 @@
 #include <algorithm>
 #include <memory>
 
-#include "RequirementMachine/RequirementMachine.h"
 #include "RequirementMachine/RewriteContext.h"
 
 using namespace swift;
@@ -538,14 +537,6 @@ struct ASTContext::Implementation {
 
   /// Memory allocation arena for the term rewriting system.
   std::unique_ptr<rewriting::RewriteContext> TheRewriteContext;
-
-  /// Stored requirement machines for canonical generic signatures.
-  ///
-  /// This should come after TheRewriteContext above, since various destructors
-  /// compile stats in the histograms stored in our RewriteContext.
-  llvm::DenseMap<GenericSignature,
-                 std::unique_ptr<rewriting::RequirementMachine>>
-    RequirementMachines;
 };
 
 ASTContext::Implementation::Implementation()
@@ -1965,32 +1956,7 @@ ASTContext::getOrCreateRequirementMachine(CanGenericSignature sig) {
   if (!rewriteCtx)
     rewriteCtx.reset(new rewriting::RewriteContext(*this));
 
-  // Check whether we already have a requirement machine for this
-  // signature.
-  auto &machines = getImpl().RequirementMachines;
-
-  auto &machinePtr = machines[sig];
-  if (machinePtr) {
-    auto *machine = machinePtr.get();
-    if (!machine->isComplete()) {
-      llvm::errs() << "Re-entrant construction of requirement "
-                   << "machine for " << sig << "\n";
-      abort();
-    }
-
-    return machine;
-  }
-
-  auto *machine = new rewriting::RequirementMachine(*rewriteCtx);
-
-  // Store this requirement machine before adding the signature,
-  // to catch re-entrant construction via addGenericSignature()
-  // below.
-  machinePtr.reset(machine);
-
-  machine->addGenericSignature(sig);
-
-  return machine;
+  return rewriteCtx->getRequirementMachine(sig);
 }
 
 bool ASTContext::isRecursivelyConstructingRequirementMachine(
@@ -1999,13 +1965,7 @@ bool ASTContext::isRecursivelyConstructingRequirementMachine(
   if (!rewriteCtx)
     return false;
 
-  auto &machines = getImpl().RequirementMachines;
-
-  auto found = machines.find(sig);
-  if (found == machines.end())
-    return false;
-
-  return !found->second->isComplete();
+  return rewriteCtx->isRecursivelyConstructingRequirementMachine(sig);
 }
 
 Optional<llvm::TinyPtrVector<ValueDecl *>>

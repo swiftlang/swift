@@ -150,9 +150,14 @@ ERROR(error_stdlib_module_name,none,
       "module name \"%0\" is reserved for the standard library"
       "%select{|; use -module-name flag to specify an alternate name}1",
       (StringRef, bool))
-
 ERROR(error_stdlib_not_found,Fatal,
       "unable to load standard library for target '%0'", (StringRef))
+ERROR(error_module_alias_invalid_format,none,
+      "invalid module alias format \"%0\"; make sure to use the format '-module-alias alias_name=underlying_name'", (StringRef))
+ERROR(error_module_alias_forbidden_name,none,
+      "invalid module alias \"%0\"; make sure the alias differs from the module name, module ABI name, module link name, and a standard library name", (StringRef))
+ERROR(error_module_alias_duplicate,none,
+      "duplicate module alias; the name \"%0\" is already used for a module alias or an underlying name", (StringRef))
 
 ERROR(error_unable_to_load_supplementary_output_file_map, none,
       "unable to load supplementary output file map '%0': %1",

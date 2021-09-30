@@ -430,6 +430,11 @@ def module_name : Separate<["-"], "module-name">,
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
+def module_alias : Separate<["-"], "module-alias">,
+  Flags<[FrontendOption]>,
+  MetaVarName<"<alias_name=underlying_name>">,
+  HelpText<"If a source file imports or references module <alias_name>, the underlying name is used for the contents of the file">;
+
 def module_link_name : Separate<["-"], "module-link-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Library to link against when using this module">;
@@ -554,7 +559,7 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
 def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
-  
+
 def lto_library : Separate<["-"], "lto-library">,
   Flags<[FrontendOption, ArgumentIsPath, NoInteractiveOption]>,
   HelpText<"Perform LTO with <lto-library>">, MetaVarName<"<lto-library>">;
@@ -809,6 +814,10 @@ def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,
   HelpText<"Specify the debug info format type to either 'dwarf' or 'codeview'">;
+
+def prefix_serialized_debugging_options : Flag<["-"], "prefix-serialized-debugging-options">,
+  Flags<[FrontendOption]>,
+  HelpText<"Apply debug prefix mappings to serialized debug info in Swiftmodule files">;
 
 // Verify debug info
 def verify_debug_info : Flag<["-"], "verify-debug-info">,

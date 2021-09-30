@@ -1032,6 +1032,8 @@ ERROR(expected_await_not_async,none,
 // Yield Statment
 ERROR(expected_expr_yield,PointsToFirstBadToken,
       "expected expression in 'yield' statement", ())
+ERROR(unexpected_label_yield,none,
+      "unexpected label in 'yield' statement", ())
 
 // Defer Statement
 ERROR(expected_lbrace_after_defer,PointsToFirstBadToken,
@@ -1748,6 +1750,9 @@ ERROR(unsupported_conditional_compilation_unary_expression,none,
 ERROR(unsupported_platform_condition_expression,none,
       "unexpected platform condition "
       "(expected 'os', 'arch', or 'swift')",
+      ())
+ERROR(platform_condition_expected_argument,none,
+      "expected argument to platform condition",
       ())
 ERROR(platform_condition_expected_one_argument,none,
       "expected only one argument to platform condition",

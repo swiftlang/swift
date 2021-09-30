@@ -105,6 +105,25 @@ inline void simple_display(llvm::raw_ostream &out, const Requirement &req) {
   req.print(out, PrintOptions());
 }
 
+/// A requirement as written in source, together with a source location. See
+/// ProtocolDecl::getStructuralRequirements().
+struct StructuralRequirement {
+  /// The actual requirement, where the types were resolved with the
+  /// 'Structural' type resolution stage.
+  Requirement req;
+
+  /// The source location where the requirement is written, used for redundancy
+  /// and conflict diagnostics.
+  SourceLoc loc;
+
+  /// A flag indicating whether the requirement was inferred from the
+  /// application of a type constructor. Also used for diagnostics, because
+  /// an inferred requirement made redundant by an explicit requirement is not
+  /// diagnosed as redundant, since we want to give users the option of
+  /// spelling out these requirements explicitly.
+  bool inferred = false;
+};
+
 } // end namespace swift
 
 #endif

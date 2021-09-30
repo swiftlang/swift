@@ -45,6 +45,7 @@ class RewriteContext;
 /// generic signatures and interface types.
 class RequirementMachine final {
   friend class swift::ASTContext;
+  friend class swift::rewriting::RewriteContext;
 
   CanGenericSignature Sig;
 
@@ -77,10 +78,11 @@ class RequirementMachine final {
   RequirementMachine &operator=(const RequirementMachine &) = delete;
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
-  void addGenericSignature(CanGenericSignature sig);
+  void initWithGenericSignature(CanGenericSignature sig);
 
   bool isComplete() const;
-  void computeCompletion();
+
+  void computeCompletion(RewriteSystem::ValidityPolicy policy);
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
@@ -96,9 +98,11 @@ public:
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
   GenericSignature::RequiredProtocols getRequiredProtocols(Type depType) const;
-  Type getSuperclassBound(Type depType) const;
+  Type getSuperclassBound(Type depType,
+                          TypeArrayView<GenericTypeParamType> genericParams) const;
   bool isConcreteType(Type depType) const;
-  Type getConcreteType(Type depType) const;
+  Type getConcreteType(Type depType,
+                       TypeArrayView<GenericTypeParamType> genericParams) const;
   bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
   bool isCanonicalTypeInContext(Type type) const;
   Type getCanonicalTypeInContext(Type type,
