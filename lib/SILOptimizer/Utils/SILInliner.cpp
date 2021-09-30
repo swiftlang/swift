@@ -437,7 +437,8 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
     unsigned idx = p.index();
     if (idx >= calleeConv.getSILArgIndexOfFirstParam()) {
       if (Apply.getFunction()->hasOwnership() && enableLexicalLifetimes) {
-        if (!callArg->getType().isTrivial(*Apply.getFunction())) {
+        if (!callArg->getType().isTrivial(*Apply.getFunction()) &&
+            !callArg->getType().isAddress()) {
           SILBuilderWithScope builder(Apply.getInstruction(), getBuilder());
           if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
             callArg = builder.createBeginBorrow(Apply.getLoc(), callArg,
