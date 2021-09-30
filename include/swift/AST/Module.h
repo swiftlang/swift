@@ -357,6 +357,15 @@ public:
     ModuleABIName = name;
   }
 
+  /// Retrieve the actual module name of an alias used for this module (if any).
+  ///
+  /// For example, if '-module-alias Foo=Bar' is passed in when building the main module,
+  /// and this module is (a) not the main module and (b) is named Foo, then it returns
+  /// the real (physically on-disk) module name Bar.
+  ///
+  /// If no module aliasing is set, it will return getName(), i.e. Foo.
+  Identifier getRealName() const;
+
   /// User-defined module version number.
   llvm::VersionTuple UserModuleVersion;
   void setUserModuleVersion(llvm::VersionTuple UserVer) {
@@ -365,6 +374,7 @@ public:
   llvm::VersionTuple getUserModuleVersion() const {
     return UserModuleVersion;
   }
+
 private:
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.

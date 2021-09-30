@@ -1642,6 +1642,23 @@ void ASTContext::addModuleInterfaceChecker(
   getImpl().InterfaceChecker = std::move(checker);
 }
 
+void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
+  for (auto k: aliasMap.keys()) {
+    auto val = aliasMap.lookup(k);
+    if (!val.empty()) {
+      ModuleAliasMap[getIdentifier(k)] = getIdentifier(val);
+    }
+  }
+}
+
+Identifier ASTContext::getRealModuleName(Identifier key) const {
+  auto found = ModuleAliasMap.find(key);
+  if (found != ModuleAliasMap.end()) {
+    return found->second;
+  }
+  return key;
+}
+
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
     ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate,
