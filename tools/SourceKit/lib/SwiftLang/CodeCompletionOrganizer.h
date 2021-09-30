@@ -36,7 +36,7 @@ struct Options {
   bool addInnerResults = false;
   bool addInnerOperators = true;
   bool addInitsToTopLevel = false;
-  bool callPatternHeuristics = true;
+  bool callPatternHeuristics = false;
   bool hideUnderscores = true;
   bool reallyHideAllUnderscores = false;
   bool hideLowPriority = true;

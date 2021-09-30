@@ -506,12 +506,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.CodeCompleteInitsInPostfixExpr |=
-      Args.hasArg(OPT_code_complete_inits_in_postfix_expr);
-
-  Opts.CodeCompleteCallPatternHeuristics |=
-      Args.hasArg(OPT_code_complete_call_pattern_heuristics);
-
   if (auto A = Args.getLastArg(OPT_enable_target_os_checking,
                                OPT_disable_target_os_checking)) {
     Opts.EnableTargetOSChecking

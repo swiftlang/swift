@@ -45,6 +45,7 @@ import Swift
 @available(SwiftStdlib 5.5, *)
 extension MainActor {
   /// Execute the given body closure on the main actor.
+  @_silgen_name("$sScM3run10resultType4bodyxxm_xyYbKScMYcXEtYaKlFZ")
   public static func run<T: Sendable>(
     resultType: T.Type = T.self,
     body: @MainActor @Sendable () throws -> T

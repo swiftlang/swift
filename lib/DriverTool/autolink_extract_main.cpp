@@ -147,14 +147,13 @@ extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
   return false;
 }
 
-/// Look inside the object file 'WasmObjectFile' and append any linker flags found in
-/// its ".swift1_autolink_entries" section to 'LinkerFlags'.
-/// Return 'true' if there was an error, and 'false' otherwise.
+/// Look inside the object file 'WasmObjectFile' and append any linker flags
+/// found in its ".swift1_autolink_entries" section to 'LinkerFlags'. Return
+/// 'true' if there was an error, and 'false' otherwise.
 static bool
 extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
                                  std::vector<std::string> &LinkerFlags,
                                  CompilerInstance &Instance) {
-
   // Search for the data segment we hold autolink entries in
   for (const llvm::object::WasmSegment &Segment : ObjectFile->dataSegments()) {
     if (Segment.Data.Name == ".swift1_autolink_entries") {
@@ -164,7 +163,7 @@ extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
       // the set.
       llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
       SegmentData.split(SplitFlags, llvm::StringRef("\0", 1), -1,
-                         /*KeepEmpty=*/false);
+                        /*KeepEmpty=*/false);
       for (const auto &Flag : SplitFlags)
         LinkerFlags.push_back(Flag.str());
     }
@@ -182,7 +181,8 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
                                std::vector<std::string> &LinkerFlags) {
   if (auto *ObjectFile = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Bin)) {
     return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
-  } else if (auto *ObjectFile = llvm::dyn_cast<llvm::object::WasmObjectFile>(Bin)) {
+  } else if (auto *ObjectFile =
+                 llvm::dyn_cast<llvm::object::WasmObjectFile>(Bin)) {
     return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
   } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
     llvm::Error Error = llvm::Error::success();

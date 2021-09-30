@@ -19,7 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #if defined(__APPLE__) && defined(__MACH__) &&                                 \
-    !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+    !defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)
 
 #include "ImageInspection.h"
 #include "ImageInspectionCommon.h"
@@ -159,6 +159,7 @@ void swift::initializeDynamicReplacementLookup() {
                                 addImageDynamicReplacementBlockCallback>);
 }
 
+#if SWIFT_STDLIB_HAS_DLADDR
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   Dl_info dlinfo;
   if (dladdr(address, &dlinfo) == 0) {
@@ -171,6 +172,7 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
 }
+#endif
 
 #endif // defined(__APPLE__) && defined(__MACH__) &&
-       // !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+       // !defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)
