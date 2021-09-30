@@ -436,8 +436,10 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
     SILValue callArg = p.value();
     unsigned idx = p.index();
     if (idx >= calleeConv.getSILArgIndexOfFirstParam()) {
-      if (Apply.getFunction()->hasOwnership() && enableLexicalLifetimes) {
-        if (!callArg->getType().isTrivial(*Apply.getFunction())) {
+      if (enableLexicalLifetimes) {
+        if (Apply.getFunction()->hasOwnership() &&
+            !callArg->getType().isTrivial(*Apply.getFunction()) &&
+            !callArg->getType().isAddress()) {
           SILBuilderWithScope builder(Apply.getInstruction(), getBuilder());
           if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
             callArg = builder.createBeginBorrow(Apply.getLoc(), callArg,
@@ -448,8 +450,8 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
             callArg = builder.createCopyValue(Apply.getLoc(), bbi);
             copiedArgs[idx] = true;
           }
+          borrowedArgs[idx] = true;
         }
-        borrowedArgs[idx] = true;
       } else {
         // Insert begin/end borrow for guaranteed arguments.
         if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
