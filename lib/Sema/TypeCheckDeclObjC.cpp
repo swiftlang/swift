@@ -455,7 +455,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
   case ActorIsolationRestriction::GlobalActor:
     // FIXME: Consider whether to limit @objc on global-actor-qualified
     // declarations.
-  case ActorIsolationRestriction::DistributedActorSelf:
+  case ActorIsolationRestriction::CrossDistributedActorSelf:
     // we do not allow distributed + objc actors.
     return false;
   case ActorIsolationRestriction::Unrestricted:
