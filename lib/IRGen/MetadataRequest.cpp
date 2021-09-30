@@ -2477,7 +2477,11 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
   // Never access by mangled name if we've been asked not to.
   if (IGM.getOptions().DisableConcreteTypeMetadataMangledNameAccessors)
     return false;
-  
+
+  // Do not access by mangled name if the runtime won't understand it.
+  if (mangledNameIsUnknownToDeployTarget(IGM, type))
+    return false;
+
   // A nongeneric nominal type with nontrivial metadata has an accessor
   // already we can just call.
   if (auto nom = dyn_cast<NominalType>(type)) {
@@ -2487,14 +2491,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
       return false;
     }
   }
-  
-  // The Swift 5.1 runtime fails to demangle associated types of opaque types.
-  if (auto minimumSwiftVersion =
-          getRuntimeVersionThatSupportsDemanglingType(type)) {
-    return IGM.getAvailabilityContext().isContainedIn(
-        IGM.Context.getSwift5PlusAvailability(*minimumSwiftVersion));
-  }
-  
+
   return true;
 
 // The visitor below can be used to fine-tune a heuristic to decide whether
