@@ -27,6 +27,12 @@ static StringRef getRuntimeLibPath() {
   return sys::path::parent_path(SWIFTLIB_DIR);
 }
 
+static void *createCancallationToken() {
+  static std::atomic<size_t> handle(1000);
+  return reinterpret_cast<void *>(
+      handle.fetch_add(1, std::memory_order_relaxed));
+}
+
 namespace {
 
 class NullEditorConsumer : public EditorConsumer {
@@ -145,9 +151,10 @@ public:
     getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer);
   }
 
-  TestCursorInfo getCursor(const char *DocName, unsigned Offset,
-                           ArrayRef<const char *> CArgs,
-                           bool CancelOnSubsequentRequest = false) {
+  TestCursorInfo
+  getCursor(const char *DocName, unsigned Offset, ArrayRef<const char *> CArgs,
+            SourceKitCancellationToken CancellationToken = nullptr,
+            bool CancelOnSubsequentRequest = false) {
     auto Args = makeArgs(DocName, CArgs);
     Semaphore sema(0);
 
@@ -155,7 +162,8 @@ public:
     getLang().getCursorInfo(
         DocName, Offset, /*Length=*/0, /*Actionables=*/false,
         /*SymbolGraph=*/false, CancelOnSubsequentRequest, Args,
-        /*vfsOptions=*/None, [&](const RequestResult<CursorInfoData> &Result) {
+        /*vfsOptions=*/None, CancellationToken,
+        [&](const RequestResult<CursorInfoData> &Result) {
           assert(!Result.isCancelled());
           if (Result.isError()) {
             TestInfo.Error = Result.getError().str();
@@ -439,12 +447,14 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
   getLang().getCursorInfo(
       SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/true, ArgsForSlow,
-      /*vfsOptions=*/None, [&](const RequestResult<CursorInfoData> &Result) {
+      /*vfsOptions=*/None, /*CancellationToken=*/nullptr,
+      [&](const RequestResult<CursorInfoData> &Result) {
         EXPECT_TRUE(Result.isCancelled());
         FirstCursorInfoSema.signal();
       });
 
   auto Info = getCursor(FastDocName, FastOffset, Args,
+                        /*CancellationToken=*/nullptr,
                         /*CancelOnSubsequentRequest=*/true);
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("Int", Info.Typename.c_str());
@@ -452,6 +462,43 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
   EXPECT_EQ(strlen("foo"), Info.Length);
 
   bool expired = FirstCursorInfoSema.wait(30 * 1000);
+  if (expired)
+    llvm::report_fatal_error("Did not receive a resonse for the first request");
+}
+
+TEST_F(CursorInfoTest, CursorInfoCancellation) {
+  // TODO: This test case relies on the following snippet being slow to type
+  // check so that the first cursor info request takes longer to execute than it
+  // takes time to schedule the second request. If that is fixed, we need to
+  // find a new way to cause slow type checking. rdar://80582770
+  const char *SlowDocName = "slow.swift";
+  const char *SlowContents = "func foo(x: Invalid1, y: Invalid2) {\n"
+                             "    x / y / x / y / x / y / x / y\n"
+                             "}\n";
+  auto SlowOffset = findOffset("x", SlowContents);
+  const char *Args[] = {"-parse-as-library"};
+  std::vector<const char *> ArgsForSlow = llvm::makeArrayRef(Args).vec();
+  ArgsForSlow.push_back(SlowDocName);
+
+  open(SlowDocName, SlowContents, llvm::makeArrayRef(Args));
+
+  SourceKitCancellationToken CancellationToken = createCancallationToken();
+
+  // Schedule a cursor info request that takes long to execute. This should be
+  // cancelled as the next cursor info (which is faster) gets requested.
+  Semaphore CursorInfoSema(0);
+  getLang().getCursorInfo(
+      SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
+      /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/false, ArgsForSlow,
+      /*vfsOptions=*/None, /*CancellationToken=*/CancellationToken,
+      [&](const RequestResult<CursorInfoData> &Result) {
+        EXPECT_TRUE(Result.isCancelled());
+        CursorInfoSema.signal();
+      });
+
+  getLang().cancelRequest(CancellationToken);
+
+  bool expired = CursorInfoSema.wait(30 * 1000);
   if (expired)
     llvm::report_fatal_error("Did not receive a resonse for the first request");
 }
