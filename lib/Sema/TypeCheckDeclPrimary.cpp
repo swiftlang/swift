@@ -1709,7 +1709,7 @@ public:
 
         auto &diags = ID->getASTContext().Diags;
         InFlightDiagnostic inFlight =
-            diags.diagnose(ID, diag::warn_public_import_of_private_module,
+            diags.diagnose(ID, diag::error_public_import_of_private_module,
                            target->getName(), importer->getName());
         if (ID->getAttrs().isEmpty()) {
            inFlight.fixItInsert(ID->getStartLoc(),
