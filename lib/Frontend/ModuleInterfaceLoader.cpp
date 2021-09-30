@@ -1739,7 +1739,13 @@ bool ExplicitSwiftModuleLoader::findModule(ImportPath::Element ModuleID,
            std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
            bool skipBuildingInterface, bool &IsFramework, bool &IsSystemModule) {
-  StringRef moduleName = ModuleID.Item.str();
+  // Find a module with an actual, physical name on disk, in case
+  // -module-alias is used (otherwise same).
+  //
+  // For example, if '-module-alias Foo=Bar' is passed in to the frontend, and an
+  // input file has 'import Foo', a module called Bar (real name) should be searched.
+  StringRef moduleName = Ctx.getRealModuleName(ModuleID.Item).str();
+
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no explicit module path is given matches the name, return with an
   // error code.
