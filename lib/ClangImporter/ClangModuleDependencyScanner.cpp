@@ -242,6 +242,13 @@ void ClangImporter::recordModuleDependencies(
       // from the depending Swift modules.
       if (arg == "-target") {
         It += 2;
+      } else if (arg == "clang" ||
+                 arg.endswith(llvm::sys::path::get_separator().str() + "clang")) {
+        // Remove the initial path to clang executable argument, to avoid
+        // treating it as an executable input to compilation. It is not needed
+        // because the consumer of this command-line will invoke the emit-PCM
+        // action via swift-frontend.
+        It += 1;
       } else if (arg.startswith("-fapinotes-swift-version=")) {
         // Remove the apinotes version because we should use the language version
         // specified in the interface file.
