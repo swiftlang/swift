@@ -460,6 +460,12 @@ std::string LinkEntity::mangleAsString() const {
     Result.append("Tu");
     return Result;
   }
+  case Kind::DistributedThunkAsyncFunctionPointer: {
+    std::string Result = getSILDeclRef().mangle();
+    Result.append("Td");
+    Result.append("Tu");
+    return Result;
+  }
   case Kind::KnownAsyncFunctionPointer: {
     std::string Result(static_cast<char *>(Pointer));
     Result.append("Tu");
@@ -467,11 +473,7 @@ std::string LinkEntity::mangleAsString() const {
   }
 
   case Kind::AsyncFunctionPointerAST: {
-    std::string Result;
-    Result = SILDeclRef(const_cast<ValueDecl *>(getDecl()),
-                        static_cast<SILDeclRef::Kind>(
-                            reinterpret_cast<uintptr_t>(SecondaryPointer)))
-                 .mangle();
+    std::string Result = getSILDeclRef().mangle();
     Result.append("Tu");
     return Result;
   }
@@ -481,6 +483,15 @@ std::string LinkEntity::mangleAsString() const {
     return Result;
   }
   llvm_unreachable("bad entity kind!");
+}
+
+SILDeclRef LinkEntity::getSILDeclRef() const {
+  assert(getKind() == Kind::DistributedThunkAsyncFunctionPointer ||
+         getKind() == Kind::AsyncFunctionPointerAST);
+
+  return SILDeclRef(const_cast<ValueDecl *>(getDecl()),
+             static_cast<SILDeclRef::Kind>(
+                 reinterpret_cast<uintptr_t>(SecondaryPointer)));
 }
 
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
@@ -717,6 +728,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILFunction()->getEffectiveSymbolLinkage();
 
   case Kind::AsyncFunctionPointerAST:
+  case Kind::DistributedThunkAsyncFunctionPointer:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
   case Kind::DynamicallyReplaceableFunctionImpl:
@@ -779,6 +791,7 @@ bool LinkEntity::isContextDescriptor() const {
     return true;
   case Kind::AsyncFunctionPointer:
   case Kind::AsyncFunctionPointerAST:
+  case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::PropertyDescriptor:
   case Kind::DispatchThunk:
   case Kind::DispatchThunkDerivative:
@@ -962,6 +975,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::DispatchThunkAsyncFunctionPointer:
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
+  case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
   case Kind::AsyncFunctionPointerAST:
   case Kind::KnownAsyncFunctionPointer:
@@ -1071,6 +1085,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   }
 
   case Kind::AsyncFunctionPointerAST:
+  case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::DispatchThunk:
   case Kind::DispatchThunkDerivative:
   case Kind::DispatchThunkInitializer:
@@ -1165,6 +1180,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
 DeclContext *LinkEntity::getDeclContextForEmission() const {
   switch (getKind()) {
   case Kind::AsyncFunctionPointerAST:
+  case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::DispatchThunk:
   case Kind::DispatchThunkDerivative:
   case Kind::DispatchThunkInitializer:

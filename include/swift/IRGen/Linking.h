@@ -153,6 +153,10 @@ class LinkEntity {
     /// a class.
     DispatchThunkAllocatorAsyncFunctionPointer,
 
+    /// An async function pointer for a distributed thunk.
+    /// The pointer is a FuncDecl* inside an actor (class).
+    DistributedThunkAsyncFunctionPointer,
+
     /// A method descriptor.  The pointer is a FuncDecl* inside a protocol
     /// or a class.
     MethodDescriptor,
@@ -1198,7 +1202,9 @@ public:
 
   static LinkEntity forAsyncFunctionPointer(SILDeclRef declRef) {
     LinkEntity entity;
-    entity.setForDecl(Kind::AsyncFunctionPointerAST,
+    entity.setForDecl(declRef.isDistributedThunk()
+                          ? Kind::DistributedThunkAsyncFunctionPointer
+                          : Kind::AsyncFunctionPointerAST,
                       declRef.getAbstractFunctionDecl());
     entity.SecondaryPointer =
         reinterpret_cast<void *>(static_cast<uintptr_t>(declRef.kind));
@@ -1264,6 +1270,8 @@ public:
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   std::string mangleAsString() const;
+
+  SILDeclRef getSILDeclRef() const;
   SILLinkage getLinkage(ForDefinition_t isDefinition) const;
 
   bool hasDecl() const {
