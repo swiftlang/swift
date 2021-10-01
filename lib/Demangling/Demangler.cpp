@@ -611,11 +611,15 @@ NodePointer Demangler::demangleConformance(StringRef MangledName,
       Result = Result->getChild(0);
     }
 
-    if (Result->getKind() != Node::Kind::ConcreteProtocolConformance
-        && Result->getKind() != Node::Kind::DependentProtocolConformanceRoot)
+    switch (Result->getKind()) {
+    case Node::Kind::ConcreteProtocolConformance:
+    case Node::Kind::DependentProtocolConformanceRoot:
+    case Node::Kind::AssociatedConformanceProtocolRelativeAccessor:
+    case Node::Kind::AssociatedConformanceTypeRelativeAccessor:
+      return Result;
+    default:
       return nullptr;
-
-    return Result;
+    }
   }
 
   return nullptr;
