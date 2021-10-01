@@ -247,7 +247,10 @@ private func _findBoundary(
     if idx == 0 { return 0 }
 
     let scalar = _decodeScalar(utf8, startingAt: idx).0
-    if scalar._hasNormalizationBoundaryBefore { return idx }
+
+    if scalar._isNFCStarter {
+      return idx
+    }
 
     idx &-= _utf8ScalarLength(utf8, endingAt: idx)
   }
@@ -319,204 +322,42 @@ extension _StringGutsSlice {
     with other: _StringGutsSlice,
     expecting: _StringComparisonResult
   ) -> Bool {
-    var left_output = _FixedArray16<UInt8>(allZeros: ())
-    var left_icuInput = _FixedArray16<UInt16>(allZeros: ())
-    var left_icuOutput = _FixedArray16<UInt16>(allZeros: ())
-    var right_output = _FixedArray16<UInt8>(allZeros: ())
-    var right_icuInput = _FixedArray16<UInt16>(allZeros: ())
-    var right_icuOutput = _FixedArray16<UInt16>(allZeros: ())
-    if _fastPath(self.isFastUTF8 && other.isFastUTF8) {
-      return self.withFastUTF8 { leftUTF8 in
-        other.withFastUTF8 { rightUTF8 in
-          let leftStartIndex = String.Index(_encodedOffset: 0)
-          let rightStartIndex = String.Index(_encodedOffset: 0)
-          let leftEndIndex = String.Index(_encodedOffset: leftUTF8.count)
-          let rightEndIndex = String.Index(_encodedOffset: rightUTF8.count)
-          return _normalizedCompareImpl(
-            left_outputBuffer: _castOutputBuffer(&left_output),
-            left_icuInputBuffer: _castOutputBuffer(&left_icuInput),
-            left_icuOutputBuffer: _castOutputBuffer(&left_icuOutput),
-            right_outputBuffer: _castOutputBuffer(&right_output),
-            right_icuInputBuffer: _castOutputBuffer(&right_icuInput),
-            right_icuOutputBuffer: _castOutputBuffer(&right_icuOutput),
-            left_range: leftStartIndex..<leftEndIndex,
-            right_range: rightStartIndex..<rightEndIndex,
-            expecting: expecting,
-            normalizeLeft: { readIndex, outputBuffer, icuInputBuffer, icuOutputBuffer in
-              _fastNormalize(
-                readIndex: readIndex,
-                sourceBuffer: leftUTF8,
-                outputBuffer: &outputBuffer,
-                icuInputBuffer: &icuInputBuffer,
-                icuOutputBuffer: &icuOutputBuffer)
-            },
-            normalizeRight: { readIndex, outputBuffer, icuInputBuffer, icuOutputBuffer in
-              _fastNormalize(
-                readIndex: readIndex,
-                sourceBuffer: rightUTF8,
-                outputBuffer: &outputBuffer,
-                icuInputBuffer: &icuInputBuffer,
-                icuOutputBuffer: &icuOutputBuffer)
-            })
-        }
+    var iter1 = Substring(self)._nfc.makeIterator()
+    var iter2 = Substring(other)._nfc.makeIterator()
+
+    var scalar1: Unicode.Scalar? = nil
+    var scalar2: Unicode.Scalar? = nil
+
+    while true {
+      scalar1 = iter1.next()
+      scalar2 = iter2.next()
+
+      if scalar1 == nil || scalar2 == nil {
+        break
       }
-    } else {
-      return _normalizedCompareImpl(
-        left_outputBuffer: _castOutputBuffer(&left_output),
-        left_icuInputBuffer: _castOutputBuffer(&left_icuInput),
-        left_icuOutputBuffer: _castOutputBuffer(&left_icuOutput),
-        right_outputBuffer: _castOutputBuffer(&right_output),
-        right_icuInputBuffer: _castOutputBuffer(&right_icuInput),
-        right_icuOutputBuffer: _castOutputBuffer(&right_icuOutput),
-        left_range: range,
-        right_range: other.range,
-        expecting: expecting,
-        normalizeLeft: { readIndex, outputBuffer, icuInputBuffer, icuOutputBuffer in
-          _foreignNormalize(
-            readIndex: readIndex,
-            endIndex: range.upperBound,
-            guts: _guts,
-            outputBuffer: &outputBuffer,
-            icuInputBuffer: &icuInputBuffer,
-            icuOutputBuffer: &icuOutputBuffer)
-        },
-        normalizeRight: { readIndex, outputBuffer, icuInputBuffer, icuOutputBuffer in
-          _foreignNormalize(
-            readIndex: readIndex,
-            endIndex: other.range.upperBound,
-            guts: other._guts,
-            outputBuffer: &outputBuffer,
-            icuInputBuffer: &icuInputBuffer,
-            icuOutputBuffer: &icuOutputBuffer)
-        })
+
+      if scalar1 == scalar2 {
+        continue
+      }
+
+      if scalar1! < scalar2! {
+        return expecting == .less
+      } else {
+        return false
+      }
     }
-  }
-  
-  
-  @inline(__always) //Avoid unecessary overhead from the closures.
-  internal func _normalizedCompareImpl(
-    left_outputBuffer: UnsafeMutableBufferPointer<UInt8>,
-    left_icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
-    left_icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
-    right_outputBuffer: UnsafeMutableBufferPointer<UInt8>,
-    right_icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
-    right_icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
-    left_range: Range<String.Index>,
-    right_range: Range<String.Index>,
-    expecting: _StringComparisonResult,
-    normalizeLeft: (
-      _ readIndex: String.Index,
-      _ outputBuffer: inout UnsafeMutableBufferPointer<UInt8>,
-      _ icuInputBuffer: inout UnsafeMutableBufferPointer<UInt16>,
-      _ icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>) -> NormalizationResult,
-    normalizeRight: (
-      _ readIndex: String.Index,
-      _ outputBuffer: inout UnsafeMutableBufferPointer<UInt8>,
-      _ icuInputBuffer: inout UnsafeMutableBufferPointer<UInt16>,
-      _ icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>) -> NormalizationResult
-  ) -> Bool {
-    var left_outputBuffer = left_outputBuffer
-    var left_icuInputBuffer = left_icuInputBuffer
-    var left_icuOutputBuffer = left_icuOutputBuffer
-    var right_outputBuffer = right_outputBuffer
-    var right_icuInputBuffer = right_icuInputBuffer
-    var right_icuOutputBuffer = right_icuOutputBuffer
-  
-    var leftNextReadPosition = left_range.lowerBound
-    var rightNextReadPosition = right_range.lowerBound
-    var leftOutputBufferIndex = 0
-    var rightOutputBufferIndex = 0
-    var leftOutputBufferCount = 0
-    var rightOutputBufferCount = 0
-    let leftEndIndex = left_range.upperBound
-    let rightEndIndex = right_range.upperBound
-  
-    var hasLeftBufferOwnership = false
-    var hasRightBufferOwnership = false
-    
-    if left_range.isEmpty && right_range.isEmpty {
+
+    // If both of them ran out of scalars, then these are completely equal.
+    if scalar1 == nil, scalar2 == nil {
       return expecting == .equal
     }
-    if left_range.isEmpty {
+
+    // Otherwise, one of these strings has more scalars, so the one with less
+    // scalars is considered "less" than.
+    if end < other.end {
       return expecting == .less
     }
-    if right_range.isEmpty {
-      return false
-    }
-  
-    defer {
-      if hasLeftBufferOwnership {
-        left_outputBuffer.deallocate()
-        left_icuInputBuffer.deallocate()
-        left_icuOutputBuffer.deallocate()
-      }
-      if hasRightBufferOwnership {
-        right_outputBuffer.deallocate()
-        right_icuInputBuffer.deallocate()
-        right_icuOutputBuffer.deallocate()
-      }
-    }
-  
-    repeat {
-      if leftOutputBufferIndex == leftOutputBufferCount {
-        let result = normalizeLeft(
-          leftNextReadPosition,
-          &left_outputBuffer,
-          &left_icuInputBuffer,
-          &left_icuOutputBuffer)
-        _internalInvariant(result.nextReadPosition != leftNextReadPosition)
-        leftOutputBufferCount = result.amountFilled
-        leftOutputBufferIndex = 0
-        leftNextReadPosition = result.nextReadPosition
-        if result.allocatedBuffers {
-          _internalInvariant(!hasLeftBufferOwnership)
-          hasLeftBufferOwnership = true
-        }
-      }
-      if rightOutputBufferIndex == rightOutputBufferCount {
-        let result = normalizeRight(
-          rightNextReadPosition,
-          &right_outputBuffer,
-          &right_icuInputBuffer,
-          &right_icuOutputBuffer)
-        _internalInvariant(result.nextReadPosition != rightNextReadPosition)
-        rightOutputBufferCount = result.amountFilled
-        rightOutputBufferIndex = 0
-        rightNextReadPosition = result.nextReadPosition
-        if result.allocatedBuffers {
-          _internalInvariant(!hasRightBufferOwnership)
-          hasRightBufferOwnership = true
-        }
-      }
-      while leftOutputBufferIndex < leftOutputBufferCount && rightOutputBufferIndex < rightOutputBufferCount {
-        let leftCU = left_outputBuffer[leftOutputBufferIndex]
-        let rightCU = right_outputBuffer[rightOutputBufferIndex]
-        if leftCU == rightCU {
-          leftOutputBufferIndex += 1
-          rightOutputBufferIndex += 1
-          continue
-        } else if leftCU < rightCU {
-          return expecting == .less
-        } else {
-          return false
-        }
-      }
-    } while (leftNextReadPosition < leftEndIndex
-    || leftOutputBufferIndex < leftOutputBufferCount)
-    && (rightNextReadPosition < rightEndIndex
-    || rightOutputBufferIndex < rightOutputBufferCount)
-    
-  
-    //At least one of them ran out of code units, whichever it was is the "smaller" string
-    if leftNextReadPosition < leftEndIndex 
-    || leftOutputBufferIndex < leftOutputBufferCount {
-      return false
-    } else if rightNextReadPosition < rightEndIndex
-    || rightOutputBufferIndex < rightOutputBufferCount {
-      return expecting == .less
-    } else {
-      //They both ran out
-      return expecting == .equal
-    }
+
+    return false
   }
 }
