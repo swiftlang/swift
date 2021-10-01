@@ -397,6 +397,10 @@ option(SWIFT_CHECK_INCREMENTAL_COMPILATION
     "Check if incremental compilation works when compiling the Swift libraries"
     FALSE)
 
+option(SWIFT_ENABLE_ARRAY_COW_CHECKS
+    "Compile the stdlib with Array COW checks enabled (only relevant for assert builds)"
+    FALSE)
+
 option(SWIFT_REPORT_STATISTICS
     "Create json files which contain internal compilation statistics"
     FALSE)
