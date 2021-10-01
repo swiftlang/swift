@@ -1073,7 +1073,7 @@ public:
   }
 
   /// Add "Unavailable" annotation to the swift declaration.
-  void markUnavailable(ValueDecl *decl, StringRef unavailabilityMsg);
+  void markUnavailable(Decl *decl, StringRef unavailabilityMsg);
 
   /// Create a decl with error type and an "unavailable" attribute on it
   /// with the specified message.

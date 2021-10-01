@@ -22,6 +22,15 @@ struct Point {
   float y;
 };
 
+struct PartialImport {
+  int a;
+  int b;
+  int _Complex c;
+  _Atomic(int) d;
+};
+
+struct PartialImport partialImport = {1, 2, 3, 4};
+
 typedef struct {
   struct {
     int a;

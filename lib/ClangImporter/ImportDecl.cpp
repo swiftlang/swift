@@ -3545,6 +3545,7 @@ namespace {
       // it is nested in a struct.
 
       for (auto m : decl->decls()) {
+        StringRef declName;
         if (isa<clang::AccessSpecDecl>(m)) {
           // The presence of AccessSpecDecls themselves does not influence
           // whether we can generate a member-wise initializer.
@@ -3574,6 +3575,7 @@ namespace {
         }
 
         if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
+          declName = field->getName();
           // Non-nullable pointers can't be zero-initialized.
           if (auto nullability = field->getType()
                 ->getNullability(Impl.getClangASTContext())) {
@@ -3593,7 +3595,43 @@ namespace {
           }
         }
 
-        Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
+        diagnostic::ImportResult<Decl> memberImportResult =
+            Impl.importDecl(nd, getActiveSwiftVersion());
+        Decl *member = memberImportResult.payload;
+
+        if (Impl.SwiftContext.LangOpts
+                .EnableExperimentalClangImporterDiagnostics &&
+            memberImportResult.diagnostics) {
+
+          // If a diagnostic is attached, the imported type should be stubbed
+          // and never arrive at this point empty.
+          assert(member);
+
+          clang::SourceManager &clangSrcMgr =
+              Impl.getClangASTContext().getSourceManager();
+          ClangSourceBufferImporter &bufferImporter =
+              Impl.getBufferImporterForDiagnostics();
+
+          for (auto &diagnostic : memberImportResult.diagnostics) {
+            const clang::SourceLocation offendingEntitySourceLocation =
+                diagnostic.offendingEntitySourceLocation.getValueOr(
+                    m->getLocation());
+            if (declName.size()) {
+              Impl.diagnose(bufferImporter.resolveSourceLocation(
+                                clangSrcMgr, offendingEntitySourceLocation),
+                            diag::field_not_imported_type_not_available,
+                            declName, diagnostic.offendingEntitySourceName);
+            }
+          }
+
+          hasMemberwiseInitializer = false;
+          hasUnreferenceableStorage = true;
+          Impl.markUnavailable(
+              member, StringRef(llvm::formatv("'{0}' is unavailable in Swift",
+                                              memberImportResult.diagnostics[0]
+                                                  .offendingEntitySourceName)));
+        }
+
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
             // We don't know what this member is.
@@ -4392,7 +4430,8 @@ namespace {
       return VisitFunctionDecl(decl);
     }
 
-    Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
+    diagnostic::ImportResult<Decl>
+    VisitFieldDecl(const clang::FieldDecl *decl) {
       // Fields are imported as variables.
       Optional<ImportedName> correctSwiftName;
       ImportedName importedName;
@@ -4424,6 +4463,20 @@ namespace {
       auto importedType =
           Impl.importType(decl->getType(), ImportTypeKind::RecordField,
                           isInSystemModule(dc), Bridgeability::None);
+
+      if (Impl.SwiftContext.LangOpts
+              .EnableExperimentalClangImporterDiagnostics &&
+          importedType.failureDiagnostics) {
+        // At this point, only failed imports should have diagnostics attached
+        assert(!importedType.getType());
+        // If any diagnostics are attached, replace the unimportable
+        // type with Any, allowing a stub for this field to be generated.
+        // The stub will be marked unavailable.
+        importedType = {Impl.SwiftContext.TheAnyType,
+                        importedType.isImplicitlyUnwrapped(),
+                        importedType.failureDiagnostics};
+      }
+
       if (!importedType)
         return nullptr;
 
@@ -4457,7 +4510,7 @@ namespace {
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
-      return result;
+      return {result, importedType.failureDiagnostics};
     }
 
     Decl *VisitObjCIvarDecl(const clang::ObjCIvarDecl *decl) {
@@ -9052,7 +9105,7 @@ diagnostic::ImportResult<Decl> ClangImporter::Implementation::importDeclImpl(
       }
     }
 
-    return nullptr;
+    return Result;
   }
 
   // Finalize the imported declaration.
@@ -9279,9 +9332,9 @@ ClangImporter::Implementation::importDeclAndCacheImpl(
     ImportedDecls[{Canon, version}] = Result;
 
   if (!SuperfluousTypedefsAreTransparent && TypedefIsSuperfluous)
-    return nullptr;
+    return {nullptr, ImportResult.diagnostics};
 
-  return Result;
+  return ImportResult;
 }
 
 Decl *
@@ -9861,8 +9914,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
 /// Create a decl with error type and an "unavailable" attribute on it
 /// with the specified message.
-void ClangImporter::Implementation::
-markUnavailable(ValueDecl *decl, StringRef unavailabilityMsgRef) {
+void ClangImporter::Implementation::markUnavailable(
+    Decl *decl, StringRef unavailabilityMsgRef) {
 
   unavailabilityMsgRef = SwiftContext.AllocateCopy(unavailabilityMsgRef);
   auto ua = AvailableAttr::createPlatformAgnostic(SwiftContext,

@@ -56,6 +56,19 @@ func testPoint() -> Float {
   return p.y
 }
 
+func testPartialStructImport() {
+  let s: PartialImport
+  s.c = 5 // expected-error {{value of type 'PartialImport' has no member 'c'}}
+  s.d = 5 // expected-error {{value of type 'PartialImport' has no member 'd'}}
+  partialImport.c = 5 // expected-error {{value of type 'PartialImport' has no member 'c'}}
+  partialImport.d = 5 // expected-error {{value of type 'PartialImport' has no member 'd'}}
+  var newPartialImport = PartialImport()
+  newPartialImport.a = 5
+  newPartialImport.b = 5
+  newPartialImport.c = 5  // expected-error {{value of type 'PartialImport' has no member 'c'}}
+  newPartialImport.d = 5  // expected-error {{value of type 'PartialImport' has no member 'd'}}
+}
+
 func testAnonStructs() {
   var a_s: AnonStructs
   a_s.a = 5
