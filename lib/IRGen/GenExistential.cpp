@@ -1778,6 +1778,16 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   });
 }
 
+#ifndef NDEBUG
+static size_t numProtocolsWithWitnessTables(
+    ArrayRef<ProtocolConformanceRef> conformances) {
+  return llvm::count_if(conformances, [](ProtocolConformanceRef conformance) {
+    auto proto = conformance.getRequirement();
+    return Lowering::TypeConverter::protocolRequiresWitnessTable(proto);
+  });
+}
+#endif
+
 /// Emit an existential container initialization operation for a concrete type.
 /// Returns the address of the uninitialized fixed-size buffer for the concrete
 /// value.
@@ -1791,7 +1801,8 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
          "initializing a class existential container as opaque");
   auto &destTI = IGF.getTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
   OpaqueExistentialLayout destLayout = destTI.getLayout();
-  assert(destTI.getStoredProtocols().size() == conformances.size());
+  assert(destTI.getStoredProtocols().size()
+             == numProtocolsWithWitnessTables(conformances));
 
   // First, write out the metadata.
   llvm::Value *metadata = IGF.emitTypeMetadataRef(formalSrcType);

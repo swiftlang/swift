@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -540,6 +540,36 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     auto conformance =
       ctx.getInheritedConformance(conformingType,
                                   inheritedConformance.getConcrete());
+    return ProtocolConformanceRef(conformance);
+  }
+
+  case BUILTIN_PROTOCOL_CONFORMANCE: {
+    TypeID conformingTypeID;
+    DeclID protoID;
+    GenericSignatureID genericSigID;
+    BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
+                                                 protoID, genericSigID);
+
+    Type conformingType = getType(conformingTypeID);
+
+    auto decl = getDeclChecked(protoID);
+    if (!decl)
+      return decl.takeError();
+
+    auto proto = cast<ProtocolDecl>(decl.get());
+    auto genericSig = getGenericSignatureChecked(genericSigID);
+    if (!genericSig)
+      return genericSig.takeError();
+
+    // Read the conditional requirements.
+    SmallVector<Requirement, 4> conditionalRequirements;
+    auto error = readGenericRequirementsChecked(
+        conditionalRequirements, Cursor);
+    if (error)
+      return std::move(error);
+
+    auto conformance = getContext().getBuiltinConformance(
+        conformingType, proto, *genericSig, conditionalRequirements);
     return ProtocolConformanceRef(conformance);
   }
 
