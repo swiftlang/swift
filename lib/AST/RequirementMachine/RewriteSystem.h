@@ -120,6 +120,8 @@ public:
     return LHS.size();
   }
 
+  bool containsUnresolvedSymbols() const;
+
   void dump(llvm::raw_ostream &out) const;
 
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
@@ -453,10 +455,15 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   Optional<unsigned>
-  findRuleToDelete(RewritePath &replacementPath,
-                   const llvm::DenseSet<unsigned> *redundantConformances);
+  findRuleToDelete(bool firstPass,
+                   const llvm::DenseSet<unsigned> *redundantConformances,
+                   RewritePath &replacementPath);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
+
+  void performHomotopyReduction(
+      bool firstPass,
+      const llvm::DenseSet<unsigned> *redundantConformances);
 
   void minimizeRewriteSystem();
 
@@ -471,6 +478,9 @@ public:
   void decomposeTermIntoConformanceRuleLeftHandSides(
       MutableTerm term,
       SmallVectorImpl<unsigned> &result) const;
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term, unsigned ruleID,
+      SmallVectorImpl<unsigned> &result) const;
 
   void computeCandidateConformancePaths(
       llvm::MapVector<unsigned,
@@ -481,6 +491,16 @@ public:
       llvm::SmallDenseSet<unsigned, 4> &visited,
       llvm::DenseSet<unsigned> &redundantConformances,
       const llvm::SmallVectorImpl<unsigned> &path,
+      const llvm::MapVector<unsigned,
+                            std::vector<SmallVector<unsigned, 2>>>
+          &conformancePaths) const;
+
+  void dumpGeneratingConformanceEquation(
+      llvm::raw_ostream &out,
+      unsigned baseRuleID,
+      const std::vector<SmallVector<unsigned, 2>> &paths) const;
+
+  void verifyGeneratingConformanceEquations(
       const llvm::MapVector<unsigned,
                             std::vector<SmallVector<unsigned, 2>>>
           &conformancePaths) const;
