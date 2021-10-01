@@ -142,7 +142,7 @@ func test_outside(
   _ = DistributedActor_1.staticFunc()
 
   // ==== non-distributed functions
-  _ = await distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   _ = await distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   _ = try await distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
 }
