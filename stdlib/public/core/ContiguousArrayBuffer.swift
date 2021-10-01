@@ -12,11 +12,7 @@
 
 import SwiftShims
 
-#if INTERNAL_CHECKS_ENABLED
-// "9999" means: enable if linked with a built library, but not when linked with
-// the OS libraries.
-// Note: this must not be changed to a "real" OS version.
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
 @_silgen_name("swift_COWChecksEnabled")
 public func _COWChecksEnabled() -> Bool
 #endif
@@ -428,7 +424,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal var immutableStorage : __ContiguousArrayStorageBase {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     _internalInvariant(isImmutable, "Array storage is not immutable")
 #endif
     return Builtin.COWBufferForReading(_storage)
@@ -440,7 +436,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal var mutableStorage : __ContiguousArrayStorageBase {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     _internalInvariant(isMutable, "Array storage is immutable")
 #endif
     return _storage
@@ -452,44 +448,34 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal var mutableOrEmptyStorage : __ContiguousArrayStorageBase {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     _internalInvariant(isMutable || _storage.countAndCapacity.capacity == 0,
                        "Array storage is immutable and not empty")
 #endif
     return _storage
   }
 
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
   @_alwaysEmitIntoClient
   internal var isImmutable: Bool {
     get {
-      // "9999" means: enable if linked with a built library, but not when
-      // linked with the OS libraries.
-      // Note: this must not be changed to a "real" OS version.
-      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-        if (_COWChecksEnabled()) {
-          return capacity == 0 || _swift_isImmutableCOWBuffer(_storage)
-        }
+      if (_COWChecksEnabled()) {
+        return capacity == 0 || _swift_isImmutableCOWBuffer(_storage)
       }
       return true
     }
     nonmutating set {
-      // "9999" means: enable if linked with a built library, but not when
-      // linked with the OS libraries.
-      // Note: this must not be changed to a "real" OS version.
-      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-        if (_COWChecksEnabled()) {
-          // Make sure to not modify the empty array singleton (which has a
-          // capacity of 0).
-          if capacity > 0 {
-            let wasImmutable = _swift_setImmutableCOWBuffer(_storage, newValue)
-            if newValue {
-              _internalInvariant(!wasImmutable,
-                "re-setting immutable array buffer to immutable")
-            } else {
-              _internalInvariant(wasImmutable,
-                "re-setting mutable array buffer to mutable")
-            }
+      if (_COWChecksEnabled()) {
+        // Make sure to not modify the empty array singleton (which has a
+        // capacity of 0).
+        if capacity > 0 {
+          let wasImmutable = _swift_setImmutableCOWBuffer(_storage, newValue)
+          if newValue {
+            _internalInvariant(!wasImmutable,
+              "re-setting immutable array buffer to immutable")
+          } else {
+            _internalInvariant(wasImmutable,
+              "re-setting mutable array buffer to mutable")
           }
         }
       }
@@ -498,13 +484,8 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   
   @_alwaysEmitIntoClient
   internal var isMutable: Bool {
-      // "9999" means: enable if linked with a built library, but not when
-      // linked with the OS libraries.
-      // Note: this must not be changed to a "real" OS version.
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-      if (_COWChecksEnabled()) {
-        return !_swift_isImmutableCOWBuffer(_storage)
-      }
+    if (_COWChecksEnabled()) {
+      return !_swift_isImmutableCOWBuffer(_storage)
     }
     return true
   }
@@ -704,7 +685,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   internal mutating func beginCOWMutation() -> Bool {
     if Bool(Builtin.beginCOWMutation(&_storage)) {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
       isImmutable = false
 #endif
       return true
@@ -721,7 +702,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal mutating func endCOWMutation() {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     isImmutable = true
 #endif
     Builtin.endCOWMutation(&_storage)
