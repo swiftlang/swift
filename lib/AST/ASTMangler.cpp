@@ -3332,3 +3332,11 @@ std::string ASTMangler::mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
   appendOperator("MQ");
   return finalize();
 }
+
+std::string
+ASTMangler::mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl) {
+  beginMangling();
+  appendOpaqueDeclName(decl);
+  appendOperator("Ho");
+  return finalize();
+}

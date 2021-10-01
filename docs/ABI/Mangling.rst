@@ -137,6 +137,13 @@ Globals
   global ::= type assoc-type-list 'MXA'  // generic parameter ref (HISTORICAL)
   global ::= protocol 'Mp'               // protocol descriptor
 
+  global ::= protocol 'Hr'               // protocol descriptor runtime record
+  global ::= nominal-type 'Hn'           // nominal type descriptor runtime record
+  #if SWIFT_RUNTIME_VERSION >= 5.1
+    global ::= opaque-type 'Ho'          // opaque type descriptor runtime record
+  #endif
+  global ::= protocol-conformance 'Hc'   // protocol conformance runtime record
+
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
 
   global ::= type 'MF'                   // metadata for remote mirrors: field descriptor

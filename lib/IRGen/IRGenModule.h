@@ -1023,9 +1023,9 @@ public:
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
 
-  llvm::Constant *emitSwiftProtocols();
-  llvm::Constant *emitProtocolConformances();
-  llvm::Constant *emitTypeMetadataRecords();
+  llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
+  llvm::Constant *emitProtocolConformances(bool asContiguousArray);
+  llvm::Constant *emitTypeMetadataRecords(bool asContiguousArray);
   llvm::Constant *emitFieldDescriptors();
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,

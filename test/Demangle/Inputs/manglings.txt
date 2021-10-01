@@ -313,6 +313,10 @@ _S$s5print_9separator10terminatoryypfC ---> _S$s5print_9separator10terminatoryyp
 _T0So13GenericOptionas8HashableSCsACP9hashValueSivgTW ---> {T:} protocol witness for Swift.Hashable.hashValue.getter : Swift.Int in conformance __C.GenericOption : Swift.Hashable in __C_Synthesized
 _T0So11CrappyColorVs16RawRepresentableSCMA ---> reflection metadata associated type descriptor __C.CrappyColor : Swift.RawRepresentable in __C_Synthesized
 $S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc ---> protocol conformance descriptor for protocol_conformance_records.NativeValueType : protocol_conformance_records.Runcible in protocol_conformance_records
+$ss6SimpleHr ---> protocol descriptor runtime record for Swift.Simple
+$ss5OtherVs6SimplesHc ---> protocol conformance descriptor runtime record for Swift.Other : Swift.Simple in Swift
+$ss5OtherVHn ---> nominal type descriptor runtime record for Swift.Other
+$s18opaque_return_type3fooQryFQOHo ---> opaque type descriptor runtime record for <<opaque return type of opaque_return_type.foo() -> some>>
 $SSC9SomeErrorLeVD ---> __C_Synthesized.related decl 'e' for SomeError
 $s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAyHCg_AiJ1QAAyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
 $s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PHPyHCg_AiJ1QHPyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()

@@ -690,7 +690,7 @@ void IRGenModule::emitRuntimeRegistration() {
 
   // Register Swift protocols if we added any.
   if (!SwiftProtocols.empty()) {
-    llvm::Constant *protocols = emitSwiftProtocols();
+    llvm::Constant *protocols = emitSwiftProtocols(/*asContiguousArray*/ true);
 
     llvm::Constant *beginIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
@@ -709,7 +709,8 @@ void IRGenModule::emitRuntimeRegistration() {
   }
 
   // Register Swift protocol conformances if we added any.
-  if (llvm::Constant *conformances = emitProtocolConformances()) {
+  if (llvm::Constant *conformances =
+          emitProtocolConformances(/*asContiguousArray*/ true)) {
     llvm::Constant *beginIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, 0),
@@ -727,7 +728,8 @@ void IRGenModule::emitRuntimeRegistration() {
   }
 
   if (!RuntimeResolvableTypes.empty()) {
-    llvm::Constant *records = emitTypeMetadataRecords();
+    llvm::Constant *records =
+        emitTypeMetadataRecords(/*asContiguousArray*/ true);
 
     llvm::Constant *beginIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
@@ -1208,19 +1210,19 @@ void IRGenModule::finishEmitAfterTopLevel() {
 
 void IRGenerator::emitSwiftProtocols() {
   for (auto &m : *this) {
-    m.second->emitSwiftProtocols();
+    m.second->emitSwiftProtocols(/*asContiguousArray*/ false);
   }
 }
 
 void IRGenerator::emitProtocolConformances() {
   for (auto &m : *this) {
-    m.second->emitProtocolConformances();
+    m.second->emitProtocolConformances(/*asContiguousArray*/ false);
   }
 }
 
 void IRGenerator::emitTypeMetadataRecords() {
   for (auto &m : *this) {
-    m.second->emitTypeMetadataRecords();
+    m.second->emitTypeMetadataRecords(/*asContiguousArray*/ false);
   }
 }
 
@@ -3649,34 +3651,66 @@ IRGenModule::emitDirectRelativeReference(llvm::Constant *target,
   return relativeAddr;
 }
 
-/// Emit the protocol descriptors list and return it.
-llvm::Constant *IRGenModule::emitSwiftProtocols() {
+/// Expresses that `var` is removable (dead-strippable) when `dependsOn` is not
+/// referenced.
+static void appendLLVMUsedConditionalEntry(IRGenModule &IGM,
+                                           llvm::GlobalVariable *var,
+                                           llvm::Constant *dependsOn) {
+  llvm::Metadata *metadata[] = {
+      // (1) which variable is being conditionalized, "target"
+      llvm::ConstantAsMetadata::get(var),
+      // (2) type, not relevant for a single-edge condition
+      llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
+          llvm::Type::getInt32Ty(IGM.Module.getContext()), 0)),
+      // (3) the "edge" that holds the target alive, if it's missing the target
+      // is allowed to be removed
+      llvm::ConstantAsMetadata::get(dependsOn),
+  };
+  auto *usedConditional =
+      IGM.Module.getOrInsertNamedMetadata("llvm.used.conditional");
+  usedConditional->addOperand(
+      llvm::MDNode::get(IGM.Module.getContext(), metadata));
+}
+
+/// Expresses that `var` is removable (dead-strippable) when either the protocol
+/// from `record` is not referenced or the type from `record` is not referenced.
+static void
+appendLLVMUsedConditionalEntry(IRGenModule &IGM, llvm::GlobalVariable *var,
+                               const ConformanceDescription &record) {
+  auto *protocol =
+      IGM.getAddrOfProtocolDescriptor(record.conformance->getProtocol())
+          ->stripPointerCasts();
+  auto *type = IGM.getAddrOfTypeContextDescriptor(
+                      record.conformance->getType()->getAnyNominal(),
+                      DontRequireMetadata)
+                   ->stripPointerCasts();
+
+  llvm::Metadata *metadata[] = {
+      // (1) which variable is being conditionalized, "target"
+      llvm::ConstantAsMetadata::get(var),
+      // (2) type, "1" = if either edge is missing, the target is allowed to be
+      // removed.
+      llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
+          llvm::Type::getInt32Ty(IGM.Module.getContext()), 1)),
+      // (3) list of edges
+      llvm::MDNode::get(IGM.Module.getContext(),
+                        {
+                            llvm::ConstantAsMetadata::get(protocol),
+                            llvm::ConstantAsMetadata::get(type),
+                        }),
+  };
+  auto *usedConditional =
+      IGM.Module.getOrInsertNamedMetadata("llvm.used.conditional");
+  usedConditional->addOperand(
+      llvm::MDNode::get(IGM.Module.getContext(), metadata));
+}
+
+/// Emit the protocol descriptors list and return it (if asContiguousArray is
+/// true, otherwise the descriptors are emitted as individual globals and
+/// nullptr is returned).
+llvm::Constant *IRGenModule::emitSwiftProtocols(bool asContiguousArray) {
   if (SwiftProtocols.empty())
     return nullptr;
-
-  // Define the global variable for the protocol list.
-  ConstantInitBuilder builder(*this);
-  auto recordsArray = builder.beginArray(ProtocolRecordTy);
-
-  for (auto *protocol : SwiftProtocols) {
-    auto record = recordsArray.beginStruct(ProtocolRecordTy);
-
-    // Relative reference to the protocol descriptor.
-    auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(
-                                   LinkEntity::forProtocolDescriptor(protocol));
-    record.addRelativeAddress(descriptorRef);
-
-    record.finishAndAddTo(recordsArray);
-  }
-
-  // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
-  // resolve relocations relative to it.
-
-  auto var = recordsArray.finishAndCreateGlobal(
-                                            "\x01l_protocols",
-                                            Alignment(4),
-                                            /*isConstant*/ true,
-                                            llvm::GlobalValue::PrivateLinkage);
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
@@ -3697,12 +3731,64 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
     break;
   }
 
-  var->setSection(sectionName);
-  
-  disableAddressSanitizer(*this, var);
-  
-  addUsedGlobal(var);
-  return var;
+  // For JIT, emit the protocol list as a single global array, and return it.
+  if (asContiguousArray) {
+    ConstantInitBuilder builder(*this);
+    auto recordsArray = builder.beginArray(ProtocolRecordTy);
+    for (auto *protocol : SwiftProtocols) {
+      auto record = recordsArray.beginStruct(ProtocolRecordTy);
+      // Relative reference to the protocol descriptor.
+      auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forProtocolDescriptor(protocol));
+      record.addRelativeAddress(descriptorRef);
+      record.finishAndAddTo(recordsArray);
+    }
+
+    // Define the global variable for the protocol list.
+    // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
+    // resolve relocations relative to it.
+    auto var = recordsArray.finishAndCreateGlobal(
+        "\x01l_protocols", Alignment(4),
+        /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
+    var->setSection(sectionName);
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
+
+    return var;
+  }
+
+  // In non-JIT mode, emit the protocol records as individual globals.
+  for (auto *protocol : SwiftProtocols) {
+    auto entity = LinkEntity::forProtocolDescriptor(protocol);
+    auto link = LinkInfo::get(*this, entity, NotForDefinition);
+    auto recordMangledName =
+        LinkEntity::forProtocolDescriptorRecord(protocol).mangleAsString();
+    auto var =
+        new llvm::GlobalVariable(Module, ProtocolRecordTy, /*isConstant*/ true,
+                                 llvm::GlobalValue::PrivateLinkage,
+                                 /*initializer*/ nullptr, recordMangledName);
+
+    auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(entity);
+    llvm::Constant *relativeAddr =
+        emitDirectRelativeReference(descriptorRef.getValue(), var, {0});
+
+    llvm::Constant *recordFields[] = {relativeAddr};
+    auto record = llvm::ConstantStruct::get(ProtocolRecordTy, recordFields);
+    var->setInitializer(record);
+
+    var->setSection(sectionName);
+    var->setAlignment(llvm::MaybeAlign(4));
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
+
+    if (IRGen.Opts.ConditionalRuntimeRecords) {
+      // Allow dead-stripping `var` (the protocol record) when the protocol
+      // (descriptorRef) is not referenced.
+      appendLLVMUsedConditionalEntry(*this, var, descriptorRef.getValue());
+    }
+  }
+
+  return nullptr;
 }
 
 void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
@@ -3713,31 +3799,12 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
   ProtocolConformances.push_back(std::move(record));
 }
 
-/// Emit the protocol conformance list and return it.
-llvm::Constant *IRGenModule::emitProtocolConformances() {
+/// Emit the protocol conformance list and return it (if asContiguousArray is
+/// true, otherwise the records are emitted as individual globals and
+/// nullptr is returned).
+llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
   if (ProtocolConformances.empty())
     return nullptr;
-
-  // Define the global variable for the conformance list.
-  ConstantInitBuilder builder(*this);
-  auto descriptorArray = builder.beginArray(RelativeAddressTy);
-
-  for (const auto &record : ProtocolConformances) {
-    auto conformance = record.conformance;
-    auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
-    auto descriptor =
-      getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
-    descriptorArray.addRelativeAddress(descriptor);
-  }
-
-  // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
-  // resolve relocations relative to it.
-
-  auto var = descriptorArray.finishAndCreateGlobal(
-                                          "\x01l_protocol_conformances",
-                                          Alignment(4),
-                                          /*isConstant*/ true,
-                                          llvm::GlobalValue::PrivateLinkage);
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
@@ -3758,17 +3825,75 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     break;
   }
 
-  var->setSection(sectionName);
+  // For JIT, emit the protocol conformance list as a single global array, and
+  // return it.
+  if (asContiguousArray) {
+    ConstantInitBuilder builder(*this);
+    auto descriptorArray = builder.beginArray(RelativeAddressTy);
+    for (const auto &record : ProtocolConformances) {
+      auto conformance = record.conformance;
+      auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
+      auto descriptor =
+        getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
+      descriptorArray.addRelativeAddress(descriptor);
+    }
 
-  disableAddressSanitizer(*this, var);
-  
-  addUsedGlobal(var);
-  return var;
+    // Define the global variable for the conformance list.
+    // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
+    // resolve relocations relative to it.
+    auto var = descriptorArray.finishAndCreateGlobal(
+        "\x01l_protocol_conformances", Alignment(4),
+        /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
+    var->setSection(sectionName);
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
+
+    return var;
+  }
+
+  // In non-JIT mode, emit the protocol conformance records as individual
+  // globals.
+  for (const auto &record : ProtocolConformances) {
+    auto entity =
+        LinkEntity::forProtocolConformanceDescriptor(record.conformance);
+    auto link = LinkInfo::get(*this, entity, NotForDefinition);
+    auto recordMangledName =
+        LinkEntity::forProtocolConformanceDescriptorRecord(record.conformance)
+            .mangleAsString();
+    auto var = new llvm::GlobalVariable(
+        Module, RelativeAddressTy, /*isConstant*/ true,
+        llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
+        recordMangledName);
+
+    auto descriptorRef = getAddrOfLLVMVariableOrGOTEquivalent(entity);
+    llvm::Constant *relativeAddr =
+        emitDirectRelativeReference(descriptorRef.getValue(), var, {});
+    var->setInitializer(relativeAddr);
+
+    var->setSection(sectionName);
+    var->setAlignment(llvm::MaybeAlign(4));
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
+
+    if (IRGen.Opts.ConditionalRuntimeRecords) {
+      // Allow dead-stripping `var` (the conformance record) when the protocol
+      // or type (from the conformance) is not referenced.
+      appendLLVMUsedConditionalEntry(*this, var, record);
+    }
+  }
+
+  return nullptr;
 }
 
 
-/// Emit type metadata for types that might not have explicit protocol conformances.
-llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
+/// Emit list of type metadata records for types that might not have explicit
+/// protocol conformances, and return it (if asContiguousArray is true,
+/// otherwise the descriptors are emitted as individual globals and nullptr is
+/// returned).
+llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
+  if (RuntimeResolvableTypes.empty())
+    return nullptr;
+
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
@@ -3788,54 +3913,91 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
                      "the selected object format.");
   }
 
-  // Do nothing if the list is empty.
-  if (RuntimeResolvableTypes.empty())
-    return nullptr;
+  auto generateRecord = [this](TypeEntityReference ref,
+                               llvm::GlobalVariable *var,
+                               ArrayRef<unsigned> baseIndices) {
+    // Form the relative address, with the type reference kind in the low bits.
+    llvm::Constant *relativeAddr =
+        emitDirectRelativeReference(ref.getValue(), var, baseIndices);
+    unsigned lowBits = static_cast<unsigned>(ref.getKind());
+    if (lowBits != 0) {
+      relativeAddr = llvm::ConstantExpr::getAdd(
+          relativeAddr, llvm::ConstantInt::get(RelativeAddressTy, lowBits));
+    }
 
-  // Define the global variable for the conformance list.
-  // We have to do this before defining the initializer since the entries will
-  // contain offsets relative to themselves.
-  auto arrayTy = llvm::ArrayType::get(TypeMetadataRecordTy,
-                                      RuntimeResolvableTypes.size());
+    llvm::Constant *recordFields[] = {relativeAddr};
+    auto record = llvm::ConstantStruct::get(TypeMetadataRecordTy, recordFields);
+    return record;
+  };
 
-  // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
-  // resolve relocations relative to it.
-  auto var = new llvm::GlobalVariable(Module, arrayTy,
-                                      /*isConstant*/ true,
-                                      llvm::GlobalValue::PrivateLinkage,
-                                      /*initializer*/ nullptr,
-                                      "\x01l_type_metadata_table");
+  // For JIT, emit the type list as a single global array, and return it.
+  if (asContiguousArray) {
+    // Define the global variable for the list of types.
+    // We have to do this before defining the initializer since the entries will
+    // contain offsets relative to themselves.
+    // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
+    // resolve relocations relative to it.
+    auto arrayTy = llvm::ArrayType::get(TypeMetadataRecordTy,
+                                        RuntimeResolvableTypes.size());
+    auto var = new llvm::GlobalVariable(
+        Module, arrayTy,
+        /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage,
+        /*initializer*/ nullptr, "\x01l_type_metadata_table");
 
-  SmallVector<llvm::Constant *, 8> elts;
+    SmallVector<llvm::Constant *, 8> elts;
+    for (auto type : RuntimeResolvableTypes) {
+      auto ref = getTypeEntityReference(type);
+      unsigned arrayIdx = elts.size();
+      auto record = generateRecord(ref, var, { arrayIdx, 0 });
+      elts.push_back(record);
+    }
+
+    auto initializer = llvm::ConstantArray::get(arrayTy, elts);
+    var->setInitializer(initializer);
+    var->setSection(sectionName);
+    var->setAlignment(llvm::MaybeAlign(4));
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
+
+    return var;
+  }
+
+  // In non-JIT mode, emit the type records as individual globals.
   for (auto type : RuntimeResolvableTypes) {
     auto ref = getTypeEntityReference(type);
 
-    // Form the relative address, with the type reference kind in the low bits.
-    unsigned arrayIdx = elts.size();
-    llvm::Constant *relativeAddr =
-      emitDirectRelativeReference(ref.getValue(), var, { arrayIdx, 0 });
-    unsigned lowBits = static_cast<unsigned>(ref.getKind());
-    if (lowBits != 0) {
-      relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
-                       llvm::ConstantInt::get(RelativeAddressTy, lowBits));
+    std::string recordMangledName;
+    if (auto opaque = dyn_cast<OpaqueTypeDecl>(type)) {
+      recordMangledName =
+          LinkEntity::forOpaqueTypeDescriptorRecord(opaque).mangleAsString();
+    } else if (auto nominal = dyn_cast<NominalTypeDecl>(type)) {
+      recordMangledName =
+          LinkEntity::forNominalTypeDescriptorRecord(nominal).mangleAsString();
+    } else {
+      llvm_unreachable("bad type in RuntimeResolvableTypes");
     }
 
-    llvm::Constant *recordFields[] = { relativeAddr };
-    auto record = llvm::ConstantStruct::get(TypeMetadataRecordTy,
-                                            recordFields);
-    elts.push_back(record);
+    auto var = new llvm::GlobalVariable(
+        Module, TypeMetadataRecordTy, /*isConstant*/ true,
+        llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
+        recordMangledName);
+
+    auto record = generateRecord(ref, var, {0});
+    var->setInitializer(record);
+
+    var->setSection(sectionName);
+    var->setAlignment(llvm::MaybeAlign(4));
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
+
+    if (IRGen.Opts.ConditionalRuntimeRecords) {
+      // Allow dead-stripping `var` (the type record) when the type (`ref`) is
+      // not referenced.
+      appendLLVMUsedConditionalEntry(*this, var, ref.getValue());
+    }
   }
 
-  auto initializer = llvm::ConstantArray::get(arrayTy, elts);
-
-  var->setInitializer(initializer);
-  var->setSection(sectionName);
-  var->setAlignment(llvm::MaybeAlign(4));
-
-  disableAddressSanitizer(*this, var);
-  
-  addUsedGlobal(var);
-  return var;
+  return nullptr;
 }
 
 /// Fetch a global reference to a reference to the given Objective-C class.
