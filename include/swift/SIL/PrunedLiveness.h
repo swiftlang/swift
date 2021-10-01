@@ -284,6 +284,9 @@ public:
 
   bool areUsesWithinBoundary(ArrayRef<Operand *> uses,
                              DeadEndBlocks &deadEndBlocks) const;
+
+  /// Compute liveness for a single SSA definition.
+  void computeSSALiveness(SILValue def);
 };
 
 /// Record the last use points and CFG edges that form the boundary of

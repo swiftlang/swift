@@ -161,6 +161,17 @@ bool PrunedLiveness::areUsesWithinBoundary(ArrayRef<Operand *> uses,
   return true;
 }
 
+// An SSA def meets all the criteria for pruned liveness--def dominates all uses
+// with no holes in the liverange. The lifetime-ending uses are also
+// recorded--destroy_value or end_borrow. However destroy_values may not
+// jointly-post dominate if dead-end blocks are present.
+void PrunedLiveness::computeSSALiveness(SILValue def) {
+  initializeDefBlock(def->getParentBlock());
+  for (Operand *use : def->getUses()) {
+    updateForUse(use->getUser(), use->isLifetimeEnding());
+  }
+}
+
 void PrunedLivenessBoundary::visitInsertionPoints(
     llvm::function_ref<void(SILBasicBlock::iterator insertPt)> visitor,
     DeadEndBlocks *deBlocks) {
