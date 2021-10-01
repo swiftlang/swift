@@ -699,7 +699,8 @@ static bool isSendableClosure(
   return false;
 }
 
-bool swift::isSendableType(ModuleDecl *module, Type type) {
+bool swift::isSendableType(const DeclContext *dc, Type type) {
+  auto module = dc->getParentModule();
   auto proto = module->getASTContext().getProtocol(KnownProtocolKind::Sendable);
   if (!proto)
     return true;
