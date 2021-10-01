@@ -54,6 +54,12 @@ void decay_param_const_array(const int p[]);
 void decay_param_func(void g(int));
 void decay_param_nested(void g(int p[]));
 
+double _Complex complex_retval();
+void complex_parameter(int, double, double _Complex, double _Complex);
+
+_Atomic(int) atomic_retval();
+void atomic_parameter(int, double, _Atomic(int), _Atomic(double));
+
 struct not_importable;
 
 void opaque_pointer_param(struct not_importable *);

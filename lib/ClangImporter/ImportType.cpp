@@ -381,29 +381,29 @@ namespace {
       llvm_unreachable("Invalid BuiltinType.");
     }
 
-    ImportResult VisitExtIntType(const clang::ExtIntType *) {
+    ImportResult VisitExtIntType(const clang::ExtIntType *type) {
       // ExtInt is not supported in Swift.
-      return Type();
+      return ImportFailureDiagnostic(StringRef(type->getTypeClassName()));
     }
 
-    ImportResult VisitPipeType(const clang::PipeType *) {
+    ImportResult VisitPipeType(const clang::PipeType *type) {
       // OpenCL types are not supported in Swift.
-      return Type();
+      return ImportFailureDiagnostic(StringRef(type->getTypeClassName()));
     }
 
     ImportResult VisitMatrixType(const clang::MatrixType *ty) {
       // Matrix types are not supported in Swift.
-      return Type();
+      return ImportFailureDiagnostic(StringRef(ty->getTypeClassName()));
     }
 
     ImportResult VisitComplexType(const clang::ComplexType *type) {
       // FIXME: Implement once Complex is in the library.
-      return Type();
+      return ImportFailureDiagnostic(StringRef(type->getTypeClassName()));
     }
 
     ImportResult VisitAtomicType(const clang::AtomicType *type) {
       // FIXME: handle pointers and fields of atomic type
-      return Type();
+      return ImportFailureDiagnostic(StringRef(type->getTypeClassName()));
     }
 
     ImportResult VisitMemberPointerType(const clang::MemberPointerType *type) {
