@@ -104,6 +104,8 @@ def create_parser():
                         'member.')
     parser.add_argument('--enable-experimental-concurrency', action='store_true',
                         help='Enable experimental concurrency model.')
+    parser.add_argument('--enable-experimental-distributed', action='store_true',
+                        help='Enable experimental distributed actors.')
     parser.add_argument('-swift-version', metavar='N',
                         help='the Swift version to use')
     parser.add_argument('-show-overlay', action='store_true',
