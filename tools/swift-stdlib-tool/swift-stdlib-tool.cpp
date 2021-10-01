@@ -81,11 +81,13 @@ const char *usage =
 #include <libkern/OSByteOrder.h>
 #include <uuid/uuid.h>
 #include <dispatch/dispatch.h>
+#include <copyfile.h>
+#include <dirent.h>
+#include <libgen.h>
 
 #include <algorithm>
 #include <vector>
 #include <string>
-#include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
 #include <mutex>
@@ -424,7 +426,7 @@ ssize_t pread_all(int fd, void *buf, size_t count, off_t offset)
 
 template <typename T> 
 int parse_macho(int fd, uint32_t offset, uint32_t size, 
-                void (^dylibVisitor)(std::filesystem::path const &path),
+                void (^dylibVisitor)(std::string const &path),
                 void (^uuidVisitor)(uuid_t const uuid))
 {
     ssize_t readed;
@@ -485,7 +487,7 @@ int parse_macho(int fd, uint32_t offset, uint32_t size,
 
 
 int parse_macho(int fd, uint32_t offset, uint32_t size, 
-              void (^dylibVisitor)(std::filesystem::path const &path),
+              void (^dylibVisitor)(std::string const &path),
               void (^uuidVisitor)(uuid_t const uuid))
 {
     uint32_t magic;
@@ -513,7 +515,7 @@ int parse_macho(int fd, uint32_t offset, uint32_t size,
 
 
 int parse_fat(int fd, off_t fsize, char *buffer, size_t size, 
-              void (^dylibVisitor)(std::filesystem::path const &path),
+              void (^dylibVisitor)(std::string const &path),
               void (^uuidVisitor)(uuid_t const uuid))
 {
     uint32_t magic;
@@ -607,7 +609,7 @@ int parse_fat(int fd, off_t fsize, char *buffer, size_t size,
 }
 
 
-void process(std::filesystem::path const& path, void(^dylibVisitor)(std::filesystem::path const&),
+void process(std::string const& path, void(^dylibVisitor)(std::string const&),
              void (^uuidVisitor)(uuid_t const))
 {
     log_vv("Scanning %s...", path.c_str());
@@ -640,29 +642,42 @@ bool operator <= (const struct timespec &lhs, const struct timespec &rhs)
     return lhs.tv_sec <= rhs.tv_sec;
 }
 
+std::string parentPath(std::string path) {
+    const char *pathCstr = path.c_str();
+    char parent[MAXPATHLEN];
+
+    return dirname_r(pathCstr, parent) ? parent : pathCstr;
+}
+
+std::string filename(std::string path) {
+    const char *pathCstr = path.c_str();
+    char filename[MAXPATHLEN];
+
+    return basename_r(pathCstr, filename) ? filename : pathCstr;
+}
 
 // This executable's own path.
-std::filesystem::path self_executable = []() -> std::filesystem::path {
+std::string self_executable = []() -> std::string {
     char path[MAXPATHLEN] = {0};
     uint32_t len = sizeof(path);
     _NSGetExecutablePath(path, &len);
-    return std::filesystem::path(path);
+    return std::string(path);
 }();
 
 
 // This executable's own xctoolchain path.
-std::filesystem::path self_toolchain = []() -> std::filesystem::path  {
+std::string self_toolchain = []() -> std::string  {
     auto result = self_executable;
     
     // Remove the executable name.
-    result = result.parent_path();
+    result = parentPath(result);
     
     // Remove trailing /usr/bin, if any
-    if (result.filename() == std::filesystem::path("bin")) {
-        result = result.parent_path();
+    if (filename(result) == "bin") {
+        result = parentPath(result);
     }
-    if (result.filename() == std::filesystem::path("usr")) {
-        result = result.parent_path();
+    if (filename(result) == "usr") {
+        result = parentPath(result);
     }
     return result;
 }();
@@ -761,7 +776,7 @@ int xcrunToolCommand(std::vector<std::string> commandAndArguments, XcrunToolBloc
 }
 
 
-void copyAndStripBitcode(std::filesystem::path src, std::filesystem::path dst)
+void copyAndStripBitcode(std::string src, std::string dst)
 {
     // -r removes bitcode
     std::vector<std::string> commandAndArgs = {"bitcode_strip", src, "-r", "-o", dst};
@@ -774,14 +789,12 @@ void copyAndStripBitcode(std::filesystem::path src, std::filesystem::path dst)
     }
 }
 
-
-void 
-copyFile(std::filesystem::path src, std::filesystem::path dst, bool stripBitcode)
+void copyFile(std::string src, std::string dst, bool stripBitcode)
 {
     if (stripBitcode) {
         copyAndStripBitcode(src, dst);
     } else {
-        if (!std::filesystem::copy_file(src, dst)) {
+        if (copyfile(src.c_str(), dst.c_str(), NULL, COPYFILE_ALL) != 0) {
             fail("Couldn't copy %s to %s: %s", src.c_str(), dst.c_str(), strerror(errno));
         }
    }
@@ -793,16 +806,19 @@ std::string uuidString(uuid_t const uuid) {
     return buffer;
 }
 
-void copyLibraries(std::filesystem::path src_dir, std::filesystem::path dst_dir, 
+void copyLibraries(std::string src_dir, std::string dst_dir,
                    std::unordered_map<std::string,
                    std::unordered_set<std::string>> const &libs,
                    bool stripBitcode)
 {
     mkpath_np(dst_dir.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
     
-    for (auto const &[lib, srcUUIDs]: libs) {
-        std::filesystem::path src = src_dir/lib;
-        std::filesystem::path dst = dst_dir/lib;
+    for (auto const &pair : libs) {
+        auto const &lib = pair.first;
+        auto const &srcUUIDs = pair.second;
+
+        std::string src = src_dir + "/" + lib;
+        std::string dst = dst_dir + "/" + lib;
         
         // Compare UUIDs of src and dst and don't copy if they're the same.
         // Do not use mod times for this task: the dst copy gets code-signed 
@@ -843,7 +859,7 @@ void copyLibraries(std::filesystem::path src_dir, std::filesystem::path dst_dir,
               dst_dir.c_str());
         
         unlink(dst.c_str());
-        copyFile(std::filesystem::canonical(src), dst, stripBitcode);
+        copyFile(src, dst, stripBitcode);
     }
 }
 
@@ -858,11 +874,35 @@ std::vector<uint8_t> query_code_signature(std::string file) {
     return d;
 }
 
+template <typename F>
+void enumerateDirectory(std::string directory, F&& func) {
+    DIR *dir = opendir(directory.c_str());
+    if (dir == NULL) {
+        return;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        std::string path = directory + "/" + entry->d_name;
+        if (entry->d_type == DT_REG) {
+            func(path);
+        } else if (entry->d_type == DT_DIR) {
+            // check if . or ..
+            if (strncmp(entry->d_name, "..", entry->d_namlen)) {
+                continue;
+            }
+            enumerateDirectory(path, func);
+        }
+    }
+}
+
+
+
 int main(int argc, const char *argv[])
 {
     // Executables to scan for Swift references.
     // --scan-executable
-    std::vector<std::filesystem::path> executables;
+    std::vector<std::string> executables;
 
     // Directories to scan for more executables.
     // --scan-folder
@@ -876,12 +916,12 @@ int main(int argc, const char *argv[])
     // Copy source.
     // --source-libraries
     // or /path/to/swift-stdlib-tool/../../lib/swift/<--platform>
-    std::filesystem::path src_dir;
+    std::string src_dir;
 
     // Copy destinations, signed and unsigned.
     // --destination and --unsigned-destination
-    std::filesystem::path dst_dir;
-    std::filesystem::path unsigned_dst_dir;
+    std::string dst_dir;
+    std::string unsigned_dst_dir;
 
     // Resource copy destination.
     // --resource-destination
@@ -923,10 +963,10 @@ int main(int argc, const char *argv[])
         }
 
         if (0 == strcmp(argv[i], "--destination")) {
-            dst_dir = std::filesystem::path(argv[++i]);
+            dst_dir = std::string(argv[++i]);
         }
         if (0 == strcmp(argv[i], "--unsigned-destination")) {
-            unsigned_dst_dir = std::filesystem::path(argv[++i]);
+            unsigned_dst_dir = std::string(argv[++i]);
         }
 
         if (0 == strcmp(argv[i], "--sign")) {
@@ -959,19 +999,19 @@ int main(int argc, const char *argv[])
     } else if (src_dir.empty()) {
         // platform is set but src_dir is not. 
         // Use platform to set src_dir relative to us.
-        src_dir = self_executable.parent_path().parent_path()/
-                  "lib"/"swift-5.0"/platform;
+        src_dir = parentPath(parentPath(self_executable)) + "/" + "lib" +
+                  "swift-5.0" + "/" + platform;
     } else if (platform.empty()) {
         // src_dir is set but platform is not.
         // Pick platform from src_dir's name.
-        platform = src_dir.filename();
+        platform = src_dir;
     }
 
     // Add the platform to unsigned_dst_dir if it is not already present.
     if (!unsigned_dst_dir.empty()) {
-        auto const unsigned_platform = unsigned_dst_dir.filename();
+        auto const unsigned_platform = unsigned_dst_dir;
         if (platform != unsigned_platform) {
-            unsigned_dst_dir = unsigned_dst_dir/platform;
+            unsigned_dst_dir = unsigned_dst_dir + "/" + platform;
         }
     }
     
@@ -985,15 +1025,13 @@ int main(int argc, const char *argv[])
 
     // Collect executables from the --scan-folder locations.
     for (auto const &embedDir : embedDirs) {
-        for (auto const &entry : std::filesystem::recursive_directory_iterator(embedDir)) {
-            if (entry.exists() && !entry.is_directory() &&
-                0 == access(entry.path().c_str(), X_OK))
-            {
-                executables.push_back(entry.path());
+        enumerateDirectory(embedDir, [&](std::string entry) {
+            if (0 == access(entry.c_str(), X_OK)) {
+                executables.push_back(entry);
             } else {
-                log_vv("%s is not an executable file", entry.path().c_str());
+                log_vv("%s is not an executable file", entry.c_str());
             }
-        }
+        });
     }
          
     // Collect Swift library names from the input files.
@@ -1003,9 +1041,9 @@ int main(int argc, const char *argv[])
                     std::unordered_set<std::string>> swiftLibs;
     for (auto const &path : executables) {
         process(path,
-           ^(std::filesystem::path const &linkedLib) {
-                auto const linkedSrc = src_dir/linkedLib;
-                if (std::filesystem::exists(linkedSrc)) {
+           ^(std::string const &linkedLib) {
+                auto const linkedSrc = src_dir + "/" + linkedLib;
+                if (access(linkedSrc.c_str(), F_OK) == 0) {
                     swiftLibs[linkedLib] = std::unordered_set<std::string>();
                 }
             }, 
@@ -1016,18 +1054,18 @@ int main(int argc, const char *argv[])
     // Also collect the Swift libraries' UUIDs.
     __block std::vector<std::string> worklist;
     worklist.reserve(swiftLibs.size());
-    for (auto const &[lib, _] : swiftLibs) {
-        worklist.push_back(lib);
+    for (auto const &pair : swiftLibs) {
+        worklist.push_back(pair.first);
     }
     while (worklist.size()) {
         auto const lib = worklist.back();
         worklist.pop_back();
-        auto const path = src_dir/lib;
+        auto const path = src_dir + "/" + lib;
         process(path,
-            ^(std::filesystem::path const &linkedLib) {
-                auto const linkedSrc = src_dir/linkedLib;
+            ^(std::string const &linkedLib) {
+                auto const linkedSrc = src_dir + "/" + linkedLib;
                 if (swiftLibs.count(linkedLib) == 0 &&
-                    std::filesystem::exists(linkedSrc))
+                    access(linkedSrc.c_str(), F_OK) == 0)
                 {
                     swiftLibs[linkedLib] = std::unordered_set<std::string>();
                     worklist.push_back(linkedLib);
@@ -1043,26 +1081,26 @@ int main(int argc, const char *argv[])
     __block std::unordered_map<std::string,
         std::unordered_set<std::string>> swiftLibsForResources;
     for (auto const &lib : resourceLibraries) {
-        auto const libSrc = src_dir/lib;
-        if (std::filesystem::exists(libSrc)) {
+        auto const libSrc = src_dir + "/" + lib;
+        if (access(libSrc.c_str(), F_OK) == 0) {
             swiftLibsForResources[lib] = std::unordered_set<std::string>();
         }
     }
 
     // Collect dependencies of --resource-library libs.
     worklist.clear();
-    for (auto const &[lib, _] : swiftLibsForResources) {
-        worklist.push_back(lib);
+    for (auto const &pair : swiftLibsForResources) {
+        worklist.push_back(pair.first);
     }
     while (worklist.size()) {
         auto const lib = worklist.back();
         worklist.pop_back();
-        auto const path = src_dir/lib;
+        auto const path = src_dir + "/" + lib;
         process(path,
-            ^(std::filesystem::path const &linkedLib) {
-                auto const linkedSrc = src_dir/linkedLib;
+            ^(std::string const &linkedLib) {
+                auto const linkedSrc = src_dir + "/" + linkedLib;
                 if (swiftLibsForResources.count(linkedLib) == 0 &&
-                    std::filesystem::exists(linkedSrc))
+                    access(linkedSrc.c_str(), F_OK) == 0)
                 {
                     swiftLibsForResources[linkedLib] = std::unordered_set<std::string>();
                     worklist.push_back(linkedLib);
@@ -1076,7 +1114,7 @@ int main(int argc, const char *argv[])
     // Print the Swift libraries (full path to toolchain's copy)
     if (print) {
         for (auto const &lib : swiftLibs) {
-            printf("%s\n", (src_dir/lib.first).c_str());
+            printf("%s\n", (src_dir + "/" + lib.first).c_str());
         }
     }
 
@@ -1111,7 +1149,8 @@ int main(int argc, const char *argv[])
         __block bool signedOne = false;
         std::mutex signingLock;
 
-        for (auto const &[lib, _] : swiftLibs) {
+        for (auto const &pair : swiftLibs) {
+            auto const &lib = pair.first;
             // Work around authentication UI problems
             // by signing one synchronously and then signing the rest.
             signingLock.lock();
@@ -1126,13 +1165,13 @@ int main(int argc, const char *argv[])
             // to preserve it in case it does not change.  We can use
             // this to avoid unnecessary copies during delta installs
             // to devices.
-            auto const dst = dst_dir/lib;
+            auto const dst = dst_dir + "/" + lib;
             auto const oldSignatureData = query_code_signature(dst);
             const char *tmpFilePath = 0;
             if (!oldSignatureData.empty()) {
                 // Make a copy of the existing file, with permissions and
                 // mtime preserved.
-                auto tmpFile = dst.string() + ".original";
+                auto tmpFile = dst + ".original";
                 tmpFilePath = tmpFile.c_str();
                 xcrunToolCommand({"cp", "-p", dst, tmpFile});
             }
