@@ -11,8 +11,6 @@
 // rdar://77798215
 // UNSUPPORTED: OS=windows-msvc
 
-// REQUIRES: rdar78290608
-
 import _Distributed
 import _Concurrency
 
@@ -114,7 +112,7 @@ struct FakeTransport: ActorTransport {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type)
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
   throws -> Act?
       where Act: DistributedActor {
     return nil
@@ -155,21 +153,21 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
     if __isRemoteActor(actor) {
       do {
         _ = try await actor.helloThrowsTransportBoom()
-        preconditionFailure("helloThrowsTransportBoom: should have thrown")
+        print("WRONG: helloThrowsTransportBoom: should have thrown")
       } catch {
         print("\(personality) - helloThrowsTransportBoom: \(error)")
       }
     } else {
       do {
         _ = try await actor.helloThrowsImplBoom()
-        preconditionFailure("helloThrowsImplBoom: Should have thrown")
+        print("WRONG: helloThrowsImplBoom: Should have thrown")
       } catch {
         print("\(personality) - helloThrowsImplBoom: \(error)")
       }
     }
   }
 
-  let remote = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
+  let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
   assert(__isRemoteActor(remote) == true, "should be remote")
 
   let local = SomeSpecificDistributedActor(transport: transport)

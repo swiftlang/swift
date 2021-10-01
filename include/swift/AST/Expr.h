@@ -1206,7 +1206,9 @@ public:
   /// which are cross-actor invoked, because such calls actually go over the
   /// transport/network, and may throw from this, rather than the function
   /// implementation itself..
-  bool isImplicitlyThrows() const { return Bits.DeclRefExpr.IsImplicitlyThrows; }
+  bool isImplicitlyThrows() const {
+    return Bits.DeclRefExpr.IsImplicitlyThrows;
+  }
 
   /// Set whether this reference must account for a `throw` occurring for reasons
   /// other than the function implementation itself throwing, e.g. an
@@ -4391,7 +4393,7 @@ public:
   ///
   /// where the new closure is declared to be async.
   ///
-  /// When the application is implciitly async, the result describes
+  /// When the application is implicitly async, the result describes
   /// the actor to which we need to need to hop.
   Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
     if (!Bits.ApplyExpr.ImplicitlyAsync)
@@ -4418,6 +4420,10 @@ public:
   void setImplicitlyThrows(bool flag) {
     Bits.ApplyExpr.ImplicitlyThrows = flag;
   }
+
+  /// Informs IRGen to that this expression should be applied as its distributed
+  /// thunk, rather than invoking the function directly.
+  bool shouldApplyDistributedThunk() const;
 
   ValueDecl *getCalledValue() const;
 

@@ -2277,7 +2277,8 @@ namespace {
             } else if (func->isDistributed()) {
               tryMarkImplicitlyAsync(memberLoc, memberRef, context,
                                      ImplicitActorHopTarget::forInstanceSelf());
-                tryMarkImplicitlyThrows(memberLoc, memberRef, context);
+              tryMarkImplicitlyThrows(memberLoc, memberRef, context);
+
             } else {
               // neither static or distributed, apply full distributed isolation
               ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method)

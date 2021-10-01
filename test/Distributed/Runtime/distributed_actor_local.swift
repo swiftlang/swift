@@ -49,7 +49,7 @@ struct FakeTransport: ActorTransport {
     fatalError("not implemented \(#function)")
   }
 
-  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type) throws -> Act?
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor {
     return nil
   }
@@ -75,7 +75,7 @@ func test_initializers() {
   let transport = FakeTransport()
 
   _ = SomeSpecificDistributedActor(transport: transport)
-  _ = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
+  _ = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
 }
 
 @available(SwiftStdlib 5.5, *)
