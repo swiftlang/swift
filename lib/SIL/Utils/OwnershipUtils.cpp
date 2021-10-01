@@ -163,6 +163,14 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 // visitReborrow is not called for them.
 bool swift::findInnerTransitiveGuaranteedUses(
     SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints) {
+
+  auto leafUse = [&](Operand *use) {
+    if (usePoints && use->getOperandOwnership() != OperandOwnership::NonUse) {
+      usePoints->push_back(use);
+    }
+    return true;
+  };
+
   // Push the value's immediate uses.
   //
   // TODO: The worklist can be a simple vector without any a membership check if
@@ -178,13 +186,6 @@ bool swift::findInnerTransitiveGuaranteedUses(
   }
 
   // --- Transitively follow forwarded uses and look for escapes.
-
-  auto recordLeafUse = [&](Operand *use) {
-    if (usePoints && use->getOperandOwnership() != OperandOwnership::NonUse) {
-      usePoints->push_back(use);
-    }
-    return true;
-  };
 
   // usePoints grows in this loop.
   while (Operand *use = worklist.pop()) {
@@ -209,6 +210,7 @@ bool swift::findInnerTransitiveGuaranteedUses(
     // borrow scope, or when it is pushed as a use when processing a nested
     // borrow.
     case OperandOwnership::EndBorrow:
+      leafUse(use);
       break;
 
     case OperandOwnership::InteriorPointer:
@@ -220,24 +222,32 @@ bool swift::findInnerTransitiveGuaranteedUses(
       }
       break;
 
-    case OperandOwnership::ForwardingBorrow:
-      ForwardingOperand(use).visitForwardedValues(
-          [&](SILValue transitiveValue) {
-            // Do not include transitive uses with 'none' ownership
-            if (transitiveValue.getOwnershipKind() == OwnershipKind::None)
-              return true;
-            for (auto *transitiveUse : transitiveValue->getUses()) {
-              if (transitiveUse->getOperandOwnership()
-                  != OperandOwnership::NonUse) {
-                worklist.insert(use);
-              }
-            }
-            return true;
-          });
+    case OperandOwnership::ForwardingBorrow: {
+      bool nonLeaf = false;
+      ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
+        // Do not include transitive uses with 'none' ownership
+        if (result.getOwnershipKind() == OwnershipKind::None)
+          return true;
+        for (auto *resultUse : result->getUses()) {
+          if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
+            nonLeaf = true;
+            worklist.insert(resultUse);
+          }
+        }
+        return true;
+      });
+      // e.g. A dead forwarded value, e.g. a switch_enum with only trivial uses,
+      // must itself be a leaf use.
+      if (!nonLeaf) {
+        leafUse(use);
+      }
       break;
-
+    }
     case OperandOwnership::Borrow:
-      BorrowingOperand(use).visitExtendedScopeEndingUses(recordLeafUse);
+      BorrowingOperand(use).visitExtendedScopeEndingUses([&](Operand *endUse) {
+        leafUse(endUse);
+        return true;
+      });
     }
   }
   return true;
