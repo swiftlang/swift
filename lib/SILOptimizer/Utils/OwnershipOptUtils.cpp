@@ -1150,7 +1150,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   auto &oldValueUses = ctx->extraAddressFixupInfo.allAddressUsesFromOldValue;
   // FIXME: The return value of findTransitiveUsesForAddress is currently
   // inverted.
-  if (findTransitiveUsesForAddress(oldValue, oldValueUses)) {
+  if (!findTransitiveUsesForAddress(oldValue, &oldValueUses)) {
     invalidate();
     return;
   }
@@ -1520,7 +1520,7 @@ void GuaranteedPhiBorrowFixup::insertEndBorrowsAndFindPhis(
     return;
   }
   SmallVector<Operand *, 16> usePoints;
-  bool result = findInnerTransitiveGuaranteedUses(phi, usePoints);
+  bool result = findInnerTransitiveGuaranteedUses(phi, &usePoints);
   assert(result && "should be checked by canCloneTerminator");
   (void)result;
 

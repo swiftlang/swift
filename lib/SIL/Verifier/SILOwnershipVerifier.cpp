@@ -377,7 +377,7 @@ bool SILValueOwnershipChecker::gatherUsers(
           });
         };
         foundError |= !interiorPointerOperand.findTransitiveUses(
-            nonLifetimeEndingUsers, &onError);
+            &nonLifetimeEndingUsers, &onError);
       }
 
       // Finally add the op to the non lifetime ending user list.

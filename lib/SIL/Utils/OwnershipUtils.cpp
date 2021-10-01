@@ -12,6 +12,7 @@
 
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/DAGNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
@@ -160,35 +161,33 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 // points. Transitively find all nested scope-ending instructions by looking
 // through nested reborrows. Nested reborrows are not use points and \p
 // visitReborrow is not called for them.
-bool swift::
-findInnerTransitiveGuaranteedUses(SILValue guaranteedValue,
-                                  SmallVectorImpl<Operand *> &usePoints) {
+bool swift::findInnerTransitiveGuaranteedUses(
+    SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints) {
   // Push the value's immediate uses.
-  unsigned firstOffset = usePoints.size();
+  //
+  // TODO: The worklist can be a simple vector without any a membership check if
+  // destructures are changed to be represented as reborrows. Currently a
+  // destructure forwards multiple results! This means that usePoints could grow
+  // exponentially without the membership check. It's fine to do this membership
+  // check locally in this function (within a borrow scope) because it isn't
+  // needed for the immediate uses, only the transitive uses.
+  DAGNodeWorklist<Operand *, 8> worklist;
   for (Operand *use : guaranteedValue->getUses()) {
     if (use->getOperandOwnership() != OperandOwnership::NonUse)
-      usePoints.push_back(use);
+      worklist.insert(use);
   }
 
   // --- Transitively follow forwarded uses and look for escapes.
 
-  // TODO: Remove this SmallPtrSet if destructures are changed to be represented
-  // as reborrows. Currently it forwards multiple results! This means that
-  // usePoints could grow exponentially without a membership check. It's fine to
-  // do this membership check locally in this function (within a borrow
-  // scope). It isn't needed for the immediate uses, only the transitive uses.
-  SmallPtrSet<Operand *, 16> visitedUses;
-  auto pushUse = [&](Operand *use) {
-    if (use->getOperandOwnership() != OperandOwnership::NonUse) {
-      if (visitedUses.insert(use).second)
-        usePoints.push_back(use);
+  auto recordLeafUse = [&](Operand *use) {
+    if (usePoints && use->getOperandOwnership() != OperandOwnership::NonUse) {
+      usePoints->push_back(use);
     }
     return true;
   };
 
   // usePoints grows in this loop.
-  for (unsigned i = firstOffset; i < usePoints.size(); ++i) {
-    Operand *use = usePoints[i];
+  while (Operand *use = worklist.pop()) {
     switch (use->getOperandOwnership()) {
     case OperandOwnership::NonUse:
     case OperandOwnership::TrivialUse:
@@ -228,14 +227,17 @@ findInnerTransitiveGuaranteedUses(SILValue guaranteedValue,
             if (transitiveValue.getOwnershipKind() == OwnershipKind::None)
               return true;
             for (auto *transitiveUse : transitiveValue->getUses()) {
-              pushUse(transitiveUse);
+              if (transitiveUse->getOperandOwnership()
+                  != OperandOwnership::NonUse) {
+                worklist.insert(use);
+              }
             }
             return true;
           });
       break;
 
     case OperandOwnership::Borrow:
-      BorrowingOperand(use).visitExtendedScopeEndingUses(pushUse);
+      BorrowingOperand(use).visitExtendedScopeEndingUses(recordLeafUse);
     }
   }
   return true;
@@ -271,7 +273,7 @@ bool swift::findTransitiveGuaranteedUses(
     }
     return true;
   }
-  return findInnerTransitiveGuaranteedUses(guaranteedValue, usePoints);
+  return findInnerTransitiveGuaranteedUses(guaranteedValue, &usePoints);
 }
 
 // Find all use points of \p guaranteedValue within its borrow scope. If the
@@ -705,11 +707,16 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
 }
 
 bool swift::findTransitiveUsesForAddress(
-    SILValue projectedAddress, SmallVectorImpl<Operand *> &foundUses,
+    SILValue projectedAddress, SmallVectorImpl<Operand *> *foundUses,
     std::function<void(Operand *)> *onError) {
   SmallVector<Operand *, 8> worklist(projectedAddress->getUses());
 
   bool foundError = false;
+
+  auto leafUse = [foundUses](Operand *use) {
+    if (foundUses)
+      foundUses->push_back(use);
+  };
 
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
@@ -717,10 +724,6 @@ bool swift::findTransitiveUsesForAddress(
     // Skip type dependent operands.
     if (op->isTypeDependent())
       continue;
-
-    // Before we do anything, add this operand to our implicit regular user
-    // list.
-    foundUses.push_back(op);
 
     // Then update the worklist with new things to find if we recognize this
     // inst and then continue. If we fail, we emit an error at the bottom of the
@@ -741,6 +744,7 @@ bool swift::findTransitiveUsesForAddress(
         isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
         isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
         isa<IsUniqueInst>(user)) {
+      leafUse(op);
       continue;
     }
 
@@ -763,6 +767,7 @@ bool swift::findTransitiveUsesForAddress(
     if (auto *builtin = dyn_cast<BuiltinInst>(user)) {
       if (auto kind = builtin->getBuiltinKind()) {
         if (*kind == BuiltinValueKind::TSanInoutAccess) {
+          leafUse(op);
           continue;
         }
       }
@@ -770,26 +775,31 @@ bool swift::findTransitiveUsesForAddress(
 
     // If we have a load_borrow, add it's end scope to the liveness requirement.
     if (auto *lbi = dyn_cast<LoadBorrowInst>(user)) {
-      transform(lbi->getEndBorrows(), std::back_inserter(foundUses),
-                [](EndBorrowInst *ebi) { return &ebi->getAllOperands()[0]; });
+      if (foundUses) {
+        transform(lbi->getEndBorrows(), std::back_inserter(*foundUses),
+                  [](EndBorrowInst *ebi) { return &ebi->getAllOperands()[0]; });
+      }
       continue;
     }
 
     // TODO: Merge this into the full apply site code below.
     if (auto *beginApply = dyn_cast<BeginApplyInst>(user)) {
-      // TODO: Just add this to implicit regular user list?
-      llvm::copy(beginApply->getTokenResult()->getUses(),
-                 std::back_inserter(foundUses));
+      if (foundUses) {
+        llvm::copy(beginApply->getTokenResult()->getUses(),
+                   std::back_inserter(*foundUses));
+      }
       continue;
     }
 
     if (auto fas = FullApplySite::isa(user)) {
+      leafUse(op);
       continue;
     }
 
     if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
       // If this is the base, just treat it as a liveness use.
       if (op->get() == mdi->getBase()) {
+        leafUse(op);
         continue;
       }
 
