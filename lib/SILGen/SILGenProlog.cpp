@@ -251,10 +251,15 @@ struct ArgumentInitHelper {
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
     }
-    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(argrv.getValue());
     SILValue value = argrv.getValue();
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
+      if (SGF.getASTContext().LangOpts.EnableExperimentalLexicalLifetimes &&
+          value->getOwnershipKind() != OwnershipKind::None) {
+        value =
+            SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
+        SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+      }
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
       if (auto AllocStack = dyn_cast<AllocStackInst>(value))
@@ -262,6 +267,7 @@ struct ArgumentInitHelper {
       else
         SGF.B.createDebugValueAddr(loc, value, varinfo);
     }
+    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
   }
 
   void emitParam(ParamDecl *PD) {
