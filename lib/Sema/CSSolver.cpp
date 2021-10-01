@@ -180,8 +180,9 @@ Solution ConstraintSystem::finalize() {
   }
 
   // Remember contextual types.
-  solution.contextualTypes.assign(
-      contextualTypes.begin(), contextualTypes.end());
+  for (auto &entry : contextualTypes) {
+    solution.contextualTypes.push_back({entry.first, entry.second.first});
+  }
 
   solution.solutionApplicationTargets = solutionApplicationTargets;
   solution.caseLabelItems = caseLabelItems;
