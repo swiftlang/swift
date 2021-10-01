@@ -2824,24 +2824,6 @@ bool ConformanceChecker::checkActorIsolation(
               ActorIsolationRestriction::forDeclaration(
                   witness, witness->getDeclContext(),
                   /*fromExpression=*/false)) {
-  case ActorIsolationRestriction::DistributedActorSelf: {
-    if (witness->isSynthesized()) {
-      // we only have two 'distributed-actor-nonisolated' properties,
-      // the address and transport; if we see any such marked property,
-      // we're free to automatically assume those are fine and accessible always.
-      if (witness->isDistributedActorIndependent())
-        return false;
-    }
-
-    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(witness)) {
-      // A 'distributed func' may witness a distributed isolated function requirement.
-      if (funcDecl->isDistributed())
-        return false;
-    }
-
-    // continue checking ActorSelf rules
-    LLVM_FALLTHROUGH;
-  }
   case ActorIsolationRestriction::ActorSelf: {
     auto requirementIsolation = getActorIsolation(requirement);
 
@@ -2850,23 +2832,60 @@ bool ConformanceChecker::checkActorIsolation(
     if (requirementIsolation == ActorIsolation::ActorInstance)
       return false;
 
+    auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness);
+    auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
+
+    /// Distributed actors can witness protocol requirements either with
+    /// nonisolated or distributed members.
+    auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
+    if (witnessClass && witnessClass->isDistributedActor()) {
+        // we only have two 'distributed-actor-nonisolated' properties,
+        // the address and transport; if we see any such marked property,
+        // we're free to automatically assume those are fine and accessible always.
+      if (witness->isSynthesized() && witness->isDistributedActorIndependent()) {
+        return false;
+      }
+
+      // Maybe we're dealing with a 'distributed func' which is witness to
+      // a distributed function requirement, this is ok.
+      if (requirementFunc && requirementFunc->isDistributed() &&
+          witnessFunc && witnessFunc->isDistributed()) {
+          return false;
+      }
+    }
+
     witness->diagnose(diag::actor_isolated_witness,
                       witness->getDescriptiveKind(),
                       witness->getName());
     {
       auto witnessVar = dyn_cast<VarDecl>(witness);
       if ((witnessVar && !witnessVar->hasStorage()) || !witnessVar) {
-        auto independentNote = witness->diagnose(
-            diag::note_add_nonisolated_to_decl,
-            witness->getName(), witness->getDescriptiveKind());
-        independentNote.fixItInsert(witness->getAttributeInsertionLoc(true),
-            "nonisolated ");
+        if (requirementFunc && requirementFunc->isDistributed()) {
+          // a distributed protocol requirement can be witnessed with a
+          // distributed function:
+          witness
+              ->diagnose(diag::note_add_distributed_to_decl,
+                         witness->getName(), witness->getDescriptiveKind())
+              .fixItInsert(witness->getAttributeInsertionLoc(true),
+                           "distributed ");
+          requirement
+              ->diagnose(diag::note_distributed_requirement_defined_here,
+                         requirement->getName());
+        } else {
+          // the only other way to witness is to use a nonisolated member:
+          witness
+              ->diagnose(diag::note_add_nonisolated_to_decl, witness->getName(),
+                         witness->getDescriptiveKind())
+              .fixItInsert(witness->getAttributeInsertionLoc(true),
+                           "nonisolated ");
+        }
       }
     }
 
     return true;
   }
 
+  case ActorIsolationRestriction::CrossDistributedActorSelf:
   case ActorIsolationRestriction::CrossActorSelf:
     return diagnoseNonSendableTypesInReference(
         witness, DC->getParentModule(), witness->getLoc(),
