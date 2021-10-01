@@ -40,7 +40,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
-#include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -49,9 +48,9 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
-#include "swift/SymbolGraphGen/SymbolGraphGen.h"
-#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -512,7 +511,7 @@ static uint8_t getRawOpaqueReadOwnership(swift::OpaqueReadOwnership ownership) {
   CASE(OwnedOrBorrowed)
 #undef CASE
   }
-  llvm_unreachable("bad kind");
+  llvm_unreachable("bad kind");  
 }
 
 static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
@@ -1059,35 +1058,25 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         options_block::SDKPathLayout SDKPath(Out);
         options_block::XCCLayout XCC(Out);
 
-        const auto &PathRemapper = options.DebuggingOptionsPrefixMap;
-        SDKPath.emit(
-            ScratchRecord,
-            PathRemapper.remapPath(M->getASTContext().SearchPathOpts.SDKPath));
+        SDKPath.emit(ScratchRecord, M->getASTContext().SearchPathOpts.SDKPath);
         auto &Opts = options.ExtraClangOptions;
-        for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) {
-          StringRef arg(*Arg);
-          if (arg.startswith("-ivfsoverlay")) {
-            // FIXME: This is a hack and calls for a better design.
-            //
-            // Filter out any -ivfsoverlay options that include an
-            // unextended-module-overlay.yaml overlay. By convention the Xcode
-            // buildsystem uses these while *building* mixed Objective-C and
-            // Swift frameworks; but they should never be used to *import* the
-            // module defined in the framework.
+        for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) { 
+          // FIXME: This is a hack and calls for a better design.
+          //
+          // Filter out any -ivfsoverlay options that include an
+          // unextended-module-overlay.yaml overlay. By convention the Xcode
+          // buildsystem uses these while *building* mixed Objective-C and Swift
+          // frameworks; but they should never be used to *import* the module
+          // defined in the framework.
+          if (StringRef(*Arg).startswith("-ivfsoverlay")) {
             auto Next = std::next(Arg);
             if (Next != E &&
                 StringRef(*Next).endswith("unextended-module-overlay.yaml")) {
               ++Arg;
               continue;
             }
-          } else if (arg.startswith("-fdebug-prefix-map=")) {
-            // We don't serialize the debug prefix map flags as these
-            // contain absoute paths that are not usable on different
-            // machines. These flags are not necessary to compile the
-            // clang modules again so are safe to remove.
-            continue;
           }
-          XCC.emit(ScratchRecord, arg);
+          XCC.emit(ScratchRecord, *Arg);
         }
       }
     }
@@ -1138,16 +1127,14 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::ModuleInterfaceLayout ModuleInterface(Out);
 
   if (options.SerializeOptionsForDebugging) {
-    const auto &PathMapper = options.DebuggingOptionsPrefixMap;
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     // Put the framework search paths first so that they'll be preferred upon
     // deserialization.
     for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
       SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
-                      PathMapper.remapPath(framepath.Path));
+                      framepath.Path);
     for (auto &path : searchPathOpts.ImportSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
-                      PathMapper.remapPath(path));
+      SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
   }
 
   // Note: We're not using StringMap here because we don't need to own the
@@ -1481,7 +1468,7 @@ void Serializer::writeASTBlockEntity(const SILLayout *layout) {
       typeRef |= 0x80000000U;
     data.push_back(typeRef);
   }
-
+  
   unsigned abbrCode
     = DeclTypeAbbrCodes[SILLayoutLayout::Code];
 
@@ -1716,7 +1703,7 @@ static bool shouldSerializeMember(Decl *D) {
 
   case DeclKind::OpaqueType:
     return true;
-
+      
   case DeclKind::EnumElement:
   case DeclKind::Protocol:
   case DeclKind::Constructor:
@@ -1814,14 +1801,14 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     if (auto opaque = dyn_cast<OpaqueTypeDecl>(generic)) {
       if (!opaque->hasName()) {
         abbrCode = DeclTypeAbbrCodes[XRefOpaqueReturnTypePathPieceLayout::Code];
-
+        
         XRefOpaqueReturnTypePathPieceLayout::emitRecord(Out, ScratchRecord,
                   abbrCode,
                   addDeclBaseNameRef(opaque->getOpaqueReturnTypeIdentifier()));
         break;
       }
     }
-
+      
     assert(generic->hasName());
 
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
@@ -1862,7 +1849,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::SubscriptDecl: {
     auto SD = cast<SubscriptDecl>(DC);
     writeCrossReference(DC->getParent(), pathLen + 1);
-
+    
     Type ty = SD->getInterfaceType()->getCanonicalType();
 
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
@@ -1873,7 +1860,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
                                          SD->isStatic());
     break;
   }
-
+      
   case DeclContextKind::AbstractFunctionDecl: {
     if (auto fn = dyn_cast<AccessorDecl>(DC)) {
       auto storage = fn->getStorage();
@@ -1985,7 +1972,7 @@ void Serializer::writeCrossReference(const Decl *D) {
                    addDeclBaseNameRef(opaque->getOpaqueReturnTypeIdentifier()));
     return;
   }
-
+  
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(D)) {
     assert(!D->getDeclContext()->isModuleScopeContext() &&
            "Cannot cross reference a generic type decl at module scope.");
@@ -4686,7 +4673,7 @@ class ClangToSwiftBasicWriter :
 
   Serializer &S;
   SmallVectorImpl<uint64_t> &Record;
-  using TypeWriter =
+  using TypeWriter = 
     clang::serialization::AbstractTypeWriter<ClangToSwiftBasicWriter>;
   TypeWriter Types;
 
@@ -5490,7 +5477,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
                                              /*isLocal=*/true);
       }
     }
-
+    
     for (auto OTD : opaqueReturnTypeDecls) {
       // FIXME: We should delay parsing function bodies so these type decls
       //        don't even get added to the file.
