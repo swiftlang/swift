@@ -573,6 +573,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.RequireExplicitSendable |= Args.hasArg(OPT_require_explicit_sendable);
   for (const Arg *A : Args.filtered(OPT_define_availability)) {
     Opts.AvailabilityMacros.push_back(A->getValue());
   }

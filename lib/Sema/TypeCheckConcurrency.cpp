@@ -553,11 +553,32 @@ bool swift::isSendableType(ModuleDecl *module, Type type) {
       });
 }
 
+/// Add Fix-It text for the given nominal type to adopt Sendable.
+static void addSendableFixIt(
+    const NominalTypeDecl *nominal, InFlightDiagnostic &diag, bool unchecked) {
+  if (nominal->getInherited().empty()) {
+    SourceLoc fixItLoc = nominal->getBraces().Start;
+    if (unchecked)
+      diag.fixItInsert(fixItLoc, ": @unchecked Sendable");
+    else
+      diag.fixItInsert(fixItLoc, ": Sendable");
+  } else {
+    ASTContext &ctx = nominal->getASTContext();
+    SourceLoc fixItLoc = nominal->getInherited().back().getSourceRange().End;
+    fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
+    if (unchecked)
+      diag.fixItInsert(fixItLoc, ", @unchecked Sendable");
+    else
+      diag.fixItInsert(fixItLoc, ", Sendable");
+  }
+}
+
 /// Produce a diagnostic for a single instance of a non-Sendable type where
 /// a Sendable type is required.
 static bool diagnoseSingleNonSendableType(
     Type type, ModuleDecl *module, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+    llvm::function_ref<
+      std::pair<DiagnosticBehavior, bool>(Type, DiagnosticBehavior)> diagnose) {
 
   auto behavior = DiagnosticBehavior::Unspecified;
 
@@ -594,23 +615,20 @@ static bool diagnoseSingleNonSendableType(
     behavior = DiagnosticBehavior::Warning;
   }
 
-  bool wasError = diagnose(type, behavior);
+  DiagnosticBehavior actualBehavior;
+  bool wasError;
+  std::tie(actualBehavior, wasError) = diagnose(type, behavior);
 
-  if (type->is<FunctionType>()) {
+  if (actualBehavior == DiagnosticBehavior::Ignore) {
+    // Don't emit any other diagnostics.
+  } else if (type->is<FunctionType>()) {
     ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
   } else if (nominal && nominal->getParentModule() == module &&
              (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))) {
     auto note = nominal->diagnose(
         diag::add_nominal_sendable_conformance,
         nominal->getDescriptiveKind(), nominal->getName());
-    if (nominal->getInherited().empty()) {
-      SourceLoc fixItLoc = nominal->getBraces().Start;
-      note.fixItInsert(fixItLoc, ": Sendable ");
-    } else {
-      SourceLoc fixItLoc = nominal->getInherited().back().getSourceRange().End;
-      fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
-      note.fixItInsert(fixItLoc, ", Sendable");
-    }
+    addSendableFixIt(nominal, note, /*unchecked=*/false);
   } else if (nominal) {
     nominal->diagnose(
         diag::non_sendable_nominal, nominal->getDescriptiveKind(),
@@ -622,7 +640,8 @@ static bool diagnoseSingleNonSendableType(
 
 bool swift::diagnoseNonSendableTypes(
     Type type, ModuleDecl *module, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+    llvm::function_ref<
+      std::pair<DiagnosticBehavior, bool>(Type, DiagnosticBehavior)> diagnose) {
   // If the Sendable protocol is missing, do nothing.
   auto proto = module->getASTContext().getProtocol(KnownProtocolKind::Sendable);
   if (!proto)
@@ -708,6 +727,81 @@ void swift::diagnoseMissingSendableConformance(
     SourceLoc loc, Type type, ModuleDecl *module) {
   diagnoseNonSendableTypes(
       type, module, loc, diag::non_sendable_type);
+}
+
+static bool checkSendableInstanceStorage(
+    NominalTypeDecl *nominal, DeclContext *dc, SendableCheck check);
+
+void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
+  // Only diagnose when explicitly requested.
+  ASTContext &ctx = nominal->getASTContext();
+  if (!ctx.LangOpts.RequireExplicitSendable)
+    return;
+
+  if (nominal->getLoc().isInvalid())
+    return;
+
+  // Protocols aren't checked.
+  if (isa<ProtocolDecl>(nominal))
+    return;
+
+  // Actors are always Sendable.
+  if (auto classDecl = dyn_cast<ClassDecl>(nominal))
+    if (classDecl->isActor())
+      return;
+
+  // Only public/open types have this check.
+  if (!nominal->getFormalAccessScope(
+        /*useDC=*/nullptr,
+        /*treatUsableFromInlineAsPublic=*/true).isPublic())
+    return;
+
+  // FIXME: Check for explicit "do not conform to Sendable" marker.
+
+  // Look for any conformance to `Sendable`.
+  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
+  if (!proto)
+    return;
+
+  SmallVector<ProtocolConformance *, 2> conformances;
+  if (nominal->lookupConformance(proto, conformances))
+    return;
+
+  // Diagnose it.
+  nominal->diagnose(
+      diag::public_decl_needs_sendable, nominal->getDescriptiveKind(),
+      nominal->getName());
+
+  // Note to add a Sendable conformance, possibly an unchecked one.
+  {
+    bool isUnchecked = false;
+
+    // Non-final classes can only have @unchecked.
+    if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+      if (!classDecl->isFinal())
+        isUnchecked = true;
+    }
+
+    // NOTE: We might need to introduce a conditional conformance here.
+    if (!isUnchecked &&
+        checkSendableInstanceStorage(
+            nominal, nominal, SendableCheck::Implicit)) {
+      isUnchecked = true;
+    }
+
+    auto note = nominal->diagnose(
+        isUnchecked ? diag::explicit_unchecked_sendable
+                    : diag::add_nominal_sendable_conformance,
+        nominal->getDescriptiveKind(), nominal->getName());
+    addSendableFixIt(nominal, note, isUnchecked);
+  }
+
+  // Note to disable the warning.
+  nominal->diagnose(
+      diag::explicit_disable_sendable, nominal->getDescriptiveKind(),
+      nominal->getName())
+    .fixItInsert(nominal->getAttributeInsertionLoc(/*forModifier=*/false),
+                 "@_nonSendable ");
 }
 
 /// Determine whether this is the main actor type.
@@ -3413,13 +3507,16 @@ static bool checkSendableInstanceStorage(
               [&](Type type, DiagnosticBehavior suggestedBehavior) {
                 auto action = limitSendableInstanceBehavior(
                     langOpts, check, suggestedBehavior);
+                if (check == SendableCheck::Implicit)
+                  return action;
+
                 property->diagnose(diag::non_concurrent_type_member,
                                    false, property->getName(),
                                    nominal->getDescriptiveKind(),
                                    nominal->getName(),
                                    propertyType)
                     .limitBehavior(action.first);
-                return action.second;
+                return action;
               });
 
       if (diagnosedProperty) {
@@ -3450,13 +3547,16 @@ static bool checkSendableInstanceStorage(
               [&](Type type, DiagnosticBehavior suggestedBehavior) {
                 auto action = limitSendableInstanceBehavior(
                     langOpts, check, suggestedBehavior);
+                if (check == SendableCheck::Implicit)
+                  return action;
+
                 element->diagnose(diag::non_concurrent_type_member,
                                   true, element->getName(),
                                   nominal->getDescriptiveKind(),
                                   nominal->getName(),
                                   type)
                     .limitBehavior(action.first);
-                return action.second;
+                return action;
               });
 
         if (diagnosedElement) {

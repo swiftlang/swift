@@ -245,6 +245,10 @@ bool diagnoseNonSendableTypesInReference(
 void diagnoseMissingSendableConformance(
     SourceLoc loc, Type type, ModuleDecl *module);
 
+/// If the given nominal type is public and does not explicitly
+/// state whether it conforms to Sendable, provide a diagnostic.
+void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
+
 /// Diagnose any non-Sendable types that occur within the given type, using
 /// the given diagnostic.
 ///
@@ -255,7 +259,8 @@ void diagnoseMissingSendableConformance(
 /// \returns \c true if any diagnostics were produced, \c false otherwise.
 bool diagnoseNonSendableTypes(
     Type type, ModuleDecl *module, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose);
+    llvm::function_ref<
+      std::pair<DiagnosticBehavior, bool>(Type, DiagnosticBehavior)> diagnose);
 
 namespace detail {
   template<typename T>
@@ -276,7 +281,8 @@ bool diagnoseNonSendableTypes(
       type, module, loc, [&](Type specificType, DiagnosticBehavior behavior) {
     ctx.Diags.diagnose(loc, diag, type, diagArgs...)
       .limitBehavior(behavior);
-    return behavior == DiagnosticBehavior::Unspecified;
+    return std::pair<DiagnosticBehavior, bool>(
+        behavior, behavior == DiagnosticBehavior::Unspecified);
   });
 }
 

@@ -10,7 +10,7 @@ struct S1 {
   var c: C2
 }
 
-enum E1 { // expected-note{{consider making enum 'E1' conform to the 'Sendable' protocol}}{{9-9=: Sendable }}
+enum E1 { // expected-note {{consider making enum 'E1' conform to the 'Sendable' protocol}}{{9-9=: Sendable}}
   case base
   indirect case nested(E1)
 }

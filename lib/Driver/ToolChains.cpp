@@ -233,6 +233,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
+  inputArgs.AddLastArg(arguments, options::OPT_require_explicit_sendable);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_enable_private_imports);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
