@@ -2599,9 +2599,15 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   if (auto *derivativeId = c.getDerivativeFunctionIdentifier()) {
     auto originalFnTy =
         makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
+    // Protocol witness derivatives cannot have a derivative generic signature,
+    // but class method derivatives can.
+    GenericSignature derivativeGenSig = nullptr;
+    if (isa<ClassDecl>(c.getAbstractFunctionDecl()->getInnermostTypeContext()))
+      derivativeGenSig = derivativeId->getDerivativeGenericSignature();
     auto *derivativeFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
         derivativeId->getParameterIndices(), derivativeId->getKind(),
-        LookUpConformanceInModule(&M));
+        LookUpConformanceInModule(&M),
+        derivativeGenSig);
     return cast<AnyFunctionType>(derivativeFnTy->getCanonicalType());
   }
 
