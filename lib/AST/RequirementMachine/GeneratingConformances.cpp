@@ -56,6 +56,45 @@ void HomotopyGenerator::findProtocolConformanceRules(
     SmallVectorImpl<std::pair<MutableTerm, unsigned>> &inContext,
     const RewriteSystem &system) const {
 
+  auto redundancyCandidates = Path.findRulesAppearingOnceInEmptyContext();
+  if (redundancyCandidates.empty())
+    return;
+
+  for (const auto &step : Path) {
+    switch (step.Kind) {
+    case RewriteStep::ApplyRewriteRule: {
+      const auto &rule = system.getRule(step.RuleID);
+      if (!rule.isProtocolConformanceRule())
+        break;
+
+      if (!step.isInContext() &&
+          step.Inverse &&
+          std::find(redundancyCandidates.begin(),
+                    redundancyCandidates.end(),
+                    step.RuleID) != redundancyCandidates.end()) {
+        notInContext.push_back(step.RuleID);
+      }
+
+      break;
+    }
+
+    case RewriteStep::AdjustConcreteType:
+      break;
+    }
+  }
+
+  if (notInContext.empty())
+    return;
+
+  if (notInContext.size() > 1) {
+    llvm::errs() << "Multiple conformance rules appear once without context:\n";
+    for (unsigned ruleID : notInContext)
+      llvm::errs() << system.getRule(ruleID) << "\n";
+    dump(llvm::errs(), system);
+    llvm::errs() << "\n";
+    abort();
+  }
+
   MutableTerm term = Basepoint;
 
   for (const auto &step : Path) {
@@ -65,14 +104,9 @@ void HomotopyGenerator::findProtocolConformanceRules(
       if (!rule.isProtocolConformanceRule())
         break;
 
-      if (!step.isInContext()) {
-        assert(std::find(notInContext.begin(),
-                         notInContext.end(),
-                         step.RuleID) == notInContext.end() &&
-               "A conformance rule appears more than once without context?");
-        notInContext.push_back(step.RuleID);
-      } else if (step.EndOffset == 0) {
-        assert(step.StartOffset > 0);
+      if (step.StartOffset > 0 &&
+          step.EndOffset == 0 &&
+          rule.getLHS().back() == system.getRule(notInContext[0]).getLHS().back()) {
         MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
         inContext.emplace_back(prefix, step.RuleID);
       }
@@ -86,8 +120,13 @@ void HomotopyGenerator::findProtocolConformanceRules(
     step.apply(term, system);
   }
 
-  if (notInContext.size() == 1 && inContext.empty()) {
-    llvm::errs() << "A conformance rule not based on another conformance rule?\n";
+  if (inContext.empty()) {
+    notInContext.clear();
+    return;
+  }
+
+  if (inContext.size() > 1) {
+    llvm::errs() << "Multiple candidate conformance rules in context?\n";
     dump(llvm::errs(), system);
     llvm::errs() << "\n";
     abort();
@@ -252,6 +291,8 @@ void RewriteSystem::computeCandidateConformancePaths(
         unsigned ruleID = pair.second;
         llvm::dbgs() << " (#" << ruleID << ") " << getRule(ruleID) << "\n";
       }
+
+      llvm::dbgs() << "\n";
     }
 
     // Suppose a 3-cell contains a conformance rule (T.[P] => T) in an empty
@@ -354,6 +395,74 @@ bool RewriteSystem::isValidConformancePath(
   return true;
 }
 
+void RewriteSystem::dumpGeneratingConformanceEquation(
+    llvm::raw_ostream &out,
+    unsigned baseRuleID,
+    const std::vector<SmallVector<unsigned, 2>> &paths) const {
+  out << getRule(baseRuleID).getLHS() << " := ";
+
+  bool first = true;
+  for (const auto &path : paths) {
+    if (!first)
+      out << " ∨ ";
+    else
+      first = false;
+    for (unsigned ruleID : path)
+      out << "(" << getRule(ruleID).getLHS() << ")";
+  }
+}
+
+void RewriteSystem::verifyGeneratingConformanceEquations(
+    const llvm::MapVector<unsigned,
+                          std::vector<SmallVector<unsigned, 2>>>
+        &conformancePaths) const {
+#ifndef NDEBUG
+  for (const auto &pair : conformancePaths) {
+    const auto &rule = getRule(pair.first);
+    auto *proto = rule.getLHS().back().getProtocol();
+
+    MutableTerm baseTerm(rule.getLHS());
+    (void) simplify(baseTerm);
+
+    for (const auto &path : pair.second) {
+      const auto &otherRule = getRule(path.back());
+      auto *otherProto = otherRule.getLHS().back().getProtocol();
+
+      if (proto != otherProto) {
+        llvm::errs() << "Invalid equation: ";
+        dumpGeneratingConformanceEquation(llvm::errs(),
+                                          pair.first, pair.second);
+        llvm::errs() << "\n";
+        llvm::errs() << "Mismatched conformance:\n";
+        llvm::errs() << "Base rule: " << rule << "\n";
+        llvm::errs() << "Final rule: " << otherRule << "\n\n";
+        dump(llvm::errs());
+        abort();
+      }
+
+      MutableTerm otherTerm;
+      for (unsigned otherRuleID : path) {
+        otherTerm.append(getRule(otherRuleID).getLHS());
+      }
+
+      (void) simplify(otherTerm);
+
+      if (baseTerm != otherTerm) {
+        llvm::errs() << "Invalid equation: ";
+        llvm::errs() << "\n";
+        dumpGeneratingConformanceEquation(llvm::errs(),
+                                          pair.first, pair.second);
+        llvm::errs() << "Invalid conformance path:\n";
+        llvm::errs() << "Expected: " << baseTerm << "\n";
+        llvm::errs() << "Got: " << otherTerm << "\n\n";
+        dump(llvm::errs());
+        abort();
+      }
+    }
+  }
+#endif
+}
+
 /// Computes a minimal set of generating conformances, assuming that homotopy
 /// reduction has already eliminated all redundant rewrite rules that are not
 /// conformance rules.
@@ -361,13 +470,19 @@ void RewriteSystem::computeGeneratingConformances(
     llvm::DenseSet<unsigned> &redundantConformances) {
   llvm::MapVector<unsigned, std::vector<SmallVector<unsigned, 2>>> conformancePaths;
 
+  // Prepare the initial set of equations: every non-redundant conformance rule
+  // can be expressed as itself.
   for (unsigned ruleID : indices(Rules)) {
     const auto &rule = getRule(ruleID);
-    if (rule.isProtocolConformanceRule()) {
-      SmallVector<unsigned, 2> path;
-      path.push_back(ruleID);
-      conformancePaths[ruleID].push_back(path);
-    }
+    if (rule.isRedundant())
+      continue;
+
+    if (!rule.isProtocolConformanceRule())
+      continue;
+
+    SmallVector<unsigned, 2> path;
+    path.push_back(ruleID);
+    conformancePaths[ruleID].push_back(path);
   }
 
   computeCandidateConformancePaths(conformancePaths);
@@ -375,22 +490,16 @@ void RewriteSystem::computeGeneratingConformances(
   if (Debug.contains(DebugFlags::GeneratingConformances)) {
     llvm::dbgs() << "Initial set of equations:\n";
     for (const auto &pair : conformancePaths) {
-      llvm::dbgs() << "- " << getRule(pair.first).getLHS() << " := ";
-
-      bool first = true;
-      for (const auto &path : pair.second) {
-        if (!first)
-          llvm::dbgs() << " ∨ ";
-        else
-          first = false;
-        for (unsigned ruleID : path)
-          llvm::dbgs() << "(" << getRule(ruleID).getLHS() << ")";
-      }
-
+      llvm::dbgs() << "- ";
+      dumpGeneratingConformanceEquation(llvm::dbgs(),
+                                        pair.first, pair.second);
       llvm::dbgs() << "\n";
     }
   }
 
+  verifyGeneratingConformanceEquations(conformancePaths);
+
+  // Find a minimal set of generating conformances.
   for (const auto &pair : conformancePaths) {
     for (const auto &path : pair.second) {
       llvm::SmallDenseSet<unsigned, 4> visited;
@@ -403,6 +512,30 @@ void RewriteSystem::computeGeneratingConformances(
       }
     }
   }
+
+  // Check invariants.
+#ifndef NDEBUG
+  for (const auto &pair : conformancePaths) {
+    if (redundantConformances.count(pair.first) > 0)
+      continue;
+
+    const auto &rule = getRule(pair.first);
+
+    if (rule.isRedundant()) {
+      llvm::errs() << "Generating conformance is redundant: ";
+      llvm::errs() << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+
+    if (rule.containsUnresolvedSymbols()) {
+      llvm::errs() << "Generating conformance contains unresolved symbols: ";
+      llvm::errs() << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
+#endif
 
   if (Debug.contains(DebugFlags::GeneratingConformances)) {
     llvm::dbgs() << "Generating conformances:\n";

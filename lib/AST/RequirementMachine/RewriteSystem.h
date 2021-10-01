@@ -495,6 +495,16 @@ public:
                             std::vector<SmallVector<unsigned, 2>>>
           &conformancePaths) const;
 
+  void dumpGeneratingConformanceEquation(
+      llvm::raw_ostream &out,
+      unsigned baseRuleID,
+      const std::vector<SmallVector<unsigned, 2>> &paths) const;
+
+  void verifyGeneratingConformanceEquations(
+      const llvm::MapVector<unsigned,
+                            std::vector<SmallVector<unsigned, 2>>>
+          &conformancePaths) const;
+
   void computeGeneratingConformances(
       llvm::DenseSet<unsigned> &redundantConformances);
 
