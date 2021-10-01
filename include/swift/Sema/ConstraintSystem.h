@@ -5298,9 +5298,8 @@ public:
 
   /// Determine whether referencing the given member on the
   /// given existential base type is supported. This is the case only if the
-  /// type of the member, spelled in the context of \p baseTy,
-  /// - does not contain any 'Self'-rooted dependent member types, and
-  /// - does not contain 'Self' in non-covariant position.
+  /// type of the member, spelled in the context of \p baseTy, does not contain
+  /// 'Self' or 'Self'-rooted dependent member types in non-covariant position.
   bool isMemberAvailableOnExistential(Type baseTy,
                                       const ValueDecl *member) const;
 

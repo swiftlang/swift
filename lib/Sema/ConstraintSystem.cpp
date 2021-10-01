@@ -5991,11 +5991,12 @@ bool ConstraintSystem::isMemberAvailableOnExistential(
     Type baseTy, const ValueDecl *member) const {
   assert(member->getDeclContext()->getSelfProtocolDecl());
 
-  // If the type of the member references 'Self' in non-covariant position, or
-  // an associated type in any position, we cannot make use of the member.
+  // If the type of the member references 'Self' or a 'Self'-rooted associated
+  // type in non-covariant position, we cannot reference the member.
   const auto info = member->findExistentialSelfReferences(
       baseTy, /*treatNonResultCovariantSelfAsInvariant=*/false);
-  if (info.selfRef > TypePosition::Covariant || info.assocTypeRef) {
+  if (info.selfRef > TypePosition::Covariant ||
+      info.assocTypeRef > TypePosition::Covariant) {
     return false;
   }
 

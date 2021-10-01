@@ -248,14 +248,19 @@ do {
       { (_: () -> (any P1)?) in }
     )
 
-    arg.covariantAssoc1() // expected-error {{member 'covariantAssoc1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssoc2() // expected-error {{member 'covariantAssoc2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssoc3() // expected-error {{member 'covariantAssoc3' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssoc4() // expected-error {{member 'covariantAssoc4' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssoc5() // expected-error {{member 'covariantAssoc5' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssoc6() // expected-error {{member 'covariantAssoc6' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    _ = arg.covariantAssoc7 // expected-error {{member 'covariantAssoc7' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    _ = arg.covariantAssocComplex // expected-error {{member 'covariantAssocComplex' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+    let _: Any = arg.covariantAssoc1()
+    let _: Any? = arg.covariantAssoc2()
+    let _: Any.Type = arg.covariantAssoc3()
+    let _: (Any, Any) = arg.covariantAssoc4()
+    let _: Array<Any> = arg.covariantAssoc5()
+    let _: [String : Any] = arg.covariantAssoc6()
+    arg.covariantAssoc7 { (_: Any) in }
+    let _: [String : () -> (Any, Any)] = arg.covariantAssocComplex(
+      { (_: Any.Type) in },
+      { (_: Array<Any>) in },
+      { (_: Array<Array<Any>?>) in },
+      { (_: () -> Any?) in }
+    )
 
     let _: any P1 = arg.covariantSelfProp1
     let _: (any P1)? = arg.covariantSelfProp2
@@ -271,14 +276,19 @@ do {
       (() -> (any P1)?) -> Void
     ) -> [String : () -> (any P1, any P1)] = arg.covariantSelfPropComplex
 
-    arg.covariantAssocProp1 // expected-error {{member 'covariantAssocProp1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssocProp2 // expected-error {{member 'covariantAssocProp2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssocProp3 // expected-error {{member 'covariantAssocProp3' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssocProp4 // expected-error {{member 'covariantAssocProp4' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssocProp5 // expected-error {{member 'covariantAssocProp5' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssocProp6 // expected-error {{member 'covariantAssocProp6' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssocProp7 // expected-error {{member 'covariantAssocProp7' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg.covariantAssocPropComplex // expected-error {{member 'covariantAssocPropComplex' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+    let _: Any = arg.covariantAssocProp1
+    let _: Any? = arg.covariantAssocProp2
+    let _: Any.Type = arg.covariantAssocProp3
+    let _: (Any, Any) = arg.covariantAssocProp4
+    let _: Array<Any> = arg.covariantAssocProp5
+    let _: [String : Any] = arg.covariantAssocProp6
+    let _: ((Any) -> Void) -> Void = arg.covariantAssocProp7
+    let _: (
+      (Any.Type) -> Void,
+      (Array<Any>) -> Void,
+      (Array<Array<Any>?>) -> Void,
+      (() -> Any?) -> Void
+    ) -> [String : () -> (Any, Any)] = arg.covariantAssocPropComplex
 
     let _: any P1 = arg[covariantSelfSubscript1: ()]
     let _: (any P1)? = arg[covariantSelfSubscript2: ()]
@@ -294,14 +304,19 @@ do {
       { (_: () -> (any P1)?) in }
     ]
 
-    arg[covariantAssocSubscript1: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg[covariantAssocSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg[covariantAssocSubscript3: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg[covariantAssocSubscript4: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg[covariantAssocSubscript5: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg[covariantAssocSubscript6: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg[covariantAssocSubscript7: { _ in }] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
-    arg[covariantAssocSubscriptComplex: { _ in }, { _ in }, { _ in }, { _ in }] // expected-error {{member 'subscript' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
+    let _: Any = arg[covariantAssocSubscript1: ()]
+    let _: Any? = arg[covariantAssocSubscript2: ()]
+    let _: Any.Type = arg[covariantAssocSubscript3: ()]
+    let _: (Any, Any) = arg[covariantAssocSubscript4: ()]
+    let _: Array<Any> = arg[covariantAssocSubscript5: ()]
+    let _: [String : Any] = arg[covariantAssocSubscript6: ()]
+    let _: Any = arg[covariantAssocSubscript7: { (_: Any) in }]
+    let _: [String : () -> (Any, Any)] = arg[
+      covariantAssocSubscriptComplex: { (_: Any.Type) in },
+      { (_: Array<Any>) in },
+      { (_: Array<Array<Any>?>) in },
+      { (_: () -> Any?) in }
+    ]
 
     arg.contravariantSelf1(0) // expected-error {{member 'contravariantSelf1' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
     arg.contravariantSelf2(0) // expected-error {{member 'contravariantSelf2' cannot be used on value of protocol type 'P1'; use a generic constraint instead}}
@@ -633,36 +648,24 @@ func takesP2(p2: any P2) {
 }
 
 protocol MiscTestsProto {
-  associatedtype Assoc
-  func runce<A>(_: A)
-  func spoon(_: Self)
-
   associatedtype R : IteratorProtocol, Sequence
   func getR() -> R
 
-  subscript(intToAssoc _: Int) -> Assoc { get }
-  subscript(intToInt _: Int) -> Int { get }
+  associatedtype Assoc
+  subscript() -> Assoc { get }
+  var getAssoc: Assoc? { get }
 }
 do {
-  func miscTests(_ arg: any MiscTestsProto) { // ok
-    arg.runce(5)
+  func miscTests(_ arg: any MiscTestsProto) {
+    var r: any Sequence & IteratorProtocol = arg.getR()
+    r.makeIterator() // expected-warning {{result of call to 'makeIterator()' is unused}}
+    // FIXME: We are leaking an implementation detail in this warning.
+    r.next() // expected-warning {{expression of type '(IteratorProtocol & Sequence).Element' is unused}}
+    r.nonexistent() // expected-error {{value of type 'IteratorProtocol & Sequence' has no member 'nonexistent'}}
 
-    do {
-      // FIXME: Crummy diagnostics.
-      var x = arg.getR() // expected-error{{member 'getR' cannot be used on value of protocol type 'MiscTestsProto'; use a generic constraint instead}}
-      x.makeIterator()
-      x.next()
-      x.nonexistent()
-    }
-
-    var _: Int = arg[intToInt: 17]
-    _ = arg[intToAssoc: 17] // expected-error{{member 'subscript' cannot be used on value of protocol type 'MiscTestsProto'; use a generic constraint instead}}
-  }
-
-  func existentialSequence(_ e: any Sequence) {
-    var x = e.makeIterator() // expected-error{{member 'makeIterator' cannot be used on value of protocol type 'Sequence'; use a generic constraint instead}}
-    x.next()
-    x.nonexistent()
+    // FIXME: We are leaking an implementation detail in this warning.
+    arg[] // expected-warning {{expression of type '(MiscTestsProto).Assoc' is unused}}
+    arg.getAssoc // expected-warning {{expression of type '(MiscTestsProto).Assoc' is unused}}
   }
 }
 
@@ -679,7 +682,7 @@ protocol CovariantMetatypes {
   var covariantSelfMetatypeProp1: Self.Type.Type.Type { get }
   var covariantSelfMetatypeProp2: (Self.Type, Self.Type.Type) { get }
 
-  var covariantAssocMetatypeProp1: (Q.Type.Type.Type) -> Void { get }
+  var covariantAssocMetatypeProp1: Q.Type.Type.Type { get }
   var covariantAssocMetatypeProp2: (Q.Type, Q.Type.Type) { get }
 
   subscript(covariantSelfMetatypeSubscript1 _: (Self.Type.Type.Type) -> Void) -> Self.Type { get }
@@ -693,20 +696,20 @@ do {
     arg.covariantSelfMetatype1 { (_: any CovariantMetatypes.Type.Type.Type) in }
     let _: (any CovariantMetatypes.Type, any CovariantMetatypes.Type.Type) = arg.covariantSelfMetatype2()
 
-    arg.covariantAssocMetatype1 // expected-error {{member 'covariantAssocMetatype1' cannot be used on value of protocol type 'CovariantMetatypes'; use a generic constraint instead}}
-    arg.covariantAssocMetatype2 // expected-error {{member 'covariantAssocMetatype2' cannot be used on value of protocol type 'CovariantMetatypes'; use a generic constraint instead}}
+    arg.covariantAssocMetatype1 { (_: Any.Type.Type.Type) in }
+    let _: (Any.Type, Any.Type.Type) = arg.covariantAssocMetatype2()
 
     let _: any CovariantMetatypes.Type.Type.Type = arg.covariantSelfMetatypeProp1
     let _: (any CovariantMetatypes.Type, any CovariantMetatypes.Type.Type) = arg.covariantSelfMetatypeProp2
 
-    arg.covariantAssocMetatypeProp1 // expected-error {{member 'covariantAssocMetatypeProp1' cannot be used on value of protocol type 'CovariantMetatypes'; use a generic constraint instead}}
-    arg.covariantAssocMetatypeProp2 // expected-error {{member 'covariantAssocMetatypeProp2' cannot be used on value of protocol type 'CovariantMetatypes'; use a generic constraint instead}}
+    let _: Any.Type.Type.Type = arg.covariantAssocMetatypeProp1
+    let _: (Any.Type, Any.Type.Type) = arg.covariantAssocMetatypeProp2
 
     let _: any CovariantMetatypes.Type = arg[covariantSelfMetatypeSubscript1: { (_: any CovariantMetatypes.Type.Type.Type) in }]
     let _: (any CovariantMetatypes.Type, any CovariantMetatypes.Type.Type) = arg[covariantSelfMetatypeSubscript2: ()]
 
-    arg[covariantAssocMetatypeSubscript1: { _ in }] // expected-error {{member 'subscript' cannot be used on value of protocol type 'CovariantMetatypes'; use a generic constraint instead}}
-    arg[covariantAssocMetatypeSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of protocol type 'CovariantMetatypes'; use a generic constraint instead}}
+    let _: Any.Type = arg[covariantAssocMetatypeSubscript1: { (_: Any.Type.Type.Type) in }]
+    let _: (Any.Type, Any.Type.Type) = arg[covariantAssocMetatypeSubscript2: ()]
   }
 }
 
@@ -830,4 +833,80 @@ do {
   // of the error type here for Self.A, despite the broken conformance?
   let exist: any CompositionBrokenClassConformance_b & BadConformanceClass
   exist.method(false) // expected-error {{type of expression is ambiguous without more context}}
+}
+
+/// Covariant Associated Type Erasure
+
+class Class2Base {}
+class Class2Derived<T>: Class2Base {}
+protocol CovariantAssocTypeErasure {
+  associatedtype A1
+  associatedtype A2: AnyObject
+  associatedtype A3: CovariantAssocTypeErasure
+  associatedtype A4: Class2Base
+  associatedtype A5: Class2Derived<Self>
+  associatedtype A6: CovariantAssocTypeErasure & Class2Base
+  associatedtype A7: Class2Derived<Self> & CovariantAssocTypeErasure
+
+  associatedtype B1 where B1 == Optional<A1>
+  associatedtype B2 where B2 == (A2, Bool)
+  associatedtype B3 where B3 == A3.Type
+  associatedtype B4 where B4 == Array<A4>
+  associatedtype B5 where B5 == Dictionary<String, A5>
+
+  func method1() -> A1
+  func method2() -> A2
+  func method3() -> A3
+  func method4() -> A4
+  func method5() -> A5
+  func method6() -> A6
+  func method7() -> A7
+
+  func method8() -> B1
+  func method9() -> B2
+  func method10() -> B3
+  func method11() -> B4
+  func method12() -> B5
+}
+protocol CovariantAssocTypeErasureDerived: CovariantAssocTypeErasure
+where A1: CovariantAssocTypeErasureDerived,
+      A2: Class2Base,
+      A3: CovariantAssocTypeErasureDerived,
+      A4: CovariantAssocTypeErasureDerived,
+      A5: CovariantAssocTypeErasureDerived,
+      A6: CovariantAssocTypeErasureDerived,
+      A7: Sequence {}
+do {
+  let exist: any CovariantAssocTypeErasure
+
+  let _: Any = exist.method1()
+  let _: AnyObject = exist.method2()
+  let _: any CovariantAssocTypeErasure = exist.method3()
+  let _: Class2Base = exist.method4()
+  let _: Class2Base = exist.method5()
+  let _: any Class2Base & CovariantAssocTypeErasure = exist.method6()
+  let _: any Class2Base & CovariantAssocTypeErasure = exist.method7()
+
+  let _: Any? = exist.method8()
+  let _: (AnyObject, Bool) = exist.method9()
+  let _: any CovariantAssocTypeErasure.Type = exist.method10()
+  let _: Array<Class2Base> = exist.method11()
+  let _: Dictionary<String, Class2Base> = exist.method12()
+}
+do {
+  let exist: any CovariantAssocTypeErasureDerived
+
+  let _: any CovariantAssocTypeErasureDerived = exist.method1()
+  let _: Class2Base = exist.method2()
+  let _: any CovariantAssocTypeErasureDerived = exist.method3()
+  let _: any Class2Base & CovariantAssocTypeErasureDerived = exist.method4()
+  let _: any Class2Base & CovariantAssocTypeErasureDerived = exist.method5()
+  let _: any Class2Base & CovariantAssocTypeErasureDerived = exist.method6()
+  let _: any Class2Base & CovariantAssocTypeErasure & Sequence = exist.method7()
+
+  let _: (any CovariantAssocTypeErasureDerived)? = exist.method8()
+  let _: (Class2Base, Bool) = exist.method9()
+  let _: any CovariantAssocTypeErasureDerived.Type = exist.method10()
+  let _: Array<any Class2Base & CovariantAssocTypeErasureDerived> = exist.method11()
+  let _: Dictionary<String, any Class2Base & CovariantAssocTypeErasureDerived> = exist.method12()
 }

@@ -439,12 +439,19 @@ bool TypeBase::isSpecialized() {
   return false;
 }
 
-bool TypeBase::hasOpenedExistential(const OpenedArchetypeType *opened) {
+bool TypeBase::hasOpenedExistentialWithRoot(
+    const OpenedArchetypeType *root) const {
+  assert(root->isRoot() && "Expected a root archetype");
+
   if (!hasOpenedExistential())
     return false;
 
   return getCanonicalType().findIf([&](Type type) -> bool {
-    return opened == dyn_cast<OpenedArchetypeType>(type.getPointer());
+    auto *opened = dyn_cast<OpenedArchetypeType>(type.getPointer());
+    if (!opened)
+      return false;
+
+    return opened->getRoot() == root;
   });
 }
 

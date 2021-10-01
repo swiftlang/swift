@@ -621,7 +621,7 @@ public:
 
   /// Determine whether the type involves the given opened existential
   /// archetype.
-  bool hasOpenedExistential(const OpenedArchetypeType *opened);
+  bool hasOpenedExistentialWithRoot(const OpenedArchetypeType *root) const;
 
   /// Determine whether the type involves an opaque type.
   bool hasOpaqueArchetype() const {

@@ -1004,7 +1004,7 @@ namespace {
       // If we had a return type of 'Self', erase it.
       Type resultTy;
       resultTy = cs.getType(result);
-      if (resultTy->hasOpenedExistential(record.Archetype)) {
+      if (resultTy->hasOpenedExistentialWithRoot(record.Archetype)) {
         Type erasedTy =
             resultTy->typeEraseOpenedArchetypesWithRoot(record.Archetype);
         auto range = result->getSourceRange();
