@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation -Xfrontend -requirement-machine=off)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
 // REQUIRES: executable_test
 
 import StdlibUnittest
