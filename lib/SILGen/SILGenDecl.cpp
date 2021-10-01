@@ -69,16 +69,9 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
   // In the address case, we forward the underlying value and store it
   // into memory and then create a +1 cleanup. since we assume here
   // that we have a +1 value since we are forwarding into memory.
-  //
-  // In order to ensure that we properly clean up along any failure paths, we
-  // need to mark value as being persistently active. We then unforward it once
-  // we are done.
   assert(value.isPlusOne(SGF) && "Can not store a +0 value into memory?!");
-  CleanupStateRestorationScope valueScope(SGF.Cleanups);
-  if (value.hasCleanup())
-    valueScope.pushCleanupState(value.getCleanup(),
-                                CleanupState::PersistentlyActive);
-  copyOrInitValueIntoHelper(
+  value = ManagedValue::forUnmanaged(value.forward(SGF));
+  return copyOrInitValueIntoHelper(
       SGF, loc, value, isInit, SubInitializations,
       [&](ManagedValue aggregate, unsigned i,
           SILType fieldType) -> ManagedValue {
@@ -90,8 +83,6 @@ void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
 
         return SGF.emitManagedRValueWithCleanup(elt.getValue());
       });
-  std::move(valueScope).pop();
-  value.forward(SGF);
 }
 
 void TupleInitialization::finishUninitialized(SILGenFunction &SGF) {
