@@ -106,9 +106,9 @@ public:
       argType = argType.getObjectType();
     }
 
-    if (argType != paramType) {
+    if (argType.getASTType() != paramType.getASTType()) {
       // Reabstract the value if necessary.
-      mv = SGF.emitOrigToSubstValue(loc, mv, orig, t);
+      mv = SGF.emitOrigToSubstValue(loc, mv.ensurePlusOne(SGF, loc), orig, t);
     }
 
     // If the value is a (possibly optional) ObjC block passed into the entry

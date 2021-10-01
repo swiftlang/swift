@@ -239,8 +239,16 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleNominalTypeDescriptor(
                                         cast<NominalTypeDecl>(getDecl()));
 
+  case Kind::NominalTypeDescriptorRecord:
+    return mangler.mangleNominalTypeDescriptorRecord(
+                                        cast<NominalTypeDecl>(getDecl()));
+
   case Kind::OpaqueTypeDescriptor:
     return mangler.mangleOpaqueTypeDescriptor(cast<OpaqueTypeDecl>(getDecl()));
+
+  case Kind::OpaqueTypeDescriptorRecord:
+    return mangler.mangleOpaqueTypeDescriptorRecord(
+        cast<OpaqueTypeDecl>(getDecl()));
 
   case Kind::OpaqueTypeDescriptorAccessor:
     return mangler.mangleOpaqueTypeDescriptorAccessor(
@@ -273,6 +281,9 @@ std::string LinkEntity::mangleAsString() const {
 
   case Kind::ProtocolDescriptor:
     return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
+
+  case Kind::ProtocolDescriptorRecord:
+    return mangler.mangleProtocolDescriptorRecord(cast<ProtocolDecl>(getDecl()));
 
   case Kind::ProtocolRequirementsBaseDescriptor:
     return mangler.mangleProtocolRequirementsBaseDescriptor(
@@ -307,6 +318,10 @@ std::string LinkEntity::mangleAsString() const {
 
   case Kind::ProtocolConformanceDescriptor:
     return mangler.mangleProtocolConformanceDescriptor(
+                                                  getRootProtocolConformance());
+
+  case Kind::ProtocolConformanceDescriptorRecord:
+    return mangler.mangleProtocolConformanceDescriptorRecord(
                                                   getRootProtocolConformance());
 
   case Kind::EnumCase:
@@ -673,11 +688,14 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
   case Kind::NominalTypeDescriptor:
+  case Kind::NominalTypeDescriptorRecord:
   case Kind::ClassMetadataBaseOffset:
   case Kind::ProtocolDescriptor:
+  case Kind::ProtocolDescriptorRecord:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
   case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorRecord:
   case Kind::OpaqueTypeDescriptorAccessor:
   case Kind::OpaqueTypeDescriptorAccessorImpl:
   case Kind::OpaqueTypeDescriptorAccessorKey:
@@ -695,6 +713,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptorRecord:
     return getLinkageForProtocolConformance(getRootProtocolConformance(),
                                             forDefinition);
 
@@ -820,6 +839,9 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::TypeMetadataInstantiationFunction:
   case Kind::TypeMetadataSingletonInitializationCache:
   case Kind::TypeMetadataCompletionFunction:
+  case Kind::NominalTypeDescriptorRecord:
+  case Kind::OpaqueTypeDescriptorRecord:
+  case Kind::ProtocolDescriptorRecord:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::AssociatedTypeDescriptor:
   case Kind::AssociatedConformanceDescriptor:
@@ -833,6 +855,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::ReflectionAssociatedTypeDescriptor:
   case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptorRecord:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::ValueWitness:
@@ -872,18 +895,22 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::ExtensionDescriptor:
   case Kind::AnonymousDescriptor:
   case Kind::NominalTypeDescriptor:
+  case Kind::NominalTypeDescriptorRecord:
   case Kind::PropertyDescriptor:
     return IGM.TypeContextDescriptorTy;
   case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorRecord:
     return IGM.OpaqueTypeDescriptorTy;
   case Kind::ProtocolDescriptor:
     return IGM.ProtocolDescriptorStructTy;
   case Kind::AssociatedTypeDescriptor:
   case Kind::AssociatedConformanceDescriptor:
   case Kind::BaseConformanceDescriptor:
+  case Kind::ProtocolDescriptorRecord:
   case Kind::ProtocolRequirementsBaseDescriptor:
     return IGM.ProtocolRequirementStructTy;
   case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptorRecord:
     return IGM.ProtocolConformanceDescriptorTy;
   case Kind::ObjCClassRef:
     return IGM.ObjCClassPtrTy;
@@ -993,11 +1020,14 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::ExtensionDescriptor:
   case Kind::AnonymousDescriptor:
   case Kind::NominalTypeDescriptor:
+  case Kind::NominalTypeDescriptorRecord:
   case Kind::ProtocolDescriptor:
+  case Kind::ProtocolDescriptorRecord:
   case Kind::AssociatedTypeDescriptor:
   case Kind::AssociatedConformanceDescriptor:
   case Kind::BaseConformanceDescriptor:
   case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptorRecord:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
@@ -1008,6 +1038,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator:
   case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorRecord:
     return Alignment(4);
   case Kind::AsyncFunctionPointer:
   case Kind::DispatchThunkAsyncFunctionPointer:
@@ -1104,14 +1135,17 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ClassMetadataBaseOffset:
   case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
+  case Kind::NominalTypeDescriptorRecord:
   case Kind::ModuleDescriptor:
   case Kind::ProtocolDescriptor:
+  case Kind::ProtocolDescriptorRecord:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::AssociatedTypeDescriptor:
   case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::DynamicallyReplaceableFunctionVariableAST:
   case Kind::DynamicallyReplaceableFunctionImpl:
   case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorRecord:
   case Kind::OpaqueTypeDescriptorAccessor:
   case Kind::OpaqueTypeDescriptorAccessorImpl:
   case Kind::OpaqueTypeDescriptorAccessorKey:
@@ -1123,6 +1157,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
 
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptorRecord:
     return getProtocolConformance()->getRootConformance()
                                    ->isWeakImported(module);
 
@@ -1200,12 +1235,14 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::ClassMetadataBaseOffset:
   case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
+  case Kind::NominalTypeDescriptorRecord:
   case Kind::TypeMetadataPattern:
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
   case Kind::TypeMetadataSingletonInitializationCache:
   case Kind::TypeMetadataCompletionFunction:
   case Kind::ProtocolDescriptor:
+  case Kind::ProtocolDescriptorRecord:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::AssociatedTypeDescriptor:
   case Kind::AssociatedConformanceDescriptor:
@@ -1215,6 +1252,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::DynamicallyReplaceableFunctionImpl:
   case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorRecord:
   case Kind::OpaqueTypeDescriptorAccessor:
   case Kind::OpaqueTypeDescriptorAccessorImpl:
   case Kind::OpaqueTypeDescriptorAccessorKey:
@@ -1238,6 +1276,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
     
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptorRecord:
     return getRootProtocolConformance()->getDeclContext();
 
   case Kind::ProtocolWitnessTablePattern:

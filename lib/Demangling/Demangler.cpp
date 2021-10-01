@@ -793,6 +793,18 @@ recur:
       case 'p':
         return createWithChild(
             Node::Kind::ProtocolConformanceRefInProtocolModule, popProtocol());
+
+      // Runtime records (type/protocol/conformance)
+      case 'c':
+        return createWithChild(Node::Kind::ProtocolConformanceDescriptorRecord,
+                               popProtocolConformance());
+      case 'n':
+        return createWithPoppedType(Node::Kind::NominalTypeDescriptorRecord);
+      case 'o': // XXX
+        return createWithChild(Node::Kind::OpaqueTypeDescriptorRecord, popNode());
+      case 'r':
+        return createWithChild(Node::Kind::ProtocolDescriptorRecord, popProtocol());
+
       default:
         pushBack();
         pushBack();
