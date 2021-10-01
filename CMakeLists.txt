@@ -498,7 +498,7 @@ endif()
 # Use dispatch as the system scheduler by default.
 # For convenience, we set this to false when concurrency is disabled.
 set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
-if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY AND NOT SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY AND "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
   set(SWIFT_CONCURRENCY_USES_DISPATCH TRUE)
 endif()
 

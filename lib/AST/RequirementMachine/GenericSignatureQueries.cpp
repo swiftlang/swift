@@ -523,7 +523,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
 
     if (CurrentConformanceAccessPaths.empty()) {
       llvm::errs() << "Failed to find conformance access path for ";
-      llvm::errs() << type << " " << protocol->getName() << "\n:";
+      llvm::errs() << type << " " << protocol->getName() << ":\n";
       type.dump(llvm::errs());
       llvm::errs() << "\n";
       dump(llvm::errs());
