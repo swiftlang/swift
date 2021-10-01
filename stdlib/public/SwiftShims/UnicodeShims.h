@@ -432,7 +432,6 @@ typedef enum __swift_stdlib_UNumericType {
 
 typedef struct __swift_stdlib_UBreakIterator __swift_stdlib_UBreakIterator;
 typedef struct __swift_stdlib_UText __swift_stdlib_UText;
-typedef struct __swift_stdlib_UNormalizer2 __swift_stdlib_UNormalizer2;
 typedef __swift_int8_t __swift_stdlib_UBool;
 typedef __swift_int32_t __swift_stdlib_UChar32;
 #if defined(__APPLE__)
@@ -488,27 +487,6 @@ __swift_int32_t __swift_stdlib_ubrk_preceding(__swift_stdlib_UBreakIterator *bi,
 SWIFT_RUNTIME_STDLIB_API
 __swift_int32_t __swift_stdlib_ubrk_following(__swift_stdlib_UBreakIterator *bi,
                                               __swift_int32_t offset);
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_stdlib_UBool
-__swift_stdlib_unorm2_hasBoundaryBefore(const __swift_stdlib_UNormalizer2 *,
-                                        __swift_stdlib_UChar32);
-
-SWIFT_RUNTIME_STDLIB_API
-const __swift_stdlib_UNormalizer2 *
-__swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *);
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t
-__swift_stdlib_unorm2_normalize(const __swift_stdlib_UNormalizer2 *,
-                                const __swift_stdlib_UChar *, __swift_int32_t,
-                                __swift_stdlib_UChar *, __swift_int32_t,
-                                __swift_stdlib_UErrorCode *);
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t __swift_stdlib_unorm2_spanQuickCheckYes(
-    const __swift_stdlib_UNormalizer2 *, const __swift_stdlib_UChar *,
-    __swift_int32_t, __swift_stdlib_UErrorCode *);
 
 SWIFT_RUNTIME_STDLIB_API
 __swift_stdlib_UBool
