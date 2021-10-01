@@ -4329,6 +4329,12 @@ NOTE(note_add_async_to_function,none,
 NOTE(note_add_nonisolated_to_decl,none,
      "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
+NOTE(note_add_distributed_to_decl,none,
+     "add 'distributed' to %0 to make this %1 witness the protocol requirement",
+     (DeclName, DescriptiveDeclKind))
+NOTE(note_distributed_requirement_defined_here,none,
+     "distributed function requirement %0 declared here",
+     (DeclName))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
      (StringRef, DescriptiveDeclKind, DeclName, Type))
@@ -4398,8 +4404,8 @@ ERROR(actor_isolated_non_self_reference,none,
         "from the main actor|from a non-isolated context}3",
         (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
 ERROR(distributed_actor_isolated_non_self_reference,none,
-      "distributed actor-isolated %0 %1 can only be referenced "
-      "inside the distributed actor",
+      "distributed actor-isolated %0 %1 can only be referenced inside the "
+      "distributed actor",
       (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'_Distributed' module not imported, required for 'distributed actor'",

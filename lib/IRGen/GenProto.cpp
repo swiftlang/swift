@@ -2193,8 +2193,13 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
     break;
   case SILLinkage::Public:
   default:
-    global->setVCallVisibilityMetadata(
-        llvm::GlobalObject::VCallVisibility::VCallVisibilityPublic);
+    if (IGM.getOptions().InternalizeAtLink) {
+      global->setVCallVisibilityMetadata(
+          llvm::GlobalObject::VCallVisibility::VCallVisibilityLinkageUnit);
+    } else {
+      global->setVCallVisibilityMetadata(
+          llvm::GlobalObject::VCallVisibility::VCallVisibilityPublic);
+    }
     break;
   }
 }

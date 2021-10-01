@@ -118,7 +118,7 @@ public:
 
     /// References to declarations that are part of a distributed actor are
     /// only permitted if they are async.
-    DistributedActorSelf,
+    CrossDistributedActorSelf, // FIXME(distributed): remove this case entirely rdar://83713366
   };
 
 private:
@@ -150,7 +150,7 @@ public:
   NominalTypeDecl *getActorType() const {
     assert(kind == ActorSelf || 
            kind == CrossActorSelf || 
-           kind == DistributedActorSelf);
+           kind == CrossDistributedActorSelf);
     return data.actorType;
   }
 
@@ -174,6 +174,7 @@ public:
   /// the current actor or is a cross-actor access.
   static ActorIsolationRestriction forActorSelf(
       NominalTypeDecl *actor, bool isCrossActor) {
+
     ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf,
                                      isCrossActor);
     result.data.actorType = actor;
@@ -184,7 +185,8 @@ public:
   /// the current actor.
   static ActorIsolationRestriction forDistributedActorSelf(
       NominalTypeDecl *actor, bool isCrossActor) {
-    ActorIsolationRestriction result(DistributedActorSelf, isCrossActor);
+    ActorIsolationRestriction result(isCrossActor ? CrossActorSelf : ActorSelf,
+                                     isCrossActor);
     result.data.actorType = actor;
     return result;
   }

@@ -325,7 +325,7 @@ internal struct _SliceBuffer<Element>
       return false
     }
     if Bool(Builtin.beginCOWMutation(&owner)) {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
       nativeBuffer.isImmutable = false
 #endif
       return true
@@ -342,7 +342,7 @@ internal struct _SliceBuffer<Element>
   @_alwaysEmitIntoClient
   @inline(__always)
   internal mutating func endCOWMutation() {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     nativeBuffer.isImmutable = true
 #endif
     Builtin.endCOWMutation(&owner)

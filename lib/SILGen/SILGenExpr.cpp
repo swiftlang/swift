@@ -158,34 +158,30 @@ SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
   return emitManagedBorrowedRValueWithCleanup(v, bbi, lowering);
 }
 
-namespace {
-
-struct EndBorrowCleanup : Cleanup {
-  SILValue borrowedValue;
-
-  EndBorrowCleanup(SILValue borrowedValue) : borrowedValue(borrowedValue) {
-    if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
-      if (auto *ti = arg->getSingleTerminator()) {
-        assert(!ti->isTransformationTerminator() &&
-               "Transforming terminators do not have end_borrow");
-      }
+EndBorrowCleanup::EndBorrowCleanup(SILValue borrowedValue)
+    : borrowedValue(borrowedValue) {
+  if (auto *arg = dyn_cast<SILPhiArgument>(borrowedValue)) {
+    if (auto *ti = arg->getSingleTerminator()) {
+      assert(!ti->isTransformationTerminator() &&
+             "Transforming terminators do not have end_borrow");
     }
   }
+}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l,
-            ForUnwind_t forUnwind) override {
-    SGF.B.createEndBorrow(l, borrowedValue);
-  }
+void EndBorrowCleanup::emit(SILGenFunction &SGF, CleanupLocation l,
+                            ForUnwind_t forUnwind) {
+  SGF.B.createEndBorrow(l, borrowedValue);
+}
 
-  void dump(SILGenFunction &) const override {
+void EndBorrowCleanup::dump(SILGenFunction &) const {
 #ifndef NDEBUG
-    llvm::errs() << "EndBorrowCleanup "
-                 << "State:" << getState() << "\n"
-                 << "borrowed:" << borrowedValue
-                 << "\n";
+  llvm::errs() << "EndBorrowCleanup "
+               << "State:" << getState() << "\n"
+               << "borrowed:" << borrowedValue << "\n";
 #endif
-  }
-};
+}
+
+namespace {
 
 struct FormalEvaluationEndBorrowCleanup : Cleanup {
   FormalEvaluationContext::stable_iterator Depth;

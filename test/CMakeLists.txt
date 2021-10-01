@@ -160,6 +160,11 @@ if (SWIFT_TEST_USE_LEAKS)
   list(APPEND SWIFT_LIT_ARGS "--param" "leaks-all")
 endif()
 
+if (SWIFT_ENABLE_ARRAY_COW_CHECKS)
+  list(APPEND SWIFT_LIT_ARGS
+       "--param" "array_cow_checks")
+endif()
+
 if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
   list(APPEND SWIFT_LIT_ARGS
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
