@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/Basic/DAGNodeWorklist.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/DAGNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
@@ -159,8 +160,7 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 //
 // Skip over nested borrow scopes. Their scope-ending instructions are their use
 // points. Transitively find all nested scope-ending instructions by looking
-// through nested reborrows. Nested reborrows are not use points and \p
-// visitReborrow is not called for them.
+// through nested reborrows. Nested reborrows are not use points.
 bool swift::findInnerTransitiveGuaranteedUses(
     SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints) {
 
@@ -175,10 +175,10 @@ bool swift::findInnerTransitiveGuaranteedUses(
   //
   // TODO: The worklist can be a simple vector without any a membership check if
   // destructures are changed to be represented as reborrows. Currently a
-  // destructure forwards multiple results! This means that usePoints could grow
-  // exponentially without the membership check. It's fine to do this membership
-  // check locally in this function (within a borrow scope) because it isn't
-  // needed for the immediate uses, only the transitive uses.
+  // destructure forwards multiple results! This means that the worklist could
+  // grow exponentially without the membership check. It's fine to do this
+  // membership check locally in this function (within a borrow scope) because
+  // it isn't needed for the immediate uses, only the transitive uses.
   DAGNodeWorklist<Operand *, 8> worklist;
   for (Operand *use : guaranteedValue->getUses()) {
     if (use->getOperandOwnership() != OperandOwnership::NonUse)
@@ -220,7 +220,8 @@ bool swift::findInnerTransitiveGuaranteedUses(
       // If our base guaranteed value does not have any consuming uses (consider
       // function arguments), we need to be sure to include interior pointer
       // operands since we may not get a use from a end_scope instruction.
-      if (!InteriorPointerOperand(use).findTransitiveUses(usePoints)) {
+      if (InteriorPointerOperand(use).findTransitiveUses(usePoints)
+          != AddressUseKind::NonEscaping) {
         return false;
       }
 #endif
@@ -252,6 +253,7 @@ bool swift::findInnerTransitiveGuaranteedUses(
         leafUse(endUse);
         return true;
       });
+      break;
     }
   }
   return true;
@@ -720,16 +722,34 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
   return true;
 }
 
-bool swift::findTransitiveUsesForAddress(
-    SILValue projectedAddress, SmallVectorImpl<Operand *> *foundUses,
-    std::function<void(Operand *)> *onError) {
+AddressUseKind
+swift::findTransitiveUsesForAddress(SILValue projectedAddress,
+                                    SmallVectorImpl<Operand *> *foundUses,
+                                    std::function<void(Operand *)> *onError) {
+  // If the projectedAddress is dead, it is itself a leaf use. Since we don't
+  // have an operand for it, simply bail. Dead projectedAddress is unexpected.
+  //
+  // TODO: store_borrow is currently an InteriorPointer with no uses, so we end
+  // up bailing. It should be in a dependence scope instead. It's not clear why
+  // it produces an address at all.
+  if (projectedAddress->use_empty())
+    return AddressUseKind::PointerEscape;
+
   SmallVector<Operand *, 8> worklist(projectedAddress->getUses());
 
-  bool foundError = false;
+  AddressUseKind result = AddressUseKind::NonEscaping;
 
   auto leafUse = [foundUses](Operand *use) {
     if (foundUses)
       foundUses->push_back(use);
+  };
+  auto transitiveResultUses = [&](Operand *use) {
+    auto *svi = cast<SingleValueInstruction>(use->getUser());
+    if (svi->use_empty()) {
+      leafUse(use);
+    } else {
+      worklist.append(svi->use_begin(), svi->use_end());
+    }
   };
 
   while (!worklist.empty()) {
@@ -744,21 +764,32 @@ bool swift::findTransitiveUsesForAddress(
     // loop that we didn't recognize the user.
     auto *user = op->getUser();
 
+    // TODO: Partial apply should be NonEscaping, but then we need to consider
+    // the apply to be a use point.
+    if (isa<PartialApplyInst>(user) || isa<AddressToPointerInst>(user)) {
+      result = meet(result, AddressUseKind::PointerEscape);
+      continue;
+    }
     // First, eliminate "end point uses" that we just need to check liveness at
     // and do not need to check transitive uses of.
-    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
-        isIncidentalUse(user) || isa<StoreInst>(user) ||
-        isa<PartialApplyInst>(user) || isa<DestroyAddrInst>(user) ||
-        isa<AssignInst>(user) || isa<AddressToPointerInst>(user) ||
-        isa<YieldInst>(user) || isa<LoadUnownedInst>(user) ||
-        isa<StoreUnownedInst>(user) || isa<EndApplyInst>(user) ||
-        isa<LoadWeakInst>(user) || isa<StoreWeakInst>(user) ||
-        isa<AssignByWrapperInst>(user) || isa<BeginUnpairedAccessInst>(user) ||
-        isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
-        isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
-        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
-        isa<IsUniqueInst>(user)) {
+    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) || isIncidentalUse(user)
+        || isa<StoreInst>(user) || isa<DestroyAddrInst>(user)
+        || isa<AssignInst>(user) || isa<YieldInst>(user)
+        || isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user)
+        || isa<EndApplyInst>(user) || isa<LoadWeakInst>(user)
+        || isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user)
+        || isa<BeginUnpairedAccessInst>(user)
+        || isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user)
+        || isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user)
+        || isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)
+        || isa<IsUniqueInst>(user)) {
       leafUse(op);
+      continue;
+    }
+
+    if (isa<UnconditionalCheckedCastAddrInst>(user)
+        || isa<MarkFunctionEscapeInst>(user)) {
+      assert(!user->hasResults());
       continue;
     }
 
@@ -769,12 +800,8 @@ bool swift::findTransitiveUsesForAddress(
         isa<InitExistentialAddrInst>(user) || isa<InitEnumDataAddrInst>(user) ||
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
         isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
-        isa<UnconditionalCheckedCastAddrInst>(user) ||
-        isa<UncheckedAddrCastInst>(user)
-        || isa<MarkFunctionEscapeInst>(user)) {
-      for (SILValue r : user->getResults()) {
-        llvm::copy(r->getUses(), std::back_inserter(worklist));
-      }
+        isa<UncheckedAddrCastInst>(user)) {
+      transitiveResultUses(op);
       continue;
     }
 
@@ -790,8 +817,11 @@ bool swift::findTransitiveUsesForAddress(
     // If we have a load_borrow, add it's end scope to the liveness requirement.
     if (auto *lbi = dyn_cast<LoadBorrowInst>(user)) {
       if (foundUses) {
-        transform(lbi->getEndBorrows(), std::back_inserter(*foundUses),
-                  [](EndBorrowInst *ebi) { return &ebi->getAllOperands()[0]; });
+        for (Operand *use : lbi->getUses()) {
+          if (use->endsLocalBorrowScope()) {
+            leafUse(use);
+          }
+        }
       }
       continue;
     }
@@ -799,8 +829,14 @@ bool swift::findTransitiveUsesForAddress(
     // TODO: Merge this into the full apply site code below.
     if (auto *beginApply = dyn_cast<BeginApplyInst>(user)) {
       if (foundUses) {
-        llvm::copy(beginApply->getTokenResult()->getUses(),
-                   std::back_inserter(*foundUses));
+        // TODO: the empty check should not be needed when dead begin_apply is
+        // disallowed.
+        if (beginApply->getTokenResult()->use_empty()) {
+          leafUse(op);
+        } else {
+          llvm::copy(beginApply->getTokenResult()->getUses(),
+                     std::back_inserter(*foundUses));
+        }
       }
       continue;
     }
@@ -818,7 +854,7 @@ bool swift::findTransitiveUsesForAddress(
       }
 
       // If we are the value use, look through it.
-      llvm::copy(mdi->getUses(), std::back_inserter(worklist));
+      transitiveResultUses(op);
       continue;
     }
 
@@ -826,12 +862,9 @@ bool swift::findTransitiveUsesForAddress(
     if (onError) {
       (*onError)(op);
     }
-    foundError = true;
+    result = AddressUseKind::Unknown;
   }
-
-  // We were able to recognize all of the uses of the address, so return false
-  // that we did not find any errors.
-  return !foundError;
+  return result;
 }
 
 //===----------------------------------------------------------------------===//

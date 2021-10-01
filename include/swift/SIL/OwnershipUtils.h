@@ -663,12 +663,19 @@ bool getAllBorrowIntroducingValues(SILValue value,
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
 BorrowedValue getSingleBorrowIntroducingValue(SILValue inputValue);
 
+enum class AddressUseKind { NonEscaping, PointerEscape, Unknown };
+
+inline AddressUseKind meet(AddressUseKind lhs, AddressUseKind rhs) {
+  return (lhs > rhs) ? lhs : rhs;
+}
+
 /// The algorithm that is used to determine what the verifier will consider to
 /// be transitive uses of the given address. Used to implement \see
 /// findTransitiveUses.
-bool findTransitiveUsesForAddress(
-    SILValue address, SmallVectorImpl<Operand *> *foundUses = nullptr,
-    std::function<void(Operand *)> *onError = nullptr);
+AddressUseKind
+findTransitiveUsesForAddress(SILValue address,
+                             SmallVectorImpl<Operand *> *foundUses = nullptr,
+                             std::function<void(Operand *)> *onError = nullptr);
 
 class InteriorPointerOperandKind {
 public:
@@ -845,8 +852,9 @@ struct InteriorPointerOperand {
   /// of the instruction's operand. The uses of that address act as liveness
   /// requirements to ensure that the underlying class is alive at all use
   /// points.
-  bool findTransitiveUses(SmallVectorImpl<Operand *> *foundUses = nullptr,
-                          std::function<void(Operand *)> *onError = nullptr) {
+  AddressUseKind
+  findTransitiveUses(SmallVectorImpl<Operand *> *foundUses = nullptr,
+                     std::function<void(Operand *)> *onError = nullptr) {
     return findTransitiveUsesForAddress(getProjectedAddress(), foundUses,
                                         onError);
   }
@@ -916,7 +924,7 @@ struct AddressOwnership {
   }
 
   /// Transitively compute uses of this base address.
-  bool findTransitiveUses(SmallVectorImpl<Operand *> &foundUses) {
+  AddressUseKind findTransitiveUses(SmallVectorImpl<Operand *> &foundUses) {
     return findTransitiveUsesForAddress(base.getBaseAddress(), &foundUses);
   }
 
