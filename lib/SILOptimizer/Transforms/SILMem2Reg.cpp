@@ -342,10 +342,10 @@ beginLexicalLifetimeAtStore(AllocStackInst *asi, StoreInst *si,
 /// They should be added after the value is done being used.  If the value is
 /// ever used, that means after the last use.  Otherwise, it means immediately
 /// after the definition.
-void endLexicalLifetimeInBlock(AllocStackInst *asi, SILBasicBlock *bb,
-                               SILBuilderContext &ctx, DominanceInfo *domInfo,
-                               SILValue copy, SILValue borrow,
-                               SILValue original) {
+static void endLexicalLifetimeInBlock(AllocStackInst *asi, SILBasicBlock *bb,
+                                      SILBuilderContext &ctx,
+                                      DominanceInfo *domInfo, SILValue copy,
+                                      SILValue borrow, SILValue original) {
   assert(shouldAddLexicalLifetime(asi));
   SILInstruction *lastInst = nullptr;
   if (auto *cvi = copy->getDefiningInstruction()) {
