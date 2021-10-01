@@ -399,8 +399,8 @@ void sourcekitd::handleRequest(sourcekitd_object_t Req,
 }
 
 void sourcekitd::cancelRequest(SourceKitCancellationToken CancellationToken) {
-  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.cancelRequest(CancellationToken);
+  getGlobalContext().getSlowRequestSimulator()->cancel(CancellationToken);
+  getGlobalContext().getSwiftLangSupport().cancelRequest(CancellationToken);
 }
 
 static std::unique_ptr<llvm::MemoryBuffer> getInputBufForRequest(
@@ -472,6 +472,16 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   ++numRequests;
 
   RequestDict Req(ReqObj);
+
+  if (auto SimulateLongRequestDuration =
+          Req.getOptionalInt64(KeySimulateLongRequest)) {
+    if (!getGlobalContext().getSlowRequestSimulator()->simulateLongRequest(
+            *SimulateLongRequestDuration, CancellationToken)) {
+      Rec(createErrorRequestCancelled());
+      return;
+    }
+  }
+
   sourcekitd_uid_t ReqUID = Req.getUID(KeyRequest);
   if (!ReqUID)
     return Rec(createErrorRequestInvalid("missing 'key.request' with UID value"));

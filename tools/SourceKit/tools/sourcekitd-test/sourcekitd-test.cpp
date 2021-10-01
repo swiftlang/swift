@@ -1137,6 +1137,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyCancelOnSubsequentRequest,
                                             *Opts.CancelOnSubsequentRequest);
   }
+  if (Opts.SimulateLongRequest.hasValue()) {
+    sourcekitd_request_dictionary_set_int64(Req, KeySimulateLongRequest,
+                                            *Opts.SimulateLongRequest);
+  }
 
   if (!Opts.SwiftVersion.empty()) {
     if (Opts.PassVersionAsString) {
