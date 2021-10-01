@@ -35,12 +35,10 @@
 
 #include "swift/Runtime/Config.h"
 
-SWIFT_RUNTIME_ATTRIBUTE_NORETURN
-inline static void swift_unreachable(const char *msg) {
-  assert(false && msg);
-  (void)msg;
-  abort();
-}
+#define swift_unreachable(msg)  do { \
+    assert(false && (msg));          \
+    abort();                         \
+  } while (0)
 
 #endif
 
