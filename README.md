@@ -25,7 +25,7 @@
 |**[Windows 2019 (VS 2017)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_windows_2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64)|
 |**[Windows 2019 (VS 2019)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/main/nodes/x86_64_windows_2019_VS2019.json)** | x86_64 | [![Build Status](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-windows-x86_64-vs2019)|
 
-## Welcome to Swift
+## Introduction to Swift
 
 Swift is a high-performance system programming language.  It has a clean
 and modern syntax, offers seamless access to existing C and Objective-C code
@@ -36,6 +36,12 @@ C-derived language. As a complete and independent language, Swift packages core
 features like flow control, data structures, and functions, with high-level
 constructs like objects, protocols, closures, and generics. Swift embraces
 modules, eliminating the need for headers and the code duplication they entail.
+
+Announced in 2014, the Swift programming language has quickly become one of the fastest growing languages in history.
+Swift makes it easy to write software that is incredibly fast and safe by design
+Swift is a powerful and intuitive programming language for iOS, iPadOS, macOS, tvOS, and watchOS.
+Writing Swift code is interactive and fun, the syntax is concise yet expressive, and Swift includes modern features developers love. 
+Swift code is safe by design, yet also produces software that runs lightning-fast.
 
 To learn more about the programming language, visit [swift.org](https://swift.org/documentation/).
 
