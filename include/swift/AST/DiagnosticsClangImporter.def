@@ -96,5 +96,7 @@ WARNING(import_multiple_mainactor_attr,none,
 
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
+WARNING(function_not_imported_type_not_available, none, "function '%0' not imported: type '%1' is unavailable in Swift", (StringRef, StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

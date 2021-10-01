@@ -151,6 +151,7 @@ namespace {
   struct ImportResult {
     Type AbstractType;
     ImportHint Hint;
+    Optional<ImportFailureDiagnostic> FailureDiagnosticInfo;
 
     /*implicit*/ ImportResult(Type type = Type(),
                               ImportHint hint = ImportHint::None)
@@ -159,6 +160,10 @@ namespace {
     /*implicit*/ ImportResult(TypeBase *type,
                               ImportHint hint = ImportHint::None)
       : AbstractType(type), Hint(hint) {}
+
+    ImportResult(ImportFailureDiagnostic failureDiagnosticInfo)
+        : AbstractType(Type()), Hint(ImportHint::None),
+          FailureDiagnosticInfo(failureDiagnosticInfo) {}
 
     explicit operator bool() const { return (bool) AbstractType; }
   };
@@ -688,7 +693,7 @@ namespace {
       if (auto *category =
             dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
         auto ext = cast_or_null<ExtensionDecl>(
-            Impl.importDecl(category, Impl.CurrentVersion));
+            Impl.importDecl(category, Impl.CurrentVersion).payload);
         if (!ext)
           return ImportResult();
         genericSig = ext->getGenericSignature();
@@ -738,7 +743,7 @@ namespace {
 
       // Import the underlying declaration.
       auto decl = dyn_cast_or_null<TypeDecl>(
-          Impl.importDecl(type->getDecl(), Impl.CurrentVersion));
+          Impl.importDecl(type->getDecl(), Impl.CurrentVersion).payload);
 
       // If that fails, fall back on importing the underlying type.
       if (!decl) return Visit(type->desugar());
@@ -894,7 +899,7 @@ namespace {
 
     ImportResult VisitRecordType(const clang::RecordType *type) {
       auto decl = dyn_cast_or_null<TypeDecl>(
-          Impl.importDecl(type->getDecl(), Impl.CurrentVersion));
+          Impl.importDecl(type->getDecl(), Impl.CurrentVersion).payload);
       if (!decl)
         return nullptr;
 
@@ -926,7 +931,7 @@ namespace {
       case EnumKind::Unknown:
       case EnumKind::Options: {
         auto decl = dyn_cast_or_null<TypeDecl>(
-            Impl.importDecl(clangDecl, Impl.CurrentVersion));
+            Impl.importDecl(clangDecl, Impl.CurrentVersion).payload);
         if (!decl)
           return nullptr;
 
@@ -1361,6 +1366,11 @@ static ImportedType adjustTypeForConcreteImport(
     return {importedType, false};
   }
 
+  if (!importResult && importResult.FailureDiagnosticInfo)
+    return {Type(), false,
+            ImportFailureDiagnosticsCollection(
+                {*importResult.FailureDiagnosticInfo})};
+
   // If we completely failed to import the type, give up now.
   // Special-case for 'void' which is valid in result positions.
   if (!importedType && hint != ImportHint::Void)
@@ -1791,11 +1801,23 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   }
 
   // Import the result type.
-  return importType(clangDecl->getReturnType(),
-                    (isAuditedResult ? ImportTypeKind::AuditedResult
-                                     : ImportTypeKind::Result),
-                    allowNSUIntegerAsInt, Bridgeability::Full,
-                    OptionalityOfReturn);
+  ImportedType retval = importType(
+      clangDecl->getReturnType(),
+      (isAuditedResult ? ImportTypeKind::AuditedResult
+                       : ImportTypeKind::Result),
+      allowNSUIntegerAsInt, Bridgeability::Full, OptionalityOfReturn);
+
+  if (SwiftContext.LangOpts.EnableExperimentalClangImporterDiagnostics &&
+      retval.failureDiagnostics) {
+    // If any diagnostics were attached, replaced the empty
+    // type with Any, allowing a function stub to be generated.
+    // The function stub will be marked unavailable.
+    assert(!retval.getType());
+    retval = {SwiftContext.TheAnyType, retval.isImplicitlyUnwrapped(),
+              retval.failureDiagnostics};
+  }
+
+  return retval;
 }
 
 static Type
@@ -1846,19 +1868,29 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
 
   Type swiftResultTy = importedType.getType();
   ArrayRef<Identifier> argNames = name.getArgumentNames();
-  parameterList = importFunctionParameterList(dc, clangDecl, params, isVariadic,
-                                              allowNSUIntegerAsInt, argNames,
-                                              genericParams, swiftResultTy);
+
+  diagnostic::ImportResult<ParameterList> importedParameterList =
+      importFunctionParameterList(dc, clangDecl, params, isVariadic,
+                                  allowNSUIntegerAsInt, argNames,
+                                  genericParams, swiftResultTy);
+  parameterList = importedParameterList.payload;
+
+  ImportFailureDiagnosticsCollection failureDiagnostics;
+  failureDiagnostics.append(importedType.failureDiagnostics);
+  failureDiagnostics.append(importedParameterList.diagnostics);
+
   if (!parameterList)
     return {Type(), false};
 
   if (clangDecl->isNoReturn())
     swiftResultTy = SwiftContext.getNeverType();
 
-  return {swiftResultTy, importedType.isImplicitlyUnwrapped()};
+  return {swiftResultTy, importedType.isImplicitlyUnwrapped(),
+          failureDiagnostics};
 }
 
-ParameterList *ClangImporter::Implementation::importFunctionParameterList(
+diagnostic::ImportResult<ParameterList>
+ClangImporter::Implementation::importFunctionParameterList(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
@@ -1894,6 +1926,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       parameters.push_back(param);
     }
   }
+
+  ImportFailureDiagnosticsCollection failureDiagnostics;
 
   for (auto param : params) {
     auto paramTy = param->getType();
@@ -1941,6 +1975,22 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       }
       auto importedType = importType(paramTy, importKind, allowNSUIntegerAsInt,
                                      Bridgeability::Full, OptionalityOfParam);
+
+      if (SwiftContext.LangOpts.EnableExperimentalClangImporterDiagnostics &&
+          importedType.failureDiagnostics.size()) {
+        assert(!importedType.getType());
+        // Collect any diagnostics generated while importing this parameter.
+        failureDiagnostics.applySourceLocation(
+            param->getSourceRange().getBegin());
+        failureDiagnostics.append(importedType.failureDiagnostics);
+
+        // Replace the unavailble type with Any for function stub generation
+        // purposes.
+        importedType = {SwiftContext.TheAnyType,
+                        importedType.isImplicitlyUnwrapped(),
+                        importedType.failureDiagnostics};
+      }
+
       if (!importedType)
         return nullptr;
 
@@ -2042,7 +2092,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   }
 
   // Form the parameter list.
-  return ParameterList::create(SwiftContext, parameters);
+  return {ParameterList::create(SwiftContext, parameters), failureDiagnostics};
 }
 
 static bool isObjCMethodResultAudited(const clang::Decl *decl) {

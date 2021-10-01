@@ -276,6 +276,71 @@ private:
 };
 }
 
+struct ImportFailureDiagnostic {
+  StringRef offendingEntitySourceName;
+  Optional<clang::SourceLocation> offendingEntitySourceLocation;
+  ImportFailureDiagnostic(
+      StringRef offendingEntitySourceName,
+      Optional<clang::SourceLocation> offendingEntitySourceLocation = None)
+      : offendingEntitySourceName(offendingEntitySourceName),
+        offendingEntitySourceLocation(offendingEntitySourceLocation) {}
+};
+
+struct ImportFailureDiagnosticsCollection {
+  SmallVector<ImportFailureDiagnostic, 0> diagnostics;
+
+  ImportFailureDiagnosticsCollection(
+      SmallVector<ImportFailureDiagnostic, 0> diagnostics = {})
+      : diagnostics(diagnostics) {}
+
+  void append(const ImportFailureDiagnosticsCollection &other) {
+    diagnostics.append(other.diagnostics.begin(), other.diagnostics.end());
+  }
+
+  void applySourceLocation(const clang::SourceLocation newSourceLocation) {
+    for (auto diagnostic : diagnostics) {
+      diagnostic.offendingEntitySourceLocation = newSourceLocation;
+    }
+  }
+
+  ImportFailureDiagnostic operator[](size_t idx) { return diagnostics[idx]; }
+
+  size_t size() const { return diagnostics.size(); }
+
+  operator bool() const { return diagnostics.size(); }
+
+  auto begin() { return diagnostics.begin(); }
+  auto end() { return diagnostics.end(); }
+  auto cbegin() const { return diagnostics.begin(); }
+  auto cend() const { return diagnostics.end(); }
+  auto begin() const { return diagnostics.begin(); }
+  auto end() const { return diagnostics.end(); }
+};
+
+namespace diagnostic {
+template <class T>
+struct ImportResult {
+  T *payload;
+  ImportFailureDiagnosticsCollection diagnostics;
+
+  ImportResult(T *payload, ImportFailureDiagnosticsCollection diagnostics = {})
+      : payload(payload), diagnostics(diagnostics) {}
+
+  void addDiagnostics(const ImportResult<T> &other) {
+    diagnostics.append(other.diagnostics);
+  }
+
+  void
+  addDiagnostics(const ImportFailureDiagnosticsCollection &newDiagnostics) {
+    diagnostics.append(newDiagnostics);
+  }
+
+  operator T *() { return payload; }
+  T *operator->() { return payload; }
+  operator bool() { return payload; }
+};
+}
+
 using LookupTableMap =
     llvm::DenseMap<StringRef, std::unique_ptr<SwiftLookupTable>>;
 
@@ -289,13 +354,17 @@ class ImportedType {
   bool isIUO;
 
 public:
+  ImportFailureDiagnosticsCollection failureDiagnostics;
+
   ImportedType() {
     type = Type();
     isIUO = false;
   }
 
-  ImportedType(Type ty, bool implicitlyUnwrap)
-      : type(ty), isIUO(implicitlyUnwrap) {
+  ImportedType(Type ty, bool implicitlyUnwrap,
+               ImportFailureDiagnosticsCollection failureDiagnostics = {})
+      : type(ty), isIUO(implicitlyUnwrap),
+        failureDiagnostics(failureDiagnostics) {
 #if !defined(NDEBUG)
     if (implicitlyUnwrap) {
       assert(ty->getOptionalObjectType() || ty->getAs<AnyFunctionType>());
@@ -855,14 +924,13 @@ public:
   /// Otherwise, return nullptr.
   Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version,
                          bool UseCanonicalDecl = true);
-
-  Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
-                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
-
-  Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
-                               Version version,
-                               bool SuperfluousTypedefsAreTransparent,
-                               bool UseCanonicalDecl);
+  diagnostic::ImportResult<Decl>
+  importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
+                 bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
+  diagnostic::ImportResult<Decl>
+  importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl, Version version,
+                         bool SuperfluousTypedefsAreTransparent,
+                         bool UseCanonicalDecl);
 
   /// Same as \c importDeclReal, but for use inside importer
   /// implementation.
@@ -870,8 +938,9 @@ public:
   /// Unlike \c importDeclReal, this function for convenience transparently
   /// looks through superfluous typedefs and returns the imported underlying
   /// decl in that case.
-  Decl *importDecl(const clang::NamedDecl *ClangDecl, Version version,
-                   bool UseCanonicalDecl = true) {
+  diagnostic::ImportResult<Decl> importDecl(const clang::NamedDecl *ClangDecl,
+                                            Version version,
+                                            bool UseCanonicalDecl = true) {
     return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/true,
                                   /*UseCanonicalDecl*/UseCanonicalDecl);
@@ -1219,7 +1288,7 @@ public:
   /// \param argNames The argument names
   ///
   /// \returns The imported parameter list on success, or null on failure
-  ParameterList *importFunctionParameterList(
+  diagnostic::ImportResult<ParameterList> importFunctionParameterList(
       DeclContext *dc, const clang::FunctionDecl *clangDecl,
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,

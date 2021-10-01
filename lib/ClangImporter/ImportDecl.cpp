@@ -62,6 +62,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
@@ -1917,7 +1918,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                            ClangImporter::Implementation &importer) {
   auto &C = importer.SwiftContext;
   auto swiftValueDecl = dyn_cast_or_null<ValueDecl>(
-      importer.importDecl(errorDomainDecl, importer.CurrentVersion));
+      importer.importDecl(errorDomainDecl, importer.CurrentVersion).payload);
   auto stringTy = C.getStringType();
   assert(stringTy && "no string type available");
   if (!swiftValueDecl || !swiftValueDecl->getInterfaceType()->isString()) {
@@ -2275,8 +2276,8 @@ namespace {
   /// Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
-    : public clang::ConstDeclVisitor<SwiftDeclConverter, Decl *>
-  {
+      : public clang::ConstDeclVisitor<SwiftDeclConverter,
+                                       diagnostic::ImportResult<Decl>> {
     ClangImporter::Implementation &Impl;
     bool forwardDeclaration = false;
     ImportNameVersion version;
@@ -2486,8 +2487,8 @@ namespace {
         // that we add this to the parent enum (in the "__ObjC" module) and not
         // to the extension.
         auto parentNS = cast<clang::NamespaceDecl>(decl->getParent());
-        auto parent =
-            Impl.importDecl(parentNS, getVersion(), /*UseCanonicalDecl*/ false);
+        Decl *parent = Impl.importDecl(parentNS, getVersion(),
+                                       /*UseCanonicalDecl*/ false);
         // Sometimes when the parent namespace is imported, this namespace
         // also gets imported. If that's the case, then the parent namespace
         // will be an enum (because it was able to be fully imported) in which
@@ -2637,7 +2638,8 @@ namespace {
         return nullptr;
 
       auto aliasedDecl =
-          Impl.importDecl(decl->getAliasedNamespace(), getActiveSwiftVersion());
+          Impl.importDecl(decl->getAliasedNamespace(), getActiveSwiftVersion())
+              .payload;
       if (!aliasedDecl)
         return nullptr;
 
@@ -2810,8 +2812,9 @@ namespace {
             // If the pointee is another CF typedef, create an extra typealias
             // for the name without "Ref", but not a separate type.
             if (pointee.isTypedef()) {
-              auto underlying = cast_or_null<TypeDecl>(Impl.importDecl(
-                  pointee.getTypedef(), getActiveSwiftVersion()));
+              auto underlying = cast_or_null<TypeDecl>(
+                  Impl.importDecl(pointee.getTypedef(), getActiveSwiftVersion())
+                      .payload);
               if (!underlying)
                 return nullptr;
 
@@ -3590,7 +3593,7 @@ namespace {
           }
         }
 
-        auto member = Impl.importDecl(nd, getActiveSwiftVersion());
+        Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
             // We don't know what this member is.
@@ -4238,6 +4241,28 @@ namespace {
         name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
       }
 
+      ImportFailureDiagnosticsCollection failureDiagnostics;
+      if (Impl.SwiftContext.LangOpts
+              .EnableExperimentalClangImporterDiagnostics &&
+          importedType.failureDiagnostics.size()) {
+        failureDiagnostics = importedType.failureDiagnostics;
+
+        clang::SourceManager &clangSrcMgr =
+            Impl.getClangASTContext().getSourceManager();
+        ClangSourceBufferImporter &bufferImporter =
+            Impl.getBufferImporterForDiagnostics();
+        for (auto &failure : failureDiagnostics) {
+          const clang::SourceLocation offendingEntitySourceLocation =
+              failure.offendingEntitySourceLocation.getValueOr(
+                  decl->getSourceRange().getBegin());
+
+          Impl.diagnose(bufferImporter.resolveSourceLocation(
+                            clangSrcMgr, offendingEntitySourceLocation),
+                        diag::function_not_imported_type_not_available,
+                        decl->getName(), failure.offendingEntitySourceName);
+        }
+      }
+
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
       ClangNode clangNode = decl;
@@ -4323,7 +4348,7 @@ namespace {
         result->getAttrs().add(new (Impl.SwiftContext)
                                    FinalAttr(/*IsImplicit=*/true));
 
-      finishFuncDecl(decl, result);
+      finishFuncDecl(decl, result, failureDiagnostics);
 
       // If this is a compatibility stub, mark it as such.
       if (correctSwiftName)
@@ -4332,11 +4357,20 @@ namespace {
       return result;
     }
 
-    void finishFuncDecl(const clang::FunctionDecl *decl,
-                        AbstractFunctionDecl *result) {
+    void
+    finishFuncDecl(const clang::FunctionDecl *decl,
+                   AbstractFunctionDecl *result,
+                   ImportFailureDiagnosticsCollection diagnosticInfo = {}) {
       // Set availability.
       if (decl->isVariadic()) {
         Impl.markUnavailable(result, "Variadic function is unavailable");
+      }
+
+      if (diagnosticInfo.size()) {
+        Impl.markUnavailable(result,
+                             StringRef(llvm::formatv(
+                                 "type '{0}' is unavailable in Swift",
+                                 diagnosticInfo[0].offendingEntitySourceName)));
       }
 
       if (decl->hasAttr<clang::ReturnsTwiceAttr>()) {
@@ -5938,8 +5972,7 @@ namespace {
       auto name = importedName.getDeclName().getBaseIdentifier();
 
       if (name.empty()) return nullptr;
-
-      auto importedDecl =
+      Decl *importedDecl =
           Impl.importDecl(decl->getClassInterface(), getActiveSwiftVersion());
       auto typeDecl = dyn_cast_or_null<TypeDecl>(importedDecl);
       if (!typeDecl) return nullptr;
@@ -7371,7 +7404,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       return nullptr;
 
     return cast_or_null<FuncDecl>(
-        Impl.importDecl(counterpart, getActiveSwiftVersion()));
+        Impl.importDecl(counterpart, getActiveSwiftVersion()).payload);
   };
 
   // Determine the selector of the counterpart.
@@ -8945,11 +8978,9 @@ void ClangImporter::Implementation::importAttributes(
   }
 }
 
-Decl *
-ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
-                                              ImportNameVersion version,
-                                              bool &TypedefIsSuperfluous,
-                                              bool &HadForwardDeclaration) {
+diagnostic::ImportResult<Decl> ClangImporter::Implementation::importDeclImpl(
+    const clang::NamedDecl *ClangDecl, ImportNameVersion version,
+    bool &TypedefIsSuperfluous, bool &HadForwardDeclaration) {
   assert(ClangDecl);
 
   // If this decl isn't valid, don't import it. Bail now.
@@ -8968,7 +8999,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     return nullptr;
 
   bool SkippedOverTypedef = false;
-  Decl *Result = nullptr;
+  diagnostic::ImportResult<Decl> Result = nullptr;
   if (auto *UnderlyingDecl = canSkipOverTypedef(*this, ClangDecl,
                                                 TypedefIsSuperfluous)) {
     Result = importDecl(UnderlyingDecl, version);
@@ -9205,11 +9236,10 @@ void ClangImporter::Implementation::finishNormalConformance(
   conformance->setState(ProtocolConformanceState::Complete);
 }
 
-Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
-    const clang::NamedDecl *ClangDecl,
-    ImportNameVersion version,
-    bool SuperfluousTypedefsAreTransparent,
-    bool UseCanonicalDecl) {
+diagnostic::ImportResult<Decl>
+ClangImporter::Implementation::importDeclAndCacheImpl(
+    const clang::NamedDecl *ClangDecl, ImportNameVersion version,
+    bool SuperfluousTypedefsAreTransparent, bool UseCanonicalDecl) {
   if (!ClangDecl)
     return nullptr;
 
@@ -9231,8 +9261,11 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   bool HadForwardDeclaration = false;
 
   startedImportingEntity();
-  Decl *Result = importDeclImpl(ClangDecl, version, TypedefIsSuperfluous,
-                                HadForwardDeclaration);
+
+  diagnostic::ImportResult<Decl> ImportResult = importDeclImpl(
+      ClangDecl, version, TypedefIsSuperfluous, HadForwardDeclaration);
+  Decl *Result = ImportResult.payload;
+
   if (!Result)
     return nullptr;
 
@@ -9990,7 +10023,7 @@ bool ClangImporter::Implementation::addMemberAndAlternatesToExtension(
       return true;
 
   // Then try to import the decl under the specified name.
-  auto *member = importDecl(decl, nameVersion);
+  Decl *member = importDecl(decl, nameVersion);
   if (!member)
     return false;
 

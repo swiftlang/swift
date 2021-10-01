@@ -2883,7 +2883,7 @@ void ClangImporter::lookupTypeDecl(
             !isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
           continue;
         }
-        auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
+        Decl *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
 
         // Namespaces are imported as extensions for enums.
         if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported)) {
@@ -2993,8 +2993,10 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     // Add the extensions produced by importing categories.
     for (auto category : lookupTable->categories()) {
       if (auto extension = cast_or_null<ExtensionDecl>(
-              owner.importDecl(category, owner.CurrentVersion,
-                               /*UseCanonical*/false))) {
+              owner
+                  .importDecl(category, owner.CurrentVersion,
+                              /*UseCanonical*/ false)
+                  .payload)) {
         results.push_back(extension);
       }
     }
@@ -3015,7 +3017,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
-      auto importedDecl = owner.importDecl(decl, owner.CurrentVersion);
+      Decl *importedDecl = owner.importDecl(decl, owner.CurrentVersion);
       if (!importedDecl) continue;
 
       // Find the enclosing extension, if there is one.
@@ -3299,7 +3301,7 @@ void ClangImporter::loadObjCMethods(
                             Impl.CurrentVersion);
 
     method = dyn_cast_or_null<AbstractFunctionDecl>(
-        Impl.importDecl(objcMethod, Impl.CurrentVersion));
+        Impl.importDecl(objcMethod, Impl.CurrentVersion).payload);
   }
 
   // If we didn't find anything, we're done.
@@ -3381,9 +3383,7 @@ void ClangModuleUnit::lookupObjCMethods(
     if (objcMethod->isPropertyAccessor())
       (void)owner.importDecl(objcMethod->findPropertyDecl(true),
                              owner.CurrentVersion);
-
-    auto imported =
-        owner.importDecl(objcMethod, owner.CurrentVersion);
+    Decl *imported = owner.importDecl(objcMethod, owner.CurrentVersion);
     if (!imported) continue;
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(imported))
@@ -4347,7 +4347,7 @@ ClangImporter::instantiateCXXClassTemplate(
           "type of non-dependent specialization is not a RecordType");
 
   return dyn_cast_or_null<StructDecl>(
-      Impl.importDecl(ctsd, Impl.CurrentVersion));
+      Impl.importDecl(ctsd, Impl.CurrentVersion).payload);
 }
 
 bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
