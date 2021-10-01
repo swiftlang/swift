@@ -60,6 +60,15 @@ bool Rule::isProtocolConformanceRule() const {
   return false;
 }
 
+bool Rule::containsUnresolvedSymbols() const {
+  for (auto symbol : LHS) {
+    if (symbol.getKind() == Symbol::Kind::Name)
+      return true;
+  }
+
+  return false;
+}
+
 void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
   if (Permanent)

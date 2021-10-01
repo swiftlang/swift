@@ -120,6 +120,8 @@ public:
     return LHS.size();
   }
 
+  bool containsUnresolvedSymbols() const;
+
   void dump(llvm::raw_ostream &out) const;
 
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
@@ -453,10 +455,15 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   Optional<unsigned>
-  findRuleToDelete(RewritePath &replacementPath,
-                   const llvm::DenseSet<unsigned> *redundantConformances);
+  findRuleToDelete(bool firstPass,
+                   const llvm::DenseSet<unsigned> *redundantConformances,
+                   RewritePath &replacementPath);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
+
+  void performHomotopyReduction(
+      bool firstPass,
+      const llvm::DenseSet<unsigned> *redundantConformances);
 
   void minimizeRewriteSystem();
 
