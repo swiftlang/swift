@@ -522,6 +522,7 @@ class C {}
 sil [ossa] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
 
+// basic_N {{ functions consisting of a single block
 
 // An owned instance of C is passed in, stored to the stack, used
 // non-consumingly once, and destroyed.
@@ -601,6 +602,9 @@ entry(%instance : @owned $C):
     return %res : $()
 }
 
+// basic_N }}
+
+// diamond_N {{ the usages of the alloc_stack occur over a diamond of blocks
 
 // CHECK-LABEL: sil [ossa] @diamond_1 : $@convention(thin) (@owned C, @owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
@@ -854,6 +858,8 @@ exit:
     %result = tuple ()
     return %result : $()
 }
+
+// diamond_N }}
 
 // =============================================================================
 // lexical scope specific                                                     }}
