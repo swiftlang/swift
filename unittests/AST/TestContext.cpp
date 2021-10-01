@@ -40,6 +40,7 @@ TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
                            SourceMgr, Diags)) {
   registerParseRequestFunctions(Ctx.evaluator);
   registerTypeCheckerRequestFunctions(Ctx.evaluator);
+  registerClangImporterRequestFunctions(Ctx.evaluator);
   auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
   auto *module = ModuleDecl::create(stdlibID, Ctx);
   Ctx.addLoadedModule(module);

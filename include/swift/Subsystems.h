@@ -363,6 +363,12 @@ namespace swift {
   /// Calling registerIDERequestFunctions will invoke this function as well.
   void registerIDETypeCheckRequestFunctions(Evaluator &evaluator);
 
+  /// Register clang importer request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and import any Clang APIs should call this function
+  /// after forming the ASTContext.
+  void registerClangImporterRequestFunctions(Evaluator &evaluator);
+
   /// Register SILOptimizer passes necessary for IRGen.
   void registerIRGenSILTransforms(ASTContext &ctx);
 

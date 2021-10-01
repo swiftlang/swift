@@ -736,10 +736,10 @@ public:
   }
 };
 
-void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
-                                                      StringRef SourceName,
-                                                      ArrayRef<const char *> Args,
-                                                      std::shared_ptr<EditorConsumer> Consumer) {
+void SwiftLangSupport::editorOpenSwiftSourceInterface(
+    StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
+    SourceKitCancellationToken CancellationToken,
+    std::shared_ptr<EditorConsumer> Consumer) {
   std::string Error;
   auto Invocation = ASTMgr->getInvocation(Args, SourceName, Error);
   if (!Invocation) {
@@ -750,6 +750,7 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
   getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken,
+                                   CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
 

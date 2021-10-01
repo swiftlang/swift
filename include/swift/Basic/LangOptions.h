@@ -771,6 +771,9 @@ namespace swift {
                           DisableOverlayModules,
                           EnableClangSPI);
     }
+
+    std::vector<std::string> getRemappedExtraArgs(
+        std::function<std::string(StringRef)> pathRemapCallback) const;
   };
 
 } // end namespace swift

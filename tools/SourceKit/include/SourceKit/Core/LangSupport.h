@@ -14,13 +14,14 @@
 #define LLVM_SOURCEKIT_CORE_LANGSUPPORT_H
 
 #include "SourceKit/Core/LLVM.h"
+#include "SourceKit/Support/CancellationToken.h"
 #include "SourceKit/Support/UIdent.h"
-#include "llvm/Support/VersionTuple.h"
+#include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
-#include "swift/AST/Type.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <functional>
 #include <memory>
@@ -737,6 +738,8 @@ public:
 
   virtual void dependencyUpdated() {}
 
+  virtual void cancelRequest(SourceKitCancellationToken CancellationToken) = 0;
+
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,
                            ArrayRef<const char *> Args) = 0;
@@ -794,10 +797,11 @@ public:
                                          bool SynthesizedExtensions,
                                          StringRef swiftVersion) = 0;
 
-  virtual void editorOpenSwiftSourceInterface(StringRef Name,
-                                              StringRef SourceName,
-                                              ArrayRef<const char *> Args,
-                                              std::shared_ptr<EditorConsumer> Consumer) = 0;
+  virtual void
+  editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
+                                 ArrayRef<const char *> Args,
+                                 SourceKitCancellationToken CancellationToken,
+                                 std::shared_ptr<EditorConsumer> Consumer) = 0;
 
   virtual void editorClose(StringRef Name, bool RemoveCache) = 0;
 
@@ -821,33 +825,37 @@ public:
                                        unsigned Length,
                                        EditorConsumer &Consumer) = 0;
 
+  virtual void getCursorInfo(
+      StringRef Filename, unsigned Offset, unsigned Length, bool Actionables,
+      bool SymbolGraph, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
+
   virtual void
-  getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
-                bool Actionables, bool SymbolGraph,
-                bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-                Optional<VFSOptions> vfsOptions,
-       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
+  getNameInfo(StringRef Filename, unsigned Offset, NameTranslatingInfo &Input,
+              ArrayRef<const char *> Args,
+              SourceKitCancellationToken CancellationToken,
+              std::function<void(const RequestResult<NameTranslatingInfo> &)>
+                  Receiver) = 0;
 
-  virtual void getNameInfo(StringRef Filename, unsigned Offset,
-                           NameTranslatingInfo &Input,
-                           ArrayRef<const char *> Args,
-                std::function<void(const RequestResult<NameTranslatingInfo> &)> Receiver) = 0;
-
-  virtual void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
-                            bool CancelOnSubsequentRequest,
-                            ArrayRef<const char *> Args,
-                            std::function<void(const RequestResult<RangeInfo> &)> Receiver) = 0;
+  virtual void getRangeInfo(
+      StringRef Filename, unsigned Offset, unsigned Length,
+      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<RangeInfo> &)> Receiver) = 0;
 
   virtual void getCursorInfoFromUSR(
       StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
       ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+      SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
-  virtual void findRelatedIdentifiersInFile(StringRef Filename,
-                                            unsigned Offset,
-                                            bool CancelOnSubsequentRequest,
-                                            ArrayRef<const char *> Args,
-                   std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver) = 0;
+  virtual void findRelatedIdentifiersInFile(
+      StringRef Filename, unsigned Offset, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<RelatedIdentsInfo> &)>
+          Receiver) = 0;
 
   virtual llvm::Optional<std::pair<unsigned, unsigned>>
       findUSRRange(StringRef DocumentName, StringRef USR) = 0;
@@ -872,18 +880,21 @@ public:
   virtual void
   findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
                         unsigned Length, ArrayRef<const char *> Args,
+                        SourceKitCancellationToken CancellationToken,
                         CategorizedRenameRangesReceiver Receiver) = 0;
 
-  virtual void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
-                                   ArrayRef<const char*> Args,
+  virtual void semanticRefactoring(StringRef Filename,
+                                   SemanticRefactoringInfo Info,
+                                   ArrayRef<const char *> Args,
+                                   SourceKitCancellationToken CancellationToken,
                                    CategorizedEditsReceiver Receiver) = 0;
 
-  virtual void collectExpressionTypes(StringRef FileName,
-                                      ArrayRef<const char *> Args,
-                                      ArrayRef<const char *> ExpectedProtocols,
-                                      bool CanonicalType,
-                                      std::function<void(const
-                                          RequestResult<ExpressionTypesInFile> &)> Receiver) = 0;
+  virtual void collectExpressionTypes(
+      StringRef FileName, ArrayRef<const char *> Args,
+      ArrayRef<const char *> ExpectedProtocols, bool CanonicalType,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<ExpressionTypesInFile> &)>
+          Receiver) = 0;
 
   /// Collects variable types for a range defined by `Offset` and `Length` in
   /// the source file. If `Offset` or `Length` are empty, variable types for
@@ -891,6 +902,7 @@ public:
   virtual void collectVariableTypes(
       StringRef FileName, ArrayRef<const char *> Args,
       Optional<unsigned> Offset, Optional<unsigned> Length,
+      SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)>
           Receiver) = 0;
 

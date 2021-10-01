@@ -659,7 +659,8 @@ public:
                         Optional<std::vector<DiagnosticEntryInfo>> &Diags,
                         ArrayRef<DiagnosticEntryInfo> ParserDiags);
 
-  void processLatestSnapshotAsync(EditableTextBufferRef EditableBuffer);
+  void processLatestSnapshotAsync(EditableTextBufferRef EditableBuffer,
+                                  SourceKitCancellationToken CancellationToken);
 
   void updateSemanticInfo(std::vector<SwiftSemanticToken> Toks,
                           std::vector<DiagnosticEntryInfo> Diags,
@@ -978,11 +979,14 @@ class AnnotAndDiagASTConsumer : public SwiftASTConsumer {
 
 public:
   std::vector<SwiftSemanticToken> SemaToks;
+  SourceKitCancellationToken CancellationToken;
 
   AnnotAndDiagASTConsumer(EditableTextBufferRef EditableBuffer,
-                          RefPtr<SwiftDocumentSemanticInfo> SemaInfoRef)
-    : EditableBuffer(std::move(EditableBuffer)),
-      SemaInfoRef(std::move(SemaInfoRef)) { }
+                          RefPtr<SwiftDocumentSemanticInfo> SemaInfoRef,
+                          SourceKitCancellationToken CancellationToken)
+      : EditableBuffer(std::move(EditableBuffer)),
+        SemaInfoRef(std::move(SemaInfoRef)),
+        CancellationToken(CancellationToken) {}
 
   void failed(StringRef Error) override {
     LOG_WARN_FUNC("sema annotations failed: " << Error);
@@ -1018,7 +1022,8 @@ public:
       // Save time if we already know we processed this AST version.
       if (DocSnapshot->getStamp() != EditableBuffer->getSnapshot()->getStamp()){
         // Handle edits that occurred after we processed the AST.
-        SemaInfoRef->processLatestSnapshotAsync(EditableBuffer);
+        SemaInfoRef->processLatestSnapshotAsync(EditableBuffer,
+                                                CancellationToken);
       }
       return;
     }
@@ -1041,7 +1046,8 @@ public:
 
     if (DocSnapshot->getStamp() != EditableBuffer->getSnapshot()->getStamp()) {
       // Handle edits that occurred after we processed the AST.
-      SemaInfoRef->processLatestSnapshotAsync(EditableBuffer);
+      SemaInfoRef->processLatestSnapshotAsync(EditableBuffer,
+                                              CancellationToken);
     }
   }
 };
@@ -1049,15 +1055,16 @@ public:
 } // anonymous namespace
 
 void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
-    EditableTextBufferRef EditableBuffer) {
+    EditableTextBufferRef EditableBuffer,
+    SourceKitCancellationToken CancellationToken) {
 
   SwiftInvocationRef Invok = InvokRef;
   if (!Invok)
     return;
 
   RefPtr<SwiftDocumentSemanticInfo> SemaInfoRef = this;
-  auto Consumer = std::make_shared<AnnotAndDiagASTConsumer>(EditableBuffer,
-                                                            SemaInfoRef);
+  auto Consumer = std::make_shared<AnnotAndDiagASTConsumer>(
+      EditableBuffer, SemaInfoRef, CancellationToken);
 
   // Semantic annotation queries for a particular document should cancel
   // previously queued queries for the same document. Each document has a
@@ -1065,7 +1072,7 @@ void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
   const void *OncePerASTToken = SemaInfoRef.get();
   if (auto ASTMgr = this->ASTMgr.lock()) {
     ASTMgr->processASTAsync(Invok, std::move(Consumer), OncePerASTToken,
-                            fileSystem);
+                            CancellationToken, fileSystem);
   }
 }
 
@@ -1897,9 +1904,10 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
 }
 
 static void updateSemaInfo(RefPtr<SwiftDocumentSemanticInfo> SemanticInfo,
-                           EditableTextBufferRef EditableBuffer) {
+                           EditableTextBufferRef EditableBuffer,
+                           SourceKitCancellationToken CancellationToken) {
   if (SemanticInfo) {
-    SemanticInfo->processLatestSnapshotAsync(EditableBuffer);
+    SemanticInfo->processLatestSnapshotAsync(EditableBuffer, CancellationToken);
   }
 }
 
@@ -1943,7 +1951,10 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
   if (ProvideSemanticInfo) {
     // If this is not a no-op, update semantic info.
     if (Length != 0 || Buf->getBufferSize() != 0) {
-      ::updateSemaInfo(SemanticInfo, EditableBuffer);
+      // We implicitly send the semantic info as a notification after the edit.
+      // The client thus doesn't have a handle to cancel it.
+      ::updateSemaInfo(SemanticInfo, EditableBuffer,
+                       /*CancellationToken=*/nullptr);
 
       // FIXME: we should also update any "interesting" ASTs that depend on this
       // document here, e.g. any ASTs for files visible in an editor. However,
@@ -1955,7 +1966,8 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
   return Snapshot;
 }
 
-void SwiftEditorDocument::updateSemaInfo() {
+void SwiftEditorDocument::updateSemaInfo(
+    SourceKitCancellationToken CancellationToken) {
   Impl.AccessMtx.lock();
   auto EditableBuffer = Impl.EditableBuffer;
   auto SemanticInfo = Impl.SemanticInfo;
@@ -1963,7 +1975,7 @@ void SwiftEditorDocument::updateSemaInfo() {
   // may call back to the editor for document state.
   Impl.AccessMtx.unlock();
 
-  ::updateSemaInfo(SemanticInfo, EditableBuffer);
+  ::updateSemaInfo(SemanticInfo, EditableBuffer, CancellationToken);
 }
 
 void SwiftEditorDocument::resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
@@ -2350,7 +2362,9 @@ void SwiftLangSupport::editorOpen(
   }
 
   if (Consumer.needsSemanticInfo()) {
-    EditorDoc->updateSemaInfo();
+    // We implicitly send the semantic info as a notification after the
+    // document is opened. The client thus doesn't have a handle to cancel it.
+    EditorDoc->updateSemaInfo(/*CancellationToken=*/nullptr);
   }
 
   if (!Consumer.documentStructureEnabled() &&

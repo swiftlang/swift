@@ -3132,8 +3132,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                    Kind, [&] () -> ParserStatus {
     Identifier FieldName;
     SourceLoc FieldNameLoc;
-    if (Kind != SyntaxKind::YieldStmt)
-      parseOptionalArgumentLabel(FieldName, FieldNameLoc);
+    parseOptionalArgumentLabel(FieldName, FieldNameLoc);
 
     // See if we have an operator decl ref '(<op>)'. The operator token in
     // this case lexes as a binary operator because it neither leads nor

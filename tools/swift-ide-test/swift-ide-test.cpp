@@ -1660,6 +1660,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
 
     registerParseRequestFunctions(Parser.getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
+    registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
 
     Parser.getDiagnosticEngine().addConsumer(PrintDiags);
 
@@ -1895,6 +1896,7 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   registerParseRequestFunctions(Parser.getParser().Context.evaluator);
   registerTypeCheckerRequestFunctions(
       Parser.getParser().Context.evaluator);
+  registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;

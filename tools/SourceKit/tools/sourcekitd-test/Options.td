@@ -16,6 +16,10 @@ def req : Separate<["-"], "req">,
   HelpText<"Request kind">;
 def req_EQ : Joined<["-"], "req=">, Alias<req>;
 
+def id : Separate<["-"], "id">,
+  HelpText<"If this is an async request, an ID that can be used to cancel the request">;
+def id_EQ : Joined<["-"], "id=">, Alias<id>;
+
 def offset : Separate<["-"], "offset">,
   HelpText<"byte offset">;
 def offset_EQ : Joined<["-"], "offset=">, Alias<offset>;
@@ -155,6 +159,10 @@ def module_cache_path_EQ : Joined<["-"], "module-cache-path=">, Alias<module_cac
 
 def shell: Flag<["-"], "shell">,
   HelpText<"Run shell command">;
+
+def cancel : Separate<["-"], "cancel">,
+  HelpText<"Cancel all async requests with the given ID">;
+def cancel_EQ : Joined<["-"], "cancel=">, Alias<cancel>;
 
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;
