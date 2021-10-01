@@ -147,7 +147,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.UserModuleVersion = opts.UserModuleVersion;
-
+  serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   serializationOpts.PublicDependentLibraries =
       getIRGenOptions().PublicLinkLibraries;
   serializationOpts.SDKName = getLangOptions().SDKName;
@@ -175,20 +175,6 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.SerializeOptionsForDebugging =
       opts.SerializeOptionsForDebugging.getValueOr(
           !module->isExternallyConsumed());
-
-  if (serializationOpts.SerializeOptionsForDebugging &&
-      opts.DebugPrefixSerializedDebuggingOptions) {
-    serializationOpts.DebuggingOptionsPrefixMap =
-        getIRGenOptions().DebugPrefixMap;
-    auto &remapper = serializationOpts.DebuggingOptionsPrefixMap;
-    auto remapClangPaths = [&remapper](StringRef path) {
-      return remapper.remapPath(path);
-    };
-    serializationOpts.ExtraClangOptions =
-        getClangImporterOptions().getRemappedExtraArgs(remapClangPaths);
-  } else {
-    serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
-  }
 
   serializationOpts.DisableCrossModuleIncrementalInfo =
       opts.DisableCrossModuleIncrementalBuild;
