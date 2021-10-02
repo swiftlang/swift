@@ -14,7 +14,7 @@ distributed actor Philosopher {
   let log: Logger
   // expected-note@-1{{distributed actor state is only available within the actor instance}}
   var variable = 12
-  var variable_fromDetach = 12 // expected-note{{distributed actor state is only available within the actor instance}}
+  var variable_fromDetach = 12
   let INITIALIZED: Int
   let outside: Int = 1
 
@@ -47,7 +47,9 @@ distributed actor Philosopher {
       // because we KNOW this is a local call -- and there is no transport in
       // between that will throw.
       _ = await self.dist() // notice lack of 'try' even though 'distributed func'
-      _ = self.variable_fromDetach // expected-error{{distributed actor-isolated property 'variable_fromDetach' can only be referenced inside the distributed actor}}
+      _ = self.variable_fromDetach // expected-error{{expression is 'async' but is not marked with 'await'}}
+      // expected-note@-1{{property access is 'async'}}
+      _ = await self.variable_fromDetach // okay, we know we're on the local node
     }
   }
 }
