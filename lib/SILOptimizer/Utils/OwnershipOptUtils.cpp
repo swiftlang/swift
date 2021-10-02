@@ -350,6 +350,10 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   if (oldValue.getOwnershipKind() != OwnershipKind::Guaranteed)
     return true;
 
+  SILValue newRoot = findOwnershipReferenceRoot(newValue);
+  if (newRoot && isa<SILFunctionArgument>(newRoot))
+    return true;
+
   // Check that the old lifetime can be extended and record the necessary
   // book-keeping in the OwnershipFixupContext.
   context.clear();
@@ -870,9 +874,10 @@ SILValue
 OwnershipLifetimeExtender::borrowOverValue(SILValue newValue,
                                            SILValue guaranteedValue) {
   // Avoid borrowing guaranteed function arguments.
-  if (isa<SILFunctionArgument>(newValue)
-      && newValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
-    return newValue;
+  if (newValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
+    SILValue newRoot = findOwnershipReferenceRoot(newValue);
+    if (newRoot && isa<SILFunctionArgument>(newRoot))
+      return newValue;
   }
   auto borrowedValue = BorrowedValue(guaranteedValue);
   if (borrowedValue && borrowedValue.isLocalScope()) {
