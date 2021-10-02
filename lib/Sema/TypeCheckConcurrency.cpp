@@ -1847,15 +1847,17 @@ namespace {
             ConcurrentReferenceKind::CrossActor);
       }
 
+      // Call is implicitly asynchronous.
+      auto result = tryMarkImplicitlyAsync(
+        loc, valueRef, context,
+        ImplicitActorHopTarget::forGlobalActor(globalActor));
+      if (result == AsyncMarkingResult::FoundAsync)
+        return false;
+
+      // Diagnose failures.
       switch (contextIsolation) {
       case ActorIsolation::DistributedActorInstance:
       case ActorIsolation::ActorInstance: {
-        auto result = tryMarkImplicitlyAsync(
-          loc, valueRef, context,
-          ImplicitActorHopTarget::forGlobalActor(globalActor));
-        if (result == AsyncMarkingResult::FoundAsync)
-          return false;
-
         auto useKind = static_cast<unsigned>(
             kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
 
@@ -1869,14 +1871,6 @@ namespace {
 
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe: {
-        // Check if this decl reference is the callee of the enclosing Apply,
-        // making it OK as an implicitly async call.
-        auto result = tryMarkImplicitlyAsync(
-            loc, valueRef, context,
-            ImplicitActorHopTarget::forGlobalActor(globalActor));
-        if (result == AsyncMarkingResult::FoundAsync)
-          return false;
-
         auto useKind = static_cast<unsigned>(
             kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
 
@@ -1891,12 +1885,6 @@ namespace {
       }
 
       case ActorIsolation::Independent: {
-        auto result = tryMarkImplicitlyAsync(
-            loc, valueRef, context,
-            ImplicitActorHopTarget::forGlobalActor(globalActor));
-        if (result == AsyncMarkingResult::FoundAsync)
-          return false;
-
         auto useKind = static_cast<unsigned>(
             kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
 
@@ -1910,12 +1898,6 @@ namespace {
       }
 
       case ActorIsolation::Unspecified: {
-        auto result = tryMarkImplicitlyAsync(
-            loc, valueRef, context,
-            ImplicitActorHopTarget::forGlobalActor(globalActor));
-        if (result == AsyncMarkingResult::FoundAsync)
-          return false;
-
         // Diagnose the reference.
         auto useKind = static_cast<unsigned>(
             kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
