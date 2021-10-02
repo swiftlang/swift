@@ -398,7 +398,7 @@ class StackAllocationPromoter {
   /// The AllocStackInst that we are handling.
   AllocStackInst *asi;
 
-  /// The deallocation Instruction. This value could be NULL if there are
+  /// The unique deallocation instruction. This value could be NULL if there are
   /// multiple deallocations.
   DeallocStackInst *dsi;
 
