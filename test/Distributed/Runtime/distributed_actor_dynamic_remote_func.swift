@@ -54,7 +54,7 @@ struct FakeTransport: ActorTransport {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type)
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
   throws -> Act?
       where Act: DistributedActor {
     return nil
@@ -95,7 +95,7 @@ func test_remote() async throws {
   let address = ActorAddress(parse: "")
   let transport = FakeTransport()
 
-  let worker = try LocalWorker(resolve: .init(address), using: transport)
+  let worker = try LocalWorkerresolve(.init(address), using: transport)
   let x = try await worker.function()
   print("call: \(x)")
   // CHECK: call: _cluster_remote_function():

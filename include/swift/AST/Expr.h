@@ -307,12 +307,13 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1,
     ThrowsIsSet : 1,
     Throws : 1,
     ImplicitlyAsync : 1,
     ImplicitlyThrows : 1,
-    NoAsync : 1
+    NoAsync : 1,
+    ShouldApplyDistributedThunk : 1
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(CallExpr, ApplyExpr);
@@ -1206,7 +1207,9 @@ public:
   /// which are cross-actor invoked, because such calls actually go over the
   /// transport/network, and may throw from this, rather than the function
   /// implementation itself..
-  bool isImplicitlyThrows() const { return Bits.DeclRefExpr.IsImplicitlyThrows; }
+  bool isImplicitlyThrows() const {
+    return Bits.DeclRefExpr.IsImplicitlyThrows;
+  }
 
   /// Set whether this reference must account for a `throw` occurring for reasons
   /// other than the function implementation itself throwing, e.g. an
@@ -4391,7 +4394,7 @@ public:
   ///
   /// where the new closure is declared to be async.
   ///
-  /// When the application is implciitly async, the result describes
+  /// When the application is implicitly async, the result describes
   /// the actor to which we need to need to hop.
   Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
     if (!Bits.ApplyExpr.ImplicitlyAsync)
@@ -4417,6 +4420,15 @@ public:
   }
   void setImplicitlyThrows(bool flag) {
     Bits.ApplyExpr.ImplicitlyThrows = flag;
+  }
+
+  /// Informs IRGen to that this expression should be applied as its distributed
+  /// thunk, rather than invoking the function directly.
+  bool shouldApplyDistributedThunk() const {
+    return Bits.ApplyExpr.ShouldApplyDistributedThunk;
+  }
+  void setShouldApplyDistributedThunk(bool flag) {
+    Bits.ApplyExpr.ShouldApplyDistributedThunk = flag;
   }
 
   ValueDecl *getCalledValue() const;
