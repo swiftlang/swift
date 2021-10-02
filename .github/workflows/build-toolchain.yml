@@ -24,7 +24,7 @@ jobs:
           - build_os: ubuntu-18.04
             agent_query: ubuntu-18.04
             target: ubuntu18.04_x86_64
-            run_stdlib_test: false
+            run_stdlib_test: true
             run_full_test: false
             run_e2e_test: true
             build_hello_wasm: true
@@ -33,7 +33,7 @@ jobs:
           - build_os: ubuntu-20.04
             agent_query: ubuntu-20.04
             target: ubuntu20.04_x86_64
-            run_stdlib_test: false
+            run_stdlib_test: true
             run_full_test: false
             run_e2e_test: true
             build_hello_wasm: true
