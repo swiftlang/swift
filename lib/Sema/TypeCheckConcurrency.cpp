@@ -1476,8 +1476,7 @@ namespace {
           break;
         }
         case ActorIsolationRestriction::CrossActorSelf:
-        case ActorIsolationRestriction::ActorSelf:
-        case ActorIsolationRestriction::CrossDistributedActorSelf: {
+        case ActorIsolationRestriction::ActorSelf: {
           if (isPartialApply) {
             // The partially applied InoutArg is a property of actor. This
             // can really only happen when the property is a struct with a
@@ -2076,13 +2075,10 @@ namespace {
             }
             LLVM_FALLTHROUGH; // otherwise, it's invalid so diagnose it.
 
-          case ActorIsolationRestriction::ActorSelf:
-          case ActorIsolationRestriction::CrossDistributedActorSelf: {
+          case ActorIsolationRestriction::ActorSelf: {
             auto decl = concDecl.getDecl();
             ctx.Diags.diagnose(component.getLoc(),
                                diag::actor_isolated_keypath_component,
-                               /*isDistributed=*/isolation.getKind() ==
-                                  ActorIsolationRestriction::CrossDistributedActorSelf || // FIXME: remove this
                                isolation.getKind() ==
                                   ActorIsolationRestriction::CrossActorSelf,
                                decl->getDescriptiveKind(), decl->getName());
@@ -2175,7 +2171,6 @@ namespace {
 
       case ActorIsolationRestriction::CrossActorSelf:
       case ActorIsolationRestriction::ActorSelf:
-      case ActorIsolationRestriction::CrossDistributedActorSelf:
         llvm_unreachable("non-member reference into an actor");
 
       case ActorIsolationRestriction::GlobalActorUnsafe:
@@ -2213,7 +2208,6 @@ namespace {
       case ActorIsolationRestriction::Unrestricted:
         return false;
 
-      case ActorIsolationRestriction::CrossDistributedActorSelf:
       case ActorIsolationRestriction::CrossActorSelf: {
         // If a cross-actor reference is to an isolated actor, it's not
         // crossing actors.

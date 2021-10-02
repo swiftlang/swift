@@ -2878,7 +2878,6 @@ bool ConformanceChecker::checkActorIsolation(
     return true;
   }
 
-  case ActorIsolationRestriction::CrossDistributedActorSelf:
   case ActorIsolationRestriction::CrossActorSelf:
     return diagnoseNonSendableTypesInReference(
         witness, DC->getParentModule(), witness->getLoc(),
