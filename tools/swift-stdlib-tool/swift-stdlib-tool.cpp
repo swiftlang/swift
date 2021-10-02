@@ -888,7 +888,7 @@ void enumerateDirectory(std::string directory, F&& func) {
             func(path);
         } else if (entry->d_type == DT_DIR) {
             // check if . or ..
-            if (strncmp(entry->d_name, "..", entry->d_namlen)) {
+            if (strncmp(entry->d_name, "..", entry->d_namlen) == 0) {
                 continue;
             }
             enumerateDirectory(path, func);
