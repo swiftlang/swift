@@ -119,9 +119,9 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
 
   propDecl->setIntroducer(VarDecl::Introducer::Let);
 
-  // mark as @_distributedActorIndependent, allowing access to it from everywhere
+  // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
-      new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*IsImplicit=*/true));
 
   derived.addMembersToConformanceContext({ propDecl, pbDecl });
   return propDecl;
@@ -148,9 +148,9 @@ static ValueDecl *deriveDistributedActor_actorTransport(
 
   propDecl->setIntroducer(VarDecl::Introducer::Let);
 
-  // mark as @_distributedActorIndependent, allowing access to it from everywhere
+  // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
-      new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*IsImplicit=*/true));
 
   derived.addMembersToConformanceContext({ propDecl, pbDecl });
   return propDecl;
