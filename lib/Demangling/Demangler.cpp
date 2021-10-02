@@ -1681,6 +1681,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
+    case Node::Kind::Static:
       return false;
     default:
       return true;
