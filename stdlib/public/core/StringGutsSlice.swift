@@ -96,13 +96,4 @@ internal struct _StringGutsSlice {
     }
     return (scalar, len)
   }
-
-  internal func foreignHasNormalizationBoundary(
-    before index: String.Index
-  ) -> Bool {
-    if index == range.lowerBound || index == range.upperBound {
-      return true
-    }
-    return _guts.foreignHasNormalizationBoundary(before: index)
-  }
 }

@@ -27,7 +27,7 @@
 #include "Debug.h"
 #include "Error.h"
 
-#if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
 #endif
 
@@ -248,7 +248,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
 }
 
 static ExecutorRef executorForEnqueuedJob(Job *job) {
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+#if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
   return ExecutorRef::generic();
 #else
   void *jobQueue = job->SchedulerPrivate[Job::DispatchQueueIndex];
@@ -1065,13 +1065,19 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
 }
 
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 SWIFT_CC(swift)
 static void swift_task_asyncMainDrainQueueImpl() {
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   bool Finished = false;
-  donateThreadToGlobalExecutorUntil([](void *context) {
+  swift_task_donateThreadToGlobalExecutorUntil([](void *context) {
     return *reinterpret_cast<bool*>(context);
   }, &Finished);
+#elif !SWIFT_CONCURRENCY_ENABLE_DISPATCH
+  // FIXME: consider implementing a concurrent global main queue for
+  // these environments?
+  swift_reportError(0, "operation unsupported without libdispatch: "
+                       "swift_task_asyncMainDrainQueue");
 #else
 #if defined(_WIN32)
   static void(FAR *pfndispatch_main)(void) = NULL;

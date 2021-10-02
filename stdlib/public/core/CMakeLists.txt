@@ -101,6 +101,8 @@ set(SWIFTLIB_ESSENTIAL
   NativeDictionary.swift
   NativeSet.swift
   NewtypeWrapper.swift
+  NFC.swift
+  NFD.swift
   ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
@@ -172,6 +174,7 @@ set(SWIFTLIB_ESSENTIAL
   ThreadLocalStorage.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift
+  UnicodeData.swift
   UnicodeEncoding.swift
   UnicodeHelpers.swift
   UnicodeParser.swift

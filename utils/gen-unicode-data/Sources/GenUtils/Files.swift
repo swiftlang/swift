@@ -14,7 +14,7 @@ import Foundation
 
 public func readFile(_ path: String) -> String {
   do {
-    return try String(contentsOfFile: path)
+    return try String(contentsOfFile: path, encoding: .utf8)
   } catch {
     fatalError(error.localizedDescription)
   }

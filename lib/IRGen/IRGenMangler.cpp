@@ -180,6 +180,14 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
   return finalize();
 }
 
+std::string IRGenMangler::mangleProtocolConformanceDescriptorRecord(
+                                 const RootProtocolConformance *conformance) {
+  beginMangling();
+  appendProtocolConformance(conformance);
+  appendOperator("Hc");
+  return finalize();
+}
+
 std::string IRGenMangler::mangleProtocolConformanceInstantiationCache(
                                  const RootProtocolConformance *conformance) {
   beginMangling();

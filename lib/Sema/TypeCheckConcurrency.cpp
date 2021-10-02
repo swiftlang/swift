@@ -1003,7 +1003,8 @@ namespace {
     ///
     /// and we reach up to mark the CallExpr.
     void markNearestCallAsImplicitly(
-        Optional<ImplicitActorHopTarget> setAsync, bool setThrows = false) {
+        Optional<ImplicitActorHopTarget> setAsync,
+        bool setThrows = false, bool setDistributedThunk = false) {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
 
       const auto End = applyStack.rend();
@@ -1011,6 +1012,7 @@ namespace {
         if (auto call = dyn_cast<CallExpr>(*I)) {
           if (setAsync) call->setImplicitlyAsync(*setAsync);
           if (setThrows) call->setImplicitlyThrows(true);
+          if (setDistributedThunk) call->setShouldApplyDistributedThunk(true);
           return;
         }
       llvm_unreachable("expected a CallExpr in applyStack!");
@@ -1667,7 +1669,6 @@ namespace {
     ThrowsMarkingResult tryMarkImplicitlyThrows(SourceLoc declLoc,
                                                 ConcreteDeclRef concDeclRef,
                                                 Expr* context) {
-
       ValueDecl *decl = concDeclRef.getDecl();
       ThrowsMarkingResult result = ThrowsMarkingResult::NotFound;
 
@@ -1869,8 +1870,11 @@ namespace {
       }
 
       switch (contextIsolation) {
-      case ActorIsolation::ActorInstance:
-      case ActorIsolation::DistributedActorInstance: {
+      case ActorIsolation::DistributedActorInstance:
+        markNearestCallAsImplicitly(/*setAsync*/None, /*setThrows*/false,
+                                    /*setDistributedThunk*/true);
+        LLVM_FALLTHROUGH;
+      case ActorIsolation::ActorInstance: {
         auto result = tryMarkImplicitlyAsync(
           loc, valueRef, context,
           ImplicitActorHopTarget::forGlobalActor(globalActor));
@@ -2277,7 +2281,10 @@ namespace {
             } else if (func->isDistributed()) {
               tryMarkImplicitlyAsync(memberLoc, memberRef, context,
                                      ImplicitActorHopTarget::forInstanceSelf());
-                tryMarkImplicitlyThrows(memberLoc, memberRef, context);
+              tryMarkImplicitlyThrows(memberLoc, memberRef, context);
+              markNearestCallAsImplicitly(/*setAsync*/None, /*setThrows*/false,
+                                          /*setDistributedThunk*/true);
+
             } else {
               // neither static or distributed, apply full distributed isolation
               ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method)
@@ -2362,8 +2369,7 @@ namespace {
           }
 
           // It wasn't a distributed func, so ban the access
-          // TODO(distributed): handle subscripts here too
-          if (auto var = dyn_cast<VarDecl>(member)) {
+          if (isPropOrSubscript(member)) {
             ctx.Diags.diagnose(
                 memberLoc, diag::distributed_actor_isolated_non_self_reference,
                 member->getDescriptiveKind(), member->getName());
@@ -2379,6 +2385,8 @@ namespace {
         if (isolation.getActorType()->isDistributedActor() &&
             !isolatedActor.isPotentiallyIsolated) {
           tryMarkImplicitlyThrows(memberLoc, memberRef, context);
+          markNearestCallAsImplicitly(/*setAsync*/None, /*setThrows*/false,
+                                      /*setDistributedThunk*/true);
         }
 
         if (implicitAsyncResult == AsyncMarkingResult::FoundAsync)

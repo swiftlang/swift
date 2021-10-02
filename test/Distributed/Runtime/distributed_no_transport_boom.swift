@@ -36,7 +36,7 @@ struct FakeTransport: ActorTransport {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type)
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
   throws -> Act?
       where Act: DistributedActor {
     return nil
@@ -65,7 +65,7 @@ func test_remote() async {
   let address = ActorAddress(parse: "")
   let transport = FakeTransport()
 
-  let remote = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
+  let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
   _ = try! await remote.hello() // let it crash!
 
   // CHECK: SOURCE_DIR/test/Distributed/Runtime/distributed_no_transport_boom.swift:18: Fatal error: Invoked remote placeholder function '_remote_hello' on remote distributed actor of type 'main.SomeSpecificDistributedActor'. Configure an appropriate 'ActorTransport' for this actor to resolve this error (e.g. by depending on some specific transport library).
