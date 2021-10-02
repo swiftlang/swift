@@ -4338,6 +4338,7 @@ protected:
     Bits.ApplyExpr.ImplicitlyAsync = false;
     Bits.ApplyExpr.ImplicitlyThrows = false;
     Bits.ApplyExpr.NoAsync = false;
+    Bits.ApplyExpr.ShouldApplyDistributedThunk = false;
   }
 
 public:

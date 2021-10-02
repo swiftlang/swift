@@ -113,14 +113,6 @@ library), instead of at an arbitrary point in time.
 For more details, see the forum post on
 [dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
 
-## `@_distributedActorIndependent`
-
-Marks a specific property of a distributed actor to be available even if the
-actor is remote.
-
-This only applies to two distributed actor properties `address` and `transport`.
-It cannot be safely declared on any properties defined by ordinary Swift code.
-
 ## `@_effects(effectname)`
 
 Tells the compiler that the implementation of the defined function is limited

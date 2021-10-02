@@ -4616,9 +4616,6 @@ ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",
       (DeclName))
-ERROR(distributed_actor_independent_property_must_be_let,none,
-      "_distributedActorIndependent can be applied to properties, however they must be 'let'",
-      ())
 NOTE(distributed_actor_isolated_property,none,
       "distributed actor state is only available within the actor instance", // TODO: reword in terms of isolation
       ())

@@ -67,33 +67,32 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
 
-  distributed func distReturnGeneric<T: Codable>(item: T) async throws -> T { // ok
+  distributed func distReturnGeneric<T: Codable & Sendable>(item: T) async throws -> T { // ok
     item
   }
-  distributed func distReturnGenericWhere<T>(item: Int) async throws -> T where T: Codable { // ok
+  distributed func distReturnGenericWhere<T: Sendable>(item: Int) async throws -> T where T: Codable { // ok
     fatalError()
   }
-  distributed func distBadReturnGeneric<T>(int: Int) async throws -> T {
+  distributed func distBadReturnGeneric<T: Sendable>(int: Int) async throws -> T {
     // expected-error@-1 {{distributed function result type 'T' does not conform to 'Codable'}}
     fatalError()
   }
 
-  distributed func distGenericParam<T: Codable>(value: T) async throws { // ok
+  distributed func distGenericParam<T: Codable & Sendable>(value: T) async throws { // ok
     fatalError()
   }
-  distributed func distGenericParamWhere<T>(value: T) async throws -> T where T: Codable { // ok
+  distributed func distGenericParamWhere<T: Sendable>(value: T) async throws -> T where T: Codable { // ok
     value
   }
-  distributed func distBadGenericParam<T>(int: T) async throws {
+  distributed func distBadGenericParam<T: Sendable>(int: T) async throws {
     // expected-error@-1 {{distributed function parameter 'int' of type 'T' does not conform to 'Codable'}}
     fatalError()
   }
 
   static func staticFunc() -> String { "" } // ok
 
-// TODO: should be able to handle a static, global actor isolated function as well
-//  @MainActor
-//  static func staticMainActorFunc() -> String { "" } // ok
+  @MainActor
+  static func staticMainActorFunc() -> String { "" } // ok
 
   static distributed func staticDistributedFunc() -> String {
     // expected-error@-1{{'distributed' functions cannot be 'static'}}{10-21=}
@@ -115,6 +114,9 @@ distributed actor DistributedActor_1 {
     await self.distHelloAsync()
     try self.distHelloThrows()
     try await self.distHelloAsyncThrows()
+
+    // Hops over to the global actor.
+    _ = await DistributedActor_1.staticMainActorFunc()
   }
 }
 
@@ -132,7 +134,7 @@ func test_outside(
   _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can only be referenced inside the distributed actor}}
   _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can only be referenced inside the distributed actor}}
 
-  // ==== special properties (@_distributedActorIndependent)
+  // ==== special properties (nonisolated, implicitly replicated)
   // the distributed actor's special fields may always be referred to
   _ = distributed.id
   _ = distributed.actorTransport

@@ -115,10 +115,6 @@ public:
     /// are permitted from elsewhere as a cross-actor reference, but
     /// contexts with unspecified isolation won't diagnose anything.
     GlobalActorUnsafe,
-
-    /// References to declarations that are part of a distributed actor are
-    /// only permitted if they are async.
-    CrossDistributedActorSelf, // FIXME(distributed): remove this case entirely rdar://83713366
   };
 
 private:
@@ -149,8 +145,7 @@ public:
   /// Retrieve the actor type that the declaration is within.
   NominalTypeDecl *getActorType() const {
     assert(kind == ActorSelf || 
-           kind == CrossActorSelf || 
-           kind == CrossDistributedActorSelf);
+           kind == CrossActorSelf);
     return data.actorType;
   }
 

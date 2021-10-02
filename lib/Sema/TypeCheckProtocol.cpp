@@ -2839,13 +2839,6 @@ bool ConformanceChecker::checkActorIsolation(
     /// nonisolated or distributed members.
     auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
     if (witnessClass && witnessClass->isDistributedActor()) {
-        // we only have two 'distributed-actor-nonisolated' properties,
-        // the address and transport; if we see any such marked property,
-        // we're free to automatically assume those are fine and accessible always.
-      if (witness->isSynthesized() && witness->isDistributedActorIndependent()) {
-        return false;
-      }
-
       // Maybe we're dealing with a 'distributed func' which is witness to
       // a distributed function requirement, this is ok.
       if (requirementFunc && requirementFunc->isDistributed() &&
@@ -2885,7 +2878,6 @@ bool ConformanceChecker::checkActorIsolation(
     return true;
   }
 
-  case ActorIsolationRestriction::CrossDistributedActorSelf:
   case ActorIsolationRestriction::CrossActorSelf:
     return diagnoseNonSendableTypesInReference(
         witness, DC->getParentModule(), witness->getLoc(),
