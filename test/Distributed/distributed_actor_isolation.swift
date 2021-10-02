@@ -91,9 +91,8 @@ distributed actor DistributedActor_1 {
 
   static func staticFunc() -> String { "" } // ok
 
-// TODO: should be able to handle a static, global actor isolated function as well
-//  @MainActor
-//  static func staticMainActorFunc() -> String { "" } // ok
+  @MainActor
+  static func staticMainActorFunc() -> String { "" } // ok
 
   static distributed func staticDistributedFunc() -> String {
     // expected-error@-1{{'distributed' functions cannot be 'static'}}{10-21=}
@@ -115,6 +114,9 @@ distributed actor DistributedActor_1 {
     await self.distHelloAsync()
     try self.distHelloThrows()
     try await self.distHelloAsyncThrows()
+
+    // Hops over to the global actor.
+    _ = await DistributedActor_1.staticMainActorFunc()
   }
 }
 

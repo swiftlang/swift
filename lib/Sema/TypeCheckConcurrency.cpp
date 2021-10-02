@@ -1871,9 +1871,6 @@ namespace {
 
       switch (contextIsolation) {
       case ActorIsolation::DistributedActorInstance:
-        markNearestCallAsImplicitly(/*setAsync*/None, /*setThrows*/false,
-                                    /*setDistributedThunk*/true);
-        LLVM_FALLTHROUGH;
       case ActorIsolation::ActorInstance: {
         auto result = tryMarkImplicitlyAsync(
           loc, valueRef, context,
@@ -2234,28 +2231,8 @@ namespace {
       switch (auto isolation =
                   ActorIsolationRestriction::forDeclaration(
                     memberRef, getDeclContext())) {
-      case ActorIsolationRestriction::Unrestricted: {
-        // If a cross-actor reference is to an isolated actor, it's not
-        // crossing actors.
-        if (getIsolatedActor(base))
-          return false;
-
-        // Always fine to invoke constructors from outside of actors.
-        if (dyn_cast<ConstructorDecl>(member))
-          return false;
-
-        // While the member may be unrestricted, perhaps it is in a
-        // distributed actor, in which case we need to diagnose it.
-        if (auto classDecl = dyn_cast<ClassDecl>(member->getDeclContext())) {
-          if (classDecl->isDistributedActor()) {
-            ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
-            noteIsolatedActorMember(member, context);
-            return true;
-          }
-        }
-
+      case ActorIsolationRestriction::Unrestricted:
         return false;
-      }
 
       case ActorIsolationRestriction::CrossDistributedActorSelf:
       case ActorIsolationRestriction::CrossActorSelf: {
@@ -3077,13 +3054,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // A @Sendable function is assumed to be actor-independent.
     if (func->isSendable()) {
       defaultIsolation = ActorIsolation::forIndependent();
-    }
-
-    if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) {
-      /// Unless the function is static, it is isolated to the dist actor
-      if (nominal->isDistributedActor() && !func->isStatic()) {
-        defaultIsolation = ActorIsolation::forDistributedActorInstance(nominal);
-      }
     }
   }
 
