@@ -419,3 +419,4 @@ $s1t10globalFuncyyAA7MyActorCYiF ---> t.globalFunc(isolated t.MyActor) -> ()
 $sSIxip6foobarP ---> foobar in Swift.DefaultIndices.subscript : A
 $s13__lldb_expr_110$10016c2d8yXZ1B10$10016c2e0LLC ---> __lldb_expr_1.(unknown context at $10016c2d8).(B in $10016c2e0)
 $s__TJO ---> $s__TJO
+$s6Foobar7Vector2VAASdRszlE10simdMatrix5scale6rotate9translateSo0C10_double3x3aACySdG_SdAJtFZ0D4TypeL_aySd__GD ---> MatrixType #1 in static (extension in Foobar):Foobar.Vector2<Swift.Double><A where A == Swift.Double>.simdMatrix(scale: Foobar.Vector2<Swift.Double>, rotate: Swift.Double, translate: Foobar.Vector2<Swift.Double>) -> __C.simd_double3x3

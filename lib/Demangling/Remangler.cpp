@@ -568,6 +568,7 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
+    case Node::Kind::Static:
       if (!fullSubstitutionMap)
         break;
 
@@ -3448,6 +3449,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::ModifyAccessor:
     case Node::Kind::UnsafeAddressor:
     case Node::Kind::UnsafeMutableAddressor:
+    case Node::Kind::Static:
       assert(node->getNumChildren() > 0);
       return node->getNumChildren() > 0 && isSpecialized(node->getChild(0));
 
@@ -3484,6 +3486,7 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::Static:
       NumToCopy = node->getNumChildren();
       LLVM_FALLTHROUGH;
     case Node::Kind::Structure:
