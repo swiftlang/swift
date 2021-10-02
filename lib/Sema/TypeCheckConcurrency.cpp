@@ -385,18 +385,6 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
       if (func->isAsyncContext())
         isAccessibleAcrossActors = true;
-
-      // FIXME: move diagnosis out of this function entirely (!)
-      if (func->isDistributed()) {
-        if (auto classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-          if (!classDecl->isDistributedActor()) {
-            // `distributed func` must only be defined in `distributed actor`
-            func->diagnose(
-                diag::distributed_actor_func_defined_outside_of_distributed_actor,
-                func->getName());
-          }
-        } // TODO: need to handle protocol case here too?
-      }
     }
 
     // Similarly, a computed property or subscript that has an 'async' getter

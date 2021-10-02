@@ -5400,7 +5400,7 @@ void AttributeChecker::visitActorAttr(ActorAttr *attr) {
 void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   auto dc = D->getDeclContext();
 
-  // distributed can be applied to actor class definitions and async functions
+  // distributed can be applied to actor definitions and their methods
   if (auto varDecl = dyn_cast<VarDecl>(D)) {
     // distributed can not be applied to stored properties
     diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
