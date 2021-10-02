@@ -256,7 +256,6 @@ public:
 
   void visitActorAttr(ActorAttr *attr);
   void visitDistributedActorAttr(DistributedActorAttr *attr);
-  void visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr);
   void visitGlobalActorAttr(GlobalActorAttr *attr);
   void visitAsyncAttr(AsyncAttr *attr);
   void visitMarkerAttr(MarkerAttr *attr);
@@ -5507,16 +5506,6 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     (void)getActorIsolation(VD);
-  }
-}
-
-void AttributeChecker::visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr) {
-  /// user-inaccessible _distributedActorIndependent can only be applied to let properties
-  if (auto var = dyn_cast<VarDecl>(D)) {
-    if (!var->isLet()) {
-      diagnoseAndRemoveAttr(attr, diag::distributed_actor_independent_property_must_be_let);
-      return;
-    }
   }
 }
 

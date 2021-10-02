@@ -2561,8 +2561,6 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
   // If any of them are present, use that attribute.
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
-  auto distributedActorIndependentAttr =
-      decl->getAttrs().getAttribute<DistributedActorIndependentAttr>();
 
   // Remove implicit attributes if we only care about explicit ones.
   if (onlyExplicit) {
@@ -2570,14 +2568,10 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
       nonisolatedAttr = nullptr;
     if (globalActorAttr && globalActorAttr->first->isImplicit())
       globalActorAttr = None;
-    if (distributedActorIndependentAttr &&
-        distributedActorIndependentAttr->isImplicit())
-      distributedActorIndependentAttr = nullptr;
   }
 
   unsigned numIsolationAttrs =
-    (nonisolatedAttr ? 1 : 0) + (globalActorAttr ? 1 : 0) +
-    (distributedActorIndependentAttr ? 1 : 0);
+    (nonisolatedAttr ? 1 : 0) + (globalActorAttr ? 1 : 0);
   if (numIsolationAttrs == 0)
     return None;
 
@@ -2594,32 +2588,20 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
 
     if (globalActorAttr) {
       if (shouldDiagnose) {
-        if (globalActorAttr) {
-          const DeclAttribute *otherAttr =
-              nonisolatedAttr
-                ? static_cast<const DeclAttribute *>(nonisolatedAttr)
-                : distributedActorIndependentAttr;
-          decl->diagnose(
-              diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
-              name, otherAttr->getAttrName(),
-              globalActorAttr->second->getName().str())
-            .highlight(otherAttr->getRangeWithAt())
-            .highlight(globalActorAttr->first->getRangeWithAt());
-        } else {
-          decl->diagnose(
-              diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
-              name, nonisolatedAttr->getAttrName(),
-              distributedActorIndependentAttr->getAttrName())
-            .highlight(nonisolatedAttr->getRangeWithAt())
-            .highlight(distributedActorIndependentAttr->getRangeWithAt());
+        decl->diagnose(
+            diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
+            name, nonisolatedAttr->getAttrName(),
+            globalActorAttr->second->getName().str())
+          .highlight(nonisolatedAttr->getRangeWithAt())
+          .highlight(globalActorAttr->first->getRangeWithAt());
         }
       }
     }
   }
 
-  // If the declaration is explicitly marked 'nonisolated' or distributed
-  // actor-independent, report it as nonisolated.
-  if (nonisolatedAttr || distributedActorIndependentAttr) {
+  // If the declaration is explicitly marked 'nonisolated', report it as
+  // independent.
+  if (nonisolatedAttr) {
     return ActorIsolation::forIndependent();
   }
 

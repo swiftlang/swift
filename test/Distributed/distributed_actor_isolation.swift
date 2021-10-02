@@ -134,7 +134,7 @@ func test_outside(
   _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can only be referenced inside the distributed actor}}
   _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can only be referenced inside the distributed actor}}
 
-  // ==== special properties (@_distributedActorIndependent)
+  // ==== special properties (nonisolated, implicitly replicated)
   // the distributed actor's special fields may always be referred to
   _ = distributed.id
   _ = distributed.actorTransport

@@ -105,7 +105,7 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   auto &C = derived.Context;
 
   // ```
-  // @_distributedActorIndependent
+  // nonisolated
   // let id: AnyActorIdentity
   // ```
   auto propertyType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
@@ -133,7 +133,7 @@ static ValueDecl *deriveDistributedActor_actorTransport(
   auto &C = derived.Context;
 
   // ```
-  // @_distributedActorIndependent
+  // nonisolated
   // let actorTransport: ActorTransport
   // ```
   // (no need for @actorIndependent because it is an immutable let)
