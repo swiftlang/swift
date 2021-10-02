@@ -2,6 +2,9 @@
 
 // Clang driver on Windows doesn't support -stdlib=libc++
 // XFAIL: OS=windows-msvc
+// Android NDK layout might need more flags to find libc++
+// XFAIL: OS=linux-androideabi
+// XFAIL: OS=linux-android
 
 // CHECK: extension FakeNamespace {
 // CHECK:   static func foo(_ x: Int32)
