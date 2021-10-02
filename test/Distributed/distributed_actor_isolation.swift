@@ -67,24 +67,24 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
 
-  distributed func distReturnGeneric<T: Codable>(item: T) async throws -> T { // ok
+  distributed func distReturnGeneric<T: Codable & Sendable>(item: T) async throws -> T { // ok
     item
   }
-  distributed func distReturnGenericWhere<T>(item: Int) async throws -> T where T: Codable { // ok
+  distributed func distReturnGenericWhere<T: Sendable>(item: Int) async throws -> T where T: Codable { // ok
     fatalError()
   }
-  distributed func distBadReturnGeneric<T>(int: Int) async throws -> T {
+  distributed func distBadReturnGeneric<T: Sendable>(int: Int) async throws -> T {
     // expected-error@-1 {{distributed function result type 'T' does not conform to 'Codable'}}
     fatalError()
   }
 
-  distributed func distGenericParam<T: Codable>(value: T) async throws { // ok
+  distributed func distGenericParam<T: Codable & Sendable>(value: T) async throws { // ok
     fatalError()
   }
-  distributed func distGenericParamWhere<T>(value: T) async throws -> T where T: Codable { // ok
+  distributed func distGenericParamWhere<T: Sendable>(value: T) async throws -> T where T: Codable { // ok
     value
   }
-  distributed func distBadGenericParam<T>(int: T) async throws {
+  distributed func distBadGenericParam<T: Sendable>(int: T) async throws {
     // expected-error@-1 {{distributed function parameter 'int' of type 'T' does not conform to 'Codable'}}
     fatalError()
   }

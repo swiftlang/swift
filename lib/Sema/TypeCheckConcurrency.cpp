@@ -396,8 +396,6 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
                 func->getName());
           }
         } // TODO: need to handle protocol case here too?
-        return forDistributedActorSelf(isolation.getActor(),
-                                       /*isCrossActor*/ isAccessibleAcrossActors);
       }
     }
 
@@ -1586,13 +1584,6 @@ namespace {
       ValueDecl *decl = concDeclRef.getDecl();
       AsyncMarkingResult result = AsyncMarkingResult::NotFound;
 
-      // if it is explicitly marked distributed actor independent,
-      // it is synchronously accessible, no implicit async needed.
-      if (decl->getAttrs().hasAttribute<DistributedActorIndependentAttr>() ||
-          decl->getAttrs().hasAttribute<NonisolatedAttr>()) {
-        return result;
-      }
-
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
@@ -2247,9 +2238,7 @@ namespace {
             !(isolatedActor.isActorSelf() &&
               member->isInstanceMember() &&
               isActorInitOrDeInitContext(getDeclContext())
-            ) &&
-            !member->getAttrs().hasAttribute<NonisolatedAttr>() &&
-            !member->getAttrs().hasAttribute<DistributedActorIndependentAttr>();
+            );
 
         if (performDistributedChecks) {
           if (auto func = dyn_cast<FuncDecl>(member)) {
@@ -2272,13 +2261,6 @@ namespace {
           } // end FuncDecl
 
           if (isPropOrSubscript(member)) {
-            DeclAttributes &attrs = member->getAttrs();
-            if (attrs.hasAttribute<DistributedActorIndependentAttr>())
-              return false;
-
-            if (attrs.hasAttribute<NonisolatedAttr>())
-              return false;
-
               ctx.Diags.diagnose(
                   memberLoc, diag::distributed_actor_isolated_non_self_reference,
                   member->getDescriptiveKind(),
@@ -2329,12 +2311,7 @@ namespace {
             } else {
               // it is some other member and since we only allow distributed
               // funcs this definitely is distributed-actor-isolated
-              auto distributedAccessAllowed =
-                  func->isDistributed() ||
-                  member->getAttrs()
-                      .hasAttribute<DistributedActorIndependentAttr>() ||
-                  member->getAttrs().hasAttribute<NonisolatedAttr>();
-              if (!distributedAccessAllowed) {
+              if (!func->isDistributed()) {
                 ctx.Diags.diagnose(
                     memberLoc,
                     diag::distributed_actor_isolated_non_self_reference,
@@ -2596,6 +2573,8 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
   // If any of them are present, use that attribute.
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
+  auto distributedActorIndependentAttr =
+      decl->getAttrs().getAttribute<DistributedActorIndependentAttr>();
 
   // Remove implicit attributes if we only care about explicit ones.
   if (onlyExplicit) {
@@ -2603,10 +2582,14 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
       nonisolatedAttr = nullptr;
     if (globalActorAttr && globalActorAttr->first->isImplicit())
       globalActorAttr = None;
+    if (distributedActorIndependentAttr &&
+        distributedActorIndependentAttr->isImplicit())
+      distributedActorIndependentAttr = nullptr;
   }
 
   unsigned numIsolationAttrs =
-    (nonisolatedAttr ? 1 : 0) + (globalActorAttr ? 1 : 0);
+    (nonisolatedAttr ? 1 : 0) + (globalActorAttr ? 1 : 0) +
+    (distributedActorIndependentAttr ? 1 : 0);
   if (numIsolationAttrs == 0)
     return None;
 
@@ -2623,19 +2606,32 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
 
     if (globalActorAttr) {
       if (shouldDiagnose) {
-        decl->diagnose(
-            diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
-            name, nonisolatedAttr->getAttrName(),
-            globalActorAttr->second->getName().str())
-          .highlight(nonisolatedAttr->getRangeWithAt())
-          .highlight(globalActorAttr->first->getRangeWithAt());
+        if (globalActorAttr) {
+          const DeclAttribute *otherAttr =
+              nonisolatedAttr
+                ? static_cast<const DeclAttribute *>(nonisolatedAttr)
+                : distributedActorIndependentAttr;
+          decl->diagnose(
+              diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
+              name, otherAttr->getAttrName(),
+              globalActorAttr->second->getName().str())
+            .highlight(otherAttr->getRangeWithAt())
+            .highlight(globalActorAttr->first->getRangeWithAt());
+        } else {
+          decl->diagnose(
+              diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
+              name, nonisolatedAttr->getAttrName(),
+              distributedActorIndependentAttr->getAttrName())
+            .highlight(nonisolatedAttr->getRangeWithAt())
+            .highlight(distributedActorIndependentAttr->getRangeWithAt());
+        }
       }
     }
   }
 
-  // If the declaration is explicitly marked 'nonisolated', report it as
-  // independent.
-  if (nonisolatedAttr) {
+  // If the declaration is explicitly marked 'nonisolated' or distributed
+  // actor-independent, report it as nonisolated.
+  if (nonisolatedAttr || distributedActorIndependentAttr) {
     return ActorIsolation::forIndependent();
   }
 
@@ -3089,17 +3085,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       break;
     }
 
-    case ActorIsolation::DistributedActorInstance: {
-      /// 'distributed actor independent' implies 'nonisolated'
-      if (value->isDistributedActorIndependent()) {
-        // TODO: rename 'distributed actor independent' to 'distributed(nonisolated)'
-        value->getAttrs().add(
-            new (ctx) DistributedActorIndependentAttr(/*IsImplicit=*/true));
-        value->getAttrs().add(
-            new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
-      }
-      break;
-    }
+    case ActorIsolation::DistributedActorInstance:
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
       if (onlyGlobal)
