@@ -2588,7 +2588,6 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
             globalActorAttr->second->getName().str())
           .highlight(nonisolatedAttr->getRangeWithAt())
           .highlight(globalActorAttr->first->getRangeWithAt());
-        }
       }
     }
   }
