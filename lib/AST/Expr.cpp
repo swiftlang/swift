@@ -1068,22 +1068,6 @@ Type OverloadSetRefExpr::getBaseType() const {
   llvm_unreachable("Unhandled overloaded set reference expression");
 }
 
-bool ApplyExpr::shouldApplyDistributedThunk() const {
-  // only a distributed decl has a chance of needing to be invoked as a thunk
-  auto func = dyn_cast<AbstractFunctionDecl>(getCalledValue());
-  if (!func || !func->isDistributed())
-    return false;
-
-  if (implicitlyThrows())
-    return true;
-
-  auto isEffectivelyAsync = func->hasAsync() || isImplicitlyAsync();
-  if (func->hasThrows() && isEffectivelyAsync)
-    return true;
-
-  return false;
-}
-
 bool OverloadSetRefExpr::hasBaseObject() const {
   if (Type BaseTy = getBaseType())
     return !BaseTy->is<AnyMetatypeType>();
