@@ -799,6 +799,38 @@ SILValue swift::findOwnershipReferenceRoot(SILValue ref) {
   return FindReferenceRoot(true /*preserveOwnership*/).findRoot(ref);
 }
 
+/// Find the first owned aggregate containing the reference, or simply the
+/// reference root if no aggregate is found.
+///
+/// TODO: Add a component path to a ReferenceRoot abstraction and handle
+/// that within FindReferenceRoot.
+SILValue swift::findOwnershipReferenceAggregate(SILValue ref) {
+  SILValue root = ref;
+  while(true) {
+    root = findOwnershipReferenceRoot(root);
+    if (!root)
+      return root;
+    if (isa<FirstArgOwnershipForwardingSingleValueInst>(root)
+        || isa<OwnershipForwardingConversionInst>(root)
+        || isa<OwnershipForwardingSelectEnumInstBase>(root)
+        || isa<OwnershipForwardingMultipleValueInstruction>(root)) {
+      root = root->getDefiningInstruction()->getOperand(0);
+      continue;
+    }
+    if (auto *arg = dyn_cast<SILArgument>(root)) {
+      if (auto *term = arg->getSingleTerminator()) {
+        if (term->isTransformationTerminator()) {
+          assert(OwnershipForwardingTermInst::isa(term));
+          root = term->getOperand(0);
+          continue;
+        }
+      }
+    }
+    break;
+  }
+  return root;
+}
+
 //===----------------------------------------------------------------------===//
 //                            MARK: AccessStorage
 //===----------------------------------------------------------------------===//

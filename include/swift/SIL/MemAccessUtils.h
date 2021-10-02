@@ -204,6 +204,11 @@ SILValue findReferenceRoot(SILValue ref);
 /// Find the first owned root of the reference.
 SILValue findOwnershipReferenceRoot(SILValue ref);
 
+/// Find the aggregate containing the first owned root of the
+/// reference. Identical to findOwnershipReferenceRoot, but looks through
+/// struct_extract, tuple_extract, etc.
+SILValue findOwnershipReferenceAggregate(SILValue ref);
+
 /// Return true if \p address points to a let-variable.
 ///
 /// let-variables are only written during let-variable initialization, which is
