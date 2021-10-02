@@ -2209,8 +2209,6 @@ namespace {
             if (func->isStatic()) {
               // no additional checks for static functions
             } else if (func->isDistributed()) {
-              tryMarkImplicitlyAsync(memberLoc, memberRef, context,
-                                     ImplicitActorHopTarget::forInstanceSelf());
               tryMarkImplicitlyThrows(memberLoc, memberRef, context);
               markNearestCallAsImplicitly(/*setAsync*/None, /*setThrows*/false,
                                           /*setDistributedThunk*/true);
