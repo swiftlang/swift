@@ -736,8 +736,13 @@ int xcrunToolCommand(std::vector<std::string> commandAndArguments, XcrunToolBloc
         dup2(outPipe[1], STDOUT_FILENO);
         dup2(errPipe[1], STDERR_FILENO);
 
+        close(outPipe[0]);
+        close(errPipe[0]);
+
         execv(launchPath, (char *const *)arguments.data());
     }
+    close(outPipe[1]);
+    close(errPipe[1]);
     
     // Read stdout and stderr in parallel, then wait for the task 
     // to exit. Anything else risks deadlock if the task fills 
@@ -754,9 +759,11 @@ int xcrunToolCommand(std::vector<std::string> commandAndArguments, XcrunToolBloc
     });
 
     auto const stdOutData = readToEOF(outPipe[0]);
+    close(outPipe[0]);
 
     dispatch_semaphore_wait(gotStdErr, DISPATCH_TIME_FOREVER);
     dispatch_release(gotStdErr);
+    close(errPipe[0]);
 
     int status = 0;
     waitpid(childPid, &status, 0);
@@ -881,6 +888,7 @@ void enumerateDirectory(std::string directory, F&& func) {
         return;
     }
 
+    std::vector<std::string> subpaths;
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
         std::string path = directory + "/" + entry->d_name;
@@ -891,8 +899,12 @@ void enumerateDirectory(std::string directory, F&& func) {
             if (strncmp(entry->d_name, "..", entry->d_namlen) == 0) {
                 continue;
             }
-            enumerateDirectory(path, func);
+            subpaths.push_back(path);
         }
+    }
+    closedir(dir);
+    for (auto const &path : subpaths) {
+        enumerateDirectory(path, func);
     }
 }
 
