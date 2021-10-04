@@ -116,3 +116,28 @@ bool PrunedLiveness::updateForBorrowingOperand(Operand *op) {
   }
   return true;
 }
+
+bool PrunedLiveness::isWithinBoundary(SILInstruction *inst) {
+  SILBasicBlock *block = inst->getParent();
+  switch (getBlockLiveness(block)) {
+  case PrunedLiveBlocks::Dead:
+    return false;
+  case PrunedLiveBlocks::LiveWithin:
+    break;
+  case PrunedLiveBlocks::LiveOut:
+    return true;
+  }
+  // The boundary is within this block. This instruction is before the boundary
+  // iff any interesting uses occur after it.
+  for (SILInstruction &inst :
+         make_range(std::next(inst->getIterator()), block->end())) {
+    switch (isInterestingUser(&inst)) {
+    case PrunedLiveness::NonUser:
+      break;
+    case PrunedLiveness::NonLifetimeEndingUse:
+    case PrunedLiveness::LifetimeEndingUse:
+      return true;
+    }
+  }
+  return false;
+}

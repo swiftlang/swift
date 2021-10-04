@@ -242,6 +242,10 @@ public:
       return NonUser;
     return useIter->second ? LifetimeEndingUse : NonLifetimeEndingUse;
   }
+
+  /// Return true if \p inst occurs before the liveness boundary. Used when the
+  /// client already knows that inst occurs after the start of liveness.
+  bool isWithinBoundary(SILInstruction *inst);
 };
 
 } // namespace swift
