@@ -914,23 +914,14 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   B.setInsertionPoint(entryBlock);
 
-  /// Generates a reinterpret_cast for converting
-  /// Builtin.Job -> UnownedJob
-  /// Builtin.Executor -> UnownedSerialExecutor
-  /// These are used by _swiftJobRun, which, ABI-wise, could take
-  /// Builtin.Job or Builtin.Executor, but doesn't.
-  auto createExplodyCastForCall =
-      [this, &moduleLoc](SILValue originalValue, FuncDecl *jobRunFuncDecl,
-                         uint32_t paramIndex) -> SILValue {
-    // The type coming from the _swiftJobRun function
-    Type apiType = jobRunFuncDecl->getParameters()->get(paramIndex)->getType();
-    SILType apiSILType =
-        SILType::getPrimitiveObjectType(apiType->getCanonicalType());
+  auto wrapCallArgs = [this, &moduleLoc](SILValue originalValue, FuncDecl *fd,
+                            uint32_t paramIndex) -> SILValue {
+    Type parameterType = fd->getParameters()->get(paramIndex)->getType();
+    SILType paramSILType = SILType::getPrimitiveObjectType(parameterType->getCanonicalType());
     // If the types are the same, we don't need to do anything!
-    if (apiSILType == originalValue->getType())
+    if (paramSILType == originalValue->getType())
       return originalValue;
-    return this->B.createUncheckedReinterpretCast(moduleLoc, originalValue,
-                                                  apiSILType);
+    return this->B.createStruct(moduleLoc, paramSILType, originalValue);
   };
 
   // Call CreateAsyncTask
@@ -975,7 +966,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
       moduleLoc,
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::ConvertTaskToJob)),
       JobType, {}, {task});
-  jobResult = createExplodyCastForCall(jobResult, swiftJobRunFuncDecl, 0);
+  jobResult = wrapCallArgs(jobResult, swiftJobRunFuncDecl, 0);
 
   // Get main executor
   FuncDecl *getMainExecutorFuncDecl = SGM.getGetMainExecutor();
@@ -985,7 +976,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   SILValue getMainExeutorFunc =
       B.createFunctionRefFor(moduleLoc, getMainExeutorSILFunc);
   SILValue mainExecutor = B.createApply(moduleLoc, getMainExeutorFunc, {}, {});
-  mainExecutor = createExplodyCastForCall(mainExecutor, swiftJobRunFuncDecl, 1);
+  mainExecutor = wrapCallArgs(mainExecutor, swiftJobRunFuncDecl, 1);
 
   // Run first part synchronously
   B.createApply(moduleLoc, swiftJobRunFunc, {}, {jobResult, mainExecutor});

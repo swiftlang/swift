@@ -69,11 +69,11 @@ func asyncFunc() async {
 // CHECK-SIL-NEXT:  // function_ref swift_job_run
 // CHECK-SIL-NEXT:  %12 = function_ref @swift_job_run : $@convention(thin) (UnownedJob, UnownedSerialExecutor) -> ()
 // CHECK-SIL-NEXT:  %13 = builtin "convertTaskToJob"(%11 : $Builtin.NativeObject) : $Builtin.Job
-// CHECK-SIL-NEXT:  %14 = unchecked_trivial_bit_cast %13 : $Builtin.Job to $UnownedJob
+// CHECK-SIL-NEXT:  %14 = struct $UnownedJob (%13 : $Builtin.Job)
 // CHECK-SIL-NEXT:  // function_ref swift_task_getMainExecutor
 // CHECK-SIL-NEXT:  %15 = function_ref @swift_task_getMainExecutor : $@convention(thin) () -> Builtin.Executor
 // CHECK-SIL-NEXT:  %16 = apply %15() : $@convention(thin) () -> Builtin.Executor
-// CHECK-SIL-NEXT:  %17 = unchecked_trivial_bit_cast %16 : $Builtin.Executor to $UnownedSerialExecutor
+// CHECK-SIL-NEXT:  %17 = struct $UnownedSerialExecutor (%16 : $Builtin.Executor)
 // CHECK-SIL-NEXT:  %18 = apply %12(%14, %17) : $@convention(thin) (UnownedJob, UnownedSerialExecutor) -> ()
 // CHECK-SIL-NEXT:  // function_ref swift_task_asyncMainDrainQueue
 // CHECK-SIL-NEXT:  %19 = function_ref @swift_task_asyncMainDrainQueue : $@convention(thin) () -> Never
