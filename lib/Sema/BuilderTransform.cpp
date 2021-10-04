@@ -1729,7 +1729,16 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
           solutions.front(),
           SolutionApplicationTarget(func))) {
     performSyntacticDiagnosticsForTarget(*result, /*isExprStmt*/ false);
-    return result->getFunctionBody();
+    auto *body = result->getFunctionBody();
+
+    if (cs.isDebugMode()) {
+      auto &log = llvm::errs();
+      log << "--- Type-checked function body ---\n";
+      body->dump(log);
+      log << '\n';
+    }
+
+    return body;
   }
 
   return nullptr;
