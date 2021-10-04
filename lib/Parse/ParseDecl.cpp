@@ -595,8 +595,10 @@ bool Parser::parseSpecializeAttributeArguments(
       auto ParamLabel = Tok.getText();
       SyntaxParsingContext ArgumentContext(
           SyntaxContext, ParamLabel == "target"
-                             ? SyntaxKind::TargetFunctionEntry
-                             : SyntaxKind::LabeledSpecializeEntry);
+                             ? SyntaxKind::TargetFunctionEntry :
+                             (ParamLabel == "availability" ?
+                              SyntaxKind::AvailabilityEntry
+                              : SyntaxKind::LabeledSpecializeEntry));
       if (ParamLabel != "exported" && ParamLabel != "kind" &&
           ParamLabel != "target" && ParamLabel != "spi" &&
           ParamLabel != "spiModule" && ParamLabel != "availability") {

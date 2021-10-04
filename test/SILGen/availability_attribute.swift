@@ -34,3 +34,7 @@ public struct AvailableStruct {
         public func availableNestedMethod() {}
     }
 }
+
+@_specialize(exported: true, availability: macOS 11, iOS 13, *; where T == Int)
+//@_specialize(exported: true, where T == Int)
+public func testAvailability<T>(_ t: T) {}
