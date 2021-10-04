@@ -1462,6 +1462,14 @@ public:
         return nullptr;
     }
 
+    // Setup the types of our case body var decls.
+    for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+      assert(expected->hasName());
+      auto prev = expected->getParentVarDecl();
+      auto type = solution.resolveInterfaceType(solution.getType(prev));
+      expected->setInterfaceType(type);
+    }
+
     // Transform the body of the case.
     auto body = cast<BraceStmt>(caseStmt->getBody());
     auto captured = takeCapturedStmt(body);
