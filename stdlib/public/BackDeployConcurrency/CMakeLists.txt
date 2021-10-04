@@ -49,7 +49,8 @@ set(swift_concurrency_options
   DARWIN_INSTALL_NAME_DIR "@rpath")
 set(swift_concurrency_extra_sources
   "../BackDeployConcurrency/Exclusivity.cpp"
-  "../BackDeployConcurrency/Metadata.cpp")
+  "../BackDeployConcurrency/Metadata.cpp"
+  "../stubs/SwiftNativeNSObject.mm")
 set(swift_concurrency_async_fp_mode "never")
 
 add_subdirectory(../Concurrency stdlib/public/BackDeployConcurrency)
