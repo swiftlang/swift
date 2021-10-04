@@ -131,8 +131,15 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   Status status = Status::Valid;
 
   ModuleDecl *M = file->getParentModule();
-  if (M->getName().str() != Core->Name)
+  // The real (on-disk) name of the module should be checked here as that's the
+  // actually loaded module. In case module aliasing is used when building the main
+  // module, e.g. -module-name MyModule -module-alias Foo=Bar, the loaded module
+  // that maps to 'Foo' is actually Bar.swiftmodule|.swiftinterface (applies to swift
+  // modules only), which is retrieved via M->getRealName(). If no module aliasing is
+  // used, M->getRealName() will return the same value as M->getName(), which is 'Foo'.
+  if (M->getRealName().str() != Core->Name) {
     return error(Status::NameMismatch);
+  }
 
   ASTContext &ctx = getContext();
 
