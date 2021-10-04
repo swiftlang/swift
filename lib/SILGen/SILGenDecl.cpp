@@ -39,50 +39,42 @@ using namespace Lowering;
 void Initialization::_anchor() {}
 void SILDebuggerClient::anchor() {}
 
-static void copyOrInitValueIntoHelper(
-    SILGenFunction &SGF, SILLocation loc, ManagedValue value, bool isInit,
-    ArrayRef<InitializationPtr> subInitializations,
-    llvm::function_ref<ManagedValue(ManagedValue, unsigned, SILType)> func) {
-  auto sourceType = value.getType().castTo<TupleType>();
-  auto sourceSILType = value.getType();
-  for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
-    SILType fieldTy = sourceSILType.getTupleElementType(i);
-    ManagedValue elt = func(value, i, fieldTy);
-    subInitializations[i]->copyOrInitValueInto(SGF, loc, elt, isInit);
-    subInitializations[i]->finishInitialization(SGF);
-  }
-}
-
 void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
                                               SILLocation loc,
                                               ManagedValue value, bool isInit) {
+  // Process all values before initialization all at once to ensure all cleanups
+  // are setup on all tuple elements before a potential early exit.
+  SmallVector<ManagedValue, 8> destructuredValues;
+
   // In the object case, emit a destructure operation and return.
   if (value.getType().isObject()) {
-    return SGF.B.emitDestructureValueOperation(
-        loc, value, [&](unsigned i, ManagedValue subValue) {
-          auto &subInit = SubInitializations[i];
-          subInit->copyOrInitValueInto(SGF, loc, subValue, isInit);
-          subInit->finishInitialization(SGF);
-        });
+    SGF.B.emitDestructureValueOperation(loc, value, destructuredValues);
+  } else {
+    // In the address case, we forward the underlying value and store it
+    // into memory and then create a +1 cleanup. since we assume here
+    // that we have a +1 value since we are forwarding into memory.
+    assert(value.isPlusOne(SGF) && "Can not store a +0 value into memory?!");
+    CleanupCloner cloner(SGF, value);
+    SILValue v = value.forward(SGF);
+
+    auto sourceType = value.getType().castTo<TupleType>();
+    auto sourceSILType = value.getType();
+    for (unsigned i : range(sourceType->getNumElements())) {
+      SILType fieldTy = sourceSILType.getTupleElementType(i);
+      SILValue elt = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
+      if (!fieldTy.isAddressOnly(SGF.F)) {
+        elt = SGF.B.emitLoadValueOperation(loc, elt,
+                                           LoadOwnershipQualifier::Take);
+      }
+      destructuredValues.push_back(cloner.clone(elt));
+    }
   }
 
-  // In the address case, we forward the underlying value and store it
-  // into memory and then create a +1 cleanup. since we assume here
-  // that we have a +1 value since we are forwarding into memory.
-  assert(value.isPlusOne(SGF) && "Can not store a +0 value into memory?!");
-  value = ManagedValue::forUnmanaged(value.forward(SGF));
-  return copyOrInitValueIntoHelper(
-      SGF, loc, value, isInit, SubInitializations,
-      [&](ManagedValue aggregate, unsigned i,
-          SILType fieldType) -> ManagedValue {
-        ManagedValue elt =
-            SGF.B.createTupleElementAddr(loc, value, i, fieldType);
-        if (!fieldType.isAddressOnly(SGF.F)) {
-          return SGF.B.createLoadTake(loc, elt);
-        }
-
-        return SGF.emitManagedRValueWithCleanup(elt.getValue());
-      });
+  for (unsigned i : indices(destructuredValues)) {
+    SubInitializations[i]->copyOrInitValueInto(SGF, loc, destructuredValues[i],
+                                               isInit);
+    SubInitializations[i]->finishInitialization(SGF);
+  }
 }
 
 void TupleInitialization::finishUninitialized(SILGenFunction &SGF) {

@@ -372,6 +372,9 @@ public:
   void emitDestructureValueOperation(
       SILLocation loc, ManagedValue value,
       function_ref<void(unsigned, ManagedValue)> func);
+  void emitDestructureValueOperation(
+      SILLocation loc, ManagedValue value,
+      SmallVectorImpl<ManagedValue> &destructuredValues);
 
   using SILBuilder::createProjectBox;
   ManagedValue createProjectBox(SILLocation loc, ManagedValue mv,
