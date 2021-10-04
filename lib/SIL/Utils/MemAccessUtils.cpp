@@ -732,12 +732,8 @@ namespace {
 // Essentially RC identity where the starting point is already a reference.
 class FindReferenceRoot {
   SmallPtrSet<SILPhiArgument *, 4> visitedPhis;
-  bool preserveOwnership;
 
 public:
-  FindReferenceRoot(bool preserveOwnership)
-      : preserveOwnership(preserveOwnership) {}
-
   SILValue findRoot(SILValue ref) && {
     SILValue root = recursiveFindRoot(ref);
     assert(root && "all phi inputs must be reachable");
@@ -749,14 +745,8 @@ protected:
   SILValue recursiveFindRoot(SILValue ref) {
     while (auto *svi = dyn_cast<SingleValueInstruction>(ref)) {
       // If preserveOwnership is true, stop at the first owned root
-      if (preserveOwnership) {
-        if (!isIdentityAndOwnershipPreservingRefCast(svi)) {
-          break;
-        }
-      } else {
-        if (!isIdentityPreservingRefCast(svi)) {
-          break;
-        }
+      if (!isIdentityPreservingRefCast(svi)) {
+        break;
       }
       ref = svi->getOperand(0);
     };
@@ -792,11 +782,22 @@ protected:
 } // end anonymous namespace
 
 SILValue swift::findReferenceRoot(SILValue ref) {
-  return FindReferenceRoot(false /*preserveOwnership*/).findRoot(ref);
+  return FindReferenceRoot().findRoot(ref);
 }
 
+// This does not handle phis because a phis is either a consume or a
+// reborrow. In either case, the phi argument's ownership is independent from
+// the phi itself. The client assumes that the returned root is in the same
+// lifetime or borrow scope of the access.
 SILValue swift::findOwnershipReferenceRoot(SILValue ref) {
-  return FindReferenceRoot(true /*preserveOwnership*/).findRoot(ref);
+  while (auto *svi = dyn_cast<SingleValueInstruction>(ref)) {
+    if (isIdentityAndOwnershipPreservingRefCast(svi)) {
+      ref = svi->getOperand(0);
+      continue;
+    }
+    break;
+  }
+  return ref;
 }
 
 /// Find the first owned aggregate containing the reference, or simply the
