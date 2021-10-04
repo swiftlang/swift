@@ -1089,8 +1089,7 @@ public:
   }
 };
 
-/// A single value inst that forwards a static ownership from one (or all) of
-/// its operands.
+/// A single value inst that forwards a static ownership from its first operand.
 ///
 /// The ownership kind is set on construction and afterwards must be changed
 /// explicitly using setOwnershipKind().
@@ -6259,20 +6258,17 @@ class SelectEnumAddrInst final
 class SelectValueInst final
     : public InstructionBaseWithTrailingOperands<
           SILInstructionKind::SelectValueInst, SelectValueInst,
-          SelectInstBase<SelectValueInst, SILValue,
-                         FirstArgOwnershipForwardingSingleValueInst>> {
+          SelectInstBase<SelectValueInst, SILValue, SingleValueInstruction>> {
   friend SILBuilder;
 
   SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                   SILValue DefaultResult,
-                  ArrayRef<SILValue> CaseValuesAndResults,
-                  ValueOwnershipKind forwardingOwnershipKind);
+                  ArrayRef<SILValue> CaseValuesAndResults);
 
   static SelectValueInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
-         ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILModule &M,
-         ValueOwnershipKind forwardingOwnershipKind);
+         ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILModule &M);
 
 public:
   std::pair<SILValue, SILValue>
