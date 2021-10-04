@@ -15,6 +15,7 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
+// REQUIRES: concurrency_runtime
 actor MyActor { }
 
 protocol MyProtocol {
