@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILOptimizer/Utils/PrunedLiveness.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/OwnershipUtils.h"
 
 using namespace swift;
@@ -105,14 +105,13 @@ bool PrunedLiveness::updateForBorrowingOperand(Operand *op) {
   // TODO: Handle reborrowed copies by considering the extended borrow
   // scope. Temporarily bail-out on reborrows because we can't handle uses
   // that aren't dominated by currentDef.
-  if (!BorrowingOperand(op).visitScopeEndingUses(
-        [this](Operand *end) {
-          if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-            return false;
-          }
-          updateForUse(end->getUser(), /*lifetimeEnding*/ false);
-          return true;
-        })) {
+  if (!BorrowingOperand(op).visitScopeEndingUses([this](Operand *end) {
+        if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+          return false;
+        }
+        updateForUse(end->getUser(), /*lifetimeEnding*/ false);
+        return true;
+      })) {
     return false;
   }
   return true;

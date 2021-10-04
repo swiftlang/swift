@@ -12,7 +12,9 @@
 ///
 /// Incrementally compute and represent basic block liveness of a single live
 /// range. The live range is defined by points in the CFG, independent of any
-/// particular SSA value. The client initializes liveness with a set of
+/// particular SSA value; however, it must be contiguous. Unlike traditional
+/// variable liveness, a definition within the live range does not create a
+/// "hole" in the live range. The client initializes liveness with a set of
 /// definition blocks, typically a single block. The client then incrementally
 /// updates liveness by providing a set of "interesting" uses one at a time.
 ///
@@ -137,7 +139,10 @@ private:
 public:
   bool empty() const { return liveBlocks.empty(); }
 
-  void clear() { liveBlocks.clear(); SWIFT_ASSERT_ONLY(seenUse = false); }
+  void clear() {
+    liveBlocks.clear();
+    SWIFT_ASSERT_ONLY(seenUse = false);
+  }
 
   unsigned numLiveBlocks() const { return liveBlocks.size(); }
 
