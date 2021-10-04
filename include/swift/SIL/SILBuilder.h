@@ -1526,18 +1526,9 @@ public:
   SelectValueInst *createSelectValue(
       SILLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultResult,
       ArrayRef<std::pair<SILValue, SILValue>> CaseValuesAndResult) {
-    return createSelectValue(Loc, Operand, Ty, DefaultResult,
-                             CaseValuesAndResult, Operand.getOwnershipKind());
-  }
-
-  SelectValueInst *
-  createSelectValue(SILLocation Loc, SILValue Operand, SILType Ty,
-                    SILValue DefaultResult,
-                    ArrayRef<std::pair<SILValue, SILValue>> CaseValuesAndResult,
-                    ValueOwnershipKind forwardingOwnershipKind) {
-    return insert(SelectValueInst::create(
-        getSILDebugLocation(Loc), Operand, Ty, DefaultResult,
-        CaseValuesAndResult, getModule(), forwardingOwnershipKind));
+    return insert(SelectValueInst::create(getSILDebugLocation(Loc), Operand, Ty,
+                                          DefaultResult, CaseValuesAndResult,
+                                          getModule()));
   }
 
   TupleExtractInst *createTupleExtract(SILLocation Loc, SILValue Operand,
