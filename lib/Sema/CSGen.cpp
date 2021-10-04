@@ -2405,7 +2405,19 @@ namespace {
         Type memberType = CS.createTypeVariable(
             CS.getConstraintLocator(locator),
             TVO_CanBindToLValue | TVO_CanBindToNoEscape);
-        FunctionRefKind functionRefKind = FunctionRefKind::Compound;
+
+        // Tuple splat is still allowed for patterns (with a warning in Swift 5)
+        // so we need to start here from single-apply to make sure that e.g.
+        // `case test(x: Int, y: Int)` gets the labels preserved when matched
+        // with `case let .test(tuple)`.
+        FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
+        // If sub-pattern is a tuple we'd need to mark reference as compound,
+        // that would make sure that the labels are dropped in cases
+        // when `case` has a single tuple argument (tuple explosion) or multiple
+        // arguments (tuple-to-tuple conversion).
+        if (dyn_cast_or_null<TuplePattern>(enumPattern->getSubPattern()))
+          functionRefKind = FunctionRefKind::Compound;
+
         if (enumPattern->getParentType() || enumPattern->getParentTypeRepr()) {
           // Resolve the parent type.
           const auto parentType = [&] {
