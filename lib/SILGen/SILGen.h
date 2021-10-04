@@ -131,6 +131,11 @@ public:
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
   Optional<FuncDecl*> CheckExpectedExecutor;
 
+  Optional<FuncDecl *> AsyncMainDrainQueue;
+  Optional<FuncDecl *> GetMainExecutor;
+  Optional<FuncDecl *> SwiftJobRun;
+  Optional<FuncDecl *> ExitFunc;
+
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
 
@@ -516,6 +521,15 @@ public:
   FuncDecl *getRunTaskForBridgedAsyncMethod();
   /// Retrieve the _Concurrency._checkExpectedExecutor intrinsic.
   FuncDecl *getCheckExpectedExecutor();
+
+  /// Retrieve the _Concurrency._asyncMainDrainQueue intrinsic.
+  FuncDecl *getAsyncMainDrainQueue();
+  /// Retrieve the _Concurrency._getMainExecutor intrinsic.
+  FuncDecl *getGetMainExecutor();
+  /// Retrieve the _Concurrency._swiftJobRun intrinsic.
+  FuncDecl *getSwiftJobRun();
+  // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
+  FuncDecl *getExit();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);
