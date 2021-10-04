@@ -4038,6 +4038,10 @@ class BeginBorrowInst
         lexical(isLexical) {}
 
 public:
+  // FIXME: this does not return all instructions that end a local borrow
+  // scope. Branches can also end it via a reborrow, so APIs using this are
+  // incorrect. Instead, either iterate over all uses and return those with
+  // OperandOwnership::EndBorrow or Reborrow.
   using EndBorrowRange =
       decltype(std::declval<ValueBase>().getUsersOfType<EndBorrowInst>());
 
