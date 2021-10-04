@@ -79,6 +79,13 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     INSTALL_IN_COMPONENT never_install)
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS
+    "-Wl,-reexported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/Concurrency/ReexportedSymbols")
+endif()
+
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
+
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
@@ -117,10 +124,3 @@ if(SWIFT_BUILD_SDK_OVERLAY)
     add_subdirectory(Windows)
   endif()
 endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS
-    "-Wl,-reexported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/Concurrency/ReexportedSymbols")
-endif()
-
-list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
