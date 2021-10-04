@@ -4036,6 +4036,10 @@ class BeginBorrowInst
         lexical(isLexical) {}
 
 public:
+  // FIXME: this does not return all instructions that end a local borrow
+  // scope. Branches can also end it via a reborrow, so APIs using this are
+  // incorrect. Instead, either iterate over all uses and return those with
+  // OperandOwnership::EndBorrow or Reborrow.
   using EndBorrowRange =
       decltype(std::declval<ValueBase>().getUsersOfType<EndBorrowInst>());
 
@@ -8765,10 +8769,13 @@ public:
 
   TermInst::SuccessorListTy getSuccessors() { return DestBBs; }
 
-  SILBasicBlock *getSuccessBB() { return DestBBs[0]; }
-  const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
-  SILBasicBlock *getFailureBB() { return DestBBs[1]; }
-  const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
+  // Enumerate the successor indices
+  enum SuccessorPath { SuccessIdx = 0, FailIdx = 1};
+
+  SILBasicBlock *getSuccessBB() { return DestBBs[SuccessIdx]; }
+  const SILBasicBlock *getSuccessBB() const { return DestBBs[SuccessIdx]; }
+  SILBasicBlock *getFailureBB() { return DestBBs[FailIdx]; }
+  const SILBasicBlock *getFailureBB() const { return DestBBs[FailIdx]; }
 
   /// The number of times the True branch was executed
   ProfileCounter getTrueBBCount() const { return DestBBs[0].getCount(); }
