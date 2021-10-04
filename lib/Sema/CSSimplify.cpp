@@ -2284,9 +2284,29 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
             increaseScore(SK_FunctionConversion);
           }
         }
-      } else if (last->getKind() == ConstraintLocator::PatternMatch &&
-          isa<EnumElementPattern>(
-            last->castTo<LocatorPathElt::PatternMatch>().getPattern())) {
+      } else if (last->is<LocatorPathElt::PatternMatch>() &&
+                 isa<EnumElementPattern>(
+                     last->castTo<LocatorPathElt::PatternMatch>()
+                         .getPattern())) {
+        // A single paren pattern becomes a labeled tuple pattern
+        // e.g. `case .test(let value):` should be able to match
+        // `case test(result: Int)`. Note that it also means that:
+        // `cast test(result: (String, Int))` would be matched against
+        // e.g. `case .test((let x, let y))` but that fails during
+        // pattern coercion (behavior consistent with what happens in
+        // `TypeCheckPattern`).
+        if (func1Params.size() == 1 && !func1Params.front().hasLabel() &&
+            func2Params.size() == 1 && func2Params.front().hasLabel()) {
+          auto param = func1Params.front();
+          auto label = func2Params.front().getLabel();
+
+          auto labeledParam = FunctionType::Param(param.getPlainType(), label,
+                                                  param.getParameterFlags());
+
+          func1Params.clear();
+          func1Params.push_back(labeledParam);
+        }
+
         // Consider following example:
         //
         // enum E {
