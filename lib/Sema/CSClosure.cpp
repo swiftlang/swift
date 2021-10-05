@@ -1217,6 +1217,13 @@ private:
       }
     }
 
+    for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+      assert(expected->hasName());
+      auto prev = expected->getParentVarDecl();
+      auto type = solution.resolveInterfaceType(solution.getType(prev));
+      expected->setInterfaceType(type);
+    }
+
     // Translate the body.
     auto *newBody = visit(caseStmt->getBody()).get<Stmt *>();
     caseStmt->setBody(cast<BraceStmt>(newBody));
