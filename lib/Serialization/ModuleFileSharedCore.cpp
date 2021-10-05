@@ -320,7 +320,7 @@ static ValidationInfo validateControlBlock(
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
 
       bool isCompilerTagged = forcedDebugRevision ||
--        !version::Version::getCurrentCompilerVersion().empty();
+        !version::Version::getCurrentCompilerVersion().empty();
 
       StringRef moduleRevision = blobData;
       if (isCompilerTagged && !moduleRevision.empty()) {
