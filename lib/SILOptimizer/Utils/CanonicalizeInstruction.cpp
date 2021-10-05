@@ -19,14 +19,17 @@
 // CanonicalizeInstruction defines a default DEBUG_TYPE: "sil-canonicalize"
 
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
+#include "swift/AST/Type.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ValueUtils.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -509,6 +512,55 @@ tryEliminateUnneededForwardingInst(SILInstruction *i,
 }
 
 //===----------------------------------------------------------------------===//
+//                   DestructureTuple <-> Tuple Round Trip
+//===----------------------------------------------------------------------===//
+
+/// hat(%x) = destructure_tuple x
+/// %x2 = tuple(hat(%x))
+/// ->
+/// %x2 = %x
+static SILBasicBlock::iterator
+eliminateRoundTripTupleOfDestructure(TupleInst *tupleInst,
+                                     CanonicalizeInstruction &pass) {
+  auto nextII = std::next(tupleInst->getIterator());
+
+  auto tupleElts = tupleInst->getAllOperands();
+  if (tupleElts.empty())
+    return nextII;
+
+  SILValue firstElt = tupleElts[0].get();
+
+  // We use dyn_cast_or_null in case our tuple's element is from an argument.
+  auto *dti = dyn_cast_or_null<DestructureTupleInst>(
+      firstElt->getDefiningInstruction());
+  if (!dti) {
+    return nextII;
+  }
+
+  // Make sure the types line up.
+  if (tupleInst->getType() != dti->getOperand()->getType())
+    return nextII;
+
+  // Then make sure that every result of the dti is one of our tuple operands
+  // and they line up in order. Then if our destructure results only have a
+  // single non-debug use (which must be our tuple), then we can eliminate both
+  // instructions.
+  for (auto p : llvm::enumerate(dti->getResults())) {
+    if (tupleElts[p.index()].get() != p.value())
+      return nextII;
+    if (!p.value()->hasOneUse())
+      return nextII;
+  }
+
+  // Then make everything that used the tuple, use the destructure's opeand and
+  // then delete the tuple/destructure in that order.
+  pass.callbacks.replaceValueUsesWith(tupleInst, dti->getOperand());
+  nextII = killInstruction(tupleInst, nextII, pass);
+  nextII = killInstruction(dti, nextII, pass);
+  return nextII;
+}
+
+//===----------------------------------------------------------------------===//
 //                            Top-Level Entry Point
 //===----------------------------------------------------------------------===//
 
@@ -516,6 +568,10 @@ SILBasicBlock::iterator
 CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   if (auto nextII = simplifyAndReplace(inst, *this))
     return nextII.getValue();
+
+  if (auto *tuple = dyn_cast<TupleInst>(inst)) {
+    return eliminateRoundTripTupleOfDestructure(tuple, *this);
+  }
 
   if (auto li = LoadOperation(inst)) {
     return splitAggregateLoad(li, *this);

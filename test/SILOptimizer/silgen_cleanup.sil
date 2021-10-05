@@ -239,3 +239,62 @@ bb0(%0 : @owned $(Builtin.NativeObject, Builtin.NativeObject)):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @testRoundTripDestructureTuple : $@convention(thin) (@owned (Klass, Klass)) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK-NOT: tuple ({{%.*}} : $Klass,
+// CHECK: } // end sil function 'testRoundTripDestructureTuple'
+sil [ossa] @testRoundTripDestructureTuple : $@convention(thin) (@owned (Klass, Klass)) -> () {
+bb0(%0 : @owned $(Klass, Klass)):
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  %3 = tuple(%1 : $Klass, %2: $Klass)
+  destroy_value %3 : $(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Fail case where the tuple is partially from a destructure and partially from
+// something else.
+//
+// CHECK-LABEL: sil [ossa] @testRoundTripDestructureTuple2 : $@convention(thin) (@owned (Klass, Klass), @owned Klass) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRoundTripDestructureTuple2'
+sil [ossa] @testRoundTripDestructureTuple2 : $@convention(thin) (@owned (Klass, Klass), @owned Klass) -> () {
+bb0(%0 : @owned $(Klass, Klass), %0a : @owned $Klass):
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  %3 = tuple (%1 : $Klass, %0a: $Klass)
+  destroy_value %2 : $Klass
+  destroy_value %3 : $(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we don't crash when we check if %0a is a destructure_tuple.
+// CHECK-LABEL: sil [ossa] @testRoundTripDestructureTuple3 : $@convention(thin) (@owned (Klass, Klass), @owned Klass) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRoundTripDestructureTuple3'
+sil [ossa] @testRoundTripDestructureTuple3 : $@convention(thin) (@owned (Klass, Klass), @owned Klass) -> () {
+bb0(%0 : @owned $(Klass, Klass), %0a : @owned $Klass):
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  %3 = tuple (%0a : $Klass, %1 : $Klass)
+  destroy_value %2 : $Klass
+  destroy_value %3 : $(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We are very conservative and do not perform this optimization if we have any
+// uses of the destructure elements.
+//
+// CHECK-LABEL: sil [ossa] @testRoundTripDestructureTuple4 : $@convention(thin) (@owned (Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRoundTripDestructureTuple4'
+sil [ossa] @testRoundTripDestructureTuple4 : $@convention(thin) (@owned (Klass, Klass)) -> () {
+bb0(%0 : @owned $(Klass, Klass)):
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  debug_value %1 : $Klass, let, name "oops"
+  %3 = tuple(%1 : $Klass, %2: $Klass)
+  destroy_value %3 : $(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
