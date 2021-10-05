@@ -60,7 +60,7 @@ common_expected_dependencies = [
 ] + icu_dependencies + cxx_dependencies + math_dependencies
 vendor_apple_specific_dependencies = [
     "__NSGetArgc", "__NSGetArgv", "___stack_chk_fail", "___stack_chk_guard",
-    "_asl_log", "_getsectiondata", "__dyld_register_func_for_add_image",
+    "_getsectiondata", "__dyld_register_func_for_add_image",
 ]
 ################################################################################
 
