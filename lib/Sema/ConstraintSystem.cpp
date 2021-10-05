@@ -3670,7 +3670,7 @@ static bool diagnoseAmbiguityWithContextualType(
   auto name = result->choices.front().getName();
   DE.diagnose(getLoc(anchor), diag::no_candidates_match_result_type,
               name.getBaseName().userFacingName(),
-              cs.getContextualType(anchor));
+              cs.getContextualType(anchor, /*forConstraint=*/false));
 
   for (const auto &solution : solutions) {
     auto overload = solution.getOverloadChoice(calleeLocator);
@@ -3685,7 +3685,8 @@ static bool diagnoseAmbiguityWithContextualType(
         auto fnType = type->castTo<FunctionType>();
         DE.diagnose(
             loc, diag::cannot_convert_candidate_result_to_contextual_type,
-            decl->getName(), fnType->getResult(), cs.getContextualType(anchor));
+            decl->getName(), fnType->getResult(),
+            cs.getContextualType(anchor, /*forConstraint=*/false));
       } else {
         DE.diagnose(loc, diag::found_candidate_type, type);
       }
@@ -3759,7 +3760,8 @@ static bool diagnoseAmbiguity(
     if (locator->isForContextualType()) {
       auto baseName = name.getBaseName();
       DE.diagnose(getLoc(commonAnchor), diag::no_candidates_match_result_type,
-                  baseName.userFacingName(), cs.getContextualType(anchor));
+                  baseName.userFacingName(),
+                  cs.getContextualType(anchor, /*forConstraint=*/false));
     } else if (name.isOperator()) {
       auto *anchor = castToExpr(commonCalleeLocator->getAnchor());
 

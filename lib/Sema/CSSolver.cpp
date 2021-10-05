@@ -877,7 +877,8 @@ void ConstraintSystem::shrink(Expr *expr) {
       // A dictionary expression is just a set of tuples; try to solve ones
       // that have overload sets.
       if (auto collectionExpr = dyn_cast<CollectionExpr>(expr)) {
-        visitCollectionExpr(collectionExpr, CS.getContextualType(expr),
+        visitCollectionExpr(collectionExpr,
+                            CS.getContextualType(expr, /*forConstraint=*/false),
                             CS.getContextualTypePurpose(expr));
         // Don't try to walk into the dictionary.
         return {false, expr};
@@ -950,7 +951,8 @@ void ConstraintSystem::shrink(Expr *expr) {
         if (Candidates.empty())
           return expr;
 
-        auto contextualType = CS.getContextualType(expr);
+        auto contextualType = CS.getContextualType(expr,
+                                                   /*forConstraint=*/false);
         // If there is a contextual type set for this expression.
         if (!contextualType.isNull()) {
           Candidates.push_back(Candidate(CS, PrimaryExpr, contextualType,

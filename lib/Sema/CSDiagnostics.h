@@ -132,7 +132,7 @@ protected:
 
   Type getContextualType(ASTNode anchor) const {
     auto &cs = getConstraintSystem();
-    return cs.getContextualType(anchor);
+    return cs.getContextualType(anchor, /*forConstraint=*/false);
   }
 
   TypeLoc getContextualTypeLoc(ASTNode anchor) const {
