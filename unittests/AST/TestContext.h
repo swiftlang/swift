@@ -31,6 +31,7 @@ class TestContextBase {
 public:
   LangOptions LangOpts;
   TypeCheckerOptions TypeCheckerOpts;
+  SILOptions SILOpts;
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;

@@ -22,6 +22,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -38,8 +39,8 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
@@ -221,11 +222,10 @@ class ASTContext final {
   void operator=(const ASTContext&) = delete;
 
   ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-             SearchPathOptions &SearchPathOpts,
+             SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
              ClangImporterOptions &ClangImporterOpts,
              symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
-             SourceManager &SourceMgr,
-             DiagnosticEngine &Diags);
+             SourceManager &SourceMgr, DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -237,7 +237,7 @@ public:
   void operator delete(void *Data) throw();
 
   static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-                         SearchPathOptions &SearchPathOpts,
+                         SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
                          ClangImporterOptions &ClangImporterOpts,
                          symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                          SourceManager &SourceMgr, DiagnosticEngine &Diags);
@@ -254,6 +254,9 @@ public:
 
   /// The type checker options.
   const TypeCheckerOptions &TypeCheckerOpts;
+
+  /// Options for SIL.
+  const SILOptions &SILOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;

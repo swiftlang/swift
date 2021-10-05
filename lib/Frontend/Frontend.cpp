@@ -182,6 +182,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.StaticLibrary = opts.Static;
 
+  serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
+
   return serializationOpts;
 }
 
@@ -216,9 +218,8 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 
   Context.reset(ASTContext::get(
       Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
-      Invocation.getSearchPathOptions(),
-      Invocation.getClangImporterOptions(),
-      Invocation.getSymbolGraphOptions(),
+      Invocation.getSILOptions(), Invocation.getSearchPathOptions(),
+      Invocation.getClangImporterOptions(), Invocation.getSymbolGraphOptions(),
       SourceMgr, Diagnostics));
   if (!Invocation.getFrontendOptions().ModuleAliasMap.empty())
     Context->setModuleAliases(Invocation.getFrontendOptions().ModuleAliasMap);

@@ -2378,7 +2378,6 @@ public:
       *this << ", default " << Ctx.getID(SVI->getDefaultResult());
 
     *this << " : " << SVI->getType();
-    printForwardingOwnershipKind(SVI, SVI->getOperand());
   }
   
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {

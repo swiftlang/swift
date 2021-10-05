@@ -281,6 +281,7 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
   auto layoutFn = llvm::Function::Create(fnTy,
     llvm::GlobalValue::PrivateLinkage, "keypath_get_arg_layout", IGM.getModule());
   layoutFn->setAttributes(IGM.constructInitialAttributes());
+  layoutFn->setCallingConv(IGM.SwiftCC);
     
   {
     IRGenFunction IGF(IGM, layoutFn);
@@ -383,6 +384,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         llvm::GlobalValue::PrivateLinkage, "keypath_destroy", IGM.getModule());
       destroy = destroyFn;
       destroyFn->setAttributes(IGM.constructInitialAttributes());
+      destroyFn->setCallingConv(IGM.SwiftCC);
       
       IRGenFunction IGF(IGM, destroyFn);
       if (IGM.DebugInfo)
@@ -432,6 +434,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         llvm::GlobalValue::PrivateLinkage, "keypath_copy", IGM.getModule());
       copy = copyFn;
       copyFn->setAttributes(IGM.constructInitialAttributes());
+      copyFn->setCallingConv(IGM.SwiftCC);
       
       IRGenFunction IGF(IGM, copyFn);
       if (IGM.DebugInfo)
@@ -545,6 +548,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
   auto initFn = llvm::Function::Create(fnTy,
     llvm::GlobalValue::PrivateLinkage, "keypath_arg_init", IGM.getModule());
   initFn->setAttributes(IGM.constructInitialAttributes());
+  initFn->setCallingConv(IGM.SwiftCC);
     
   {
     IRGenFunction IGF(IGM, initFn);
