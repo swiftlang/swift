@@ -1075,6 +1075,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                           RequestDependencyUpdated);
     break;
+  case SourceKitRequest::Diagnostics:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestDiagnostics);
+    break;
   }
 
   if (!SourceFile.empty()) {
@@ -1305,6 +1308,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::TypeContextInfo:
     case SourceKitRequest::ConformingMethodList:
     case SourceKitRequest::DependencyUpdated:
+    case SourceKitRequest::Diagnostics:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
       break;
 
@@ -1465,6 +1469,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
         break;
       case SourceKitRequest::Statistics:
         printStatistics(Info, llvm::outs());
+        break;
     }
   }
 
