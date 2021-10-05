@@ -35,6 +35,8 @@ public:
     return Impl::wait(ImplObj);
   }
 
+  /// Waits for the semaphore, timing out after \p milliseconds.
+  /// Returns \c true if waiting timed out.
   bool wait(long milliseconds) {
     return Impl::wait(ImplObj, milliseconds);
   }

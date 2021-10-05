@@ -157,6 +157,10 @@ def suppress_config_request : Flag<["-"], "suppress-config-request">,
 def module_cache_path: Separate<["-"], "module-cache-path">, HelpText<"module cache path">;
 def module_cache_path_EQ : Joined<["-"], "module-cache-path=">, Alias<module_cache_path>;
 
+def simulate_long_request : Separate<["-"], "simulate-long-request">,
+  HelpText<"Simulate that the request takes x ms longer to execute. The request can be cancelled while waiting this duration">;
+def simulate_long_request_EQ : Joined<["-"], "simulate-long-request=">, Alias<simulate_long_request>;
+
 def shell: Flag<["-"], "shell">,
   HelpText<"Run shell command">;
 
