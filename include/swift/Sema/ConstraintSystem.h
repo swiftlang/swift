@@ -908,6 +908,7 @@ using OpenedTypeMap =
 /// within a constraint system.
 struct ContextualTypeInfo {
   TypeLoc typeLoc;
+
   ContextualTypePurpose purpose;
 
   ContextualTypeInfo() : typeLoc(TypeLoc()), purpose(CTP_Unused) {}
@@ -2343,8 +2344,10 @@ private:
     solutionApplicationTargets;
 
   /// Contextual type information for expressions that are part of this
-  /// constraint system.
-  llvm::MapVector<ASTNode, ContextualTypeInfo> contextualTypes;
+  /// constraint system. The second type, if valid, contains the type as it
+  /// should appear in actual constraint. This will have unbound generic types
+  /// opened, placeholder types converted to type variables, etc.
+  llvm::MapVector<ASTNode, std::pair<ContextualTypeInfo, Type>> contextualTypes;
 
   /// Information about each case label item tracked by the constraint system.
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
@@ -3184,21 +3187,47 @@ public:
     assert(bool(node) && "Expected non-null expression!");
     assert(contextualTypes.count(node) == 0 &&
            "Already set this contextual type");
-    contextualTypes[node] = {T, purpose};
+    contextualTypes[node] = {{T, purpose}, Type()};
   }
 
   Optional<ContextualTypeInfo> getContextualTypeInfo(ASTNode node) const {
     auto known = contextualTypes.find(node);
     if (known == contextualTypes.end())
       return None;
-    return known->second;
+    return known->second.first;
   }
 
-  Type getContextualType(ASTNode node) const {
-    auto result = getContextualTypeInfo(node);
-    if (result)
-      return result->typeLoc.getType();
-    return Type();
+  /// Gets the contextual type recorded for an AST node. When fetching a type
+  /// for use in constraint solving, \c forConstraint should be set to \c true,
+  /// which will ensure that unbound generics have been opened and placeholder
+  /// types have been converted to type variables, etc.
+  Type getContextualType(ASTNode node, bool forConstraint = false) {
+    if (forConstraint) {
+      auto known = contextualTypes.find(node);
+      if (known == contextualTypes.end())
+        return Type();
+
+      // If we've already computed a type for use in the constraint system,
+      // use that.
+      if (known->second.second)
+        return known->second.second;
+
+      // Otherwise, compute a type that can be used in a constraint and record
+      // it.
+      auto info = known->second.first;
+
+      auto *locator = getConstraintLocator(
+          node, LocatorPathElt::ContextualType(info.purpose));
+      known->second.second = replaceInferableTypesWithTypeVars(info.getType(),
+                                                               locator);
+
+      return known->second.second;
+    } else {
+      auto result = getContextualTypeInfo(node);
+      if (result)
+        return result->getType();
+      return Type();
+    }
   }
 
   TypeLoc getContextualTypeLoc(ASTNode node) const {

@@ -1731,9 +1731,12 @@ namespace {
       };
 
       // If a contextual type exists for this expression, apply it directly.
-      Optional<Type> arrayElementType;
-      if (contextualType &&
-          (arrayElementType = ConstraintSystem::isArrayType(contextualType))) {
+      if (contextualType && ConstraintSystem::isArrayType(contextualType)) {
+        // Now that we know we're actually going to use the type, get the
+        // version for use in a constraint.
+        contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        Optional<Type> arrayElementType =
+            ConstraintSystem::isArrayType(contextualType);
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
                          locator);
@@ -1836,14 +1839,19 @@ namespace {
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
-      auto openedType =
-          CS.openOpaqueType(contextualType, contextualPurpose, locator);
 
       // If a contextual type exists for this expression and is a dictionary
       // type, apply it directly.
-      Optional<std::pair<Type, Type>> dictionaryKeyValue;
-      if (openedType && (dictionaryKeyValue =
-                             ConstraintSystem::isDictionaryType(openedType))) {
+      if (contextualType && ConstraintSystem::isDictionaryType(contextualType)) {
+        // Now that we know we're actually going to use the type, get the
+        // version for use in a constraint.
+        contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        auto openedType =
+            CS.openOpaqueType(contextualType, contextualPurpose, locator);
+        openedType = CS.replaceInferableTypesWithTypeVars(
+            openedType, CS.getConstraintLocator(expr));
+        auto dictionaryKeyValue =
+            ConstraintSystem::isDictionaryType(openedType);
         Type contextualDictionaryKeyType;
         Type contextualDictionaryValueType;
         std::tie(contextualDictionaryKeyType,
