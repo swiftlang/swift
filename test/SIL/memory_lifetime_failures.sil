@@ -538,3 +538,66 @@ bb0(%0 : $Bool):
   %10 = tuple ()
   return %10 : $()
 }
+
+// MemoryLifetimeVerifier does not detect an error here due to reborrows
+sil [ossa] @test_load_borrow1 : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  destroy_addr %0 : $*Optional<T>
+  %1 = load_borrow %0 : $*Optional<T>
+  br bb1(%1 : $Optional<T>)
+
+bb1(%3 : @guaranteed $Optional<T>):
+  end_borrow %3 : $Optional<T>
+  br bb2
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_load_borrow2: memory is not initialized, but should
+sil [ossa] @test_load_borrow2 : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  destroy_addr %0 : $*Optional<T>
+  %1 = load_borrow %0 : $*Optional<T>
+  end_borrow %1 : $Optional<T>
+  br bb1
+
+bb1:
+  %r = tuple ()
+  return %r : $()
+}
+
+enum Result<T1, T2>{
+  case success(T1)
+  case failure(T2)
+}
+
+sil @try_get_error : $@convention(thin) () -> @error Error
+
+// CHECK: SIL memory lifetime failure in @test_init_enum_trivial_case: memory is not initialized, but should
+sil [ossa] @test_init_enum_trivial_case : $@convention(thin) () -> @error Error {
+bb0:
+  %0 = alloc_stack $Result<Int, Error>
+  %1 = function_ref @try_get_error : $@convention(thin) () -> @error Error
+  try_apply %1() : $@convention(thin) () -> @error Error, normal bb1, error bb2
+
+bb1(%3 : $()):
+  inject_enum_addr %0 : $*Result<Int, Error>, #Result.success!enumelt
+  br bb3
+
+
+bb2(%7 : @owned $Error):
+  %8 = init_enum_data_addr %0 : $*Result<Int, Error>, #Result.failure!enumelt
+  store %7 to [init] %8 : $*Error
+  inject_enum_addr %0 : $*Result<Int, Error>, #Result.failure!enumelt
+  br bb3
+
+bb3:
+  %12 = load [take] %0 : $*Result<Int, Error>
+  destroy_value %12 : $Result<Int, Error>
+  dealloc_stack %0 : $*Result<Int, Error>
+  %15 = tuple ()
+  return %15 : $()
+}
+
