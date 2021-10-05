@@ -16,6 +16,9 @@
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
+
+// REQUIRES: rdar83840279
+
 actor MyActor { }
 
 protocol MyProtocol {
