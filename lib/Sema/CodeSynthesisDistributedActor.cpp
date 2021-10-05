@@ -175,6 +175,10 @@ AbstractFunctionDecl *TypeChecker::addImplicitDistributedActorRemoteFunction(
   // nonisolated
   remoteFuncDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit=*/true));
 
+  // nonisolated
+  remoteFuncDecl->getAttrs().add(
+      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+
   // users should never have to access this function directly;
   // it is only invoked from our distributed function thunk if the actor is remote.
   remoteFuncDecl->setUserAccessible(false);
