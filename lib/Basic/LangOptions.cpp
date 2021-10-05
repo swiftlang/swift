@@ -408,3 +408,56 @@ DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
   }
   llvm_unreachable("covered switch");
 }
+
+std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
+    std::function<std::string(StringRef)> pathRemapCallback) const {
+  auto consumeIncludeOption = [](StringRef &arg, StringRef &prefix) {
+    static StringRef options[] = {"-I",
+                                  "-F",
+                                  "-fmodule-map-file=",
+                                  "-iquote",
+                                  "-idirafter",
+                                  "-iframeworkwithsysroot",
+                                  "-iframework",
+                                  "-iprefix",
+                                  "-iwithprefixbefore",
+                                  "-iwithprefix",
+                                  "-isystemafter",
+                                  "-isystem",
+                                  "-isysroot",
+                                  "-ivfsoverlay",
+                                  "-working-directory=",
+                                  "-working-directory"};
+    for (StringRef &option : options)
+      if (arg.consume_front(option)) {
+        prefix = option;
+        return true;
+      }
+    return false;
+  };
+
+  // true if the previous argument was the dash-option of an option pair
+  bool remap_next = false;
+  std::vector<std::string> args;
+  for (auto A : ExtraArgs) {
+    StringRef prefix;
+    StringRef arg(A);
+
+    if (remap_next) {
+      remap_next = false;
+      args.push_back(pathRemapCallback(arg));
+    } else if (consumeIncludeOption(arg, prefix)) {
+      if (arg.empty()) {
+        // Option pair
+        remap_next = true;
+        args.push_back(prefix.str());
+      } else {
+        // Combine prefix with remapped path value
+        args.push_back(prefix.str() + pathRemapCallback(arg));
+      }
+    } else {
+      args.push_back(A);
+    }
+  }
+  return args;
+}
