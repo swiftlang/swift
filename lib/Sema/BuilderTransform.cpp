@@ -1462,6 +1462,14 @@ public:
         return nullptr;
     }
 
+    // Setup the types of our case body var decls.
+    for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+      assert(expected->hasName());
+      auto prev = expected->getParentVarDecl();
+      auto type = solution.resolveInterfaceType(solution.getType(prev));
+      expected->setInterfaceType(type);
+    }
+
     // Transform the body of the case.
     auto body = cast<BraceStmt>(caseStmt->getBody());
     auto captured = takeCapturedStmt(body);
@@ -1721,7 +1729,16 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
           solutions.front(),
           SolutionApplicationTarget(func))) {
     performSyntacticDiagnosticsForTarget(*result, /*isExprStmt*/ false);
-    return result->getFunctionBody();
+    auto *body = result->getFunctionBody();
+
+    if (cs.isDebugMode()) {
+      auto &log = llvm::errs();
+      log << "--- Type-checked function body ---\n";
+      body->dump(log);
+      log << '\n';
+    }
+
+    return body;
   }
 
   return nullptr;
