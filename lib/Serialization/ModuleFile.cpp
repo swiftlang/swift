@@ -158,9 +158,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
     return error(status);
   }
 
-  for (const auto &searchPath : Core->SearchPaths)
-    ctx.addSearchPath(searchPath.Path, searchPath.IsFramework,
-                      searchPath.IsSystem);
+  for (const auto &searchPath : Core->SearchPaths) {
+    ctx.addSearchPath(
+        ctx.SearchPathOpts.SearchPathRemapper.remapPath(searchPath.Path),
+        searchPath.IsFramework, searchPath.IsSystem);
+  }
 
   auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
@@ -349,12 +351,10 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
     /*RequiresNullTerminator=*/false);
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   bool isFramework = false;
-  serialization::ValidationInfo loadInfo =
-     ModuleFileSharedCore::load(modulePath.str(),
-                      std::move(newBuf),
-                      nullptr,
-                      nullptr,
-                      /*isFramework*/isFramework, loadedModuleFile);
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      modulePath.str(), std::move(newBuf), nullptr, nullptr,
+      /*isFramework*/ isFramework, Ctx.SILOpts.EnableOSSAModules,
+      loadedModuleFile);
   Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());
 }

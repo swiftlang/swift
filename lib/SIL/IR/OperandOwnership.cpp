@@ -170,7 +170,6 @@ OPERAND_OWNERSHIP(TrivialUse, ProjectBlockStorage)
 OPERAND_OWNERSHIP(TrivialUse, ProjectValueBuffer)
 OPERAND_OWNERSHIP(TrivialUse, RawPointerToRef)
 OPERAND_OWNERSHIP(TrivialUse, SelectEnumAddr)
-OPERAND_OWNERSHIP(TrivialUse, SelectValue)
 OPERAND_OWNERSHIP(TrivialUse, StructElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchValue)
@@ -386,6 +385,23 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
   }
   return getOwnershipKind().getForwardingOperandOwnership(
     /*allowUnowned*/true);
+}
+
+OperandOwnership
+OperandOwnershipClassifier::visitSelectValueInst(SelectValueInst *i) {
+  if (getValue() == i->getDefaultResult())
+    return OperandOwnership::ForwardingBorrow;
+
+  for (unsigned idx = 0, endIdx = i->getNumCases(); idx < endIdx; ++idx) {
+    SILValue casevalue;
+    SILValue result;
+    std::tie(casevalue, result) = i->getCase(idx);
+
+    if (getValue() == casevalue) {
+      return OperandOwnership::ForwardingBorrow;
+    }
+  }
+  return OperandOwnership::TrivialUse;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {

@@ -149,10 +149,9 @@ struct FakeTransport: ActorTransport {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
-  throws -> Act?
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor {
-    return nil
+    nil
   }
 
   func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity

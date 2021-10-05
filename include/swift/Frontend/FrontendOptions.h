@@ -182,6 +182,11 @@ public:
   /// module appears to not be a public module.
   Optional<bool> SerializeOptionsForDebugging;
 
+  /// When true the debug prefix map entries will be applied to debugging
+  /// options before serialization. These can be reconstructed at debug time by
+  /// applying the inverse map in SearchPathOptions.SearchPathRemapper.
+  bool DebugPrefixSerializedDebuggingOptions = false;
+
   /// When true, check if all required SwiftOnoneSupport symbols are present in
   /// the module.
   bool CheckOnoneSupportCompleteness = false;

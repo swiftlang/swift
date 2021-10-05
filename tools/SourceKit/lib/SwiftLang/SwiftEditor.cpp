@@ -716,14 +716,11 @@ public:
           SM, BufferID, CompInv.getMainFileSyntaxParsingCache(), syntaxArena);
     }
 
-    Parser.reset(
-                 new ParserUnit(SM, SourceFileKind::Main, BufferID,
-                     CompInv.getLangOptions(),
-                     CompInv.getTypeCheckerOptions(),
-                     CompInv.getModuleName(),
-                     SynTreeCreator,
-                     CompInv.getMainFileSyntaxParsingCache())
-    );
+    Parser.reset(new ParserUnit(
+        SM, SourceFileKind::Main, BufferID, CompInv.getLangOptions(),
+        CompInv.getTypeCheckerOptions(), CompInv.getSILOptions(),
+        CompInv.getModuleName(), SynTreeCreator,
+        CompInv.getMainFileSyntaxParsingCache()));
 
     registerParseRequestFunctions(Parser->getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(
