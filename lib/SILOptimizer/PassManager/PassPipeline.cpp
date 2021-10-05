@@ -518,6 +518,18 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // not blocked by any other passes' optimizations, so do it early.
   P.addDifferentiabilityWitnessDevirtualizer();
 
+  // Start by linking in referenced functions from other modules.
+  P.addPerformanceSILLinker();
+
+  // Cleanup after SILGen: remove trivial copies to temporaries. This version of
+  // temp-rvalue opt is here so that we can hit copies from non-ossa code that
+  // is linked in from the stdlib.
+  P.addTempRValueOpt();
+
+  // Needed to serialize static initializers of globals for cross-module
+  // optimization.
+  P.addGlobalOpt();
+
   // Strip ownership from non-transparent functions when we are not compiling
   // the stdlib module. When compiling the stdlib, we eliminate ownership on
   // these functions later with a nromal call to
@@ -530,18 +542,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 
   if (!P.getOptions().EnableOSSAModules)
     P.addNonTransparentFunctionOwnershipModelEliminator();
-
-  // Start by linking in referenced functions from other modules.
-  P.addPerformanceSILLinker();
-
-  // Cleanup after SILGen: remove trivial copies to temporaries. This version of
-  // temp-rvalue opt is here so that we can hit copies from non-ossa code that
-  // is linked in from the stdlib.
-  P.addTempRValueOpt();
-
-  // Needed to serialize static initializers of globals for cross-module
-  // optimization.
-  P.addGlobalOpt();
 
   // Add the outliner pass (Osize).
   P.addOutliner();
