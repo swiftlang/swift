@@ -17,6 +17,10 @@ let package = Package(
     .executableTarget(
       name: "GenNormalization",
       dependencies: ["GenUtils"]
+    ),
+    .executableTarget(
+      name: "GenScalarProps",
+      dependencies: ["GenUtils"]
     )
   ]
 )

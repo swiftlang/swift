@@ -9,6 +9,7 @@ set(swift_stubs_sources
     UnicodeData.cpp
     UnicodeGrapheme.cpp
     UnicodeNormalization.cpp
+    UnicodeScalarProps.cpp
 )
 set(swift_stubs_objc_sources
     Availability.mm
