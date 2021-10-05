@@ -990,7 +990,10 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
 
         auto type = binding.BindingType;
 
-        if (type->isAnyHashable())
+        if (CS.shouldAttemptFixes())
+          return false;
+
+        if (type->isAnyHashable() || type->isDouble() || type->isCGFloatType())
           return false;
 
         {
