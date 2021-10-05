@@ -2600,13 +2600,6 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     CanType associatedType =
       sourceConformance.getAssociatedType(sourceType, association)
       ->getCanonicalType();
-    if (sourceConformance.isConcrete() &&
-        isa<NormalProtocolConformance>(sourceConformance.getConcrete())) {
-      associatedType =
-        sourceConformance.getConcrete()->getDeclContext()
-          ->mapTypeIntoContext(associatedType)
-          ->getCanonicalType();
-    }
     sourceKey.Type = associatedType;
 
     auto associatedConformance =
