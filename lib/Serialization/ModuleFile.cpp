@@ -349,12 +349,10 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
     /*RequiresNullTerminator=*/false);
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   bool isFramework = false;
-  serialization::ValidationInfo loadInfo =
-     ModuleFileSharedCore::load(modulePath.str(),
-                      std::move(newBuf),
-                      nullptr,
-                      nullptr,
-                      /*isFramework*/isFramework, loadedModuleFile);
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      modulePath.str(), std::move(newBuf), nullptr, nullptr,
+      /*isFramework*/ isFramework, Ctx.SILOpts.EnableOSSAModules,
+      loadedModuleFile);
   Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());
 }

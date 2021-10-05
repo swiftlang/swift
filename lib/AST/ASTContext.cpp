@@ -583,12 +583,11 @@ void ASTContext::operator delete(void *Data) throw() {
 }
 
 ASTContext *ASTContext::get(LangOptions &langOpts,
-                            TypeCheckerOptions &typeckOpts,
+                            TypeCheckerOptions &typeckOpts, SILOptions &silOpts,
                             SearchPathOptions &SearchPathOpts,
                             ClangImporterOptions &ClangImporterOpts,
                             symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
-                            SourceManager &SourceMgr,
-                            DiagnosticEngine &Diags) {
+                            SourceManager &SourceMgr, DiagnosticEngine &Diags) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
   // constraints.
@@ -600,33 +599,28 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
       llvm::alignAddr(impl, llvm::Align(alignof(Implementation))));
   new (impl) Implementation();
   return new (mem)
-      ASTContext(langOpts, typeckOpts, SearchPathOpts, ClangImporterOpts,
-                 SymbolGraphOpts, SourceMgr, Diags);
+      ASTContext(langOpts, typeckOpts, silOpts, SearchPathOpts,
+                 ClangImporterOpts, SymbolGraphOpts, SourceMgr, Diags);
 }
 
 ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-                       SearchPathOptions &SearchPathOpts,
+                       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
                        ClangImporterOptions &ClangImporterOpts,
                        symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                        SourceManager &SourceMgr, DiagnosticEngine &Diags)
-  : LangOpts(langOpts),
-    TypeCheckerOpts(typeckOpts),
-    SearchPathOpts(SearchPathOpts),
-    ClangImporterOpts(ClangImporterOpts),
-    SymbolGraphOpts(SymbolGraphOpts),
-    SourceMgr(SourceMgr), Diags(Diags),
-    evaluator(Diags, langOpts),
-    TheBuiltinModule(createBuiltinModule(*this)),
-    StdlibModuleName(getIdentifier(STDLIB_NAME)),
-    SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
-    TheErrorType(
-      new (*this, AllocationArena::Permanent)
-        ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
-    TheUnresolvedType(new (*this, AllocationArena::Permanent)
-                      UnresolvedType(*this)),
-    TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
-    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
-                                            /*HasExplicitAnyObject=*/false)),
+    : LangOpts(langOpts), TypeCheckerOpts(typeckOpts), SILOpts(silOpts),
+      SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
+      SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
+      evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
+      StdlibModuleName(getIdentifier(STDLIB_NAME)),
+      SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
+      TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(
+          *this, Type(), RecursiveTypeProperties::HasError)),
+      TheUnresolvedType(new (*this, AllocationArena::Permanent)
+                            UnresolvedType(*this)),
+      TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
+      TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
+                                              /*HasExplicitAnyObject=*/false)),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
