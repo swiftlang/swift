@@ -2590,11 +2590,33 @@ internal func _getTypeByMangledNameInEnvironmentOrContext(
   }
 }
 
+// Same as above, but expecting a witness table rather than a type
+internal func _getWitnessByMangledNameInEnvironmentOrContext(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt,
+  genericEnvironmentOrContext: UnsafeRawPointer?,
+  genericArguments: UnsafeRawPointer?)
+  -> UnsafeRawPointer? {
+
+  let taggedPointer = UInt(bitPattern: genericEnvironmentOrContext)
+  if taggedPointer & 1 == 0 {
+    return _getWitnessByMangledNameInEnvironment(name, nameLength,
+                      genericEnvironment: genericEnvironmentOrContext,
+                      genericArguments: genericArguments)
+  } else {
+    let context = UnsafeRawPointer(bitPattern: taggedPointer & ~1)
+    return _getWitnessByMangledNameInContext(name, nameLength,
+                      genericContext: context,
+                      genericArguments: genericArguments)
+  }
+}
+
 // Resolve the given generic argument reference to a generic argument.
 internal func _resolveKeyPathGenericArgReference(
     _ reference: UnsafeRawPointer,
     genericEnvironment: UnsafeRawPointer?,
-    arguments: UnsafeRawPointer?)
+    arguments: UnsafeRawPointer?,
+    allowWitnessTable: Bool)
     -> UnsafeRawPointer {
   // If the low bit is clear, it's a direct reference to the argument.
   if (UInt(bitPattern: reference) & 0x01 == 0) {
@@ -2603,44 +2625,29 @@ internal func _resolveKeyPathGenericArgReference(
 
   // Adjust the reference.
   let referenceStart = reference - 1
-
-  // If we have a symbolic reference to an accessor, call it.
-  let first = referenceStart.load(as: UInt8.self)
-  if first == 255 && reference.load(as: UInt8.self) == 9 {
-    typealias MetadataAccessor =
-      @convention(c) (UnsafeRawPointer?) -> UnsafeRawPointer
-
-    // Unaligned load of the offset.
-    let pointerReference = reference + 1
-    var offset: Int32 = 0
-    _memcpy(dest: &offset, src: pointerReference, size: 4)
-
-    let accessorPtrRaw = _resolveRelativeAddress(pointerReference, offset)
-    let accessorPtrSigned =
-      _PtrAuth.sign(pointer: accessorPtrRaw,
-              key: .processIndependentCode,
-              discriminator: _PtrAuth.discriminator(for: MetadataAccessor.self))
-    let accessor = unsafeBitCast(accessorPtrSigned, to: MetadataAccessor.self)
-    return accessor(arguments)
-  }
-
   let nameLength = _getSymbolicMangledNameLength(referenceStart)
   let namePtr = referenceStart.bindMemory(to: UInt8.self,
                                           capacity: nameLength + 1)
-  // FIXME: Could extract this information from the mangled name.
-  guard let result =
-    _getTypeByMangledNameInEnvironmentOrContext(namePtr, UInt(nameLength),
-                         genericEnvironmentOrContext: genericEnvironment,
-                         genericArguments: arguments)
-  else {
-    let nameStr = String._fromUTF8Repairing(
-      UnsafeBufferPointer(start: namePtr, count: nameLength)
-    ).0
 
-    fatalError("could not demangle keypath type from '\(nameStr)'")
+  if allowWitnessTable, let result =
+    _getWitnessByMangledNameInEnvironmentOrContext(namePtr, UInt(nameLength),
+                         genericEnvironmentOrContext: genericEnvironment,
+                         genericArguments: arguments) {
+    return result
   }
 
-  return unsafeBitCast(result, to: UnsafeRawPointer.self)
+  if let result =
+    _getTypeByMangledNameInEnvironmentOrContext(namePtr, UInt(nameLength),
+                         genericEnvironmentOrContext: genericEnvironment,
+                         genericArguments: arguments) {
+    return unsafeBitCast(result, to: UnsafeRawPointer.self)
+  }
+
+  let nameStr = String._fromUTF8Repairing(
+    UnsafeBufferPointer(start: namePtr, count: nameLength)
+  ).0
+
+  fatalError("could not demangle keypath type from '\(nameStr)'")
 }
 
 // Resolve the given metadata reference to (type) metadata.
@@ -2653,7 +2660,8 @@ internal func _resolveKeyPathMetadataReference(
            _resolveKeyPathGenericArgReference(
              reference,
              genericEnvironment: genericEnvironment,
-             arguments: arguments),
+             arguments: arguments,
+             allowWitnessTable: false),
            to: Any.Type.self)
 }
 
@@ -3481,7 +3489,8 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
         let result = _resolveKeyPathGenericArgReference(
                        metadataRef,
                        genericEnvironment: genericEnvironment,
-                       arguments: patternArgs)
+                       arguments: patternArgs,
+                       allowWitnessTable: true)
         pushDest(result)
       }
     }

@@ -223,6 +223,22 @@ OVERRIDE_PROTOCOLCONFORMANCE(getConformanceDescriptor,
                               const ProtocolDescriptor *protocol),
                              (type, protocol))
 
+OVERRIDE_METADATALOOKUP(getWitnessByMangledNode, const WitnessTable *, , SWIFT_CC(swift), swift::,
+                        (MetadataRequest request,
+                         Demangler &demangler,
+                         Demangle::NodePointer node,
+                         const void * const *arguments,
+                         SubstGenericParameterFn substGenericParam,
+                         SubstDependentWitnessTableFn substWitnessTable),
+                        (request, demangler, node, arguments, substGenericParam, substWitnessTable))
+OVERRIDE_METADATALOOKUP(getWitnessByMangledName, const WitnessTable *, , SWIFT_CC(swift), swift::,
+                        (MetadataRequest request,
+                         StringRef mangledName,
+                         const void * const *arguments,
+                         SubstGenericParameterFn substGenericParam,
+                         SubstDependentWitnessTableFn substWitnessTable),
+                        (request, mangledName, arguments, substGenericParam, substWitnessTable))
+
 #undef OVERRIDE
 #undef OVERRIDE_METADATALOOKUP
 #undef OVERRIDE_CASTING

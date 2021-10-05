@@ -352,3 +352,4 @@ std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
   appendGenericSignature(genericSig);
   return finalize();
 }
+

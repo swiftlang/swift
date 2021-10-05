@@ -398,6 +398,35 @@ public:
                                const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
+
+  /// Retrieve the witness table described by the given mangled name.
+  ///
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+  const WitnessTable *swift_getWitnessByMangledNode(
+                               MetadataRequest request,
+                               Demangler &demangler,
+                               Demangle::NodePointer node,
+                               const void * const *arguments,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
+
+  /// Retrieve the witness table described by the given mangled name.
+  ///
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+  const WitnessTable *swift_getWitnessByMangledName(
+                               MetadataRequest request,
+                               StringRef mangledName,
+                               const void * const *arguments,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
 #pragma clang diagnostic pop
 
   /// Function object that produces substitutions for the generic parameters

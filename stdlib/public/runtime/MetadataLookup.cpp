@@ -1972,6 +1972,50 @@ swift_getTypeByMangledNameImpl(MetadataRequest request, StringRef typeName,
                                     substGenericParam, substWitnessTable);
 }
 
+SWIFT_CC(swift)
+static const WitnessTable * _Nullable
+swift_getWitnessByMangledNodeImpl(MetadataRequest request, Demangler &demangler,
+                               Demangle::NodePointer node,
+                               const void *const *origArgumentVector,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable) {
+  // Simply call an accessor function if that's all we got.
+  if (node->getKind() == Node::Kind::AccessorFunctionReference) {
+    // The accessor function is passed the pointer to the original argument
+    // buffer. It's assumed to match the generic context.
+    auto accessorFn =
+        (const WitnessTable *(*)(const void * const *))node->getIndex();
+    return accessorFn(origArgumentVector);
+  }
+
+  DecodedMetadataBuilder builder(demangler, substGenericParam,
+                                 substWitnessTable, nullptr);
+  auto decoded = Demangle::decodeMangledProtocolConformance(builder, node);
+  if (decoded.isError()) {
+    return nullptr;
+  }
+
+  return decoded.getValue();
+}
+
+SWIFT_CC(swift)
+static const WitnessTable * _Nullable
+swift_getWitnessByMangledNameImpl(MetadataRequest request, StringRef mangledName,
+                               const void *const *origArgumentVector,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable) {
+  DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+
+  NodePointer node = demangler.demangleConformance(mangledName);
+  if (!node) {
+    return nullptr;
+  }
+
+  return swift_getWitnessByMangledNode(request, demangler, node,
+                                       origArgumentVector,
+                                       substGenericParam, substWitnessTable);
+}
+
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 const Metadata * _Nullable
 swift_getTypeByMangledNameInEnvironment(
@@ -2063,6 +2107,44 @@ swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
   
   return swift_getTypeByMangledName(MetadataState::Complete, typeName, nullptr,
                                     {}, {}).getType().getMetadata();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const WitnessTable * _Nullable
+swift_getWitnessByMangledNameInEnvironment(
+                        const char *typeNameStart,
+                        size_t typeNameLength,
+                        const TargetGenericEnvironment<InProcess> *environment,
+                        const void * const *genericArgs) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
+  return swift_getWitnessByMangledName(MetadataState::Complete, typeName,
+    genericArgs,
+    [&substitutions](unsigned depth, unsigned index) {
+      return substitutions.getMetadata(depth, index);
+    },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    });
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const WitnessTable * _Nullable
+swift_getWitnessByMangledNameInContext(
+                        const char *typeNameStart,
+                        size_t typeNameLength,
+                        const TargetContextDescriptor<InProcess> *context,
+                        const void * const *genericArgs) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  SubstGenericParametersFromMetadata substitutions(context, genericArgs);
+  return swift_getWitnessByMangledName(MetadataState::Complete, typeName,
+    genericArgs,
+    [&substitutions](unsigned depth, unsigned index) {
+      return substitutions.getMetadata(depth, index);
+    },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    });
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
