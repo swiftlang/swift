@@ -61,14 +61,14 @@ class RequirementMachine final {
   UnifiedStatsReporter *Stats;
 
   /// All conformance access paths computed so far.
-  llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
+  llvm::DenseMap<std::pair<Term, ProtocolDecl *>,
                  ConformanceAccessPath> ConformanceAccessPaths;
 
   /// Conformance access paths computed during the last round. All elements
   /// have the same length. If a conformance access path of greater length
   /// is requested, we refill CurrentConformanceAccessPaths with all paths of
   /// length N+1, and add them to the ConformanceAccessPaths map.
-  std::vector<std::pair<CanType, ConformanceAccessPath>>
+  std::vector<std::pair<Term, ConformanceAccessPath>>
       CurrentConformanceAccessPaths;
 
   explicit RequirementMachine(RewriteContext &rewriteCtx);
