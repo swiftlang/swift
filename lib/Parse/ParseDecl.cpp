@@ -582,10 +582,11 @@ bool Parser::parseSpecializeAttributeArguments(
     swift::tok ClosingBrace, bool &DiscardAttribute, Optional<bool> &Exported,
     Optional<SpecializeAttr::SpecializationKind> &Kind,
     swift::TrailingWhereClause *&TrailingWhereClause,
-    DeclNameRef &targetFunction, SmallVectorImpl<Identifier> &spiGroups,
+    DeclNameRef &targetFunction, AvailabilityContext *SILAvailability, SmallVectorImpl<Identifier> &spiGroups,
     SmallVectorImpl<AvailableAttr *> &availableAttrs,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
     llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
+  bool isSIL = SILAvailability != nullptr;
   SyntaxParsingContext ContentContext(SyntaxContext,
                                       SyntaxKind::SpecializeAttributeSpecList);
   // Parse optional "exported" and "kind" labeled parameters.
@@ -601,7 +602,8 @@ bool Parser::parseSpecializeAttributeArguments(
                               : SyntaxKind::LabeledSpecializeEntry));
       if (ParamLabel != "exported" && ParamLabel != "kind" &&
           ParamLabel != "target" && ParamLabel != "spi" &&
-          ParamLabel != "spiModule" && ParamLabel != "availability") {
+          ParamLabel != "spiModule" && ParamLabel != "availability" &&
+          (!isSIL || ParamLabel != "available")) {
         diagnose(Tok.getLoc(), diag::attr_specialize_unknown_parameter_name,
                  ParamLabel);
       }
@@ -626,6 +628,15 @@ bool Parser::parseSpecializeAttributeArguments(
           (ParamLabel == "spi" && !spiGroups.empty())) {
         diagnose(Tok.getLoc(), diag::attr_specialize_parameter_already_defined,
                  ParamLabel);
+      }
+      if (ParamLabel == "available") {
+        SourceRange range;
+        llvm::VersionTuple version;
+        if (parseVersionTuple(version, range,
+                                 diag::sil_availability_expected_version))
+          return false;
+
+        *SILAvailability = AvailabilityContext(VersionRange::allGTE(version));
       }
       if (ParamLabel == "availability") {
         SourceRange attrRange;
@@ -877,7 +888,7 @@ bool Parser::parseAvailability(
 
 bool Parser::parseSpecializeAttribute(
     swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
-    SpecializeAttr *&Attr,
+    SpecializeAttr *&Attr, AvailabilityContext *SILAvailability,
     llvm::function_ref<bool(Parser &)> parseSILTargetName,
     llvm::function_ref<bool(Parser &)> parseSILSIPModule) {
   assert(ClosingBrace == tok::r_paren || ClosingBrace == tok::r_square);
@@ -896,7 +907,7 @@ bool Parser::parseSpecializeAttribute(
   SmallVector<AvailableAttr *, 4> availableAttrs;
   if (!parseSpecializeAttributeArguments(
           ClosingBrace, DiscardAttribute, exported, kind, trailingWhereClause,
-          targetFunction, spiGroups, availableAttrs, parseSILTargetName,
+          targetFunction, SILAvailability, spiGroups, availableAttrs, parseSILTargetName,
           parseSILSIPModule)) {
     return false;
   }
@@ -2588,7 +2599,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
     SpecializeAttr *Attr;
-    if (!parseSpecializeAttribute(tok::r_paren, AtLoc, Loc, Attr))
+    if (!parseSpecializeAttribute(tok::r_paren, AtLoc, Loc, Attr, nullptr))
       return false;
 
     Attributes.add(Attr);

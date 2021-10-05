@@ -3114,12 +3114,15 @@ public:
   }
 
   void noteUseOfExportedPrespecialization(const AbstractFunctionDecl *afd) {
+    bool hasNoted = false;
     for (auto *A : afd->getAttrs().getAttributes<SpecializeAttr>()) {
       auto *SA = cast<SpecializeAttr>(A);
       if (!SA->isExported())
         continue;
       if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(afd)) {
-        exportedPrespecializationDecls.push_back(S.addDeclRef(afd));
+        if (!hasNoted)
+          exportedPrespecializationDecls.push_back(S.addDeclRef(afd));
+        hasNoted = true;
       }
     }
   }

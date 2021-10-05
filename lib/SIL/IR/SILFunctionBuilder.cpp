@@ -80,17 +80,20 @@ void SILFunctionBuilder::addFunctionAttributes(
     if (hasSPI) {
       spiGroupIdent = spiGroups[0];
     }
+    auto availability =
+      AvailabilityInference::annotatedAvailableRangeForAttr(SA,
+         M.getSwiftModule()->getASTContext());
     if (targetFunctionDecl) {
       SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
       targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
       F->addSpecializeAttr(SILSpecializeAttr::create(
           M, SA->getSpecializedSignature(), SA->isExported(), kind,
           targetFunction, spiGroupIdent,
-          attributedFuncDecl->getModuleContext()));
+          attributedFuncDecl->getModuleContext(), availability));
     } else {
       F->addSpecializeAttr(SILSpecializeAttr::create(
           M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-          spiGroupIdent, attributedFuncDecl->getModuleContext()));
+          spiGroupIdent, attributedFuncDecl->getModuleContext(), availability));
     }
   }
 
