@@ -20,7 +20,6 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
 #include "TaskPrivate.h"
-
 #include <stdlib.h>
 
 using namespace swift;

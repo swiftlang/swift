@@ -47,6 +47,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   CheckedContinuation.swift
   GlobalExecutor.cpp
   Errors.swift
+  Error.cpp
   Executor.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
