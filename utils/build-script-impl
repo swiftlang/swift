@@ -207,6 +207,7 @@ KNOWN_SETTINGS=(
     swift-enable-compatibility-overrides          "1"               "whether to support back-deploying compatibility fixes for newer apps running on older runtimes"
     swift-enable-reflection                       "1"               "whether to support reflection and mirrors"
     swift-stdlib-has-dladdr                       "1"               "whether to build stdlib assuming the runtime environment provides dladdr API"
+    swift-stdlib-supports-backtrace-reporting     ""                "whether to build stdlib assuming the runtime environment provides the backtrace(3) API, if not set defaults to true on all platforms except for Cygwin, Haiku and wasm"
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
     swift-stdlib-single-threaded-runtime          "0"               "whether to build stdlib as a single-threaded runtime only"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
@@ -2100,6 +2101,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_STDLIB_STABLE_ABI:BOOL=$(true_false "${SWIFT_STDLIB_STABLE_ABI}")
+                    )
+                fi
+
+                if [[ "${SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING}" ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING:BOOL=$(true_false "${SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING}")
                     )
                 fi
 
