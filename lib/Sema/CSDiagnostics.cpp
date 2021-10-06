@@ -4189,6 +4189,9 @@ bool PartialApplicationFailure::diagnoseAsError() {
     kind = RefKind::SuperMethod;
   }
 
+  /* TODO(diagnostics): SR-15250, 
+  Add a "did you mean to call it?" note with a fix-it for inserting '()'
+  if function type has no params or all have a default value. */
   auto diagnostic = CompatibilityWarning
                         ? diag::partial_application_of_function_invalid_swift4
                         : diag::partial_application_of_function_invalid;
