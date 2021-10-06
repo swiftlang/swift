@@ -807,7 +807,7 @@ bool swift::findTransitiveUsesForAddress(
 
   // We were able to recognize all of the uses of the address, so return false
   // that we did not find any errors.
-  return foundError;
+  return !foundError;
 }
 
 //===----------------------------------------------------------------------===//
