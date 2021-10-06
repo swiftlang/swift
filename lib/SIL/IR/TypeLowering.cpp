@@ -2572,7 +2572,8 @@ static CanAnyFunctionType getAsyncEntryPoint(ASTContext &C) {
   // This generates the type signature for @async_main
   // TODO: 'Never' return type would be more accurate.
 
-  CanType returnType = C.getVoidType()->getCanonicalType();
+  CanType returnType =
+      C.getVoidDecl()->getDeclaredInterfaceType()->getCanonicalType();
   FunctionType::ExtInfo extInfo =
       FunctionType::ExtInfoBuilder().withAsync(true).withThrows(false).build();
   return CanAnyFunctionType::get(/*genericSig*/ nullptr, {}, returnType,
