@@ -73,7 +73,7 @@ To ease reading/understanding type declarations, we prefer to define members in 
 
 Please keep all stored properties together in a single uninterrupted list, followed immediately by the type's most crucial initializer(s). Put these as close to the top of the type declaration as possible -- we don't want to force readers to scroll around to find these core definitions.
 
-The main declaration ought to be kept as short as possible -- preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
+The main `struct`/`class` definiton ought to be kept as short as possible -- preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
 Everything else should go in standalone extensions, arranged by logical theme. For example, it's often better to define protocol conformances in dedicated extensions. Think about what order you present these -- put related conformances together, follow some didactic arc, etc. (E.g, conformance definitions for `Equatable`/`Hashable`/`Comparable` should be kept very close to each other, for easy referencing.)
 
 It's okay for the core type declaration to forward reference large nested types or static members that are defined in subsequent extensions. It's often a good idea to define these in an extension immediately following the type declaration, but this is not a strict rule. The goal is to make things easy to understand -- if a type is small enough, it may be fine to put every member directly in the `struct`/`class` definition, while it may make sense to break the definition of a huge type into a number of source files.
@@ -105,7 +105,7 @@ struct Foo: RandomAccessCollection, Hashable {
 }
 
 // GOOD
-struct Foo: RandomAccessCollection, Hashable {
+struct Foo {
   var _storage: _FooStorage
   
   init(foo: Int, bar: Double) { ... }
