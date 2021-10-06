@@ -347,6 +347,10 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_RUNTIME_OS_VERSIONING")
   endif()
 
+  if(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING)
+    list(APPEND result "-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING")
+  endif()
+
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
