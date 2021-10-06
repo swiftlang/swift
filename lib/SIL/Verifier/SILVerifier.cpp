@@ -2646,21 +2646,6 @@ public:
             "closure parameter must not be a @noescape closure");
   }
 
-  void checkAllocValueBufferInst(AllocValueBufferInst *I) {
-    require(I->getOperand()->getType().isAddress(),
-            "Operand value should be an address");
-    require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
-            "Operand value should be a Builtin.UnsafeValueBuffer");
-    verifyOpenedArchetype(I, I->getValueType().getASTType());
-  }
-
-  void checkProjectValueBufferInst(ProjectValueBufferInst *I) {
-    require(I->getOperand()->getType().isAddress(),
-            "Operand value should be an address");
-    require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
-            "Operand value should be a Builtin.UnsafeValueBuffer");
-  }
-
   void checkProjectBoxInst(ProjectBoxInst *I) {
     require(I->getOperand()->getType().isObject(),
             "project_box operand should be a value");
@@ -2708,13 +2693,6 @@ public:
               "project_existential_box result should be the lowered "
               "concrete type of its alloc_existential_box");
     }
-  }
-  
-  void checkDeallocValueBufferInst(DeallocValueBufferInst *I) {
-    require(I->getOperand()->getType().isAddress(),
-            "Operand value should be an address");
-    require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
-            "Operand value should be a Builtin.UnsafeValueBuffer");
   }
   
   void checkStructInst(StructInst *SI) {

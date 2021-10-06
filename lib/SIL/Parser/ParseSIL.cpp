@@ -2878,31 +2878,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
-  case SILInstructionKind::AllocValueBufferInst: {
-    SILType Ty;
-    if (parseSILType(Ty) || parseVerbatim("in") || parseTypedValueRef(Val, B) ||
-        parseSILDebugLocation(InstLoc, B))
-      return true;
-    ResultVal = B.createAllocValueBuffer(InstLoc, Ty, Val);
-    break;
-  }
-  case SILInstructionKind::ProjectValueBufferInst: {
-    SILType Ty;
-    if (parseSILType(Ty) || parseVerbatim("in") || parseTypedValueRef(Val, B) ||
-        parseSILDebugLocation(InstLoc, B))
-      return true;
-    ResultVal = B.createProjectValueBuffer(InstLoc, Ty, Val);
-    break;
-  }
-  case SILInstructionKind::DeallocValueBufferInst: {
-    SILType Ty;
-    if (parseSILType(Ty) || parseVerbatim("in") || parseTypedValueRef(Val, B) ||
-        parseSILDebugLocation(InstLoc, B))
-      return true;
-    ResultVal = B.createDeallocValueBuffer(InstLoc, Ty, Val);
-    break;
-  }
-
   case SILInstructionKind::ProjectBoxInst: {
     if (parseTypedValueRef(Val, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))

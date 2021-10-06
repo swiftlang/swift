@@ -1292,10 +1292,6 @@ public:
     *this << ", " << ARDI->getType();
   }
 
-  void visitAllocValueBufferInst(AllocValueBufferInst *AVBI) {
-    *this << AVBI->getValueType() << " in " << getIDAndType(AVBI->getOperand());
-  }
-
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     if (ABI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
@@ -2157,17 +2153,11 @@ public:
     *this << ", ";
     *this << getIDAndType(DPI->getMetatype());
   }
-  void visitDeallocValueBufferInst(DeallocValueBufferInst *DVBI) {
-    *this << DVBI->getValueType() << " in " << getIDAndType(DVBI->getOperand());
-  }
   void visitDeallocBoxInst(DeallocBoxInst *DI) {
     *this << getIDAndType(DI->getOperand());
   }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
     *this << getIDAndType(DI->getOperand());
-  }
-  void visitProjectValueBufferInst(ProjectValueBufferInst *PVBI) {
-    *this << PVBI->getValueType() << " in " << getIDAndType(PVBI->getOperand());
   }
   void visitProjectBoxInst(ProjectBoxInst *PBI) {
     *this << getIDAndType(PBI->getOperand()) << ", " << PBI->getFieldIndex();

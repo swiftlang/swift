@@ -201,15 +201,6 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
-sil [ossa] @alloc_value_buffer_dealloc_value_buffer : $@convention(thin) (@inout Builtin.UnsafeValueBuffer, Builtin.Int32) -> () {
-bb0(%0 : $*Builtin.UnsafeValueBuffer, %1 : $Builtin.Int32):
-  %2 = alloc_value_buffer $Builtin.Int32 in %0 : $*Builtin.UnsafeValueBuffer
-  store %1 to [trivial] %2 : $*Builtin.Int32
-  dealloc_value_buffer $Builtin.Int32 in %0 : $*Builtin.UnsafeValueBuffer
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 sil [ossa] @builtins_test : $@convention(thin) (@owned Error, Builtin.Int1, Builtin.RawPointer, Builtin.Word) -> ((), @error Error) {
 bb0(%0 : @owned $Error, %1 : $Builtin.Int1, %2 : $Builtin.RawPointer, %3 : $Builtin.Word):
   %4 = metatype $@thick Builtin.Int32.Type
