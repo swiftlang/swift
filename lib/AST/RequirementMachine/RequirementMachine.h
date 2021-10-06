@@ -79,6 +79,7 @@ class RequirementMachine final {
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
   void initWithGenericSignature(CanGenericSignature sig);
+  void initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
 
   bool isComplete() const;
 

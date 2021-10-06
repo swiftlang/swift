@@ -43,6 +43,9 @@ enum class DebugFlags : unsigned {
 
   /// Print debug output from the generating conformances algorithm.
   GeneratingConformances = (1<<7),
+
+  /// Print debug output from the protocol dependency graph.
+  ProtocolDependencies = (1<<8)
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

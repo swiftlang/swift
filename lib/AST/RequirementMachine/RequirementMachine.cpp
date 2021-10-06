@@ -43,10 +43,12 @@ struct RewriteSystemBuilder {
   RewriteSystemBuilder(RewriteContext &ctx, bool dump)
     : Context(ctx), Dump(dump) {}
   void addGenericSignature(CanGenericSignature sig);
+  void addProtocols(ArrayRef<const ProtocolDecl *> proto);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
                       const ProtocolDecl *proto);
+  void processProtocolDependencies();
 };
 
 } // end namespace
@@ -85,31 +87,20 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
   Protocols.visitRequirements(sig.getRequirements());
   Protocols.compute();
 
-  // Add rewrite rules for each protocol.
-  for (auto *proto : Protocols.getProtocols()) {
-    if (Dump) {
-      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
-    }
-
-    const auto &info = Protocols.getProtocolInfo(proto);
-
-    for (auto *assocType : info.AssociatedTypes)
-      addAssociatedType(assocType, proto);
-
-    for (auto *assocType : info.InheritedAssociatedTypes)
-      addAssociatedType(assocType, proto);
-
-    for (auto req : info.Requirements)
-      addRequirement(req.getCanonical(), proto);
-
-    if (Dump) {
-      llvm::dbgs() << "}\n";
-    }
-  }
+  processProtocolDependencies();
 
   // Add rewrite rules for all requirements in the top-level signature.
   for (const auto &req : sig.getRequirements())
     addRequirement(req, /*proto=*/nullptr);
+}
+
+void RewriteSystemBuilder::addProtocols(ArrayRef<const ProtocolDecl *> protos) {
+  // Collect all protocols transitively referenced from this connected component
+  // of the protocol dependency graph.
+  Protocols.visitProtocols(protos);
+  Protocols.compute();
+
+  processProtocolDependencies();
 }
 
 /// For an associated type T in a protocol P, we add a rewrite rule:
@@ -235,6 +226,30 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   }
 
   RequirementRules.emplace_back(subjectTerm, constraintTerm);
+}
+
+void RewriteSystemBuilder::processProtocolDependencies() {
+  // Add rewrite rules for each protocol.
+  for (auto *proto : Protocols.getProtocols()) {
+    if (Dump) {
+      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
+    }
+
+    const auto &info = Protocols.getProtocolInfo(proto);
+
+    for (auto *assocType : info.AssociatedTypes)
+      addAssociatedType(assocType, proto);
+
+    for (auto *assocType : info.InheritedAssociatedTypes)
+      addAssociatedType(assocType, proto);
+
+    for (auto req : info.Requirements)
+      addRequirement(req.getCanonical(), proto);
+
+    if (Dump) {
+      llvm::dbgs() << "}\n";
+    }
+  }
 }
 
 void RequirementMachine::verify(const MutableTerm &term) const {
@@ -372,6 +387,40 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
                     std::move(builder.Protocols));
 
   computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+
+  if (Dump) {
+    llvm::dbgs() << "}\n";
+  }
+}
+
+void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
+  auto &ctx = Context.getASTContext();
+  auto *Stats = ctx.Stats;
+
+  if (Stats)
+    ++Stats->getFrontendCounters().NumRequirementMachines;
+
+  FrontendStatsTracer tracer(Stats, "build-rewrite-system");
+
+  if (Dump) {
+    llvm::dbgs() << "Adding protocols";
+    for (auto *proto : protos) {
+      llvm::dbgs() << " " << proto->getName();
+    }
+    llvm::dbgs() << " {\n";
+  }
+
+  RewriteSystemBuilder builder(Context, Dump);
+  builder.addProtocols(protos);
+
+  // Add the initial set of rewrite rules to the rewrite system, also
+  // providing the protocol graph to use for the linear order on terms.
+  System.initialize(std::move(builder.AssociatedTypeRules),
+                    std::move(builder.RequirementRules),
+                    std::move(builder.Protocols));
+
+  // FIXME: Only if the protocols were written in source, though.
+  computeCompletion(RewriteSystem::AllowInvalidRequirements);
 
   if (Dump) {
     llvm::dbgs() << "}\n";
