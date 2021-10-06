@@ -17,7 +17,7 @@ public struct Struct {
 public enum Enum {
 }
 
-// CHECK:      @llvm.used = appending global [
+// CHECK:      @llvm.{{(compiler.)?}}used = appending global [
 // CHECK-SAME:   @"$s4main11TheProtocolHr"
 // CHECK-SAME:   @"$s4main5ClassCAA11TheProtocolAAHc"
 // CHECK-SAME:   @"$s4main5ClassCHn"

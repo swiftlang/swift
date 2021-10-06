@@ -52,6 +52,7 @@ namespace swift {
   class GenericParamList;
   class IRGenOptions;
   class LangOptions;
+  class SILOptions;
   class ModuleDecl;
   /// A opaque syntax node created by a \c SyntaxParseAction, whose contents
   /// must be interpreted by the \c SyntaxParseAction which created it.
@@ -283,7 +284,7 @@ namespace swift {
   public:
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                const LangOptions &LangOpts, const TypeCheckerOptions &TyOpts,
-               StringRef ModuleName,
+               const SILOptions &SILOpts, StringRef ModuleName,
                std::shared_ptr<SyntaxParseActions> spActions = nullptr,
                SyntaxParsingCache *SyntaxCache = nullptr);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);

@@ -31,6 +31,7 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/raw_ostream.h"
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -771,6 +772,9 @@ namespace swift {
                           DisableOverlayModules,
                           EnableClangSPI);
     }
+
+    std::vector<std::string> getRemappedExtraArgs(
+        std::function<std::string(StringRef)> pathRemapCallback) const;
   };
 
 } // end namespace swift

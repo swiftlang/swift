@@ -7,12 +7,17 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: rdar78290608
+// FIXME(distributed): remote functions dont seem to work on windows?
+// XFAIL: OS=windows-msvc
 
 import _Distributed
 
 @available(SwiftStdlib 5.5, *)
 distributed actor LocalWorker {
+  init(transport: ActorTransport) {
+    defer { transport.actorReady(self) } // FIXME(distributed): rdar://81783599 this should be injected automatically
+  }
+
   distributed func function() async throws -> String {
     "local:"
   }
@@ -25,13 +30,13 @@ distributed actor LocalWorker {
 @available(SwiftStdlib 5.5, *)
 extension LocalWorker {
   @_dynamicReplacement(for: _remote_function())
-  // TODO: @_remoteDynamicReplacement(for: function()) - could be a nicer spelling, hiding that we use dynamic under the covers
+  // TODO(distributed): @_remoteDynamicReplacement(for: function()) - could be a nicer spelling, hiding that we use dynamic under the covers
   func _cluster_remote_function() async throws -> String {
     "\(#function):"
   }
 
   @_dynamicReplacement(for: _remote_echo(name:))
-  // TODO: @_remoteDynamicReplacement(for: hello(name:)) - could be a nicer spelling, hiding that we use dynamic under the covers
+  // TODO(distributed): @_remoteDynamicReplacement(for: hello(name:)) - could be a nicer spelling, hiding that we use dynamic under the covers
   func _cluster_remote_echo(name: String) async throws -> String {
     "\(#function):\(name)"
   }
@@ -95,7 +100,7 @@ func test_remote() async throws {
   let address = ActorAddress(parse: "")
   let transport = FakeTransport()
 
-  let worker = try LocalWorkerresolve(.init(address), using: transport)
+  let worker = try LocalWorker.resolve(.init(address), using: transport)
   let x = try await worker.function()
   print("call: \(x)")
   // CHECK: call: _cluster_remote_function():

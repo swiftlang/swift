@@ -1522,10 +1522,8 @@ void Parser::parseAllAvailabilityMacroArguments() {
     // Create temporary parser.
     int bufferID = SM.addMemBufferCopy(macro,
                                        "-define-availability argument");
-    swift::ParserUnit PU(SM,
-                         SourceFileKind::Main, bufferID,
-                         LangOpts,
-                         TypeCheckerOptions(), "unknown");
+    swift::ParserUnit PU(SM, SourceFileKind::Main, bufferID, LangOpts,
+                         TypeCheckerOptions(), SILOptions(), "unknown");
 
     ForwardingDiagnosticConsumer PDC(Context.Diags);
     PU.getDiagnosticEngine().addConsumer(PDC);
