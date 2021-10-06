@@ -178,7 +178,15 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   // related to concurrency.
   bool needsConcurrency = type.findIf([](CanType t) -> bool {
     if (auto fn = dyn_cast<AnyFunctionType>(t)) {
-      return fn->isAsync() || fn->isSendable() || fn->hasGlobalActor();
+      if (fn->isAsync() || fn->isSendable() || fn->hasGlobalActor())
+        return true;
+
+      for (const auto param: fn->getParams()) {
+        if (param.isIsolated())
+          return true;
+      }
+
+      return false;
     }
     return false;
   });

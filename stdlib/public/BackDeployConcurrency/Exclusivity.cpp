@@ -15,21 +15,35 @@
 //===----------------------------------------------------------------------===//
 #include <cinttypes>
 
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Exclusivity.h"
+#include "swift/Runtime/ThreadLocalStorage.h"
 #include "../runtime/ExclusivityPrivate.h"
 #include "../runtime/SwiftTLSContext.h"
 
 using namespace swift;
 using namespace swift::runtime;
 
-// Thread-local storage used by the back-deployed concurrency library.
-namespace {
+SwiftTLSContext &SwiftTLSContext::get() {
+  SwiftTLSContext *ctx = static_cast<SwiftTLSContext *>(
+      SWIFT_THREAD_GETSPECIFIC(SWIFT_RUNTIME_TLS_KEY));
+  if (ctx)
+    return *ctx;
 
-static thread_local SwiftTLSContext TLSContext;
+  static OnceToken_t setupToken;
+  SWIFT_ONCE_F(
+      setupToken,
+      [](void *) {
+        pthread_key_init_np(SWIFT_RUNTIME_TLS_KEY, [](void *pointer) {
+          delete static_cast<SwiftTLSContext *>(pointer);
+        });
+      },
+      nullptr);
 
-} // anonymous namespace
-
-SwiftTLSContext &SwiftTLSContext::get() { return TLSContext; }
+  ctx = new SwiftTLSContext();
+  SWIFT_THREAD_SETSPECIFIC(SWIFT_RUNTIME_TLS_KEY, ctx);
+  return *ctx;
+}
 
 // Bring in the concurrency-specific exclusivity code.
 #include "../runtime/ConcurrencyExclusivity.inc"

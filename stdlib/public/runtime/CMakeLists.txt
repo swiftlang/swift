@@ -30,7 +30,6 @@ set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
     AutoDiffSupport.cpp
-    BackDeployment.cpp
     Bincompat.cpp
     Casting.cpp
     CygwinPort.cpp

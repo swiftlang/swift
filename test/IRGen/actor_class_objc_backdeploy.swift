@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -target %target-cpu-apple-macosx12.0 | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -target %target-cpu-apple-macosx11.0 -module-name actor_class_objc | %IRGenFileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -10,12 +10,12 @@ import Foundation
 
 // CHECK-LABEL: @"OBJC_METACLASS_$__TtC16actor_class_objc7MyClass" = global
 //   Metaclass is an instance of the root class.
-// CHECK-SAME: %objc_class* {{.*}}@"OBJC_METACLASS_$_SwiftNativeNSObject{{(.ptrauth)?}}"
+// CHECK-SAME: %objc_class* {{.*}}@"OBJC_METACLASS_$_NSObject{{(.ptrauth)?}}"
 
 // CHECK: @"$s16actor_class_objc7MyClassCMf" = internal global
 // CHECK-SAME: @"$s16actor_class_objc7MyClassCfD{{(.ptrauth)?}}"
 // CHECK-SAME: @"OBJC_METACLASS_$__TtC16actor_class_objc7MyClass{{(.ptrauth)?}}"
-// CHECK-SAME: @"OBJC_CLASS_$_SwiftNativeNSObject{{(.ptrauth)?}}"
+// CHECK-SAME: @"OBJC_CLASS_$_NSObject{{(.ptrauth)?}}"
 //   Flags: uses Swift refcounting
 // CHECK-SAME: i32 2,
 //   Instance size
@@ -33,6 +33,12 @@ import Foundation
   public init() { self.x = 0 }
 }
 
+// CHECK: [[SWIFT_NATIVE_NSOBJECT_NAME:@.*]] = private unnamed_addr constant [20 x i8] c"SwiftNativeNSObject\00"
+
+// CHECK: @llvm.global_ctors = appending global
+// CHECK-SAME: _swift_objc_actor_initialization
+
+
 // CHECK-LABEL: define {{.*}} @"$s16actor_class_objc7MyClassC1xSivg"
 // CHECK: [[T0:%.*]] = getelementptr inbounds %T16actor_class_objc7MyClassC, %T16actor_class_objc7MyClassC* %0, i32 0, i32 2
 // CHECK: [[T1:%.*]] = getelementptr inbounds %TSi, %TSi* [[T0]], i32 0, i32 0
@@ -43,3 +49,11 @@ import Foundation
 // CHECK-LABEL: ret %T16actor_class_objc7MyClassC*
 
 // CHECK: swift_defaultActor_destroy
+
+// CHECK-LABEL: define private void @_swift_objc_actor_initialization()
+// CHECK: [[SWIFT_NATIVE_NSOBJECT_CLASS:%.*]]  = call %objc_class* @objc_getRequiredClass(i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[SWIFT_NATIVE_NSOBJECT_NAME]]
+// CHECK: [[ACTOR_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s16actor_class_objc7MyClassCMa"(
+// CHECK: [[ACTOR_METADATA:%.*]] = extractvalue %swift.metadata_response [[ACTOR_RESPONSE]], 0
+// CHECK: [[ACTOR_CLASS:%.*]] = bitcast %swift.type* [[ACTOR_METADATA]] to %objc_class*
+// CHECK: call %objc_class* @class_setSuperclass(%objc_class* [[ACTOR_CLASS]], %objc_class* [[SWIFT_NATIVE_NSOBJECT_CLASS]])
+
