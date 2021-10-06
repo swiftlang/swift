@@ -52,6 +52,11 @@ using namespace rewriting;
 /// Finds all protocol conformance rules appearing in a 3-cell, both without
 /// context, and with a non-empty left context. Applications of rules with a
 /// non-empty right context are ignored.
+///
+/// The rules are organized by protocol. For each protocol, the first element
+/// of the pair stores conformance rules that appear without context. The
+/// second element of the pair stores rules that appear with non-empty left
+/// context. For each such rule, the left prefix is also stored alongside.
 void HomotopyGenerator::findProtocolConformanceRules(
     llvm::SmallDenseMap<const ProtocolDecl *,
                         std::pair<SmallVector<unsigned, 2>,

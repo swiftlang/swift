@@ -382,6 +382,8 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
   return !found->second->isComplete();
 }
 
+/// Implement Tarjan's algorithm to compute strongly-connected components in
+/// the protocol dependency graph.
 void RewriteContext::getRequirementMachineRec(
     const ProtocolDecl *proto,
     SmallVectorImpl<const ProtocolDecl *> &stack) {
@@ -453,6 +455,8 @@ void RewriteContext::getRequirementMachineRec(
   }
 }
 
+/// Lazily construct a requirement machine for the given protocol's strongly
+/// connected component (SCC) in the protocol dependency graph.
 RequirementMachine *RewriteContext::getRequirementMachine(
     const ProtocolDecl *proto) {
   auto found = Protos.find(proto);
@@ -471,6 +475,8 @@ RequirementMachine *RewriteContext::getRequirementMachine(
   auto *&machine = component.Machine;
 
   if (machine) {
+    // If this component has a machine already, make sure it is ready
+    // for use.
     if (!machine->isComplete()) {
       llvm::errs() << "Re-entrant construction of requirement "
                    << "machine for:";
@@ -479,6 +485,8 @@ RequirementMachine *RewriteContext::getRequirementMachine(
       abort();
     }
   } else {
+    // Construct a requirement machine from the structural requirements of
+    // the given set of protocols.
     machine = new RequirementMachine(*this);
     machine->initWithProtocols(component.Protos);
   }

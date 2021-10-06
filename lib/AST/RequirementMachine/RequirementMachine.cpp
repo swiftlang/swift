@@ -369,6 +369,10 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
 
 RequirementMachine::~RequirementMachine() {}
 
+/// Build a requirement machine for the requirements of a generic signature.
+///
+/// This must only be called exactly once, before any other operations are
+/// performed on this requirement machine.
 void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   Sig = sig;
 
@@ -404,6 +408,12 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   }
 }
 
+/// Build a requirement machine for the structural requirements of a set
+/// of protocols, which are understood to form a strongly-connected component
+/// (SCC) of the protocol dependency graph.
+///
+/// This must only be called exactly once, before any other operations are
+/// performed on this requirement machine.
 void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
   Protos = protos;
 
