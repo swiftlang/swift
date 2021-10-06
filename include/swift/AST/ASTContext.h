@@ -1201,6 +1201,11 @@ public:
   bool isRecursivelyConstructingRequirementMachine(
       CanGenericSignature sig);
 
+  /// Retrieve or create a term rewriting system for answering queries on
+  /// type parameters written against the given protocol requirement signature.
+  rewriting::RequirementMachine *getOrCreateRequirementMachine(
+      const ProtocolDecl *proto);
+
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;

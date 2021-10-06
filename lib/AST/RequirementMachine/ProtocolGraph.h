@@ -85,6 +85,7 @@ class ProtocolGraph {
   bool Debug = false;
 
 public:
+  void visitProtocols(ArrayRef<const ProtocolDecl *> protos);
   void visitRequirements(ArrayRef<Requirement> reqs);
 
   bool isKnownProtocol(const ProtocolDecl *proto) const;
