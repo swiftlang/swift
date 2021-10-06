@@ -1,28 +1,22 @@
 /// Test the -module-alias flag with an explicit module loader.
 
 // RUN: %empty-directory(%t)
+// RUN: mkdir -p %t/inputs
+// RUN: mkdir -p %t/outputs
 
 /// Create a module Bar
-// RUN: echo 'public func bar() {}' > %t/FileBar.swift
-// RUN: %target-swift-frontend -module-name Bar %t/FileBar.swift -emit-module -emit-module-path %t/Bar.swiftmodule
+// RUN: echo 'public func bar() {}' > %t/inputs/FileBar.swift
+// RUN: %target-swift-frontend -module-name Bar %t/inputs/FileBar.swift -emit-module -emit-module-path %t/inputs/Bar.swiftmodule
 
 /// Check Bar.swiftmodule is created
-// RUN: test -f %t/Bar.swiftmodule
+// RUN: test -f %t/inputs/Bar.swiftmodule
 
 /// Next create an explicit module dependency map to build module Foo
-// RUN: mkdir -p %t/inputs
-// RUN: echo 'import Cat' > %t/FileFoo.swift
+// RUN: echo 'import Cat' > %t/inputs/FileFoo.swift
 
 // RUN: echo "[{" > %/t/inputs/map.json
-// RUN: echo "\"moduleName\": \"Foo\"," >> %/t/inputs/map.json
-// RUN: echo "\"modulePath\": \"%/t/inputs/Foo.swiftmodule\"," >> %/t/inputs/map.json
-// RUN: echo "\"docPath\": \"%/t/inputs/Foo.swiftdoc\"," >> %/t/inputs/map.json
-// RUN: echo "\"sourceInfoPath\": \"%/t/inputs/Foo.swiftsourceinfo\"," >> %/t/inputs/map.json
-// RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
-// RUN: echo "}," >> %/t/inputs/map.json
-// RUN: echo "{" >> %/t/inputs/map.json
 // RUN: echo "\"moduleName\": \"Bar\"," >> %/t/inputs/map.json
-// RUN: echo "\"modulePath\": \"%t/Bar.swiftmodule\"," >> %/t/inputs/map.json
+// RUN: echo "\"modulePath\": \"%/t/inputs/Bar.swiftmodule\"," >> %/t/inputs/map.json
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}," >> %/t/inputs/map.json
 // RUN: echo "{" >> %/t/inputs/map.json
@@ -42,12 +36,12 @@
 // RUN: echo "}]" >> %/t/inputs/map.json
 
 /// Create a module Foo that imports Cat with -module-alias Cat=Bar with an explicit module loader
-// RUN: %target-swift-frontend -module-name Foo %t/FileFoo.swift -module-alias Cat=Bar -I %t -emit-module -emit-module-path %t/Foo.swiftmodule -disable-implicit-swift-modules -explicit-swift-module-map-file %t/inputs/map.json -Rmodule-loading 2> %t/load-result.output
+// RUN: %target-swift-frontend -module-name Foo %t/inputs/FileFoo.swift -module-alias Cat=Bar -I %t/inputs -emit-module -emit-module-path %t/outputs/Foo.swiftmodule -disable-implicit-swift-modules -explicit-swift-module-map-file %t/inputs/map.json -Rmodule-loading 2> %t/outputs/load-result.output
 
-// RUN: test -f %t/Foo.swiftmodule
-// RUN: test -f %t/Bar.swiftmodule
-// RUN: not test -f %t/Cat.swiftmodule
+// RUN: test -f %t/outputs/Foo.swiftmodule
+// RUN: test -f %t/inputs/Bar.swiftmodule
+// RUN: not test -f %t/inputs/Cat.swiftmodule
 
-// RUN: %FileCheck %s -input-file %t/load-result.output -check-prefix CHECK
+// RUN: %FileCheck %s -input-file %t/outputs/load-result.output -check-prefix CHECK
 // CHECK: remark: loaded module at {{.*}}Bar.swiftmodule
 
