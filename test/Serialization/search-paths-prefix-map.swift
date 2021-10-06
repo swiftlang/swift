@@ -10,7 +10,7 @@
 // RUN:   -Xcc -I -Xcc %t/include -Xcc -isystem -Xcc %t/system -Xcc -F -Xcc %t/fw \
 // RUN:   -Xcc -I%t/includejoined -Xcc -isystem%t/systemjoined -Xcc -F%t/fwjoined \
 // RUN:   -Xcc -D -Xcc donotprefixme -prefix-serialized-debugging-options \
-// RUN:   -debug-prefix-map %t/workingdir=WORKINGDIR -debug-prefix-map %t/sdk=SDKROOT -debug-prefix-map %t=SRC -debug-prefix-map donotprefixme=ERROR
+// RUN:   -debug-prefix-map %t/sdk=SDKROOT -debug-prefix-map %t=SRC -debug-prefix-map donotprefixme=ERROR
 // RUN: llvm-bcanalyzer -dump %t/prefixed.swiftmodule | %FileCheck %s
 
 import has_xref
@@ -20,7 +20,7 @@ numeric(42)
 // CHECK-LABEL: <OPTIONS_BLOCK
 // CHECK: <SDK_PATH abbrevid={{[0-9]+}}/> blob data = 'SDKROOT'
 // CHECK: <XCC abbrevid={{[0-9]+}}/> blob data = '-working-directory'
-// CHECK: <XCC abbrevid={{[0-9]+}}/> blob data = 'WORKINGDIR'
+// CHECK: <XCC abbrevid={{[0-9]+}}/> blob data = 'SRC{{[\/\\]}}workingdir'
 // CHECK: <XCC abbrevid={{[0-9]+}}/> blob data = '-I'
 // CHECK: <XCC abbrevid={{[0-9]+}}/> blob data = 'SRC/include'
 // CHECK: <XCC abbrevid={{[0-9]+}}/> blob data = '-isystem'
@@ -36,10 +36,10 @@ numeric(42)
 // CHECK: </OPTIONS_BLOCK>
 
 // CHECK-LABEL: <INPUT_BLOCK
-// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=1 op1=0/> blob data = 'SRC/Frameworks'
-// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=1 op1=1/> blob data = 'SRC/SystemFrameworks'
+// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=1 op1=0/> blob data = 'SRC{{[\/\\]}}Frameworks'
+// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=1 op1=1/> blob data = 'SRC{{[\/\\]}}SystemFrameworks'
 // CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=0 op1=0/> blob data = 'SRC'
-// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=0 op1=0/> blob data = 'SRC/secret'
+// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=0 op1=0/> blob data = 'SRC{{[\/\\]}}secret'
 // CHECK: </INPUT_BLOCK>
 
 // RUN: cd %t/workingdir && %target-swift-frontend -sdk %t/sdk %s -emit-module -o %t/unprefixed.swiftmodule \

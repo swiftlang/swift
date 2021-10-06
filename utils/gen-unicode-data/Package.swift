@@ -9,6 +9,10 @@ let package = Package(
     .target(
       name: "GenUtils",
       dependencies: []
+    ),
+    .executableTarget(
+      name: "GenNormalization",
+      dependencies: ["GenUtils"]
     )
   ]
 )

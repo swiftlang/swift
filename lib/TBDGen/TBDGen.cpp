@@ -720,6 +720,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
   if (AFD->isDistributed()) {
     addSymbol(SILDeclRef(AFD).asDistributed());
+    addAsyncFunctionPointerSymbol(SILDeclRef(AFD).asDistributed());
   }
 
   // Add derivative function symbols.
@@ -1078,7 +1079,7 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
           : TBD(TBD), PD(PD), Resilient(PD->getParentModule()->isResilient()) {}
 
       void addMethod(SILDeclRef declRef) {
-        if (Resilient) {
+        if (Resilient || TBD.Opts.WitnessMethodElimination) {
           TBD.addDispatchThunk(declRef);
           TBD.addMethodDescriptor(declRef);
         }

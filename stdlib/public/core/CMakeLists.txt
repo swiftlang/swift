@@ -101,6 +101,8 @@ set(SWIFTLIB_ESSENTIAL
   NativeDictionary.swift
   NativeSet.swift
   NewtypeWrapper.swift
+  NFC.swift
+  NFD.swift
   ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
@@ -172,6 +174,7 @@ set(SWIFTLIB_ESSENTIAL
   ThreadLocalStorage.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift
+  UnicodeData.swift
   UnicodeEncoding.swift
   UnicodeHelpers.swift
   UnicodeParser.swift
@@ -282,6 +285,9 @@ if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
 endif()
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
+endif()
+if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
+  list(APPEND swift_stdlib_compile_flags "-DCOW_CHECKS_ENABLED")
 endif()
 
 # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.

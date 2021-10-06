@@ -50,6 +50,7 @@ KNOWN_SETTINGS=(
     check-args-only                               ""                "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     only-execute                                  "all"             "Only execute the named action (see implementation)"
     check-incremental-compilation                 "0"               "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
+    enable-array-cow-checks                       "0"               "set tp 1 compile the stdlib with Array COW checks enabled (only relevant for assert builds)"
 
     ## Build Mode Options
     enable-asan                                   ""                "enable Address Sanitizer"
@@ -212,6 +213,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
     swift-stdlib-has-darwin-libmalloc             "1"               "whether the Darwin build of stdlib can use extended libmalloc APIs"
     swift-stdlib-has-stdin                        "1"               "whether to build stdlib assuming the platform supports stdin and getline API"
+    swift-stdlib-lto                              ""                "enable LLVM LTO on the stdlib, valid values are empty string (no LTO), 'full' and 'thin'"
     swift-disable-dead-stripping                  "0"               "turns off Darwin-specific dead stripping for Swift host tools"
     common-swift-flags                            ""                "Flags used for Swift targets other than the stdlib, like the corelibs"
 
@@ -1987,6 +1989,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_OS_VERSIONING:BOOL=$(true_false "${SWIFT_STDLIB_OS_VERSIONING}")
                     -DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC}")
                     -DSWIFT_STDLIB_HAS_STDIN:BOOL=$(true_false "${SWIFT_STDLIB_HAS_STDIN}")
+                    -DSWIFT_STDLIB_ENABLE_LTO:STRING="${SWIFT_STDLIB_LTO}"
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
@@ -1994,6 +1997,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
                     -DSWIFT_CHECK_INCREMENTAL_COMPILATION:BOOL=$(true_false "${CHECK_INCREMENTAL_COMPILATION}")
+                    -DSWIFT_ENABLE_ARRAY_COW_CHECKS:BOOL=$(true_false "${ENABLE_ARRAY_COW_CHECKS}")
                     -DSWIFT_REPORT_STATISTICS:BOOL=$(true_false "${REPORT_STATISTICS}")
                     -DSWIFT_BUILD_DYNAMIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_DYNAMIC_STDLIB}")
                     -DSWIFT_BUILD_STATIC_STDLIB:BOOL=$(true_false "${BUILD_SWIFT_STATIC_STDLIB}")

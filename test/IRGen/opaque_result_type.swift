@@ -5,9 +5,6 @@
 // rdar://76863553
 // UNSUPPORTED: OS=watchos && CPU=x86_64
 
-// https://bugs.swift.org/browse/SR-15237
-// UNSUPPORTED: CPU=arm64e
-
 public protocol O {
   func bar()
 }

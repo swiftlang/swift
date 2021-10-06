@@ -114,6 +114,16 @@ option(SWIFT_ENABLE_REFLECTION
   "Build stdlib with support for runtime reflection and mirrors."
   TRUE)
 
+if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
+else()
+  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
+endif()
+
+set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
+    "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
+    "Build the concurrency library to use the given global executor (options: dispatch, singlethreaded, hooked)")
+
 #
 # End of user-configurable options.
 #
@@ -244,6 +254,11 @@ function(swift_create_stdlib_targets name variant define_all_alias)
     message(WARNING "Primary variant ${SWIFT_PRIMARY_VARIANT_SDK} is not being built, not creating ${name}${variant} alias target for it.")
   endif()
 endfunction()
+
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded"
+   AND NOT SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  message(SEND_ERROR "Cannot enable the single-threaded global executor without enabling SWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
+endif()
 
 swift_create_stdlib_targets("swift-stdlib" "" TRUE)
 if(SWIFT_STDLIB_ENABLE_SIB_TARGETS)

@@ -89,7 +89,7 @@ namespace swift {
 // Override section name computation. `COMPATIBILITY_OVERRIDE_SECTION_NAME` will
 // resolve to string literal containing the appropriate section name for the
 // current library.
-#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime "__swift54_hooks"
+#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime "__swift56_hooks"
 #define COMPATIBILITY_OVERRIDE_SECTION_NAME_swift_Concurrency "__s_async_hook"
 
 #define COMPATIBILITY_OVERRIDE_SECTION_NAME                                    \

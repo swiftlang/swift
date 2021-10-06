@@ -1116,9 +1116,10 @@ void ConstraintSystem::print(raw_ostream &out) const {
   
   out << "Score: " << CurrentScore << "\n";
 
-  for (const auto &contextualType : contextualTypes) {
-    out << "Contextual Type: " << contextualType.second.getType().getString(PO);
-    if (TypeRepr *TR = contextualType.second.typeLoc.getTypeRepr()) {
+  for (const auto &contextualTypeEntry : contextualTypes) {
+    auto info = contextualTypeEntry.second.first;
+    out << "Contextual Type: " << info.getType().getString(PO);
+    if (TypeRepr *TR = info.typeLoc.getTypeRepr()) {
       out << " at ";
       TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
     }

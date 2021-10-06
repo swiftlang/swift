@@ -145,6 +145,7 @@ namespace swift {
     bool IsSIB = false;
     bool DisableCrossModuleIncrementalInfo = false;
     bool StaticLibrary = false;
+    bool IsOSSA = false;
   };
 
 } // end namespace swift

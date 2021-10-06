@@ -958,13 +958,17 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
 
 std::vector<std::string>
 ClangImporter::getClangArguments(ASTContext &ctx) {
-  if (ctx.ClangImporterOpts.ExtraArgsOnly) {
-    return ctx.ClangImporterOpts.ExtraArgs;
-  }
   std::vector<std::string> invocationArgStrs;
   // Clang expects this to be like an actual command line. So we need to pass in
   // "clang" for argv[0]
   invocationArgStrs.push_back(ctx.ClangImporterOpts.clangPath);
+  if (ctx.ClangImporterOpts.ExtraArgsOnly) {
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             ctx.ClangImporterOpts.ExtraArgs.begin(),
+                             ctx.ClangImporterOpts.ExtraArgs.end());
+    return invocationArgStrs;
+  }
+
   switch (ctx.ClangImporterOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
   case ClangImporterOptions::Modes::PrecompiledModule:

@@ -1777,17 +1777,15 @@ SwitchValueInst *SwitchValueInst::create(
 
 SelectValueInst::SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                  SILType Type, SILValue DefaultResult,
-                                 ArrayRef<SILValue> CaseValuesAndResults,
-                                 ValueOwnershipKind forwardingOwnership)
+                                 ArrayRef<SILValue> CaseValuesAndResults)
     : InstructionBaseWithTrailingOperands(Operand, CaseValuesAndResults,
-                                          DebugLoc, Type, forwardingOwnership) {
-}
+                                          DebugLoc, Type) {}
 
 SelectValueInst *
 SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
                         SILValue DefaultResult,
                         ArrayRef<std::pair<SILValue, SILValue>> CaseValues,
-                        SILModule &M, ValueOwnershipKind forwardingOwnership) {
+                        SILModule &M) {
   // Allocate enough room for the instruction with tail-allocated data for all
   // the case values and the SILSuccessor arrays. There are `CaseBBs.size()`
   // SILValues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
@@ -1802,8 +1800,8 @@ SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
 
   auto Size = totalSizeToAlloc<swift::Operand>(CaseValuesAndResults.size() + 1);
   auto Buf = M.allocateInst(Size, alignof(SelectValueInst));
-  return ::new (Buf) SelectValueInst(Loc, Operand, Type, DefaultResult,
-                                     CaseValuesAndResults, forwardingOwnership);
+  return ::new (Buf)
+      SelectValueInst(Loc, Operand, Type, DefaultResult, CaseValuesAndResults);
 }
 
 template <typename SELECT_ENUM_INST>

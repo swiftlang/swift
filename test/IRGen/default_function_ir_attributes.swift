@@ -119,35 +119,35 @@ func test_computed_key_path_sil_thunks() -> KeyPath<S, Int> {
 }
 
 //   helper function: IR-generated key path getter
-// CHECK-LABEL: define {{.*}} @keypath_get(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_get(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path setter
-// CHECK-LABEL: define {{.*}} @keypath_set(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_set(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path arg layout accessor
-// CHECK-LABEL: define {{.*}} @keypath_get_arg_layout(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_get_arg_layout(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path destroy function
-// CHECK-LABEL: define {{.*}} @keypath_destroy(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_destroy(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path copy function
-// CHECK-LABEL: define {{.*}} @keypath_copy(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_copy(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path equals function
-// CHECK-LABEL: define {{.*}} @keypath_equals(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_equals(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path hash function
-// CHECK-LABEL: define {{.*}} @keypath_hash(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_hash(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path argument initializer
-// CHECK-LABEL: define {{.*}} @keypath_arg_init(
+// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_arg_init(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 func test_computed_key_path_generic_thunks<T: P0 & Hashable>(value: T) -> KeyPath<S, Int> {

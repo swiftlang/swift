@@ -28,10 +28,9 @@ import c_layout
 // CHECK-SAME:  i32 4, 
 // CHECK-SAME:  i64 0 }
 
-// CHECK-LABEL: @"\01l_type_metadata_table" = private constant
-// CHECK-SAME: @"$sSo12AmazingColorVMn"
-// CHECK-SAME: @"$sSo14HasNestedUnionVMn"
-// CHECK-SAME: @"$sSo14HasNestedUnionV18__Unnamed_struct_sVMn"
+// CHECK-LABEL: @"$sSo12AmazingColorVHn" = private constant
+// CHECK-LABEL: @"$sSo14HasNestedUnionVHn" = private constant
+// CHECK-LABEL: @"$sSo14HasNestedUnionV18__Unnamed_struct_sVHn" = private constant
 
 sil @test0 : $() -> () {
 bb0:

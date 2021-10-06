@@ -1542,6 +1542,7 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   Opts.IsInstallAPI = Args.hasArg(OPT_tbd_is_installapi);
 
   Opts.VirtualFunctionElimination = Args.hasArg(OPT_enable_llvm_vfe);
+  Opts.WitnessMethodElimination = Args.hasArg(OPT_enable_llvm_wme);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     Opts.CompatibilityVersion = A->getValue();
@@ -1930,6 +1931,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.WitnessMethodElimination = true;
   }
 
+  if (Args.hasArg(OPT_conditional_runtime_records)) {
+    Opts.ConditionalRuntimeRecords = true;
+  }
+
   if (Args.hasArg(OPT_internalize_at_link)) {
     Opts.InternalizeAtLink = true;
   }
@@ -2146,8 +2151,8 @@ bool CompilerInvocation::parseArgs(
 serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;
-  serialization::ValidationInfo info =
-      serialization::validateSerializedAST(data, &extendedInfo);
+  serialization::ValidationInfo info = serialization::validateSerializedAST(
+      data, getSILOptions().EnableOSSAModules, &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
     return info.status;
@@ -2182,7 +2187,8 @@ CompilerInvocation::setUpInputForSILTool(
       InputFile(inputFilename, bePrimary, fileBufOrErr.get().get(), file_types::TY_SIL));
 
   auto result = serialization::validateSerializedAST(
-      fileBufOrErr.get()->getBuffer(), &extendedInfo);
+      fileBufOrErr.get()->getBuffer(), getSILOptions().EnableOSSAModules,
+      &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {

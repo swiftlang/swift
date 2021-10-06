@@ -402,12 +402,9 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   // Load the module file without validation.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   bool isFramework = false;
-  serialization::ValidationInfo loadInfo =
-      ModuleFileSharedCore::load(modulePath.str(),
-                       std::move(moduleBuf.get()),
-                       nullptr,
-                       nullptr,
-                       isFramework, loadedModuleFile);
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      modulePath.str(), std::move(moduleBuf.get()), nullptr, nullptr,
+      isFramework, isRequiredOSSAModules(), loadedModuleFile);
 
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
@@ -723,12 +720,10 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
 
   std::unique_ptr<ModuleFile> loadedModuleFile;
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFileCore;
-  serialization::ValidationInfo loadInfo =
-      ModuleFileSharedCore::load(moduleInterfacePath,
-                       std::move(moduleInputBuffer),
-                       std::move(moduleDocInputBuffer),
-                       std::move(moduleSourceInfoInputBuffer),
-                       isFramework, loadedModuleFileCore);
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      moduleInterfacePath, std::move(moduleInputBuffer),
+      std::move(moduleDocInputBuffer), std::move(moduleSourceInfoInputBuffer),
+      isFramework, isRequiredOSSAModules(), loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
 
   if (loadInfo.status == serialization::Status::Valid) {
@@ -802,6 +797,10 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   return fileUnit;
 }
 
+bool SerializedModuleLoaderBase::isRequiredOSSAModules() const {
+  return Ctx.SILOpts.EnableOSSAModules;
+}
+
 void swift::serialization::diagnoseSerializedASTLoadFailure(
     ASTContext &Ctx, SourceLoc diagLoc,
     const serialization::ValidationInfo &loadInfo,
@@ -838,6 +837,9 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
       break;
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_old, ModuleName,
                        moduleBufferID);
+    break;
+  case serialization::Status::NotInOSSA:
+    // soft reject, silently ignore.
     break;
   case serialization::Status::RevisionIncompatible:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_revision,
@@ -1121,8 +1123,8 @@ bool SerializedModuleLoaderBase::canImportModule(
   // If failing to extract the user version from the interface file, try the binary
   // format, if present.
   if (currentVersion.empty() && *unusedModuleBuffer) {
-    auto metaData =
-      serialization::validateSerializedAST((*unusedModuleBuffer)->getBuffer());
+    auto metaData = serialization::validateSerializedAST(
+        (*unusedModuleBuffer)->getBuffer(), Ctx.SILOpts.EnableOSSAModules);
     currentVersion = metaData.userModuleVersion;
   }
 

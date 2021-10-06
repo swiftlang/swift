@@ -262,6 +262,32 @@ public enum Optional<Wrapped>: ExpressibleByNilLiteral {
       _internalInvariantFailure("_unsafelyUnwrappedUnchecked of nil optional")
     }
   }
+
+  /// Takes the wrapped value being stored in this instance and returns it while
+  /// also setting the instance to `nil`. If there is no value being stored in
+  /// this instance, this returns `nil` instead.
+  ///
+  ///     var numberOfShoes: Int? = 34
+  ///
+  ///     if let numberOfShoes = numberOfShoes.take() {
+  ///       print(numberOfShoes)
+  ///       // Prints "34"
+  ///     }
+  ///
+  ///     print(numberOfShoes)
+  ///     // Prints "nil"
+  ///
+  /// - Returns: The wrapped value being stored in this instance. If this
+  ///   instance is `nil`, returns `nil`.
+  internal mutating func _take() -> Wrapped? {
+    switch self {
+    case .some(let wrapped):
+      self = nil
+      return wrapped
+    case .none:
+      return nil
+    }
+  }
 }
 
 extension Optional: CustomDebugStringConvertible {

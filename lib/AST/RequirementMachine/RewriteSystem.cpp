@@ -41,6 +41,13 @@ Optional<Symbol> Rule::isPropertyRule() const {
   if (!std::equal(RHS.begin(), RHS.end(), LHS.begin()))
     return None;
 
+  // A same-type requirement of the form 'Self.Foo == Self' can induce a
+  // conformance rule [P].[P] => [P]. Don't consider this a property-like
+  // rule, since it messes up the generating conformances algorithm and
+  // doesn't mean anything useful anyway.
+  if (RHS.size() == 1 && RHS[0] == LHS[1])
+    return None;
+
   return property;
 }
 
@@ -49,6 +56,15 @@ Optional<Symbol> Rule::isPropertyRule() const {
 bool Rule::isProtocolConformanceRule() const {
   if (auto property = isPropertyRule())
     return property->getKind() == Symbol::Kind::Protocol;
+
+  return false;
+}
+
+bool Rule::containsUnresolvedSymbols() const {
+  for (auto symbol : LHS) {
+    if (symbol.getKind() == Symbol::Kind::Name)
+      return true;
+  }
 
   return false;
 }
@@ -257,8 +273,8 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 
   if (Debug.contains(DebugFlags::Simplify)) {
     if (changed) {
-      llvm::dbgs() << "= Simplified " << term << ": ";
-      forDebug.dump(llvm::dbgs(), original, *this);
+      llvm::dbgs() << "= Simplified " << original << " to " << term << " via ";
+      (path == nullptr ? &forDebug : path)->dump(llvm::dbgs(), original, *this);
       llvm::dbgs() << "\n";
     } else {
       llvm::dbgs() << "= Irreducible term: " << term << "\n";
@@ -329,28 +345,26 @@ void RewriteSystem::simplifyRewriteSystem() {
     assert(oldRuleID == ruleID);
     (void) oldRuleID;
 
-    // Produce a loop at the simplified rhs.
+    // Produce a loop at the original lhs.
     RewritePath loop;
 
-    // (1) First, apply rhsPath in reverse to produce the original rhs.
-    rhsPath.invert();
+    // (1) First, apply the original rule to produce the original rhs.
+    loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
+                                         ruleID, /*inverse=*/false));
+
+    // (2) Next, apply rhsPath to produce the simplified rhs.
     loop.append(rhsPath);
 
-    // (2) Next, apply the original rule in reverse to produce the
-    // original lhs.
+    // (3) Finally, apply the new rule in reverse to produce the original lhs.
     loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
-                                         ruleID, /*inverse=*/true));
+                                         newRuleID, /*inverse=*/true));
 
-    // (3) Finally, apply the new rule to produce the simplified rhs.
-    loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
-                                         newRuleID, /*inverse=*/false));
+    HomotopyGenerators.emplace_back(MutableTerm(lhs), loop);
 
     if (Debug.contains(DebugFlags::Completion)) {
       llvm::dbgs() << "$ Right hand side simplification recorded a loop: ";
-      loop.dump(llvm::dbgs(), rhs, *this);
+      HomotopyGenerators.back().dump(llvm::dbgs(), *this);
     }
-
-    HomotopyGenerators.emplace_back(rhs, loop);
   }
 }
 
