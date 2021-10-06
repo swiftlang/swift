@@ -434,19 +434,6 @@ Type RequirementMachine::getCanonicalTypeInContext(
   });
 }
 
-/// Replace 'Self' in the given dependent type (\c depTy) with the given
-/// dependent type, producing a type that refers to the nested type.
-static Type replaceSelfWithType(Type selfType, Type depTy) {
-  if (auto depMemTy = depTy->getAs<DependentMemberType>()) {
-    Type baseType = replaceSelfWithType(selfType, depMemTy->getBase());
-    assert(depMemTy->getAssocType() && "Missing associated type");
-    return DependentMemberType::get(baseType, depMemTy->getAssocType());
-  }
-
-  assert(depTy->is<GenericTypeParamType>() && "missing Self?");
-  return selfType;
-}
-
 /// Retrieve the conformance access path used to extract the conformance of
 /// interface \c type to the given \c protocol.
 ///
@@ -462,12 +449,29 @@ static Type replaceSelfWithType(Type selfType, Type depTy) {
 ConformanceAccessPath
 RequirementMachine::getConformanceAccessPath(Type type,
                                              ProtocolDecl *protocol) {
-  auto canType = getCanonicalTypeInContext(type, { })->getCanonicalType();
-  assert(canType->isTypeParameter());
+  assert(type->isTypeParameter());
+
+  auto mutTerm = Context.getMutableTermForType(type->getCanonicalType(),
+                                               /*proto=*/nullptr);
+  System.simplify(mutTerm);
+  verify(mutTerm);
+
+#ifndef NDEBUG
+  auto *props = Map.lookUpProperties(mutTerm);
+  assert(props &&
+         "Subject type of conformance access path should be known");
+  assert(!props->isConcreteType() &&
+         "Concrete types do not have conformance access paths");
+  auto conformsTo = props->getConformsTo();
+  assert(std::find(conformsTo.begin(), conformsTo.end(), protocol) &&
+         "Subject type of conformance access path must conform to protocol");
+#endif
+
+  auto term = Term::get(mutTerm, Context);
 
   // Check if we've already cached the result before doing anything else.
   auto found = ConformanceAccessPaths.find(
-      std::make_pair(canType, protocol));
+      std::make_pair(term, protocol));
   if (found != ConformanceAccessPaths.end()) {
     return found->second;
   }
@@ -476,13 +480,13 @@ RequirementMachine::getConformanceAccessPath(Type type,
 
   FrontendStatsTracer tracer(Stats, "get-conformance-access-path");
 
-  auto recordPath = [&](CanType type, ProtocolDecl *proto,
+  auto recordPath = [&](Term term, ProtocolDecl *proto,
                         ConformanceAccessPath path) {
     // Add the path to the buffer.
-    CurrentConformanceAccessPaths.emplace_back(type, path);
+    CurrentConformanceAccessPaths.emplace_back(term, path);
 
     // Add the path to the map.
-    auto key = std::make_pair(type, proto);
+    auto key = std::make_pair(term, proto);
     auto inserted = ConformanceAccessPaths.insert(
         std::make_pair(key, path));
     assert(inserted.second);
@@ -508,7 +512,11 @@ RequirementMachine::getConformanceAccessPath(Type type,
       ArrayRef<ConformanceAccessPath::Entry> path(root);
       ConformanceAccessPath result(ctx.AllocateCopy(path));
 
-      recordPath(rootType, rootProto, result);
+      auto mutTerm = Context.getMutableTermForType(rootType, nullptr);
+      System.simplify(mutTerm);
+
+      auto rootTerm = Term::get(mutTerm, Context);
+      recordPath(rootTerm, rootProto, result);
     }
   }
 
@@ -516,14 +524,15 @@ RequirementMachine::getConformanceAccessPath(Type type,
   // path whose corresponding type canonicalizes to the one we are looking for.
   while (true) {
     auto found = ConformanceAccessPaths.find(
-        std::make_pair(canType, protocol));
+        std::make_pair(term, protocol));
     if (found != ConformanceAccessPaths.end()) {
       return found->second;
     }
 
     if (CurrentConformanceAccessPaths.empty()) {
       llvm::errs() << "Failed to find conformance access path for ";
-      llvm::errs() << type << " " << protocol->getName() << ":\n";
+      llvm::errs() << type << " (" << term << ")" << " : ";
+      llvm::errs() << protocol->getName() << ":\n";
       type.dump(llvm::errs());
       llvm::errs() << "\n";
       dump(llvm::errs());
@@ -533,7 +542,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
     // The buffer consists of all conformance access paths of length N.
     // Swap it out with an empty buffer, and fill it with all paths of
     // length N+1.
-    std::vector<std::pair<CanType, ConformanceAccessPath>> oldPaths;
+    std::vector<std::pair<Term, ConformanceAccessPath>> oldPaths;
     std::swap(CurrentConformanceAccessPaths, oldPaths);
 
     for (const auto &pair : oldPaths) {
@@ -551,21 +560,19 @@ RequirementMachine::getConformanceAccessPath(Type type,
         auto nextSubjectType = req.getFirstType()->getCanonicalType();
         auto *nextProto = req.getProtocolDecl();
 
-        // Compute the canonical anchor for this conformance requirement.
-        auto nextType = replaceSelfWithType(pair.first, nextSubjectType);
-        auto nextCanType = getCanonicalTypeInContext(nextType, { })
-            ->getCanonicalType();
+        MutableTerm mutTerm(pair.first);
+        mutTerm.append(Context.getMutableTermForType(nextSubjectType,
+                                                     /*proto=*/lastProto));
+        System.simplify(mutTerm);
 
-        // Skip "derived via concrete" sources.
-        if (!nextCanType->isTypeParameter())
-          continue;
+        auto nextTerm = Term::get(mutTerm, Context);
 
         // If we've already seen a path for this conformance, skip it and
         // don't add it to the buffer. Note that because we iterate over
         // conformance access paths in shortlex order, the existing
         // conformance access path is shorter than the one we found just now.
         if (ConformanceAccessPaths.count(
-                std::make_pair(nextCanType, nextProto)))
+                std::make_pair(nextTerm, nextProto)))
           continue;
 
         if (entries.empty()) {
@@ -580,7 +587,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
         ConformanceAccessPath result = ctx.AllocateCopy(entries);
         entries.pop_back();
 
-        recordPath(nextCanType, nextProto, result);
+        recordPath(nextTerm, nextProto, result);
       }
     }
   }

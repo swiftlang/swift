@@ -204,6 +204,11 @@ SILValue findReferenceRoot(SILValue ref);
 /// Find the first owned root of the reference.
 SILValue findOwnershipReferenceRoot(SILValue ref);
 
+/// Find the aggregate containing the first owned root of the
+/// reference. Identical to findOwnershipReferenceRoot, but looks through
+/// struct_extract, tuple_extract, etc.
+SILValue findOwnershipReferenceAggregate(SILValue ref);
+
 /// Return true if \p address points to a let-variable.
 ///
 /// let-variables are only written during let-variable initialization, which is
@@ -546,6 +551,17 @@ private:
 /// require traversing phis.
 class AccessBase : public AccessRepresentation {
 public:
+  /// Return an AccessBase for the formally accessed variable pointed to by \p
+  /// sourceAddress.
+  ///
+  /// \p sourceAddress may be an address type or Builtin.RawPointer.
+  ///
+  /// If \p sourceAddress is within a formal access scope, which does not have
+  /// "Unsafe" enforcement, then this always returns the valid base.
+  ///
+  /// If \p sourceAddress is not within a formal access scope, or within an
+  /// "Unsafe" scope, then this finds the formal base if possible,
+  /// otherwise returning an invalid base.
   static AccessBase compute(SILValue sourceAddress);
 
   // Do not add any members to this class. AccessBase can be copied as
@@ -576,6 +592,20 @@ public:
   /// Precondition: isReference() is true.
   SILValue getReference() const;
 
+  /// Return the OSSA root of the reference being accessed.
+  ///
+  /// Precondition: isReference() is true.
+  SILValue getOwnershipReferenceRoot() const {
+    return findOwnershipReferenceRoot(getReference());
+  }
+
+  /// Return the storage root of the reference being accessed.
+  ///
+  /// Precondition: isReference() is true.
+  SILValue getStorageReferenceRoot() const {
+    return findReferenceRoot(getReference());
+  }
+
   /// Return the global variable being accessed.
   ///
   /// Precondition: getKind() == Global
@@ -584,6 +614,16 @@ public:
   /// Returns the ValueDecl for the formal access, if it can be
   /// determined. Otherwise returns null.
   const ValueDecl *getDecl() const;
+
+  /// Return true if this base address may be derived from a reference that is
+  /// only valid within a locally scoped OSSA lifetime. This is not true for
+  /// scoped storage such as alloc_stack and @in argument. It can be
+  /// independently assumed that addresses are only used within the scope of the
+  /// storage object.
+  ///
+  /// Useful to determine whether addresses with the same AccessStorage are in
+  /// fact substitutable without fixing OSSA lifetime.
+  bool hasLocalOwnershipLifetime() const;
 
   void print(raw_ostream &os) const;
   void dump() const;
@@ -719,10 +759,6 @@ public:
   bool hasIdenticalStorage(const AccessStorage &other) const {
     return hasIdenticalAccessInfo(other);
   }
-
-  /// Return true if this storage is valid for all uses in a function without
-  /// checking its lifetime.
-  bool isGuaranteedForFunction() const;
 
   /// Returns the ValueDecl for the underlying storage, if it can be
   /// determined. Otherwise returns null.

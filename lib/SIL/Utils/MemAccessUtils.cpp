@@ -258,7 +258,15 @@ class FindAccessBaseVisitor
   using SuperTy = FindAccessVisitorImpl<FindAccessBaseVisitor>;
 
 protected:
-  Optional<SILValue> base;
+  // If the optional baseVal is set, then a result was found. If the SILValue
+  // within the optional is invalid, then there are multiple inconsistent base
+  // addresses (this may currently happen with RawPointer phis).
+  Optional<SILValue> baseVal;
+  // If the kind optional is set, then 'baseVal' is a valid
+  // AccessBase. 'baseVal' may be a valid SILValue while kind optional has no
+  // value if an invalid address producer was detected, via a call to
+  // visitNonAccess.
+  Optional<AccessBase::Kind> kindVal;
 
 public:
   FindAccessBaseVisitor(NestedAccessType nestedAccessTy,
@@ -266,27 +274,39 @@ public:
       : FindAccessVisitorImpl(nestedAccessTy, storageCastTy) {}
 
   // Returns the accessed address or an invalid SILValue.
-  SILValue findBase(SILValue sourceAddr) && {
+  SILValue findPossibleBaseAddress(SILValue sourceAddr) && {
     reenterUseDef(sourceAddr);
-    return base.getValueOr(SILValue());
+    return baseVal.getValueOr(SILValue());
+  }
+
+  AccessBase findBase(SILValue sourceAddr) && {
+    reenterUseDef(sourceAddr);
+    if (!baseVal || !kindVal)
+      return AccessBase();
+
+    return AccessBase(baseVal.getValue(), kindVal.getValue());
   }
 
   void setResult(SILValue foundBase) {
-    if (!base)
-      base = foundBase;
-    else if (base.getValue() != foundBase)
-      base = SILValue();
+    if (!baseVal)
+      baseVal = foundBase;
+    else if (baseVal.getValue() != foundBase)
+      baseVal = SILValue();
   }
 
   // MARK: AccessPhiVisitor::UseDefVisitor implementation.
 
-  bool isResultValid() const { return base && bool(base.getValue()); }
+  // Keep going as long as baseVal is valid regardless of kindVal.
+  bool isResultValid() const { return baseVal && bool(baseVal.getValue()); }
 
-  void invalidateResult() { base = SILValue(); }
+  void invalidateResult() {
+    baseVal = SILValue();
+    kindVal = None;
+  }
 
-  Optional<SILValue> saveResult() const { return base; }
+  Optional<SILValue> saveResult() const { return baseVal; }
 
-  void restoreResult(Optional<SILValue> result) { base = result; }
+  void restoreResult(Optional<SILValue> result) { baseVal = result; }
 
   void addUnknownOffset() { return; }
 
@@ -294,11 +314,18 @@ public:
 
   SILValue visitBase(SILValue base, AccessStorage::Kind kind) {
     setResult(base);
+    if (!baseVal.getValue()) {
+      kindVal = None;
+    } else {
+      assert(!kindVal || kindVal.getValue() == kind);
+      kindVal = kind;
+    }
     return SILValue();
   }
 
   SILValue visitNonAccess(SILValue value) {
     setResult(value);
+    kindVal = None;
     return SILValue();
   }
 
@@ -322,7 +349,7 @@ SILValue swift::getTypedAccessAddress(SILValue address) {
   SILValue accessAddress =
       FindAccessBaseVisitor(NestedAccessType::StopAtAccessBegin,
                             StopAtStorageCast)
-          .findBase(address);
+          .findPossibleBaseAddress(address);
   assert(accessAddress->getType().isAddress());
   return accessAddress;
 }
@@ -334,14 +361,14 @@ SILValue swift::getAccessScope(SILValue address) {
   assert(address->getType().isAddress());
   return FindAccessBaseVisitor(NestedAccessType::StopAtAccessBegin,
                                IgnoreStorageCast)
-      .findBase(address);
+      .findPossibleBaseAddress(address);
 }
 
 // This is allowed to be called on a non-address pointer type.
 SILValue swift::getAccessBase(SILValue address) {
   return FindAccessBaseVisitor(NestedAccessType::IgnoreAccessBegin,
                                IgnoreStorageCast)
-      .findBase(address);
+      .findPossibleBaseAddress(address);
 }
 
 static bool isLetForBase(SILValue base) {
@@ -510,6 +537,12 @@ void AccessRepresentation::print(raw_ostream &os) const {
 //                              MARK: AccessBase
 //===----------------------------------------------------------------------===//
 
+AccessBase AccessBase::compute(SILValue sourceAddress) {
+  return FindAccessBaseVisitor(NestedAccessType::IgnoreAccessBegin,
+                               IgnoreStorageCast)
+      .findBase(sourceAddress);
+}
+
 AccessBase::AccessBase(SILValue base, Kind kind)
   : AccessRepresentation(base, kind)
 {
@@ -609,6 +642,30 @@ const ValueDecl *AccessBase::getDecl() const {
   }
 }
 
+bool AccessBase::hasLocalOwnershipLifetime() const {
+  switch (getKind()) {
+  case AccessBase::Argument:
+  case AccessBase::Stack:
+  case AccessBase::Global:
+    return false;
+  case AccessBase::Unidentified:
+    // Unidentified storage may be nested within object access, but this is an
+    // "escaped pointer", so it is not restricted to the object's borrow scope.
+    return false;
+  case AccessBase::Yield:
+    // Yielded values have a local apply scope, but they never have the same
+    // storage as yielded values from a different scope, so there is no need to
+    // consider their local scope during substitution.
+    return false;
+  case AccessBase::Box:
+  case AccessBase::Class:
+  case AccessBase::Tail:
+    return getReference()->getOwnershipKind() != OwnershipKind::None;
+  case AccessBase::Nested:
+    llvm_unreachable("unexpected storage");
+  };
+}
+
 void AccessBase::print(raw_ostream &os) const {
   AccessRepresentation::print(os);
   switch (getKind()) {
@@ -675,12 +732,8 @@ namespace {
 // Essentially RC identity where the starting point is already a reference.
 class FindReferenceRoot {
   SmallPtrSet<SILPhiArgument *, 4> visitedPhis;
-  bool preserveOwnership;
 
 public:
-  FindReferenceRoot(bool preserveOwnership)
-      : preserveOwnership(preserveOwnership) {}
-
   SILValue findRoot(SILValue ref) && {
     SILValue root = recursiveFindRoot(ref);
     assert(root && "all phi inputs must be reachable");
@@ -692,14 +745,8 @@ protected:
   SILValue recursiveFindRoot(SILValue ref) {
     while (auto *svi = dyn_cast<SingleValueInstruction>(ref)) {
       // If preserveOwnership is true, stop at the first owned root
-      if (preserveOwnership) {
-        if (!isIdentityAndOwnershipPreservingRefCast(svi)) {
-          break;
-        }
-      } else {
-        if (!isIdentityPreservingRefCast(svi)) {
-          break;
-        }
+      if (!isIdentityPreservingRefCast(svi)) {
+        break;
       }
       ref = svi->getOperand(0);
     };
@@ -735,11 +782,54 @@ protected:
 } // end anonymous namespace
 
 SILValue swift::findReferenceRoot(SILValue ref) {
-  return FindReferenceRoot(false /*preserveOwnership*/).findRoot(ref);
+  return FindReferenceRoot().findRoot(ref);
 }
 
+// This does not handle phis because a phis is either a consume or a
+// reborrow. In either case, the phi argument's ownership is independent from
+// the phi itself. The client assumes that the returned root is in the same
+// lifetime or borrow scope of the access.
 SILValue swift::findOwnershipReferenceRoot(SILValue ref) {
-  return FindReferenceRoot(true /*preserveOwnership*/).findRoot(ref);
+  while (auto *svi = dyn_cast<SingleValueInstruction>(ref)) {
+    if (isIdentityAndOwnershipPreservingRefCast(svi)) {
+      ref = svi->getOperand(0);
+      continue;
+    }
+    break;
+  }
+  return ref;
+}
+
+/// Find the first owned aggregate containing the reference, or simply the
+/// reference root if no aggregate is found.
+///
+/// TODO: Add a component path to a ReferenceRoot abstraction and handle
+/// that within FindReferenceRoot.
+SILValue swift::findOwnershipReferenceAggregate(SILValue ref) {
+  SILValue root = ref;
+  while(true) {
+    root = findOwnershipReferenceRoot(root);
+    if (!root)
+      return root;
+    if (isa<FirstArgOwnershipForwardingSingleValueInst>(root)
+        || isa<OwnershipForwardingConversionInst>(root)
+        || isa<OwnershipForwardingSelectEnumInstBase>(root)
+        || isa<OwnershipForwardingMultipleValueInstruction>(root)) {
+      root = root->getDefiningInstruction()->getOperand(0);
+      continue;
+    }
+    if (auto *arg = dyn_cast<SILArgument>(root)) {
+      if (auto *term = arg->getSingleTerminator()) {
+        if (term->isTransformationTerminator()) {
+          assert(OwnershipForwardingTermInst::isa(term));
+          root = term->getOperand(0);
+          continue;
+        }
+      }
+    }
+    break;
+  }
+  return root;
 }
 
 //===----------------------------------------------------------------------===//
@@ -800,17 +890,6 @@ void AccessStorage::visitRoots(
       }
     }
   }
-}
-
-bool AccessStorage::isGuaranteedForFunction() const {
-  if (getKind() == AccessStorage::Argument) {
-    return getArgument()->getArgumentConvention().isGuaranteedConvention();
-  }
-  if (isObjectAccess()) {
-    return getRoot().getOwnershipKind() == OwnershipKind::Guaranteed
-           && isa<SILFunctionArgument>(getRoot());
-  }
-  return false;
 }
 
 const ValueDecl *AccessStorage::getDecl() const {

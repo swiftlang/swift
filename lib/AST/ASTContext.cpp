@@ -1979,6 +1979,15 @@ bool ASTContext::isRecursivelyConstructingRequirementMachine(
   return rewriteCtx->isRecursivelyConstructingRequirementMachine(sig);
 }
 
+rewriting::RequirementMachine *
+ASTContext::getOrCreateRequirementMachine(const ProtocolDecl *proto) {
+  auto &rewriteCtx = getImpl().TheRewriteContext;
+  if (!rewriteCtx)
+    rewriteCtx.reset(new rewriting::RewriteContext(*this));
+
+  return rewriteCtx->getRequirementMachine(proto);
+}
+
 Optional<llvm::TinyPtrVector<ValueDecl *>>
 OverriddenDeclsRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());

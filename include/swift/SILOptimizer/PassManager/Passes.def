@@ -315,9 +315,6 @@ PASS(NestedSemanticFunctionCheck, "nested-semantic-function-check",
 PASS(NonTransparentFunctionOwnershipModelEliminator,
      "non-transparent-func-ownership-model-eliminator",
      "Eliminate Ownership Annotations from non-transparent SIL Functions")
-PASS(NonStdlibNonTransparentFunctionOwnershipModelEliminator,
-     "non-stdlib-non-transparent-func-ownership-model-eliminator",
-     "Eliminate Ownership Annotations from non-transparent SIL Functions only when not processing the stdlib.")
 PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
 PASS(AlwaysInlineInliner, "always-inline",
