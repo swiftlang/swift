@@ -172,9 +172,9 @@ We also have some recommendations for defining other members. These aren't stric
 
 - It's okay for the core type declaration to forward reference large nested types or static members that are defined in subsequent extensions. It's often a good idea to define these in an extension immediately following the type declaration, but this is not a strict rule. 
 
-Extensions are a nice way to break up the implementation into easily digestable chunks, but they aren't the only way. The goal is to make things easy to understand -- if a type is small enough, it may be best to list every member directly in the `struct`/`class` definition, while for huge types it often makes more sense to break them up into number of separate source files. 
+Extensions are a nice way to break up the implementation into easily digestable chunks, but they aren't the only way. The goal is to make things easy to understand -- if a type is small enough, it may be best to list every member directly in the `struct`/`class` definition, while for huge types it often makes more sense to break them up into a handful of separate source files instead. 
 
-```
+```swift
 // BAD (a jumbled mess)
 struct Foo: RandomAccessCollection, Hashable {
   var count: Int { ... }
