@@ -1226,14 +1226,13 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
     return nullptr;
 
   auto moduleID = path[0];
-  auto moduleName = Ctx.getRealModuleName(moduleID.Item).str();
 
   // See if we find it in the registered memory buffers.
 
   // FIXME: Right now this works only with access paths of length 1.
   // Once submodules are designed, this needs to support suffix
   // matching and a search path.
-  auto bufIter = MemoryBuffers.find(moduleName);
+  auto bufIter = MemoryBuffers.find(moduleID.Item.str());
   if (bufIter == MemoryBuffers.end())
     return nullptr;
 
