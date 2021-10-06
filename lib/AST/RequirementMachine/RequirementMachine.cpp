@@ -513,6 +513,74 @@ bool RequirementMachine::isComplete() const {
   return Complete;
 }
 
-void RequirementMachine::computeMinimalRequirements(const ProtocolDecl *proto) {
+void RequirementMachine::computeMinimalRequirements() {
   System.minimizeRewriteSystem();
+
+  llvm::DenseMap<const ProtocolDecl *, llvm::SmallVector<Requirement, 2>> reqs;
+
+  auto createRequirementFromRule = [&](
+      const Rule &rule,
+      TypeArrayView<GenericTypeParamType> genericParams)
+        -> Optional<Requirement> {
+    if (auto prop = rule.isPropertyRule()) {
+      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
+                                                System.getProtocols());
+
+      switch (prop->getKind()) {
+      case Symbol::Kind::Protocol:
+        return Requirement(RequirementKind::Conformance,
+                           subjectType,
+                           prop->getProtocol()->getDeclaredInterfaceType());
+
+      case Symbol::Kind::Layout:
+      case Symbol::Kind::ConcreteType:
+      case Symbol::Kind::Superclass:
+        return None;
+
+      case Symbol::Kind::Name:
+      case Symbol::Kind::AssociatedType:
+      case Symbol::Kind::GenericParam:
+        break;
+      }
+      llvm_unreachable("Invalid symbol kind");
+    } else if (rule.getLHS().back().getKind() != Symbol::Kind::Protocol) {
+      auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams,
+                                                   System.getProtocols());
+      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
+                                                System.getProtocols());
+
+      return Requirement(RequirementKind::SameType, constraintType, subjectType);
+    }
+
+    return None;
+  };
+
+  for (const auto &rule : System.getRules()) {
+    if (rule.isPermanent())
+      continue;
+
+    if (rule.isRedundant())
+      continue;
+
+    auto domain = rule.getLHS()[0].getProtocols();
+    assert(domain.size() == 1);
+
+    const auto *proto = domain[0];
+    if (std::find(Protos.begin(), Protos.end(), proto) != Protos.end()) {
+      auto genericParams = proto->getGenericSignature().getGenericParams();
+      if (auto req = createRequirementFromRule(rule, genericParams))
+        reqs[proto].push_back(*req);
+    }
+  }
+
+  if (Context.getDebugOptions().contains(DebugFlags::Minimization)) {
+    for (const auto &pair : reqs) {
+      llvm::dbgs() << "Protocol " << pair.first->getName() << ":\n";
+      for (const auto &req : pair.second) {
+        llvm::dbgs() << "- ";
+        req.dump(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      }
+    }
+  }
 }

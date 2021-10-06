@@ -45,7 +45,10 @@ enum class DebugFlags : unsigned {
   GeneratingConformances = (1<<7),
 
   /// Print debug output from the protocol dependency graph.
-  ProtocolDependencies = (1<<8)
+  ProtocolDependencies = (1<<8),
+
+  /// Print debug output from generic signature minimization.
+  Minimization = (1<<9),
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

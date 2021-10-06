@@ -391,6 +391,10 @@ public:
     return (unsigned)(&rule - &*Rules.begin());
   }
 
+  ArrayRef<Rule> getRules() const {
+    return Rules;
+  }
+
   Rule &getRule(unsigned ruleID) {
     return Rules[ruleID];
   }

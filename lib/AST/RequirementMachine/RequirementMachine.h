@@ -113,7 +113,7 @@ public:
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
-  void computeMinimalRequirements(const ProtocolDecl *proto);
+  void computeMinimalRequirements();
 
   void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;

@@ -38,6 +38,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
       .Case("generating-conformances", DebugFlags::GeneratingConformances)
       .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
+      .Case("minimization", DebugFlags::Minimization)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
