@@ -114,6 +114,7 @@ namespace {
     SILFunction *target = nullptr;
     Identifier spiGroupID;
     ModuleDecl *spiModule;
+    AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
   };
 
   class SILParser {
@@ -1092,9 +1093,9 @@ static bool parseDeclSILOptional(bool *isTransparent,
       SpecializeAttr *Attr;
       StringRef targetFunctionName;
       ModuleDecl *module = nullptr;
-
+      AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
       if (!SP.P.parseSpecializeAttribute(
-              tok::r_square, AtLoc, Loc, Attr,
+              tok::r_square, AtLoc, Loc, Attr, &availability,
               [&targetFunctionName](Parser &P) -> bool {
                 if (P.Tok.getKind() != tok::string_literal) {
                   P.diagnose(P.Tok, diag::expected_in_attribute_list);
@@ -1136,6 +1137,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                           : SILSpecializeAttr::SpecializationKind::Partial;
       SpecAttr.exported = Attr->isExported();
       SpecAttr.target = targetFunction;
+      SpecAttr.availability = availability;
       SpecAttrs->emplace_back(SpecAttr);
       if (!Attr->getSPIGroups().empty()) {
         SpecAttr.spiGroupID = Attr->getSPIGroups()[0];
@@ -6279,7 +6281,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
                 GenericSignature());
           FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
               FunctionState.F->getModule(), genericSig, Attr.exported,
-              Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule));
+              Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability));
         }
       }
 

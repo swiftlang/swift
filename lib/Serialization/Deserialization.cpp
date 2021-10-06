@@ -4225,6 +4225,9 @@ public:
 
     return dtor;
   }
+
+  AvailableAttr *readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
+                                         StringRef blobData);
 };
 }
 
@@ -4265,6 +4268,61 @@ ModuleFile::getDeclChecked(
     }
   }
   return declOrOffset;
+}
+
+AvailableAttr *
+DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
+                                          StringRef blobData) {
+  bool isImplicit;
+  bool isUnavailable;
+  bool isDeprecated;
+  bool isPackageDescriptionVersionSpecific;
+  DEF_VER_TUPLE_PIECES(Introduced);
+  DEF_VER_TUPLE_PIECES(Deprecated);
+  DEF_VER_TUPLE_PIECES(Obsoleted);
+  DeclID renameDeclID;
+  unsigned platform, messageSize, renameSize;
+
+  // Decode the record, pulling the version tuple information.
+  serialization::decls_block::AvailableDeclAttrLayout::readRecord(
+      scratch, isImplicit, isUnavailable, isDeprecated,
+      isPackageDescriptionVersionSpecific, LIST_VER_TUPLE_PIECES(Introduced),
+      LIST_VER_TUPLE_PIECES(Deprecated), LIST_VER_TUPLE_PIECES(Obsoleted),
+      platform, renameDeclID, messageSize, renameSize);
+
+  ValueDecl *renameDecl = nullptr;
+  if (renameDeclID) {
+    renameDecl = cast<ValueDecl>(MF.getDecl(renameDeclID));
+  }
+
+  StringRef message = blobData.substr(0, messageSize);
+  blobData = blobData.substr(messageSize);
+  StringRef rename = blobData.substr(0, renameSize);
+  llvm::VersionTuple Introduced, Deprecated, Obsoleted;
+  DECODE_VER_TUPLE(Introduced)
+  DECODE_VER_TUPLE(Deprecated)
+  DECODE_VER_TUPLE(Obsoleted)
+
+  PlatformAgnosticAvailabilityKind platformAgnostic;
+  if (isUnavailable)
+    platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
+  else if (isDeprecated)
+    platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
+  else if (((PlatformKind)platform) == PlatformKind::none &&
+           (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()))
+    platformAgnostic =
+        isPackageDescriptionVersionSpecific
+            ? PlatformAgnosticAvailabilityKind::
+                  PackageDescriptionVersionSpecific
+            : PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+  else
+    platformAgnostic = PlatformAgnosticAvailabilityKind::None;
+
+  auto attr = new (ctx) AvailableAttr(
+      SourceLoc(), SourceRange(), (PlatformKind)platform, message, rename,
+      renameDecl, Introduced, SourceRange(), Deprecated, SourceRange(),
+      Obsoleted, SourceRange(), platformAgnostic, isImplicit);
+  return attr;
 }
 
 llvm::Error DeclDeserializer::deserializeDeclCommon() {
@@ -4385,60 +4443,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::Available_DECL_ATTR: {
-        bool isImplicit;
-        bool isUnavailable;
-        bool isDeprecated;
-        bool isPackageDescriptionVersionSpecific;
-        DEF_VER_TUPLE_PIECES(Introduced);
-        DEF_VER_TUPLE_PIECES(Deprecated);
-        DEF_VER_TUPLE_PIECES(Obsoleted);
-        DeclID renameDeclID;
-        unsigned platform, messageSize, renameSize;
-
-        // Decode the record, pulling the version tuple information.
-        serialization::decls_block::AvailableDeclAttrLayout::readRecord(
-            scratch, isImplicit, isUnavailable, isDeprecated,
-            isPackageDescriptionVersionSpecific,
-            LIST_VER_TUPLE_PIECES(Introduced),
-            LIST_VER_TUPLE_PIECES(Deprecated),
-            LIST_VER_TUPLE_PIECES(Obsoleted),
-            platform, renameDeclID, messageSize, renameSize);
-
-        ValueDecl *renameDecl = nullptr;
-        if (renameDeclID) {
-          renameDecl = cast<ValueDecl>(MF.getDecl(renameDeclID));
-        }
-
-        StringRef message = blobData.substr(0, messageSize);
-        blobData = blobData.substr(messageSize);
-        StringRef rename = blobData.substr(0, renameSize);
-        llvm::VersionTuple Introduced, Deprecated, Obsoleted;
-        DECODE_VER_TUPLE(Introduced)
-        DECODE_VER_TUPLE(Deprecated)
-        DECODE_VER_TUPLE(Obsoleted)
-
-        PlatformAgnosticAvailabilityKind platformAgnostic;
-        if (isUnavailable)
-          platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
-        else if (isDeprecated)
-          platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
-        else if (((PlatformKind)platform) == PlatformKind::none &&
-                 (!Introduced.empty() ||
-                  !Deprecated.empty() ||
-                  !Obsoleted.empty()))
-          platformAgnostic = isPackageDescriptionVersionSpecific ?
-            PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
-        else
-          platformAgnostic = PlatformAgnosticAvailabilityKind::None;
-
-        Attr = new (ctx) AvailableAttr(
-          SourceLoc(), SourceRange(),
-          (PlatformKind)platform, message, rename, renameDecl,
-          Introduced, SourceRange(),
-          Deprecated, SourceRange(),
-          Obsoleted, SourceRange(),
-          platformAgnostic, isImplicit);
+        Attr = readAvailable_DECL_ATTR(scratch, blobData);
         break;
       }
 
@@ -4475,11 +4480,13 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         ArrayRef<uint64_t> rawPieceIDs;
         uint64_t numArgs;
         uint64_t numSPIGroups;
+        uint64_t numAvailabilityAttrs;
         DeclID targetFunID;
 
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
             scratch, exported, specializationKindVal, specializedSigID,
-            targetFunID, numArgs, numSPIGroups, rawPieceIDs);
+            targetFunID, numArgs, numSPIGroups, numAvailabilityAttrs,
+            rawPieceIDs);
 
         assert(rawPieceIDs.size() == numArgs + numSPIGroups ||
                rawPieceIDs.size() == (numArgs - 1 + numSPIGroups));
@@ -4509,10 +4516,35 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
           for (auto id : rawPieceIDs.slice(numTargetFunctionPiecesToSkip))
             spis.push_back(MF.getIdentifier(id));
         }
+        SmallVector<AvailableAttr *, 4> availabilityAttrs;
+        while (numAvailabilityAttrs) {
+          // Prepare to read the next record.
+          restoreOffset.cancel();
+          scratch.clear();
+
+          // TODO: deserialize them.
+          BCOffsetRAII restoreOffset2(MF.DeclTypeCursor);
+          llvm::BitstreamEntry entry =
+              MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
+          if (entry.Kind != llvm::BitstreamEntry::Record) {
+            // We don't know how to serialize decls represented by sub-blocks.
+            MF.fatal();
+          }
+          unsigned recordID = MF.fatalIfUnexpected(
+              MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+          if (recordID != decls_block::Available_DECL_ATTR) {
+            MF.fatal();
+          }
+
+          auto attr = readAvailable_DECL_ATTR(scratch, blobData);
+          availabilityAttrs.push_back(attr);
+          restoreOffset2.cancel();
+          --numAvailabilityAttrs;
+        }
 
         auto specializedSig = MF.getGenericSignature(specializedSigID);
         Attr = SpecializeAttr::create(ctx, exported != 0, specializationKind,
-                                      spis, specializedSig,
+                                      spis, availabilityAttrs, specializedSig,
                                       replacedFunctionName, &MF, targetFunID);
         break;
       }

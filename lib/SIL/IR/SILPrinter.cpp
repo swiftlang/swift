@@ -3711,6 +3711,10 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   if (targetFunction) {
     OS << "target: \"" << targetFunction->getName() << "\", ";
   }
+ if (!availability.isAlwaysAvailable()) {
+    auto version = availability.getOSVersion().getLowerEndpoint();
+    OS << "available: " << version.getAsString() << ", ";
+  }
   if (!requirements.empty()) {
     OS << "where ";
     SILFunction *F = getFunction();
