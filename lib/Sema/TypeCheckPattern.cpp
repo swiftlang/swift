@@ -494,9 +494,7 @@ public:
         },
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        [](auto &ctx, auto *originator) {
-          return Type();
-        });
+        PlaceholderType::get);
     const auto ty = resolution.resolveType(repr);
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -618,9 +616,7 @@ public:
               },
               // FIXME: Don't let placeholder types escape type resolution.
               // For now, just return the placeholder type.
-              [](auto &ctx, auto *originator) {
-                return Type();
-              })
+              PlaceholderType::get)
               .resolveType(prefixRepr);
       auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
       if (!enumDecl)
@@ -830,9 +826,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
       };
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
-      placeholderHandler = [](auto &ctx, auto *originator) {
-        return Type();
-      };
+      placeholderHandler = PlaceholderType::get;
     }
     return validateTypedPattern(
         cast<TypedPattern>(P),
@@ -900,9 +894,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
         };
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        placeholderHandler = [](auto &ctx, auto *originator) {
-          return Type();
-        };
+        placeholderHandler = PlaceholderType::get;
       }
       TypedPattern *TP = cast<TypedPattern>(somePat->getSubPattern());
       const auto type = validateTypedPattern(

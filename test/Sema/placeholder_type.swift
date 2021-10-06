@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-let x: _ = 0 // expected-error {{placeholders are not allowed as top-level types}}
+let x: _ = 0
 let x2 = x
 let dict1: [_: Int] = ["hi": 0]
 let dict2: [Character: _] = ["h": 0]
@@ -9,8 +9,8 @@ let arr = [_](repeating: "hi", count: 3)
 
 func foo(_ arr: [_] = [0]) {} // expected-error {{type placeholder not allowed here}}
 
-let foo = _.foo // expected-error {{placeholders are not allowed as top-level types}}
-let zero: _ = .zero // expected-error {{placeholders are not allowed as top-level types}}
+let foo = _.foo // expected-error {{could not infer type for placeholder}}
+let zero: _ = .zero // expected-error {{cannot infer contextual base in reference to member 'zero'}}
 
 struct S<T> {
     var x: T
@@ -48,10 +48,9 @@ func dictionary<K, V>(ofType: [K: V].Type) -> [K: V] { [:] }
 
 let _: [String: _] = dictionary(ofType: [_: Int].self)
 let _: [_: _] = dictionary(ofType: [String: Int].self)
-let _: [String: Int] = dictionary(ofType: _.self) // expected-error {{placeholders are not allowed as top-level types}}
+let _: [String: Int] = dictionary(ofType: _.self)
 
 let _: @convention(c) _ = { 0 } // expected-error {{@convention attribute only applies to function types}}
-// expected-error@-1 {{placeholders are not allowed as top-level types}}
 let _: @convention(c) (_) -> _ = { (x: Double) in 0 }
 let _: @convention(c) (_) -> Int = { (x: Double) in 0 }
 
@@ -99,18 +98,18 @@ extension Bar {
 }
 
 // FIXME: We should probably have better diagnostics for these situations--the user probably meant to use implicit member syntax
-let _: Int = _() // expected-error {{placeholders are not allowed as top-level types}}
-let _: () -> Int = { _() } // expected-error {{unable to infer closure type in the current context}} expected-error {{placeholders are not allowed as top-level types}}
-let _: Int = _.init() // expected-error {{placeholders are not allowed as top-level types}}
-let _: () -> Int = { _.init() } // expected-error {{unable to infer closure type in the current context}} expected-error {{placeholders are not allowed as top-level types}}
+let _: Int = _() // expected-error {{type of expression is ambiguous without more context}}
+let _: () -> Int = { _() } // expected-error {{unable to infer closure type in the current context}}
+let _: Int = _.init() // expected-error {{could not infer type for placeholder}}
+let _: () -> Int = { _.init() } // expected-error {{could not infer type for placeholder}}
 
-func returnsInt() -> Int { _() } // expected-error {{placeholders are not allowed as top-level types}}
-func returnsIntClosure() -> () -> Int { { _() } } // expected-error {{unable to infer closure type in the current context}} expected-error {{placeholders are not allowed as top-level types}}
-func returnsInt2() -> Int { _.init() }  // expected-error {{placeholders are not allowed as top-level types}}
-func returnsIntClosure2() -> () -> Int { { _.init() } } // expected-error {{unable to infer closure type in the current context}} expected-error {{placeholders are not allowed as top-level types}}
+func returnsInt() -> Int { _() } // expected-error {{type of expression is ambiguous without more context}}
+func returnsIntClosure() -> () -> Int { { _() } } // expected-error {{unable to infer closure type in the current context}}
+func returnsInt2() -> Int { _.init() }  // expected-error {{could not infer type for placeholder}}
+func returnsIntClosure2() -> () -> Int { { _.init() } } // expected-error {{could not infer type for placeholder}}
 
 let _: Int.Type = _ // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
-let _: Int.Type = _.self // expected-error {{placeholders are not allowed as top-level types}}
+let _: Int.Type = _.self
 
 struct SomeSuperLongAndComplexType {}
 func getSomething() -> SomeSuperLongAndComplexType? { .init() }
@@ -136,13 +135,13 @@ let _ = [_].otherStaticMember.method()
 func f(x: Any, arr: [Int]) {
     // FIXME: Better diagnostics here. Maybe we should suggest replacing placeholders with 'Any'?
 
-    if x is _ {} // expected-error {{placeholders are not allowed as top-level types}}
+    if x is _ {} // expected-error {{type of expression is ambiguous without more context}}
     if x is [_] {} // expected-error {{type of expression is ambiguous without more context}}
     if x is () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    if let y = x as? _ {} // expected-error {{placeholders are not allowed as top-level types}}
+    if let y = x as? _ {} // expected-error {{type of expression is ambiguous without more context}}
     if let y = x as? [_] {} // expected-error {{type of expression is ambiguous without more context}}
     if let y = x as? () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    let y1 = x as! _ // expected-error {{placeholders are not allowed as top-level types}}
+    let y1 = x as! _ // expected-error {{type of expression is ambiguous without more context}}
     let y2 = x as! [_] // expected-error {{type of expression is ambiguous without more context}}
     let y3 = x as! () -> _ // expected-error {{type of expression is ambiguous without more context}}
 
@@ -155,13 +154,13 @@ func f(x: Any, arr: [Int]) {
     case let y as () -> _: break // expected-error {{type placeholder not allowed here}}
     }
 
-    if arr is _ {} // expected-error {{placeholders are not allowed as top-level types}}
+    if arr is _ {} // expected-error {{type of expression is ambiguous without more context}}
     if arr is [_] {} // expected-error {{type of expression is ambiguous without more context}}
     if arr is () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    if let y = arr as? _ {} // expected-error {{placeholders are not allowed as top-level types}}
+    if let y = arr as? _ {} // expected-error {{type of expression is ambiguous without more context}}
     if let y = arr as? [_] {} // expected-error {{type of expression is ambiguous without more context}}
     if let y = arr as? () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    let y1 = arr as! _ // expected-error {{placeholders are not allowed as top-level types}}
+    let y1 = arr as! _ // expected-error {{type of expression is ambiguous without more context}}
     let y2 = arr as! [_] // expected-error {{type of expression is ambiguous without more context}}
     let y3 = arr as! () -> _ // expected-error {{type of expression is ambiguous without more context}}
 
@@ -187,12 +186,12 @@ struct Just<Output>: Publisher {
 struct SetFailureType<Output, Failure>: Publisher {}
 
 extension Publisher {
-    func setFailureType<T>(to: T.Type) -> SetFailureType<Output, T> {
+    func setFailureType<T>(to: T.Type) -> SetFailureType<Output, T> { // expected-note {{in call to function 'setFailureType(to:)'}}
         return .init()
     }
 }
 
-let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self) // expected-error {{placeholders are not allowed as top-level types}}
+let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self)
 let _: SetFailureType<Int, [String]> = Just<Int>().setFailureType(to: [_].self)
 let _: SetFailureType<Int, (String) -> Double> = Just<Int>().setFailureType(to: ((_) -> _).self)
 let _: SetFailureType<Int, (String, Double)> = Just<Int>().setFailureType(to: (_, _).self)
@@ -216,3 +215,5 @@ _ = (1...10)
     .map { (intValue, x: (_, boolValue: _)) in
         x.boolValue ? intValue : 0
     }
+
+let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self).setFailureType(to: String.self) // expected-error {{generic parameter 'T' could not be inferred}}
