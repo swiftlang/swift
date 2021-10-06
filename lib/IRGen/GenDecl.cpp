@@ -1881,15 +1881,13 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
   auto swiftNativeNSObjectName =
       IGM->getAddrOfGlobalString("SwiftNativeNSObject");
   auto swiftNativeNSObjectClass = RegisterIGF.Builder.CreateCall(
-      RegisterIGF.IGM.getLookUpClassFn(), swiftNativeNSObjectName);
+      RegisterIGF.IGM.getObjCGetRequiredClassFn(), swiftNativeNSObjectName);
 
   for (ClassDecl *CD : ObjCActorsNeedingSuperclassSwizzle) {
     // The @objc actor class.
     llvm::Value *classRef = RegisterIGF.emitTypeMetadataRef(
         CD->getDeclaredInterfaceType()->getCanonicalType());
     classRef = RegisterIGF.Builder.CreateBitCast(classRef, IGM->ObjCClassPtrTy);
-    classRef = RegisterIGF.Builder.CreateCall(
-        IGM->getFixedClassInitializationFn(), classRef);
 
     // Set its superclass to SwiftNativeNSObject.
     RegisterIGF.Builder.CreateCall(
@@ -1900,8 +1898,8 @@ void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
 
   // Add the registration function as a static initializer. We use a priority
   // slightly lower than used for C++ global constructors, so that the code is
-  // executed before C++ global constructors (in case someone uses archives
-  // from a C++ global constructor).
+  // executed before C++ global constructors (in case someone manages to access
+  // an @objc actor from a global constructor).
   llvm::appendToGlobalCtors(IGM->Module, RegisterFn, 60000, nullptr);
 }
 

@@ -51,10 +51,9 @@ import Foundation
 // CHECK: swift_defaultActor_destroy
 
 // CHECK-LABEL: define private void @_swift_objc_actor_initialization()
-// CHECK: [[SWIFT_NATIVE_NSOBJECT_CLASS:%.*]]  = call %objc_class* @objc_lookUpClass(i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[SWIFT_NATIVE_NSOBJECT_NAME]]
+// CHECK: [[SWIFT_NATIVE_NSOBJECT_CLASS:%.*]]  = call %objc_class* @objc_getRequiredClass(i8* getelementptr inbounds ([20 x i8], [20 x i8]* [[SWIFT_NATIVE_NSOBJECT_NAME]]
 // CHECK: [[ACTOR_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s16actor_class_objc7MyClassCMa"(
 // CHECK: [[ACTOR_METADATA:%.*]] = extractvalue %swift.metadata_response [[ACTOR_RESPONSE]], 0
-// CHECK: [[ACTOR_CLASS_RAW:%.*]] = bitcast %swift.type* [[ACTOR_METADATA]] to %objc_class*
-// CHECK: [[ACTOR_CLASS:%.*]] = call %objc_class* @objc_opt_self(%objc_class* [[ACTOR_CLASS_RAW]])
+// CHECK: [[ACTOR_CLASS:%.*]] = bitcast %swift.type* [[ACTOR_METADATA]] to %objc_class*
 // CHECK: call %objc_class* @class_setSuperclass(%objc_class* [[ACTOR_CLASS]], %objc_class* [[SWIFT_NATIVE_NSOBJECT_CLASS]])
 
