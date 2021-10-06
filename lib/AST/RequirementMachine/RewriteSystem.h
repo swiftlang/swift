@@ -485,6 +485,9 @@ public:
 
   void minimizeRewriteSystem();
 
+  llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
+  getMinimizedRules(ArrayRef<const ProtocolDecl *> protos);
+
   void verifyHomotopyGenerators() const;
 
   //////////////////////////////////////////////////////////////////////////////

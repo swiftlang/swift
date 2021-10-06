@@ -88,6 +88,9 @@ class RequirementMachine final {
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
+  std::vector<Requirement> buildRequirementSignature(
+    ArrayRef<unsigned> rules, const ProtocolDecl *proto) const;
+
 public:
   ~RequirementMachine();
 
@@ -113,10 +116,13 @@ public:
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
-  void computeMinimalRequirements();
+  llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>>
+  computeMinimalRequirements();
 
   void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;
+
+  DebugOptions getDebugOptions() const { return Context.getDebugOptions(); }
 };
 
 } // end namespace rewriting
