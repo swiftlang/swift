@@ -2873,12 +2873,13 @@ getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
   ASTContext &ctx = fnDecl->getASTContext();
 
   const bool isMainMain = fnDecl->isMainTypeMainMethod();
-  const bool isMain$Main =
+  const bool isMainInternalMain =
       fnDecl->getBaseIdentifier() == ctx.getIdentifier("$main") &&
       !fnDecl->isInstanceMember() &&
       fnDecl->getResultInterfaceType()->isVoid() &&
       fnDecl->getParameters()->size() == 0;
-  const bool isMainFunction = isMainDeclContext && (isMainMain || isMain$Main);
+  const bool isMainFunction =
+      isMainDeclContext && (isMainMain || isMainInternalMain);
   const bool hasMainActor = !ctx.getMainActorType().isNull();
 
   return isMainFunction && hasMainActor
