@@ -1414,6 +1414,10 @@ FUNCTION(ObjCGetClass, objc_getClass, C_CC,  AlwaysAvailable,
          RETURNS(ObjCClassPtrTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
+FUNCTION(ObjCGetRequiredClass, objc_getRequiredClass, C_CC,  AlwaysAvailable,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
 FUNCTION(ObjCGetMetaClass, objc_getMetaClass, C_CC, AlwaysAvailable,
          RETURNS(ObjCClassPtrTy),
          ARGS(Int8PtrTy),
