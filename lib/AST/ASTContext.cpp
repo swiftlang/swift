@@ -3640,7 +3640,6 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               Optional<ExtInfo> info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!result->hasTypeVariable());
-  assert(!result->hasPlaceholder());
 
   llvm::FoldingSetNodeID id;
   GenericFunctionType::Profile(id, sig, params, result, info);

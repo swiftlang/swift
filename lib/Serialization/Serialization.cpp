@@ -4289,6 +4289,13 @@ public:
   }
 
   void visitPlaceholderType(const PlaceholderType *) {
+    // If for some reason we have a placeholder type while compiling with
+    // errors, just serialize an ErrorType and continue.
+    if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+      visitErrorType(
+          cast<ErrorType>(ErrorType::get(S.getASTContext()).getPointer()));
+      return;
+    }
     llvm_unreachable("should not serialize a PlaceholderType");
   }
 
