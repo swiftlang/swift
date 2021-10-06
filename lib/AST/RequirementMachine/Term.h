@@ -65,6 +65,10 @@ public:
     return Ptr;
   }
 
+  static Term fromOpaquePointer(void *ptr) {
+    return Term((Storage *) ptr);
+  }
+
   static Term get(const MutableTerm &term, RewriteContext &ctx);
 
   ArrayRef<const ProtocolDecl *> getRootProtocols() const {
@@ -202,5 +206,25 @@ public:
 } // end namespace rewriting
 
 } // end namespace swift
+
+namespace llvm {
+  template<> struct DenseMapInfo<swift::rewriting::Term> {
+    static swift::rewriting::Term getEmptyKey() {
+      return swift::rewriting::Term::fromOpaquePointer(
+        llvm::DenseMapInfo<void *>::getEmptyKey());
+    }
+    static swift::rewriting::Term getTombstoneKey() {
+      return swift::rewriting::Term::fromOpaquePointer(
+        llvm::DenseMapInfo<void *>::getTombstoneKey());
+    }
+    static unsigned getHashValue(swift::rewriting::Term Val) {
+      return DenseMapInfo<void *>::getHashValue(Val.getOpaquePointer());
+    }
+    static bool isEqual(swift::rewriting::Term LHS,
+                        swift::rewriting::Term RHS) {
+      return LHS == RHS;
+    }
+  };
+} // end namespace llvm
 
 #endif
