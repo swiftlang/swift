@@ -333,7 +333,18 @@ void RequirementMachine::verify(const MutableTerm &term) const {
 }
 
 void RequirementMachine::dump(llvm::raw_ostream &out) const {
-  out << "Requirement machine for " << Sig << "\n";
+  out << "Requirement machine for ";
+  if (Sig)
+    out << Sig;
+  else {
+    out << "[";
+    for (auto *proto : Protos) {
+      out << " " << proto->getName();
+    }
+    out << " ]";
+  }
+  out << "\n";
+
   System.dump(out);
   Map.dump(out);
 
@@ -394,6 +405,8 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 }
 
 void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
+  Protos = protos;
+
   auto &ctx = Context.getASTContext();
   auto *Stats = ctx.Stats;
 

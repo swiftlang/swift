@@ -48,6 +48,7 @@ class RequirementMachine final {
   friend class swift::rewriting::RewriteContext;
 
   CanGenericSignature Sig;
+  ArrayRef<const ProtocolDecl *> Protos;
 
   RewriteContext &Context;
   RewriteSystem System;
