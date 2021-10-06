@@ -12,7 +12,9 @@ In this document, "stdlib" refers to the core standard library (`stdlib/public/c
 
 ### Formatting Conventions
 
-The Standard Library codebase has some rather strict formatting conventions. While these aren't currently automatically enforced, we still expect these conventions to be followed in every PR, including draft PRs. (PRs are first and foremost intended to be read/reviewed by *people familiar with the stdlib codebase*, and it's crucial that trivial formatting issues don't get in the way of understanding proposed changes.)
+The Standard Library codebase has some uniformly applied formatting conventions. While these aren't currently automatically enforced, we still expect these conventions to be followed in every PR, including draft PRs. (PRs are first and foremost intended to be read/reviewed by people, and it's crucial that trivial formatting issues don't get in the way of understanding proposed changes.)
+
+Some of this code is very subtle, and its presentation matters greatly. Effort spent on getting formatting _just right_ is time very well spent: new code we add is going to be repeatedly read and re-read by many people, and it's important that code is presented in a way that helps understanding it.
 
 #### Line Breaking
 
@@ -22,30 +24,93 @@ We use two spaces as the unit of indentation. We don't use tabs.
 
 To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe in detail.)
 
-Our primary rule is that if we need to break a list (such as arguments, tuple or array/dictionary literals, generic type parameters, etc.), then we always put each item on its own line, indented by +1 unit, even if a series of items would fit on a single line together. 
+Our primary rule is that if we need to put a line break anywhere in the middle of a list (such as arguments, tuple or array/dictionary literals, generic type parameters, etc.), then we need to go the full way, and put each item on its own line, indented by +1 unit, even if some of the items would fit on a single line together.
 
-The rationale for this is that line breaks tend to put strong visual emphasis on the item that follows them, allowing subsequent items on the same line to be glanced over during review. For example, see how easy it is to accidentally miss `arg2` in the second example below.
+The rationale for this is that line breaks tend to put strong visual emphasis on the item that follows them, risking subsequent items on the same line to be glanced over during review. For example, see how easy it is to accidentally miss `arg2` in the second example below.
 
 ```swift
-// BAD: (completely unreadable)
+// BAD (completely unreadable)
 @inlinable public func foobar<Result>(_ arg1: Result, arg2: Int, _ arg3: (Result, Element) throws -> Result) rethrows -> Result {
   ...
 }
 
-// BAD: (arg2 is easily missed)
+// BAD (arg2 is easily missed)
 @inlinable 
 public func foobar<Result>(
   _ arg1: Result, arg2: Int,             // ☹️
   _ arg3: (Result, Element) throws -> Result
 ) rethrows -> Result {
 
-// GOOD:
+// GOOD
 @inlinable
 public func foobar<Result>(
   _ arg1: Result, 
   arg2: Int, 
   _ arg3: (Result, Element) throws -> Result
 ) rethrows -> Result {
+  ...
+}
+```
+
+As a special case, function arguments that are very tightly coupled together are sometimes kept on the same line. The typical example for this is a pair of defaulted file/line arguments that track the caller's source position:
+
+```swift
+// OK
+internal func _preconditionFailure(
+  _ message: StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) -> Never {
+  ...
+}
+
+// Also OK
+internal func _preconditionFailure(
+  _ message: StaticString = StaticString(),
+  file: StaticString = #file, 
+  line: UInt = #line
+) -> Never {
+  ...
+}
+```
+
+(When in doubt, err on the side of adding more line breaks.)
+
+
+For lists that have delimiter characters (`(`/`)`, `[`/`]`, `<`/`>`, etc.), we prefer to put a line break both *after* the opening delimiter, and *before* the closing delimiter.
+However, within function bodies, it's okay to omit the line break before the closing delimiter.
+
+```swift
+// GOOD:
+func foo<S: Sequence, T>(
+  input: S,
+  transform: (S.Element) -> throws T
+) -> [S.Element] {     // Note: there *must* be a line break before the ')'
+  ...
+  someLongFunctionCall(
+    on: S,
+    startingAt: i,
+    stride: 32)        // Note: the break before the closing paren is optional
+}
+```
+
+If the entire contents of a list fit on a single line, it is okay to only break at the delimiters. That said, it is also acceptable to put breaks around each item:
+
+```swift
+// GOOD:
+@_alwaysEmitIntoClient
+internal func _parseIntegerDigits<Result: FixedWidthInteger>(
+  ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
+) -> Result? {
+  ...
+}
+
+// ALSO GOOD:
+@_alwaysEmitIntoClient
+internal func _parseIntegerDigits<Result: FixedWidthInteger>(
+  ascii codeUnits: UnsafeBufferPointer<UInt8>, 
+  radix: Int, 
+  isNegative: Bool
+) -> Result? {
   ...
 }
 ```
@@ -62,6 +127,28 @@ guard let foo = foo else {
 }
 ```
 
+Historically, we had a one (1) exception to the line limit, which is that we allowed string literals to go over the margin. Now that Swift has multi-line string literals, we could start breaking overlong ones. However, multiline literals can be a bit heavy visually, while in most cases the string is a precondition failure message, which doesn't necessarily need to be emphasized as much -- so the old exception still applies:
+
+```swift
+      // OK
+      _precondition(                                                           |
+        buffer.baseAddress == firstElementAddress,                             |
+        "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
+      )                                                                        |
+                                                                               |
+      // Also OK, although spending 4 lines on the message is a bit much       |
+      _precondition(                                                           |
+        buffer.baseAddress == firstElementAddress,                             |
+        """"                                                                   |
+        Can't reassign buffer in \                                             |
+        Array(unsafeUninitializedCapacity:initializingWith:)                   |
+        """"                                                                   |
+      )                                                                        |
+```
+
+In every other case, long lines must be broken up. We expect this rule to be strictly observed.
+
+
 #### Presentation of Type Definitions
 
 To ease reading/understanding type declarations, we prefer to define members in the following order:
@@ -69,14 +156,23 @@ To ease reading/understanding type declarations, we prefer to define members in 
 1. Crucial type aliases and nested types, not exceeding a handful of lines in length
 2. Stored properties
 3. Initializers
-4. Any other instance members (methods, calculated properties)
+4. Any other instance members (methods, computed properties, etc)
 
 Please keep all stored properties together in a single uninterrupted list, followed immediately by the type's most crucial initializer(s). Put these as close to the top of the type declaration as possible -- we don't want to force readers to scroll around to find these core definitions.
 
-The main `struct`/`class` definiton ought to be kept as short as possible -- preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
-Everything else should go in standalone extensions, arranged by logical theme. For example, it's often better to define protocol conformances in dedicated extensions. Think about what order you present these -- put related conformances together, follow some didactic arc, etc. (E.g, conformance definitions for `Equatable`/`Hashable`/`Comparable` should be kept very close to each other, for easy referencing.)
+We also have some recommendations for defining other members. These aren't strict rules, as the best way to present definitions varies; but it usually makes sense to break up the implementation into easily digestable, logical chunks.
 
-It's okay for the core type declaration to forward reference large nested types or static members that are defined in subsequent extensions. It's often a good idea to define these in an extension immediately following the type declaration, but this is not a strict rule. The goal is to make things easy to understand -- if a type is small enough, it may be fine to put every member directly in the `struct`/`class` definition, while it may make sense to break the definition of a huge type into a number of source files.
+- In general, it is a good idea to keep the main `struct`/`class` definiton as short as possible: preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
+
+- Everything else should go in standalone extensions, arranged by logical theme. For example, it's often nice to define protocol conformances in dedicated extensions. If it makes sense, feel free to add a comment to title these sectioning extensions.
+
+- Think about what order you present these sections -- put related conformances together, follow some didactic progression, etc. E.g, conformance definitions for closely related protocols such as `Equatable`/`Hashable`/`Comparable` should be kept very close to each other, for easy referencing.
+
+- In some cases, it can also work well to declare the most essential protocol conformances directly on the type definition; feel free to do so if it helps understanding. (You can still implement requirements in separate extensions in this case, or you can do it within the main declaration.)
+
+- It's okay for the core type declaration to forward reference large nested types or static members that are defined in subsequent extensions. It's often a good idea to define these in an extension immediately following the type declaration, but this is not a strict rule. 
+
+Extensions are a nice way to break up the implementation into easily digestable chunks, but they aren't the only way. The goal is to make things easy to understand -- if a type is small enough, it may be best to list every member directly in the `struct`/`class` definition, while for huge types it often makes more sense to break them up into number of separate source files. 
 
 ```
 // BAD (a jumbled mess)
@@ -106,7 +202,7 @@ struct Foo: RandomAccessCollection, Hashable {
 
 // GOOD
 struct Foo {
-  var _storage: _FooStorage
+  var _storage: _Storage
   
   init(foo: Int, bar: Double) { ... }
 }
