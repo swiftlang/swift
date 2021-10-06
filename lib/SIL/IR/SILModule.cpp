@@ -79,12 +79,10 @@ class SILModule::SerializationCallback final
       decl->setLinkage(SILLinkage::SharedExternal);
       return;
     case SILLinkage::Private:
-      decl->setLinkage(SILLinkage::PrivateExternal);
-      return;
+      llvm_unreachable("cannot make a private external symbol");
     case SILLinkage::PublicExternal:
     case SILLinkage::HiddenExternal:
     case SILLinkage::SharedExternal:
-    case SILLinkage::PrivateExternal:
       return;
     }
   }

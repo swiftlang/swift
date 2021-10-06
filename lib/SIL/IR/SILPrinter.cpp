@@ -2746,7 +2746,6 @@ static StringRef getLinkageString(SILLinkage linkage) {
   case SILLinkage::PublicExternal: return "public_external ";
   case SILLinkage::HiddenExternal: return "hidden_external ";
   case SILLinkage::SharedExternal: return "shared_external ";
-  case SILLinkage::PrivateExternal: return "private_external ";
   }
   llvm_unreachable("bad linkage");
 }

@@ -86,7 +86,7 @@ swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
   switch (access) {
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
-      return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
+      return SILLinkage::Private;
 
     case AccessLevel::Internal:
       return (definition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
@@ -280,7 +280,6 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
     return false;
     
   case SILLinkage::HiddenExternal:
-  case SILLinkage::PrivateExternal:
   case SILLinkage::PublicExternal:
   case SILLinkage::SharedExternal:
     llvm_unreachable("should be definition linkage?");

@@ -2074,7 +2074,6 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
   }
 
   case SILLinkage::HiddenExternal:
-  case SILLinkage::PrivateExternal:
     if (isDefinition)
       return RESULT(AvailableExternally, Hidden, Default);
 
