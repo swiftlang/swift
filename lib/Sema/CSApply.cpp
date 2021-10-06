@@ -3314,10 +3314,7 @@ namespace {
     }
 
     Type getTypeOfDynamicMemberIndex(const SelectedOverload &overload) {
-      assert(overload.choice.getKind() ==
-                 OverloadChoiceKind::DynamicMemberLookup ||
-             overload.choice.getKind() ==
-                 OverloadChoiceKind::KeyPathDynamicMemberLookup);
+      assert(overload.choice.isAnyDynamicMemberLookup());
 
       auto declTy = solution.simplifyType(overload.openedFullType);
       auto subscriptTy = declTy->castTo<FunctionType>()->getResult();
@@ -3438,8 +3435,7 @@ namespace {
         return nullptr;
       }
 
-      if (overload->choice.getKind() ==
-              OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+      if (overload->choice.isKeyPathDynamicMemberLookup()) {
         return buildDynamicMemberLookupRef(
             expr, expr->getBase(), expr->getArgs()->getStartLoc(), SourceLoc(),
             *overload, memberLocator);
@@ -4803,11 +4799,7 @@ namespace {
             continue;
           }
 
-          isDynamicMember =
-              foundDecl->choice.getKind() ==
-                  OverloadChoiceKind::DynamicMemberLookup ||
-              foundDecl->choice.getKind() ==
-                  OverloadChoiceKind::KeyPathDynamicMemberLookup;
+          isDynamicMember = foundDecl->choice.isAnyDynamicMemberLookup();
 
           // If this was a @dynamicMemberLookup property, then we actually
           // form a subscript reference, so switch the kind.
@@ -5087,17 +5079,10 @@ namespace {
       // through the subscript(dynamicMember:) member, restore the
       // openedType and origComponent to its full reference as if the user
       // wrote out the subscript manually.
-      bool forDynamicLookup =
-          overload.choice.getKind() ==
-              OverloadChoiceKind::DynamicMemberLookup ||
-          overload.choice.getKind() ==
-              OverloadChoiceKind::KeyPathDynamicMemberLookup;
-
-      if (forDynamicLookup) {
+      if (overload.choice.isAnyDynamicMemberLookup()) {
         auto indexType = getTypeOfDynamicMemberIndex(overload);
         Expr *argExpr = nullptr;
-        if (overload.choice.getKind() ==
-            OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        if (overload.choice.isKeyPathDynamicMemberLookup()) {
           argExpr = buildKeyPathDynamicMemberArgExpr(
               indexType->castTo<BoundGenericType>(), componentLoc, memberLoc);
         } else {
@@ -5150,7 +5135,7 @@ namespace {
           ctx, ref, args, resolvedTy, ctx.AllocateCopy(conformances));
       components.push_back(comp);
 
-      if (shouldForceUnwrapResult(overload.choice, locator))
+      if (shouldForceUnwrapResult(overload.choice, memberLoc))
         buildKeyPathOptionalForceComponent(components);
     }
 

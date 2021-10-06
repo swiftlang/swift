@@ -1614,13 +1614,13 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       }
     }
 
-    if (auto resolvedOverload = getOverloadChoiceIfAvailable(getLocator())) {
+    if (auto resolvedOverload =
+            getCalleeOverloadChoiceIfAvailable(getLocator())) {
       if (resolvedOverload->choice.getKind() ==
           OverloadChoiceKind::DynamicMemberLookup)
         subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
 
-      if (resolvedOverload->choice.getKind() ==
-          OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+      if (resolvedOverload->choice.isKeyPathDynamicMemberLookup()) {
         if (!getType(member->getBase(), /*wantRValue=*/false)->hasLValueType())
           subElementDiagID =
               diag::assignment_dynamic_property_has_immutable_base;
