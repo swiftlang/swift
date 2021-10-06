@@ -1137,24 +1137,27 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   //
   // NOTE: We also need to handle this here since a pointer_to_address is not a
   // valid base value for an access path since it doesn't refer to any storage.
-  BorrowedAddress borrowedAddress(newValue);
-  if (!borrowedAddress.mayBeBorrowed)
+  AddressOwnership addressOwnership(newValue);
+  if (!addressOwnership.hasLocalOwnershipLifetime())
     return;
 
-  if (!borrowedAddress.interiorPointerOp) {
+  auto intPtrOp =
+    InteriorPointerOperand::inferFromResult(
+      addressOwnership.base.getBaseAddress());
+  if (!intPtrOp) {
     invalidate();
     return;
   }
 
-  ctx->extraAddressFixupInfo.intPtrOp = borrowedAddress.interiorPointerOp;
-  auto borrowedValue = borrowedAddress.interiorPointerOp.getSingleBaseValue();
+  ctx->extraAddressFixupInfo.intPtrOp = intPtrOp;
+  auto borrowedValue = intPtrOp.getSingleBorrowedValue();
   if (!borrowedValue) {
     invalidate();
     return;
   }
 
   auto *intPtrInst =
-    cast<SingleValueInstruction>(borrowedAddress.interiorPointerOp.getUser());
+    cast<SingleValueInstruction>(intPtrOp.getUser());
   auto checkBase = [&](SILValue srcAddr) {
     return (srcAddr == intPtrInst) ? SILValue(intPtrInst) : SILValue();
   };
@@ -1167,8 +1170,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
 
   // For now, just gather up uses
   auto &oldValueUses = ctx->extraAddressFixupInfo.allAddressUsesFromOldValue;
-  if (InteriorPointerOperand::findTransitiveUsesForAddress(oldValue,
-                                                           oldValueUses)) {
+  if (findTransitiveUsesForAddress(oldValue, oldValueUses)) {
     invalidate();
     return;
   }
@@ -1177,9 +1179,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // need to perform the copy or not when we actually RAUW. So perform the is
   // within region check. If we succeed, clear our extra state so we perform a
   // normal RAUW.
-  SmallVector<Operand *, 8> scratchSpace;
-  if (borrowedValue.areUsesWithinScope(oldValueUses, scratchSpace,
-                                       ctx->deBlocks)) {
+  if (borrowedValue.areUsesWithinLocalScope(oldValueUses, ctx->deBlocks)) {
     // We do not need to copy the base value! Clear the extra info we have.
     ctx->extraAddressFixupInfo.clear();
   }

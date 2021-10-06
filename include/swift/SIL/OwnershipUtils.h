@@ -662,6 +662,13 @@ bool getAllBorrowIntroducingValues(SILValue value,
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
 BorrowedValue getSingleBorrowIntroducingValue(SILValue inputValue);
 
+/// The algorithm that is used to determine what the verifier will consider to
+/// be transitive uses of the given address. Used to implement \see
+/// findTransitiveUses.
+bool findTransitiveUsesForAddress(
+    SILValue address, SmallVectorImpl<Operand *> &foundUses,
+    std::function<void(Operand *)> *onError = nullptr);
+
 class InteriorPointerOperandKind {
 public:
   enum Kind : uint8_t {
@@ -805,7 +812,7 @@ struct InteriorPointerOperand {
   }
 
   /// Return the base BorrowedValue of the incoming value's operand.
-  BorrowedValue getSingleBaseValue() const {
+  BorrowedValue getSingleBorrowedValue() const {
     return getSingleBorrowIntroducingValue(operand->get());
   }
 
@@ -840,14 +847,6 @@ struct InteriorPointerOperand {
                                         onError);
   }
 
-  /// The algorithm that is used to determine what the verifier will consider to
-  /// be transitive uses of the given address. Used to implement \see
-  /// findTransitiveUses.
-  static bool
-  findTransitiveUsesForAddress(SILValue address,
-                               SmallVectorImpl<Operand *> &foundUses,
-                               std::function<void(Operand *)> *onError = nullptr);
-
   Operand *operator->() { return operand; }
   const Operand *operator->() const { return operand; }
   Operand *operator*() { return operand; }
@@ -860,23 +859,70 @@ private:
       : operand(op), kind(kind) {}
 };
 
-/// Utility to check if an address may originate from a borrowed value. If so,
+/// Utility to check if an address may originate from an OSSA value. If so,
 /// then uses of the address cannot be replaced without ensuring that they are
-/// also within the same scope.
+/// also within the same owned lifetime or borrow scope.
 ///
-/// If mayBeBorrowed is false, then there is no enclosing borrow scope and
-/// interiorPointerOp is irrelevant.
+/// If hasOwnership() is false, then there is no enclosing lifetime or borrow
+/// scope and interiorPointerOp is irrelevant.
 ///
-/// If mayBeBorrowed is true, then interiorPointerOp refers to the operand that
+/// If hasOwnership() is true, then interiorPointerOp refers to the operand that
 /// converts a non-address value into the address from which the contructor's
 /// address is derived. If the best-effort to find an InteriorPointerOperand
 /// fails, then interiorPointerOp remains invalid, and clients must be
 /// conservative.
-struct BorrowedAddress {
-  bool mayBeBorrowed = true;
-  InteriorPointerOperand interiorPointerOp;
+///
+/// TODO: Handle implicit borrow scopes once they are legal in SIL. The operand
+/// of the base will be owned but mayBeBorrowed will remain true.
+struct AddressOwnership {
+  AccessBase base;
 
-  BorrowedAddress(SILValue address);
+  AddressOwnership() = default;
+
+  AddressOwnership(SILValue address) : base(AccessBase::compute(address)) {
+    assert(address->getType().isAddress());
+  }
+
+  AddressOwnership(AccessBase base) : base(base) {}
+
+  operator bool() const { return bool(base); }
+
+  bool operator==(const AddressOwnership &other) const {
+    return base.hasIdenticalAccessInfo(other.base);
+  }
+
+  bool operator!=(const AddressOwnership &other) const {
+    return !(*this == other);
+  }
+
+  /// Return true if this address may be derived from a value with a local OSSA
+  /// lifetime or borrow scope.
+  bool hasLocalOwnershipLifetime() const {
+    return base.hasLocalOwnershipLifetime();
+  }
+
+  /// Return the OSSA value from which this address is derived. This may be
+  /// invalid even if hasOSSALifetime() is true in cases where the
+  /// InteriorPointerOperand is unrecognized.
+  SILValue getOwnershipReferenceRoot() const {
+    if (base.isReference())
+      return base.getOwnershipReferenceRoot();
+
+    return SILValue();
+  }
+
+  /// Transitively compute uses of this base address.
+  bool findTransitiveUses(SmallVectorImpl<Operand *> &foundUses) {
+    return findTransitiveUsesForAddress(base.getBaseAddress(), foundUses);
+  }
+
+  /// Return true of all \p uses occur before the end of the address' lifetime
+  /// or borrow scope.
+  ///
+  /// Precondition: all \p uses are dominated by the beginning of the address'
+  /// lifetime or borrow scope.
+  bool areUsesWithinLifetime(ArrayRef<Operand *> uses,
+                             DeadEndBlocks &deadEndBlocks) const;
 };
 
 class OwnedValueIntroducerKind {

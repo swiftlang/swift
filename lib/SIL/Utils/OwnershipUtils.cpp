@@ -704,11 +704,7 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
   return true;
 }
 
-//===----------------------------------------------------------------------===//
-//                           InteriorPointerOperand
-//===----------------------------------------------------------------------===//
-
-bool InteriorPointerOperand::findTransitiveUsesForAddress(
+bool swift::findTransitiveUsesForAddress(
     SILValue projectedAddress, SmallVectorImpl<Operand *> &foundUses,
     std::function<void(Operand *)> *onError) {
   SmallVector<Operand *, 8> worklist(projectedAddress->getUses());
@@ -814,44 +810,26 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
   return foundError;
 }
 
-// Determine whether \p address may be in a borrow scope and if so record the
-// InteriorPointerOperand that produces the address from a guaranteed value.
-BorrowedAddress::BorrowedAddress(SILValue address) {
-  assert(address->getType().isAddress());
+//===----------------------------------------------------------------------===//
+//                              AddressOwnership
+//===----------------------------------------------------------------------===//
 
-  auto storageWithBase = AccessStorageWithBase::compute(address);
-  switch (storageWithBase.storage.getKind()) {
-  case AccessStorage::Argument:
-  case AccessStorage::Stack:
-  case AccessStorage::Global:
-  // Unidentified storage is from an "escaped pointer", so it need not be
-  // restricted to a borrow scope.
-  case AccessStorage::Unidentified:
-    this->mayBeBorrowed = false;
-    return;
-  case AccessStorage::Box:
-  case AccessStorage::Yield:
-  case AccessStorage::Class:
-  case AccessStorage::Tail:
-    // The base object might be within a borrow scope.
-    break;
-  case AccessStorage::Nested:
-    llvm_unreachable("unexpected storage");
-  };
-  auto base = storageWithBase.base;
-  if (!base)
-    return; // bail on unexpected patterns
+bool AddressOwnership::areUsesWithinLifetime(
+    ArrayRef<Operand *> uses, DeadEndBlocks &deadEndBlocks) const {
+  if (!base.hasLocalOwnershipLifetime())
+    return true;
 
-  auto intPtrOp = InteriorPointerOperand::inferFromResult(base);
-  if (!intPtrOp)
-    return;
+  SILValue root = base.getOwnershipReferenceRoot();
+  BorrowedValue borrow(root);
+  if (borrow)
+    return borrow.areUsesWithinLocalScope(uses, deadEndBlocks);
 
-  SILValue nonAddressValue = intPtrOp.operand->get();
-  if (nonAddressValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
-    this->mayBeBorrowed = false;
-    return;
-  }
-  this->interiorPointerOp = intPtrOp;
+  // --- A reference no borrow scope. Currently happens for project_box.
+
+  // Compute the reference value's liveness.
+  PrunedLiveness liveness;
+  liveness.computeSSALiveness(root);
+  return liveness.areUsesWithinBoundary(uses, deadEndBlocks);
 }
 
 //===----------------------------------------------------------------------===//
@@ -961,6 +939,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
   return true;
 }
 
+// FIXME: replace this logic with AccessBase::findOwnershipReferenceRoot.
 BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
   if (inputValue.getOwnershipKind() != OwnershipKind::Guaranteed)
     return {};
