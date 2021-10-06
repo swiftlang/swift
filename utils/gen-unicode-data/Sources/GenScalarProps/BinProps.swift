@@ -12,57 +12,70 @@
 
 import GenUtils
 
-struct BinProps: OptionSet {
-  var rawValue: UInt64
-  
-  static let changesWhenCaseFolded       = BinProps(rawValue: 1 << 0)
-  static let changesWhenCaseMapped       = BinProps(rawValue: 1 << 1)
-  static let changesWhenLowercased       = BinProps(rawValue: 1 << 2)
-  static let changesWhenNFKCCaseFolded   = BinProps(rawValue: 1 << 3)
-  static let changesWhenTitlecased       = BinProps(rawValue: 1 << 4)
-  static let changesWhenUppercased       = BinProps(rawValue: 1 << 5)
-  static let isASCIIHexDigit             = BinProps(rawValue: 1 << 6)
-  static let isAlphabetic                = BinProps(rawValue: 1 << 7)
-  static let isBidiControl               = BinProps(rawValue: 1 << 8)
-  static let isBidiMirrored              = BinProps(rawValue: 1 << 9)
-  static let isCaseIgnorable             = BinProps(rawValue: 1 << 10)
-  static let isCased                     = BinProps(rawValue: 1 << 11)
-  static let isDash                      = BinProps(rawValue: 1 << 12)
-  static let isDefaultIgnorableCodePoint = BinProps(rawValue: 1 << 13)
-  static let isDeprecated                = BinProps(rawValue: 1 << 14)
-  static let isDiacritic                 = BinProps(rawValue: 1 << 15)
-  static let isEmoji                     = BinProps(rawValue: 1 << 16)
-  static let isEmojiModifier             = BinProps(rawValue: 1 << 17)
-  static let isEmojiModifierBase         = BinProps(rawValue: 1 << 18)
-  static let isEmojiPresentation         = BinProps(rawValue: 1 << 19)
-  static let isExtender                  = BinProps(rawValue: 1 << 20)
-  static let isFullCompositionExclusion  = BinProps(rawValue: 1 << 21)
-  static let isGraphemeBase              = BinProps(rawValue: 1 << 22)
-  static let isGraphemeExtend            = BinProps(rawValue: 1 << 23)
-  static let isHexDigit                  = BinProps(rawValue: 1 << 24)
-  static let isIDContinue                = BinProps(rawValue: 1 << 25)
-  static let isIDSBinaryOperator         = BinProps(rawValue: 1 << 26)
-  static let isIDSTrinaryOperator        = BinProps(rawValue: 1 << 27)
-  static let isIDStart                   = BinProps(rawValue: 1 << 28)
-  static let isIdeographic               = BinProps(rawValue: 1 << 29)
-  static let isJoinControl               = BinProps(rawValue: 1 << 30)
-  static let isLogicalOrderException     = BinProps(rawValue: 1 << 31)
-  static let isLowercase                 = BinProps(rawValue: 1 << 32)
-  static let isMath                      = BinProps(rawValue: 1 << 33)
-  static let isNoncharacterCodePoint     = BinProps(rawValue: 1 << 34)
-  static let isPatternSyntax             = BinProps(rawValue: 1 << 35)
-  static let isPatternWhitespace         = BinProps(rawValue: 1 << 36)
-  static let isQuotationMark             = BinProps(rawValue: 1 << 37)
-  static let isRadical                   = BinProps(rawValue: 1 << 38)
-  static let isSentenceTerminal          = BinProps(rawValue: 1 << 39)
-  static let isSoftDotted                = BinProps(rawValue: 1 << 40)
-  static let isTerminalPunctuation       = BinProps(rawValue: 1 << 41)
-  static let isUnifiedIdeograph          = BinProps(rawValue: 1 << 42)
-  static let isUppercase                 = BinProps(rawValue: 1 << 43)
-  static let isVariationSelector         = BinProps(rawValue: 1 << 44)
-  static let isWhitespace                = BinProps(rawValue: 1 << 45)
-  static let isXIDContinue               = BinProps(rawValue: 1 << 46)
-  static let isXIDStart                  = BinProps(rawValue: 1 << 47)
+// Note: If one ever updates this list, be it reordering bits adding new ones,
+// etc., please update the same list found in:
+// 'stdlib/public/core/UnicodeScalarProperties.swift'.
+internal struct BinProps: OptionSet {
+  let rawValue: UInt64
+
+  init(_ rawValue: UInt64) {
+    self.rawValue = rawValue
+  }
+
+  // Because we defined the labelless init, we lose the memberwise one
+  // generated, so define that here to satisfy the 'OptionSet' requirement.
+  init(rawValue: UInt64) {
+    self.rawValue = rawValue
+  }
+
+  static var changesWhenCaseFolded       : Self { Self(1 &<< 0) }
+  static var changesWhenCaseMapped       : Self { Self(1 &<< 1) }
+  static var changesWhenLowercased       : Self { Self(1 &<< 2) }
+  static var changesWhenNFKCCaseFolded   : Self { Self(1 &<< 3) }
+  static var changesWhenTitlecased       : Self { Self(1 &<< 4) }
+  static var changesWhenUppercased       : Self { Self(1 &<< 5) }
+  static var isASCIIHexDigit             : Self { Self(1 &<< 6) }
+  static var isAlphabetic                : Self { Self(1 &<< 7) }
+  static var isBidiControl               : Self { Self(1 &<< 8) }
+  static var isBidiMirrored              : Self { Self(1 &<< 9) }
+  static var isCaseIgnorable             : Self { Self(1 &<< 10) }
+  static var isCased                     : Self { Self(1 &<< 11) }
+  static var isDash                      : Self { Self(1 &<< 12) }
+  static var isDefaultIgnorableCodePoint : Self { Self(1 &<< 13) }
+  static var isDeprecated                : Self { Self(1 &<< 14) }
+  static var isDiacritic                 : Self { Self(1 &<< 15) }
+  static var isEmoji                     : Self { Self(1 &<< 16) }
+  static var isEmojiModifier             : Self { Self(1 &<< 17) }
+  static var isEmojiModifierBase         : Self { Self(1 &<< 18) }
+  static var isEmojiPresentation         : Self { Self(1 &<< 19) }
+  static var isExtender                  : Self { Self(1 &<< 20) }
+  static var isFullCompositionExclusion  : Self { Self(1 &<< 21) }
+  static var isGraphemeBase              : Self { Self(1 &<< 22) }
+  static var isGraphemeExtend            : Self { Self(1 &<< 23) }
+  static var isHexDigit                  : Self { Self(1 &<< 24) }
+  static var isIDContinue                : Self { Self(1 &<< 25) }
+  static var isIDSBinaryOperator         : Self { Self(1 &<< 26) }
+  static var isIDSTrinaryOperator        : Self { Self(1 &<< 27) }
+  static var isIDStart                   : Self { Self(1 &<< 28) }
+  static var isIdeographic               : Self { Self(1 &<< 29) }
+  static var isJoinControl               : Self { Self(1 &<< 30) }
+  static var isLogicalOrderException     : Self { Self(1 &<< 31) }
+  static var isLowercase                 : Self { Self(1 &<< 32) }
+  static var isMath                      : Self { Self(1 &<< 33) }
+  static var isNoncharacterCodePoint     : Self { Self(1 &<< 34) }
+  static var isPatternSyntax             : Self { Self(1 &<< 35) }
+  static var isPatternWhitespace         : Self { Self(1 &<< 36) }
+  static var isQuotationMark             : Self { Self(1 &<< 37) }
+  static var isRadical                   : Self { Self(1 &<< 38) }
+  static var isSentenceTerminal          : Self { Self(1 &<< 39) }
+  static var isSoftDotted                : Self { Self(1 &<< 40) }
+  static var isTerminalPunctuation       : Self { Self(1 &<< 41) }
+  static var isUnifiedIdeograph          : Self { Self(1 &<< 42) }
+  static var isUppercase                 : Self { Self(1 &<< 43) }
+  static var isVariationSelector         : Self { Self(1 &<< 44) }
+  static var isWhitespace                : Self { Self(1 &<< 45) }
+  static var isXIDContinue               : Self { Self(1 &<< 46) }
+  static var isXIDStart                  : Self { Self(1 &<< 47) }
 }
 
 extension BinProps: Hashable {}
@@ -178,7 +191,7 @@ func emitBinaryProps(
   
   emitCollection(
     combinations,
-    name: "_swift_stdlib_scalar_binProp_data",
+    name: "_swift_stdlib_scalar_binProps_data",
     into: &result
   )
   
@@ -199,57 +212,58 @@ func emitBinaryProps(
 func emitBinaryPropAccessor(_ dataCount: Int, into result: inout String) {
   result += """
   SWIFT_RUNTIME_STDLIB_INTERNAL
-  __swift_bool _swift_stdlib_hasBinaryProperty(__swift_uint32_t scalar,
-                                               __swift_intptr_t propertyMask) {
-  
-    __swift_uint64_t binaryProperties = 0;
-  
-    auto low = 0;
-    auto high = \(dataCount) - 1;
+  __swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar) {
 
-    while (high >= low) {
-      auto idx = low + (high - low) / 2;
+    auto lowerBoundIndex = 0;
+    auto endIndex = \(dataCount);
+    auto upperBoundIndex = endIndex - 1;
 
-      auto entry = _swift_stdlib_scalar_binProps[idx];
+    while (upperBoundIndex >= lowerBoundIndex) {
+      auto index = lowerBoundIndex + (upperBoundIndex - lowerBoundIndex) / 2;
+
+      auto entry = _swift_stdlib_scalar_binProps[index];
 
       // Shift the ccc value out of the scalar.
-      auto lower = (entry << 11) >> 11;
+      auto lowerBoundScalar = (entry << 11) >> 11;
 
-      __swift_uint32_t upper = 0;
+      __swift_uint32_t upperBoundScalar = 0;
       
       // If we're not at the end of the array, the range count is simply the
       // distance to the next element.
-      if (idx != \(dataCount) - 1) {
-        auto nextEntry = _swift_stdlib_scalar_binProps[idx + 1];
+      if (index != endIndex - 1) {
+        auto nextEntry = _swift_stdlib_scalar_binProps[index + 1];
   
         auto nextLower = (nextEntry << 11) >> 11;
         
-        upper = nextLower - 1;
+        upperBoundScalar = nextLower - 1;
       } else {
         // Otherwise, the range count is the distance to 0x10FFFF
-        upper = 0x10FFFF;
+        upperBoundScalar = 0x10FFFF;
       }
 
       // Shift everything out.
-      auto dataIdx = entry >> 21;
+      auto dataIndex = entry >> 21;
 
-      if (scalar >= lower && scalar <= upper) {
-        binaryProperties =  _swift_stdlib_scalar_binProps_data[dataIdx];
-        break;
+      if (scalar >= lowerBoundScalar && scalar <= upperBoundScalar) {
+        return  _swift_stdlib_scalar_binProps_data[dataIndex];
       }
 
-      if (scalar > upper) {
-        low = idx + 1;
+      if (scalar > upperBoundScalar) {
+        lowerBoundIndex = index + 1;
         continue;
       }
 
-      if (scalar < lower) {
-        high = idx - 1;
+      if (scalar < lowerBoundScalar) {
+        upperBoundIndex = index - 1;
         continue;
       }
     }
 
-    return binaryProperties & propertyMask;
+    // If we make it out of this loop, then it means the scalar was not found at
+    // all in the array. This should never happen because the array represents all
+    // scalars from 0x0 to 0x10FFFF, but if somehow this branch gets reached,
+    // return 0 to indicate no properties.
+    return 0;
   }
   
   

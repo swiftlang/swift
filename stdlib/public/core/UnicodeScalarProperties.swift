@@ -49,17 +49,96 @@ extension Unicode.Scalar {
   }
 }
 
-/// Boolean properties that are defined by the Unicode Standard (i.e., not
-/// ICU-specific).
 extension Unicode.Scalar.Properties {
+  // This OptionSet represents the 64 bit integer value returned when asking
+  // '_swift_stdlib_getBinaryProperties' where each bit indicates a unique
+  // Unicode defined binary property of a scalar. For example, bit 8 represents
+  // the 'isAlphabetic' property for scalars.
+  //
+  // Note: If one ever updates this list, be it reordering bits adding new ones,
+  // etc., please update the same list found in:
+  // 'utils/gen-unicode-data/Sources/GenScalarProps/BinProps.swift'.
+  fileprivate struct _BinaryProperties: OptionSet {
+    let rawValue: UInt64
+
+    private init(_ rawValue: UInt64) {
+      self.rawValue = rawValue
+    }
+
+    // Because we defined the labelless init, we lose the memberwise one
+    // generated, so define that here to satisfy the 'OptionSet' requirement.
+    init(rawValue: UInt64) {
+      self.rawValue = rawValue
+    }
+
+    static var changesWhenCaseFolded       : Self { Self(1 &<<  0) }
+    static var changesWhenCaseMapped       : Self { Self(1 &<<  1) }
+    static var changesWhenLowercased       : Self { Self(1 &<<  2) }
+    static var changesWhenNFKCCaseFolded   : Self { Self(1 &<<  3) }
+    static var changesWhenTitlecased       : Self { Self(1 &<<  4) }
+    static var changesWhenUppercased       : Self { Self(1 &<<  5) }
+    static var isASCIIHexDigit             : Self { Self(1 &<<  6) }
+    static var isAlphabetic                : Self { Self(1 &<<  7) }
+    static var isBidiControl               : Self { Self(1 &<<  8) }
+    static var isBidiMirrored              : Self { Self(1 &<<  9) }
+    static var isCaseIgnorable             : Self { Self(1 &<< 10) }
+    static var isCased                     : Self { Self(1 &<< 11) }
+    static var isDash                      : Self { Self(1 &<< 12) }
+    static var isDefaultIgnorableCodePoint : Self { Self(1 &<< 13) }
+    static var isDeprecated                : Self { Self(1 &<< 14) }
+    static var isDiacritic                 : Self { Self(1 &<< 15) }
+    static var isEmoji                     : Self { Self(1 &<< 16) }
+    static var isEmojiModifier             : Self { Self(1 &<< 17) }
+    static var isEmojiModifierBase         : Self { Self(1 &<< 18) }
+    static var isEmojiPresentation         : Self { Self(1 &<< 19) }
+    static var isExtender                  : Self { Self(1 &<< 20) }
+    static var isFullCompositionExclusion  : Self { Self(1 &<< 21) }
+    static var isGraphemeBase              : Self { Self(1 &<< 22) }
+    static var isGraphemeExtend            : Self { Self(1 &<< 23) }
+    static var isHexDigit                  : Self { Self(1 &<< 24) }
+    static var isIDContinue                : Self { Self(1 &<< 25) }
+    static var isIDSBinaryOperator         : Self { Self(1 &<< 26) }
+    static var isIDSTrinaryOperator        : Self { Self(1 &<< 27) }
+    static var isIDStart                   : Self { Self(1 &<< 28) }
+    static var isIdeographic               : Self { Self(1 &<< 29) }
+    static var isJoinControl               : Self { Self(1 &<< 30) }
+    static var isLogicalOrderException     : Self { Self(1 &<< 31) }
+    static var isLowercase                 : Self { Self(1 &<< 32) }
+    static var isMath                      : Self { Self(1 &<< 33) }
+    static var isNoncharacterCodePoint     : Self { Self(1 &<< 34) }
+    static var isPatternSyntax             : Self { Self(1 &<< 35) }
+    static var isPatternWhitespace         : Self { Self(1 &<< 36) }
+    static var isQuotationMark             : Self { Self(1 &<< 37) }
+    static var isRadical                   : Self { Self(1 &<< 38) }
+    static var isSentenceTerminal          : Self { Self(1 &<< 39) }
+    static var isSoftDotted                : Self { Self(1 &<< 40) }
+    static var isTerminalPunctuation       : Self { Self(1 &<< 41) }
+    static var isUnifiedIdeograph          : Self { Self(1 &<< 42) }
+    static var isUppercase                 : Self { Self(1 &<< 43) }
+    static var isVariationSelector         : Self { Self(1 &<< 44) }
+    static var isWhitespace                : Self { Self(1 &<< 45) }
+    static var isXIDContinue               : Self { Self(1 &<< 46) }
+    static var isXIDStart                  : Self { Self(1 &<< 47) }
+  }
+}
+
+/// Boolean properties that are defined by the Unicode Standard.
+extension Unicode.Scalar.Properties {
+  fileprivate var _binaryProperties: _BinaryProperties {
+    _BinaryProperties(
+      rawValue: _swift_stdlib_getBinaryProperties(_scalar.value)
+    )
+  }
+
   /// A Boolean value indicating whether the scalar is alphabetic.
   ///
   /// Alphabetic scalars are the primary units of alphabets and/or syllabaries.
   ///
-  /// This property corresponds to the "Alphabetic" property in the
+  /// This property corresponds to the "Alphabetic" and the "Other_Alphabetic"
+  /// properties in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isAlphabetic: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 7)
+    _binaryProperties.contains(.isAlphabetic)
   }
 
   /// A Boolean value indicating whether the scalar is an ASCII character
@@ -74,7 +153,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "ASCII_Hex_Digit" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isASCIIHexDigit: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 6)
+    _binaryProperties.contains(.isASCIIHexDigit)
   }
 
   /// A Boolean value indicating whether the scalar is a format control
@@ -84,7 +163,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Bidi_Control" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isBidiControl: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 8)
+    _binaryProperties.contains(.isBidiControl)
   }
 
   /// A Boolean value indicating whether the scalar is mirrored in
@@ -93,7 +172,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Bidi_Mirrored" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isBidiMirrored: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 9)
+    _binaryProperties.contains(.isBidiMirrored)
   }
 
   /// A Boolean value indicating whether the scalar is a punctuation
@@ -103,7 +182,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Dash" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isDash: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 12)
+    _binaryProperties.contains(.isDash)
   }
 
   /// A Boolean value indicating whether the scalar is a default-ignorable
@@ -114,10 +193,11 @@ extension Unicode.Scalar.Properties {
   /// advance width in and of themselves, although they may affect the display,
   /// positioning, or adornment of adjacent or surrounding characters.
   ///
-  /// This property corresponds to the "Default_Ignorable_Code_Point" property
-  /// in the [Unicode Standard](http://www.unicode.org/versions/latest/).
+  /// This property corresponds to the "Default_Ignorable_Code_Point" and the
+  /// "Other_Default_Ignorable_Code_point" properties in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isDefaultIgnorableCodePoint: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 13)
+    _binaryProperties.contains(.isDefaultIgnorableCodePoint)
   }
 
   /// A Boolean value indicating whether the scalar is deprecated.
@@ -128,7 +208,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Deprecated" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isDeprecated: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 14)
+    _binaryProperties.contains(.isDeprecated)
   }
 
   /// A Boolean value indicating whether the scalar is a diacritic.
@@ -140,7 +220,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Diacritic" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isDiacritic: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 15)
+    _binaryProperties.contains(.isDiacritic)
   }
 
   /// A Boolean value indicating whether the scalar's principal function is
@@ -151,7 +231,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Extender" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isExtender: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 20)
+    _binaryProperties.contains(.isExtender)
   }
 
   /// A Boolean value indicating whether the scalar is excluded from
@@ -160,7 +240,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Full_Composition_Exclusion" property in
   /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isFullCompositionExclusion: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 21)
+    _binaryProperties.contains(.isFullCompositionExclusion)
   }
 
   /// A Boolean value indicating whether the scalar is a grapheme base.
@@ -177,7 +257,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Grapheme_Base" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isGraphemeBase: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 22)
+    _binaryProperties.contains(.isGraphemeBase)
   }
 
   /// A Boolean value indicating whether the scalar is a grapheme extender.
@@ -191,10 +271,11 @@ extension Unicode.Scalar.Properties {
   /// The set of scalars for which `isGraphemeExtend` is `true` is disjoint by
   /// definition from the set for which `isGraphemeBase` is `true`.
   ///
-  /// This property corresponds to the "Grapheme_Extend" property in the
+  /// This property corresponds to the "Grapheme_Extend" and the
+  /// "Other_Grapheme_Extend" properties in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isGraphemeExtend: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 23)
+    _binaryProperties.contains(.isGraphemeExtend)
   }
 
   /// A Boolean value indicating whether the scalar is one that is commonly
@@ -207,7 +288,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Hex_Digit" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isHexDigit: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 24)
+    _binaryProperties.contains(.isHexDigit)
   }
 
   /// A Boolean value indicating whether the scalar is one which is
@@ -218,10 +299,11 @@ extension Unicode.Scalar.Properties {
   /// use `isXIDContinue` to check whether a scalar is a valid identifier
   /// character.
   ///
-  /// This property corresponds to the "ID_Continue" property in the
+  /// This property corresponds to the "ID_Continue" and the "Other_ID_Continue"
+  /// properties in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isIDContinue: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 25)
+    _binaryProperties.contains(.isIDContinue)
   }
 
   /// A Boolean value indicating whether the scalar is one which is
@@ -232,10 +314,11 @@ extension Unicode.Scalar.Properties {
   /// use `isXIDStart` to check whether a scalar is a valid identifier
   /// character.
   ///
-  /// This property corresponds to the "ID_Start" property in the
+  /// This property corresponds to the "ID_Start" and the "Other_ID_Start"
+  /// properties in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isIDStart: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 28)
+    _binaryProperties.contains(.isIDStart)
   }
 
   /// A Boolean value indicating whether the scalar is considered to be a
@@ -249,7 +332,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Ideographic" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isIdeographic: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 29)
+    _binaryProperties.contains(.isIdeographic)
   }
 
   /// A Boolean value indicating whether the scalar is an ideographic
@@ -264,7 +347,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "IDS_Binary_Operator" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isIDSBinaryOperator: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 26)
+    _binaryProperties.contains(.isIDSBinaryOperator)
   }
 
   /// A Boolean value indicating whether the scalar is an ideographic
@@ -279,7 +362,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "IDS_Trinary_Operator" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isIDSTrinaryOperator: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 27)
+    _binaryProperties.contains(.isIDSTrinaryOperator)
   }
 
   /// A Boolean value indicating whether the scalar is a format control
@@ -305,7 +388,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Join_Control" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isJoinControl: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 30)
+    _binaryProperties.contains(.isJoinControl)
   }
 
   /// A Boolean value indicating whether the scalar requires special handling
@@ -319,16 +402,17 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Logical_Order_Exception" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isLogicalOrderException: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 31)
+    _binaryProperties.contains(.isLogicalOrderException)
   }
 
   /// A Boolean value indicating whether the scalar's letterform is
   /// considered lowercase.
   ///
-  /// This property corresponds to the "Lowercase" property in the
+  /// This property corresponds to the "Lowercase" and the "Other_Lowercase"
+  /// properties in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isLowercase: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 32)
+    _binaryProperties.contains(.isLowercase)
   }
 
   /// A Boolean value indicating whether the scalar is one that naturally
@@ -341,10 +425,10 @@ extension Unicode.Scalar.Properties {
   /// mathematical Latin, Greek, and Arabic letters and numbers defined in the
   /// Supplemental Multilingual Plane.
   ///
-  /// This property corresponds to the "Math" property in the
-  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  /// This property corresponds to the "Math" and the "Other_Math" properties in
+  /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isMath: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 33)
+    _binaryProperties.contains(.isMath)
   }
 
   /// A Boolean value indicating whether the scalar is permanently reserved
@@ -353,7 +437,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Noncharacter_Code_Point" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isNoncharacterCodePoint: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 34)
+    _binaryProperties.contains(.isNoncharacterCodePoint)
   }
 
   /// A Boolean value indicating whether the scalar is one that is used in
@@ -362,7 +446,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Quotation_Mark" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isQuotationMark: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 37)
+    _binaryProperties.contains(.isQuotationMark)
   }
 
   /// A Boolean value indicating whether the scalar is a radical component of
@@ -375,7 +459,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Radical" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isRadical: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 38)
+    _binaryProperties.contains(.isRadical)
   }
 
   /// A Boolean value indicating whether the scalar has a "soft dot" that
@@ -387,7 +471,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Soft_Dotted" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isSoftDotted: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 40)
+    _binaryProperties.contains(.isSoftDotted)
   }
 
   /// A Boolean value indicating whether the scalar is a punctuation symbol
@@ -396,7 +480,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Terminal_Punctuation" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isTerminalPunctuation: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 41)
+    _binaryProperties.contains(.isTerminalPunctuation)
   }
 
   /// A Boolean value indicating whether the scalar is one of the unified
@@ -409,16 +493,17 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Unified_Ideograph" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isUnifiedIdeograph: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 42)
+    _binaryProperties.contains(.isUnifiedIdeograph)
   }
 
   /// A Boolean value indicating whether the scalar's letterform is
   /// considered uppercase.
   ///
-  /// This property corresponds to the "Uppercase" property in the
+  /// This property corresponds to the "Uppercase" and the "Other_Uppercase"
+  /// properties in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isUppercase: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 43)
+    _binaryProperties.contains(.isUppercase)
   }
 
   /// A Boolean value indicating whether the scalar is a whitespace
@@ -431,7 +516,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "White_Space" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isWhitespace: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 45)
+    _binaryProperties.contains(.isWhitespace)
   }
 
   /// A Boolean value indicating whether the scalar is one which is
@@ -446,7 +531,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "XID_Continue" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isXIDContinue: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 46)
+    _binaryProperties.contains(.isXIDContinue)
   }
 
   /// A Boolean value indicating whether the scalar is one which is
@@ -461,7 +546,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "XID_Start" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isXIDStart: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 47)
+    _binaryProperties.contains(.isXIDStart)
   }
 
   /// A Boolean value indicating whether the scalar is a punctuation mark
@@ -470,7 +555,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Sentence_Terminal" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isSentenceTerminal: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 39)
+    _binaryProperties.contains(.isSentenceTerminal)
   }
 
   /// A Boolean value indicating whether the scalar is a variation selector.
@@ -481,7 +566,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Variation_Selector" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isVariationSelector: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 44)
+    _binaryProperties.contains(.isVariationSelector)
   }
 
   /// A Boolean value indicating whether the scalar is recommended to have
@@ -490,7 +575,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Pattern_Syntax" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isPatternSyntax: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 35)
+    _binaryProperties.contains(.isPatternSyntax)
   }
 
   /// A Boolean value indicating whether the scalar is recommended to be
@@ -499,7 +584,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Pattern_White_Space" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isPatternWhitespace: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 36)
+    _binaryProperties.contains(.isPatternWhitespace)
   }
 
   /// A Boolean value indicating whether the scalar is considered to be
@@ -515,7 +600,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Cased" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isCased: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 11)
+    _binaryProperties.contains(.isCased)
   }
 
   /// A Boolean value indicating whether the scalar is ignored for casing
@@ -524,7 +609,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Case_Ignorable" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var isCaseIgnorable: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 10)
+    _binaryProperties.contains(.isCaseIgnorable)
   }
 
   /// A Boolean value indicating whether the scalar's normalized form differs
@@ -533,7 +618,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Changes_When_Lowercased" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var changesWhenLowercased: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 2)
+    _binaryProperties.contains(.changesWhenLowercased)
   }
 
   /// A Boolean value indicating whether the scalar's normalized form differs
@@ -542,7 +627,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Changes_When_Uppercased" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var changesWhenUppercased: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 5)
+    _binaryProperties.contains(.changesWhenUppercased)
   }
 
   /// A Boolean value indicating whether the scalar's normalized form differs
@@ -551,7 +636,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Changes_When_Titlecased" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var changesWhenTitlecased: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 4)
+    _binaryProperties.contains(.changesWhenTitlecased)
   }
 
   /// A Boolean value indicating whether the scalar's normalized form differs
@@ -560,7 +645,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Changes_When_Casefolded" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var changesWhenCaseFolded: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 0)
+    _binaryProperties.contains(.changesWhenCaseFolded)
   }
 
   /// A Boolean value indicating whether the scalar may change when it
@@ -572,7 +657,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Changes_When_Casemapped" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var changesWhenCaseMapped: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 1)
+    _binaryProperties.contains(.changesWhenCaseMapped)
   }
 
   /// A Boolean value indicating whether the scalar is one that is not
@@ -581,7 +666,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Changes_When_NFKC_Casefolded" property
   /// in the [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var changesWhenNFKCCaseFolded: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 3)
+    _binaryProperties.contains(.changesWhenNFKCCaseFolded)
   }
 
   /// A Boolean value indicating whether the scalar has an emoji
@@ -615,7 +700,7 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmoji: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 16)
+    _binaryProperties.contains(.isEmoji)
   }
 
   /// A Boolean value indicating whether the scalar is one that should be
@@ -632,7 +717,7 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmojiPresentation: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 19)
+    _binaryProperties.contains(.isEmojiPresentation)
   }
 
   /// A Boolean value indicating whether the scalar is one that can modify
@@ -646,7 +731,7 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmojiModifier: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 17)
+    _binaryProperties.contains(.isEmojiModifier)
   }
 
   /// A Boolean value indicating whether the scalar is one whose appearance
@@ -656,7 +741,7 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmojiModifierBase: Bool {
-    _swift_stdlib_hasBinaryProperty(_scalar.value, 1 << 18)
+    _binaryProperties.contains(.isEmojiModifierBase)
   }
 }
 

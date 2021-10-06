@@ -45,8 +45,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_bool _swift_stdlib_hasBinaryProperty(__swift_uint32_t scalar,
-                                             __swift_intptr_t propertyMask);
+__swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar);
 
 #ifdef __cplusplus
 } // extern "C"

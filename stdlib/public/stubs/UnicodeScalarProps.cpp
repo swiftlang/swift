@@ -619,55 +619,56 @@ static const __swift_uint32_t _swift_stdlib_scalar_binProps[4855] = {
 };
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_bool _swift_stdlib_hasBinaryProperty(__swift_uint32_t scalar,
-                                             __swift_intptr_t propertyMask) {
+__swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar) {
 
-  __swift_uint64_t binaryProperties = 0;
+  auto lowerBoundIndex = 0;
+  auto endIndex = 4855;
+  auto upperBoundIndex = endIndex - 1;
 
-  auto low = 0;
-  auto high = 4855 - 1;
+  while (upperBoundIndex >= lowerBoundIndex) {
+    auto index = lowerBoundIndex + (upperBoundIndex - lowerBoundIndex) / 2;
 
-  while (high >= low) {
-    auto idx = low + (high - low) / 2;
-
-    auto entry = _swift_stdlib_scalar_binProps[idx];
+    auto entry = _swift_stdlib_scalar_binProps[index];
 
     // Shift the ccc value out of the scalar.
-    auto lower = (entry << 11) >> 11;
+    auto lowerBoundScalar = (entry << 11) >> 11;
 
-    __swift_uint32_t upper = 0;
-    
+    __swift_uint32_t upperBoundScalar = 0;
+
     // If we're not at the end of the array, the range count is simply the
     // distance to the next element.
-    if (idx != 4855 - 1) {
-      auto nextEntry = _swift_stdlib_scalar_binProps[idx + 1];
+    if (index != endIndex - 1) {
+      auto nextEntry = _swift_stdlib_scalar_binProps[index + 1];
 
       auto nextLower = (nextEntry << 11) >> 11;
-      
-      upper = nextLower - 1;
+
+      upperBoundScalar = nextLower - 1;
     } else {
       // Otherwise, the range count is the distance to 0x10FFFF
-      upper = 0x10FFFF;
+      upperBoundScalar = 0x10FFFF;
     }
 
     // Shift everything out.
-    auto dataIdx = entry >> 21;
+    auto dataIndex = entry >> 21;
 
-    if (scalar >= lower && scalar <= upper) {
-      binaryProperties =  _swift_stdlib_scalar_binProps_data[dataIdx];
-      break;
+    if (scalar >= lowerBoundScalar && scalar <= upperBoundScalar) {
+      return  _swift_stdlib_scalar_binProps_data[dataIndex];
     }
 
-    if (scalar > upper) {
-      low = idx + 1;
+    if (scalar > upperBoundScalar) {
+      lowerBoundIndex = index + 1;
       continue;
     }
 
-    if (scalar < lower) {
-      high = idx - 1;
+    if (scalar < lowerBoundScalar) {
+      upperBoundIndex = index - 1;
       continue;
     }
   }
 
-  return binaryProperties & propertyMask;
+  // If we make it out of this loop, then it means the scalar was not found at
+  // all in the array. This should never happen because the array represents all
+  // scalars from 0x0 to 0x10FFFF, but if somehow this branch gets reached,
+  // return 0 to indicate no properties.
+  return 0;
 }
