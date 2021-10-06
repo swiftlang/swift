@@ -102,8 +102,23 @@ ATTRIBUTE_NODES = [
          element='Syntax', element_name='SpecializeAttribute',
          element_choices=[
              'LabeledSpecializeEntry',
+             'AvailabilityEntry',
              'TargetFunctionEntry',
              'GenericWhereClause',
+         ]),
+
+    Node('AvailabilityEntry', kind='Syntax',
+         description='''
+         The availability argument for the _specialize attribute
+         ''',
+         children=[
+             Child('Label', kind='IdentifierToken',
+                   description='The label of the argument'),
+             Child('Colon', kind='ColonToken',
+                   description='The colon separating the label and the value'),
+             Child('AvailabilityList', kind='AvailabilitySpecList',
+                   collection_element_name='Availability'),
+             Child('Semicolon', kind='SemicolonToken'),
          ]),
 
     # Representation of e.g. 'exported: true,'

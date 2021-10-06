@@ -2209,9 +2209,12 @@ static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
       if (hasSPIGroup) {
         spiGroupIdent = spiGroups[0];
       }
+      auto availability =
+        AvailabilityInference::annotatedAvailableRangeForAttr(SA,
+                                                              M.getSwiftModule()->getASTContext());
       targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
           M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-          spiGroupIdent, vd->getModuleContext()));
+          spiGroupIdent, vd->getModuleContext(), availability));
     }
   }
 }

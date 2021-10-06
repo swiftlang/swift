@@ -430,10 +430,11 @@ static bool isShortFormAvailabilityImpliedByOther(const AvailableAttr *Attr,
 ///   @available(OSX 10.10, iOS 8.0, *)
 static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
                                     ASTPrinter &Printer,
-                                    const PrintOptions &Options) {
+                                    const PrintOptions &Options,
+                                    bool forAtSpecialize = false) {
   assert(!Attrs.empty());
-
-  Printer << "@available(";
+  if (!forAtSpecialize)
+    Printer << "@available(";
   auto FirstAvail = cast<AvailableAttr>(Attrs.front());
   if (Attrs.size() == 1 &&
       FirstAvail->getPlatformAgnosticAvailability() !=
@@ -445,8 +446,9 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
       assert(FirstAvail->isPackageDescriptionVersionSpecific());
       Printer << "_PackageDescription ";
     }
-    Printer << FirstAvail->Introduced.getValue().getAsString()
-            << ")";
+    Printer << FirstAvail->Introduced.getValue().getAsString();
+    if (!forAtSpecialize)
+      Printer << ")";
   } else {
     for (auto *DA : Attrs) {
       auto *AvailAttr = cast<AvailableAttr>(DA);
@@ -458,9 +460,12 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
       Printer << platformString(AvailAttr->Platform) << " "
               << AvailAttr->Introduced.getValue().getAsString() << ", ";
     }
-    Printer << "*)";
+    Printer << "*";
+    if (!forAtSpecialize)
+      Printer << ")";
   }
-  Printer.printNewline();
+  if (!forAtSpecialize)
+    Printer.printNewline();
 }
 
 /// The kind of a parameter in a `wrt:` differentiation parameters clause:
@@ -745,6 +750,53 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
   return lastAttr ? lastAttr->getRangeWithAt().Start : SourceLoc();
 }
 
+static void printAvailableAttr(const AvailableAttr *Attr, ASTPrinter &Printer,
+                               const PrintOptions &Options) {
+  if (Attr->isLanguageVersionSpecific())
+    Printer << "swift";
+  else if (Attr->isPackageDescriptionVersionSpecific())
+    Printer << "_PackageDescription";
+  else
+    Printer << Attr->platformString();
+
+  if (Attr->isUnconditionallyUnavailable())
+    Printer << ", unavailable";
+  else if (Attr->isUnconditionallyDeprecated())
+    Printer << ", deprecated";
+
+  if (Attr->Introduced)
+    Printer << ", introduced: " << Attr->Introduced.getValue().getAsString();
+  if (Attr->Deprecated)
+    Printer << ", deprecated: " << Attr->Deprecated.getValue().getAsString();
+  if (Attr->Obsoleted)
+    Printer << ", obsoleted: " << Attr->Obsoleted.getValue().getAsString();
+
+  if (!Attr->Rename.empty()) {
+    Printer << ", renamed: \"" << Attr->Rename << "\"";
+  } else if (Attr->RenameDecl) {
+    Printer << ", renamed: \"";
+    if (auto *Accessor = dyn_cast<AccessorDecl>(Attr->RenameDecl)) {
+      SmallString<32> Name;
+      llvm::raw_svector_ostream OS(Name);
+      Accessor->printUserFacingName(OS);
+      Printer << Name.str();
+    } else {
+      Printer << Attr->RenameDecl->getName();
+    }
+    Printer << "\"";
+  }
+
+  // If there's no message, but this is specifically an imported
+  // "unavailable in Swift" attribute, synthesize a message to look good in
+  // the generated interface.
+  if (!Attr->Message.empty()) {
+    Printer << ", message: ";
+    Printer.printEscapedStringLiteral(Attr->Message);
+  } else if (Attr->getPlatformAgnosticAvailability() ==
+             PlatformAgnosticAvailabilityKind::UnavailableInSwift)
+    Printer << ", message: \"Not available in Swift\"";
+}
+
 bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
                               const Decl *D) const {
 
@@ -890,51 +942,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@available");
     Printer << "(";
     auto Attr = cast<AvailableAttr>(this);
-    if (Attr->isLanguageVersionSpecific())
-      Printer << "swift";
-    else if (Attr->isPackageDescriptionVersionSpecific())
-      Printer << "_PackageDescription";
-    else
-      Printer << Attr->platformString();
-
-    if (Attr->isUnconditionallyUnavailable())
-      Printer << ", unavailable";
-    else if (Attr->isUnconditionallyDeprecated())
-      Printer << ", deprecated";
-
-    if (Attr->Introduced)
-      Printer << ", introduced: " << Attr->Introduced.getValue().getAsString();
-    if (Attr->Deprecated)
-      Printer << ", deprecated: " << Attr->Deprecated.getValue().getAsString();
-    if (Attr->Obsoleted)
-      Printer << ", obsoleted: " << Attr->Obsoleted.getValue().getAsString();
-
-    if (!Attr->Rename.empty()) {
-      Printer << ", renamed: \"" << Attr->Rename << "\"";
-    } else if (Attr->RenameDecl) {
-      Printer << ", renamed: \"";
-      if (auto *Accessor = dyn_cast<AccessorDecl>(Attr->RenameDecl)) {
-        SmallString<32> Name;
-        llvm::raw_svector_ostream OS(Name);
-        Accessor->printUserFacingName(OS);
-        Printer << Name.str();
-      } else {
-        Printer << Attr->RenameDecl->getName();
-      }
-      Printer << "\"";
-    }
-
-    // If there's no message, but this is specifically an imported
-    // "unavailable in Swift" attribute, synthesize a message to look good in
-    // the generated interface.
-    if (!Attr->Message.empty()) {
-      Printer << ", message: ";
-      Printer.printEscapedStringLiteral(Attr->Message);
-    }
-    else if (Attr->getPlatformAgnosticAvailability()
-               == PlatformAgnosticAvailabilityKind::UnavailableInSwift)
-      Printer << ", message: \"Not available in Swift\"";
-
+    printAvailableAttr(Attr, Printer, Options);
     Printer << ")";
     break;
   }
@@ -984,6 +992,21 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "kind: " << kind << ", ";
     if (target)
       Printer << "target: " << target << ", ";
+    auto availAttrs = attr->getAvailabeAttrs();
+    if (!availAttrs.empty()) {
+      Printer << "availability: ";
+      auto numAttrs = availAttrs.size();
+      if (numAttrs == 1) {
+        printAvailableAttr(availAttrs[0], Printer, Options);
+        Printer << "; ";
+      } else {
+        SmallVector<const DeclAttribute *, 8> tmp(availAttrs.begin(),
+                                                  availAttrs.end());
+        printShortFormAvailable(tmp, Printer, Options,
+                                true /*forAtSpecialize*/);
+        Printer << "; ";
+      }
+    }
     SmallVector<Requirement, 4> requirementsScratch;
     auto requirements = attr->getSpecializedSignature().getRequirements();
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
@@ -1663,13 +1686,18 @@ SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                SpecializationKind kind,
                                GenericSignature specializedSignature,
                                DeclNameRef targetFunctionName,
-                               ArrayRef<Identifier> spiGroups)
+                               ArrayRef<Identifier> spiGroups,
+                               ArrayRef<AvailableAttr *> availableAttrs)
     : DeclAttribute(DAK_Specialize, atLoc, range,
                     /*Implicit=*/clause == nullptr),
       trailingWhereClause(clause), specializedSignature(specializedSignature),
-      targetFunctionName(targetFunctionName), numSPIGroups(spiGroups.size()) {
+      targetFunctionName(targetFunctionName), numSPIGroups(spiGroups.size()),
+      numAvailableAttrs(availableAttrs.size()) {
   std::uninitialized_copy(spiGroups.begin(), spiGroups.end(),
                           getTrailingObjects<Identifier>());
+  std::uninitialized_copy(availableAttrs.begin(), availableAttrs.end(),
+                          getTrailingObjects<AvailableAttr *>());
+
   Bits.SpecializeAttr.exported = exported;
   Bits.SpecializeAttr.kind = unsigned(kind);
 }
@@ -1684,35 +1712,41 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        bool exported, SpecializationKind kind,
                                        DeclNameRef targetFunctionName,
                                        ArrayRef<Identifier> spiGroups,
+                                       ArrayRef<AvailableAttr *> availableAttrs,
                                        GenericSignature specializedSignature) {
-  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
+  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *>(
+      spiGroups.size(), availableAttrs.size());
   void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
   return new (mem)
       SpecializeAttr(atLoc, range, clause, exported, kind, specializedSignature,
-                     targetFunctionName, spiGroups);
+                     targetFunctionName, spiGroups, availableAttrs);
 }
 
 SpecializeAttr *SpecializeAttr::create(ASTContext &ctx, bool exported,
                                        SpecializationKind kind,
                                        ArrayRef<Identifier> spiGroups,
+                                       ArrayRef<AvailableAttr *> availableAttrs,
                                        GenericSignature specializedSignature,
                                        DeclNameRef targetFunctionName) {
-  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
+  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *>(
+      spiGroups.size(), availableAttrs.size());
   void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
-  return new (mem)
-      SpecializeAttr(SourceLoc(), SourceRange(), nullptr, exported, kind,
-                     specializedSignature, targetFunctionName, spiGroups);
+  return new (mem) SpecializeAttr(
+      SourceLoc(), SourceRange(), nullptr, exported, kind, specializedSignature,
+      targetFunctionName, spiGroups, availableAttrs);
 }
 
 SpecializeAttr *SpecializeAttr::create(
     ASTContext &ctx, bool exported, SpecializationKind kind,
-    ArrayRef<Identifier> spiGroups, GenericSignature specializedSignature,
-    DeclNameRef targetFunctionName, LazyMemberLoader *resolver, uint64_t data) {
-  unsigned size = totalSizeToAlloc<Identifier>(spiGroups.size());
+    ArrayRef<Identifier> spiGroups, ArrayRef<AvailableAttr *> availableAttrs,
+    GenericSignature specializedSignature, DeclNameRef targetFunctionName,
+    LazyMemberLoader *resolver, uint64_t data) {
+  unsigned size = totalSizeToAlloc<Identifier, AvailableAttr *>(
+      spiGroups.size(), availableAttrs.size());
   void *mem = ctx.Allocate(size, alignof(SpecializeAttr));
-  auto *attr = new (mem)
-      SpecializeAttr(SourceLoc(), SourceRange(), nullptr, exported, kind,
-                     specializedSignature, targetFunctionName, spiGroups);
+  auto *attr = new (mem) SpecializeAttr(
+      SourceLoc(), SourceRange(), nullptr, exported, kind, specializedSignature,
+      targetFunctionName, spiGroups, availableAttrs);
   attr->resolver = resolver;
   attr->resolverContextData = data;
   return attr;

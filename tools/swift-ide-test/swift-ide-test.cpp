@@ -797,6 +797,11 @@ AllowCompilerErrors("allow-compiler-errors",
                     llvm::cl::desc("Whether to attempt to continue despite compiler errors"),
                     llvm::cl::init(false));
 
+static llvm::cl::opt<std::string>
+  DefineAvailability("define-availability",
+                     llvm::cl::desc("Define a macro for @available"),
+                     llvm::cl::cat(Category));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -3887,6 +3892,10 @@ int main(int argc, char *argv[]) {
   InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
+
+  if (!options::DefineAvailability.empty()) {
+    InitInvok.getLangOptions().AvailabilityMacros.push_back(options::DefineAvailability);
+  }
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
   InitInvok.getLangOptions().EnableCrossImportOverlays =

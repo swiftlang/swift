@@ -509,11 +509,18 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       spiGroupID = S.addUniquedStringRef(ident.str());
       spiModuleDeclID = S.addModuleRef(SA->getSPIModule());
     }
+    auto availability = SA->getAvailability();
+    if (!availability.isAlwaysAvailable()) {
+      available = availability.getOSVersion().getLowerEndpoint();
+    }
+    ENCODE_VER_TUPLE(available, available)
+
     SILSpecializeAttrLayout::emitRecord(
         Out, ScratchRecord, specAttrAbbrCode, (unsigned)SA->isExported(),
         (unsigned)SA->getSpecializationKind(),
         S.addGenericSignatureRef(SA->getSpecializedSignature()),
-        targetFunctionNameID, spiGroupID, spiModuleDeclID);
+        targetFunctionNameID, spiGroupID, spiModuleDeclID,
+        LIST_VER_TUPLE_PIECES(available));
   }
 
   // Assign a unique ID to each basic block of the SILFunction.

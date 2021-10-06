@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 631; // IS_OSSA
+const uint16_t SWIFTMODULE_VERSION_MINOR = 632; // _specialize availability
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1933,15 +1933,16 @@ namespace decls_block {
   >;
 
   using SpecializeDeclAttrLayout = BCRecordLayout<
-    Specialize_DECL_ATTR,
-    BCFixed<1>, // exported flag
-    BCFixed<1>, // specialization kind
-    GenericSignatureIDField, // specialized signature
-    DeclIDField, // target function
-    BCVBR<4>,   // # of arguments (+1) or 1 if simple decl name, 0 if no target
-    BCVBR<4>,   // # of SPI groups
-    BCArray<IdentifierIDField> // target function pieces, spi groups
-  >;
+      Specialize_DECL_ATTR,
+      BCFixed<1>,              // exported flag
+      BCFixed<1>,              // specialization kind
+      GenericSignatureIDField, // specialized signature
+      DeclIDField,             // target function
+      BCVBR<4>, // # of arguments (+1) or 1 if simple decl name, 0 if no target
+      BCVBR<4>, // # of SPI groups
+      BCVBR<4>, // # of availability attributes
+      BCArray<IdentifierIDField> // target function pieces, spi groups
+      >;
 
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
