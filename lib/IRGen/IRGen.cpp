@@ -1113,6 +1113,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
       irgen.emitEagerClassInitialization();
+      irgen.emitObjCActorsNeedingSuperclassSwizzle();
       irgen.emitDynamicReplacements();
     }
 
@@ -1353,6 +1354,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   irgen.emitReflectionMetadataVersion();
 
   irgen.emitEagerClassInitialization();
+  irgen.emitObjCActorsNeedingSuperclassSwizzle();
 
   // Emit reflection metadata for builtin and imported types.
   irgen.emitBuiltinReflectionMetadata();
