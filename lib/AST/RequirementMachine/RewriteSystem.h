@@ -300,8 +300,10 @@ public:
   bool isInContext() const;
 
   void findProtocolConformanceRules(
-      SmallVectorImpl<unsigned> &notInContext,
-      SmallVectorImpl<std::pair<MutableTerm, unsigned>> &inContext,
+      llvm::SmallDenseMap<const ProtocolDecl *,
+                          std::pair<SmallVector<unsigned, 2>,
+                                    SmallVector<std::pair<MutableTerm, unsigned>, 2>>>
+                          &result,
       const RewriteSystem &system) const;
 
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
