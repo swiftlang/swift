@@ -61,34 +61,36 @@ public:
 
 private:
   void inferVariables(Type type) {
-    auto *typeVar = type->getWithoutSpecifierType()->getAs<TypeVariableType>();
-    if (!typeVar)
-      return;
-
+    type = type->getWithoutSpecifierType();
     // Record the type variable itself because it has to
     // be in scope even when already bound.
-    ReferencedVars.insert(typeVar);
+    if (auto *typeVar = type->getAs<TypeVariableType>()) {
+      ReferencedVars.insert(typeVar);
 
-    // It is possible that contextual type of a parameter/result
-    // has been assigned to e.g. an anonymous or named argument
-    // early, to facilitate closure type checking. Such a
-    // type can have type variables inside e.g.
-    //
-    // func test<T>(_: (UnsafePointer<T>) -> Void) {}
-    //
-    // test { ptr in
-    //  ...
-    // }
-    //
-    // Type variable representing `ptr` in the body of
-    // this closure would be bound to `UnsafePointer<$T>`
-    // in this case, where `$T` is a type variable for a
-    // generic parameter `T`.
-    auto simplifiedTy = CS.getFixedTypeRecursive(typeVar, /*wantRValue=*/false);
+      // It is possible that contextual type of a parameter/result
+      // has been assigned to e.g. an anonymous or named argument
+      // early, to facilitate closure type checking. Such a
+      // type can have type variables inside e.g.
+      //
+      // func test<T>(_: (UnsafePointer<T>) -> Void) {}
+      //
+      // test { ptr in
+      //  ...
+      // }
+      //
+      // Type variable representing `ptr` in the body of
+      // this closure would be bound to `UnsafePointer<$T>`
+      // in this case, where `$T` is a type variable for a
+      // generic parameter `T`.
+      type = CS.getFixedTypeRecursive(typeVar, /*wantRValue=*/false);
 
-    if (!simplifiedTy->isEqual(typeVar) && simplifiedTy->hasTypeVariable()) {
+      if (type->isEqual(typeVar))
+        return;
+    }
+
+    if (type->hasTypeVariable()) {
       SmallPtrSet<TypeVariableType *, 4> typeVars;
-      simplifiedTy->getTypeVariables(typeVars);
+      type->getTypeVariables(typeVars);
       ReferencedVars.insert(typeVars.begin(), typeVars.end());
     }
   }
@@ -113,8 +115,16 @@ public:
       auto *decl = DRE->getDecl();
       if (isa<ParamDecl>(decl)) {
         if (auto type = CS.getTypeIfAvailable(decl)) {
-          if (auto *typeVar = type->getAs<TypeVariableType>())
+          if (auto *typeVar = type->getAs<TypeVariableType>()) {
             Vars.insert(typeVar);
+          } else if (type->hasTypeVariable()) {
+            // Parameter or result type could be only partially
+            // resolved e.g. `{ (x: X) -> Void in ... }` where
+            // `X` is a generic type.
+            SmallPtrSet<TypeVariableType *, 4> typeVars;
+            type->getTypeVariables(typeVars);
+            Vars.insert(typeVars.begin(), typeVars.end());
+          }
         }
       }
     }
