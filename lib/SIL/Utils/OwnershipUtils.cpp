@@ -244,7 +244,7 @@ findInnerTransitiveGuaranteedUses(SILValue guaranteedValue,
 // Find all use points of \p guaranteedValue within its borrow scope. All use
 // points will be dominated by \p guaranteedValue.
 //
-// Record (non-nested) reborrows as uses and call \p visitReborrow.
+// Record (non-nested) reborrows as uses.
 //
 // BorrowedValues (which introduce a borrow scope) are fundamentally different
 // than "inner" guaranteed values. Their only use points are their scope-ending
@@ -418,14 +418,15 @@ bool BorrowingOperand::visitScopeEndingUses(
 }
 
 bool BorrowingOperand::visitExtendedScopeEndingUses(
-    function_ref<bool(Operand *)> func) const {
+    function_ref<bool(Operand *)> visitor) const {
+
   if (hasBorrowIntroducingUser()) {
     return visitBorrowIntroducingUserResults(
-        [func](BorrowedValue borrowedValue) {
-          return borrowedValue.visitExtendedLocalScopeEndingUses(func);
+        [visitor](BorrowedValue borrowedValue) {
+          return borrowedValue.visitExtendedScopeEndingUses(visitor);
         });
   }
-  return visitScopeEndingUses(func);
+  return visitScopeEndingUses(visitor);
 }
 
 bool BorrowingOperand::visitBorrowIntroducingUserResults(
@@ -598,8 +599,8 @@ bool BorrowedValue::areUsesWithinLocalScope(
 }
 
 // The visitor \p func is only called on final scope-ending uses, not reborrows.
-bool BorrowedValue::visitExtendedLocalScopeEndingUses(
-    function_ref<bool(Operand *)> func) const {
+bool BorrowedValue::visitExtendedScopeEndingUses(
+    function_ref<bool(Operand *)> visitor) const {
   assert(isLocalScope());
 
   SmallPtrSetVector<SILValue, 4> reborrows;
@@ -613,7 +614,7 @@ bool BorrowedValue::visitExtendedLocalScopeEndingUses(
         });
       return true;
     }
-    return func(scopeEndingUse);
+    return visitor(scopeEndingUse);
   };
 
   if (!visitLocalScopeEndingUses(visitEnd))

@@ -150,7 +150,7 @@ bool findTransitiveGuaranteedUses(SILValue guaranteedValue,
 /// 1. If \p guaranteedValue introduces a borrow scope (begin_borrow,
 /// load_borrow, or phi), then its only use points are the extended scope-ending
 /// uses, and this function returns true. This is, in fact, equivalent to
-/// calling BorrowedValue::visitExtendedLocalScopeEndingUses().
+/// calling BorrowedValue::visitExtendedScopeEndingUses().
 ///
 /// 2. If \p guaranteedValue does not introduce a borrow scope (it is not a
 /// valid BorrowedValue), then its uses are discovered transitively by looking
@@ -320,8 +320,6 @@ struct BorrowingOperand {
   /// BorrowingOperand.
   ///
   /// Returns false and early exits if the visitor \p func returns false.
-  ///
-  /// Note: this does not visit the intermediate reborrows.
   bool visitExtendedScopeEndingUses(function_ref<bool(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
@@ -504,7 +502,7 @@ struct InteriorPointerOperand;
 /// jointly post-dominate this value (see visitLocalScopeEndingUses()). The
 /// extended scope, including reborrows has end points that are not dominated by
 /// this value but still jointly post-dominate (see
-/// visitExtendedLocalScopeEndingUses()).
+/// visitExtendedScopeEndingUses()).
 struct BorrowedValue {
   SILValue value;
   BorrowedValueKind kind = BorrowedValueKind::Invalid;
@@ -563,8 +561,8 @@ struct BorrowedValue {
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments. \p
   /// visitor is *not* called on Reborrows, only on final scope ending uses.
-  bool visitExtendedLocalScopeEndingUses(
-      function_ref<bool(Operand *)> visitor) const;
+  bool
+  visitExtendedScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
