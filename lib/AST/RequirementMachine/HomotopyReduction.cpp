@@ -622,15 +622,33 @@ findRuleToDelete(bool firstPass,
           if (rule.isPermanent())
             return false;
 
-          // Other rules involving unresolved name symbols are eliminated in
-          // the first pass.
+          // Other rules involving unresolved name symbols are derived from an
+          // associated type introduction rule together with a conformance rule.
+          // They are eliminated in the first pass.
           if (firstPass)
             return rule.containsUnresolvedSymbols();
 
+          // In the second and third pass we should not have any rules involving
+          // unresolved name symbols, except for permanent rules which were
+          // already skipped above.
+          //
+          // FIXME: This isn't true with invalid code.
           assert(!rule.containsUnresolvedSymbols());
 
           // Protocol conformance rules are eliminated via a different
           // algorithm which computes "generating conformances".
+          //
+          // The first and second passes skip protocol conformance rules.
+          //
+          // The third pass eliminates any protocol conformance rule which is
+          // redundant according to both homotopy reduction and the generating
+          // conformances algorithm.
+          //
+          // Later on, we verify that any conformance redundant via generating
+          // conformances was also redundant via homotopy reduction. This
+          // means that the set of generating conformances is always a superset
+          // (or equal to) of the set of minimal protocol conformance
+          // requirements that homotopy reduction alone would produce.
           if (rule.isProtocolConformanceRule()) {
             if (!redundantConformances)
               return false;
@@ -744,7 +762,13 @@ void RewriteSystem::performHomotopyReduction(
 /// Use the 3-cells to delete redundant rewrite rules via a series of Tietze
 /// transformations, updating and simplifying existing 3-cells as each rule
 /// is deleted.
+///
+/// Redundant rules are mutated to set their isRedundant() bit.
 void RewriteSystem::minimizeRewriteSystem() {
+  assert(Complete);
+  assert(!Minimized);
+  Minimized = 1;
+
   /// Begin by normalizing all 3-cells to cyclically-reduced left-canonical
   /// form.
   for (auto &loop : HomotopyGenerators) {

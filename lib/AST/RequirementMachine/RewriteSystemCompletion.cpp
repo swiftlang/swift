@@ -488,6 +488,13 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
 std::pair<RewriteSystem::CompletionResult, unsigned>
 RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
                                           unsigned maxDepth) {
+  assert(Initialized);
+  assert(!Minimized);
+
+  // Complete might already be set, if we're re-running completion after
+  // adding new rules in the property map's concrete type unification procedure.
+  Complete = 1;
+
   unsigned steps = 0;
 
   bool again = false;

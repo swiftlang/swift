@@ -80,7 +80,11 @@ void Rule::dump(llvm::raw_ostream &out) const {
 }
 
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
-    : Context(ctx), Debug(ctx.getDebugOptions()) {}
+    : Context(ctx), Debug(ctx.getDebugOptions()) {
+  Initialized = 0;
+  Complete = 0;
+  Minimized = 0;
+}
 
 RewriteSystem::~RewriteSystem() {
   Trie.updateHistograms(Context.RuleTrieHistogram,
@@ -91,6 +95,9 @@ void RewriteSystem::initialize(
     std::vector<std::pair<MutableTerm, MutableTerm>> &&associatedTypeRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
     ProtocolGraph &&graph) {
+  assert(!Initialized);
+  Initialized = 1;
+
   Protos = graph;
 
   for (const auto &rule : associatedTypeRules) {
@@ -113,6 +120,10 @@ void RewriteSystem::initialize(
 /// \p lhs to \p rhs.
 bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
                             const RewritePath *path) {
+  // FIXME:
+  // assert(!Complete || path != nullptr &&
+  //        "Rules added by completion must have a path");
+
   assert(!lhs.empty());
   assert(!rhs.empty());
 
@@ -292,6 +303,8 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 /// Must be run after the completion procedure, since the deletion of
 /// rules is only valid to perform if the rewrite system is confluent.
 void RewriteSystem::simplifyRewriteSystem() {
+  assert(Complete);
+
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
     if (rule.isSimplified())
@@ -440,6 +453,9 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "}\n";
   out << "Homotopy generators: {\n";
   for (const auto &loop : HomotopyGenerators) {
+    if (loop.isDeleted())
+      continue;
+
     out << "- ";
     loop.dump(out, *this);
     out << "\n";

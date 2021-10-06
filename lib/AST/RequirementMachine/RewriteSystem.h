@@ -367,6 +367,18 @@ class RewriteSystem final {
 
   DebugOptions Debug;
 
+  /// Whether we've initialized the rewrite system with a call to initialize().
+  unsigned Initialized : 1;
+
+  /// Whether we've computed the confluent completion at least once.
+  ///
+  /// It might be computed multiple times if the property map's concrete type
+  /// unification procedure adds new rewrite rules.
+  unsigned Complete : 1;
+
+  /// Whether we've minimized the rewrite system.
+  unsigned Minimized : 1;
+
 public:
   explicit RewriteSystem(RewriteContext &ctx);
   ~RewriteSystem();
