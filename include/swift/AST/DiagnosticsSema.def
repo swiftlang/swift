@@ -362,6 +362,11 @@ ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
       (Type,Type))
 
+ERROR(cannot_convert_argument_value_for_swift_func,none,
+      "cannot convert value of type %0 to expected argument type %1 "
+      "because %2 %3 was not imported from C header",
+      (Type,Type, DescriptiveDeclKind, DeclName))
+
 NOTE(candidate_has_invalid_argument_at_position,none,
      "candidate expects %select{|in-out }2value of type %0 for parameter #%1 (got %3)",
      (Type, unsigned, bool, Type))

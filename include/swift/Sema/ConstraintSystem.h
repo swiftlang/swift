@@ -4859,6 +4859,12 @@ public: // FIXME: Public for use by static functions.
                                      TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
 
+  /// Simplify a conversion between Swift and C pointers.
+  SolutionKind
+  simplifyPointerToCPointerRestriction(Type type1, Type type2,
+                                       TypeMatchOptions flags,
+                                       ConstraintLocatorBuilder locator);
+
 public:
   /// Simplify the system of constraints, by breaking down complex
   /// constraints into simpler constraints.
@@ -5204,6 +5210,10 @@ public:
   /// calls `test(42)` passing `42` should return a locator with the entire call
   /// as the anchor, and a path to the argument at index `0`.
   ConstraintLocator *getArgumentLocator(Expr *expr);
+
+  /// Determine whether given locator represents an argument to declaration
+  /// imported from C/ObjectiveC.
+  bool isArgumentOfImportedDecl(ConstraintLocatorBuilder locator);
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));

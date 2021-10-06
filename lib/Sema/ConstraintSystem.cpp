@@ -5067,6 +5067,40 @@ bool constraints::isArgumentOfReferenceEqualityOperator(
          isOperatorArgument(locator, "!==");
 }
 
+bool ConstraintSystem::isArgumentOfImportedDecl(
+    ConstraintLocatorBuilder locator) {
+  SmallVector<LocatorPathElt, 4> path;
+  auto anchor = locator.getLocatorParts(path);
+
+  if (path.empty())
+    return false;
+
+  while (!path.empty()) {
+    const auto &last = path.back();
+
+    // Drop all of the `optional payload` or `generic argument`
+    // locator elements at the end of the path, they came from
+    // either value-to-optional promotion or optional-to-optional
+    // conversion.
+    if (last.is<LocatorPathElt::OptionalPayload>() ||
+        last.is<LocatorPathElt::GenericArgument>()) {
+      path.pop_back();
+      continue;
+    }
+
+    break;
+  }
+
+  auto *application = getCalleeLocator(getConstraintLocator(anchor, path));
+
+  auto overload = findSelectedOverloadFor(application);
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *choice = overload->choice.getDecl();
+  return choice->hasClangNode();
+}
+
 ConversionEphemeralness
 ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
                                         ConstraintLocatorBuilder locator) {
@@ -5197,6 +5231,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
   case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
   case ConversionRestrictionKind::PointerToPointer:
+  case ConversionRestrictionKind::PointerToCPointer:
   case ConversionRestrictionKind::ArrayUpcast:
   case ConversionRestrictionKind::DictionaryUpcast:
   case ConversionRestrictionKind::SetUpcast:

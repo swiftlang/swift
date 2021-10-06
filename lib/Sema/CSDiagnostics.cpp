@@ -6691,6 +6691,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
   case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
   case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
   case ConversionRestrictionKind::PointerToPointer:
+  case ConversionRestrictionKind::PointerToCPointer:
   case ConversionRestrictionKind::ArrayUpcast:
   case ConversionRestrictionKind::DictionaryUpcast:
   case ConversionRestrictionKind::SetUpcast:
@@ -7822,5 +7823,19 @@ bool InvalidWeakAttributeUse::diagnoseAsError() {
         .fixItInsertAfter(typeRange.End, ")?");
   }
 
+  return true;
+}
+
+bool SwiftToCPointerConversionInInvalidContext::diagnoseAsError() {
+  auto argInfo = getFunctionArgApplyInfo(getLocator());
+  if (!argInfo)
+    return false;
+
+  auto *callee = argInfo->getCallee();
+  auto argType = resolveType(argInfo->getArgType());
+  auto paramType = resolveType(argInfo->getParamType());
+
+  emitDiagnostic(diag::cannot_convert_argument_value_for_swift_func, argType,
+                 paramType, callee->getDescriptiveKind(), callee->getName());
   return true;
 }
