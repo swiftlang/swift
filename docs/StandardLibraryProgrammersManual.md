@@ -24,7 +24,7 @@ We use two spaces as the unit of indentation. We don't use tabs.
 
 To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe in detail.)
 
-Our primary rule is that if we need to put a line break anywhere in the middle of a list (such as arguments, tuple or array/dictionary literals, generic type parameters, etc.), then we need to go the full way, and put each item on its own line, indented by +1 unit, even if some of the items would fit on a single line together.
+Our primary rule is that if we need to insert a line break anywhere in the middle of a list (such as arguments, tuple or array/dictionary literals, generic type parameters, etc.), then we must go all the way and put each item on its own line, indented by +1 unit, even if some of the items would fit on a single line together.
 
 The rationale for this is that line breaks tend to put strong visual emphasis on the item that follows them, risking subsequent items on the same line to be glanced over during review. For example, see how easy it is to accidentally miss `arg2` in the second example below.
 
