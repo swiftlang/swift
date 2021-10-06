@@ -15,9 +15,10 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -29,6 +30,7 @@ class SILInstruction;
 class SILModule;
 class SILValue;
 class DeadEndBlocks;
+class PrunedLiveness;
 
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v);
@@ -535,14 +537,19 @@ struct BorrowedValue {
 
   bool isLocalScope() const { return kind.isLocalScope(); }
 
-  /// Returns true if the passed in set of uses is completely within
-  /// the lifetime of this borrow introducer.
+  /// Add this scopes live blocks into the PrunedLiveness result.
+  void computeLiveness(PrunedLiveness &liveness) const;
+
+  /// Returns true if \p uses are completely within this borrow introducer's
+  /// local scope.
   ///
-  /// NOTE: Scratch space is used internally to this method to store the end
-  /// borrow scopes if needed.
-  bool areUsesWithinScope(ArrayRef<Operand *> uses,
-                          SmallVectorImpl<Operand *> &scratchSpace,
-                          DeadEndBlocks &deadEndBlocks) const;
+  /// Precondition: \p uses are dominated by the local borrow introducer.
+  ///
+  /// This ignores reborrows. The assumption is that, since \p uses are
+  /// dominated by this local scope, checking the extended borrow scope should
+  /// not be necessary to determine they are within the scope.
+  bool areUsesWithinLocalScope(ArrayRef<Operand *> uses,
+                               DeadEndBlocks &deadEndBlocks) const;
 
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments. \p
@@ -583,6 +590,14 @@ struct BorrowedValue {
         func, InteriorPointerOperandVisitorKind::YesNestedYesReborrows);
   }
 
+  bool hasReborrow() const {
+    for (auto *op : value->getUses()) {
+      if (op->getOperandOwnership() == OperandOwnership::Reborrow)
+        return true;
+    }
+    return false;
+  }
+
   /// Visit all immediate uses of this borrowed value and if any of them are
   /// reborrows, place them in BorrowingOperand form into \p
   /// foundReborrows. Returns true if we appended any such reborrows to
@@ -591,12 +606,10 @@ struct BorrowedValue {
                            &foundReborrows) const {
     bool foundAnyReborrows = false;
     for (auto *op : value->getUses()) {
-      if (auto borrowingOperand = BorrowingOperand(op)) {
-        if (borrowingOperand.isReborrow()) {
-          foundReborrows.push_back(
-              {value->getParentBlock(), op->getOperandNumber()});
-          foundAnyReborrows = true;
-        }
+      if (op->getOperandOwnership() == OperandOwnership::Reborrow) {
+        foundReborrows.push_back(
+            {value->getParentBlock(), op->getOperandNumber()});
+        foundAnyReborrows = true;
       }
     }
     return foundAnyReborrows;

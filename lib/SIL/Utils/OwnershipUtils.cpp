@@ -550,14 +550,17 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-bool BorrowedValue::areUsesWithinScope(
-    ArrayRef<Operand *> uses, SmallVectorImpl<Operand *> &scratchSpace,
-    DeadEndBlocks &deadEndBlocks) const {
-  // Make sure that we clear our scratch space/utilities before we exit.
-  SWIFT_DEFER {
-    scratchSpace.clear();
-  };
+/// Add this scopes live blocks into the PrunedLiveness result.
+void BorrowedValue::computeLiveness(PrunedLiveness &liveness) const {
+  liveness.initializeDefBlock(value->getParentBlock());
+  visitLocalScopeEndingUses([&](Operand *endOp) {
+    liveness.updateForUse(endOp->getUser(), true);
+    return true;
+  });
+}
 
+bool BorrowedValue::areUsesWithinLocalScope(
+    ArrayRef<Operand *> uses, DeadEndBlocks &deadEndBlocks) const {
   // First make sure that we actually have a local scope. If we have a non-local
   // scope, then we have something (like a SILFunctionArgument) where a larger
   // semantic construct (in the case of SILFunctionArgument, the function
@@ -566,15 +569,10 @@ bool BorrowedValue::areUsesWithinScope(
   if (!isLocalScope())
     return true;
 
-  // Otherwise, gather up our local scope ending instructions, looking through
-  // guaranteed phi nodes.
-  visitExtendedLocalScopeEndingUses([&scratchSpace](Operand *op) {
-    scratchSpace.emplace_back(op);
-    return true;
-  });
-
-  LinearLifetimeChecker checker(deadEndBlocks);
-  return checker.validateLifetime(value, scratchSpace, uses);
+  // Compute the local scope's liveness.
+  PrunedLiveness liveness;
+  computeLiveness(liveness);
+  return liveness.areUsesWithinBoundary(uses, deadEndBlocks);
 }
 
 // The visitor \p func is only called on final scope-ending uses, not reborrows.
