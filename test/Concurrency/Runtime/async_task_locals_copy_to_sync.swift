@@ -7,6 +7,7 @@
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// REQUIRES: rdar80824152
 
 import Dispatch
 
