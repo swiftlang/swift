@@ -253,6 +253,8 @@ internal final class _ContiguousArrayStorage<
 @usableFromInline
 @frozen
 internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
+  @usableFromInline
+  internal var _storage: __ContiguousArrayStorageBase
 
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the `count` elements at the
@@ -846,9 +848,6 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     }
     return true
   }
-
-  @usableFromInline
-  internal var _storage: __ContiguousArrayStorageBase
 }
 
 /// Append the elements of `rhs` to `lhs`.

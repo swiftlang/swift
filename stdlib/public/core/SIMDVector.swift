@@ -662,17 +662,17 @@ public struct SIMDMask<Storage>: SIMD
   public typealias MaskStorage = Storage
   
   public typealias Scalar = Bool
-  
-  @_transparent
-  public var scalarCount: Int {
-    return _storage.scalarCount
-  }
-  
+
   @_transparent
   public init() {
     _storage = Storage()
   }
-  
+
+  @_transparent
+  public var scalarCount: Int {
+    return _storage.scalarCount
+  }
+
   @_transparent
   public init(_ _storage: Storage) {
     self._storage = _storage
