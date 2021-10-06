@@ -12,9 +12,135 @@ In this document, "stdlib" refers to the core standard library (`stdlib/public/c
 
 ### Formatting Conventions
 
-The stdlib currently has a hard line length limit of 80 characters. To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe.)
+The Standard Library codebase has some rather strict formatting conventions. While these aren't currently automatically enforced, we still expect these conventions to be followed in every PR, including draft PRs. (PRs are first and foremost intended to be read/reviewed by *people familiar with the stdlib codebase*, and it's crucial that trivial formatting issues don't get in the way of understanding proposed changes.)
+
+#### Line Breaking
+
+The stdlib currently has a hard line length limit of 80 characters. This allows code to be easily read in environments that don't gracefully handle long lines, including (especially!) code reviews on GitHub.
    
 We use two spaces as the unit of indentation. We don't use tabs.
+
+To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe in detail.)
+
+Our primary rule is that if we need to break a list (such as arguments, tuple or array/dictionary literals, generic type parameters, etc.), then we always put each item on its own line, indented by +1 unit, even if a series of items would fit on a single line together. 
+
+The rationale for this is that line breaks tend to put strong visual emphasis on the item that follows them, allowing subsequent items on the same line to be glanced over during review. For example, see how easy it is to accidentally miss `arg2` in the second example below.
+
+```swift
+// BAD: (completely unreadable)
+@inlinable public func foobar<Result>(_ arg1: Result, arg2: Int, _ arg3: (Result, Element) throws -> Result) rethrows -> Result {
+  ...
+}
+
+// BAD: (arg2 is easily missed)
+@inlinable 
+public func foobar<Result>(
+  _ arg1: Result, arg2: Int,             // ☹️
+  _ arg3: (Result, Element) throws -> Result
+) rethrows -> Result {
+
+// GOOD:
+@inlinable
+public func foobar<Result>(
+  _ arg1: Result, 
+  arg2: Int, 
+  _ arg3: (Result, Element) throws -> Result
+) rethrows -> Result {
+  ...
+}
+```
+
+The rules typically don't require breaking lines that don't exceed the length limit; but if you find it helps understanding, feel free to do so anyway.
+
+```swift
+// OK
+guard let foo = foo else { return false }
+
+// Also OK
+guard let foo = foo else {
+  return false
+}
+```
+
+#### Presentation of Type Definitions
+
+To ease reading/understanding type declarations, we prefer to define members in the following order:
+
+1. Crucial type aliases and nested types, not exceeding a handful of lines in length
+2. Stored properties
+3. Initializers
+4. Any other instance members (methods, calculated properties)
+
+Please keep all stored properties together in a single uninterrupted list, followed immediately by the type's most crucial initializer(s). Put these as close to the top of the type declaration as possible -- we don't want to force readers to scroll around to find these core definitions.
+
+The main declaration ought to be kept as short as possible -- preferably it should consist of the type's stored properties and a handful of critical initializers, and nothing else. 
+Everything else should go in standalone extensions, arranged by logical theme. For example, it's often better to define protocol conformances in dedicated extensions. Think about what order you present these -- put related conformances together, follow some didactic arc, etc. (E.g, conformance definitions for `Equatable`/`Hashable`/`Comparable` should be kept very close to each other, for easy referencing.)
+
+It's okay for the core type declaration to forward reference large nested types or static members that are defined in subsequent extensions. It's often a good idea to define these in an extension immediately following the type declaration, but this is not a strict rule. The goal is to make things easy to understand -- if a type is small enough, it may be fine to put every member directly in the `struct`/`class` definition, while it may make sense to break the definition of a huge type into a number of source files.
+
+```
+// BAD (a jumbled mess)
+struct Foo: RandomAccessCollection, Hashable {
+  var count: Int { ... }
+  
+  struct Iterator: IteratorProtocol { /* hundreds of lines */ }
+ 
+  class _Storage { /* even more lines */ }
+  
+  static func _createStorage(_ foo: Int, _ bar: Double) -> _Storage { ... }
+  
+  func hash(into hasher: inout Hasher) { ... }
+  
+  func makeIterator() -> Iterator { ... }
+  
+  /* more stuff */
+  
+  init(foo: Int, bar: Double) { 
+    _storage = Self._createStorage(foo, bar) 
+  }
+
+  static func ==(left: Self, right: Self) -> Bool { ... }
+  
+  var _storage: _Storage
+}
+
+// GOOD
+struct Foo: RandomAccessCollection, Hashable {
+  var _storage: _FooStorage
+  
+  init(foo: Int, bar: Double) { ... }
+}
+
+extension Foo {
+  class _Storage { /* even more lines */ }
+
+  static func _createStorage(_ foo: Int, _ bar: Double) -> _Storage { ... }
+}
+
+extension Foo: Equatable {
+  static func ==(left: Self, right: Self) -> Bool { ... }
+}
+
+extension Foo: Hashable {
+  func hash(into hasher: inout Hasher) { ... }
+}
+ 
+extension Foo: Sequence {
+  struct Iterator: IteratorProtocol { /* hundreds of lines */ }
+  
+  func makeIterator() -> Iterator { ... }
+  ...
+}
+
+extension Foo: RandomAccessCollection {
+  var count: Int { ... }
+  ...
+}
+
+extension Foo {
+  /* more stuff */
+}
+```
 
 ### Public APIs
 
