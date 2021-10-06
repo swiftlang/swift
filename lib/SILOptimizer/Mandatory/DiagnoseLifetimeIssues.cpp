@@ -315,24 +315,7 @@ static bool isOutOfLifetime(SILInstruction *inst, PrunedLiveness &liveness) {
   // impossible that a use of the object is not a potential load. So we would
   // always see a potential load if the lifetime of the object goes beyond the
   // store_weak.
-
-  SILBasicBlock *block = inst->getParent();
-  if (liveness.getBlockLiveness(block) != PrunedLiveBlocks::LiveWithin)
-    return false;
-
-  // If there are any uses after the store_weak, it means that the liferange of
-  // the object goes beyond the store_weak.
-  for (SILInstruction &inst : make_range(std::next(inst->getIterator()),
-                                         block->end())) {
-    switch (liveness.isInterestingUser(&inst)) {
-    case PrunedLiveness::NonUser:
-      break;
-    case PrunedLiveness::NonLifetimeEndingUse:
-    case PrunedLiveness::LifetimeEndingUse:
-      return false;
-    }
-  }
-  return true;
+  return !liveness.isWithinBoundary(inst);
 }
 
 /// Reports a warning if the stored object \p storedObj is never loaded within
