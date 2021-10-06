@@ -356,6 +356,28 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
   return os;
 }
 
+bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
+  switch (kind) {
+  case BorrowingOperandKind::Invalid:
+    llvm_unreachable("Using invalid case");
+  case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::BeginApply: {
+    return op->getUser()->hasUsesOfAnyResult();
+  }
+  case BorrowingOperandKind::Branch: {
+    auto *br = cast<BranchInst>(op->getUser());
+    return br->getArgForOperand(op)->use_empty();
+  }
+  // These are instantaneous borrow scopes so there aren't any special end
+  // scope instructions.
+  case BorrowingOperandKind::Apply:
+  case BorrowingOperandKind::TryApply:
+  case BorrowingOperandKind::Yield:
+    return false;
+  }
+  llvm_unreachable("Covered switch isn't covered");
+}
+
 bool BorrowingOperand::visitScopeEndingUses(
     function_ref<bool(Operand *)> func) const {
   switch (kind) {

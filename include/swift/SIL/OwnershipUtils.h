@@ -306,6 +306,15 @@ struct BorrowingOperand {
   /// visits the end of the introduced borrow scope.
   bool visitScopeEndingUses(function_ref<bool(Operand *)> func) const;
 
+  /// Returns true for borrows that create a local borrow scope but have no
+  /// scope-ending uses (presumably all paths are dead-end blocks). This does
+  /// not include instantaneous borrows, which don't require explicit scope
+  /// ending uses.
+  ///
+  /// FIXME: Borrow scopes should have scope-ending uses on all paths, even to
+  /// dead end blocks. When the verifier enforces this, remove this check.
+  bool hasEmptyRequiredEndingUses() const;
+
   /// Visit the scope ending operands of the extended scope, after transitively
   /// searching through reborrows. These uses might not be dominated by this
   /// BorrowingOperand.
