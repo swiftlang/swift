@@ -176,11 +176,17 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
   if (!reason.hasValue())
     reason = ExportabilityReason::General;
 
-  ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
-                     rootConf->getType(),
-                     rootConf->getProtocol()->getName(),
-                     static_cast<unsigned>(*reason),
-                     M->getName(),
-                     static_cast<unsigned>(originKind));
+  auto inFlight =
+    ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
+                       rootConf->getType(),
+                       rootConf->getProtocol()->getName(),
+                       static_cast<unsigned>(*reason),
+                       M->getName(),
+                       static_cast<unsigned>(originKind));
+
+  if (ext->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+    inFlight.limitBehavior(DiagnosticBehavior::Warning);
+    return false;
+  }
   return true;
 }
