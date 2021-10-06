@@ -756,8 +756,6 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
         /*treatUsableFromInlineAsPublic=*/true).isPublic())
     return;
 
-  // FIXME: Check for explicit "do not conform to Sendable" marker.
-
   // Look for any conformance to `Sendable`.
   auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
   if (!proto)
@@ -797,11 +795,16 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
   }
 
   // Note to disable the warning.
-  nominal->diagnose(
-      diag::explicit_disable_sendable, nominal->getDescriptiveKind(),
-      nominal->getName())
-    .fixItInsert(nominal->getAttributeInsertionLoc(/*forModifier=*/false),
-                 "@_nonSendable ");
+  {
+    auto note = nominal->diagnose(
+        diag::explicit_disable_sendable, nominal->getDescriptiveKind(),
+        nominal->getName());
+    auto insertionLoc = nominal->getBraces().End;
+    note.fixItInsertAfter(
+        insertionLoc,
+        ("\n\n@available(*, unavailable)\nextension " + nominal->getName().str()
+         + ": Sendable { }\n").str());
+  }
 }
 
 /// Determine whether this is the main actor type.
