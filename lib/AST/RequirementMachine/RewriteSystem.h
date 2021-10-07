@@ -80,6 +80,8 @@ public:
 
   bool isProtocolConformanceRule() const;
 
+  bool isProtocolRefinementRule() const;
+
   /// See above for an explanation.
   bool isPermanent() const {
     return Permanent;
@@ -513,6 +515,9 @@ public:
       const llvm::MapVector<unsigned,
                             std::vector<SmallVector<unsigned, 2>>>
           &conformancePaths) const;
+
+  bool isValidRefinementPath(
+      const llvm::SmallVectorImpl<unsigned> &path) const;
 
   void dumpGeneratingConformanceEquation(
       llvm::raw_ostream &out,

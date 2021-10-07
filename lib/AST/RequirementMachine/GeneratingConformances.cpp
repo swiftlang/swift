@@ -369,6 +369,23 @@ bool RewriteSystem::isValidConformancePath(
   return true;
 }
 
+/// Rules of the form [P].[Q] => [P] encode protocol refinement and can only
+/// be redundant if they're equivalent to a sequence of other protocol
+/// refinements.
+///
+/// This helps ensure that the inheritance clause of a protocol is complete
+/// and correct, allowing name lookup to find associated types of inherited
+/// protocols while building the protocol requirement signature.
+bool RewriteSystem::isValidRefinementPath(
+    const llvm::SmallVectorImpl<unsigned> &path) const {
+  for (unsigned ruleID : path) {
+    if (!getRule(ruleID).isProtocolRefinementRule())
+      return false;
+  }
+
+  return true;
+}
+
 void RewriteSystem::dumpGeneratingConformanceEquation(
     llvm::raw_ostream &out,
     unsigned baseRuleID,
@@ -444,6 +461,8 @@ void RewriteSystem::computeGeneratingConformances(
     llvm::DenseSet<unsigned> &redundantConformances) {
   llvm::MapVector<unsigned, std::vector<SmallVector<unsigned, 2>>> conformancePaths;
 
+  llvm::DenseSet<unsigned> protocolRefinements;
+
   // Prepare the initial set of equations: every non-redundant conformance rule
   // can be expressed as itself.
   for (unsigned ruleID : indices(Rules)) {
@@ -457,6 +476,9 @@ void RewriteSystem::computeGeneratingConformances(
     SmallVector<unsigned, 2> path;
     path.push_back(ruleID);
     conformancePaths[ruleID].push_back(path);
+
+    if (rule.isProtocolRefinementRule())
+      protocolRefinements.insert(ruleID);
   }
 
   computeCandidateConformancePaths(conformancePaths);
@@ -475,7 +497,14 @@ void RewriteSystem::computeGeneratingConformances(
 
   // Find a minimal set of generating conformances.
   for (const auto &pair : conformancePaths) {
+    bool isProtocolRefinement = protocolRefinements.count(pair.first) > 0;
+
     for (const auto &path : pair.second) {
+      // Only consider a protocol refinement rule to be redundant if it is
+      // witnessed by a composition of other protocol refinement rules.
+      if (isProtocolRefinement && !isValidRefinementPath(path))
+        continue;
+
       llvm::SmallDenseSet<unsigned, 4> visited;
       visited.insert(pair.first);
 

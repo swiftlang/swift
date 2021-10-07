@@ -60,6 +60,17 @@ bool Rule::isProtocolConformanceRule() const {
   return false;
 }
 
+/// If this is a rule of the form [P].[Q] => [P] where [P] and [Q] are
+/// protocol symbols, return true, otherwise return false.
+bool Rule::isProtocolRefinementRule() const {
+  return (LHS.size() == 2 &&
+          RHS.size() == 1 &&
+          LHS[0] == RHS[0] &&
+          LHS[0].getKind() == Symbol::Kind::Protocol &&
+          LHS[1].getKind() == Symbol::Kind::Protocol &&
+          LHS[0] != LHS[1]);
+}
+
 void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
   if (Permanent)
