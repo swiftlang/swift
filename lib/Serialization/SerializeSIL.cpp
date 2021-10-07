@@ -2666,7 +2666,8 @@ void SILSerializer::writeSILWitnessTableEntry(
   SmallVector<ValueID, 4> ListOfValues;
   handleSILDeclRef(S, methodWitness.Requirement, ListOfValues);
   IdentifierID witnessID = 0;
-  if (SILFunction *witness = methodWitness.Witness) {
+  SILFunction *witness = methodWitness.Witness;
+  if (witness && witness->hasValidLinkageForFragileRef()) {
     addReferencedSILFunction(witness, true);
     witnessID = S.addUniquedStringRef(witness->getName());
   }
