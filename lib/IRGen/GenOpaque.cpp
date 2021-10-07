@@ -1293,40 +1293,6 @@ static llvm::Constant *getDeallocateValueInBufferFunction(IRGenModule &IGM) {
       true /*noinline*/);
 }
 
-void irgen::emitDeallocateValueInBuffer(IRGenFunction &IGF,
-                                 SILType type,
-                                 Address buffer) {
-  // Handle FixedSize types.
-  auto &IGM = IGF.IGM;
-  auto &Builder = IGF.Builder;
-  if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&IGF.getTypeInfo(type))) {
-    auto packing = fixedTI->getFixedPacking(IGM);
-
-    // Inline representation.
-    if (packing == FixedPacking::OffsetZero)
-      return;
-
-    // Outline representation.
-    assert(packing == FixedPacking::Allocate && "Expect non dynamic packing");
-    auto size = fixedTI->getStaticSize(IGM);
-    auto alignMask = fixedTI->getStaticAlignmentMask(IGM);
-    auto *ptr = Builder.CreateLoad(Address(
-        Builder.CreateBitCast(buffer.getAddress(), IGM.Int8PtrPtrTy),
-        buffer.getAlignment()));
-    IGF.emitDeallocRawCall(ptr, size, alignMask);
-    return;
-  }
-
-  // Dynamic packing.
-  auto *projectFun = getDeallocateValueInBufferFunction(IGF.IGM);
-  auto *metadata = IGF.emitTypeMetadataRefForLayout(type);
-  auto *call = Builder.CreateCall(
-      projectFun,
-      {metadata, Builder.CreateBitCast(buffer.getAddress(), IGM.OpaquePtrTy)});
-  call->setCallingConv(IGF.IGM.DefaultCC);
-  call->setDoesNotThrow();
-}
-
 llvm::Value *
 irgen::emitGetEnumTagSinglePayloadGenericCall(IRGenFunction &IGF,
                                               SILType payloadType,

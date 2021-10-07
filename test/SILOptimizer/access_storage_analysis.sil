@@ -484,14 +484,13 @@ class CP : P {
 // unidentified access.
 // CHECK-LABEL: @readUnexpected
 // CHECK: unidentified accesses: read
-sil @readUnexpected : $@convention(thin) (@inout Int, @inout Int?, @inout Builtin.UnsafeValueBuffer) -> () {
-bb0(%inout : $*Int, %oi : $*Optional<Int>, %b : $*Builtin.UnsafeValueBuffer):
+sil @readUnexpected : $@convention(thin) (@inout Int, @inout Int?, @inout Int) -> () {
+bb0(%inout : $*Int, %oi : $*Optional<Int>, %pvb : $*Int):
   %ea = init_enum_data_addr %oi : $*Optional<Int>, #Optional.some!enumelt
   %eaAccess = begin_access [read] [dynamic] %ea : $*Int
   %eaload = load %eaAccess : $*Int
   end_access %eaAccess : $*Int
 
-  %pvb = project_value_buffer $Int in %b : $*Builtin.UnsafeValueBuffer
   %pvbAccess = begin_access [read] [dynamic] %pvb : $*Int
   %bload = load %pvbAccess : $*Int
   end_access %pvbAccess : $*Int

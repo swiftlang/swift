@@ -1274,10 +1274,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
     ONETYPE_ONEOPERAND_INST(ValueMetatype)
     ONETYPE_ONEOPERAND_INST(ExistentialMetatype)
-    ONETYPE_ONEOPERAND_INST(AllocValueBuffer)
-    ONETYPE_ONEOPERAND_INST(ProjectValueBuffer)
     ONETYPE_ONEOPERAND_INST(ProjectExistentialBox)
-    ONETYPE_ONEOPERAND_INST(DeallocValueBuffer)
 #undef ONETYPE_ONEOPERAND_INST
   case SILInstructionKind::DeallocBoxInst:
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&

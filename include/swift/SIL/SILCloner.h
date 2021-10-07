@@ -840,16 +840,6 @@ SILCloner<ImplClass>::visitAllocExistentialBoxInst(
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitAllocValueBufferInst(AllocValueBufferInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createAllocValueBuffer(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpType(Inst->getValueType()),
-                                    getOpValue(Inst->getOperand())));
-}
-  
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitBuiltinInst(BuiltinInst *Inst) {
   auto Args = getOpValueArray<8>(Inst->getArguments());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -2472,16 +2462,6 @@ SILCloner<ImplClass>::visitDeallocPartialRefInst(DeallocPartialRefInst *Inst) {
 }
 
 template<typename ImplClass>
-void SILCloner<ImplClass>::visitDeallocValueBufferInst(
-                                              DeallocValueBufferInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createDeallocValueBuffer(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpType(Inst->getValueType()),
-                                    getOpValue(Inst->getOperand())));
-}
-
-template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDeallocBoxInst(DeallocBoxInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -2508,16 +2488,6 @@ SILCloner<ImplClass>::visitDestroyAddrInst(DestroyAddrInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createDestroyAddr(getOpLocation(Inst->getLoc()),
                                            getOpValue(Inst->getOperand())));
-}
-
-template<typename ImplClass>
-void SILCloner<ImplClass>::visitProjectValueBufferInst(
-                                              ProjectValueBufferInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createProjectValueBuffer(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpType(Inst->getValueType()),
-                                    getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

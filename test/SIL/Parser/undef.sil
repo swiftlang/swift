@@ -33,16 +33,12 @@ bb0:
 
   // CHECK: alloc_ref_dynamic undef : $@thick C.Type, $C
   alloc_ref_dynamic undef : $@thick C.Type, $C
-  // CHECK: alloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
-  alloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
   // CHECK: dealloc_box undef : $<τ_0_0> { var τ_0_0 } <()>
   dealloc_box undef : $<τ_0_0> { var τ_0_0 } <()>
   // CHECK: dealloc_ref undef : $C
   dealloc_ref undef : $C
   // CHECK: dealloc_partial_ref undef : $D, undef : $@thick C.Type
   dealloc_partial_ref undef : $D, undef : $@thick C.Type
-  // CHECK: dealloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
-  dealloc_value_buffer $() in undef : $*Builtin.UnsafeValueBuffer
 
   // Debug information
 

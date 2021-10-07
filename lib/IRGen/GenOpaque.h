@@ -243,10 +243,6 @@ namespace irgen {
   Address emitProjectValueInBuffer(IRGenFunction &IGF,
                               SILType type,
                               Address buffer);
-  void emitDeallocateValueInBuffer(IRGenFunction &IGF,
-                                   SILType type,
-                                   Address buffer);
-
 
   using GetExtraInhabitantTagEmitter =
     llvm::function_ref<llvm::Value*(IRGenFunction &IGF,

@@ -1972,8 +1972,6 @@ bool swift::isAddressForLocalInitOnly(SILValue sourceAddr) {
   case ValueKind::InitEnumDataAddrInst:
   case ValueKind::InitExistentialAddrInst:
   case ValueKind::AllocExistentialBoxInst:
-  case ValueKind::AllocValueBufferInst:
-  case ValueKind::ProjectValueBufferInst:
     return true;
   }
 }
@@ -2352,7 +2350,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::PartialApplyInst:
-  case SILInstructionKind::ProjectValueBufferInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:

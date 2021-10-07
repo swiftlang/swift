@@ -417,12 +417,6 @@ public:
         ElementCountOperands));
   }
 
-  AllocValueBufferInst *
-  createAllocValueBuffer(SILLocation Loc, SILType valueType, SILValue operand) {
-    return insert(AllocValueBufferInst::create(
-        getSILDebugLocation(Loc), valueType, operand, *F));
-  }
-
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                Optional<SILDebugVariable> Var = None,
                                bool hasDynamicLifetime = false) {
@@ -2010,23 +2004,11 @@ public:
     return insert(new (getModule()) DeallocExistentialBoxInst(
         getSILDebugLocation(Loc), concreteType, operand));
   }
-  DeallocValueBufferInst *createDeallocValueBuffer(SILLocation Loc,
-                                                   SILType valueType,
-                                                   SILValue operand) {
-    return insert(new (getModule()) DeallocValueBufferInst(
-        getSILDebugLocation(Loc), valueType, operand));
-  }
   DestroyAddrInst *createDestroyAddr(SILLocation Loc, SILValue Operand) {
     return insert(new (getModule())
                       DestroyAddrInst(getSILDebugLocation(Loc), Operand));
   }
 
-  ProjectValueBufferInst *createProjectValueBuffer(SILLocation Loc,
-                                                   SILType valueType,
-                                                   SILValue operand) {
-    return insert(new (getModule()) ProjectValueBufferInst(
-        getSILDebugLocation(Loc), valueType, operand));
-  }
   ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand,
                                    unsigned index);
   ProjectExistentialBoxInst *createProjectExistentialBox(SILLocation Loc,
