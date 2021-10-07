@@ -502,7 +502,7 @@ void RewriteSystem::computeGeneratingConformances(
       abort();
     }
 
-    if (rule.containsUnresolvedSymbols()) {
+    if (rule.getLHS().containsUnresolvedSymbols()) {
       llvm::errs() << "Generating conformance contains unresolved symbols: ";
       llvm::errs() << rule << "\n\n";
       dump(llvm::errs());

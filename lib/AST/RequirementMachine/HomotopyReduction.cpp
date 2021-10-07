@@ -626,14 +626,14 @@ findRuleToDelete(bool firstPass,
           // associated type introduction rule together with a conformance rule.
           // They are eliminated in the first pass.
           if (firstPass)
-            return rule.containsUnresolvedSymbols();
+            return rule.getLHS().containsUnresolvedSymbols();
 
           // In the second and third pass we should not have any rules involving
           // unresolved name symbols, except for permanent rules which were
           // already skipped above.
           //
           // FIXME: This isn't true with invalid code.
-          assert(!rule.containsUnresolvedSymbols());
+          assert(!rule.getLHS().containsUnresolvedSymbols());
 
           // Protocol conformance rules are eliminated via a different
           // algorithm which computes "generating conformances".
@@ -830,8 +830,21 @@ void RewriteSystem::minimizeRewriteSystem() {
       continue;
     }
 
-    if (rule.isSimplified() && !rule.isRedundant()) {
+    if (rule.isRedundant())
+      continue;
+
+    // Simplified rules should be redundant.
+    if (rule.isSimplified()) {
       llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+
+    // Rules with unresolved name symbols (other than permanent rules for
+    // associated type introduction) should be redundant.
+    if (rule.getLHS().containsUnresolvedSymbols() ||
+        rule.getRHS().containsUnresolvedSymbols()) {
+      llvm::errs() << "Unresolved rule is not redundant: " << rule << "\n\n";
       dump(llvm::errs());
       abort();
     }

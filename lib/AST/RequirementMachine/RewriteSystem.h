@@ -120,8 +120,6 @@ public:
     return LHS.size();
   }
 
-  bool containsUnresolvedSymbols() const;
-
   void dump(llvm::raw_ostream &out) const;
 
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
