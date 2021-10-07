@@ -1194,10 +1194,6 @@ public:
   void visitObjCSuperMethodInst(ObjCSuperMethodInst *i);
   void visitWitnessMethodInst(WitnessMethodInst *i);
 
-  void visitAllocValueBufferInst(AllocValueBufferInst *i);
-  void visitProjectValueBufferInst(ProjectValueBufferInst *i);
-  void visitDeallocValueBufferInst(DeallocValueBufferInst *i);
-
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *i);
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
@@ -6342,29 +6338,6 @@ void IRGenSILFunction::visitIndexRawPointerInst(swift::IndexRawPointerInst *i) {
   Explosion result;
   result.add(destValue);
   setLoweredExplosion(i, result);
-}
-
-void IRGenSILFunction::visitAllocValueBufferInst(
-                                          swift::AllocValueBufferInst *i) {
-  Address buffer = getLoweredAddress(i->getOperand());
-  auto valueType = i->getValueType();
-  Address value = emitAllocateValueInBuffer(*this, valueType, buffer);
-  setLoweredAddress(i, value);
-}
-
-void IRGenSILFunction::visitProjectValueBufferInst(
-                                          swift::ProjectValueBufferInst *i) {
-  Address buffer = getLoweredAddress(i->getOperand());
-  auto valueType = i->getValueType();
-  Address value = emitProjectValueInBuffer(*this, valueType, buffer);
-  setLoweredAddress(i, value);
-}
-
-void IRGenSILFunction::visitDeallocValueBufferInst(
-                                          swift::DeallocValueBufferInst *i) {
-  Address buffer = getLoweredAddress(i->getOperand());
-  auto valueType = i->getValueType();
-  emitDeallocateValueInBuffer(*this, valueType, buffer);
 }
 
 void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrInst *i) {

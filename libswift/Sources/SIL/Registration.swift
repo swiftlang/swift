@@ -110,7 +110,6 @@ public func registerSILClasses() {
   register(AllocStackInst.self)
   register(AllocRefInst.self)
   register(AllocRefDynamicInst.self)
-  register(AllocValueBufferInst.self)
   register(AllocBoxInst.self)
   register(AllocExistentialBoxInst.self)
 

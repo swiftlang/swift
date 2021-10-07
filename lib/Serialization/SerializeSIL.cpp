@@ -939,13 +939,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     break;
   }
-  case SILInstructionKind::DeallocValueBufferInst: {
-    auto DVBI = cast<DeallocValueBufferInst>(&SI);
-    writeOneTypeOneOperandLayout(DVBI->getKind(), 0,
-                                 DVBI->getValueType(),
-                                 DVBI->getOperand());
-    break;
-  }
   case SILInstructionKind::DeallocBoxInst: {
     auto DBI = cast<DeallocBoxInst>(&SI);
     writeOneTypeOneOperandLayout(DBI->getKind(), 0,
@@ -972,13 +965,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     writeOneTypeOneOperandLayout(EMI->getKind(), 0,
                                  EMI->getType(),
                                  EMI->getOperand());
-    break;
-  }
-  case SILInstructionKind::AllocValueBufferInst: {
-    auto AVBI = cast<AllocValueBufferInst>(&SI);
-    writeOneTypeOneOperandLayout(AVBI->getKind(), 0,
-                                 AVBI->getValueType(),
-                                 AVBI->getOperand());
     break;
   }
   case SILInstructionKind::AllocBoxInst: {
@@ -1024,13 +1010,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned attr =
         unsigned(ASI->hasDynamicLifetime()) + unsigned(ASI->isLexical() << 1);
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
-    break;
-  }
-  case SILInstructionKind::ProjectValueBufferInst: {
-    auto PVBI = cast<ProjectValueBufferInst>(&SI);
-    writeOneTypeOneOperandLayout(PVBI->getKind(), 0,
-                                 PVBI->getType(),
-                                 PVBI->getOperand());
     break;
   }
   case SILInstructionKind::ProjectBoxInst: {

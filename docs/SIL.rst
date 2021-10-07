@@ -3198,23 +3198,6 @@ Releasing a box is undefined behavior if the box's value is uninitialized.
 To deallocate a box whose value has not been initialized, ``dealloc_box``
 should be used.
 
-alloc_value_buffer
-``````````````````
-
-::
-
-   sil-instruction ::= 'alloc_value_buffer' sil-type 'in' sil-operand
-
-   %1 = alloc_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-   // The result has type $*(Int, T).
-
-Given the address of an unallocated value buffer, allocate space in it
-for a value of the given type.  This instruction has undefined
-behavior if the value buffer is currently allocated.
-
-The type operand must be a lowered object type.
-
 alloc_global
 ````````````
 
@@ -3441,44 +3424,6 @@ deallocating the memory for the instance.
 This does not destroy the reference type instance. The contents of the
 heap object must have been fully uninitialized or destroyed before
 ``dealloc_ref`` is applied.
-
-dealloc_value_buffer
-````````````````````
-
-::
-
-   sil-instruction ::= 'dealloc_value_buffer' sil-type 'in' sil-operand
-
-   dealloc_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-
-Given the address of a value buffer, deallocate the storage in it.
-This instruction has undefined behavior if the value buffer is not
-currently allocated, or if it was allocated with a type other than the
-type operand.
-
-The type operand must be a lowered object type.
-
-project_value_buffer
-````````````````````
-
-::
-
-   sil-instruction ::= 'project_value_buffer' sil-type 'in' sil-operand
-
-   %1 = project_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-   // The result has type $*(Int, T).
-
-Given the address of a value buffer, return the address of the value
-storage in it.  This instruction has undefined behavior if the value
-buffer is not currently allocated, or if it was allocated with a type
-other than the type operand.
-
-The result is the same value as was originally returned by
-``alloc_value_buffer``.
-
-The type operand must be a lowered object type.
 
 Debug Information
 ~~~~~~~~~~~~~~~~~
