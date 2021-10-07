@@ -512,12 +512,17 @@ public:
       llvm::SmallDenseSet<unsigned, 4> &visited,
       llvm::DenseSet<unsigned> &redundantConformances,
       const llvm::SmallVectorImpl<unsigned> &path,
+      const llvm::MapVector<unsigned, SmallVector<unsigned, 2>> &parentPaths,
       const llvm::MapVector<unsigned,
                             std::vector<SmallVector<unsigned, 2>>>
           &conformancePaths) const;
 
   bool isValidRefinementPath(
       const llvm::SmallVectorImpl<unsigned> &path) const;
+
+  void dumpConformancePath(
+      llvm::raw_ostream &out,
+      const SmallVectorImpl<unsigned> &path) const;
 
   void dumpGeneratingConformanceEquation(
       llvm::raw_ostream &out,
