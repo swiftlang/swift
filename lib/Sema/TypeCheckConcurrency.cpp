@@ -573,6 +573,29 @@ static void addSendableFixIt(
   }
 }
 
+/// Determine whether there is an unavailable conformance here.
+static bool hasUnavailableConformance(ProtocolConformanceRef conformance) {
+  // Abstract conformances are never unavailable.
+  if (!conformance.isConcrete())
+    return false;
+
+  // Check whether this conformance is on an unavailable extension.
+  auto concrete = conformance.getConcrete();
+  auto ext = dyn_cast<ExtensionDecl>(concrete->getDeclContext());
+  if (ext && AvailableAttr::isUnavailable(ext))
+    return true;
+
+  // Check the conformances in the substitution map.
+  auto module = concrete->getDeclContext()->getParentModule();
+  auto subMap = concrete->getSubstitutions(module);
+  for (auto subConformance : subMap.getConformances()) {
+    if (hasUnavailableConformance(subConformance))
+      return true;
+  }
+
+  return false;
+}
+
 /// Produce a diagnostic for a single instance of a non-Sendable type where
 /// a Sendable type is required.
 static bool diagnoseSingleNonSendableType(
@@ -647,8 +670,9 @@ bool swift::diagnoseNonSendableTypes(
   if (!proto)
     return false;
 
+  // FIXME: More detail for unavailable conformances.
   auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
-  if (conformance.isInvalid()) {
+  if (conformance.isInvalid() || hasUnavailableConformance(conformance)) {
     return diagnoseSingleNonSendableType(type, module, loc, diagnose);
   }
 
@@ -730,29 +754,6 @@ void swift::diagnoseMissingSendableConformance(
 }
 
 namespace {
-  /// Determine whether there is an unavailable conformance here.
-  static bool hasUnavailableConformance(ProtocolConformanceRef conformance) {
-    // Abstract conformances are never unavailable.
-    if (!conformance.isConcrete())
-      return false;
-
-    // Check whether this conformance is on an unavailable extension.
-    auto concrete = conformance.getConcrete();
-    auto ext = dyn_cast<ExtensionDecl>(concrete->getDeclContext());
-    if (ext && AvailableAttr::isUnavailable(ext))
-      return true;
-
-    // Check the conformances in the substitution map.
-    auto module = concrete->getDeclContext()->getParentModule();
-    auto subMap = concrete->getSubstitutions(module);
-    for (auto subConformance : subMap.getConformances()) {
-      if (hasUnavailableConformance(subConformance))
-        return true;
-    }
-
-    return false;
-  }
-
   template<typename Visitor>
   bool visitInstanceStorage(
       NominalTypeDecl *nominal, DeclContext *dc, Visitor &visitor);

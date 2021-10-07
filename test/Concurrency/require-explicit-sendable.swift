@@ -58,7 +58,7 @@ extension S6: Sendable where T: Sendable, U: Sendable { }
 func acceptSendable<T: Sendable>(_: T) {
 }
 
-struct S7 {
+struct S7 { // FIXME: expected-note{{consider making struct 'S7' conform to the 'Sendable' protocol}}
 }
 
 @available(*, unavailable)
@@ -92,4 +92,8 @@ public struct S10 { // expected-warning{{public struct 'S10' does not specify wh
   // expected-note@-1{{add '@unchecked Sendable' conformance to struct 'S10' if this type manually implements concurrency safety}}
   // expected-note@-2{{make struct 'S10' explicitly non-Sendable to suppress this warning}}
   var s7: S7
+}
+
+struct S11: Sendable {
+  var s7: S7 // expected-error{{stored property 's7' of 'Sendable'-conforming struct 'S11' has non-sendable type 'S7'}}
 }
