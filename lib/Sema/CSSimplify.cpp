@@ -1518,6 +1518,68 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 }
 
 ConstraintSystem::TypeMatchResult
+ConstraintSystem::matchFunctionResultTypes(Type expectedResult, Type fnResult,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator) {
+  // If we have a callee with an IUO return, add a disjunction that can either
+  // bind to the result or an unwrapped result.
+  auto *calleeLoc = getCalleeLocator(getConstraintLocator(locator));
+  auto *calleeResultLoc = getConstraintLocator(
+      calleeLoc, ConstraintLocator::FunctionResult);
+  auto selected = findSelectedOverloadFor(calleeLoc);
+
+  // If we don't have a direct callee, this might be the second application
+  // of a curried function reference, in which case we need to dig into the
+  // inner call to find the callee.
+  // FIXME: This is a bit of a hack. We should consider rewriting curried
+  // applies as regular applies in PreCheckExpr to eliminate the need to special
+  // case double applies in the solver.
+  bool isSecondApply = false;
+  if (!selected) {
+    auto anchor = locator.getAnchor();
+    if (auto *callExpr = getAsExpr<CallExpr>(anchor)) {
+      if (auto *innerCall = getAsExpr<CallExpr>(callExpr->getSemanticFn())) {
+        auto *innerCalleeLoc =
+            getCalleeLocator(getConstraintLocator(innerCall));
+        if (auto innerOverload = findSelectedOverloadFor(innerCalleeLoc)) {
+          auto choice = innerOverload->choice;
+          if (choice.getFunctionRefKind() == FunctionRefKind::DoubleApply) {
+            isSecondApply = true;
+            selected.emplace(*innerOverload);
+          }
+        }
+      }
+    }
+  }
+  if (selected) {
+    auto choice = selected->choice;
+
+    // Subscripts found through dynamic lookup need special treatment. Unlike
+    // other decls found through dynamic lookup, they cannot have an optional
+    // applied to their reference, instead it's applied to their result. As
+    // such, we may need to unwrap another level of optionality.
+    if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic &&
+        isa<SubscriptDecl>(choice.getDecl())) {
+      // Introduce a type variable to record whether we needed to unwrap the
+      // outer optional.
+      auto outerTy = createTypeVariable(calleeResultLoc, TVO_CanBindToLValue);
+      buildDisjunctionForDynamicLookupResult(outerTy, fnResult,
+                                             calleeResultLoc);
+      fnResult = outerTy;
+    }
+
+    auto iuoKind = choice.getIUOReferenceKind(*this, isSecondApply);
+    if (iuoKind == IUOReferenceKind::ReturnValue) {
+      buildDisjunctionForImplicitlyUnwrappedOptional(expectedResult, fnResult,
+                                                     calleeResultLoc);
+      return getTypeMatchSuccess();
+    }
+  }
+  return matchTypes(expectedResult, fnResult, ConstraintKind::Bind, flags,
+                    locator);
+}
+
+ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator) {
@@ -8371,9 +8433,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // implicit optional, don't try to fix it. The IUO will be forced instead.
       if (auto dotExpr = getAsExpr<UnresolvedDotExpr>(locator->getAnchor())) {
         auto baseExpr = dotExpr->getBase();
-        if (auto overload = findSelectedOverloadFor(baseExpr))
-          if (overload->choice.isImplicitlyUnwrappedValueOrReturnValue())
+        if (auto overload = findSelectedOverloadFor(baseExpr)) {
+          auto iuoKind = overload->choice.getIUOReferenceKind(*this);
+          if (iuoKind == IUOReferenceKind::Value)
             return SolutionKind::Error;
+        }
       }
 
       // Let's check whether the problem is related to optionality of base
@@ -10286,26 +10350,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       // Track how many times we do this so that we can record a fix for each.
       ++unwrapCount;
     }
-
-    // Let's account for optional members concept from Objective-C
-    // which forms a disjunction for member type to check whether
-    // it would be possible to use optional type directly or it has
-    // to be force unwrapped (because such types are imported as IUO).
-    if (unwrapCount > 0 && desugar2->is<TypeVariableType>()) {
-      auto *typeVar = desugar2->castTo<TypeVariableType>();
-      auto *locator = typeVar->getImpl().getLocator();
-      if (locator->isLastElement<LocatorPathElt::Member>()) {
-        auto *fix = ForceOptional::create(*this, origType2, desugar2,
-                                          getConstraintLocator(locator));
-        if (recordFix(fix, /*impact=*/unwrapCount))
-          return SolutionKind::Error;
-
-        // Since the right-hand side of the constraint has been changed
-        // we have to re-generate this constraint to use new type.
-        flags |= TMF_GenerateConstraints;
-        return formUnsolved();
-      }
-    }
   }
 
   // For a function, bind the output and convert the argument to the input.
@@ -10348,12 +10392,10 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     }
 
     // The result types are equivalent.
-    if (matchTypes(func1->getResult(),
-                   func2->getResult(),
-                   ConstraintKind::Bind,
-                   subflags,
-                   locator.withPathElement(
-                     ConstraintLocator::FunctionResult)).isFailure())
+    if (matchFunctionResultTypes(
+            func1->getResult(), func2->getResult(), subflags,
+            locator.withPathElement(ConstraintLocator::FunctionResult))
+            .isFailure())
       return SolutionKind::Error;
 
     if (unwrapCount == 0)
@@ -10622,12 +10664,10 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
       return SolutionKind::Error;
 
     // The result types are equivalent.
-    if (matchTypes(func1->getResult(),
-                   func2->getResult(),
-                   ConstraintKind::Bind,
-                   subflags,
-                   locator.withPathElement(
-                     ConstraintLocator::FunctionResult)).isFailure())
+    if (matchFunctionResultTypes(
+            func1->getResult(), func2->getResult(), subflags,
+            locator.withPathElement(ConstraintLocator::FunctionResult))
+            .isFailure())
       return SolutionKind::Error;
 
     return SolutionKind::Solved;

@@ -554,11 +554,6 @@ namespace {
                                    ConstraintLocatorBuilder locator,
                                    Optional<Pattern*> typeFromPattern = None);
 
-    /// Coerce an expression of implicitly unwrapped optional type to its
-    /// underlying value type, in the correct way for an implicit
-    /// look-through.
-    Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy);
-
     /// Peephole an array upcast.
     void peepholeArrayUpcast(ArrayExpr *expr, Type toType, bool bridged,
                              Type elementType,
@@ -758,7 +753,7 @@ namespace {
                     refExpr = declRefExpr;
                   }
 
-                  return forceUnwrapIfExpected(refExpr, choice, locator);
+                  return forceUnwrapIfExpected(refExpr, locator);
                 }
               }
             }
@@ -786,7 +781,7 @@ namespace {
           new (ctx) DeclRefExpr(ref, loc, implicit, semantics, fullType);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
-      Expr *result = forceUnwrapIfExpected(declRefExpr, choice, locator);
+      Expr *result = forceUnwrapIfExpected(declRefExpr, locator);
 
       if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
         if (AnyFunctionRef(fnDecl).hasExternalPropertyWrapperParameters() &&
@@ -1443,7 +1438,7 @@ namespace {
         ref->setFunctionRefKind(choice.getFunctionRefKind());
         auto *DSBI = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, cs.getType(ref)));
-        return forceUnwrapIfExpected(DSBI, choice, memberLocator);
+        return forceUnwrapIfExpected(DSBI, memberLocator);
       }
 
       const bool isUnboundInstanceMember =
@@ -1572,27 +1567,10 @@ namespace {
           }
         }
 
-        if (isDynamic) {
-          // Rewrite for implicit unwrapping if the solution requires it.
-          auto *dynamicLocator =
-              cs.getConstraintLocator(memberLocator.withPathElement(
-                  ConstraintLocator::DynamicLookupResult));
-
-          if (solution.getDisjunctionChoice(dynamicLocator)) {
-            auto *forceValue =
-                new (context) ForceValueExpr(ref, ref->getEndLoc());
-            auto optTy = cs.getType(forceValue->getSubExpr());
-            cs.setType(forceValue, optTy->getOptionalObjectType());
-            ref = forceValue;
-          }
-        }
-
         // We also need to handle the implicitly unwrap of the result
         // of the called function if that's the type checking solution
         // we ended up with.
-        return forceUnwrapIfExpected(
-            ref, choice, memberLocator,
-            member->getAttrs().hasAttribute<OptionalAttr>());
+        return forceUnwrapIfExpected(ref, memberLocator);
       }
 
       // For properties, build member references.
@@ -1635,7 +1613,7 @@ namespace {
                 result, conversionTy));
           }
         }
-        return forceUnwrapIfExpected(result, choice, memberLocator);
+        return forceUnwrapIfExpected(result, memberLocator);
       }
 
       if (member->getInterfaceType()->hasDynamicSelfType())
@@ -1802,13 +1780,13 @@ namespace {
       // The thunk that is built for a 'super' method reference does not
       // require application.
       if (isSuperPartialApplication) {
-        return forceUnwrapIfExpected(ref, choice, memberLocator);
+        return forceUnwrapIfExpected(ref, memberLocator);
       }
 
       ApplyExpr *apply;
       if (isa<ConstructorDecl>(member)) {
         // FIXME: Provide type annotation.
-        ref = forceUnwrapIfExpected(ref, choice, memberLocator);
+        ref = forceUnwrapIfExpected(ref, memberLocator);
         apply = ConstructorRefCallExpr::create(context, ref, base);
       } else if (isUnboundInstanceMember) {
         auto refType = cs.simplifyType(openedType);
@@ -1823,11 +1801,11 @@ namespace {
                                                               cs.getType(ref));
         cs.cacheType(result);
         closeExistential(result, locator, /*force=*/openedExistential);
-        return forceUnwrapIfExpected(result, choice, memberLocator);
+        return forceUnwrapIfExpected(result, memberLocator);
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
-        ref = forceUnwrapIfExpected(ref, choice, memberLocator);
+        ref = forceUnwrapIfExpected(ref, memberLocator);
         apply = DotSyntaxCallExpr::create(context, ref, dotLoc, base);
         if (Implicit) {
           apply->setImplicit();
@@ -1968,45 +1946,15 @@ namespace {
     /// \param locator The locator used to refer to the subscript.
     /// \param isImplicit Whether this is an implicit subscript.
     Expr *buildSubscript(Expr *base, ArgumentList *args,
-                         ConstraintLocatorBuilder locator, bool isImplicit,
-                         AccessSemantics semantics,
+                         ConstraintLocatorBuilder locator,
+                         ConstraintLocatorBuilder memberLocator,
+                         bool isImplicit, AccessSemantics semantics,
                          const SelectedOverload &selected) {
       // Build the new subscript.
       auto newSubscript = buildSubscriptHelper(base, args, selected,
                                                locator, isImplicit, semantics);
-
-      if (selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic) {
-        // Rewrite for implicit unwrapping if the solution requires it.
-        auto *dynamicLocator = cs.getConstraintLocator(
-            locator, {ConstraintLocator::SubscriptMember,
-                      ConstraintLocator::DynamicLookupResult});
-
-        if (solution.getDisjunctionChoice(dynamicLocator)) {
-          auto *forceValue = new (cs.getASTContext())
-              ForceValueExpr(newSubscript, newSubscript->getEndLoc());
-          auto optTy = cs.getType(forceValue->getSubExpr());
-          cs.setType(forceValue, optTy->getOptionalObjectType());
-          newSubscript = forceValue;
-        }
-      }
-
-      if (selected.choice.isDecl()) {
-        auto locatorKind = ConstraintLocator::SubscriptMember;
-        if (selected.choice.getKind() ==
-            OverloadChoiceKind::DynamicMemberLookup)
-          locatorKind = ConstraintLocator::Member;
-
-        if (selected.choice.getKind() ==
-                OverloadChoiceKind::KeyPathDynamicMemberLookup &&
-            !isExpr<SubscriptExpr>(locator.getAnchor()))
-          locatorKind = ConstraintLocator::Member;
-
-        newSubscript =
-            forceUnwrapIfExpected(newSubscript, selected.choice,
-                                  locator.withPathElement(locatorKind));
-      }
-
-      return newSubscript;
+      return forceUnwrapIfExpected(newSubscript, memberLocator,
+                                   IUOReferenceKind::ReturnValue);
     }
 
     Expr *buildSubscriptHelper(Expr *base, ArgumentList *args,
@@ -2113,22 +2061,10 @@ namespace {
       // Check whether the base is 'super'.
       bool isSuper = base->isSuperExpr();
 
-      // Use the correct locator kind based on the subscript kind.
-      auto locatorKind = ConstraintLocator::SubscriptMember;
-      if (choice.getKind() == OverloadChoiceKind::DynamicMemberLookup)
-        locatorKind = ConstraintLocator::Member;
-
-      if (choice.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-        locatorKind = isExpr<SubscriptExpr>(locator.getAnchor())
-                          ? ConstraintLocator::SubscriptMember
-                          : ConstraintLocator::Member;
-      }
-
       // If we opened up an existential when performing the subscript, open
       // the base accordingly.
-      auto memberLoc = locator.withPathElement(locatorKind);
-      auto knownOpened = solution.OpenedExistentialTypes.find(
-          cs.getConstraintLocator(memberLoc));
+      auto memberLoc = cs.getCalleeLocator(cs.getConstraintLocator(locator));
+      auto knownOpened = solution.OpenedExistentialTypes.find(memberLoc);
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         base = openExistentialReference(base, knownOpened->second, subscript);
         baseTy = knownOpened->second;
@@ -2142,7 +2078,8 @@ namespace {
                                   ->castTo<FunctionType>();
       auto fullSubscriptTy = openedFullFnType->getResult()
                                   ->castTo<FunctionType>();
-      auto &appliedWrappers = solution.appliedPropertyWrappers[memberLoc.getAnchor()];
+      auto &appliedWrappers =
+          solution.appliedPropertyWrappers[memberLoc->getAnchor()];
       args = coerceCallArguments(
           args, fullSubscriptTy, subscriptRef, nullptr,
           locator.withPathElement(ConstraintLocator::ApplyArgument),
@@ -2972,53 +2909,61 @@ namespace {
       return expr;
     }
 
-    // Add a forced unwrap of an expression which either has type Optional<T>
-    // or is a function that returns an Optional<T>. The latter turns into a
-    // conversion expression that we will hoist above the ApplyExpr
-    // that needs to be forced during the process of rewriting the expression.
-    //
-    // forForcedOptional is used to indicate that we will further need
-    // to hoist this result above an explicit force of an optional that is
-    // in place for something like an @optional protocol member from
-    // Objective C that we might otherwise mistake for the thing we mean to
-    // force here.
-    Expr *forceUnwrapResult(Expr *expr, bool forForcedOptional =false) {
-      auto ty = simplifyType(cs.getType(expr));
+    /// Add an implicit force unwrap of an expression that references an
+    /// implicitly unwrapped optional T!.
+    Expr *forceUnwrapIUO(Expr *expr) {
+      auto optTy = cs.getType(expr);
+      auto objectTy = optTy->getWithoutSpecifierType()->getOptionalObjectType();
+      assert(objectTy && "Trying to unwrap non-optional?");
 
-      if (forForcedOptional)
-        ty = ty->getOptionalObjectType();
+      // Preserve l-valueness of the result.
+      if (optTy->is<LValueType>())
+        objectTy = LValueType::get(objectTy);
 
-      if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
-        auto underlyingType = cs.replaceFinalResultTypeWithUnderlying(fnTy);
+      expr = new (cs.getASTContext()) ForceValueExpr(expr, expr->getEndLoc(),
+                                                     /*forcedIUO*/ true);
+      cs.setType(expr, objectTy);
+      expr->setImplicit();
+      return expr;
+    }
 
-        auto &ctx = cs.getASTContext();
-        return cs.cacheType(new (ctx) ImplicitlyUnwrappedFunctionConversionExpr(
-            expr, underlyingType));
-      } else {
-        return coerceImplicitlyUnwrappedOptionalToValue(
-            expr, ty->getWithoutSpecifierType()->getOptionalObjectType());
+    /// Retrieve the number of implicit force unwraps required for an implicitly
+    /// unwrapped optional reference at a given locator.
+    unsigned getIUOForceUnwrapCount(ConstraintLocatorBuilder locator,
+                                    IUOReferenceKind refKind) {
+      // Adjust the locator depending on the type of IUO reference.
+      auto loc = locator;
+      switch (refKind) {
+      case IUOReferenceKind::ReturnValue:
+        loc = locator.withPathElement(ConstraintLocator::FunctionResult);
+        break;
+      case IUOReferenceKind::Value:
+        break;
       }
+      auto *iuoLocator = cs.getConstraintLocator(
+          loc, {ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice});
+      auto *dynamicLocator = cs.getConstraintLocator(
+          loc, {ConstraintLocator::DynamicLookupResult});
+
+      // First check whether we recorded an implicit unwrap for an IUO.
+      unsigned unwrapCount = 0;
+      if (solution.DisjunctionChoices.lookup(iuoLocator))
+        unwrapCount += 1;
+
+      // Next check if we recorded an implicit unwrap for dynamic lookup.
+      if (solution.DisjunctionChoices.lookup(dynamicLocator))
+        unwrapCount += 1;
+
+      return unwrapCount;
     }
 
-    bool shouldForceUnwrapResult(OverloadChoice choice,
-                                 ConstraintLocatorBuilder locator) {
-      if (!choice.isImplicitlyUnwrappedValueOrReturnValue())
-        return false;
-
-      auto *choiceLocator = cs.getConstraintLocator(locator.withPathElement(
-          ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice));
-
-      return solution.getDisjunctionChoice(choiceLocator);
-    }
-
-    Expr *forceUnwrapIfExpected(Expr *expr, OverloadChoice choice,
-                                ConstraintLocatorBuilder locator,
-                                bool forForcedOptional = false) {
-      if (!shouldForceUnwrapResult(choice, locator))
-        return expr;
-
-      // Force the expression if required for the solution.
-      return forceUnwrapResult(expr, forForcedOptional);
+    Expr *
+    forceUnwrapIfExpected(Expr *expr, ConstraintLocatorBuilder locator,
+                          IUOReferenceKind refKind = IUOReferenceKind::Value) {
+      auto unwrapCount = getIUOForceUnwrapCount(locator, refKind);
+      for (unsigned i = 0; i < unwrapCount; ++i)
+        expr = forceUnwrapIUO(expr);
+      return expr;
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
@@ -3401,8 +3346,8 @@ namespace {
           ArgumentList::forImplicitSingle(ctx, ctx.Id_dynamicMember, argExpr);
       // Build and return a subscript that uses this string as the index.
       return buildSubscript(base, argList, cs.getConstraintLocator(expr),
-                            /*isImplicit*/ true, AccessSemantics::Ordinary,
-                            overload);
+                            memberLocator, /*isImplicit*/ true,
+                            AccessSemantics::Ordinary, overload);
     }
 
     Type getTypeOfDynamicMemberIndex(const SelectedOverload &overload) {
@@ -3534,8 +3479,9 @@ namespace {
       }
 
       return buildSubscript(expr->getBase(), expr->getArgs(),
-                            cs.getConstraintLocator(expr), expr->isImplicit(),
-                            expr->getAccessSemantics(), *overload);
+                            cs.getConstraintLocator(expr), memberLocator,
+                            expr->isImplicit(), expr->getAccessSemantics(),
+                            *overload);
     }
 
     /// "Finish" an array expression by filling in the semantic expression.
@@ -3633,8 +3579,8 @@ namespace {
       auto *memberLocator =
           cs.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
       return buildSubscript(expr->getBase(), expr->getArgs(),
-                            cs.getConstraintLocator(expr), expr->isImplicit(),
-                            AccessSemantics::Ordinary,
+                            cs.getConstraintLocator(expr), memberLocator,
+                            expr->isImplicit(), AccessSemantics::Ordinary,
                             solution.getOverloadChoice(memberLocator));
     }
 
@@ -4139,8 +4085,7 @@ namespace {
         if (!coerced)
           return nullptr;
 
-        return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
+        return forceUnwrapIUO(coerced);
       }
 
       return visitCoerceExpr(expr, None);
@@ -4294,8 +4239,7 @@ namespace {
         if (!coerced)
           return nullptr;
 
-        return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
+        return forceUnwrapIUO(coerced);
       }
 
       return handleConditionalCheckedCastExpr(expr, castTypeRepr);
@@ -4447,42 +4391,7 @@ namespace {
     }
 
     Expr *visitForceValueExpr(ForceValueExpr *expr) {
-      // Check to see if we are forcing an
-      // ImplicitlyUnwrappedFunctionConversionExpr.  This can happen
-      // in cases where we had a ForceValueExpr of an optional for a
-      // declaration for a function whose result type we need to
-      // implicitly force after applying. We need to hoist the function
-      // conversion above the ForceValueExpr, so that we may ultimately
-      // hoist it above the ApplyExpr where we will eventually rewrite the
-      // function conversion into a force of the result.
-      Expr *replacement = expr;
-      if (auto fnConv =
-          dyn_cast<ImplicitlyUnwrappedFunctionConversionExpr>(expr->getSubExpr())) {
-        auto fnConvSubExpr = fnConv->getSubExpr();
-        auto fnConvSubObjTy =
-          cs.getType(fnConvSubExpr)->getOptionalObjectType();
-        cs.setType(expr, fnConvSubObjTy);
-        expr->setSubExpr(fnConvSubExpr);
-        fnConv->setSubExpr(expr);
-        replacement = fnConv;
-      }
-
-      Type valueType = simplifyType(cs.getType(expr));
-      cs.setType(expr, valueType);
-
-      // Coerce the object type, if necessary.
-      auto subExpr = expr->getSubExpr();
-      if (auto objectTy = cs.getType(subExpr)->getOptionalObjectType()) {
-        if (objectTy && !objectTy->isEqual(valueType)) {
-          auto coercedSubExpr = coerceToType(subExpr,
-                                             OptionalType::get(valueType),
-                                             cs.getConstraintLocator(subExpr));
-          
-          expr->setSubExpr(coercedSubExpr);
-        }
-      }
-      
-      return replacement;
+      return simplifyExprType(expr);
     }
 
     Expr *visitOpenExistentialExpr(OpenExistentialExpr *expr) {
@@ -5151,7 +5060,9 @@ namespace {
             fieldIndex, resolvedTy, componentLoc));
       }
 
-      if (shouldForceUnwrapResult(overload.choice, locator))
+      auto unwrapCount =
+          getIUOForceUnwrapCount(locator, IUOReferenceKind::Value);
+      for (unsigned i = 0; i < unwrapCount; ++i)
         buildKeyPathOptionalForceComponent(components);
     }
 
@@ -5227,7 +5138,9 @@ namespace {
           ctx, ref, args, resolvedTy, ctx.AllocateCopy(conformances));
       components.push_back(comp);
 
-      if (shouldForceUnwrapResult(overload.choice, memberLoc))
+      auto unwrapCount =
+          getIUOForceUnwrapCount(memberLoc, IUOReferenceKind::ReturnValue);
+      for (unsigned i = 0; i < unwrapCount; ++i)
         buildKeyPathOptionalForceComponent(components);
     }
 
@@ -5670,19 +5583,6 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
 
   expr = cs.cacheType(new (ctx) OptionalEvaluationExpr(expr, toType));
   expr->setImplicit(true);
-  return expr;
-}
-
-Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy) {
-  auto optTy = cs.getType(expr);
-  // Preserve l-valueness of the result.
-  if (optTy->is<LValueType>())
-    objTy = LValueType::get(objTy);
-
-  expr = new (cs.getASTContext()) ForceValueExpr(expr, expr->getEndLoc(),
-                                                 /* forcedIUO=*/ true);
-  cs.setType(expr, objTy);
-  expr->setImplicit();
   return expr;
 }
 
@@ -7679,12 +7579,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       return special;
     }
   }
-  
-  bool unwrapResult = false;
-  if (auto *IUOFnTy = dyn_cast<ImplicitlyUnwrappedFunctionConversionExpr>(fn)) {
-    unwrapResult = true;
-    fn = IUOFnTy->getSubExpr();
-  }
 
   // If we're applying a function that resulted from a covariant
   // function conversion, strip off that conversion.
@@ -7742,14 +7636,17 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // Try closing the existential, if there is one.
     closeExistential(result, locator);
 
-    if (unwrapResult)
-      return forceUnwrapResult(result);
-
+    // We may also need to force the result for an IUO. We don't apply this on
+    // SelfApplyExprs, as the force unwraps should be inserted at the result of
+    // main application, not on the curried member reference.
+    if (!isa<SelfApplyExpr>(apply)) {
+      result = forceUnwrapIfExpected(result, calleeLocator,
+                                     IUOReferenceKind::ReturnValue);
+    }
     return result;
   }
 
-  // FIXME: handle unwrapping everywhere else
-  assert(!unwrapResult);
+  // FIXME: Handle unwrapping everywhere else.
 
   // If this is an UnresolvedType in the system, preserve it.
   if (cs.getType(fn)->is<UnresolvedType>()) {
