@@ -87,3 +87,9 @@ public struct S9<T: P2 & Hashable> {
   // expected-note@-3{{make generic struct 'S9' explicitly non-Sendable to suppress this warning}}
   var dict: [T : T.A] = [:]
 }
+
+public struct S10 { // expected-warning{{public struct 'S10' does not specify whether it is 'Sendable' or not}}
+  // expected-note@-1{{add '@unchecked Sendable' conformance to struct 'S10' if this type manually implements concurrency safety}}
+  // expected-note@-2{{make struct 'S10' explicitly non-Sendable to suppress this warning}}
+  var s7: S7
+}

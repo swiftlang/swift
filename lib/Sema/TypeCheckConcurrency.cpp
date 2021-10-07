@@ -730,6 +730,29 @@ void swift::diagnoseMissingSendableConformance(
 }
 
 namespace {
+  /// Determine whether there is an unavailable conformance here.
+  static bool hasUnavailableConformance(ProtocolConformanceRef conformance) {
+    // Abstract conformances are never unavailable.
+    if (!conformance.isConcrete())
+      return false;
+
+    // Check whether this conformance is on an unavailable extension.
+    auto concrete = conformance.getConcrete();
+    auto ext = dyn_cast<ExtensionDecl>(concrete->getDeclContext());
+    if (ext && AvailableAttr::isUnavailable(ext))
+      return true;
+
+    // Check the conformances in the substitution map.
+    auto module = concrete->getDeclContext()->getParentModule();
+    auto subMap = concrete->getSubstitutions(module);
+    for (auto subConformance : subMap.getConformances()) {
+      if (hasUnavailableConformance(subConformance))
+        return true;
+    }
+
+    return false;
+  }
+
   template<typename Visitor>
   bool visitInstanceStorage(
       NominalTypeDecl *nominal, DeclContext *dc, Visitor &visitor);
@@ -777,7 +800,9 @@ namespace {
         if (conformance.isInvalid())
           return true;
 
-        // FIXME: Look for unavailable conformances, too!
+        // If there is an unavailable conformance here, fail.
+        if (hasUnavailableConformance(conformance))
+          return true;
 
         // Look for missing Sendable conformances.
         return conformance.forEachMissingConformance(module,
@@ -3725,6 +3750,12 @@ bool swift::checkSendableConformance(
   auto nominal = conformance->getType()->getAnyNominal();
   if (!nominal)
     return false;
+
+  // If this is an always-unavailable conformance, there's nothing to check.
+  if (auto ext = dyn_cast<ExtensionDecl>(conformanceDC)) {
+    if (AvailableAttr::isUnavailable(ext))
+      return false;
+  }
 
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (classDecl) {
