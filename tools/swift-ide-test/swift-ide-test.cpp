@@ -840,7 +840,7 @@ static bool doCodeCompletionImpl(
     bool CodeCompletionDiagnostics) {
   std::unique_ptr<llvm::MemoryBuffer> FileBuf;
   if (setBufferForFile(SourceFilename, FileBuf))
-    return 1;
+    return true;
 
   unsigned Offset;
 
@@ -850,7 +850,7 @@ static bool doCodeCompletionImpl(
   if (Offset == ~0U) {
     llvm::errs() << "could not find code completion token \""
                  << CodeCompletionToken << "\"\n";
-    return 1;
+    return true;
   }
   llvm::outs() << "found code completion token " << CodeCompletionToken
                << " at offset " << Offset << "\n";
@@ -864,19 +864,30 @@ static bool doCodeCompletionImpl(
         SecondSourceFileName);
   }
 
-  std::string Error;
   PrintingDiagnosticConsumer PrintDiags;
   CompletionInstance CompletionInst;
-  auto isSuccess = CompletionInst.performOperation(
+  // FIXME: Should we count it as an error if we didn't receive a callback?
+  bool HadError = false;
+  CompletionInst.performOperation(
       Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
-      Offset, Error,
-      CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-      [&](CompilerInstance &CI, bool reusingASTContext) {
-        assert(!reusingASTContext && "reusing AST context without enabling it");
-        auto *SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF, *callbacksFactory);
+      Offset, CodeCompletionDiagnostics ? &PrintDiags : nullptr,
+      [&](CancellableResult<CompletionInstanceResult> Result) {
+        switch (Result.getKind()) {
+        case CancellableResultKind::Success: {
+          HadError = false;
+          assert(!Result->DidReuseAST &&
+                 "reusing AST context without enabling it");
+          performCodeCompletionSecondPass(*Result->CI.getCodeCompletionFile(),
+                                          *callbacksFactory);
+          break;
+        }
+        case CancellableResultKind::Failure:
+        case CancellableResultKind::Cancelled:
+          HadError = true;
+          break;
+        }
       });
-  return isSuccess ? 0 : 1;
+  return HadError;
 }
 
 static int doTypeContextInfo(const CompilerInvocation &InitInvok,
@@ -1268,30 +1279,49 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     PrintingDiagnosticConsumer PrintDiags;
     auto completionStart = std::chrono::high_resolution_clock::now();
     bool wasASTContextReused = false;
-    bool isSuccess = CompletionInst.performOperation(
+    // FIXME: Should we count it as an error if we didn't receive a callback?
+    bool completionDidFail = false;
+    CompletionInst.performOperation(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
-        Error, CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-        [&](CompilerInstance &CI, bool reusingASTContext) {
-          // Create a CodeCompletionConsumer.
-          std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
-              new ide::PrintingCodeCompletionConsumer(OS, IncludeKeywords,
-                                                      IncludeComments,
-                                                      CodeCompletionAnnotateResults,
-                                                      IncludeSourceText));
+        CodeCompletionDiagnostics ? &PrintDiags : nullptr,
+        [&](CancellableResult<CompletionInstanceResult> Result) {
+          switch (Result.getKind()) {
+          case CancellableResultKind::Success: {
+            completionDidFail = false;
 
-          // Create a factory for code completion callbacks that will feed the
-          // Consumer.
-          ide::CodeCompletionContext CompletionContext(CompletionCache);
-          CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
-          CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
-          CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
-          std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-              ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                                      *Consumer));
+            wasASTContextReused = Result->DidReuseAST;
 
-          auto *SF = CI.getCodeCompletionFile();
-          performCodeCompletionSecondPass(*SF, *callbacksFactory);
-          wasASTContextReused = reusingASTContext;
+            // Create a CodeCompletionConsumer.
+            std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
+                new ide::PrintingCodeCompletionConsumer(
+                    OS, IncludeKeywords, IncludeComments,
+                    CodeCompletionAnnotateResults, IncludeSourceText));
+
+            // Create a factory for code completion callbacks that will feed the
+            // Consumer.
+            ide::CodeCompletionContext CompletionContext(CompletionCache);
+            CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
+            CompletionContext.setAddInitsToTopLevel(
+                CodeCompletionAddInitsToTopLevel);
+            CompletionContext.setCallPatternHeuristics(
+                CodeCompletionCallPatternHeuristics);
+            std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+                ide::makeCodeCompletionCallbacksFactory(CompletionContext,
+                                                        *Consumer));
+
+            performCodeCompletionSecondPass(*Result->CI.getCodeCompletionFile(),
+                                            *callbacksFactory);
+            break;
+          }
+          case CancellableResultKind::Failure:
+            completionDidFail = true;
+            llvm::errs() << "error: " << Result.getError() << "\n";
+            break;
+          case CancellableResultKind::Cancelled:
+            completionDidFail = true;
+            llvm::errs() << "request cancelled\n";
+            break;
+          }
         });
     auto completionEnd = std::chrono::high_resolution_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -1323,8 +1353,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     fileOut << ResultStr;
     fileOut.close();
 
-    if (!isSuccess) {
-      llvm::errs() << "error: " << Error << "\n";
+    if (completionDidFail) {
+      // error message was already emitted above.
       return 1;
     }
 

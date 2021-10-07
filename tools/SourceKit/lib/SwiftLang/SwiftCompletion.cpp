@@ -117,34 +117,98 @@ static UIdent getUIDForCodeCompletionKindToReport(CompletionKind kind) {
   }
 }
 
-static bool swiftCodeCompleteImpl(
+/// The result returned via the Callback of \c swiftCodeCompleteImpl.
+/// If \c HasResults is \c false, code completion did not fail, but did not
+/// produce any values either. All other fields of the struct should be ignored
+/// in that case.
+struct CodeCompleteImplResult {
+  bool HasResults;
+  swift::ASTContext *Context;
+  const swift::CompilerInvocation *Invocation;
+  swift::ide::CodeCompletionContext *CompletionContext;
+  ArrayRef<RequestedCachedModule> RequestedModules;
+  DeclContext *DC;
+};
+
+static void swiftCodeCompleteImpl(
     SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
-    unsigned Offset, SwiftCodeCompletionConsumer &SwiftConsumer,
-    ArrayRef<const char *> Args,
+    unsigned Offset, ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    const CodeCompletion::Options &opts, std::string &Error) {
-  return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, Error,
-      [&](CompilerInstance &CI, bool reusingASTContext) {
-        // Create a factory for code completion callbacks that will feed the
-        // Consumer.
-        auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
-        ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
-        CompletionContext.ReusingASTContext = reusingASTContext;
-        CompletionContext.setAnnotateResult(opts.annotatedDescription);
-        CompletionContext.setIncludeObjectLiterals(opts.includeObjectLiterals);
-        CompletionContext.setAddInitsToTopLevel(opts.addInitsToTopLevel);
-        CompletionContext.setCallPatternHeuristics(opts.callPatternHeuristics);
-        std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-            ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                                    SwiftConsumer));
+    const CodeCompletion::Options &opts,
+    llvm::function_ref<void(CancellableResult<CodeCompleteImplResult>)>
+        Callback) {
+  assert(Callback && "Must provide callback to receive results");
 
-        SwiftConsumer.setContext(&CI.getASTContext(), &CI.getInvocation(),
-                                 &CompletionContext);
+  using ResultType = CancellableResult<CodeCompleteImplResult>;
 
-        auto *SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF, *callbacksFactory);
-        SwiftConsumer.clearContext();
+  /// Receive code completion results via \c handleResultsAndModules and calls
+  /// \c Callback with the corresponding values.
+  struct ConsumerToCallbackAdapter : public swift::ide::CodeCompletionConsumer {
+    CompilerInstance &CI;
+    ide::CodeCompletionContext &CompletionContext;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultWasCalled = false;
+
+    ConsumerToCallbackAdapter(CompilerInstance &CI,
+                              ide::CodeCompletionContext &CompletionContext,
+                              llvm::function_ref<void(ResultType)> Callback)
+        : CI(CI), CompletionContext(CompletionContext), Callback(Callback) {}
+
+    void
+    handleResultsAndModules(CodeCompletionContext &context,
+                            ArrayRef<RequestedCachedModule> requestedModules,
+                            DeclContext *DC) override {
+      HandleResultWasCalled = true;
+      assert(&context == &CompletionContext);
+      Callback(ResultType::success({/*HasResults=*/true, &CI.getASTContext(),
+                                    &CI.getInvocation(), &CompletionContext,
+                                    requestedModules, DC}));
+    }
+  };
+
+  Lang.performCompletionLikeOperation(
+      UnresolvedInputFile, Offset, Args, FileSystem,
+      [&](CancellableResult<CompletionInstanceResult> Result) {
+        switch (Result.getKind()) {
+        case CancellableResultKind::Success: {
+          // Create a factory for code completion callbacks that will feed the
+          // Consumer.
+          auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
+          ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
+          CompletionContext.ReusingASTContext = Result->DidReuseAST;
+          CompletionContext.setAnnotateResult(opts.annotatedDescription);
+          CompletionContext.setIncludeObjectLiterals(
+              opts.includeObjectLiterals);
+          CompletionContext.setAddInitsToTopLevel(opts.addInitsToTopLevel);
+          CompletionContext.setCallPatternHeuristics(
+              opts.callPatternHeuristics);
+
+          CompilerInstance &CI = Result->CI;
+          ConsumerToCallbackAdapter Consumer(CI, CompletionContext, Callback);
+
+          std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+              ide::makeCodeCompletionCallbacksFactory(CompletionContext,
+                                                      Consumer));
+
+          auto *SF = CI.getCodeCompletionFile();
+          performCodeCompletionSecondPass(*SF, *callbacksFactory);
+          if (!Consumer.HandleResultWasCalled) {
+            // If we didn't receive a handleResult call from the second pass,
+            // we didn't receive any results. To make sure Callback gets called
+            // exactly once, call it manually with no results here.
+            Callback(ResultType::success(
+                {/*HasResults=*/false, &CI.getASTContext(), &CI.getInvocation(),
+                 &CompletionContext, /*RequestedModules=*/{}, /*DC=*/nullptr}));
+          }
+          break;
+        }
+        case CancellableResultKind::Failure:
+          Callback(ResultType::failure(Result.getError()));
+          break;
+        case CancellableResultKind::Cancelled:
+          Callback(ResultType::cancelled());
+          break;
+        }
       });
 }
 
@@ -216,11 +280,32 @@ void SwiftLangSupport::codeComplete(
     SKConsumer.setAnnotatedTypename(info.completionContext->getAnnotateResult());
   });
 
-  std::string Error;
-  if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
-                             Args, fileSystem, CCOpts, Error)) {
-    SKConsumer.failed(Error);
-  }
+  swiftCodeCompleteImpl(
+      *this, UnresolvedInputFile, Offset, Args, fileSystem, CCOpts,
+      [&](CancellableResult<CodeCompleteImplResult> Result) {
+        switch (Result.getKind()) {
+        case CancellableResultKind::Success: {
+          if (Result->HasResults) {
+            SwiftConsumer.setContext(Result->Context, Result->Invocation,
+                                     Result->CompletionContext);
+            SwiftConsumer.handleResultsAndModules(*Result->CompletionContext,
+                                                  Result->RequestedModules,
+                                                  Result->DC);
+            SwiftConsumer.clearContext();
+            // SwiftConsumer will deliver the results to SKConsumer.
+          }
+          // If we don't have any results, don't call anything on SwiftConsumer.
+          // This will cause us to deliver empty results.
+          break;
+        }
+        case CancellableResultKind::Failure:
+          SKConsumer.failed(Result.getError());
+          break;
+        case CancellableResultKind::Cancelled:
+          SKConsumer.cancelled();
+          break;
+        }
+      });
 }
 
 static void getResultStructure(
@@ -1031,11 +1116,44 @@ static void transformAndForwardResults(
     std::vector<const char *> cargs;
     for (auto &arg : args)
       cargs.push_back(arg.c_str());
-    std::string error;
-    if (!swiftCodeCompleteImpl(lang, buffer.get(), str.size(), swiftConsumer,
-                               cargs, session->getFileSystem(),
-                               options, error)) {
-      consumer.failed(error);
+
+    bool CodeCompleteDidFail = false;
+    bool CallbackCalled = false;
+
+    swiftCodeCompleteImpl(
+        lang, buffer.get(), str.size(), cargs, session->getFileSystem(),
+        options, [&](CancellableResult<CodeCompleteImplResult> Result) {
+          CallbackCalled = true;
+          switch (Result.getKind()) {
+          case CancellableResultKind::Success: {
+            if (Result->HasResults) {
+              swiftConsumer.setContext(Result->Context, Result->Invocation,
+                                       Result->CompletionContext);
+              swiftConsumer.handleResultsAndModules(*Result->CompletionContext,
+                                                    Result->RequestedModules,
+                                                    Result->DC);
+              swiftConsumer.clearContext();
+            }
+            // If we didn't receive any results, don't call any method on
+            // swiftConsumer. This will cause us to deliver empty results.
+            break;
+          }
+          case CancellableResultKind::Failure:
+            CodeCompleteDidFail = true;
+            consumer.failed(Result.getError());
+            return;
+          case CancellableResultKind::Cancelled:
+            CodeCompleteDidFail = true;
+            consumer.cancelled();
+            return;
+          }
+        });
+    assert(CallbackCalled &&
+           "Expected the callback to be called synchronously");
+
+    if (CodeCompleteDidFail) {
+      // We already informed the consumer that completion failed. No need to
+      // continue.
       return;
     }
 
@@ -1085,12 +1203,13 @@ void SwiftLangSupport::codeCompleteOpen(
     translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
                                    maxResults);
 
-  std::string error;
+  std::string fileSystemError;
   // FIXME: the use of None as primary file is to match the fact we do not read
   // the document contents using the editor documents infrastructure.
-  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  auto fileSystem =
+      getFileSystem(vfsOptions, /*primaryFile=*/None, fileSystemError);
   if (!fileSystem)
-    return consumer.failed(error);
+    return consumer.failed(fileSystemError);
 
   CodeCompletion::FilterRules filterRules;
   translateFilterRules(rawFilterRules, filterRules);
@@ -1123,10 +1242,42 @@ void SwiftLangSupport::codeCompleteOpen(
             extendCompletions(results, sink, info, nameToPopularity, CCOpts);
       });
 
+  bool CodeCompleteDidFail = false;
+  bool CallbackCalled = false;
   // Invoke completion.
-  if (!swiftCodeCompleteImpl(*this, inputBuf, offset, swiftConsumer,
-                             args, fileSystem, CCOpts, error)) {
-    consumer.failed(error);
+  swiftCodeCompleteImpl(
+      *this, inputBuf, offset, args, fileSystem, CCOpts,
+      [&](CancellableResult<CodeCompleteImplResult> Result) {
+        CallbackCalled = true;
+        switch (Result.getKind()) {
+        case CancellableResultKind::Success: {
+          if (Result->HasResults) {
+            swiftConsumer.setContext(Result->Context, Result->Invocation,
+                                     Result->CompletionContext);
+            swiftConsumer.handleResultsAndModules(*Result->CompletionContext,
+                                                  Result->RequestedModules,
+                                                  Result->DC);
+            swiftConsumer.clearContext();
+          }
+          // If we didn't receive any results, don't call any method on
+          // swiftConsumer. This will cause us to deliver empty results.
+          break;
+        }
+        case CancellableResultKind::Failure:
+          CodeCompleteDidFail = true;
+          consumer.failed(Result.getError());
+          break;
+        case CancellableResultKind::Cancelled:
+          CodeCompleteDidFail = true;
+          consumer.cancelled();
+          break;
+        }
+      });
+  assert(CallbackCalled && "Expected the callback to be called synchronously");
+
+  if (CodeCompleteDidFail) {
+    // We already informed the consumer that completion failed. No need to
+    // continue.
     return;
   }
 

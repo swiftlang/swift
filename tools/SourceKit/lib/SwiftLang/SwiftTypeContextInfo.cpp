@@ -30,23 +30,69 @@ static void translateTypeContextInfoOptions(OptionsDictionary &from,
   // TypeContextInfo doesn't receive any options at this point.
 }
 
-static bool swiftTypeContextInfoImpl(
-    SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
-    unsigned Offset, ide::TypeContextInfoConsumer &Consumer,
-    ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error) {
-  return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, Error,
-      [&](CompilerInstance &CI, bool reusingASTContext) {
-        // Create a factory for code completion callbacks that will feed the
-        // Consumer.
-        std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-            ide::makeTypeContextInfoCallbacksFactory(Consumer));
+/// The results returned from \c swiftTypeContextInfoImpl via \c Callback.
+struct SwiftTypeContextInfoImplResult {
+  /// The actual results. If empty, no results were found.
+  ArrayRef<ide::TypeContextInfoItem> Results;
+  /// Whether an AST was reused to produce the results.
+  bool DidReuseAST;
+};
 
-        auto *SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF, *callbacksFactory);
-        Consumer.setReusingASTContext(reusingASTContext);
+static void swiftTypeContextInfoImpl(
+    SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
+    unsigned Offset, ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    llvm::function_ref<void(CancellableResult<SwiftTypeContextInfoImplResult>)>
+        Callback) {
+  assert(Callback && "Must provide callback to receive results");
+
+  using ResultType = CancellableResult<SwiftTypeContextInfoImplResult>;
+
+  struct ConsumerToCallbackAdapter : public ide::TypeContextInfoConsumer {
+    bool ReusingASTContext;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultsCalled = false;
+
+    ConsumerToCallbackAdapter(bool ReusingASTContext,
+                              llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext), Callback(Callback) {}
+
+    void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) override {
+      HandleResultsCalled = true;
+      Callback(ResultType::success({Results, ReusingASTContext}));
+    }
+  };
+
+  Lang.performCompletionLikeOperation(
+      UnresolvedInputFile, Offset, Args, FileSystem,
+      [&](CancellableResult<CompletionInstanceResult> Result) {
+        switch (Result.getKind()) {
+        case CancellableResultKind::Success: {
+          ConsumerToCallbackAdapter Consumer(Result->DidReuseAST, Callback);
+
+          // Create a factory for code completion callbacks that will feed the
+          // Consumer.
+          std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+              ide::makeTypeContextInfoCallbacksFactory(Consumer));
+
+          performCodeCompletionSecondPass(*Result->CI.getCodeCompletionFile(),
+                                          *callbacksFactory);
+          if (!Consumer.HandleResultsCalled) {
+            // If we didn't receive a handleResult call from the second pass,
+            // we didn't receive any results. To make sure Callback gets called
+            // exactly once, call it manually with no results here.
+            Callback(
+                ResultType::success({/*Results=*/{}, Result->DidReuseAST}));
+          }
+          break;
+        }
+        case CancellableResultKind::Failure:
+          Callback(ResultType::failure(Result.getError()));
+          break;
+        case CancellableResultKind::Cancelled:
+          Callback(ResultType::cancelled());
+          break;
+        }
       });
 }
 
@@ -160,13 +206,26 @@ void SwiftLangSupport::getExpressionContextInfo(
         handleSingleResult(Item);
     }
 
-    void setReusingASTContext(bool flag) override {
+    void setReusingASTContext(bool flag) {
       SKConsumer.setReusingASTContext(flag);
     }
   } Consumer(SKConsumer);
 
-  if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Consumer,
-                                Args, fileSystem, error)) {
-    SKConsumer.failed(error);
-  }
+  swiftTypeContextInfoImpl(
+      *this, UnresolvedInputFile, Offset, Args, fileSystem,
+      [&](CancellableResult<SwiftTypeContextInfoImplResult> Result) {
+        switch (Result.getKind()) {
+        case CancellableResultKind::Success: {
+          Consumer.handleResults(Result->Results);
+          Consumer.setReusingASTContext(Result->DidReuseAST);
+          break;
+        }
+        case CancellableResultKind::Failure:
+          SKConsumer.failed(Result.getError());
+          break;
+        case CancellableResultKind::Cancelled:
+          SKConsumer.cancelled();
+          break;
+        }
+      });
 }

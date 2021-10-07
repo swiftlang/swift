@@ -167,6 +167,7 @@ public:
   virtual ~CodeCompletionConsumer() { }
 
   virtual void failed(StringRef ErrDescription) = 0;
+  virtual void cancelled() = 0;
 
   virtual void setCompletionKind(UIdent kind) {};
   virtual void setReusingASTContext(bool) = 0;
@@ -699,6 +700,7 @@ public:
 
   virtual void handleResult(const TypeContextInfoItem &Result) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
+  virtual void cancelled() = 0;
   virtual void setReusingASTContext(bool flag) = 0;
 };
 
@@ -726,6 +728,7 @@ public:
   virtual void handleResult(const ConformingMethodListResult &Result) = 0;
   virtual void setReusingASTContext(bool flag) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
+  virtual void cancelled() = 0;
 };
 
 class LangSupport {

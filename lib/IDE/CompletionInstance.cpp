@@ -281,11 +281,12 @@ static bool areAnyDependentFilesInvalidated(
 } // namespace
 
 bool CompletionInstance::performCachedOperationIfPossible(
-   llvm::hash_code ArgsHash,
+    llvm::hash_code ArgsHash,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+        Callback) {
   llvm::PrettyStackTraceString trace(
       "While performing cached completion if possible");
 
@@ -504,7 +505,8 @@ bool CompletionInstance::performCachedOperationIfPossible(
     if (DiagC)
       CI.addDiagnosticConsumer(DiagC);
 
-    Callback(CI, /*reusingASTContext=*/true);
+    Callback(CancellableResult<CompletionInstanceResult>::success(
+        {CI, /*reusingASTContext=*/true}));
 
     if (DiagC)
       CI.removeDiagnosticConsumer(DiagC);
@@ -515,12 +517,13 @@ bool CompletionInstance::performCachedOperationIfPossible(
   return true;
 }
 
-bool CompletionInstance::performNewOperation(
+void CompletionInstance::performNewOperation(
     Optional<llvm::hash_code> ArgsHash, swift::CompilerInvocation &Invocation,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    std::string &Error, DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+    DiagnosticConsumer *DiagC,
+    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+        Callback) {
   llvm::PrettyStackTraceString trace("While performing new completion");
 
   auto isCachedCompletionRequested = ArgsHash.hasValue();
@@ -548,32 +551,35 @@ bool CompletionInstance::performNewOperation(
     Invocation.setCodeCompletionPoint(completionBuffer, Offset);
 
     if (CI.setup(Invocation)) {
-      Error = "failed to setup compiler instance";
-      return false;
+      Callback(CancellableResult<CompletionInstanceResult>::failure(
+          "failed to setup compiler instance"));
+      return;
     }
     registerIDERequestFunctions(CI.getASTContext().evaluator);
 
     // If we're expecting a standard library, but there either isn't one, or it
     // failed to load, let's bail early and hand back an empty completion
     // result to avoid any downstream crashes.
-    if (CI.loadStdlibIfNeeded())
-      return true;
+    if (CI.loadStdlibIfNeeded()) {
+      /// FIXME: Callback is not being called on this path.
+      return;
+    }
 
     CI.performParseAndResolveImportsOnly();
 
     // If we didn't find a code completion token, bail.
     auto *state = CI.getCodeCompletionFile()->getDelayedParserState();
     if (!state->hasCodeCompletionDelayedDeclState())
-      return true;
+      /// FIXME: Callback is not being called on this path.
+      return;
 
-    Callback(CI, /*reusingASTContext=*/false);
+    Callback(CancellableResult<CompletionInstanceResult>::success(
+        {CI, /*ReuisingASTContext=*/false}));
   }
 
   // Cache the compiler instance if fast completion is enabled.
   if (isCachedCompletionRequested)
     cacheCompilerInstance(std::move(TheInstance), *ArgsHash);
-
-  return true;
 }
 
 void CompletionInstance::cacheCompilerInstance(
@@ -608,12 +614,13 @@ void CompletionInstance::setOptions(CompletionInstance::Options NewOpts) {
   Opts = NewOpts;
 }
 
-bool swift::ide::CompletionInstance::performOperation(
+void swift::ide::CompletionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    std::string &Error, DiagnosticConsumer *DiagC,
-    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+    DiagnosticConsumer *DiagC,
+    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+        Callback) {
 
   // Always disable source location resolutions from .swiftsourceinfo file
   // because they're somewhat heavy operations and aren't needed for completion.
@@ -637,14 +644,11 @@ bool swift::ide::CompletionInstance::performOperation(
 
   if (performCachedOperationIfPossible(ArgsHash, FileSystem, completionBuffer,
                                        Offset, DiagC, Callback)) {
-    return true;
+    // We were able to reuse a cached AST. Callback has already been invoked
+    // and we don't need to build a new AST. We are done.
+    return;
   }
 
-  if(performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
-                         Offset, Error, DiagC, Callback)) {
-    return true;
-  }
-
-  assert(!Error.empty());
-  return false;
+  performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
+                      Offset, DiagC, Callback);
 }

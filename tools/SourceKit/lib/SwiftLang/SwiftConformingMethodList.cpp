@@ -32,25 +32,73 @@ translateConformingMethodListOptions(OptionsDictionary &from,
   // ConformingMethodList doesn't receive any options at this point.
 }
 
-static bool swiftConformingMethodListImpl(
+/// The results returned from \c swiftConformingMethodListImpl through the
+/// callback.
+struct ConformingMethodListImplResult {
+  /// The actual results. If \c nullptr, no results were found.
+  const ide::ConformingMethodListResult *Result;
+  /// Whether an AST was reused for the completion.
+  bool DidReuseAST;
+};
+
+static void swiftConformingMethodListImpl(
     SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
     unsigned Offset, ArrayRef<const char *> Args,
     ArrayRef<const char *> ExpectedTypeNames,
-    ide::ConformingMethodListConsumer &Consumer,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error) {
-  return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, Error,
-      [&](CompilerInstance &CI, bool reusingASTContext) {
-        // Create a factory for code completion callbacks that will feed the
-        // Consumer.
-        std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-            ide::makeConformingMethodListCallbacksFactory(ExpectedTypeNames,
-                                                          Consumer));
+    llvm::function_ref<void(CancellableResult<ConformingMethodListImplResult>)>
+        Callback) {
+  assert(Callback && "Must provide callback to receive results");
 
-        auto *SF = CI.getCodeCompletionFile();
-        performCodeCompletionSecondPass(*SF, *callbacksFactory);
-        Consumer.setReusingASTContext(reusingASTContext);
+  using ResultType = CancellableResult<ConformingMethodListImplResult>;
+
+  struct ConsumerToCallbackAdapter
+      : public swift::ide::ConformingMethodListConsumer {
+    bool ReusingASTContext;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultWasCalled = false;
+
+    ConsumerToCallbackAdapter(bool ReusingASTContext,
+                              llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext), Callback(Callback) {}
+
+    void handleResult(const ide::ConformingMethodListResult &result) override {
+      HandleResultWasCalled = true;
+      Callback(ResultType::success({&result, ReusingASTContext}));
+    }
+  };
+
+  Lang.performCompletionLikeOperation(
+      UnresolvedInputFile, Offset, Args, FileSystem,
+      [&](CancellableResult<CompletionInstanceResult> Result) {
+        switch (Result.getKind()) {
+        case CancellableResultKind::Success: {
+          ConsumerToCallbackAdapter Consumer(Result->DidReuseAST, Callback);
+
+          // Create a factory for code completion callbacks that will feed the
+          // Consumer.
+          std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+              ide::makeConformingMethodListCallbacksFactory(ExpectedTypeNames,
+                                                            Consumer));
+
+          performCodeCompletionSecondPass(*Result->CI.getCodeCompletionFile(),
+                                          *callbacksFactory);
+          if (!Consumer.HandleResultWasCalled) {
+            // If we didn't receive a handleResult call from the second pass,
+            // we didn't receive any results. To make sure Callback gets called
+            // exactly once, call it manually with no results here.
+            Callback(ResultType::success(
+                {/*Results=*/nullptr, Result->DidReuseAST}));
+          }
+          break;
+        }
+        case CancellableResultKind::Failure:
+          Callback(ResultType::failure(Result.getError()));
+          break;
+        case CancellableResultKind::Cancelled:
+          Callback(ResultType::cancelled());
+          break;
+        }
       });
 }
 
@@ -186,14 +234,30 @@ void SwiftLangSupport::getConformingMethodList(
       SKConsumer.handleResult(SKResult);
     }
 
-    void setReusingASTContext(bool flag) override {
+    void setReusingASTContext(bool flag) {
       SKConsumer.setReusingASTContext(flag);
     }
   } Consumer(SKConsumer);
 
-  if (!swiftConformingMethodListImpl(*this, UnresolvedInputFile, Offset, Args,
-                                     ExpectedTypeNames, Consumer, fileSystem,
-                                     error)) {
-    SKConsumer.failed(error);
-  }
+  swiftConformingMethodListImpl(
+      *this, UnresolvedInputFile, Offset, Args, ExpectedTypeNames, fileSystem,
+      [&](CancellableResult<ConformingMethodListImplResult> Result) {
+        switch (Result.getKind()) {
+        case CancellableResultKind::Success: {
+          if (Result->Result) {
+            Consumer.handleResult(*Result->Result);
+          }
+          // If we didn't receive any result, don't call handleResult on
+          // Consumer to deliver empty results.
+          Consumer.setReusingASTContext(Result->DidReuseAST);
+          break;
+        }
+        case CancellableResultKind::Failure:
+          SKConsumer.failed(Result.getError());
+          break;
+        case CancellableResultKind::Cancelled:
+          SKConsumer.cancelled();
+          break;
+        }
+      });
 }

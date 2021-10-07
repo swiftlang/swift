@@ -14,13 +14,15 @@
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTLANGSUPPORT_H
 
 #include "CodeCompletion.h"
-#include "SwiftInterfaceGenContext.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Statistic.h"
 #include "SourceKit/Support/ThreadSafeRefCntPtr.h"
 #include "SourceKit/Support/Tracing.h"
+#include "SwiftInterfaceGenContext.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/IDE/CancellableResult.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/Indenting.h"
 #include "swift/IDE/Refactoring.h"
 #include "swift/Index/IndexSymbol.h"
@@ -462,12 +464,13 @@ public:
   /// Perform a completion like operation. It initializes a \c CompilerInstance,
   /// the calls \p Callback with it. \p Callback must perform the second pass
   /// using that instance.
-  bool performCompletionLikeOperation(
+  void performCompletionLikeOperation(
       llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
       ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      std::string &Error,
-      llvm::function_ref<void(swift::CompilerInstance &, bool)> Callback);
+      llvm::function_ref<void(
+          swift::ide::CancellableResult<swift::ide::CompletionInstanceResult>)>
+          Callback);
 
   //==========================================================================//
   // LangSupport Interface

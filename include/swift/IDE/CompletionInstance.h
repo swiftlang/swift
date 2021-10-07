@@ -14,6 +14,7 @@
 #define SWIFT_IDE_COMPLETIONINSTANCE_H
 
 #include "swift/Frontend/Frontend.h"
+#include "swift/IDE/CancellableResult.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
@@ -34,6 +35,14 @@ std::unique_ptr<llvm::MemoryBuffer>
 makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
                                unsigned &Offset,
                                llvm::StringRef bufferIdentifier);
+
+/// The result returned via the callback from the perform*Operation methods.
+struct CompletionInstanceResult {
+  /// The compiler instance that is prepared for the second pass.
+  CompilerInstance &CI;
+  /// Whether an AST was reused.
+  bool DidReuseAST;
+};
 
 /// Manages \c CompilerInstance for completion like operations.
 class CompletionInstance {
@@ -58,27 +67,31 @@ class CompletionInstance {
 
   /// Calls \p Callback with cached \c CompilerInstance if it's usable for the
   /// specified completion request.
-  /// Returns \c if the callback was called. Returns \c false if the compiler
-  /// argument has changed, primary file is not the same, the \c Offset is not
-  /// in function bodies, or the interface hash of the file has changed.
+  /// Returns \c true if performing the cached operation was possible. Returns
+  /// \c false if the compiler argument has changed, primary file is not the
+  /// same, the \c Offset is not in function bodies, or the interface hash of
+  /// the file has changed.
+  /// \p Callback will be called if and only if this function returns \c true.
   bool performCachedOperationIfPossible(
       llvm::hash_code ArgsHash,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
-      llvm::function_ref<void(CompilerInstance &, bool)> Callback);
+      llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+          Callback);
 
   /// Calls \p Callback with new \c CompilerInstance for the completion
   /// request. The \c CompilerInstace passed to the callback already performed
   /// the first pass.
   /// Returns \c false if it fails to setup the \c CompilerInstance.
-  bool performNewOperation(
+  void performNewOperation(
       llvm::Optional<llvm::hash_code> ArgsHash,
       swift::CompilerInvocation &Invocation,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-      std::string &Error, DiagnosticConsumer *DiagC,
-      llvm::function_ref<void(CompilerInstance &, bool)> Callback);
+      DiagnosticConsumer *DiagC,
+      llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+          Callback);
 
 public:
   CompletionInstance() : CachedCIShouldBeInvalidated(false) {}
@@ -94,18 +107,19 @@ public:
   /// second pass. \p Callback is resposible to perform the second pass on it.
   /// The \c CompilerInstance may be reused from the previous completions,
   /// and may be cached for the next completion.
-  /// Return \c true if \p is successfully called, \c it fails. In failure
-  /// cases \p Error is populated with an error message.
+  /// In case of failure or cancellation, the callback receives the
+  /// corresponding failed or cancelled result.
   ///
   /// NOTE: \p Args is only used for checking the equaity of the invocation.
   /// Since this function assumes that it is already normalized, exact the same
   /// arguments including their order is considered as the same invocation.
-  bool performOperation(
+  void performOperation(
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-      std::string &Error, DiagnosticConsumer *DiagC,
-      llvm::function_ref<void(CompilerInstance &, bool)> Callback);
+      DiagnosticConsumer *DiagC,
+      llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+          Callback);
 };
 
 } // namespace ide

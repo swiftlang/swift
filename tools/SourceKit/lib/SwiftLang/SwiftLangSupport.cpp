@@ -1000,12 +1000,12 @@ SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
   return llvm::vfs::getRealFileSystem();
 }
 
-bool SwiftLangSupport::performCompletionLikeOperation(
+void SwiftLangSupport::performCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error,
-    llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+        Callback) {
   assert(FileSystem);
 
   // Resolve symlinks for the input file; we resolve them for the input files
@@ -1045,22 +1045,26 @@ bool SwiftLangSupport::performCompletionLikeOperation(
   ForwardingDiagnosticConsumer CIDiags(Diags);
 
   CompilerInvocation Invocation;
-  bool Failed = getASTManager()->initCompilerInvocation(
+  std::string CompilerInvocationError;
+  bool CreatingInvocationFailed = getASTManager()->initCompilerInvocation(
       Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
-      Error);
-  if (Failed)
-    return false;
+      CompilerInvocationError);
+  if (CreatingInvocationFailed) {
+    Callback(CancellableResult<CompletionInstanceResult>::failure(
+        CompilerInvocationError));
+    return;
+  }
   if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Error = "no input filenames specified";
-    return false;
+    Callback(CancellableResult<CompletionInstanceResult>::failure(
+        "no input filenames specified"));
+    return;
   }
 
   // Pin completion instance.
   auto CompletionInst = getCompletionInstance();
 
-  return CompletionInst->performOperation(Invocation, Args, FileSystem,
-                                          newBuffer.get(), Offset,
-                                          Error, &CIDiags, Callback);
+  CompletionInst->performOperation(Invocation, Args, FileSystem,
+                                   newBuffer.get(), Offset, &CIDiags, Callback);
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {
