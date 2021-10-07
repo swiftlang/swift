@@ -515,10 +515,10 @@ tryEliminateUnneededForwardingInst(SILInstruction *i,
 //                   DestructureTuple <-> Tuple Round Trip
 //===----------------------------------------------------------------------===//
 
-/// hat(%x) = destructure_tuple x
-/// %x2 = tuple(hat(%x))
+/// (%x0, ..., %xn) = destructure_tuple %x
+/// %y = tuple(%x0, ..., %xn)
 /// ->
-/// %x2 = %x
+/// %y = %x
 static SILBasicBlock::iterator
 eliminateRoundTripTupleOfDestructure(TupleInst *tupleInst,
                                      CanonicalizeInstruction &pass) {
@@ -564,11 +564,11 @@ eliminateRoundTripTupleOfDestructure(TupleInst *tupleInst,
 //                        Destructure Simplifications
 //===----------------------------------------------------------------------===//
 
-// %x = tuple(hat(%x))
-// hat(%x2) = destructure_tuple x
+// %x = tuple(%x0, ..., %xn)
+// (%y0, ..., %yn) = destructure_tuple %x
 //
 // ->
-// hat(%x2) = hat(%x)
+// (%y0, ..., %yn) = (%x0, ..., %xn)
 static SILBasicBlock::iterator eliminateRoundTripDestructureOfTuple(
     TupleInst *tupleInst, DestructureTupleInst *dti,
     SILBasicBlock::iterator nextII, CanonicalizeInstruction &pass) {
@@ -630,6 +630,9 @@ static SILBasicBlock::iterator
 canonicalizeAwayTupleEltAddrDestructurePairs(DestructureTupleInst *dti,
                                              SILBasicBlock::iterator next,
                                              CanonicalizeInstruction &pass) {
+  // This is a very specific pattern that we only expect to be produced by
+  // SILGen. In order to save a little compile time in later phases of the
+  // compiler, just bail early if we are not in Raw SIL.
   if (dti->getModule().getStage() != SILStage::Raw)
     return next;
 
@@ -674,9 +677,9 @@ canonicalizeAwayTupleEltAddrDestructurePairs(DestructureTupleInst *dti,
   for (auto ii = std::next(firstInst->getIterator(), 1),
             ie = firstInst->getParent()->end();
        ii != ie && numTupleEltStoreSeen < maxNumElements; ++ii) {
-    // We go down this path if we are in a tuple_element_addr, store,
-    // tuple_element_addr, store pattern.
     if (auto *teai = dyn_cast<TupleElementAddrInst>(&*ii)) {
+      // We go down this path if we are in an interleaved tuple_element_addr,
+      // store pattern.
       if (teai->getFieldIndex() != numTupleEltStoreSeen ||
           teai->getOperand() != firstTEAI->getOperand()) {
         return next;
