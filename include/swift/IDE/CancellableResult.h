@@ -78,7 +78,7 @@ public:
           ResultType(std::move(Other.Result));
       break;
     case CancellableResultKind::Failure:
-      Error = std::move(Other.Error);
+      ::new ((void *)std::addressof(Error)) std::string(std::move(Other.Error));
       break;
     case CancellableResultKind::Cancelled:
       break;

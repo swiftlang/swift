@@ -75,6 +75,11 @@ static void swiftTypeContextInfoImpl(
           std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
               ide::makeTypeContextInfoCallbacksFactory(Consumer));
 
+          if (!Result->DidFindCodeCompletionToken) {
+            Callback(
+                ResultType::success({/*Results=*/{}, Result->DidReuseAST}));
+          }
+
           performCodeCompletionSecondPass(*Result->CI.getCodeCompletionFile(),
                                           *callbacksFactory);
           if (!Consumer.HandleResultsCalled) {

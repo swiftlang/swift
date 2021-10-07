@@ -42,6 +42,10 @@ struct CompletionInstanceResult {
   CompilerInstance &CI;
   /// Whether an AST was reused.
   bool DidReuseAST;
+  /// Whether the CompletionInstance found a code completion token in the source
+  /// file. If this is \c false, the user will most likely want to return empty
+  /// results.
+  bool DidFindCodeCompletionToken;
 };
 
 /// Manages \c CompilerInstance for completion like operations.

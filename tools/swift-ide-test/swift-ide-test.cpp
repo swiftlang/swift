@@ -866,28 +866,48 @@ static bool doCodeCompletionImpl(
 
   PrintingDiagnosticConsumer PrintDiags;
   CompletionInstance CompletionInst;
-  // FIXME: Should we count it as an error if we didn't receive a callback?
-  bool HadError = false;
+  std::string CompletionError;
+  bool CallbackCalled = false;
   CompletionInst.performOperation(
       Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
       Offset, CodeCompletionDiagnostics ? &PrintDiags : nullptr,
       [&](CancellableResult<CompletionInstanceResult> Result) {
+        CallbackCalled = true;
         switch (Result.getKind()) {
         case CancellableResultKind::Success: {
-          HadError = false;
           assert(!Result->DidReuseAST &&
                  "reusing AST context without enabling it");
+
+          if (!Result->DidFindCodeCompletionToken) {
+            // Return empty results by not performing the second pass and never
+            // calling the consumer of the callback factory.
+            return;
+          }
+
           performCodeCompletionSecondPass(*Result->CI.getCodeCompletionFile(),
                                           *callbacksFactory);
           break;
         }
         case CancellableResultKind::Failure:
+          CompletionError = "error: " + Result.getError();
+          break;
         case CancellableResultKind::Cancelled:
-          HadError = true;
+          CompletionError = "request cancelled";
           break;
         }
       });
-  return HadError;
+  assert(CallbackCalled &&
+         "We should always receive a callback call for code completion");
+  if (CompletionError == "error: did not find code completion token") {
+    // Do not consider failure to find the code completion token as a critical
+    // failure that returns a non-zero exit code. Instead, allow the caller to
+    // match the error message.
+    llvm::outs() << CompletionError << '\n';
+  } else if (!CompletionError.empty()) {
+    llvm::errs() << CompletionError << '\n';
+    return true;
+  }
+  return false;
 }
 
 static int doTypeContextInfo(const CompilerInvocation &InitInvok,
@@ -1279,16 +1299,20 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     PrintingDiagnosticConsumer PrintDiags;
     auto completionStart = std::chrono::high_resolution_clock::now();
     bool wasASTContextReused = false;
-    // FIXME: Should we count it as an error if we didn't receive a callback?
-    bool completionDidFail = false;
+    std::string completionError = "";
+    bool CallbackCalled = false;
     CompletionInst.performOperation(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
         CodeCompletionDiagnostics ? &PrintDiags : nullptr,
         [&](CancellableResult<CompletionInstanceResult> Result) {
+          CallbackCalled = true;
           switch (Result.getKind()) {
           case CancellableResultKind::Success: {
-            completionDidFail = false;
-
+            if (!Result->DidFindCodeCompletionToken) {
+              // Return empty results by not performing the second pass and
+              // never calling the consumer of the callback factory.
+              return;
+            }
             wasASTContextReused = Result->DidReuseAST;
 
             // Create a CodeCompletionConsumer.
@@ -1314,15 +1338,15 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
             break;
           }
           case CancellableResultKind::Failure:
-            completionDidFail = true;
-            llvm::errs() << "error: " << Result.getError() << "\n";
+            completionError = "error: " + Result.getError();
             break;
           case CancellableResultKind::Cancelled:
-            completionDidFail = true;
-            llvm::errs() << "request cancelled\n";
+            completionError = "request cancelled";
             break;
           }
         });
+    assert(CallbackCalled &&
+           "We should always receive a callback call for code completion");
     auto completionEnd = std::chrono::high_resolution_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         completionEnd - completionStart);
@@ -1350,13 +1374,18 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     }
 
     llvm::raw_fd_ostream fileOut(resultFD, /*shouldClose=*/true);
-    fileOut << ResultStr;
-    fileOut.close();
-
-    if (completionDidFail) {
-      // error message was already emitted above.
+    if (completionError == "error: did not find code completion token") {
+      // Do not consider failure to find the code completion token as a critical
+      // failure that returns a non-zero exit code. Instead, allow the caller to
+      // match the error message.
+      fileOut << completionError;
+    } else if (!completionError.empty()) {
+      llvm::errs() << completionError << '\n';
       return 1;
+    } else {
+      fileOut << ResultStr;
     }
+    fileOut.close();
 
     if (options::SkipFileCheck)
       continue;

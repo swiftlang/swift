@@ -506,7 +506,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
       CI.addDiagnosticConsumer(DiagC);
 
     Callback(CancellableResult<CompletionInstanceResult>::success(
-        {CI, /*reusingASTContext=*/true}));
+        {CI, /*reusingASTContext=*/true, /*DidFindCodeCompletionToken=*/true}));
 
     if (DiagC)
       CI.removeDiagnosticConsumer(DiagC);
@@ -535,6 +535,7 @@ void CompletionInstance::performNewOperation(
   Invocation.getFrontendOptions().IntermoduleDependencyTracking =
       IntermoduleDepTrackingMode::ExcludeSystem;
 
+  bool DidFindCodeCompletionToken = false;
   {
     auto &CI = *TheInstance;
     if (DiagC)
@@ -561,24 +562,26 @@ void CompletionInstance::performNewOperation(
     // failed to load, let's bail early and hand back an empty completion
     // result to avoid any downstream crashes.
     if (CI.loadStdlibIfNeeded()) {
-      /// FIXME: Callback is not being called on this path.
+      Callback(CancellableResult<CompletionInstanceResult>::failure(
+          "failed to load the standard library"));
       return;
     }
 
     CI.performParseAndResolveImportsOnly();
 
-    // If we didn't find a code completion token, bail.
-    auto *state = CI.getCodeCompletionFile()->getDelayedParserState();
-    if (!state->hasCodeCompletionDelayedDeclState())
-      /// FIXME: Callback is not being called on this path.
-      return;
+    DidFindCodeCompletionToken = CI.getCodeCompletionFile()
+                                     ->getDelayedParserState()
+                                     ->hasCodeCompletionDelayedDeclState();
 
     Callback(CancellableResult<CompletionInstanceResult>::success(
-        {CI, /*ReuisingASTContext=*/false}));
+        {CI, /*ReuisingASTContext=*/false, DidFindCodeCompletionToken}));
   }
 
   // Cache the compiler instance if fast completion is enabled.
-  if (isCachedCompletionRequested)
+  // If we didn't find a code compleiton token, we can't cache the instance
+  // because performCachedOperationIfPossible wouldn't have an old code
+  // completion state to compare the new one to.
+  if (isCachedCompletionRequested && DidFindCodeCompletionToken)
     cacheCompilerInstance(std::move(TheInstance), *ArgsHash);
 }
 

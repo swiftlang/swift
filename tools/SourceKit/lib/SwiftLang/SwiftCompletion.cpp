@@ -190,8 +190,15 @@ static void swiftCodeCompleteImpl(
               ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                       Consumer));
 
-          auto *SF = CI.getCodeCompletionFile();
-          performCodeCompletionSecondPass(*SF, *callbacksFactory);
+          if (!Result->DidFindCodeCompletionToken) {
+            Callback(ResultType::success(
+                {/*HasResults=*/false, &CI.getASTContext(), &CI.getInvocation(),
+                 &CompletionContext, /*RequestedModules=*/{}, /*DC=*/nullptr}));
+            return;
+          }
+
+          performCodeCompletionSecondPass(*CI.getCodeCompletionFile(),
+                                          *callbacksFactory);
           if (!Consumer.HandleResultWasCalled) {
             // If we didn't receive a handleResult call from the second pass,
             // we didn't receive any results. To make sure Callback gets called

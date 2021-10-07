@@ -81,6 +81,12 @@ static void swiftConformingMethodListImpl(
               ide::makeConformingMethodListCallbacksFactory(ExpectedTypeNames,
                                                             Consumer));
 
+          if (!Result->DidFindCodeCompletionToken) {
+            Callback(ResultType::success(
+                {/*Results=*/nullptr, Result->DidReuseAST}));
+            return;
+          }
+
           performCodeCompletionSecondPass(*Result->CI.getCodeCompletionFile(),
                                           *callbacksFactory);
           if (!Consumer.HandleResultWasCalled) {
