@@ -729,6 +729,83 @@ void swift::diagnoseMissingSendableConformance(
       type, module, loc, diag::non_sendable_type);
 }
 
+namespace {
+  template<typename Visitor>
+  bool visitInstanceStorage(
+      NominalTypeDecl *nominal, DeclContext *dc, Visitor &visitor);
+
+  /// Infer Sendable from the instance storage of the given nominal type.
+  /// \returns \c None if there is no way to make the type \c Sendable,
+  /// \c true if \c Sendable needs to be @unchecked, \c false if it can be
+  /// \c Sendable without the @unchecked.
+  Optional<bool> inferSendableFromInstanceStorage(
+      NominalTypeDecl *nominal, SmallVectorImpl<Requirement> &requirements) {
+    struct Visitor {
+      NominalTypeDecl *nominal;
+      SmallVectorImpl<Requirement> &requirements;
+      bool isUnchecked = false;
+      ProtocolDecl *sendableProto = nullptr;
+
+      Visitor(
+          NominalTypeDecl *nominal, SmallVectorImpl<Requirement> &requirements
+      ) : nominal(nominal), requirements(requirements) {
+        ASTContext &ctx = nominal->getASTContext();
+        sendableProto = ctx.getProtocol(KnownProtocolKind::Sendable);
+      }
+
+      bool operator()(VarDecl *var, Type propertyType) {
+        // If we have a class with mutable state, only an @unchecked
+        // conformance will work.
+        if (isa<ClassDecl>(nominal) && var->supportsMutation())
+          isUnchecked = true;
+
+        return checkType(propertyType);
+      }
+
+      bool operator()(EnumElementDecl *element, Type elementType) {
+        return checkType(elementType);
+      }
+
+      /// Check sendability of the given type, recording any requirements.
+      bool checkType(Type type) {
+        if (!sendableProto)
+          return true;
+
+        auto module = nominal->getParentModule();
+        auto conformance = TypeChecker::conformsToProtocol(
+            type, sendableProto, module);
+        if (conformance.isInvalid())
+          return true;
+
+        // FIXME: Look for unavailable conformances, too!
+
+        // Look for missing Sendable conformances.
+        return conformance.forEachMissingConformance(module,
+            [&](BuiltinProtocolConformance *missing) {
+              // For anything other than Sendable, fail.
+              if (missing->getProtocol() != sendableProto)
+                return true;
+
+              // If we have an archetype, capture the requirement
+              // to make this type Sendable.
+              if (missing->getType()->is<ArchetypeType>()) {
+                requirements.push_back(
+                    Requirement(
+                      RequirementKind::Conformance,
+                      missing->getType()->mapTypeOutOfContext(),
+                      sendableProto->getDeclaredType()));
+                return false;
+              }
+
+              return true;
+            });
+      }
+    } visitor(nominal, requirements);
+
+    return visitInstanceStorage(nominal, nominal, visitor);
+  }
+}
+
 static bool checkSendableInstanceStorage(
     NominalTypeDecl *nominal, DeclContext *dc, SendableCheck check);
 
@@ -772,26 +849,47 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
 
   // Note to add a Sendable conformance, possibly an unchecked one.
   {
-    bool isUnchecked = false;
+    llvm::SmallVector<Requirement, 2> requirements;
+    auto canMakeSendable = inferSendableFromInstanceStorage(
+        nominal, requirements);
 
     // Non-final classes can only have @unchecked.
+    bool isUnchecked = !canMakeSendable || *canMakeSendable;
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
       if (!classDecl->isFinal())
         isUnchecked = true;
-    }
-
-    // NOTE: We might need to introduce a conditional conformance here.
-    if (!isUnchecked &&
-        checkSendableInstanceStorage(
-            nominal, nominal, SendableCheck::Implicit)) {
-      isUnchecked = true;
     }
 
     auto note = nominal->diagnose(
         isUnchecked ? diag::explicit_unchecked_sendable
                     : diag::add_nominal_sendable_conformance,
         nominal->getDescriptiveKind(), nominal->getName());
-    addSendableFixIt(nominal, note, isUnchecked);
+    if (canMakeSendable && !requirements.empty()) {
+      // Produce a Fix-It containing a conditional conformance to Sendable,
+      // based on the requirements harvested from instance storage.
+
+      // Form the where clause containing all of the requirements.
+      std::string whereClause;
+      {
+        llvm::raw_string_ostream out(whereClause);
+        llvm::interleaveComma(
+            requirements, out,
+            [&](const Requirement &req) {
+              out << req.getFirstType().getString() << ": "
+                  << req.getSecondType().getString();
+            });
+      }
+
+      // Add a Fix-It containing the conditional extension text itself.
+      auto insertionLoc = nominal->getBraces().End;
+      note.fixItInsertAfter(
+          insertionLoc,
+          ("\n\nextension " + nominal->getName().str() + ": "
+           + (isUnchecked? "@unchecked " : "") + "Sendable where " +
+           whereClause + " { }\n").str());
+    } else {
+      addSendableFixIt(nominal, note, isUnchecked);
+    }
   }
 
   // Note to disable the warning.
@@ -3476,18 +3574,74 @@ static std::pair<DiagnosticBehavior, bool> limitSendableInstanceBehavior(
   }
 }
 
+namespace {
+  /// Visit the instance storage of the given nominal type as seen through
+  /// the given declaration context.
+  ///
+  /// \param visitor Called with each (stored property, property type) pair
+  /// for classes/structs and with each (enum element, associated value type)
+  /// pair for enums.
+  ///
+  /// \returns \c true if any call to the \c visitor returns \c true, and
+  /// \c false otherwise.
+  template<typename Visitor>
+  bool visitInstanceStorage(
+      NominalTypeDecl *nominal, DeclContext *dc, Visitor &visitor) {
+    // Walk the stored properties of classes and structs.
+    if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
+      for (auto property : nominal->getStoredProperties()) {
+        auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType())
+            ->getRValueType()->getReferenceStorageReferent();
+        if (visitor(property, propertyType))
+          return true;
+      }
+
+      return false;
+    }
+
+    // Walk the enum elements that have associated values.
+    if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+      for (auto caseDecl : enumDecl->getAllCases()) {
+        for (auto element : caseDecl->getElements()) {
+          if (!element->hasAssociatedValues())
+            continue;
+
+          // Check that the associated value type is Sendable.
+          auto elementType = dc->mapTypeIntoContext(
+              element->getArgumentInterfaceType());
+          if (visitor(element, elementType))
+            return true;
+        }
+      }
+
+      return false;
+    }
+
+    return false;
+  }
+}
+
 /// Check the instance storage of the given nominal type to verify whether
 /// it is comprised only of Sendable instance storage.
 static bool checkSendableInstanceStorage(
     NominalTypeDecl *nominal, DeclContext *dc, SendableCheck check) {
   // Stored properties of structs and classes must have
   // Sendable-conforming types.
-  const LangOptions &langOpts = dc->getASTContext().LangOpts;
-  bool invalid = false;
-  if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
-    auto classDecl = dyn_cast<ClassDecl>(nominal);
-    for (auto property : nominal->getStoredProperties()) {
-      if (classDecl && property->supportsMutation()) {
+  struct Visitor {
+    bool invalid = false;
+    NominalTypeDecl *nominal;
+    DeclContext *dc;
+    SendableCheck check;
+    const LangOptions &langOpts;
+
+    Visitor(NominalTypeDecl *nominal, DeclContext *dc, SendableCheck check)
+      : nominal(nominal), dc(dc), check(check),
+        langOpts(nominal->getASTContext().LangOpts) { }
+
+    /// Handle a stored property.
+    bool operator()(VarDecl *property, Type propertyType) {
+      // Classes with mutable properties are not Sendable.
+      if (property->supportsMutation() && isa<ClassDecl>(nominal)) {
         if (check == SendableCheck::Implicit)
           return true;
 
@@ -3499,28 +3653,26 @@ static bool checkSendableInstanceStorage(
                            nominal->getName())
             .limitBehavior(action.first);
         invalid = invalid || action.second;
-        continue;
+        return true;
       }
 
-      // Check that the property is Sendable.
-      auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType())
-          ->getRValueType()->getReferenceStorageReferent();
+      // Check that the property type is Sendable.
       bool diagnosedProperty = diagnoseNonSendableTypes(
-              propertyType, dc->getParentModule(), property->getLoc(),
-              [&](Type type, DiagnosticBehavior suggestedBehavior) {
-                auto action = limitSendableInstanceBehavior(
-                    langOpts, check, suggestedBehavior);
-                if (check == SendableCheck::Implicit)
-                  return action;
+          propertyType, dc->getParentModule(), property->getLoc(),
+          [&](Type type, DiagnosticBehavior suggestedBehavior) {
+            auto action = limitSendableInstanceBehavior(
+                langOpts, check, suggestedBehavior);
+            if (check == SendableCheck::Implicit)
+              return action;
 
-                property->diagnose(diag::non_concurrent_type_member,
-                                   false, property->getName(),
-                                   nominal->getDescriptiveKind(),
-                                   nominal->getName(),
-                                   propertyType)
-                    .limitBehavior(action.first);
-                return action;
-              });
+            property->diagnose(diag::non_concurrent_type_member,
+                               false, property->getName(),
+                               nominal->getDescriptiveKind(),
+                               nominal->getName(),
+                               propertyType)
+                .limitBehavior(action.first);
+            return action;
+          });
 
       if (diagnosedProperty) {
         invalid = true;
@@ -3529,51 +3681,42 @@ static bool checkSendableInstanceStorage(
         if (check == SendableCheck::Implicit)
           return true;
       }
+
+      return false;
     }
 
-    return invalid;
-  }
+    /// Handle an enum associated value.
+    bool operator()(EnumElementDecl *element, Type elementType) {
+      bool diagnosedElement = diagnoseNonSendableTypes(
+          elementType, dc->getParentModule(), element->getLoc(),
+          [&](Type type, DiagnosticBehavior suggestedBehavior) {
+            auto action = limitSendableInstanceBehavior(
+                langOpts, check, suggestedBehavior);
+            if (check == SendableCheck::Implicit)
+              return action;
 
-  // Associated values of enum cases must have Sendable-conforming
-  // types.
-  if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-    for (auto caseDecl : enumDecl->getAllCases()) {
-      for (auto element : caseDecl->getElements()) {
-        if (!element->hasAssociatedValues())
-          continue;
+            element->diagnose(diag::non_concurrent_type_member,
+                              true, element->getName(),
+                              nominal->getDescriptiveKind(),
+                              nominal->getName(),
+                              type)
+                .limitBehavior(action.first);
+            return action;
+          });
 
-        // Check that the associated value type is Sendable.
-        auto elementType = dc->mapTypeIntoContext(
-            element->getArgumentInterfaceType());
-        bool diagnosedElement = diagnoseNonSendableTypes(
-              elementType, dc->getParentModule(), element->getLoc(),
-              [&](Type type, DiagnosticBehavior suggestedBehavior) {
-                auto action = limitSendableInstanceBehavior(
-                    langOpts, check, suggestedBehavior);
-                if (check == SendableCheck::Implicit)
-                  return action;
+      if (diagnosedElement) {
+        invalid = true;
 
-                element->diagnose(diag::non_concurrent_type_member,
-                                  true, element->getName(),
-                                  nominal->getDescriptiveKind(),
-                                  nominal->getName(),
-                                  type)
-                    .limitBehavior(action.first);
-                return action;
-              });
-
-        if (diagnosedElement) {
-          invalid = true;
-
-          // For implicit checks, bail out early if anything failed.
-          if (check == SendableCheck::Implicit)
-            return true;
-        }
+        // For implicit checks, bail out early if anything failed.
+        if (check == SendableCheck::Implicit)
+          return true;
       }
-    }
-  }
 
-  return invalid;
+      return false;
+    }
+  } visitor(nominal, dc, check);
+
+  return visitInstanceStorage(nominal, dc, visitor) || visitor.invalid;
 }
 
 bool swift::checkSendableConformance(
