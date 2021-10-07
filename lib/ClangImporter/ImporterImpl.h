@@ -1223,7 +1223,7 @@ public:
       DeclContext *dc, const clang::FunctionDecl *clangDecl,
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
-      ArrayRef<GenericTypeParamDecl *> genericParams);
+      ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType);
 
   ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                                   bool isFromSystemModule);
@@ -1559,6 +1559,12 @@ bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
 /// \returns true if this operator should be made a static function
 /// even if imported as a non-static member function.
 bool isImportedAsStatic(clang::OverloadedOperatorKind op);
+
+/// \returns true if \p a has the same underlying type as \p b after removing
+/// any pointer/reference specifiers. Note that this does not currently look through
+/// nested types other than pointers or references.
+bool hasSameUnderlyingType(const clang::Type *a,
+                           const clang::TemplateTypeParmDecl *b);
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,

@@ -1844,14 +1844,14 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
       return {Type(), false};
   }
 
+  Type swiftResultTy = importedType.getType();
   ArrayRef<Identifier> argNames = name.getArgumentNames();
   parameterList = importFunctionParameterList(dc, clangDecl, params, isVariadic,
                                               allowNSUIntegerAsInt, argNames,
-                                              genericParams);
+                                              genericParams, swiftResultTy);
   if (!parameterList)
     return {Type(), false};
 
-  Type swiftResultTy = importedType.getType();
   if (clangDecl->isNoReturn())
     swiftResultTy = SwiftContext.getNeverType();
 
@@ -1862,7 +1862,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
-    ArrayRef<GenericTypeParamDecl *> genericParams) {
+    ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType) {
   // Import the parameters.
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
@@ -1978,6 +1978,50 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         paramInfo, isUnsafeSendable, isUnsafeMainActor);
     parameters.push_back(paramInfo);
     ++index;
+  }
+
+  auto genericParamTypeUsedInSignature =
+      [params, resultType](GenericTypeParamDecl *genericParam,
+                           bool shouldCheckResultType) -> bool {
+    auto paramDecl = genericParam->getClangDecl();
+    auto templateTypeParam = cast<clang::TemplateTypeParmDecl>(paramDecl);
+    // TODO(SR-13809): This won't work when we support importing dependent types.
+    // We'll have to change this logic to traverse the type tree of the imported
+    // Swift type (basically whatever ends up in the parameters variable).
+    // Check if genericParam's corresponding clang template type is used by
+    // the clang function's parameters.
+    for (auto param : params) {
+      if (hasSameUnderlyingType(param->getType().getTypePtr(),
+                                templateTypeParam)) {
+        return true;
+      }
+    }
+
+    // Check if genericParam is used as a type parameter in the result type.
+    return shouldCheckResultType &&
+        resultType.findIf([genericParam](Type typePart) -> bool {
+          return typePart->isEqual(genericParam->getDeclaredInterfaceType());
+        });
+  };
+  
+  // Make sure all generic parameters are accounted for in the function signature.
+  for (auto genericParam : genericParams) {
+    bool shouldCheckResultType = resultType && resultType->hasTypeParameter();
+    if (genericParamTypeUsedInSignature(genericParam, shouldCheckResultType))
+      continue;
+    
+    // If this generic parameter is not used in the function signature,
+    // add a new parameter that accepts a metatype corresponding to that
+    // generic parameter.
+    Identifier name = genericParam->getName();
+    auto param = new (SwiftContext)
+        ParamDecl(SourceLoc(), SourceLoc(), name, SourceLoc(),
+                  name, dc);
+    auto metatype =
+      cast<MetatypeType>(genericParam->getInterfaceType().getPointer());
+    param->setInterfaceType(metatype);
+    param->setSpecifier(ParamSpecifier::Default);
+    parameters.push_back(param);
   }
 
   // Append an additional argument to represent varargs.
