@@ -7,7 +7,8 @@ let dict2: [Character: _] = ["h": 0]
 
 let arr = [_](repeating: "hi", count: 3)
 
-func foo(_ arr: [_] = [0]) {} // expected-error {{type placeholder not allowed here}}
+func foo(_ arr: [_] = [0]) {} // expected-error {{type placeholder may not appear in top-level parameter}}
+// expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
 
 let foo = _.foo // expected-error {{could not infer type for placeholder}}
 let zero: _ = .zero // expected-error {{cannot infer contextual base in reference to member 'zero'}}
@@ -74,27 +75,35 @@ where T: ExpressibleByIntegerLiteral, U: ExpressibleByIntegerLiteral {
 }
 
 extension Bar {
-    func frobnicate2() -> Bar<_, _> { // expected-error {{type placeholder not allowed here}}
-        return Bar(t: 42, u: 42)
-    }
-    func frobnicate3() -> Bar {
-        return Bar<_, _>(t: 42, u: 42)
-    }
-    func frobnicate4() -> Bar<_, _> { // expected-error {{type placeholder not allowed here}}
-        return Bar<_, _>(t: 42, u: 42)
-    }
-    func frobnicate5() -> Bar<_, U> { // expected-error {{type placeholder not allowed here}}
-        return Bar(t: 42, u: 42)
-    }
-    func frobnicate6() -> Bar {
-        return Bar<_, U>(t: 42, u: 42)
-    }
-    func frobnicate7() -> Bar<_, _> { // expected-error {{type placeholder not allowed here}}
-        return Bar<_, U>(t: 42, u: 42)
-    }
-    func frobnicate8() -> Bar<_, U> { // expected-error {{type placeholder not allowed here}}
-        return Bar<_, _>(t: 42, u: 42)
-    }
+  func frobnicate2() -> Bar<_, _> { // expected-error {{type placeholder may not appear in function return type}}
+    // expected-note@-1 {{replace the placeholder with the correct type 'T'}}
+    // expected-note@-2 {{replace the placeholder with the correct type 'U'}}
+    return Bar(t: 42, u: 42)
+  }
+  func frobnicate3() -> Bar {
+    return Bar<_, _>(t: 42, u: 42)
+  }
+  func frobnicate4() -> Bar<_, _> { // expected-error {{type placeholder may not appear in function return type}}
+    // expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
+    // expected-note@-2 {{replace the placeholder with the correct type 'Int'}}
+    return Bar<_, _>(t: 42, u: 42)
+  }
+  func frobnicate5() -> Bar<_, U> { // expected-error {{type placeholder may not appear in function return type}}
+    // expected-note@-1 {{replace the placeholder with the correct type 'T'}}
+    return Bar(t: 42, u: 42)
+  }
+  func frobnicate6() -> Bar {
+    return Bar<_, U>(t: 42, u: 42)
+  }
+  func frobnicate7() -> Bar<_, _> { // expected-error {{type placeholder may not appear in function return type}}
+    // expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
+    // expected-note@-2 {{replace the placeholder with the correct type 'U'}}
+    return Bar<_, U>(t: 42, u: 42)
+  }
+  func frobnicate8() -> Bar<_, U> { // expected-error {{type placeholder may not appear in function return type}}
+    // expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
+    return Bar<_, _>(t: 42, u: 42)
+  }
 }
 
 // FIXME: We should probably have better diagnostics for these situations--the user probably meant to use implicit member syntax
@@ -186,7 +195,7 @@ struct Just<Output>: Publisher {
 struct SetFailureType<Output, Failure>: Publisher {}
 
 extension Publisher {
-    func setFailureType<T>(to: T.Type) -> SetFailureType<Output, T> { // expected-note {{in call to function 'setFailureType(to:)'}}
+    func setFailureType<T>(to: T.Type) -> SetFailureType<Output, T> { // expected-note 2 {{in call to function 'setFailureType(to:)'}}
         return .init()
     }
 }
@@ -197,10 +206,10 @@ let _: SetFailureType<Int, (String) -> Double> = Just<Int>().setFailureType(to: 
 let _: SetFailureType<Int, (String, Double)> = Just<Int>().setFailureType(to: (_, _).self)
 
 // TODO: Better error message here? Would be nice if we could point to the placeholder...
-let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self).setFailureType(to: String.self) // expected-error {{placeholders are not allowed as top-level types}}
+let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self).setFailureType(to: String.self) // expected-error {{generic parameter 'T' could not be inferred}}
 
-let _: (_) = 0 as Int // expected-error {{placeholders are not allowed as top-level types}}
-let _: Int = 0 as (_) // expected-error {{placeholders are not allowed as top-level types}}
+let _: (_) = 0 as Int
+let _: Int = 0 as (_)
 
 _ = (1...10)
     .map {
@@ -217,3 +226,31 @@ _ = (1...10)
     }
 
 let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self).setFailureType(to: String.self) // expected-error {{generic parameter 'T' could not be inferred}}
+
+// N.B. The parallel structure of the annotation and inferred default
+// initializer types is all wrong. Plus, we do not trust
+// the contextual type with placeholders in it so the result is a generic
+// diagnostic.
+func mismatchedDefault<T>(_ x: [_] = [String: T]()) {} // expected-error {{type placeholder not allowed here}}
+
+func mismatchedReturnTypes() -> _ { // expected-error {{type placeholder may not appear in function return type}}
+  if true {
+    return "" // expected-note@-2 {{replace the placeholder with the correct type 'String'}}
+  } else {
+    return 0.5 // expected-note@-4 {{replace the placeholder with the correct type 'Double'}}
+  }
+}
+
+// FIXME: Opaque result types ought to be treated better than this. But it's
+// tricky to know which type is intended in a lot of cases.
+@available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+func opaque() -> some _ { // expected-error {{type placeholder not allowed here}}
+  return Just<Int>().setFailureType(to: _.self)
+}
+
+enum EnumWithPlaceholders {
+  case topLevelPlaceholder(x: _) // expected-error {{type placeholder not allowed here}}
+  case placeholderWithDefault(x: _ = 5) // expected-error {{type placeholder may not appear in top-level parameter}}
+  // expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
+}
+

@@ -3703,6 +3703,12 @@ NOTE(descriptive_generic_type_declared_here,none,
 
 ERROR(placeholder_type_not_allowed,none,
       "type placeholder not allowed here", ())
+ERROR(placeholder_type_not_allowed_in_return_type,none,
+      "type placeholder may not appear in function return type", ())
+ERROR(placeholder_type_not_allowed_in_parameter,none,
+      "type placeholder may not appear in top-level parameter", ())
+NOTE(replace_placeholder_with_inferred_type,none,
+     "replace the placeholder with the correct type %0", (Type))
 
 WARNING(use_of_void_pointer,none,
 "Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
