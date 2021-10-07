@@ -1848,12 +1848,27 @@ ASTContext::getLoadedModules() const {
 }
 
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
-  return getImpl().LoadedModules.lookup(ModuleName);
+  // Look up a loaded module using an actual module name (physical name
+  // on disk). If the -module-alias option is used, the module name that
+  // appears in source code will be different from the real module name
+  // on disk, otherwise the same.
+  //
+  // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
+  // and a source file has 'import Foo', a module called Bar (real name)
+  // will be loaded and returned.
+  auto realName = getRealModuleName(ModuleName);
+  return getImpl().LoadedModules.lookup(realName);
 }
 
 void ASTContext::addLoadedModule(ModuleDecl *M) {
   assert(M);
-  getImpl().LoadedModules[M->getName()] = M;
+  // Add a loaded module using an actual module name (physical name
+  // on disk), in case -module-alias is used (otherwise same).
+  //
+  // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
+  // and a source file has 'import Foo', a module called Bar (real name)
+  // will be loaded and added to the map.
+  getImpl().LoadedModules[M->getRealName()] = M;
 }
 
 void ASTContext::registerGenericSignatureBuilder(
