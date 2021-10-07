@@ -816,6 +816,7 @@ namespace options_block {
     IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED,
     MODULE_ABI_NAME,
     IS_CONCURRENCY_CHECKED,
+    MODULE_ALIAS_REAL_NAME,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -865,6 +866,11 @@ namespace options_block {
 
   using IsConcurrencyCheckedLayout = BCRecordLayout<
     IS_CONCURRENCY_CHECKED
+  >;
+
+  using ModuleAliasLayout = BCRecordLayout<
+    MODULE_ALIAS_REAL_NAME,
+    BCBlob
   >;
 }
 

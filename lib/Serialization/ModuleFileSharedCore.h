@@ -82,6 +82,9 @@ class ModuleFileSharedCore {
   /// The module ABI name.
   StringRef ModuleABIName;
 
+  /// The module real name if aliased.
+  StringRef ModuleAliasRealName;
+
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
 

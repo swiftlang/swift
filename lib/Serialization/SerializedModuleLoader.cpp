@@ -753,6 +753,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
+    if (!loadedModuleFile->getModuleAliasRealName().empty())
+      M.setRealName(Ctx.getIdentifier(loadedModuleFile->getModuleAliasRealName()));
     M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status = loadedModuleFile->associateWithFileContext(

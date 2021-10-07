@@ -106,6 +106,7 @@ class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
   StringRef SDKPath;
   StringRef ModuleABIName;
+  StringRef ModuleAliasRealName;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -174,6 +175,8 @@ public:
   void setIsConcurrencyChecked(bool val = true) {
     Bits.IsConcurrencyChecked = val;
   }
+  StringRef getModuleAliasRealName() const { return ModuleAliasRealName; }
+  void setModuleRealName(StringRef name) { ModuleAliasRealName = name; }
 };
 
 /// Returns info about the serialized AST in the given data.

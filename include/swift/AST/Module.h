@@ -170,6 +170,9 @@ class ModuleDecl
 
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
+      
+  /// The real name of the module if aliased.
+  mutable Identifier ModuleRealName;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -357,6 +360,10 @@ public:
     ModuleABIName = name;
   }
 
+  /// Set the real name of the module if aliased
+  void setRealName(Identifier name) {
+    ModuleRealName = name;
+  }
   /// Retrieve the actual module name of an alias used for this module (if any).
   ///
   /// For example, if '-module-alias Foo=Bar' is passed in when building the main module,

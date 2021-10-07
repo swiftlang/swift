@@ -444,6 +444,11 @@ public:
     return Core->UserModuleVersion;
   }
 
+  /// The real name of the module if aliased.
+  StringRef getModuleAliasRealName() const {
+    return Core->ModuleAliasRealName;
+  }
+
   /// The Swift compatibility version in use when this module was built.
   const version::Version &getCompatibilityVersion() const {
     return Core->CompatibilityVersion;

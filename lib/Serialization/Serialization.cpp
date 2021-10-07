@@ -1059,6 +1059,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         IsConcurrencyChecked.emit(ScratchRecord);
       }
 
+      if (M->getRealName() != M->getName()) {
+        options_block::ModuleAliasLayout AliasRealName(Out);
+        AliasRealName.emit(ScratchRecord, M->getRealName().str());
+      }
+
       if (options.SerializeOptionsForDebugging) {
         options_block::SDKPathLayout SDKPath(Out);
         options_block::XCCLayout XCC(Out);
