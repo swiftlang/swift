@@ -86,6 +86,7 @@ foreach(sdk ${DISPATCH_SDKS})
                           -DCMAKE_INSTALL_LIBDIR=lib
                           -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                           -DCMAKE_LINKER=${CMAKE_LINKER}
+                          -DCMAKE_MT=${CMAKE_MT}
                           -DCMAKE_RANLIB=${CMAKE_RANLIB}
                           -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                           -DCMAKE_SYSTEM_NAME=${SWIFT_SDK_${sdk}_NAME}
