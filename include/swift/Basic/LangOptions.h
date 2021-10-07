@@ -481,6 +481,11 @@ namespace swift {
     /// algorithm.
     unsigned RequirementMachineDepthLimit = 10;
 
+    /// Enable the new experimental protocol requirement signature minimization
+    /// algorithm.
+    RequirementMachineMode RequirementMachineProtocolSignatures =
+        RequirementMachineMode::Disabled;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
