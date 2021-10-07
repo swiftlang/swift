@@ -24,6 +24,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParseSILSupport.h"
@@ -35,6 +36,7 @@
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -44,6 +46,27 @@ static void getStringPartTokens(const swift::Token &Tok,
                                 const swift::LangOptions &LangOpts,
                                 const swift::SourceManager &SM, int BufID,
                                 std::vector<swift::Token> &Toks);
+
+namespace {
+swift::LexerMode lexerModeForBuffer(const swift::SourceManager &SM,
+                                    unsigned BufferID) {
+  using namespace swift;
+  namespace path = llvm::sys::path;
+
+  switch (file_types::lookupTypeForExtension(
+            path::extension(SM.getIdentifierForBuffer(BufferID)))) {
+  case file_types::TY_Markdown:
+    return LexerMode::Markdown;
+  case file_types::TY_reStructuredText:
+    return LexerMode::reStructuredText;
+  case file_types::TY_LaTeX:
+    return LexerMode::LaTeX;
+  case file_types::TY_Swift:
+  default:
+    return LexerMode::Swift;
+  }
+}
+}
 
 namespace swift {
 template <typename DF>
@@ -61,7 +84,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
   if (Offset == 0 && EndOffset == 0)
     EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
 
-  Lexer L(LangOpts, SM, BufferID, Diags, LexerMode::Swift,
+  Lexer L(LangOpts, SM, BufferID, Diags, lexerModeForBuffer(SM, BufferID),
           HashbangMode::Allowed, RetainComments, TriviaRetention, Offset,
           EndOffset);
 
@@ -359,8 +382,9 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-
-static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
+static LexerMode sourceFileKindToLexerMode(SourceFileKind kind,
+                                           unsigned BufferID,
+                                           SourceManager &SM) {
   switch (kind) {
     case swift::SourceFileKind::Interface:
       return LexerMode::SwiftInterface;
@@ -368,7 +392,7 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
       return LexerMode::SIL;
     case swift::SourceFileKind::Library:
     case swift::SourceFileKind::Main:
-      return LexerMode::Swift;
+      return lexerModeForBuffer(SM, BufferID);
   }
   llvm_unreachable("covered switch");
 }
@@ -387,7 +411,8 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
               BufferID, LexerDiags,
-              sourceFileKindToLexerMode(SF.Kind),
+              sourceFileKindToLexerMode(SF.Kind, BufferID,
+                                        SF.getASTContext().SourceMgr),
               SF.Kind == SourceFileKind::Main
                   ? HashbangMode::Allowed
                   : HashbangMode::Disallowed,
@@ -425,7 +450,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
   void relexComment(CharSourceRange CommentRange,
                     llvm::SmallVectorImpl<Token> &Scratch) {
     auto &SM = Ctx.SourceMgr;
-    Lexer L(Ctx.LangOpts, SM, BufferID, nullptr, LexerMode::Swift,
+    Lexer L(Ctx.LangOpts, SM, BufferID, nullptr, lexerModeForBuffer(SM, BufferID),
             HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
             TriviaRetentionMode::WithoutTrivia,
             SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
@@ -1279,7 +1304,7 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,
                       BufferID, &Impl.Diags,
-                      LexerMode::Swift,
+                      lexerModeForBuffer(SM, BufferID),
                       HashbangMode::Allowed,
                       CommentRetentionMode::None,
                       TriviaRetentionMode::WithoutTrivia,

@@ -45,6 +45,10 @@ ID lookupTypeForName(StringRef Name);
 /// Returns true if the type represents textual data.
 bool isTextual(ID Id);
 
+/// Returns true if the type is a Swift source file.  This includes literate
+/// Swift, which might be in a Markdown, reStructuredText or LaTeX wrapper.
+bool isSwiftSourceCode(ID Id);
+
 /// Returns true if the type is produced in the compiler after the LLVM
 /// passes.
 ///

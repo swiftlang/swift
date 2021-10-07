@@ -208,6 +208,22 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   ArtificialEOF = BufferStart + EndOffset;
   CurPtr = BufferStart + Offset;
 
+  // If we're in a literate mode, set InCodeBlock to false initially
+  switch (LexMode) {
+  case LexerMode::Markdown:
+  case LexerMode::reStructuredText:
+  case LexerMode::LaTeX:
+    InCodeBlock = false;
+    break;
+  default:
+    InCodeBlock = true;
+    break;
+  }
+
+  MarkdownFence = 0;
+  MarkdownFenceLength = 0;
+  RSTIndentLevel = 0;
+
   assert(NextToken.is(tok::NUM_TOKENS));
   lexImpl();
   assert((NextToken.isAtStartOfLine() || CurPtr != BufferStart) &&
@@ -235,9 +251,22 @@ Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
   initialize(Offset, EndOffset);
 }
 
+namespace {
+LexerMode modeForChildLexer(LexerMode ParentMode) {
+  switch (ParentMode) {
+  case LexerMode::Markdown:
+  case LexerMode::reStructuredText:
+  case LexerMode::LaTeX:
+    return LexerMode::Swift;
+  default:
+    return ParentMode;
+  }
+}
+}
+
 Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
     : Lexer(PrincipalTag(), Parent.LangOpts, Parent.SourceMgr, Parent.BufferID,
-            Parent.Diags, Parent.LexMode,
+            Parent.Diags, modeForChildLexer(Parent.LexMode),
             Parent.IsHashbangAllowed
                 ? HashbangMode::Allowed
                 : HashbangMode::Disallowed,
@@ -2326,6 +2355,487 @@ void Lexer::getStringLiteralSegments(
 
 
 //===----------------------------------------------------------------------===//
+// Literate Swift Processing
+//===----------------------------------------------------------------------===//
+
+void Lexer::rewindToStartOfLine() {
+  while (CurPtr > BufferStart && *CurPtr != '\r' && *CurPtr != '\n')
+    --CurPtr;
+  if (*CurPtr == '\r')
+    ++CurPtr;
+  if (*CurPtr == '\n')
+    ++CurPtr;
+}
+
+/// Skip the code in a reStructuredText code block
+void Lexer::skipRSTCodeBlock() {
+  const char *LineStart = CurPtr;
+  while (CurPtr < BufferEnd) {
+    char ch = *CurPtr++;
+
+    switch (ch) {
+    case '\r':
+      LineStart = CurPtr - 1;
+      if (*CurPtr == '\n')
+        ++CurPtr;
+      Indentation = 0;
+      break;
+    case '\n':
+      LineStart = CurPtr - 1;
+      Indentation = 0;
+      break;
+    case ' ':
+      ++Indentation;
+      break;
+    case '\t':
+      Indentation += 8;
+      break;
+    default:
+      if (Indentation <= RSTIndentLevel) {
+        CurPtr = LineStart;
+        return;
+      }
+    }
+  }
+}
+
+/// Scan a word, which is a space separated item in a literate file
+StringRef Lexer::scanWord(char ExtraTerm) {
+  const char *Start = CurPtr;
+  while (CurPtr < BufferEnd
+         && *CurPtr != ' ' && *CurPtr != '\t'
+         && *CurPtr != '\r' && *CurPtr != '\n'
+         && (!ExtraTerm || *CurPtr != ExtraTerm))
+    ++CurPtr;
+  return StringRef(Start, CurPtr - Start);
+}
+
+namespace {
+  enum class IndentState {
+    WaitingForEOL,
+    GotCR,
+    GotEOL,
+    GotBlankLineCR,
+    GotBlankLine,
+  };
+}
+
+void Lexer::advanceToMarkdownCodeBlock() {
+  IndentState IState = IndentState::GotEOL;
+  Indentation = 0;
+
+  rewindToStartOfLine();
+
+  // Looking for
+  //
+  //    ``` swift nocompile
+  //
+  // or a block with a four plus character indent.
+  //
+  // If we see a non-Swift code block, we will skip it; we will also skip
+  // any code block marked "nocompile".
+  MarkdownFence = 0;
+  const char *FenceStart = CurPtr;
+  while (CurPtr < BufferEnd) {
+    char ch = *CurPtr++;
+    if (ch == '`' || ch == '~') {
+      if (ch == MarkdownFence) {
+        if (CurPtr - FenceStart == 3) {
+          // Scan any additional fence characters and remember the length
+          while (*CurPtr == MarkdownFence)
+            ++CurPtr;
+
+          MarkdownFenceLength = CurPtr - FenceStart;
+
+          // Skip whitespace
+          while (*CurPtr == ' ' || *CurPtr == '\t')
+            ++CurPtr;
+
+          bool skip = false;
+
+          char Terminator = MarkdownFence == '`' ? '`' : 0;
+
+          // Scan a word
+          StringRef Language = scanWord(Terminator);
+          if (Language.size() && !Language.equals("swift"))
+            skip = true;
+
+          // Continue until end of line
+          while (CurPtr < BufferEnd
+                 && *CurPtr != '\r' && *CurPtr != '\n'
+                 && (MarkdownFence != '`' || *CurPtr != '`')) {
+            // Skip whitespace
+            while (*CurPtr == ' ' || *CurPtr == '\t')
+              ++CurPtr;
+
+            // Read a word
+            StringRef Word = scanWord(Terminator);
+            if (Word.equals("nocompile"))
+              skip = true;
+          }
+
+          // If we're using backticks and we found a backtick, this is not a
+          // code block; skip the backtick(s) and the rest of the line, and
+          // continue
+          if (MarkdownFence == '`' && *CurPtr == '`') {
+            while (*CurPtr == '`')
+              ++CurPtr;
+
+            while (CurPtr < BufferEnd && *CurPtr != '\r' && *CurPtr != '\n')
+              ++CurPtr;
+
+            MarkdownFence = 0;
+            continue;
+          }
+
+          // If we're at a line end, we're done
+          if (*CurPtr == '\n' || *CurPtr == '\r') {
+            char ch = *CurPtr++;
+            if (ch == '\r' && *CurPtr == '\n')
+              CurPtr++;
+
+            if (skip) {
+              // Skip this block
+              const char *CloseStart = CurPtr;
+              while (CurPtr < BufferEnd) {
+                char ch = *CurPtr++;
+                if (ch == MarkdownFence) {
+                  if (CurPtr - CloseStart == MarkdownFenceLength)
+                    break;
+                } else {
+                  CloseStart = CurPtr - 1;
+                }
+              }
+
+              if (CurPtr - CloseStart == MarkdownFenceLength) {
+                while (*CurPtr == MarkdownFence)
+                  ++CurPtr;
+              }
+              MarkdownFence = 0;
+              continue;
+            } else {
+              InCodeBlock = true;
+              NextToken.setAtStartOfLine(true);
+              return;
+            }
+          }
+        }
+      } else {
+        MarkdownFence = ch;
+        FenceStart = CurPtr - 1;
+      }
+    } else {
+      MarkdownFence = 0;
+    }
+
+    switch (IState) {
+    case IndentState::WaitingForEOL:
+      if (ch == '\r')
+        IState = IndentState::GotCR;
+      if (ch == '\n')
+        IState = IndentState::GotEOL;
+      break;
+    case IndentState::GotCR:
+      if (ch == '\n') {
+        IState = IndentState::GotEOL;
+        break;
+      }
+      IState = IndentState::GotEOL;
+      [[clang::fallthrough]];
+    case IndentState::GotEOL:
+      if (ch == '\r')
+        IState = IndentState::GotBlankLineCR;
+      else if (ch == '\n') {
+        IState = IndentState::GotBlankLine;
+        Indentation = 0;
+      } else if (ch != ' ' && ch != '\t')
+        IState = IndentState::WaitingForEOL;
+      break;
+    case IndentState::GotBlankLineCR:
+      if (ch == '\n') {
+        IState = IndentState::GotBlankLine;
+        Indentation = 0;
+        break;
+      }
+      IState = IndentState::GotBlankLine;
+      [[clang::fallthrough]];
+    case IndentState::GotBlankLine:
+      if (ch == ' ')
+        ++Indentation;
+      else if (ch == '\t')
+        Indentation += 8;
+      else
+        IState = IndentState::WaitingForEOL;
+      break;
+    }
+
+    // If we have a four plus space indent, this is a code block
+    if (Indentation >= 4) {
+      ScanningIndent = false;
+      MarkdownFence = ' ';
+      InCodeBlock = true;
+      NextToken.setAtStartOfLine(true);
+      return;
+    }
+  }
+}
+
+void Lexer::advanceToRSTCodeBlock() {
+  IndentState IState = IndentState::GotEOL;
+  RSTIndentLevel = 0;
+
+  rewindToStartOfLine();
+
+  while (CurPtr < BufferEnd) {
+    char ch = *CurPtr++;
+
+    // Looking for :: EOL WS* EOL
+    if (ch == ':' && *CurPtr == ':') {
+      ++CurPtr;
+
+      if (*CurPtr != '\r' && *CurPtr != '\n')
+        continue;
+      if (*CurPtr == '\r')
+        ++CurPtr;
+      if (*CurPtr == '\n')
+        ++CurPtr;
+
+      while (*CurPtr == ' ' || *CurPtr == '\t')
+        ++CurPtr;
+
+      if (*CurPtr != '\r' && *CurPtr != '\n')
+        continue;
+
+      RSTIndentLevel = Indentation;
+      InCodeBlock = true;
+      NextToken.setAtStartOfLine(true);
+      return;
+    }
+
+    switch (IState) {
+    case IndentState::WaitingForEOL:
+      if (ch == '\r')
+        IState = IndentState::GotCR;
+      if (ch == '\n')
+        IState = IndentState::GotEOL;
+      break;
+    case IndentState::GotCR:
+      if (ch == '\n') {
+        IState = IndentState::GotEOL;
+        break;
+      }
+      IState = IndentState::GotEOL;
+      [[clang::fallthrough]];
+    case IndentState::GotEOL:
+      if (ch == '\r')
+        IState = IndentState::GotBlankLineCR;
+      else if (ch == '\n') {
+        IState = IndentState::GotBlankLine;
+        Indentation = 0;
+      } else if (ch != ' ' && ch != '\t')
+        IState = IndentState::WaitingForEOL;
+      break;
+    case IndentState::GotBlankLineCR:
+      if (ch == '\n') {
+        IState = IndentState::GotBlankLine;
+        Indentation = 0;
+        break;
+      }
+      IState = IndentState::GotBlankLine;
+      [[clang::fallthrough]];
+    case IndentState::GotBlankLine:
+      if (ch == ' ')
+        ++Indentation;
+      else if (ch == '\t')
+        Indentation += 8;
+      else if ((ch == '-' || ch == '*' || ch == '+')
+               && (*CurPtr == ' ' || *CurPtr == '\t')) {
+        // It's a bullet
+        ++Indentation;
+        while (*CurPtr == ' ' || *CurPtr == '\t') {
+          char ch = *CurPtr++;
+          if (ch == ' ')
+            ++Indentation;
+          else
+            Indentation += 8;
+        }
+      } else if ((ch >= '0' && ch <= '9') || ch == '#') {
+        const char *Item = CurPtr;
+
+        ++Indentation;
+        if (ch != '#') {
+          while (*CurPtr >= '0' && *CurPtr <= '9')
+            ++CurPtr;
+          Indentation += CurPtr - Item;
+        }
+
+        if (*CurPtr != '.') {
+          CurPtr = Item;
+          IState = IndentState::WaitingForEOL;
+          break;
+        }
+
+        // It's an enumerated list item
+        while (*CurPtr == ' ' || *CurPtr == '\t') {
+          char ch = *CurPtr++;
+          if (ch == ' ')
+            ++Indentation;
+          else
+            Indentation += 8;
+        }
+      } else if (ch == '.' && CurPtr[0] == '.' && CurPtr[1] == ' ') {
+        // It's explicit markup
+        ++CurPtr;
+        while (*CurPtr == ' ')
+          ++CurPtr;
+
+        StringRef Rest(CurPtr, BufferEnd - CurPtr);
+        if (Rest.startswith("code-block::")
+            || Rest.startswith("sourcecode::")) {
+          CurPtr += 12;
+
+          // We're in a code-block:: directive
+          bool skip = false;
+
+          // Skip whitespace
+          while (*CurPtr == ' ' || *CurPtr == '\t')
+            ++CurPtr;
+
+          // Read the language
+          StringRef Lang = scanWord();
+          if (Lang.size() && !Lang.equals("swift"))
+            skip = true;
+
+          // Scan to the EOL
+          while (CurPtr < BufferEnd && *CurPtr != '\r' && *CurPtr != '\n')
+            ++CurPtr;
+
+          if (*CurPtr == '\r')
+            ++CurPtr;
+          if (*CurPtr == '\n')
+            ++CurPtr;
+
+          // Process options
+          while (CurPtr < BufferEnd) {
+            // Skip whitespace
+            while (*CurPtr == ' ' || *CurPtr == '\t')
+              ++CurPtr;
+
+            if (*CurPtr == ':') {
+              StringRef Opt(CurPtr, BufferEnd - CurPtr);
+              if (Opt.startswith(":nocompile:"))
+                skip = true;
+
+              // Scan to the EOL
+              while (CurPtr < BufferEnd && *CurPtr != '\r' && *CurPtr != '\n')
+                ++CurPtr;
+
+              if (*CurPtr == '\r')
+                ++CurPtr;
+              if (*CurPtr == '\n')
+                ++CurPtr;
+            } else if (*CurPtr == '\r' || *CurPtr == '\n') {
+              // We're at a code block
+
+              if (skip) {
+                // Skip this block
+                skipRSTCodeBlock();
+                break;
+              } else {
+                RSTIndentLevel = Indentation;
+                InCodeBlock = true;
+                NextToken.setAtStartOfLine(true);
+                return;
+              }
+            }
+          }
+        } else {
+          // Scan up to the EOL, then continue
+          while (CurPtr < BufferEnd && *CurPtr != '\r' && *CurPtr != '\n')
+            ++CurPtr;
+        }
+        IState = IndentState::WaitingForEOL;
+      } else {
+        IState = IndentState::WaitingForEOL;
+      }
+      break;
+    }
+  }
+
+  return;
+}
+
+void Lexer::advanceToLaTeXCodeBlock() {
+  StringRef Rest(CurPtr, BufferEnd - CurPtr);
+  size_t pos = Rest.find("\\begin{swift}");
+  if (pos == StringRef::npos)
+    CurPtr = BufferEnd;
+  else {
+    CurPtr += pos + 12;
+
+    // Skip the rest of the line
+    while (CurPtr < BufferEnd && *CurPtr != '\r' && *CurPtr != '\n')
+      ++CurPtr;
+
+    // Also skip the EOL
+    if (*CurPtr == '\r')
+      ++CurPtr;
+    if (*CurPtr == '\n')
+      ++CurPtr;
+
+    InCodeBlock = true;
+    NextToken.setAtStartOfLine(true);
+  }
+}
+
+void Lexer::advanceToCodeBlock() {
+  switch (LexMode) {
+  case LexerMode::Markdown:
+    advanceToMarkdownCodeBlock();
+    break;
+  case LexerMode::reStructuredText:
+    advanceToRSTCodeBlock();
+    break;
+  case LexerMode::LaTeX: {
+    advanceToLaTeXCodeBlock();
+    break;
+  }
+  default:
+    llvm_unreachable("cannot be outside a code block in non-literate mode");
+  }
+}
+
+bool Lexer::atEndOfCodeBlock() {
+  if (!InCodeBlock)
+    return false;
+
+  switch (LexMode) {
+  case LexerMode::Markdown: {
+    if (MarkdownFence == ' ')
+      return Indentation < 4;
+    if (*CurPtr != MarkdownFence)
+      return false;
+    const char *Ptr = CurPtr;
+    while (*Ptr == MarkdownFence)
+      ++Ptr;
+    if (Ptr - CurPtr >= MarkdownFenceLength) {
+      CurPtr = Ptr;
+      return true;
+    }
+    return false;
+  }
+  case LexerMode::reStructuredText:
+    return Indentation <= RSTIndentLevel;
+  case LexerMode::LaTeX: {
+    StringRef Rest(CurPtr, BufferEnd - CurPtr);
+    return Rest.startswith("\\end{swift}");
+  }
+  default:
+    return false;
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Main Lexer Loop
 //===----------------------------------------------------------------------===//
 
@@ -2333,23 +2843,43 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Current pointer out of range!");
 
-  const char *LeadingTriviaStart = CurPtr;
   if (CurPtr == BufferStart) {
-    if (BufferStart < ContentStart) {
-      size_t BOMLen = ContentStart - BufferStart;
-      assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
-      CurPtr += BOMLen;
-    }
+    Indentation = 0;
+    ScanningIndent = true;
     NextToken.setAtStartOfLine(true);
   } else {
     NextToken.setAtStartOfLine(false);
   }
 
-  LeadingTrivia = lexTrivia(/*IsForTrailingTrivia=*/false, LeadingTriviaStart);
+  // Loop until we're in a code block
+  do {
+    // In literate mode, if we aren't in a code block, find one
+    if (!InCodeBlock) {
+      advanceToCodeBlock();
+
+      // We might have read the rest of the file
+      if (CurPtr == BufferEnd)
+        return formToken(tok::eof, CurPtr);
+    }
+
+    const char *LeadingTriviaStart = CurPtr;
+
+    if (CurPtr == BufferStart && BufferStart < ContentStart) {
+      size_t BOMLen = ContentStart - BufferStart;
+      assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
+      CurPtr += BOMLen;
+    }
+
+    LeadingTrivia = lexTrivia(/*IsForTrailingTrivia=*/false, LeadingTriviaStart);
+
+    // We might now be looking at the end of the code block
+    if (atEndOfCodeBlock())
+      InCodeBlock = false;
+  } while (!InCodeBlock);
 
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
-  
+
   switch (*CurPtr++) {
   default: {
     char const *Tmp = CurPtr-1;
@@ -2492,7 +3022,7 @@ void Lexer::lexImpl() {
   case '"':
   case '\'':
     return lexStringLiteral();
-      
+
   case '`':
     return lexEscapedIdentifier();
   }
@@ -2535,21 +3065,33 @@ Restart:
     if (IsForTrailingTrivia)
       break;
     NextToken.setAtStartOfLine(true);
+    Indentation = 0;
+    ScanningIndent = true;
     goto Restart;
   case '\r':
     if (IsForTrailingTrivia)
       break;
     NextToken.setAtStartOfLine(true);
+    Indentation = 0;
+    ScanningIndent = true;
     if (CurPtr[0] == '\n') {
       ++CurPtr;
     }
     goto Restart;
   case ' ':
+    if (ScanningIndent)
+      ++Indentation;
+    goto Restart;
   case '\t':
+    if (ScanningIndent)
+      Indentation += 8;
+    goto Restart;
   case '\v':
   case '\f':
+    ScanningIndent = false;
     goto Restart;
   case '/':
+    ScanningIndent = false;
     if (IsForTrailingTrivia || isKeepingComments()) {
       // Don't lex comments as trailing trivias (for now).
       // Don't try to lex comments here if we are lexing comments as Tokens.
@@ -2571,6 +3113,7 @@ Restart:
     }
     break;
   case '#':
+    ScanningIndent = false;
     if (TriviaStart == ContentStart && *CurPtr == '!') {
       // Hashbang '#!/path/to/swift'.
       --CurPtr;
@@ -2582,12 +3125,14 @@ Restart:
     break;
   case '<':
   case '>':
+    ScanningIndent = false;
     if (tryLexConflictMarker(/*EatNewline=*/false)) {
       // Conflict marker.
       goto Restart;
     }
     break;
   case 0:
+    ScanningIndent = false;
     switch (getNulCharacterKind(CurPtr - 1)) {
     case NulCharacterKind::Embedded: {
       diagnoseEmbeddedNul(Diags, CurPtr - 1);
@@ -2619,9 +3164,11 @@ Restart:
   case '%': case '!': case '?': case '=':
   case '-': case '+': case '*':
   case '&': case '|': case '^': case '~': case '.':
+    ScanningIndent = false;
     break;
   default:
     const char *Tmp = CurPtr - 1;
+    ScanningIndent = false;
     if (advanceIfValidStartOfIdentifier(Tmp, BufferEnd)) {
       break;
     }
