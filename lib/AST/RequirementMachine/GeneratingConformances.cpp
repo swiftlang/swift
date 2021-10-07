@@ -64,23 +64,38 @@ void HomotopyGenerator::findProtocolConformanceRules(
                         &result,
     const RewriteSystem &system) const {
 
+  auto redundantRules = Path.findRulesAppearingOnceInEmptyContext();
+
+  bool foundAny = false;
+  for (unsigned ruleID : redundantRules) {
+    const auto &rule = system.getRule(ruleID);
+    if (auto *proto = rule.isProtocolConformanceRule()) {
+      result[proto].first.push_back(ruleID);
+      foundAny = true;
+    }
+  }
+
+  if (!foundAny)
+    return;
+
   MutableTerm term = Basepoint;
 
+  // Now look for rewrite steps with conformance rules in empty right context,
+  // that is something like X.(Y.[P] => Z) (or it's inverse, X.(Z => Y.[P])).
   for (const auto &step : Path) {
     switch (step.Kind) {
     case RewriteStep::ApplyRewriteRule: {
       const auto &rule = system.getRule(step.RuleID);
-      if (!rule.isProtocolConformanceRule())
-        break;
-
-      auto *proto = rule.getLHS().back().getProtocol();
-
-      if (!step.isInContext()) {
-        result[proto].first.push_back(step.RuleID);
-      } else if (step.StartOffset > 0 &&
-                 step.EndOffset == 0) {
-        MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
-        result[proto].second.emplace_back(prefix, step.RuleID);
+      if (auto *proto = rule.isProtocolConformanceRule()) {
+        if (step.StartOffset > 0 &&
+            step.EndOffset == 0) {
+          // Record the prefix term that is left unchanged by this rewrite step.
+          //
+          // In the above example where the rewrite step is X.(Y.[P] => Z),
+          // the prefix term is 'X'.
+          MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
+          result[proto].second.emplace_back(prefix, step.RuleID);
+        }
       }
 
       break;

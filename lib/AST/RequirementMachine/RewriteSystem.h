@@ -78,7 +78,7 @@ public:
 
   Optional<Symbol> isPropertyRule() const;
 
-  bool isProtocolConformanceRule() const;
+  const ProtocolDecl *isProtocolConformanceRule() const;
 
   bool isProtocolRefinementRule() const;
 

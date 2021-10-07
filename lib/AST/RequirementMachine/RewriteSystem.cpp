@@ -52,12 +52,14 @@ Optional<Symbol> Rule::isPropertyRule() const {
 }
 
 /// If this is a rule of the form T.[p] => T where [p] is a protocol symbol,
-/// return true, otherwise return false.
-bool Rule::isProtocolConformanceRule() const {
-  if (auto property = isPropertyRule())
-    return property->getKind() == Symbol::Kind::Protocol;
+/// return the protocol, otherwise return nullptr.
+const ProtocolDecl *Rule::isProtocolConformanceRule() const {
+  if (auto property = isPropertyRule()) {
+    if (property->getKind() == Symbol::Kind::Protocol)
+      return property->getProtocol();
+  }
 
-  return false;
+  return nullptr;
 }
 
 /// If this is a rule of the form [P].[Q] => [P] where [P] and [Q] are
