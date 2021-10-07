@@ -741,9 +741,14 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// is undefined.
   ///
   /// Any instance of `T` within the re-bound region may be initialized or
-  /// uninitialized. If a given instance of `T` within the re-bound region
-  /// overlaps with previously uninitialized memory, it shall be considered
-  /// uninitialized when executing `body`.
+  /// uninitialized. The memory underlying any individual instance of `T`
+  /// must have the same initialization state (i.e.  initialized or
+  /// uninitialized.) Accessing a `T` whose underlying memory
+  /// is in a mixed initialization state shall be undefined behaviour.
+  ///
+  /// If the byte count of the original buffer is not a multiple of
+  /// the stride of `T`, then the re-bound buffer is shorter
+  /// than the original buffer.
   ///
   /// After executing `body`, this method rebinds memory back to its original
   /// binding state. This can be unbound memory, or bound to a different type.
@@ -753,10 +758,15 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
   ///   must equal zero.
   ///
+  /// - Note: A raw buffer may represent memory that has been bound to a type.
+  ///   If that is the case, then `T` must be layout compatible with the
+  ///   type to which the memory has been bound. This requirement does not
+  ///   apply if the raw buffer represents memory that has not been bound
+  ///   to any type.
+  ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
   ///     pointer. This pointer must be a multiple of this type's alignment.
-  ///   - count: The number of instances of `T` to bind to `type`.
   ///   - body: A closure that takes a typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
@@ -788,7 +798,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// Returns a typed buffer to the memory referenced by this buffer,
   /// assuming that the memory is already bound to the specified type.
   ///
-  /// Use this method when you have a raw buffer to memory that has *already*
+  /// Use this method when you have a raw buffer to memory that has already
   /// been bound to the specified type. The memory starting at this pointer
   /// must be bound to the type `T`. Accessing memory through the returned
   /// pointer is undefined if the memory has not been bound to `T`. To bind

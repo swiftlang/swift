@@ -330,9 +330,10 @@ public struct UnsafeRawPointer: _Pointer {
   /// is undefined.
   ///
   /// Any instance of `T` within the re-bound region may be initialized or
-  /// uninitialized. If a given instance of `T` within the re-bound region
-  /// overlaps with previously uninitialized memory, it shall be considered
-  /// uninitialized when executing `body`.
+  /// uninitialized. The memory underlying any individual instance of `T`
+  /// must have the same initialization state (i.e.  initialized or
+  /// uninitialized.) Accessing a `T` whose underlying memory
+  /// is in a mixed initialization state shall be undefined behaviour.
   ///
   /// The following example temporarily rebinds a raw memory pointer
   /// to `Int64`, then accesses a property on the signed integer.
@@ -350,6 +351,12 @@ public struct UnsafeRawPointer: _Pointer {
   ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
   ///   That is, `Int(bitPattern: self) % MemoryLayout<T>.alignment`
   ///   must equal zero.
+  ///
+  /// - Note: The region of memory starting at this pointer may have been
+  ///   bound to a type. If that is the case, then `T` must be
+  ///   layout compatible with the type to which the memory has been bound.
+  ///   This requirement does not apply if the region of memory
+  ///   has not been bound to any type.
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
@@ -763,9 +770,10 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// is undefined.
   ///
   /// Any instance of `T` within the re-bound region may be initialized or
-  /// uninitialized. If a given instance of `T` within the re-bound region
-  /// overlaps with previously uninitialized memory, it shall be considered
-  /// uninitialized when executing `body`.
+  /// uninitialized. The memory underlying any individual instance of `T`
+  /// must have the same initialization state (i.e.  initialized or
+  /// uninitialized.) Accessing a `T` whose underlying memory
+  /// is in a mixed initialization state shall be undefined behaviour.
   ///
   /// The following example temporarily rebinds a raw memory pointer
   /// to `Int64`, then modifies the signed integer.
@@ -782,6 +790,12 @@ public struct UnsafeMutableRawPointer: _Pointer {
   ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
   ///   That is, `Int(bitPattern: self) % MemoryLayout<T>.alignment`
   ///   must equal zero.
+  ///
+  /// - Note: The region of memory starting at this pointer may have been
+  ///   bound to a type. If that is the case, then `T` must be
+  ///   layout compatible with the type to which the memory has been bound.
+  ///   This requirement does not apply if the region of memory
+  ///   has not been bound to any type.
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this

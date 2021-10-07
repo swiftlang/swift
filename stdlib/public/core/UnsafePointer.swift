@@ -256,9 +256,11 @@ public struct UnsafePointer<Pointee>: _Pointer {
   /// The region of memory that starts at this pointer and covers `count`
   /// strides of `T` instances must be bound to `Pointee`.
   /// Any instance of `T` within the re-bound region may be initialized or
-  /// uninitialized. If a given instance of `T` overlaps with memory previously
-  /// bound to an uninitialized `Pointee`, it shall be considered uninitialized
-  /// when executing `body`.
+  /// uninitialized. Every instance of `Pointee` overlapping with a given
+  /// instance of `T` should have the same initialization state (i.e.
+  /// initialized or uninitialized.) Accessing a `T` whose underlying
+  /// `Pointee` storage is in a mixed initialization state shall be
+  /// undefined behaviour.
   ///
   /// The following example temporarily rebinds the memory of a `UInt64`
   /// pointer to `Int64`, then accesses a property on the signed integer.
@@ -941,9 +943,11 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// The region of memory that starts at this pointer and covers `count`
   /// strides of `T` instances must be bound to `Pointee`.
   /// Any instance of `T` within the re-bound region may be initialized or
-  /// uninitialized. If a given instance of `T` overlaps with memory previously
-  /// bound to an uninitialized `Pointee`, it shall be considered uninitialized
-  /// when executing `body`.
+  /// uninitialized. Every instance of `Pointee` overlapping with a given
+  /// instance of `T` should have the same initialization state (i.e.
+  /// initialized or uninitialized.) Accessing a `T` whose underlying
+  /// `Pointee` storage is in a mixed initialization state shall be
+  /// undefined behaviour.
   ///
   /// The following example temporarily rebinds the memory of a `UInt64`
   /// pointer to `Int64`, then modifies the signed integer.

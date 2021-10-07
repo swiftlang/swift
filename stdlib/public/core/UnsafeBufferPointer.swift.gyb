@@ -660,9 +660,11 @@ extension Unsafe${Mutable}BufferPointer {
   /// at runtime.
   /// 
   /// Any instance of `T` within the re-bound region may be initialized or
-  /// uninitialized. If a given instance of `T` overlaps with memory previously
-  /// bound to an uninitialized `Pointee`, it shall be considered uninitialized
-  /// when executing `body`.
+  /// uninitialized. Every instance of `Pointee` overlapping with a given
+  /// instance of `T` should have the same initialization state (i.e.
+  /// initialized or uninitialized.) Accessing a `T` whose underlying
+  /// `Pointee` storage is in a mixed initialization state shall be
+  /// undefined behaviour.
   ///
   /// Because this buffer's memory is no longer bound to its `Element` type
   /// while the `body` closure executes, do not access memory using the
