@@ -72,18 +72,18 @@ public struct IndexingIterator<Elements: Collection> {
   @usableFromInline
   internal var _position: Elements.Index
 
+  /// Creates an iterator over the given collection.
   @inlinable
   @inline(__always)
-  /// Creates an iterator over the given collection.
   public /// @testable
   init(_elements: Elements) {
     self._elements = _elements
     self._position = _elements.startIndex
   }
 
+  /// Creates an iterator over the given collection.
   @inlinable
   @inline(__always)
-  /// Creates an iterator over the given collection.
   public /// @testable
   init(_elements: Elements, _position: Elements.Index) {
     self._elements = _elements

@@ -620,19 +620,16 @@ extension Unicode.Scalar: TextOutputStreamable {
 /// A hook for playgrounds to print through.
 public var _playgroundPrintHook: ((String) -> Void)? = nil
 
-internal struct _TeeStream<
-  L: TextOutputStream,
-  R: TextOutputStream
->: TextOutputStream {
+internal struct _TeeStream<L: TextOutputStream, R: TextOutputStream>
+  : TextOutputStream
+{
+  internal var left: L
+  internal var right: R
 
   internal init(left: L, right: R) {
     self.left = left
     self.right = right
   }
-
-  internal var left: L
-  internal var right: R
-  
   /// Append the given `string` to this stream.
   internal mutating func write(_ string: String) {
     left.write(string); right.write(string)
