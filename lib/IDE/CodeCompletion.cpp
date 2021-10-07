@@ -6623,7 +6623,6 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
       // ModuleFilename can be empty if something strange happened during
       // module loading, for example, the module file is corrupted.
       if (!ModuleFilename.empty()) {
-        auto &Ctx = TheModule->getASTContext();
         CodeCompletionCache::Key K{
             ModuleFilename.str(),
             std::string(TheModule->getName()),
