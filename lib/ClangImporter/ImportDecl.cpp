@@ -4019,7 +4019,7 @@ namespace {
       }
       return Impl.importFunctionParameterList(
           dc, decl, nonSelfParams, decl->isVariadic(), allowNSUIntegerAsInt,
-          argNames, genericParams);
+          argNames, genericParams, /*resultType=*/nullptr);
     }
 
     Decl *importGlobalAsInitializer(const clang::FunctionDecl *decl,
@@ -4079,23 +4079,15 @@ namespace {
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
       auto selfIdx = importedName.getSelfIndex();
 
-      auto underlyingTypeIsSame = [](const clang::Type *a,
-                                     clang::TemplateTypeParmDecl *b) {
-        while (a->isPointerType() || a->isReferenceType())
-          a = a->getPointeeType().getTypePtr();
-        return a == b->getTypeForDecl();
-      };
-
       auto templateParamTypeUsedInSignature =
-          [underlyingTypeIsSame,
-           decl](clang::TemplateTypeParmDecl *type) -> bool {
+          [decl](clang::TemplateTypeParmDecl *type) -> bool {
         // TODO(SR-13809): we will want to update this to handle dependent
         // types when those are supported.
-        if (underlyingTypeIsSame(decl->getReturnType().getTypePtr(), type))
+        if (hasSameUnderlyingType(decl->getReturnType().getTypePtr(), type))
           return true;
 
         for (unsigned i : range(0, decl->getNumParams())) {
-          if (underlyingTypeIsSame(
+          if (hasSameUnderlyingType(
                   decl->getParamDecl(i)->getType().getTypePtr(), type))
             return true;
         }
@@ -4240,6 +4232,11 @@ namespace {
 
       if (!bodyParams)
         return nullptr;
+
+      if (name && name.getArgumentNames().size() != bodyParams->size()) {
+        // We synthesized additional parameters so rebuild the DeclName.
+        name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
+      }
 
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
@@ -6619,7 +6616,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   } else {
     parameterList = Impl.importFunctionParameterList(
         dc, decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
-        allowNSUIntegerAsInt, argNames, /*genericParams=*/{});
+        allowNSUIntegerAsInt, argNames, /*genericParams=*/{}, /*resultType=*/nullptr);
   }
   if (!parameterList)
     return nullptr;
@@ -8532,6 +8529,13 @@ bool importer::isImportedAsStatic(const clang::OverloadedOperatorKind op) {
   default:
     llvm_unreachable("not an operator");
   }
+}
+
+bool importer::hasSameUnderlyingType(const clang::Type *a,
+                                     const clang::TemplateTypeParmDecl *b) {
+  while (a->isPointerType() || a->isReferenceType())
+    a = a->getPointeeType().getTypePtr();
+  return a == b->getTypeForDecl();
 }
 
 unsigned ClangImporter::Implementation::getClangSwiftAttrSourceBuffer(

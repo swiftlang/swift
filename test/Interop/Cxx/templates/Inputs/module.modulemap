@@ -122,3 +122,8 @@ module DefaultedTemplateTypeParameter {
   header "defaulted-template-type-parameter.h"
   requires cplusplus
 }
+
+module TemplateTypeParameterNotInSignature {
+  header "template-type-parameter-not-in-signature.h"
+  requires cplusplus
+}
