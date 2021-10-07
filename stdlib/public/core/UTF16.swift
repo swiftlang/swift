@@ -368,21 +368,25 @@ extension Unicode.UTF16: Unicode.Encoding {
     }
     return encode(FromEncoding.decode(content))
   }
-  
+
   @frozen
   public struct ForwardParser: Sendable {
     public typealias _Buffer = _UIntBuffer<UInt16>
+
+    public var _buffer: _Buffer
+
     @inlinable
     public init() { _buffer = _Buffer() }
-    public var _buffer: _Buffer
   }
-  
+
   @frozen
   public struct ReverseParser: Sendable {
     public typealias _Buffer = _UIntBuffer<UInt16>
+
+    public var _buffer: _Buffer
+
     @inlinable
     public init() { _buffer = _Buffer() }
-    public var _buffer: _Buffer
   }
 }
 
