@@ -2175,8 +2175,16 @@ void ASTMangler::appendModule(const ModuleDecl *module,
                               StringRef useModuleName) {
   assert(!module->getParent() && "cannot mangle nested modules!");
 
-  StringRef ModName =
-      DWARFMangling ? module->getName().str() : module->getABIName().str();
+  // Use the module real name in mangling; this is the physical name
+  // of the module on-disk, which can be different if -module-alias is
+  // used.
+  // For example, if a module Foo has 'import Bar', and '-module-alias Bar=Baz'
+  // was passed, the name 'Baz' will be used for mangling besides loading.
+  StringRef ModName = module->getRealName().str();
+  if (!DWARFMangling &&
+      module->getABIName() != module->getName()) { // check if the ABI name is set
+    ModName = module->getABIName().str();
+  }
 
   // Try the special 'swift' substitution.
   if (ModName == STDLIB_NAME) {
