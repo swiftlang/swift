@@ -220,6 +220,9 @@ CUSTOM_LOCATOR_PATH_ELT(PlaceholderType)
 /// The implicit conversion applied at a given location.
 CUSTOM_LOCATOR_PATH_ELT(ImplicitConversion)
 
+/// An implicit call to a 'dynamicMember' subscript for a dynamic member lookup.
+SIMPLE_LOCATOR_PATH_ELT(ImplicitDynamicMemberSubscript)
+
 /// The element of the closure body e.g. statement, declaration, or expression.
 CUSTOM_LOCATOR_PATH_ELT(ClosureBodyElement)
 

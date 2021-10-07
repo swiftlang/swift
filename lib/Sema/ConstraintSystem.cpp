@@ -460,9 +460,21 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   }
 
   auto anchor = locator->getAnchor();
+  auto path = locator->getPath();
+  {
+    // If we have an implicit x[dynamicMember:] subscript call, the callee
+    // is given by the original member locator it is based on, which we can get
+    // by stripping away the implicit member element and everything after it.
+    auto iter = path.rbegin();
+    using ImplicitSubscriptElt = LocatorPathElt::ImplicitDynamicMemberSubscript;
+    if (locator->findLast<ImplicitSubscriptElt>(iter)) {
+      auto newPath = path.drop_back(iter - path.rbegin() + 1);
+      return getConstraintLocator(anchor, newPath);
+    }
+  }
+
   assert(bool(anchor) && "Expected an anchor!");
 
-  auto path = locator->getPath();
   {
     // If we have a locator for a member found through key path dynamic member
     // lookup, then we need to chop off the elements after the
@@ -2664,6 +2676,7 @@ void ConstraintSystem::bindOverloadType(
     ConstraintLocator *locator, DeclContext *useDC,
     llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
         verifyThatArgumentIsHashable) {
+  auto &ctx = getASTContext();
   auto choice = overload.choice;
   auto openedType = overload.openedType;
 
@@ -2675,6 +2688,37 @@ void ConstraintSystem::bindOverloadType(
     } else {
       // Add the type binding constraint.
       addConstraint(ConstraintKind::Bind, boundType, ty, locator);
+    }
+  };
+  auto addDynamicMemberSubscriptConstraints = [&](Type argTy, Type resultTy) {
+    // DynamicMemberLookup results are always a (dynamicMember: T1) -> T2
+    // subscript.
+    auto *fnTy = openedType->castTo<FunctionType>();
+    assert(fnTy->getParams().size() == 1 &&
+           "subscript always has one argument");
+
+    auto *callLoc = getConstraintLocator(
+        locator, LocatorPathElt::ImplicitDynamicMemberSubscript());
+
+    // Associate an argument list for the implicit x[dynamicMember:] subscript
+    // if we haven't already.
+    auto *&argList = ArgumentLists[getArgumentInfoLocator(callLoc)];
+    if (!argList) {
+      argList = ArgumentList::createImplicit(
+          ctx, {Argument(SourceLoc(), ctx.Id_dynamicMember, /*expr*/ nullptr)},
+          AllocationArena::ConstraintSolver);
+    }
+
+    auto *callerTy = FunctionType::get(
+        {FunctionType::Param(argTy, ctx.Id_dynamicMember)}, resultTy);
+
+    ConstraintLocatorBuilder builder(callLoc);
+    addConstraint(ConstraintKind::ApplicableFunction, callerTy, fnTy,
+                  builder.withPathElement(ConstraintLocator::ApplyFunction));
+
+    if (isExpr<KeyPathExpr>(locator->getAnchor())) {
+      auto paramTy = fnTy->getParams()[0].getParameterType();
+      verifyThatArgumentIsHashable(/*idx*/ 0, paramTy, locator);
     }
   };
   switch (choice.getKind()) {
@@ -2696,7 +2740,6 @@ void ConstraintSystem::bindOverloadType(
     // makes the index default to String if otherwise unconstrained.
     assert(refFnType->getParams().size() == 1 &&
            "subscript always has one arg");
-    auto argType = refFnType->getParams()[0].getPlainType();
 
     auto stringLiteral =
         TypeChecker::getProtocol(getASTContext(), choice.getDecl()->getLoc(),
@@ -2704,17 +2747,13 @@ void ConstraintSystem::bindOverloadType(
     if (!stringLiteral)
       return;
 
-    addConstraint(ConstraintKind::LiteralConformsTo, argType,
+    // Form constraints for a x[dynamicMember:] subscript with a string literal
+    // argument, where the overload type is bound to the result to model the
+    // fact that this a property access in the source.
+    auto argTy = createTypeVariable(locator, /*options*/ 0);
+    addConstraint(ConstraintKind::LiteralConformsTo, argTy,
                   stringLiteral->getDeclaredInterfaceType(), locator);
-
-    // If this is used inside of the keypath expression, we need to make
-    // sure that argument is Hashable.
-    if (isExpr<KeyPathExpr>(locator->getAnchor()))
-      verifyThatArgumentIsHashable(0, argType, locator);
-
-    // The resolved decl is for subscript(dynamicMember:), however the original
-    // member constraint was for a property. Therefore we need to bind to the
-    // result type.
+    addDynamicMemberSubscriptConstraints(argTy, refFnType->getResult());
     bindTypeOrIUO(refFnType->getResult());
     return;
   }
@@ -2764,9 +2803,9 @@ void ConstraintSystem::bindOverloadType(
       // preferred over key path dynamic member lookup.
       increaseScore(SK_KeyPathSubscript);
 
-      auto dynamicResultTy = boundType->castTo<TypeVariableType>();
+      auto boundTypeVar = boundType->castTo<TypeVariableType>();
       auto constraints = getConstraintGraph().gatherConstraints(
-          dynamicResultTy, ConstraintGraph::GatheringKind::EquivalenceClass,
+          boundTypeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
           [](Constraint *constraint) {
             return constraint->getKind() == ConstraintKind::ApplicableFunction;
           });
@@ -2790,20 +2829,11 @@ void ConstraintSystem::bindOverloadType(
       // - Original result type `$T_R` is going to represent result of
       //   the `[dynamicMember: \.[0]]` invocation.
 
-      // Result of the `WritableKeyPath` is going to be l-value type,
-      // let's adjust l-valueness of the result type to accommodate that.
-      //
-      // This is required because we are binding result of the subscript
-      // to its "member type" which becomes dynamic result type. We could
-      // form additional `applicable fn` constraint here and bind it to a
-      // function type, but it would create inconsistency with how properties
-      // are handled, which means more special handling in CSApply.
-      if (keyPathTy->isWritableKeyPath() ||
-          keyPathTy->isReferenceWritableKeyPath())
-        dynamicResultTy->getImpl().setCanBindToLValue(getSavedBindings(),
-                                                      /*enabled=*/true);
-
-      auto fnType = applicableFn->getFirstType()->castTo<FunctionType>();
+      // The function type of the original call-site. We'll want to create a
+      // new applicable fn constraint using its parameter along with a fresh
+      // type variable for the result of the inner subscript.
+      auto originalCallerTy =
+          applicableFn->getFirstType()->castTo<FunctionType>();
 
       auto subscriptResultTy = createTypeVariable(
           getConstraintLocator(locator->getAnchor(),
@@ -2812,35 +2842,41 @@ void ConstraintSystem::bindOverloadType(
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      auto adjustedFnTy =
-          FunctionType::get(fnType->getParams(), subscriptResultTy, info);
+      auto adjustedFnTy = FunctionType::get(originalCallerTy->getParams(),
+                                            subscriptResultTy, info);
 
+      // Add a constraint for the inner application that uses the args of the
+      // original call-site, and a fresh type var result equal to the leaf type.
       ConstraintLocatorBuilder kpLocBuilder(keyPathLoc);
       addConstraint(
           ConstraintKind::ApplicableFunction, adjustedFnTy, memberTy,
           kpLocBuilder.withPathElement(ConstraintLocator::ApplyFunction));
 
-      addConstraint(ConstraintKind::Bind, dynamicResultTy, fnType->getResult(),
-                    keyPathLoc);
+      addConstraint(ConstraintKind::FunctionResult, boundType,
+                    originalCallerTy->getResult(), keyPathLoc);
 
       addConstraint(ConstraintKind::Equal, subscriptResultTy, leafTy,
                     keyPathLoc);
+
+      addDynamicMemberSubscriptConstraints(/*argTy*/ keyPathTy,
+                                           fnType->getResult());
+
+      // Bind the overload type to the opened type as usual to match the fact
+      // that this is a subscript in the source.
+      bindTypeOrIUO(fnType);
     } else {
       // Since member type is going to be bound to "leaf" generic parameter
       // of the keypath, it has to be an r-value always, so let's add a new
       // constraint to represent that conversion instead of loading member
       // type into "leaf" directly.
       addConstraint(ConstraintKind::Equal, memberTy, leafTy, keyPathLoc);
+      addDynamicMemberSubscriptConstraints(/*argTy*/ keyPathTy,
+                                           fnType->getResult());
+
+      // Bind the overload type to the result to model the fact that this a
+      // property access in the source.
+      bindTypeOrIUO(fnType->getResult());
     }
-
-    if (isExpr<KeyPathExpr>(locator->getAnchor()))
-      verifyThatArgumentIsHashable(0, keyPathTy, locator);
-
-    // The resolved decl is for subscript(dynamicMember:), however the
-    // original member constraint was either for a property, or we've
-    // re-purposed the overload type variable to represent the result type of
-    // the subscript. In both cases, we need to bind to the result type.
-    bindTypeOrIUO(fnType->getResult());
     return;
   }
   }
@@ -4534,7 +4570,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    case ConstraintLocator::KeyPathDynamicMember: {
+    case ConstraintLocator::KeyPathDynamicMember:
+    case ConstraintLocator::ImplicitDynamicMemberSubscript: {
       // Key path dynamic member lookup should be completely transparent.
       path = path.slice(1);
       continue;
@@ -4715,6 +4752,13 @@ ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
 
   if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor))
     return getConstraintLocator(UME);
+
+  // All implicit x[dynamicMember:] subscript calls can share the same argument
+  // list.
+  if (locator->findLast<LocatorPathElt::ImplicitDynamicMemberSubscript>()) {
+    return getConstraintLocator(
+        ASTNode(), LocatorPathElt::ImplicitDynamicMemberSubscript());
+  }
 
   auto path = locator->getPath();
   {

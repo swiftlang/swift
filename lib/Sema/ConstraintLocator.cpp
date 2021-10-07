@@ -92,6 +92,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::UnresolvedMemberChainResult:
   case ConstraintLocator::PlaceholderType:
   case ConstraintLocator::ImplicitConversion:
+  case ConstraintLocator::ImplicitDynamicMemberSubscript:
   case ConstraintLocator::ClosureBodyElement:
     return 0;
 
@@ -554,6 +555,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       // TODO: Would be great to print a kind of element this is e.g.
       //       "if", "for each", "switch" etc.
       out << "closure body element";
+      break;
+
+    case ConstraintLocator::ImplicitDynamicMemberSubscript:
+      out << "implicit dynamic member subscript";
       break;
 
     case ConstraintLocator::ImplicitConversion:
