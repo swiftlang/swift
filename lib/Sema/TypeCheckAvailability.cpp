@@ -2446,6 +2446,7 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
 
   StringRef platform;
+  auto behavior = DiagnosticBehavior::Unspecified;
   switch (attr->getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::Deprecated:
     llvm_unreachable("shouldn't see deprecations in explicit unavailability");
@@ -2456,6 +2457,12 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
       // This was platform-specific; indicate the platform.
       platform = attr->prettyPlatformString();
       break;
+    } else if (rootConf->getProtocol()->isSpecificProtocol(
+                   KnownProtocolKind::Sendable) &&
+               !ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+      // Downgrade unavailable Sendable conformances to warnings prior to
+      // Swift 6.
+      behavior = DiagnosticBehavior::Warning;
     }
     LLVM_FALLTHROUGH;
 
@@ -2474,7 +2481,8 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
   EncodedDiagnosticMessage EncodedMessage(attr->Message);
   diags.diagnose(loc, diag::conformance_availability_unavailable,
                  type, proto,
-                 platform.empty(), platform, EncodedMessage.Message);
+                 platform.empty(), platform, EncodedMessage.Message)
+      .limitBehavior(behavior);
 
   switch (attr->getVersionAvailability(ctx)) {
   case AvailableVersionComparison::Available:

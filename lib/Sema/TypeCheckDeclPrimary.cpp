@@ -2207,7 +2207,7 @@ public:
       visit(member);
 
     checkInheritanceClause(ED);
-
+    diagnoseMissingExplicitSendable(ED);
     checkAccessControl(ED);
 
     TypeChecker::checkPatternBindingCaptures(ED);
@@ -2257,6 +2257,7 @@ public:
     TypeChecker::checkPatternBindingCaptures(SD);
 
     checkInheritanceClause(SD);
+    diagnoseMissingExplicitSendable(SD);
 
     checkAccessControl(SD);
 
@@ -2508,6 +2509,7 @@ public:
     }
 
     checkInheritanceClause(CD);
+    diagnoseMissingExplicitSendable(CD);
 
     checkAccessControl(CD);
 
