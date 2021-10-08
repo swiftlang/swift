@@ -1677,7 +1677,7 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
   }
 
   // Remove write-only AllocStacks.
-  if (isWriteOnlyAllocation(alloc)) {
+  if (isWriteOnlyAllocation(alloc) && !shouldAddLexicalLifetime(alloc)) {
     deleter.forceDeleteWithUsers(alloc);
 
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: "<< *alloc);

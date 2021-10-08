@@ -1493,6 +1493,37 @@ work:
   unreachable
 }
 
+// CHECK-LABEL: sil [ossa] @unreachable_2 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_2'
+sil [ossa] @unreachable_2 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_3 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_3'
+sil [ossa] @unreachable_3 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance to [init] %addr : $*C
+  %instance_loaded = load [take] %addr : $*C
+  unreachable
+}
+
 // CHECK-LABEL: sil [ossa] @unreachable_4 : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] : $C
