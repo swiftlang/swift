@@ -3073,6 +3073,10 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// Prepare to traverse the list of extensions.
   void prepareExtensions();
 
+  /// Add loaded members from all extensions. Eagerly load any members that we
+  /// can't lazily load.
+  void addLoadedExtensions();
+
   /// Retrieve the conformance loader (if any), and removing it in the
   /// same operation. The caller is responsible for loading the
   /// conformances.
@@ -3194,6 +3198,11 @@ public:
 
   /// Add a new extension to this nominal type.
   void addExtension(ExtensionDecl *extension);
+
+  /// Add a member to this decl's lookup table.
+  ///
+  /// Calls "prepareLookupTable" as a side effect.
+  void addMemberToLookupTable(Decl *member);
 
   /// Retrieve the set of extensions of this type.
   ExtensionRange getExtensions();
