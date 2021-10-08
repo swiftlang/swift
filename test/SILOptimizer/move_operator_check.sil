@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -move-operator-check -verify %s
+// RUN: %target-sil-opt -enable-sil-verify-all -move-operator-check %s
 
 sil_stage raw
 

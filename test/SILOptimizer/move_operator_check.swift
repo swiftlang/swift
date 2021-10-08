@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -emit-sil -verify
+// RUN: %target-swift-frontend -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -emit-sil
 
 class Klass {}
 
