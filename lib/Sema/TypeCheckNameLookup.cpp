@@ -192,9 +192,6 @@ namespace {
         return;
       }
 
-      // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
-      // default implementations in protocols.
-      //
       // If we have an imported conformance or the witness could
       // not be deserialized, getWitnessDecl() will just return
       // the requirement, so just drop the lookup result here.

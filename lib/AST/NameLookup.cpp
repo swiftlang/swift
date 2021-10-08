@@ -701,6 +701,15 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
     // attempt to desugar itself.
     if (decl->isRecursiveValidation())
       continue;
+    
+    // Check if this decl is a default witness to a protocol's requirement.
+    if (auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+      if (isa<ProtocolDecl>(extension->getExtendedNominal()))
+        shadowed.insert(decl);
+      // FIXME: unconditionally shadowing such decls is probably too naive.
+      // what if we have multiple protocols with similarly named requirements
+      // that are satisfied by default witnesses? We'd shadow all of them!
+    }
 
     // Record this declaration based on its signature.
     auto *dc = decl->getInnermostDeclContext();
