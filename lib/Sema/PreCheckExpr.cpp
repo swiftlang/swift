@@ -1415,7 +1415,12 @@ namespace {
     bool walkToDeclPre(Decl *D) override { return isa<PatternBindingDecl>(D); }
 
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
-      return {false, pattern};
+      // With multi-statement closure inference enabled, constraint generation
+      // is responsible for pattern verification and type-checking, so there
+      // is no need to walk into patterns in that mode.
+      bool shouldWalkIntoPatterns =
+          !Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
+      return {shouldWalkIntoPatterns, pattern};
     }
   };
 } // end anonymous namespace
