@@ -138,6 +138,10 @@ def disable_testable_attr_requires_testable_module :
   Flag<["-"], "disable-testable-attr-requires-testable-module">,
   HelpText<"Disable checking of @testable">;
 
+def enable_clang_spi :
+  Flag<["-"], "enable-clang-spi">,
+  HelpText<"Import Clang SPIs as Swift SPIs">;
+
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
   HelpText<"Enable checking the target OS of serialized modules">;
@@ -461,6 +465,10 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
+def check_api_availability_only : Flag<["-"],
+  "check-api-availability-only">,
+  HelpText<"Only check the availability of the APIs, ignore function bodies">;
+
 def enable_conformance_availability_errors : Flag<["-"],
   "enable-conformance-availability-errors">,
   HelpText<"Diagnose conformance availability violations as errors">;
@@ -506,6 +514,10 @@ def internalize_at_link : Flag<["-"], "internalize-at-link">,
   HelpText<"Allow internalizing public symbols and vtables at link time (assume"
   " all client code of public types is part of the same link unit, or that"
   " external symbols are explicitly requested via -exported_symbols_list)">;
+
+def conditional_runtime_records : Flag<["-"], "conditional-runtime-records">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Allow removal of runtime metadata records (public types, protocol conformances) based on whether they're used or unused">;
 
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,

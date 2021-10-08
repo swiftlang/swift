@@ -106,9 +106,9 @@ public:
       argType = argType.getObjectType();
     }
 
-    if (argType != paramType) {
+    if (argType.getASTType() != paramType.getASTType()) {
       // Reabstract the value if necessary.
-      mv = SGF.emitOrigToSubstValue(loc, mv, orig, t);
+      mv = SGF.emitOrigToSubstValue(loc, mv.ensurePlusOne(SGF, loc), orig, t);
     }
 
     // If the value is a (possibly optional) ObjC block passed into the entry
@@ -251,10 +251,15 @@ struct ArgumentInitHelper {
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
     }
-    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(argrv.getValue());
     SILValue value = argrv.getValue();
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
+      if (SGF.getASTContext().LangOpts.EnableExperimentalLexicalLifetimes &&
+          value->getOwnershipKind() != OwnershipKind::None) {
+        value =
+            SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
+        SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+      }
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
       if (auto AllocStack = dyn_cast<AllocStackInst>(value))
@@ -262,6 +267,7 @@ struct ArgumentInitHelper {
       else
         SGF.B.createDebugValueAddr(loc, value, varinfo);
     }
+    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
   }
 
   void emitParam(ParamDecl *PD) {

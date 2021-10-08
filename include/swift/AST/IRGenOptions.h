@@ -361,6 +361,8 @@ public:
 
   unsigned WitnessMethodElimination : 1;
 
+  unsigned ConditionalRuntimeRecords : 1;
+
   unsigned InternalizeAtLink : 1;
 
   /// The number of threads for multi-threaded code generation.
@@ -422,7 +424,8 @@ public:
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
-        WitnessMethodElimination(false), InternalizeAtLink(false),
+        WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
+        InternalizeAtLink(false),
         CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}

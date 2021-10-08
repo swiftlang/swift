@@ -473,6 +473,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
+  Opts.CheckAPIAvailabilityOnly |=
+      Args.hasArg(OPT_check_api_availability_only);
 
   if (auto A = Args.getLastArg(OPT_enable_conformance_availability_errors,
                                OPT_disable_conformance_availability_errors)) {
@@ -505,12 +507,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       }
     }
   }
-
-  Opts.CodeCompleteInitsInPostfixExpr |=
-      Args.hasArg(OPT_code_complete_inits_in_postfix_expr);
-
-  Opts.CodeCompleteCallPatternHeuristics |=
-      Args.hasArg(OPT_code_complete_call_pattern_heuristics);
 
   if (auto A = Args.getLastArg(OPT_enable_target_os_checking,
                                OPT_disable_target_os_checking)) {
@@ -921,6 +917,12 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugTimeExpressions |=
       Args.hasArg(OPT_debug_time_expression_type_checking);
 
+  // Checking availability of the API only relies on skipping non-inlinable
+  // function bodies. Define it first so it can be overridden by the other
+  // flags.
+  if (Args.hasArg(OPT_check_api_availability_only))
+    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
+
   // Check for SkipFunctionBodies arguments in order from skipping less to
   // skipping more.
   if (Args.hasArg(
@@ -1051,6 +1053,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
+
+  Opts.EnableClangSPI |= Args.hasArg(OPT_enable_clang_spi);
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
 
@@ -1546,6 +1550,7 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   Opts.IsInstallAPI = Args.hasArg(OPT_tbd_is_installapi);
 
   Opts.VirtualFunctionElimination = Args.hasArg(OPT_enable_llvm_vfe);
+  Opts.WitnessMethodElimination = Args.hasArg(OPT_enable_llvm_wme);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     Opts.CompatibilityVersion = A->getValue();
@@ -1934,6 +1939,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.WitnessMethodElimination = true;
   }
 
+  if (Args.hasArg(OPT_conditional_runtime_records)) {
+    Opts.ConditionalRuntimeRecords = true;
+  }
+
   if (Args.hasArg(OPT_internalize_at_link)) {
     Opts.InternalizeAtLink = true;
   }
@@ -2150,8 +2159,8 @@ bool CompilerInvocation::parseArgs(
 serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;
-  serialization::ValidationInfo info =
-      serialization::validateSerializedAST(data, &extendedInfo);
+  serialization::ValidationInfo info = serialization::validateSerializedAST(
+      data, getSILOptions().EnableOSSAModules, &extendedInfo);
 
   if (info.status != serialization::Status::Valid)
     return info.status;
@@ -2186,7 +2195,8 @@ CompilerInvocation::setUpInputForSILTool(
       InputFile(inputFilename, bePrimary, fileBufOrErr.get().get(), file_types::TY_SIL));
 
   auto result = serialization::validateSerializedAST(
-      fileBufOrErr.get()->getBuffer(), &extendedInfo);
+      fileBufOrErr.get()->getBuffer(), getSILOptions().EnableOSSAModules,
+      &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {

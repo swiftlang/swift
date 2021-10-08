@@ -725,9 +725,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     IdentifierID targetFunctionID;
     IdentifierID spiGroupID;
     ModuleID spiModuleID;
+    unsigned LIST_VER_TUPLE_PIECES(available);
     SILSpecializeAttrLayout::readRecord(
         scratch, exported, specializationKindVal, specializedSigID,
-        targetFunctionID, spiGroupID, spiModuleID);
+        targetFunctionID, spiGroupID, spiModuleID,
+        LIST_VER_TUPLE_PIECES(available));
 
     SILFunction *target = nullptr;
     if (targetFunctionID) {
@@ -745,13 +747,19 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         specializationKindVal ? SILSpecializeAttr::SpecializationKind::Partial
                               : SILSpecializeAttr::SpecializationKind::Full;
 
+    llvm::VersionTuple available;
+    DECODE_VER_TUPLE(available);
+    auto availability = available.empty()
+      ? AvailabilityContext::alwaysAvailable()
+      : AvailabilityContext(VersionRange::allGTE(available));
+
     auto specializedSig = MF->getGenericSignature(specializedSigID);
     // Only add the specialize attributes once.
     if (shouldAddAtttributes) {
       // Read the substitution list and construct a SILSpecializeAttr.
       fn->addSpecializeAttr(SILSpecializeAttr::create(
           SILMod, specializedSig, exported != 0, specializationKind, target,
-          spiGroup, spiModule));
+          spiGroup, spiModule, availability));
     }
   }
 
@@ -1266,10 +1274,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
     ONETYPE_ONEOPERAND_INST(ValueMetatype)
     ONETYPE_ONEOPERAND_INST(ExistentialMetatype)
-    ONETYPE_ONEOPERAND_INST(AllocValueBuffer)
-    ONETYPE_ONEOPERAND_INST(ProjectValueBuffer)
     ONETYPE_ONEOPERAND_INST(ProjectExistentialBox)
-    ONETYPE_ONEOPERAND_INST(DeallocValueBuffer)
 #undef ONETYPE_ONEOPERAND_INST
   case SILInstructionKind::DeallocBoxInst:
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&

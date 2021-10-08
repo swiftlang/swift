@@ -28,6 +28,8 @@ namespace swift {
 
 namespace rewriting {
 
+class RequirementMachine;
+
 /// A global object that can be shared by multiple rewrite systems.
 ///
 /// It stores uniqued symbols and terms.
@@ -55,6 +57,48 @@ class RewriteContext final {
   /// Requirement machines built from generic signatures.
   llvm::DenseMap<GenericSignature, RequirementMachine *> Machines;
 
+  /// Stores information about a vertex in the protocol dependency graph.
+  struct ProtocolNode {
+    /// The 'index' value for Tarjan's algorithm.
+    unsigned Index;
+
+    /// The 'low link' value for Tarjan's algorithm.
+    unsigned LowLink : 31;
+
+    /// The 'on stack' flag for Tarjan's algorithm.
+    unsigned OnStack : 1;
+
+    /// The connected component index, which keys the 'Components' DenseMap
+    /// below.
+    unsigned ComponentID;
+
+    ProtocolNode() {
+      Index = 0;
+      LowLink = 0;
+      OnStack = 0;
+      ComponentID = 0;
+    }
+  };
+
+  /// A strongly-connected component in the protocol dependency graph.
+  struct ProtocolComponent {
+    /// The members of this connected component.
+    ArrayRef<const ProtocolDecl *> Protos;
+
+    /// Each connected component has a lazily-created requirement machine.
+    RequirementMachine *Machine = nullptr;
+  };
+
+  /// The protocol dependency graph.
+  llvm::DenseMap<const ProtocolDecl *, ProtocolNode> Protos;
+
+  /// Used by Tarjan's algorithm.
+  unsigned NextComponentIndex = 0;
+
+  /// The connected components. Keys are the ComponentID fields of
+  /// ProtocolNode.
+  llvm::DenseMap<unsigned, ProtocolComponent> Components;
+
   ASTContext &Context;
 
   DebugOptions Debug;
@@ -63,6 +107,9 @@ class RewriteContext final {
   RewriteContext(RewriteContext &&) = delete;
   RewriteContext &operator=(const RewriteContext &) = delete;
   RewriteContext &operator=(RewriteContext &&) = delete;
+
+  void getRequirementMachineRec(const ProtocolDecl *proto,
+                                SmallVectorImpl<const ProtocolDecl *> &stack);
 
 public:
   /// Statistics.
@@ -107,6 +154,8 @@ public:
 
   RequirementMachine *getRequirementMachine(CanGenericSignature sig);
   bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);
+
+  RequirementMachine *getRequirementMachine(const ProtocolDecl *proto);
 
   ~RewriteContext();
 };

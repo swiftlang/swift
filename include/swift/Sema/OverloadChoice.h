@@ -274,6 +274,12 @@ public:
     return BaseAndDeclKind.getInt() == IsFallbackDeclViaUnwrappedOptional;
   }
 
+  /// Whether this choice is for any kind of dynamic member lookup.
+  bool isAnyDynamicMemberLookup() const {
+    return getKind() == OverloadChoiceKind::DynamicMemberLookup ||
+           isKeyPathDynamicMemberLookup();
+  }
+
   /// Get the name of the overload choice.
   DeclName getName() const;
 

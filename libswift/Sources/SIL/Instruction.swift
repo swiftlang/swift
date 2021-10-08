@@ -442,9 +442,6 @@ final public class AllocRefInst : SingleValueInstruction, Allocation {
 final public class AllocRefDynamicInst : SingleValueInstruction, Allocation {
 }
 
-final public class AllocValueBufferInst : SingleValueInstruction, Allocation {
-}
-
 final public class AllocBoxInst : SingleValueInstruction, Allocation {
 }
 

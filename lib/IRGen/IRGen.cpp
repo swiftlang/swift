@@ -1105,12 +1105,13 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     } else {
       // Emit protocol conformances into a section we can recognize at runtime.
       // In JIT mode these are manually registered above.
-      IGM.emitSwiftProtocols();
-      IGM.emitProtocolConformances();
-      IGM.emitTypeMetadataRecords();
+      IGM.emitSwiftProtocols(/*asContiguousArray*/ false);
+      IGM.emitProtocolConformances(/*asContiguousArray*/ false);
+      IGM.emitTypeMetadataRecords(/*asContiguousArray*/ false);
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
       irgen.emitEagerClassInitialization();
+      irgen.emitObjCActorsNeedingSuperclassSwizzle();
       irgen.emitDynamicReplacements();
     }
 
@@ -1351,6 +1352,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   irgen.emitReflectionMetadataVersion();
 
   irgen.emitEagerClassInitialization();
+  irgen.emitObjCActorsNeedingSuperclassSwizzle();
 
   // Emit reflection metadata for builtin and imported types.
   irgen.emitBuiltinReflectionMetadata();

@@ -43,6 +43,68 @@ public struct Unsafe${Mutable}BufferPointer<Element> {
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   public let count: Int
+
+    // This works around _debugPrecondition() impacting the performance of
+  // optimized code. (rdar://72246338)
+  @_alwaysEmitIntoClient
+  internal init(
+    @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}Pointer<Element>?,
+    count: Int
+  ) {
+    _position = start
+    self.count = count
+  }
+
+  /// Creates a new buffer pointer over the specified number of contiguous
+  /// instances beginning at the given pointer.
+  ///
+  /// - Parameters:
+  ///   - start: A pointer to the start of the buffer, or `nil`. If `start` is
+  ///     `nil`, `count` must be zero. However, `count` may be zero even for a
+  ///     non-`nil` `start`. The pointer passed as `start` must be aligned to
+  ///     `MemoryLayout<Element>.alignment`.
+  ///   - count: The number of instances in the buffer. `count` must not be
+  ///     negative.
+  @inlinable // unsafe-performance
+  public init(
+    @_nonEphemeral start: Unsafe${Mutable}Pointer<Element>?, count: Int
+  ) {
+    _debugPrecondition(
+      count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
+    _debugPrecondition(
+      count == 0 || start != nil,
+      "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
+    self.init(_uncheckedStart: start, count: _assumeNonNegative(count))
+  }
+
+  @inlinable // unsafe-performance
+  public init(_empty: ()) {
+    _position = nil
+    count = 0
+  }
+
+% if Mutable:
+
+  /// Creates a mutable typed buffer pointer referencing the same memory as the 
+  /// given immutable buffer pointer.
+  ///
+  /// - Parameter other: The immutable buffer pointer to convert.
+  @inlinable // unsafe-performance
+  public init(mutating other: UnsafeBufferPointer<Element>) {
+    _position = UnsafeMutablePointer<Element>(mutating: other._position)
+    count = other.count
+  }
+% else:
+  /// Creates an immutable typed buffer pointer referencing the same memory as the 
+  /// given mutable buffer pointer.
+  ///
+  /// - Parameter other: The mutable buffer pointer to convert.
+  @inlinable // unsafe-performance
+  public init(_ other: UnsafeMutableBufferPointer<Element>) {
+    _position = UnsafePointer<Element>(other._position)
+    count = other.count
+  }
+% end
 }
 
 %if not mutable:
@@ -394,57 +456,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 }
 
 extension Unsafe${Mutable}BufferPointer {
-  // This works around _debugPrecondition() impacting the performance of
-  // optimized code. (rdar://72246338)
-  @_alwaysEmitIntoClient
-  internal init(
-    @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}Pointer<Element>?,
-    count: Int
-  ) {
-    _position = start
-    self.count = count
-  }
-
-  /// Creates a new buffer pointer over the specified number of contiguous
-  /// instances beginning at the given pointer.
-  ///
-  /// - Parameters:
-  ///   - start: A pointer to the start of the buffer, or `nil`. If `start` is
-  ///     `nil`, `count` must be zero. However, `count` may be zero even for a
-  ///     non-`nil` `start`. The pointer passed as `start` must be aligned to
-  ///     `MemoryLayout<Element>.alignment`.
-  ///   - count: The number of instances in the buffer. `count` must not be
-  ///     negative.
-  @inlinable // unsafe-performance
-  public init(
-    @_nonEphemeral start: Unsafe${Mutable}Pointer<Element>?, count: Int
-  ) {
-    _debugPrecondition(
-      count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
-    _debugPrecondition(
-      count == 0 || start != nil,
-      "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
-    self.init(_uncheckedStart: start, count: _assumeNonNegative(count))
-  }
-
-  @inlinable // unsafe-performance
-  public init(_empty: ()) {
-    _position = nil
-    count = 0
-  }
-
 %  if Mutable:
-
-  /// Creates a mutable typed buffer pointer referencing the same memory as the 
-  /// given immutable buffer pointer.
-  ///
-  /// - Parameter other: The immutable buffer pointer to convert.
-  @inlinable // unsafe-performance
-  public init(mutating other: UnsafeBufferPointer<Element>) {
-    _position = UnsafeMutablePointer<Element>(mutating: other._position)
-    count = other.count
-  }
-
   @inlinable
   @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
@@ -473,16 +485,6 @@ extension Unsafe${Mutable}BufferPointer {
   }
 
 %  else:
-
-  /// Creates an immutable typed buffer pointer referencing the same memory as the 
-  /// given mutable buffer pointer.
-  ///
-  /// - Parameter other: The mutable buffer pointer to convert.
-  @inlinable // unsafe-performance
-  public init(_ other: UnsafeMutableBufferPointer<Element>) {
-    _position = UnsafePointer<Element>(other._position)
-    count = other.count
-  }
 
   @inlinable
   public func withContiguousStorageIfAvailable<R>(

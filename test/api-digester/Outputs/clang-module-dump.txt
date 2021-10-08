@@ -568,6 +568,77 @@
           "usr": "c:objc(pl)NSObject"
         }
       ]
+    },
+    {
+      "kind": "TypeAlias",
+      "name": "__NSConstantString",
+      "printedName": "__NSConstantString",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "__NSConstantString_tag",
+          "printedName": "__ObjC.__NSConstantString_tag",
+          "usr": "c:@S@__NSConstantString_tag"
+        }
+      ],
+      "declKind": "TypeAlias",
+      "usr": "c:@T@__NSConstantString",
+      "moduleName": "__ObjC"
+    },
+    {
+      "kind": "TypeAlias",
+      "name": "__builtin_ms_va_list",
+      "printedName": "__builtin_ms_va_list",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "UnsafeMutablePointer",
+          "printedName": "Swift.UnsafeMutablePointer<Swift.CChar>",
+          "children": [
+            {
+              "kind": "TypeNameAlias",
+              "name": "CChar",
+              "printedName": "Swift.CChar",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int8",
+                  "printedName": "Swift.Int8",
+                  "usr": "s:s4Int8V"
+                }
+              ]
+            }
+          ],
+          "usr": "s:Sp"
+        }
+      ],
+      "declKind": "TypeAlias",
+      "usr": "c:@T@__builtin_ms_va_list",
+      "moduleName": "__ObjC"
+    },
+    {
+      "kind": "TypeAlias",
+      "name": "__builtin_va_list",
+      "printedName": "__builtin_va_list",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Paren",
+          "printedName": "(__ObjC.__va_list_tag)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "__va_list_tag",
+              "printedName": "__ObjC.__va_list_tag",
+              "usr": "c:@S@__va_list_tag"
+            }
+          ],
+          "usr": "c:@S@__va_list_tag"
+        }
+      ],
+      "declKind": "TypeAlias",
+      "usr": "c:@T@__builtin_va_list",
+      "moduleName": "__ObjC"
     }
   ],
   "json_format_version": 6

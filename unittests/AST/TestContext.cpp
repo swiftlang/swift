@@ -35,11 +35,12 @@ static Decl *createOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
 }
 
 TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
-    : Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SearchPathOpts,
-                           ClangImporterOpts, SymbolGraphOpts,
-                           SourceMgr, Diags)) {
+    : Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
+                           ClangImporterOpts, SymbolGraphOpts, SourceMgr,
+                           Diags)) {
   registerParseRequestFunctions(Ctx.evaluator);
   registerTypeCheckerRequestFunctions(Ctx.evaluator);
+  registerClangImporterRequestFunctions(Ctx.evaluator);
   auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
   auto *module = ModuleDecl::create(stdlibID, Ctx);
   Ctx.addLoadedModule(module);

@@ -2342,6 +2342,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
       // Note: Namespaces are not really enums, but since namespaces are
       // imported as enums, be consistent.
       appendOperator("O");
+    } else if (isa<clang::ClassTemplateDecl>(namedDecl)) {
+      appendIdentifier(nominal->getName().str());
     } else {
       llvm_unreachable("unknown imported Clang type");
     }
@@ -3328,5 +3330,13 @@ std::string ASTMangler::mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
   beginMangling();
   appendOpaqueDeclName(decl);
   appendOperator("MQ");
+  return finalize();
+}
+
+std::string
+ASTMangler::mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl) {
+  beginMangling();
+  appendOpaqueDeclName(decl);
+  appendOperator("Ho");
   return finalize();
 }

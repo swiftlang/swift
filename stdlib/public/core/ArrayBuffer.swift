@@ -25,6 +25,13 @@ internal typealias _ArrayBridgeStorage
 @usableFromInline
 @frozen
 internal struct _ArrayBuffer<Element>: _ArrayBufferProtocol {
+  @usableFromInline
+  internal var _storage: _ArrayBridgeStorage
+
+  @inlinable
+  internal init(storage: _ArrayBridgeStorage) {
+    _storage = storage
+  }
 
   /// Create an empty buffer.
   @inlinable
@@ -74,15 +81,6 @@ internal struct _ArrayBuffer<Element>: _ArrayBufferProtocol {
     // NSArray's need an element typecheck when the element type isn't AnyObject
     return !_isNativeTypeChecked && !(AnyObject.self is Element.Type)
   }
-  
-  //===--- private --------------------------------------------------------===//
-  @inlinable
-  internal init(storage: _ArrayBridgeStorage) {
-    _storage = storage
-  }
-
-  @usableFromInline
-  internal var _storage: _ArrayBridgeStorage
 }
 
 extension _ArrayBuffer {
@@ -128,7 +126,7 @@ extension _ArrayBuffer {
     } else {
       isUnique = _isNative
     }
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     if isUnique {
       _native.isImmutable = false
     }
@@ -145,7 +143,7 @@ extension _ArrayBuffer {
   @_alwaysEmitIntoClient
   @inline(__always)
   internal mutating func endCOWMutation() {
-#if INTERNAL_CHECKS_ENABLED
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
     _native.isImmutable = true
 #endif
     _storage.endCOWMutation()

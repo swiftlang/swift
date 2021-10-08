@@ -2934,10 +2934,6 @@ bool ValueDecl::isDynamic() const {
     getAttrs().hasAttribute<DynamicAttr>());
 }
 
-bool ValueDecl::isDistributedActorIndependent() const {
-  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
-}
-
 bool ValueDecl::isObjCDynamicInGenericClass() const {
   if (!isObjCDynamic())
     return false;
@@ -5202,6 +5198,20 @@ StringRef ProtocolDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
+ArrayRef<StructuralRequirement>
+ProtocolDecl::getStructuralRequirements() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               StructuralRequirementsRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
+
+ArrayRef<ProtocolDecl *>
+ProtocolDecl::getProtocolDependencies() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               ProtocolDependenciesRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
+
 ArrayRef<Requirement> ProtocolDecl::getRequirementSignature() const {
   return evaluateOrDefault(getASTContext().evaluator,
                RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
@@ -5355,10 +5365,6 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
       return true;
   }
   return false;
-}
-
-bool AbstractStorageDecl::isDistributedActorIndependent() const {
-  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
 }
 
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,

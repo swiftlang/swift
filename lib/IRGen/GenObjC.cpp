@@ -190,9 +190,9 @@ namespace {
   class UnknownTypeInfo : public HeapTypeInfo<UnknownTypeInfo> {
   public:
     UnknownTypeInfo(llvm::PointerType *storageType, Size size,
-                 SpareBitVector spareBits, Alignment align)
-      : HeapTypeInfo(storageType, size, spareBits, align) {
-    }
+                    SpareBitVector spareBits, Alignment align)
+        : HeapTypeInfo(ReferenceCounting::Unknown, storageType, size, spareBits,
+                       align) {}
 
     /// AnyObject requires ObjC reference-counting.
     ReferenceCounting getReferenceCounting() const {
@@ -219,9 +219,9 @@ namespace {
   class BridgeObjectTypeInfo : public HeapTypeInfo<BridgeObjectTypeInfo> {
   public:
     BridgeObjectTypeInfo(llvm::PointerType *storageType, Size size,
-                 SpareBitVector spareBits, Alignment align)
-      : HeapTypeInfo(storageType, size, spareBits, align) {
-    }
+                         SpareBitVector spareBits, Alignment align)
+        : HeapTypeInfo(ReferenceCounting::Bridge, storageType, size, spareBits,
+                       align) {}
 
     /// Builtin.BridgeObject uses its own specialized refcounting implementation.
     ReferenceCounting getReferenceCounting() const {
@@ -474,6 +474,7 @@ namespace {
       case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
       case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
       case SILDeclRef::Kind::EntryPoint:
+      case SILDeclRef::Kind::AsyncEntryPoint:
         llvm_unreachable("Method does not have a selector");
 
       case SILDeclRef::Kind::Destroyer:

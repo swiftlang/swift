@@ -143,6 +143,7 @@ struct AsyncResponseInfo {
   TestOptions options;
   std::string sourceFilename;
   std::unique_ptr<llvm::MemoryBuffer> sourceBuffer;
+  sourcekitd_request_handle_t requestHandle;
 };
 } // end anonymous namespace
 
@@ -479,6 +480,15 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   if (Opts.ShellExecution)
     return performShellExecution(Opts.CompilerArgs);
+
+  if (!Opts.CancelRequest.empty()) {
+    for (auto &asyncResponse : asyncResponses) {
+      if (asyncResponse.options.RequestId == Opts.CancelRequest) {
+        sourcekitd_cancel_request(asyncResponse.requestHandle);
+      }
+    }
+    return 0;
+  }
 
   assert(Opts.repeatRequest >= 1);
   for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
@@ -1127,6 +1137,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyCancelOnSubsequentRequest,
                                             *Opts.CancelOnSubsequentRequest);
   }
+  if (Opts.SimulateLongRequest.hasValue()) {
+    sourcekitd_request_dictionary_set_int64(Req, KeySimulateLongRequest,
+                                            *Opts.SimulateLongRequest);
+  }
 
   if (!Opts.SwiftVersion.empty()) {
     if (Opts.PassVersionAsString) {
@@ -1196,11 +1210,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     if (Opts.PrintRequest)
       sourcekitd_request_description_dump(Req);
 
-    sourcekitd_send_request(Req, nullptr, ^(sourcekitd_response_t resp) {
-      auto &info = asyncResponses[respIndex];
-      info.response = resp;
-      info.semaphore.signal(); // Ready to be handled!
-    });
+    sourcekitd_send_request(Req, &asyncResponses[respIndex].requestHandle,
+                            ^(sourcekitd_response_t resp) {
+                              auto &info = asyncResponses[respIndex];
+                              info.response = resp;
+                              info.semaphore.signal(); // Ready to be handled!
+                            });
 
 #else
     llvm::report_fatal_error(

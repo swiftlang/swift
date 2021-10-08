@@ -1194,10 +1194,6 @@ public:
   void visitObjCSuperMethodInst(ObjCSuperMethodInst *i);
   void visitWitnessMethodInst(WitnessMethodInst *i);
 
-  void visitAllocValueBufferInst(AllocValueBufferInst *i);
-  void visitProjectValueBufferInst(ProjectValueBufferInst *i);
-  void visitDeallocValueBufferInst(DeallocValueBufferInst *i);
-
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *i);
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
@@ -6344,29 +6340,6 @@ void IRGenSILFunction::visitIndexRawPointerInst(swift::IndexRawPointerInst *i) {
   setLoweredExplosion(i, result);
 }
 
-void IRGenSILFunction::visitAllocValueBufferInst(
-                                          swift::AllocValueBufferInst *i) {
-  Address buffer = getLoweredAddress(i->getOperand());
-  auto valueType = i->getValueType();
-  Address value = emitAllocateValueInBuffer(*this, valueType, buffer);
-  setLoweredAddress(i, value);
-}
-
-void IRGenSILFunction::visitProjectValueBufferInst(
-                                          swift::ProjectValueBufferInst *i) {
-  Address buffer = getLoweredAddress(i->getOperand());
-  auto valueType = i->getValueType();
-  Address value = emitProjectValueInBuffer(*this, valueType, buffer);
-  setLoweredAddress(i, value);
-}
-
-void IRGenSILFunction::visitDeallocValueBufferInst(
-                                          swift::DeallocValueBufferInst *i) {
-  Address buffer = getLoweredAddress(i->getOperand());
-  auto valueType = i->getValueType();
-  emitDeallocateValueInBuffer(*this, valueType, buffer);
-}
-
 void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrInst *i) {
   Address container = getLoweredAddress(i->getOperand());
   SILType destType = i->getOperand()->getType();
@@ -6568,8 +6541,18 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
 
   assert(member.requiresNewWitnessTableEntry());
 
-  if (IGM.isResilient(conformance.getRequirement(),
-                      ResilienceExpansion::Maximal)) {
+  bool shouldUseDispatchThunk = false;
+  if (IGM.isResilient(conformance.getRequirement(), ResilienceExpansion::Maximal)) {
+    shouldUseDispatchThunk = true;
+  } else if (IGM.getOptions().WitnessMethodElimination) {
+    // For WME, use a thunk if the target protocol is defined in another module.
+    // This way, we guarantee all wmethod call sites are visible to the LLVM VFE
+    // optimization in GlobalDCE.
+    auto protoDecl = cast<ProtocolDecl>(member.getDecl()->getDeclContext());
+    shouldUseDispatchThunk = protoDecl->getModuleContext() != IGM.getSwiftModule();
+  }
+
+  if (shouldUseDispatchThunk) {
     llvm::Constant *fnPtr = IGM.getAddrOfDispatchThunk(member, NotForDefinition);
     llvm::Constant *secondaryValue = nullptr;
 

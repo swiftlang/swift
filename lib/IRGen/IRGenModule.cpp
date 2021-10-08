@@ -1134,6 +1134,22 @@ void IRGenerator::addClassForEagerInitialization(ClassDecl *ClassDecl) {
   ClassesForEagerInitialization.push_back(ClassDecl);
 }
 
+void IRGenerator::addBackDeployedObjCActorInitialization(ClassDecl *ClassDecl) {
+  if (!ClassDecl->isActor())
+    return;
+
+  if (!ClassDecl->isObjC())
+    return;
+
+  // If we are not back-deploying concurrency, there's nothing to do.
+  ASTContext &ctx = ClassDecl->getASTContext();
+  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
+  if (deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability()))
+    return;
+
+  ObjCActorsNeedingSuperclassSwizzle.push_back(ClassDecl);
+}
+
 llvm::AttributeList IRGenModule::getAllocAttrs() {
   if (AllocAttrs.isEmpty()) {
     AllocAttrs =

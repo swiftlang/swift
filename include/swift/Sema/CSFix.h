@@ -336,6 +336,10 @@ enum class FixKind : uint8_t {
   /// resolved.
   SpecifyTypeForPlaceholder,
 
+  /// Allow Swift -> C pointer conversion in an argument position
+  /// of a Swift function.
+  AllowSwiftToCPointerConversion,
+
   /// Allow `weak` declarations to be bound to a non-optional type.
   AllowNonOptionalWeak,
 
@@ -2789,6 +2793,22 @@ public:
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowNonOptionalWeak;
   }
+};
+
+class AllowSwiftToCPointerConversion final : public ConstraintFix {
+  AllowSwiftToCPointerConversion(ConstraintSystem &cs,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowSwiftToCPointerConversion, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow implicit Swift -> C pointer conversion";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowSwiftToCPointerConversion *create(ConstraintSystem &cs,
+                                                ConstraintLocator *locator);
 };
 
 } // end namespace constraints

@@ -311,6 +311,9 @@ let _: DynamicIUO = o[dyn_iuo]!
 let _: DynamicIUO = o[dyn_iuo]!!
 let _: DynamicIUO? = o[dyn_iuo]
 // FIXME: These should all produce lvalues that we can write through
+o.t = s // expected-error {{cannot assign to property: 'o' is immutable}}
+o.t! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
+o.t!! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
 o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign through subscript: 'o' is immutable}}
 o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
 o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
@@ -449,4 +452,11 @@ func test_dynamic_subscript_accepts_type_name_argument() {
     // expected-note@-1 {{add arguments after the type to construct a value of the type}} {{20-20=()}}
     // expected-note@-2 {{use '.self' to reference the type object}} {{20-20=.self}}
   }
+}
+
+func testAnyObjectConstruction(_ x: AnyObject) {
+  AnyObject() // expected-error {{protocol type 'AnyObject' cannot be instantiated}}
+
+  // FIXME(SR-15210): This should also be rejected.
+  _ = type(of: x).init()
 }

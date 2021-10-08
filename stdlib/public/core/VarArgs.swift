@@ -444,9 +444,6 @@ final internal class __VaListBuilder {
   @frozen // c-abi
   @usableFromInline
   internal struct Header {
-    @inlinable // c-abi
-    internal init() {}
-
     @usableFromInline // c-abi
     internal var gp_offset = CUnsignedInt(0)
     @usableFromInline // c-abi
@@ -456,6 +453,9 @@ final internal class __VaListBuilder {
     internal var overflow_arg_area: UnsafeMutablePointer<Int>?
     @usableFromInline // c-abi
     internal var reg_save_area: UnsafeMutablePointer<Int>?
+
+    @inlinable // c-abi
+    internal init() {}
   }
   #endif
 
@@ -601,7 +601,7 @@ final internal class __VaListBuilder {
     // supported vararg type is greater than the alignment of Int, such
     // as non-iOS ARM. Note that we can't use alignof because it
     // differs from ABI alignment on some architectures.
-#if (arch(arm) && !os(iOS)) || arch(arm64_32)
+#if (arch(arm) && !os(iOS)) || arch(arm64_32) || arch(wasm32)
     if let arg = arg as? _CVarArgAligned {
       let alignmentInWords = arg._cVarArgAlignment / MemoryLayout<Int>.size
       let misalignmentInWords = count % alignmentInWords

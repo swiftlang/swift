@@ -475,7 +475,6 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
-
   setAccess(AccessLevel::Public);
 
   Bits.ModuleDecl.StaticLibrary = 0;
@@ -1564,6 +1563,11 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   imports.erase(last, imports.end());
 }
 
+Identifier ModuleDecl::getRealName() const {
+  // This will return the real name for an alias (if used) or getName()
+  return getASTContext().getRealModuleName(getName());
+}
+
 Identifier ModuleDecl::getABIName() const {
   if (!ModuleABIName.empty())
     return ModuleABIName;
@@ -2385,11 +2389,16 @@ void SourceFile::lookupImportedSPIGroups(
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
   llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
+
+  // Objective-C SPIs are always imported implicitly.
+  if (targetDecl->hasClangNode())
+    return !targetDecl->getSPIGroups().empty();
+
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
-  if (importedSPIGroups.empty()) return false;
+  if (importedSPIGroups.empty())
+    return false;
 
   auto declSPIGroups = targetDecl->getSPIGroups();
-
   for (auto declSPI : declSPIGroups)
     if (importedSPIGroups.count(declSPI))
       return true;

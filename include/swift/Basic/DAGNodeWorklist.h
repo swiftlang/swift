@@ -25,6 +25,9 @@
 ///
 /// The primary API has two methods: intialize() and pop(). Others are provided
 /// for flexibility.
+///
+/// TODO: This also works well for cyclic graph traversal. Particularly CFG
+/// traversal. So we should probably just call it GraphNodeWorklist.
 template <typename T, unsigned SmallSize> struct DAGNodeWorklist {
   llvm::SmallPtrSet<T, SmallSize> nodeVisited;
   llvm::SmallVector<T, SmallSize> nodeVector;

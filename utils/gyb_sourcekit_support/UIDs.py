@@ -199,6 +199,9 @@ UID_KEYS = [
     KEY('EffectiveAccess', 'key.effective_access'),
     KEY('DeclarationLang', 'key.decl_lang'),
     KEY('SecondarySymbols', 'key.secondary_symbols'),
+    # Before executing the actual request wait x ms. The request can be canceled
+    # in this time. For cancellation testing purposes.
+    KEY('SimulateLongRequest', 'key.simulate_long_request'),
 ]
 
 

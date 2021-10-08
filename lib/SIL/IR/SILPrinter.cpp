@@ -316,6 +316,7 @@ void SILDeclRef::print(raw_ostream &OS) const {
   switch (kind) {
   case SILDeclRef::Kind::Func:
   case SILDeclRef::Kind::EntryPoint:
+  case SILDeclRef::Kind::AsyncEntryPoint:
     break;
   case SILDeclRef::Kind::Allocator:
     OS << "!allocator";
@@ -1291,10 +1292,6 @@ public:
     *this << ", " << ARDI->getType();
   }
 
-  void visitAllocValueBufferInst(AllocValueBufferInst *AVBI) {
-    *this << AVBI->getValueType() << " in " << getIDAndType(AVBI->getOperand());
-  }
-
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     if (ABI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
@@ -2156,17 +2153,11 @@ public:
     *this << ", ";
     *this << getIDAndType(DPI->getMetatype());
   }
-  void visitDeallocValueBufferInst(DeallocValueBufferInst *DVBI) {
-    *this << DVBI->getValueType() << " in " << getIDAndType(DVBI->getOperand());
-  }
   void visitDeallocBoxInst(DeallocBoxInst *DI) {
     *this << getIDAndType(DI->getOperand());
   }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
     *this << getIDAndType(DI->getOperand());
-  }
-  void visitProjectValueBufferInst(ProjectValueBufferInst *PVBI) {
-    *this << PVBI->getValueType() << " in " << getIDAndType(PVBI->getOperand());
   }
   void visitProjectBoxInst(ProjectBoxInst *PBI) {
     *this << getIDAndType(PBI->getOperand()) << ", " << PBI->getFieldIndex();
@@ -2362,7 +2353,6 @@ public:
       *this << ", default " << Ctx.getID(SVI->getDefaultResult());
 
     *this << " : " << SVI->getType();
-    printForwardingOwnershipKind(SVI, SVI->getOperand());
   }
   
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
@@ -3710,6 +3700,10 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
       getSpecializedSignature().requirementsNotSatisfiedBy(genericSig);
   if (targetFunction) {
     OS << "target: \"" << targetFunction->getName() << "\", ";
+  }
+ if (!availability.isAlwaysAvailable()) {
+    auto version = availability.getOSVersion().getLowerEndpoint();
+    OS << "available: " << version.getAsString() << ", ";
   }
   if (!requirements.empty()) {
     OS << "where ";

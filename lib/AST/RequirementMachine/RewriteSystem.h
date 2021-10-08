@@ -78,7 +78,9 @@ public:
 
   Optional<Symbol> isPropertyRule() const;
 
-  bool isProtocolConformanceRule() const;
+  const ProtocolDecl *isProtocolConformanceRule() const;
+
+  bool isProtocolRefinementRule() const;
 
   /// See above for an explanation.
   bool isPermanent() const {
@@ -298,8 +300,10 @@ public:
   bool isInContext() const;
 
   void findProtocolConformanceRules(
-      SmallVectorImpl<unsigned> &notInContext,
-      SmallVectorImpl<std::pair<MutableTerm, unsigned>> &inContext,
+      llvm::SmallDenseMap<const ProtocolDecl *,
+                          std::pair<SmallVector<unsigned, 2>,
+                                    SmallVector<std::pair<MutableTerm, unsigned>, 2>>>
+                          &result,
       const RewriteSystem &system) const;
 
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
@@ -363,6 +367,18 @@ class RewriteSystem final {
 
   DebugOptions Debug;
 
+  /// Whether we've initialized the rewrite system with a call to initialize().
+  unsigned Initialized : 1;
+
+  /// Whether we've computed the confluent completion at least once.
+  ///
+  /// It might be computed multiple times if the property map's concrete type
+  /// unification procedure adds new rewrite rules.
+  unsigned Complete : 1;
+
+  /// Whether we've minimized the rewrite system.
+  unsigned Minimized : 1;
+
 public:
   explicit RewriteSystem(RewriteContext &ctx);
   ~RewriteSystem();
@@ -385,6 +401,10 @@ public:
   unsigned getRuleID(const Rule &rule) const {
     assert((unsigned)(&rule - &*Rules.begin()) < Rules.size());
     return (unsigned)(&rule - &*Rules.begin());
+  }
+
+  ArrayRef<Rule> getRules() const {
+    return Rules;
   }
 
   Rule &getRule(unsigned ruleID) {
@@ -453,12 +473,20 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   Optional<unsigned>
-  findRuleToDelete(RewritePath &replacementPath,
-                   const llvm::DenseSet<unsigned> *redundantConformances);
+  findRuleToDelete(bool firstPass,
+                   const llvm::DenseSet<unsigned> *redundantConformances,
+                   RewritePath &replacementPath);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
 
+  void performHomotopyReduction(
+      bool firstPass,
+      const llvm::DenseSet<unsigned> *redundantConformances);
+
   void minimizeRewriteSystem();
+
+  llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
+  getMinimizedRules(ArrayRef<const ProtocolDecl *> protos);
 
   void verifyHomotopyGenerators() const;
 
@@ -471,6 +499,9 @@ public:
   void decomposeTermIntoConformanceRuleLeftHandSides(
       MutableTerm term,
       SmallVectorImpl<unsigned> &result) const;
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term, unsigned ruleID,
+      SmallVectorImpl<unsigned> &result) const;
 
   void computeCandidateConformancePaths(
       llvm::MapVector<unsigned,
@@ -481,6 +512,24 @@ public:
       llvm::SmallDenseSet<unsigned, 4> &visited,
       llvm::DenseSet<unsigned> &redundantConformances,
       const llvm::SmallVectorImpl<unsigned> &path,
+      const llvm::MapVector<unsigned, SmallVector<unsigned, 2>> &parentPaths,
+      const llvm::MapVector<unsigned,
+                            std::vector<SmallVector<unsigned, 2>>>
+          &conformancePaths) const;
+
+  bool isValidRefinementPath(
+      const llvm::SmallVectorImpl<unsigned> &path) const;
+
+  void dumpConformancePath(
+      llvm::raw_ostream &out,
+      const SmallVectorImpl<unsigned> &path) const;
+
+  void dumpGeneratingConformanceEquation(
+      llvm::raw_ostream &out,
+      unsigned baseRuleID,
+      const std::vector<SmallVector<unsigned, 2>> &paths) const;
+
+  void verifyGeneratingConformanceEquations(
       const llvm::MapVector<unsigned,
                             std::vector<SmallVector<unsigned, 2>>>
           &conformancePaths) const;

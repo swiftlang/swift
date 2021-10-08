@@ -660,7 +660,28 @@ void swift::ide::printModuleInterface(
     };
 
     if (auto clangNode = getEffectiveClangNode(D)) {
-      addToClangDecls(D, clangNode);
+      if (auto namespaceDecl =
+              dyn_cast_or_null<clang::NamespaceDecl>(clangNode.getAsDecl())) {
+        // An imported namespace decl will contain members from all redecls, so
+        // make sure we add all the redecls.
+        for (auto redecl : namespaceDecl->redecls()) {
+          // Namespace redecls may exist across mutliple modules. We want to
+          // add the decl "D" to every module that has a redecl. But we only
+          // want to add "D" once to prevent duplicate printing.
+          clang::SourceLocation loc = redecl->getLocation();
+          auto *owningModule = Importer.getClangOwningModule(redecl);
+          auto found = ClangDecls.find(owningModule);
+          if (found != ClangDecls.end() &&
+              // Don't re-add this decl if it already exists for "OwningModule".
+              llvm::find_if(found->second, [D](auto p) {
+                return p.first == D;
+              }) == found->second.end()) {
+            found->second.push_back({D, loc});
+          }
+        }
+      } else {
+        addToClangDecls(D, clangNode);
+      }
       continue;
     }
 

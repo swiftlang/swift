@@ -23,17 +23,17 @@
 @frozen // lazy-performance
 public struct LazyPrefixWhileSequence<Base: Sequence> {
   public typealias Element = Base.Element
-  
-  @inlinable // lazy-performance
-  internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
-    self._base = _base
-    self._predicate = predicate
-  }
 
   @usableFromInline // lazy-performance
   internal var _base: Base
   @usableFromInline // lazy-performance
   internal let _predicate: (Element) -> Bool
+
+  @inlinable // lazy-performance
+  internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
+    self._base = _base
+    self._predicate = predicate
+  }
 }
 
 

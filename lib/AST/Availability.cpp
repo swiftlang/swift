@@ -176,6 +176,33 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
     VersionRange::allGTE(bestAvailAttr->Introduced.getValue())};
 }
 
+AvailabilityContext
+AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr,
+                                                      ASTContext &ctx) {
+
+  const AvailableAttr *bestAvailAttr = nullptr;
+
+  for (auto *availAttr : attr->getAvailabeAttrs()) {
+    if (availAttr == nullptr || !availAttr->Introduced.hasValue() ||
+        !availAttr->isActivePlatform(ctx) ||
+        availAttr->isLanguageVersionSpecific() ||
+        availAttr->isPackageDescriptionVersionSpecific()) {
+      continue;
+    }
+
+    if (isBetterThan(availAttr, bestAvailAttr))
+      bestAvailAttr = availAttr;
+  }
+
+  if (bestAvailAttr) {
+    return AvailabilityContext{
+      VersionRange::allGTE(bestAvailAttr->Introduced.getValue())
+    };
+  }
+
+  return AvailabilityContext::alwaysAvailable();
+}
+
 AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
                                                           ASTContext &Ctx) {
   Optional<AvailabilityContext> AnnotatedRange =

@@ -362,6 +362,11 @@ ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
       (Type,Type))
 
+ERROR(cannot_convert_argument_value_for_swift_func,none,
+      "cannot convert value of type %0 to expected argument type %1 "
+      "because %2 %3 was not imported from C header",
+      (Type,Type, DescriptiveDeclKind, DeclName))
+
 NOTE(candidate_has_invalid_argument_at_position,none,
      "candidate expects %select{|in-out }2value of type %0 for parameter #%1 (got %3)",
      (Type, unsigned, bool, Type))
@@ -3700,20 +3705,20 @@ NOTE(ambiguous_because_of_trailing_closure,none,
 // Cannot capture inout-ness of a parameter
 // Partial application of foreign functions not supported
 ERROR(partial_application_of_function_invalid,none,
-      "partial application of %select{"
+      "cannot reference %select{"
         "'mutating' method|"
         "'super.init' initializer chain|"
         "'self.init' initializer delegation|"
         "'super' instance method with metatype base"
-      "}0 is not allowed",
+      "}0 as function value",
       (unsigned))
 WARNING(partial_application_of_function_invalid_swift4,none,
-      "partial application of %select{"
+      "cannot reference %select{"
         "'mutating' method|"
         "'super.init' initializer chain|"
         "'self.init' initializer delegation|"
         "'super' instance method with metatype base"
-      "}0 is not allowed; calling the function has undefined behavior and will "
+      "}0 as function value; calling the function has undefined behavior and will "
       "be an error in future Swift versions",
       (unsigned))
 
@@ -4329,10 +4334,20 @@ NOTE(note_add_async_to_function,none,
 NOTE(note_add_nonisolated_to_decl,none,
      "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
+NOTE(note_add_distributed_to_decl,none,
+     "add 'distributed' to %0 to make this %1 witness the protocol requirement",
+     (DeclName, DescriptiveDeclKind))
+NOTE(note_distributed_requirement_defined_here,none,
+     "distributed function requirement %0 declared here",
+     (DeclName))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
      (StringRef, DescriptiveDeclKind, DeclName, Type))
 FIXIT(insert_globalactor_attr, "@%0 ", (Type))
+
+ERROR(main_function_must_be_mainActor,none,
+      "main() must be '@MainActor'", ())
+
 ERROR(not_objc_function_async,none,
       "'async' %0 cannot be represented in Objective-C", (DescriptiveDeclKind))
 NOTE(not_objc_function_type_async,none,
@@ -4398,8 +4413,8 @@ ERROR(actor_isolated_non_self_reference,none,
         "from the main actor|from a non-isolated context}3",
         (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
 ERROR(distributed_actor_isolated_non_self_reference,none,
-      "distributed actor-isolated %0 %1 can only be referenced "
-      "inside the distributed actor",
+      "distributed actor-isolated %0 %1 can only be referenced inside the "
+      "distributed actor",
       (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'_Distributed' module not imported, required for 'distributed actor'",
@@ -4453,10 +4468,10 @@ NOTE(actor_isolated_sync_func,none,
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
 NOTE(distributed_actor_isolated_method_note,none,
-     "only 'distributed' functions can be called from outside the distributed actor", // TODO: improve error message
+     "only 'distributed' functions can be called from outside the distributed actor", // TODO(distributed): improve error message
      ())
 ERROR(distributed_actor_isolated_method,none,
-      "only 'distributed' functions can be called from outside the distributed actor", // TODO: improve error message to be more like 'non-distributed' ... defined here
+      "only 'distributed' functions can be called from outside the distributed actor", // TODO(distributed): improve error message to be more like 'non-distributed' ... defined here
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "distributed function parameter '%0' of type %1 does not conform to 'Codable'",
@@ -4610,9 +4625,6 @@ ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",
       (DeclName))
-ERROR(distributed_actor_independent_property_must_be_let,none,
-      "_distributedActorIndependent can be applied to properties, however they must be 'let'",
-      ())
 NOTE(distributed_actor_isolated_property,none,
       "distributed actor state is only available within the actor instance", // TODO: reword in terms of isolation
       ())

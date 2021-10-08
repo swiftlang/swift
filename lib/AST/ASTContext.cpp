@@ -583,12 +583,11 @@ void ASTContext::operator delete(void *Data) throw() {
 }
 
 ASTContext *ASTContext::get(LangOptions &langOpts,
-                            TypeCheckerOptions &typeckOpts,
+                            TypeCheckerOptions &typeckOpts, SILOptions &silOpts,
                             SearchPathOptions &SearchPathOpts,
                             ClangImporterOptions &ClangImporterOpts,
                             symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
-                            SourceManager &SourceMgr,
-                            DiagnosticEngine &Diags) {
+                            SourceManager &SourceMgr, DiagnosticEngine &Diags) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
   // constraints.
@@ -600,33 +599,28 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
       llvm::alignAddr(impl, llvm::Align(alignof(Implementation))));
   new (impl) Implementation();
   return new (mem)
-      ASTContext(langOpts, typeckOpts, SearchPathOpts, ClangImporterOpts,
-                 SymbolGraphOpts, SourceMgr, Diags);
+      ASTContext(langOpts, typeckOpts, silOpts, SearchPathOpts,
+                 ClangImporterOpts, SymbolGraphOpts, SourceMgr, Diags);
 }
 
 ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-                       SearchPathOptions &SearchPathOpts,
+                       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
                        ClangImporterOptions &ClangImporterOpts,
                        symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                        SourceManager &SourceMgr, DiagnosticEngine &Diags)
-  : LangOpts(langOpts),
-    TypeCheckerOpts(typeckOpts),
-    SearchPathOpts(SearchPathOpts),
-    ClangImporterOpts(ClangImporterOpts),
-    SymbolGraphOpts(SymbolGraphOpts),
-    SourceMgr(SourceMgr), Diags(Diags),
-    evaluator(Diags, langOpts),
-    TheBuiltinModule(createBuiltinModule(*this)),
-    StdlibModuleName(getIdentifier(STDLIB_NAME)),
-    SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
-    TheErrorType(
-      new (*this, AllocationArena::Permanent)
-        ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
-    TheUnresolvedType(new (*this, AllocationArena::Permanent)
-                      UnresolvedType(*this)),
-    TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
-    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
-                                            /*HasExplicitAnyObject=*/false)),
+    : LangOpts(langOpts), TypeCheckerOpts(typeckOpts), SILOpts(silOpts),
+      SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
+      SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
+      evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
+      StdlibModuleName(getIdentifier(STDLIB_NAME)),
+      SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
+      TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(
+          *this, Type(), RecursiveTypeProperties::HasError)),
+      TheUnresolvedType(new (*this, AllocationArena::Permanent)
+                            UnresolvedType(*this)),
+      TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
+      TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
+                                              /*HasExplicitAnyObject=*/false)),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
@@ -1642,6 +1636,23 @@ void ASTContext::addModuleInterfaceChecker(
   getImpl().InterfaceChecker = std::move(checker);
 }
 
+void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
+  for (auto k: aliasMap.keys()) {
+    auto val = aliasMap.lookup(k);
+    if (!val.empty()) {
+      ModuleAliasMap[getIdentifier(k)] = getIdentifier(val);
+    }
+  }
+}
+
+Identifier ASTContext::getRealModuleName(Identifier key) const {
+  auto found = ModuleAliasMap.find(key);
+  if (found != ModuleAliasMap.end()) {
+    return found->second;
+  }
+  return key;
+}
+
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
     ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate,
@@ -1837,12 +1848,27 @@ ASTContext::getLoadedModules() const {
 }
 
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
-  return getImpl().LoadedModules.lookup(ModuleName);
+  // Look up a loaded module using an actual module name (physical name
+  // on disk). If the -module-alias option is used, the module name that
+  // appears in source code will be different from the real module name
+  // on disk, otherwise the same.
+  //
+  // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
+  // and a source file has 'import Foo', a module called Bar (real name)
+  // will be loaded and returned.
+  auto realName = getRealModuleName(ModuleName);
+  return getImpl().LoadedModules.lookup(realName);
 }
 
 void ASTContext::addLoadedModule(ModuleDecl *M) {
   assert(M);
-  getImpl().LoadedModules[M->getName()] = M;
+  // Add a loaded module using an actual module name (physical name
+  // on disk), in case -module-alias is used (otherwise same).
+  //
+  // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
+  // and a source file has 'import Foo', a module called Bar (real name)
+  // will be loaded and added to the map.
+  getImpl().LoadedModules[M->getRealName()] = M;
 }
 
 void ASTContext::registerGenericSignatureBuilder(
@@ -1966,6 +1992,15 @@ bool ASTContext::isRecursivelyConstructingRequirementMachine(
     return false;
 
   return rewriteCtx->isRecursivelyConstructingRequirementMachine(sig);
+}
+
+rewriting::RequirementMachine *
+ASTContext::getOrCreateRequirementMachine(const ProtocolDecl *proto) {
+  auto &rewriteCtx = getImpl().TheRewriteContext;
+  if (!rewriteCtx)
+    rewriteCtx.reset(new rewriting::RewriteContext(*this));
+
+  return rewriteCtx->getRequirementMachine(proto);
 }
 
 Optional<llvm::TinyPtrVector<ValueDecl *>>

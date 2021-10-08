@@ -2840,6 +2840,23 @@ public:
 
     bool hasInternalLabel() const { return !InternalLabel.empty(); }
     Identifier getInternalLabel() const { return InternalLabel; }
+
+    /// Return true if argument name is valid and matches \c paramName.
+    ///
+    /// The three tests to check if argument name is valid are:
+    /// 1. allow argument if it matches \c paramName,
+    /// 2. allow argument if  $_  for omitted projected value label,
+    /// 3. allow argument if it matches \c paramName without its \c $ prefix.
+    bool matchParameterLabel(Identifier const &paramName) const {
+      auto argLabel = getLabel();
+      if (argLabel == paramName)
+        return true;
+      if ((argLabel.str() == "$_") && paramName.empty())
+        return true;
+      if (argLabel.hasDollarPrefix() && argLabel.str().drop_front() == paramName.str())
+        return true;
+      return false;
+    }
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
 

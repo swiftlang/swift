@@ -514,6 +514,9 @@ void CanonicalizeOSSALifetime::findOrInsertDestroyInBlock(SILBasicBlock *bb) {
 ///   consuming uses, including destroys on all return paths.
 /// - The postdominating consumes cannot be within nested loops.
 /// - Any blocks in nested loops are now marked LiveOut.
+///
+/// TODO: replace this with PrunedLivenessAnalysis::computeBoundary. Separate
+/// out destroy insertion, debug info, diagnostics, etc. as post-passes.
 void CanonicalizeOSSALifetime::findOrInsertDestroys() {
   this->accessBlocks = accessBlockAnalysis->get(getCurrentDef()->getFunction());
 
@@ -525,7 +528,7 @@ void CanonicalizeOSSALifetime::findOrInsertDestroys() {
     switch (liveness.getBlockLiveness(bb)) {
     case PrunedLiveBlocks::LiveOut:
       // A lifetimeEndBlock may be determined to be LiveOut after analyzing the
-      // extended  It is irrelevent for finding the boundary.
+      // liveness. It is irrelevent for finding the boundary.
       break;
     case PrunedLiveBlocks::LiveWithin: {
       // The liveness boundary is inside this block. Insert a final destroy

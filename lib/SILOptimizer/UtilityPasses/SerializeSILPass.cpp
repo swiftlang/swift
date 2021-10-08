@@ -149,7 +149,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
-  case SILInstructionKind::AllocValueBufferInst:
   case SILInstructionKind::AllocBoxInst:
   case SILInstructionKind::AllocExistentialBoxInst:
   case SILInstructionKind::IndexAddrInst:
@@ -225,7 +224,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
 #include "swift/AST/ReferenceStorage.def"
 #undef NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
   case SILInstructionKind::MarkUninitializedInst:
-  case SILInstructionKind::ProjectValueBufferInst:
   case SILInstructionKind::ProjectBoxInst:
   case SILInstructionKind::ProjectExistentialBoxInst:
   case SILInstructionKind::BuiltinInst:
@@ -279,7 +277,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeallocPartialRefInst:
-  case SILInstructionKind::DeallocValueBufferInst:
   case SILInstructionKind::DeallocBoxInst:
   case SILInstructionKind::DeallocExistentialBoxInst:
   case SILInstructionKind::StrongRetainInst:

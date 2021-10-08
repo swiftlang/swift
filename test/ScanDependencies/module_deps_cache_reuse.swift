@@ -109,9 +109,8 @@ import SubE
 
 // CHECK: "commandLine": [
 // CHECK-NEXT: "-frontend"
-// CHECK-NEXT: "-only-use-extra-clang-opts"
-// CHECK-NEXT: "-Xcc"
-// CHECK-NEXT: "BUILD_DIR/bin/clang"
+// CHECK-NEXT: "-only-use-extra-clang-opts
+// CHECK-NOT: "BUILD_DIR/bin/clang"
 // CHECK-NEXT: "-Xcc"
 // CHECK-NEXT: "-fsyntax-only",
 // CHECK:      "-fsystem-module",

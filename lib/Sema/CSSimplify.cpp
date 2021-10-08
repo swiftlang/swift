@@ -282,22 +282,19 @@ static bool matchCallArgumentsImpl(
   // requiring further checking at the end.
   bool potentiallyOutOfOrder = false;
 
-  // Local function that claims the argument at \c argNumber, returning the
+  // Local function that claims the argument at \c argIdx, returning the
   // index of the claimed argument. This is primarily a helper for
   // \c claimNextNamed.
-  auto claim = [&](Identifier expectedName, unsigned argNumber,
+  auto claim = [&](Identifier expectedName, unsigned argIdx,
                    bool ignoreNameClash = false)  -> unsigned {
     // Make sure we can claim this argument.
-    assert(argNumber != numArgs && "Must have a valid index to claim");
-    assert(!claimedArgs[argNumber] && "Argument already claimed");
+    assert(argIdx != numArgs && "Must have a valid index to claim");
+    assert(!claimedArgs[argIdx] && "Argument already claimed");
 
-    auto argLabel = args[argNumber].getLabel();
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
-      actualArgNames[argNumber] = expectedName;
-    } else if (argLabel != expectedName && !ignoreNameClash &&
-               !(argLabel.str().startswith("$") &&
-                 argLabel.str().drop_front() == expectedName.str())) {
+      actualArgNames[argIdx] = expectedName;
+    } else if (!ignoreNameClash && !args[argIdx].matchParameterLabel(expectedName)) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
@@ -313,12 +310,12 @@ static bool matchCallArgumentsImpl(
       }
 
       // Record this argument name.
-      actualArgNames[argNumber] = expectedName;
+      actualArgNames[argIdx] = expectedName;
     }
 
-    claimedArgs[argNumber] = true;
+    claimedArgs[argIdx] = true;
     ++numClaimedArgs;
-    return argNumber;
+    return argIdx;
   };
 
   // Local function that skips over any claimed arguments.
@@ -343,11 +340,8 @@ static bool matchCallArgumentsImpl(
     // Go hunting for an unclaimed argument whose name does match.
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
-      auto argLabel = args[i].getLabel();
 
-      if (argLabel != paramLabel &&
-          !(argLabel.str().startswith("$") &&
-            argLabel.str().drop_front() == paramLabel.str())) {
+      if (!args[i].matchParameterLabel(paramLabel)) {
         // If this is an attempt to claim additional unlabeled arguments
         // for variadic parameter, we have to stop at first labeled argument.
         if (forVariadic)
@@ -379,7 +373,7 @@ static bool matchCallArgumentsImpl(
         // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
         // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
         // ```
-        if (argLabel.empty())
+        if (args[i].getLabel().empty())
           continue;
 
         potentiallyOutOfOrder = true;
@@ -2290,9 +2284,29 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
             increaseScore(SK_FunctionConversion);
           }
         }
-      } else if (last->getKind() == ConstraintLocator::PatternMatch &&
-          isa<EnumElementPattern>(
-            last->castTo<LocatorPathElt::PatternMatch>().getPattern())) {
+      } else if (last->is<LocatorPathElt::PatternMatch>() &&
+                 isa<EnumElementPattern>(
+                     last->castTo<LocatorPathElt::PatternMatch>()
+                         .getPattern())) {
+        // A single paren pattern becomes a labeled tuple pattern
+        // e.g. `case .test(let value):` should be able to match
+        // `case test(result: Int)`. Note that it also means that:
+        // `cast test(result: (String, Int))` would be matched against
+        // e.g. `case .test((let x, let y))` but that fails during
+        // pattern coercion (behavior consistent with what happens in
+        // `TypeCheckPattern`).
+        if (func1Params.size() == 1 && !func1Params.front().hasLabel() &&
+            func2Params.size() == 1 && func2Params.front().hasLabel()) {
+          auto param = func1Params.front();
+          auto label = func2Params.front().getLabel();
+
+          auto labeledParam = FunctionType::Param(param.getPlainType(), label,
+                                                  param.getParameterFlags());
+
+          func1Params.clear();
+          func1Params.push_back(labeledParam);
+        }
+
         // Consider following example:
         //
         // enum E {
@@ -5886,6 +5900,43 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                    type1PointerKind == PTK_AutoreleasingUnsafeMutablePointer)) {
                 conversionsOrFixes.push_back(
                                    ConversionRestrictionKind::PointerToPointer);
+              }
+            }
+
+            // If both sides are non-optional pointers, let's check whether
+            // this argument supports Swift -> C pointer conversions.
+            //
+            // Do some light verification before recording restriction to
+            // avoid allocating constraints for obviously invalid cases.
+            if (type1IsPointer && !type1IsOptional && !type2IsOptional &&
+                (shouldAttemptFixes() || isArgumentOfImportedDecl(locator))) {
+              // UnsafeRawPointer -> UnsafePointer<[U]Int8>
+              if (type1PointerKind == PTK_UnsafeRawPointer &&
+                  pointerKind == PTK_UnsafePointer) {
+                conversionsOrFixes.push_back(
+                    ConversionRestrictionKind::PointerToCPointer);
+              }
+
+              // UnsafeMutableRawPointer -> Unsafe[Mutable]Pointer<[U]Int8>
+              if (type1PointerKind == PTK_UnsafeMutableRawPointer &&
+                  (pointerKind == PTK_UnsafePointer ||
+                   pointerKind == PTK_UnsafeMutablePointer)) {
+                conversionsOrFixes.push_back(
+                    ConversionRestrictionKind::PointerToCPointer);
+              }
+
+              // Unsafe[Mutable]Pointer -> Unsafe[Mutable]Pointer
+              if (type1PointerKind == PTK_UnsafePointer &&
+                  pointerKind == PTK_UnsafePointer) {
+                conversionsOrFixes.push_back(
+                    ConversionRestrictionKind::PointerToCPointer);
+              }
+
+              if (type1PointerKind == PTK_UnsafeMutablePointer &&
+                  (pointerKind == PTK_UnsafePointer ||
+                   pointerKind == PTK_UnsafeMutablePointer)) {
+                conversionsOrFixes.push_back(
+                    ConversionRestrictionKind::PointerToCPointer);
               }
             }
           }
@@ -11114,7 +11165,10 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     return matchPointerBaseTypes(ptr1, ptr2);
   }
-    
+
+  case ConversionRestrictionKind::PointerToCPointer:
+    return simplifyPointerToCPointerRestriction(type1, type2, flags, locator);
+
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
   case ConversionRestrictionKind::ArrayUpcast: {
     Type baseType1 = *isArrayType(type1);
@@ -11339,6 +11393,122 @@ ConstraintSystem::simplifyRestrictedConstraint(
   }
 
   llvm_unreachable("Unhandled SolutionKind in switch.");
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyPointerToCPointerRestriction(
+    Type type1, Type type2, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  bool inCorrectPosition = isArgumentOfImportedDecl(locator);
+
+  if (inCorrectPosition) {
+    // Make sure that solutions with implicit pointer conversions
+    // are always worse than the ones without them.
+    increaseScore(SK_ImplicitValueConversion);
+  } else {
+    // If this is not an imported function, let's not proceed with
+    // the conversion, unless in diagnostic mode.
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    // Let's attempt to convert the types and record a tailored
+    // fix if that succeeds.
+  }
+
+  auto &ctx = getASTContext();
+
+  PointerTypeKind swiftPtrKind, cPtrKind;
+
+  auto swiftPtr = type1->getAnyPointerElementType(swiftPtrKind);
+  auto cPtr = type2->getAnyPointerElementType(cPtrKind);
+
+  assert(swiftPtr);
+  assert(cPtr);
+
+  auto markSupported = [&]() -> SolutionKind {
+    if (inCorrectPosition)
+      return SolutionKind::Solved;
+
+    // If conversion cannot be allowed on account of declaration,
+    // let's add a tailored fix.
+    auto *fix = AllowSwiftToCPointerConversion::create(
+        *this, getConstraintLocator(locator));
+
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  };
+
+  // Unsafe[Mutable]RawPointer -> Unsafe[Mutable]Pointer<[U]Int8>
+  if (swiftPtrKind == PTK_UnsafeRawPointer ||
+      swiftPtrKind == PTK_UnsafeMutableRawPointer) {
+    // Since it's a C pointer on parameter side it would always
+    // be fully resolved.
+    if (cPtr->isInt8() || cPtr->isUInt8())
+      return markSupported();
+  } else {
+    // Unsafe[Mutable]Pointer<T> -> Unsafe[Mutable]Pointer<[U]Int8>
+    if (cPtr->isInt8() || cPtr->isUInt8()) {
+      // <T> can default to the type of C pointer.
+      addConstraint(
+          ConstraintKind::Defaultable, swiftPtr, cPtr,
+          locator.withPathElement(LocatorPathElt::GenericArgument(0)));
+      return markSupported();
+    }
+
+    auto elementLoc =
+        locator.withPathElement(LocatorPathElt::GenericArgument(0));
+
+    // Unsafe[Mutable]Pointer<Int{8, 16, ...}> <->
+    // Unsafe[Mutable]Pointer<UInt{8, 16, ...}>
+
+    if (swiftPtr->isInt() || swiftPtr->isUInt()) {
+      addConstraint(ConstraintKind::Equal, cPtr,
+                    swiftPtr->isUInt() ? ctx.getIntType() : ctx.getUIntType(),
+                    elementLoc);
+      return markSupported();
+    }
+
+    if (swiftPtr->isInt8() || swiftPtr->isUInt8()) {
+      addConstraint(ConstraintKind::Equal, cPtr,
+                    swiftPtr->isUInt8() ? ctx.getInt8Type()
+                                        : ctx.getUInt8Type(),
+                    elementLoc);
+      return markSupported();
+    }
+
+    if (swiftPtr->isInt16() || swiftPtr->isUInt16()) {
+      addConstraint(ConstraintKind::Equal, cPtr,
+                    swiftPtr->isUInt16() ? ctx.getInt16Type()
+                                         : ctx.getUInt16Type(),
+                    elementLoc);
+      return markSupported();
+    }
+
+    if (swiftPtr->isInt32() || swiftPtr->isUInt32()) {
+      addConstraint(ConstraintKind::Equal, cPtr,
+                    swiftPtr->isUInt32() ? ctx.getInt32Type()
+                                         : ctx.getUInt32Type(),
+                    elementLoc);
+      return markSupported();
+    }
+
+    if (swiftPtr->isInt64() || swiftPtr->isUInt64()) {
+      addConstraint(ConstraintKind::Equal, cPtr,
+                    swiftPtr->isUInt64() ? ctx.getInt64Type()
+                                         : ctx.getUInt64Type(),
+                    elementLoc);
+      return markSupported();
+    }
+  }
+
+  // If the conversion is unsupported, let's record a generic argument mismatch.
+  if (shouldAttemptFixes() && !inCorrectPosition) {
+    auto *fix = AllowArgumentMismatch::create(*this, type1, type2,
+                                              getConstraintLocator(locator));
+    return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
+                                        : SolutionKind::Solved;
+  }
+
+  return SolutionKind::Error;
 }
 
 static bool isAugmentingFix(ConstraintFix *fix) {
@@ -11802,6 +11972,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddSendableAttribute:
   case FixKind::DropThrowsAttribute:
   case FixKind::DropAsyncAttribute:
+  case FixKind::AllowSwiftToCPointerConversion:
     llvm_unreachable("handled elsewhere");
   }
 

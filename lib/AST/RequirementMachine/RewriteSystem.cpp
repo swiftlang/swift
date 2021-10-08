@@ -41,16 +41,36 @@ Optional<Symbol> Rule::isPropertyRule() const {
   if (!std::equal(RHS.begin(), RHS.end(), LHS.begin()))
     return None;
 
+  // A same-type requirement of the form 'Self.Foo == Self' can induce a
+  // conformance rule [P].[P] => [P]. Don't consider this a property-like
+  // rule, since it messes up the generating conformances algorithm and
+  // doesn't mean anything useful anyway.
+  if (RHS.size() == 1 && RHS[0] == LHS[1])
+    return None;
+
   return property;
 }
 
 /// If this is a rule of the form T.[p] => T where [p] is a protocol symbol,
-/// return true, otherwise return false.
-bool Rule::isProtocolConformanceRule() const {
-  if (auto property = isPropertyRule())
-    return property->getKind() == Symbol::Kind::Protocol;
+/// return the protocol, otherwise return nullptr.
+const ProtocolDecl *Rule::isProtocolConformanceRule() const {
+  if (auto property = isPropertyRule()) {
+    if (property->getKind() == Symbol::Kind::Protocol)
+      return property->getProtocol();
+  }
 
-  return false;
+  return nullptr;
+}
+
+/// If this is a rule of the form [P].[Q] => [P] where [P] and [Q] are
+/// protocol symbols, return true, otherwise return false.
+bool Rule::isProtocolRefinementRule() const {
+  return (LHS.size() == 2 &&
+          RHS.size() == 1 &&
+          LHS[0] == RHS[0] &&
+          LHS[0].getKind() == Symbol::Kind::Protocol &&
+          LHS[1].getKind() == Symbol::Kind::Protocol &&
+          LHS[0] != LHS[1]);
 }
 
 void Rule::dump(llvm::raw_ostream &out) const {
@@ -64,7 +84,11 @@ void Rule::dump(llvm::raw_ostream &out) const {
 }
 
 RewriteSystem::RewriteSystem(RewriteContext &ctx)
-    : Context(ctx), Debug(ctx.getDebugOptions()) {}
+    : Context(ctx), Debug(ctx.getDebugOptions()) {
+  Initialized = 0;
+  Complete = 0;
+  Minimized = 0;
+}
 
 RewriteSystem::~RewriteSystem() {
   Trie.updateHistograms(Context.RuleTrieHistogram,
@@ -75,6 +99,9 @@ void RewriteSystem::initialize(
     std::vector<std::pair<MutableTerm, MutableTerm>> &&associatedTypeRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
     ProtocolGraph &&graph) {
+  assert(!Initialized);
+  Initialized = 1;
+
   Protos = graph;
 
   for (const auto &rule : associatedTypeRules) {
@@ -97,6 +124,10 @@ void RewriteSystem::initialize(
 /// \p lhs to \p rhs.
 bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
                             const RewritePath *path) {
+  // FIXME:
+  // assert(!Complete || path != nullptr &&
+  //        "Rules added by completion must have a path");
+
   assert(!lhs.empty());
   assert(!rhs.empty());
 
@@ -257,8 +288,8 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 
   if (Debug.contains(DebugFlags::Simplify)) {
     if (changed) {
-      llvm::dbgs() << "= Simplified " << term << ": ";
-      forDebug.dump(llvm::dbgs(), original, *this);
+      llvm::dbgs() << "= Simplified " << original << " to " << term << " via ";
+      (path == nullptr ? &forDebug : path)->dump(llvm::dbgs(), original, *this);
       llvm::dbgs() << "\n";
     } else {
       llvm::dbgs() << "= Irreducible term: " << term << "\n";
@@ -276,6 +307,8 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 /// Must be run after the completion procedure, since the deletion of
 /// rules is only valid to perform if the rewrite system is confluent.
 void RewriteSystem::simplifyRewriteSystem() {
+  assert(Complete);
+
   for (unsigned ruleID = 0, e = Rules.size(); ruleID < e; ++ruleID) {
     auto &rule = getRule(ruleID);
     if (rule.isSimplified())
@@ -329,28 +362,26 @@ void RewriteSystem::simplifyRewriteSystem() {
     assert(oldRuleID == ruleID);
     (void) oldRuleID;
 
-    // Produce a loop at the simplified rhs.
+    // Produce a loop at the original lhs.
     RewritePath loop;
 
-    // (1) First, apply rhsPath in reverse to produce the original rhs.
-    rhsPath.invert();
+    // (1) First, apply the original rule to produce the original rhs.
+    loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
+                                         ruleID, /*inverse=*/false));
+
+    // (2) Next, apply rhsPath to produce the simplified rhs.
     loop.append(rhsPath);
 
-    // (2) Next, apply the original rule in reverse to produce the
-    // original lhs.
+    // (3) Finally, apply the new rule in reverse to produce the original lhs.
     loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
-                                         ruleID, /*inverse=*/true));
+                                         newRuleID, /*inverse=*/true));
 
-    // (3) Finally, apply the new rule to produce the simplified rhs.
-    loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
-                                         newRuleID, /*inverse=*/false));
+    HomotopyGenerators.emplace_back(MutableTerm(lhs), loop);
 
     if (Debug.contains(DebugFlags::Completion)) {
       llvm::dbgs() << "$ Right hand side simplification recorded a loop: ";
-      loop.dump(llvm::dbgs(), rhs, *this);
+      HomotopyGenerators.back().dump(llvm::dbgs(), *this);
     }
-
-    HomotopyGenerators.emplace_back(rhs, loop);
   }
 }
 
@@ -426,6 +457,9 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
   out << "}\n";
   out << "Homotopy generators: {\n";
   for (const auto &loop : HomotopyGenerators) {
+    if (loop.isDeleted())
+      continue;
+
     out << "- ";
     loop.dump(out, *this);
     out << "\n";

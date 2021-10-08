@@ -2485,6 +2485,19 @@ usePrespecialized(SILOptFunctionBuilder &funcBuilder, ApplySite apply,
           !currentModule->isImportedAsSPI(spiGroup, funcModule))
         continue;
     }
+    // Check whether the availability of the specialization allows for using
+    // it. We check the  deployment target or the current functions availability
+    // target depending which one is more recent.
+    auto specializationAvail = SA->getAvailability();
+    auto &ctxt = funcBuilder.getModule().getSwiftModule()->getASTContext();
+    auto deploymentAvail = AvailabilityContext::forDeploymentTarget(ctxt);
+    auto currentFnAvailability = apply.getFunction()->getAvailabilityForLinkage();
+    if (!currentFnAvailability.isAlwaysAvailable() &&
+        !deploymentAvail.isContainedIn(currentFnAvailability))
+      deploymentAvail = currentFnAvailability;
+    if (!deploymentAvail.isContainedIn(specializationAvail))
+      continue;
+
     ReabstractionInfo reInfo(funcBuilder.getModule().getSwiftModule(),
                              funcBuilder.getModule().isWholeModule(), refF,
                              SA->getSpecializedSignature(),
@@ -2499,7 +2512,10 @@ usePrespecialized(SILOptFunctionBuilder &funcBuilder, ApplySite apply,
         mangler.mangleReabstracted(subs, reInfo.needAlternativeMangling());
 
     prespecializedReInfo = reInfo;
-    return lookupOrCreatePrespecialization(funcBuilder, refF, name, reInfo);
+    auto fn = lookupOrCreatePrespecialization(funcBuilder, refF, name, reInfo);
+    if (!specializationAvail.isAlwaysAvailable())
+      fn->setAvailabilityForLinkage(specializationAvail);
+    return fn;
   }
   return nullptr;
 }

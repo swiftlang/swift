@@ -18,7 +18,10 @@ if(NOT swift_concurrency_install_component)
   set(swift_concurrency_install_component stdlib)
 endif()
 
-if(SWIFT_CONCURRENCY_USES_DISPATCH)
+set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
+set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS)
+
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     include_directories(AFTER
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
@@ -29,11 +32,18 @@ if(SWIFT_CONCURRENCY_USES_DISPATCH)
     list(APPEND swift_concurrency_link_libraries
       dispatch)
   endif()
+elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded" OR
+       "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "hooked")
+  list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+    "-DSWIFT_CONCURRENCY_ENABLE_DISPATCH=0")
+else()
+  message(FATAL_ERROR "Invalid value for SWIFT_CONCURRENCY_GLOBAL_EXECUTOR (\"${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}\").")
 endif()
 
 
-set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
-set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS)
+if(NOT SWIFT_CONCURRENCY_USES_DISPATCH)
+
+endif()
 
 if(NOT swift_concurrency_async_fp_mode)
   set(swift_concurrency_async_fp_mode "always")
@@ -120,7 +130,6 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     -Xfrontend -define-availability
     -Xfrontend "SwiftStdlib 5.5:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0"
     ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
-  LINK_FLAGS "${SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS}"
   ${swift_concurrency_options}
   INSTALL_IN_COMPONENT ${swift_concurrency_install_component}
 )

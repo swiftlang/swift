@@ -167,10 +167,8 @@ OPERAND_OWNERSHIP(TrivialUse, OpenExistentialMetatype)
 OPERAND_OWNERSHIP(TrivialUse, PointerToAddress)
 OPERAND_OWNERSHIP(TrivialUse, PointerToThinFunction)
 OPERAND_OWNERSHIP(TrivialUse, ProjectBlockStorage)
-OPERAND_OWNERSHIP(TrivialUse, ProjectValueBuffer)
 OPERAND_OWNERSHIP(TrivialUse, RawPointerToRef)
 OPERAND_OWNERSHIP(TrivialUse, SelectEnumAddr)
-OPERAND_OWNERSHIP(TrivialUse, SelectValue)
 OPERAND_OWNERSHIP(TrivialUse, StructElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchValue)
@@ -183,8 +181,6 @@ OPERAND_OWNERSHIP(TrivialUse, UncheckedAddrCast)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedRefCastAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedTakeEnumDataAddr)
 OPERAND_OWNERSHIP(TrivialUse, UnconditionalCheckedCastAddr)
-OPERAND_OWNERSHIP(TrivialUse, AllocValueBuffer)
-OPERAND_OWNERSHIP(TrivialUse, DeallocValueBuffer)
 
 // Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
@@ -386,6 +382,23 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
   }
   return getOwnershipKind().getForwardingOperandOwnership(
     /*allowUnowned*/true);
+}
+
+OperandOwnership
+OperandOwnershipClassifier::visitSelectValueInst(SelectValueInst *i) {
+  if (getValue() == i->getDefaultResult())
+    return OperandOwnership::ForwardingBorrow;
+
+  for (unsigned idx = 0, endIdx = i->getNumCases(); idx < endIdx; ++idx) {
+    SILValue casevalue;
+    SILValue result;
+    std::tie(casevalue, result) = i->getCase(idx);
+
+    if (getValue() == casevalue) {
+      return OperandOwnership::ForwardingBorrow;
+    }
+  }
+  return OperandOwnership::TrivialUse;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {

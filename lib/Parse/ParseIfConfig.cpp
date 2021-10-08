@@ -116,6 +116,9 @@ static llvm::VersionTuple getCanImportVersion(ArgumentList *args,
 
 static Expr *getSingleSubExp(ArgumentList *args, StringRef kindName,
                              DiagnosticEngine *D) {
+  if (args->empty())
+    return nullptr;
+
   if (auto *unary = args->getUnlabeledUnaryExpr())
     return unary;
 
@@ -260,7 +263,11 @@ public:
 
     Expr *Arg = getSingleSubExp(E->getArgs(), *KindName, &D);
     if (!Arg) {
-      D.diagnose(E->getLoc(), diag::platform_condition_expected_one_argument);
+      if (E->getArgs()->empty()) {
+        D.diagnose(E->getLoc(), diag::platform_condition_expected_argument);
+      } else {
+        D.diagnose(E->getLoc(), diag::platform_condition_expected_one_argument);
+      }
       return nullptr;
     }
     // '_compiler_version' '(' string-literal ')'

@@ -5,7 +5,7 @@
 // CHECK: func passThrough<T>(_ value: T) -> T
 // CHECK: func passThroughConst<T>(_ value: T) -> T
 // CHECK: func templateParameterReturnType<R, T, U>(_ a: T, _ b: U) -> R
-// CHECK: func cannotInferTemplate<T>()
+// CHECK: func cannotInferTemplate<T>(T: T.Type)
 
 // CHECK: struct HasVariadicMemeber {
 // CHECK:   @available(*, unavailable, message: "Variadic function is unavailable")

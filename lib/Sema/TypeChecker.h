@@ -724,11 +724,12 @@ ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
 /// \returns The protocol conformance, if \c T conforms to the
 /// protocol \c Proto, or \c None.
 ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                          ModuleDecl *M);
+                                          ModuleDecl *M,
+                                          bool allowMissing = true);
 
 /// Check whether the type conforms to a given known protocol.
 bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
-                             ModuleDecl *module);
+                             ModuleDecl *module, bool allowMissing = true);
 
 /// This is similar to \c conformsToProtocol, but returns \c true for cases where
 /// the type \p T could be dynamically cast to \p Proto protocol, such as a non-final
