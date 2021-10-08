@@ -24,7 +24,7 @@ Swift 5.6
   func test(p: P) {
     // error: 'method' has a 'Self' requirement and cannot be used on a value of
     // protocol type (use a generic constraint instead).
-    p.method
+    _ = p.method
   }
   ```
 
