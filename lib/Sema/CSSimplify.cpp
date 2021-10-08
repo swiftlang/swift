@@ -6709,7 +6709,10 @@ static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
 static ConstraintFix *maybeWarnAboutExtraneousCast(
     ConstraintSystem &cs, Type origFromType, Type origToType, Type fromType,
     Type toType, SmallVector<Type, 4> fromOptionals,
-    SmallVector<Type, 4> toOptionals, ConstraintSystem::TypeMatchOptions flags,
+    SmallVector<Type, 4> toOptionals,
+    const std::vector<std::tuple<Type, Type, ConversionRestrictionKind>>
+        &constraintRestrictions,
+    ConstraintSystem::TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
 
   auto last = locator.last();
@@ -6731,6 +6734,22 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   // "from" could be less optional than "to" e.g. `0 as Any?`, so
   // we need to store the difference as a signed integer.
   int extraOptionals = fromOptionals.size() - toOptionals.size();
+
+  // From expression could be a type variable with a value to optional
+  // restrictions that we have to account for optionality mismatch.
+  const auto subExprType = cs.getType(castExpr->getSubExpr());
+  if (llvm::any_of(constraintRestrictions, [&](auto &entry) {
+        Type type1, type2;
+        ConversionRestrictionKind kind;
+        std::tie(type1, type2, kind) = entry;
+        if (kind != ConversionRestrictionKind::ValueToOptional)
+          return false;
+        return fromType->isEqual(type1) && subExprType->isEqual(type2);
+      })) {
+    extraOptionals++;
+    origFromType = OptionalType::get(origFromType);
+  }
+
   // Removing the optionality from to type when the force cast expr is an IUO.
   const auto *const TR = castExpr->getCastTypeRepr();
   if (isExpr<ForcedCheckedCastExpr>(anchor) && TR &&
@@ -6886,7 +6905,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     if (auto *fix = maybeWarnAboutExtraneousCast(
             *this, origFromType, origToType, fromType, toType, fromOptionals,
-            toOptionals, flags, locator)) {
+            toOptionals, ConstraintRestrictions, flags, locator)) {
       (void)recordFix(fix);
     }
   };
@@ -6954,7 +6973,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // succeed or fail.
     if (auto *fix = maybeWarnAboutExtraneousCast(
             *this, origFromType, origToType, fromType, toType, fromOptionals,
-            toOptionals, flags, locator)) {
+            toOptionals, ConstraintRestrictions, flags, locator)) {
       (void)recordFix(fix);
     }
 

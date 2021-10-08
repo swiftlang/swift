@@ -613,3 +613,23 @@ func decodeStringOrIntDictionary<T: FixedWidthInteger>() -> [Int: T] {
     fatalError()
   }
 }
+
+// SR-15281
+struct SR15281_A { }
+
+struct SR15281_B {
+  init(a: SR15281_A) { }
+}
+
+struct SR15281_S {
+  var a: SR15281_A? = SR15281_A()
+
+  var b1: SR15281_B {
+    a.flatMap(SR15281_B.init(a:)) as! SR15281_B 
+    // expected-warning@-1 {{forced cast from 'SR15281_B?' to 'SR15281_B' only unwraps optionals; did you mean to use '!'?}} {{34-34=!}} {{34-48=}}
+  }
+
+  var b: SR15281_B {
+    a.flatMap(SR15281_B.init(a:)) // expected-error{{cannot convert return expression of type 'SR15281_B?' to return type 'SR15281_B'}} {{34-34= as! SR15281_B}}
+  }
+}
