@@ -245,3 +245,16 @@ struct UnsolvableInheritance2<T : U.A, U : T.A> {}
 
 enum X7<T> where X7.X : G { case X } // expected-error{{enum case 'X' is not a member type of 'X7<T>'}}
 // expected-error@-1{{cannot find type 'G' in scope}}
+
+protocol MetatypeTypeResolutionProto {}
+struct X8<T> {
+  static var property1: T.Type { T.self }
+  static func method1() -> T.Type { T.self }
+}
+extension X8 where T == MetatypeTypeResolutionProto {
+  // FIXME: Inconsistent contextual type resolution for generic metatypes;
+  // should be .Protocol in both cases.
+  static var property2: T.Type { property1 }
+  // expected-error@-1 {{cannot convert return expression of type 'MetatypeTypeResolutionProto.Protocol' to return type 'MetatypeTypeResolutionProto.Type'}}
+  static func method2() -> T.Type { method1() } // ok
+}
