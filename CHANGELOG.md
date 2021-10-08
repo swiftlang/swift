@@ -6,6 +6,31 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.6
 ---------
 
+* [SE-0324][]:
+
+  Relax diagnostics for pointer arguments to C functions. The Swift
+  compiler now accepts limited pointer type mismatches when directly
+  calling functions imported from C as long as the C language allows
+  those pointer types to alias. Consequently, any Swift
+  `Unsafe[Mutable]Pointer<T>` or `Unsafe[Mutable]RawPointer` may be
+  passed to C function arguments declared as `[signed|unsigned] char
+  *`. Swift `Unsafe[Mutable]Pointer<T>` can also be passed to C
+  function arguments with an integer type that differs from `T` only
+  in its signedness.
+
+  For example, after importing a C function declaration:
+  ```c
+  long long decode_int64(const char *ptr_to_int64);
+  ```
+  Swift can now directly pass a raw pointer as the function argument:
+  ```swift
+  func decodeAsInt64(data: Data) -> Int64 {
+      data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+          decode_int64(bytes.baseAddress!)
+      }
+  }
+  ```
+
 * [SE-0315][]:
 
   Type expressions and annotations can now include "type placeholders" which
@@ -8697,6 +8722,7 @@ Swift 1.0
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
 [SE-0315]: <https://github.com/apple/swift-evolution/blob/main/proposals/0315-placeholder-types.md>
 [SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
+[SE-0324]: <https://github.com/apple/swift-evolution/blob/main/proposals/0324-c-lang-pointer-arg-conversion.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
