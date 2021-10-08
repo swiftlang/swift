@@ -8053,6 +8053,12 @@ namespace {
 
                 return resultTarget;
               });
+
+          if (!hadError) {
+            TypeChecker::checkClosureAttributes(closure);
+            TypeChecker::checkParameterList(closure->getParameters(), closure);
+          }
+
           continue;
         }
 
