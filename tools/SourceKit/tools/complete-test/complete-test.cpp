@@ -568,6 +568,7 @@ public:
 static void printResponse(sourcekitd_response_t resp, bool raw, bool structure,
                           unsigned indentation) {
   if (raw) {
+    llvm::outs().flush();
     sourcekitd_response_description_dump_filedesc(resp, STDOUT_FILENO);
     return;
   }

@@ -170,6 +170,16 @@ struct NotificationBuffer {
 };
 static NotificationBuffer notificationBuffer;
 
+static void printRawResponse(sourcekitd_response_t resp) {
+  llvm::outs().flush();
+  sourcekitd_response_description_dump_filedesc(resp, STDOUT_FILENO);
+}
+
+static void printRawVariant(sourcekitd_variant_t obj) {
+  llvm::outs().flush();
+  sourcekitd_variant_description_dump_filedesc(obj, STDOUT_FILENO);
+}
+
 static void syncNotificationsWithService() {
   // Send TestNotification request, then wait for the notification. This ensures
   // that all notifications previously posted on the service side have been
@@ -192,9 +202,8 @@ static void printBufferedNotifications(bool syncWithService = true) {
   if (syncWithService) {
     syncNotificationsWithService();
   }
-  notificationBuffer.handleNotifications([](sourcekitd_response_t note) {
-    sourcekitd_response_description_dump_filedesc(note, STDOUT_FILENO);
-  });
+  notificationBuffer.handleNotifications(
+      [](sourcekitd_response_t note) { printRawResponse(note); });
 }
 
 struct skt_args {
@@ -443,7 +452,7 @@ static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
   sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
   auto Error = sourcekitd_response_is_error(Resp);
   if (Opts.PrintResponse) {
-    sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+    printRawResponse(Resp);
   }
   return Error ? 1 : 0;
 }
@@ -1256,7 +1265,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     free(json);
 
   } else if (Opts.PrintRawResponse) {
-    sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+    printRawResponse(Resp);
 
   } else {
     sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
@@ -1279,7 +1288,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::Edit:
       if (Opts.Length == 0 && Opts.ReplaceText->empty()) {
         // Length=0, replace="" is a nop and will not trigger sema.
-        sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+        printRawResponse(Resp);
       } else {
         getSemanticInfo(Info, SourceFile);
         KeepResponseAlive = true;
@@ -1309,7 +1318,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::ConformingMethodList:
     case SourceKitRequest::DependencyUpdated:
     case SourceKitRequest::Diagnostics:
-      sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+      printRawResponse(Resp);
       break;
 
     case SourceKitRequest::RelatedIdents:
@@ -1380,7 +1389,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     }
     case SourceKitRequest::SyntaxMap:
     case SourceKitRequest::Structure:
-      sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+      printRawResponse(Resp);
       if (Opts.ReplaceText.hasValue()) {
         unsigned Offset =
             resolveFromLineCol(Opts.Line, Opts.Col, SourceFile, Opts.VFSFiles);
@@ -1405,7 +1414,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                                                 !Opts.UsedSema);
 
         sourcekitd_response_t EdResp = sendRequestSync(EdReq, Opts);
-        sourcekitd_response_description_dump_filedesc(EdResp, STDOUT_FILENO);
+        printRawResponse(EdResp);
         sourcekitd_response_dispose(EdResp);
         sourcekitd_request_release(EdReq);
       }
@@ -1440,7 +1449,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
         }
 
         sourcekitd_response_t FmtResp = sendRequestSync(Fmt, Opts);
-        sourcekitd_response_description_dump_filedesc(FmtResp, STDOUT_FILENO);
+        printRawResponse(FmtResp);
         sourcekitd_response_dispose(FmtResp);
         sourcekitd_request_release(Fmt);
       }
@@ -1449,7 +1458,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       case SourceKitRequest::ExpandPlaceholder:
         if (Opts.Length) {
           // Single placeholder by location.
-          sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+          printRawResponse(Resp);
         } else {
           // Expand all placeholders.
           expandPlaceholders(SourceBuf.get(), llvm::outs());
@@ -1523,13 +1532,12 @@ static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename) {
 }
 
 static int printAnnotations() {
-  sourcekitd_variant_description_dump_filedesc(LatestSemaAnnotations,
-                                               STDOUT_FILENO);
+  printRawVariant(LatestSemaAnnotations);
   return 0;
 }
 
 static int printDiags() {
-  sourcekitd_variant_description_dump_filedesc(LatestSemaDiags, STDOUT_FILENO);
+  printRawVariant(LatestSemaDiags);
   return 0;
 }
 
@@ -2106,16 +2114,14 @@ static void printFoundUSR(sourcekitd_variant_t Info,
 static void printNormalizedDocComment(sourcekitd_variant_t Info) {
   sourcekitd_variant_t Source =
     sourcekitd_variant_dictionary_get_value(Info, KeySourceText);
-  sourcekitd_variant_description_dump_filedesc(Source, STDOUT_FILENO);
+  printRawVariant(Source);
 }
 
 static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename) {
   const char *text =
       sourcekitd_variant_dictionary_get_string(Info, KeySourceText);
-  llvm::raw_fd_ostream OS(STDOUT_FILENO, /*shouldClose=*/false);
   if (text) {
-    OS << text << '\n';
-    OS.flush();
+    llvm::outs() << text << '\n';
   }
 
   sourcekitd_variant_t annotations =
@@ -2126,11 +2132,11 @@ static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename) {
   sourcekitd_variant_t diags =
       sourcekitd_variant_dictionary_get_value(Info, KeyDiagnostics);
 
-  sourcekitd_variant_description_dump_filedesc(annotations, STDOUT_FILENO);
-  sourcekitd_variant_description_dump_filedesc(entities, STDOUT_FILENO);
+  printRawVariant(annotations);
+  printRawVariant(entities);
 
   if (sourcekitd_variant_get_type(diags) != SOURCEKITD_VARIANT_TYPE_NULL)
-    sourcekitd_variant_description_dump_filedesc(diags, STDOUT_FILENO);
+    printRawVariant(diags);
 }
 
 static void checkTextIsASCII(const char *Text) {
@@ -2278,8 +2284,7 @@ static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
       sourcekitd_variant_dictionary_get_string(Info, KeySourceText);
 
   if (text) {
-    llvm::raw_fd_ostream OS(STDOUT_FILENO, /*shouldClose=*/false);
-    OS << text << '\n';
+    llvm::outs() << text << '\n';
   }
 
   if (CheckASCII) {
@@ -2288,13 +2293,13 @@ static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
 
   sourcekitd_variant_t syntaxmap =
       sourcekitd_variant_dictionary_get_value(Info, KeySyntaxMap);
-  sourcekitd_variant_description_dump_filedesc(syntaxmap, STDOUT_FILENO);
+  printRawVariant(syntaxmap);
   sourcekitd_variant_t annotations =
       sourcekitd_variant_dictionary_get_value(Info, KeyAnnotations);
-  sourcekitd_variant_description_dump_filedesc(annotations, STDOUT_FILENO);
+  printRawVariant(annotations);
   sourcekitd_variant_t structure =
       sourcekitd_variant_dictionary_get_value(Info, KeySubStructure);
-  sourcekitd_variant_description_dump_filedesc(structure, STDOUT_FILENO);
+  printRawVariant(structure);
 }
 
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
