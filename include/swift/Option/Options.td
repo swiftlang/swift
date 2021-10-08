@@ -413,6 +413,10 @@ def require_explicit_availability_target : Separate<["-"], "require-explicit-ava
   HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
   MetaVarName<"<target>">;
 
+def require_explicit_sendable : Flag<["-"], "require-explicit-sendable">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Require explicit Sendable annotations on public declarations">;
+
 def define_availability : Separate<["-"], "define-availability">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,

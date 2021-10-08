@@ -1954,6 +1954,15 @@ NOTE(non_sendable_nominal,none,
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
      (DescriptiveDeclKind, DeclName))
+WARNING(public_decl_needs_sendable,none,
+        "public %0 %1 does not specify whether it is 'Sendable' or not",
+        (DescriptiveDeclKind, DeclName))
+NOTE(explicit_unchecked_sendable,none,
+     "add '@unchecked Sendable' conformance to %0 %1 if this type manually implements concurrency safety",
+     (DescriptiveDeclKind, DeclName))
+NOTE(explicit_disable_sendable,none,
+     "make %0 %1 explicitly non-Sendable to suppress this warning",
+     (DescriptiveDeclKind, DeclName))
 
 NOTE(required_by_opaque_return,none,
     "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))

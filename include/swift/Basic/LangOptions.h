@@ -179,6 +179,9 @@ namespace swift {
     // Availability macros definitions to be expanded at parsing.
     SmallVector<std::string, 4> AvailabilityMacros;
 
+    /// Require public declarations to declare that they are Sendable (or not).
+    bool RequireExplicitSendable = false;
+
     /// If false, '#file' evaluates to the full path rather than a
     /// human-readable string.
     bool EnableConcisePoundFile = false;
