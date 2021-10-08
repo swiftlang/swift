@@ -520,4 +520,6 @@ RewriteContext::~RewriteContext() {
 
   for (const auto &pair : Components)
     delete pair.second.Machine;
+
+  Components.clear();
 }

@@ -113,6 +113,15 @@ void Term::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     id.AddPointer(symbol.getOpaquePointer());
 }
 
+bool Term::containsUnresolvedSymbols() const {
+  for (auto symbol : *this) {
+    if (symbol.getKind() == Symbol::Kind::Name)
+      return true;
+  }
+
+  return false;
+}
+
 /// Shortlex order on terms.
 ///
 /// First we compare length, then perform a lexicographic comparison
