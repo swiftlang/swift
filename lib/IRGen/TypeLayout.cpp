@@ -812,6 +812,8 @@ ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
     return {{'B'}};
   case ScalarKind::BlockReference:
     return {{'b'}};
+  case ScalarKind::ObjCReference:
+    return {{'o'}};
   case ScalarKind::ThickFunc: {
     // Return a struct of { pointer sized POD, native reference }
     size_t pointerBits = IGM.TargetInfo.PointerSpareBits.size();

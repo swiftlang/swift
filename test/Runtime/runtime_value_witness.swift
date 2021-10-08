@@ -445,4 +445,34 @@ Tests.test("Archetype Enums") {
   checkCopies(d1, &d2)
 }
 
+Tests.test("Bridging") {
+  @_GenerateLayoutBytecode
+  struct StringStruct : Equatable {
+    init(a: String, b: LifetimeTracked) {
+      self.a = a
+      self.b = b
+    }
+    let a: String
+    let b: LifetimeTracked
+  }
+  let a = StringStruct(a: "foo", b: LifetimeTracked(0))
+  var b = StringStruct(a: "bar", b: LifetimeTracked(0))
+  checkCopies(a, &b)
+}
+
+Tests.test("Bridging Optional") {
+  @_GenerateLayoutBytecode
+  struct StringStruct : Equatable {
+    init(a: String?, b: LifetimeTracked) {
+      self.a = a
+      self.b = b
+    }
+    let a: String?
+    let b: LifetimeTracked
+  }
+  let a = StringStruct(a: "foo", b: LifetimeTracked(0))
+  var b = StringStruct(a: "bar", b: LifetimeTracked(0))
+  checkCopies(a, &b)
+}
+
 runAllTests()
