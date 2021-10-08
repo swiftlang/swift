@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Note that this test should still "pass" when no swiftinterfaces have been
 # generated.
@@ -55,6 +55,6 @@ for filename in os.listdir(sdk_overlay_dir):
     output_path = os.path.join(output_dir, module_name + ".swiftmodule")
     status = subprocess.call(compiler_invocation +
                              ["-o", output_path, "-module-name", module_name,
-                              interface_file])
+                              interface_file]).decode('utf-8')
     if status != 0:
         print("# " + target_os + ": " + module_name)
