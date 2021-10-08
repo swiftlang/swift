@@ -400,26 +400,6 @@ AllocExistentialBoxInst *AllocExistentialBoxInst::create(
                                                 F);
 }
 
-AllocValueBufferInst::AllocValueBufferInst(
-    SILDebugLocation DebugLoc, SILType valueType, SILValue operand,
-    ArrayRef<SILValue> TypeDependentOperands)
-    : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, operand,
-                                                    TypeDependentOperands,
-                                                 valueType.getAddressType()) {}
-
-AllocValueBufferInst *
-AllocValueBufferInst::create(SILDebugLocation DebugLoc, SILType valueType,
-                             SILValue operand, SILFunction &F) {
-  SmallVector<SILValue, 8> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, F, valueType.getASTType());
-  void *Buffer = F.getModule().allocateInst(
-      sizeof(AllocValueBufferInst) +
-          sizeof(Operand) * (TypeDependentOperands.size() + 1),
-      alignof(AllocValueBufferInst));
-  return ::new (Buffer) AllocValueBufferInst(DebugLoc, valueType, operand,
-                                             TypeDependentOperands);
-}
-
 BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
                                  SILType ReturnType,
                                  SubstitutionMap Substitutions,

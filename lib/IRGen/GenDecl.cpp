@@ -1887,6 +1887,48 @@ void IRGenerator::emitEagerClassInitialization() {
   llvm::appendToGlobalCtors(IGM->Module, RegisterFn, 60000, nullptr);
 }
 
+void IRGenerator::emitObjCActorsNeedingSuperclassSwizzle() {
+  if (ObjCActorsNeedingSuperclassSwizzle.empty())
+    return;
+
+  // Emit the register function in the primary module.
+  IRGenModule *IGM = getPrimaryIGM();
+
+  llvm::Function *RegisterFn = llvm::Function::Create(
+                                llvm::FunctionType::get(IGM->VoidTy, false),
+                                llvm::GlobalValue::PrivateLinkage,
+                                "_swift_objc_actor_initialization");
+  IGM->Module.getFunctionList().push_back(RegisterFn);
+  IRGenFunction RegisterIGF(*IGM, RegisterFn);
+  RegisterFn->setAttributes(IGM->constructInitialAttributes());
+  RegisterFn->setCallingConv(IGM->DefaultCC);
+
+  // Look up the SwiftNativeNSObject class.
+  auto swiftNativeNSObjectName =
+      IGM->getAddrOfGlobalString("SwiftNativeNSObject");
+  auto swiftNativeNSObjectClass = RegisterIGF.Builder.CreateCall(
+      RegisterIGF.IGM.getObjCGetRequiredClassFn(), swiftNativeNSObjectName);
+
+  for (ClassDecl *CD : ObjCActorsNeedingSuperclassSwizzle) {
+    // The @objc actor class.
+    llvm::Value *classRef = RegisterIGF.emitTypeMetadataRef(
+        CD->getDeclaredInterfaceType()->getCanonicalType());
+    classRef = RegisterIGF.Builder.CreateBitCast(classRef, IGM->ObjCClassPtrTy);
+
+    // Set its superclass to SwiftNativeNSObject.
+    RegisterIGF.Builder.CreateCall(
+        RegisterIGF.IGM.getSetSuperclassFn(),
+        { classRef, swiftNativeNSObjectClass});
+  }
+  RegisterIGF.Builder.CreateRetVoid();
+
+  // Add the registration function as a static initializer. We use a priority
+  // slightly lower than used for C++ global constructors, so that the code is
+  // executed before C++ global constructors (in case someone manages to access
+  // an @objc actor from a global constructor).
+  llvm::appendToGlobalCtors(IGM->Module, RegisterFn, 60000, nullptr);
+}
+
 /// Emit symbols for eliminated dead methods, which can still be referenced
 /// from other modules. This happens e.g. if a public class contains a (dead)
 /// private method.

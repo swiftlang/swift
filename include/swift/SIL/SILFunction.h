@@ -72,7 +72,8 @@ public:
                                    GenericSignature specializedSignature,
                                    bool exported, SpecializationKind kind,
                                    SILFunction *target, Identifier spiGroup,
-                                   const ModuleDecl *spiModule);
+                                   const ModuleDecl *spiModule,
+                                   AvailabilityContext availability);
 
   bool isExported() const {
     return exported;
@@ -110,6 +111,10 @@ public:
     return spiModule;
   }
 
+  AvailabilityContext getAvailability() const {
+    return availability;
+  }
+
   void print(llvm::raw_ostream &OS) const;
 
 private:
@@ -117,13 +122,15 @@ private:
   bool exported;
   GenericSignature specializedSignature;
   Identifier spiGroup;
+  AvailabilityContext availability;
   const ModuleDecl *spiModule = nullptr;
   SILFunction *F = nullptr;
   SILFunction *targetFunction = nullptr;
 
   SILSpecializeAttr(bool exported, SpecializationKind kind,
                     GenericSignature specializedSignature, SILFunction *target,
-                    Identifier spiGroup, const ModuleDecl *spiModule);
+                    Identifier spiGroup, const ModuleDecl *spiModule,
+                    AvailabilityContext availability);
 };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of

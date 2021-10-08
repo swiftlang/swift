@@ -2000,3 +2000,15 @@ AllowNonOptionalWeak *AllowNonOptionalWeak::create(ConstraintSystem &cs,
                                                    ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowNonOptionalWeak(cs, locator);
 }
+
+bool AllowSwiftToCPointerConversion::diagnose(const Solution &solution,
+                                              bool asNote) const {
+  SwiftToCPointerConversionInInvalidContext failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowSwiftToCPointerConversion *
+AllowSwiftToCPointerConversion::create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowSwiftToCPointerConversion(cs, locator);
+}

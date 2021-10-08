@@ -1399,6 +1399,9 @@ ERROR(attr_expected_lparen,none,
 ERROR(attr_expected_rparen,none,
 "expected ')' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
+ERROR(attr_expected_semi,none,
+"expected ';' in '%0' %select{attribute|modifier}1", (StringRef, bool))
+
 ERROR(attr_expected_comma,none,
 "expected ',' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 

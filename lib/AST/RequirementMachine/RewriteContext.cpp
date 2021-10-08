@@ -16,6 +16,7 @@
 #include "RequirementMachine.h"
 #include "RewriteSystem.h"
 #include "RewriteContext.h"
+#include "RequirementMachine.h"
 
 using namespace swift;
 using namespace rewriting;
@@ -36,6 +37,8 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
       .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
       .Case("generating-conformances", DebugFlags::GeneratingConformances)
+      .Case("protocol-dependencies", DebugFlags::ProtocolDependencies)
+      .Case("minimization", DebugFlags::Minimization)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
@@ -379,6 +382,118 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
   return !found->second->isComplete();
 }
 
+/// Implement Tarjan's algorithm to compute strongly-connected components in
+/// the protocol dependency graph.
+void RewriteContext::getRequirementMachineRec(
+    const ProtocolDecl *proto,
+    SmallVectorImpl<const ProtocolDecl *> &stack) {
+  assert(Protos.count(proto) == 0);
+
+  // Initialize the next component index and push the entry
+  // on the stack
+  {
+    auto &entry = Protos[proto];
+    entry.Index = NextComponentIndex;
+    entry.LowLink = NextComponentIndex;
+    entry.OnStack = 1;
+  }
+
+  NextComponentIndex++;
+  stack.push_back(proto);
+
+  // Look at each successor.
+  for (auto *depProto : proto->getProtocolDependencies()) {
+    auto found = Protos.find(depProto);
+    if (found == Protos.end()) {
+      // Successor has not yet been visited. Recurse.
+      getRequirementMachineRec(depProto, stack);
+
+      auto &entry = Protos[proto];
+      assert(Protos.count(depProto) != 0);
+      entry.LowLink = std::min(entry.LowLink, Protos[depProto].LowLink);
+    } else if (found->second.OnStack) {
+      // Successor is on the stack and hence in the current SCC.
+      auto &entry = Protos[proto];
+      entry.LowLink = std::min(entry.LowLink, found->second.Index);
+    }
+  }
+
+  auto &entry = Protos[proto];
+
+  // If this a root node, pop the stack and generate an SCC.
+  if (entry.LowLink == entry.Index) {
+    unsigned id = Components.size();
+    SmallVector<const ProtocolDecl *, 3> protos;
+
+    const ProtocolDecl *depProto = nullptr;
+    do {
+      depProto = stack.back();
+      stack.pop_back();
+
+      assert(Protos.count(depProto) != 0);
+      Protos[depProto].OnStack = false;
+      Protos[depProto].ComponentID = id;
+
+      protos.push_back(depProto);
+    } while (depProto != proto);
+
+    if (Debug.contains(DebugFlags::ProtocolDependencies)) {
+      llvm::dbgs() << "Connected component: [";
+      bool first = true;
+      for (auto *depProto : protos) {
+        if (!first) {
+          llvm::dbgs() << ", ";
+        } else {
+          first = false;
+        }
+        llvm::dbgs() << depProto->getName();
+      }
+      llvm::dbgs() << "]\n";
+    }
+
+    Components[id] = {Context.AllocateCopy(protos), nullptr};
+  }
+}
+
+/// Lazily construct a requirement machine for the given protocol's strongly
+/// connected component (SCC) in the protocol dependency graph.
+RequirementMachine *RewriteContext::getRequirementMachine(
+    const ProtocolDecl *proto) {
+  auto found = Protos.find(proto);
+  if (found == Protos.end()) {
+    SmallVector<const ProtocolDecl *, 3> stack;
+    getRequirementMachineRec(proto, stack);
+    assert(stack.empty());
+
+    found = Protos.find(proto);
+    assert(found != Protos.end());
+  }
+
+  assert(Components.count(found->second.ComponentID) != 0);
+  auto &component = Components[found->second.ComponentID];
+
+  auto *&machine = component.Machine;
+
+  if (machine) {
+    // If this component has a machine already, make sure it is ready
+    // for use.
+    if (!machine->isComplete()) {
+      llvm::errs() << "Re-entrant construction of requirement "
+                   << "machine for:";
+      for (auto *proto : component.Protos)
+        llvm::errs() << " " << proto->getName();
+      abort();
+    }
+  } else {
+    // Construct a requirement machine from the structural requirements of
+    // the given set of protocols.
+    machine = new RequirementMachine(*this);
+    machine->initWithProtocols(component.Protos);
+  }
+
+  return machine;
+}
+
 /// We print stats in the destructor, which should get executed at the end of
 /// a compilation job.
 RewriteContext::~RewriteContext() {
@@ -402,4 +517,7 @@ RewriteContext::~RewriteContext() {
     delete pair.second;
 
   Machines.clear();
+
+  for (const auto &pair : Components)
+    delete pair.second.Machine;
 }

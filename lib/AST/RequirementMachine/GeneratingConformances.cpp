@@ -36,6 +36,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Decl.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -51,49 +52,17 @@ using namespace rewriting;
 /// Finds all protocol conformance rules appearing in a 3-cell, both without
 /// context, and with a non-empty left context. Applications of rules with a
 /// non-empty right context are ignored.
+///
+/// The rules are organized by protocol. For each protocol, the first element
+/// of the pair stores conformance rules that appear without context. The
+/// second element of the pair stores rules that appear with non-empty left
+/// context. For each such rule, the left prefix is also stored alongside.
 void HomotopyGenerator::findProtocolConformanceRules(
-    SmallVectorImpl<unsigned> &notInContext,
-    SmallVectorImpl<std::pair<MutableTerm, unsigned>> &inContext,
+    llvm::SmallDenseMap<const ProtocolDecl *,
+                        std::pair<SmallVector<unsigned, 2>,
+                                  SmallVector<std::pair<MutableTerm, unsigned>, 2>>>
+                        &result,
     const RewriteSystem &system) const {
-
-  auto redundancyCandidates = Path.findRulesAppearingOnceInEmptyContext();
-  if (redundancyCandidates.empty())
-    return;
-
-  for (const auto &step : Path) {
-    switch (step.Kind) {
-    case RewriteStep::ApplyRewriteRule: {
-      const auto &rule = system.getRule(step.RuleID);
-      if (!rule.isProtocolConformanceRule())
-        break;
-
-      if (!step.isInContext() &&
-          step.Inverse &&
-          std::find(redundancyCandidates.begin(),
-                    redundancyCandidates.end(),
-                    step.RuleID) != redundancyCandidates.end()) {
-        notInContext.push_back(step.RuleID);
-      }
-
-      break;
-    }
-
-    case RewriteStep::AdjustConcreteType:
-      break;
-    }
-  }
-
-  if (notInContext.empty())
-    return;
-
-  if (notInContext.size() > 1) {
-    llvm::errs() << "Multiple conformance rules appear once without context:\n";
-    for (unsigned ruleID : notInContext)
-      llvm::errs() << system.getRule(ruleID) << "\n";
-    dump(llvm::errs(), system);
-    llvm::errs() << "\n";
-    abort();
-  }
 
   MutableTerm term = Basepoint;
 
@@ -104,12 +73,16 @@ void HomotopyGenerator::findProtocolConformanceRules(
       if (!rule.isProtocolConformanceRule())
         break;
 
-      if (step.StartOffset > 0 &&
-          step.EndOffset == 0 &&
-          rule.getLHS().back() == system.getRule(notInContext[0]).getLHS().back()) {
+      auto *proto = rule.getLHS().back().getProtocol();
+
+      if (!step.isInContext()) {
+        result[proto].first.push_back(step.RuleID);
+      } else if (step.StartOffset > 0 &&
+                 step.EndOffset == 0) {
         MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
-        inContext.emplace_back(prefix, step.RuleID);
+        result[proto].second.emplace_back(prefix, step.RuleID);
       }
+
       break;
     }
 
@@ -118,18 +91,6 @@ void HomotopyGenerator::findProtocolConformanceRules(
     }
 
     step.apply(term, system);
-  }
-
-  if (inContext.empty()) {
-    notInContext.clear();
-    return;
-  }
-
-  if (inContext.size() > 1) {
-    llvm::errs() << "Multiple candidate conformance rules in context?\n";
-    dump(llvm::errs(), system);
-    llvm::errs() << "\n";
-    abort();
   }
 }
 
@@ -261,89 +222,102 @@ void RewriteSystem::computeCandidateConformancePaths(
     if (loop.isDeleted())
       continue;
 
-    SmallVector<unsigned, 2> notInContext;
-    SmallVector<std::pair<MutableTerm, unsigned>, 2> inContext;
+    llvm::SmallDenseMap<const ProtocolDecl *,
+                        std::pair<SmallVector<unsigned, 2>,
+                                  SmallVector<std::pair<MutableTerm, unsigned>, 2>>>
+        result;
 
-    loop.findProtocolConformanceRules(notInContext, inContext, *this);
+    loop.findProtocolConformanceRules(result, *this);
 
-    if (notInContext.empty())
+    if (result.empty())
       continue;
-
-    // We must either have multiple conformance rules in empty context, or
-    // at least one conformance rule in non-empty context. Otherwise, we have
-    // a conformance rule which is written as a series of same-type rules,
-    // which doesn't make sense.
-    assert(inContext.size() > 0 || notInContext.size() > 1);
 
     if (Debug.contains(DebugFlags::GeneratingConformances)) {
       llvm::dbgs() << "Candidate homotopy generator: ";
       loop.dump(llvm::dbgs(), *this);
       llvm::dbgs() << "\n";
+    }
 
-      llvm::dbgs() << "* Conformance rules not in context:\n";
-      for (unsigned ruleID : notInContext) {
-        llvm::dbgs() << "- (#" << ruleID << ") " << getRule(ruleID) << "\n";
+    for (const auto &pair : result) {
+      const auto *proto = pair.first;
+      const auto &notInContext = pair.second.first;
+      const auto &inContext = pair.second.second;
+
+      // No rules appear without context.
+      if (notInContext.empty())
+        continue;
+
+      // No replacement rules.
+      if (notInContext.size() == 1 && inContext.empty())
+        continue;
+
+      if (Debug.contains(DebugFlags::GeneratingConformances)) {
+        llvm::dbgs() << "* Protocol " << proto->getName() << ":\n";
+        llvm::dbgs() << "** Conformance rules not in context:\n";
+        for (unsigned ruleID : notInContext) {
+          llvm::dbgs() << "-- (#" << ruleID << ") " << getRule(ruleID) << "\n";
+        }
+
+        llvm::dbgs() << "** Conformance rules in context:\n";
+        for (auto pair : inContext) {
+          llvm::dbgs() << "-- " << pair.first;
+          unsigned ruleID = pair.second;
+          llvm::dbgs() << " (#" << ruleID << ") " << getRule(ruleID) << "\n";
+        }
+
+        llvm::dbgs() << "\n";
       }
 
-      llvm::dbgs() << "* Conformance rules in context:\n";
+      // Suppose a 3-cell contains a conformance rule (T.[P] => T) in an empty
+      // context, and a conformance rule (V.[P] => V) with a possibly non-empty
+      // left context U and empty right context.
+      //
+      // We can decompose U into a product of conformance rules:
+      //
+      //    (V1.[P1] => V1)...(Vn.[Pn] => Vn),
+      //
+      // Now, we can record a candidate decomposition of (T.[P] => T) as a
+      // product of conformance rules:
+      //
+      //    (T.[P] => T) := (V1.[P1] => V1)...(Vn.[Pn] => Vn).(V.[P] => V)
+      //
+      // Now if U is empty, this becomes the trivial candidate:
+      //
+      //    (T.[P] => T) := (V.[P] => V)
+      SmallVector<SmallVector<unsigned, 2>, 2> candidatePaths;
       for (auto pair : inContext) {
-        llvm::dbgs() << "- " << pair.first;
-        unsigned ruleID = pair.second;
-        llvm::dbgs() << " (#" << ruleID << ") " << getRule(ruleID) << "\n";
+        // We have a term U, and a rule V.[P] => V.
+        SmallVector<unsigned, 2> conformancePath;
+
+        // Simplify U to get U'.
+        MutableTerm term = pair.first;
+        (void) simplify(term);
+
+        // Write U'.[domain(V)] as a product of left hand sides of protocol
+        // conformance rules.
+        decomposeTermIntoConformanceRuleLeftHandSides(term, pair.second,
+                                                      conformancePath);
+
+        candidatePaths.push_back(conformancePath);
       }
 
-      llvm::dbgs() << "\n";
-    }
+      for (unsigned candidateRuleID : notInContext) {
+        // If multiple conformance rules appear in an empty context, each one
+        // can be replaced with any other conformance rule.
+        for (unsigned otherRuleID : notInContext) {
+          if (otherRuleID == candidateRuleID)
+            continue;
 
-    // Suppose a 3-cell contains a conformance rule (T.[P] => T) in an empty
-    // context, and a conformance rule (V.[P] => V) with a possibly non-empty
-    // left context U and empty right context.
-    //
-    // We can decompose U into a product of conformance rules:
-    //
-    //    (V1.[P1] => V1)...(Vn.[Pn] => Vn),
-    //
-    // Now, we can record a candidate decomposition of (T.[P] => T) as a
-    // product of conformance rules:
-    //
-    //    (T.[P] => T) := (V1.[P1] => V1)...(Vn.[Pn] => Vn).(V.[P] => V)
-    //
-    // Now if U is empty, this becomes the trivial candidate:
-    //
-    //    (T.[P] => T) := (V.[P] => V)
-    SmallVector<SmallVector<unsigned, 2>, 2> candidatePaths;
-    for (auto pair : inContext) {
-      // We have a term U, and a rule V.[P] => V.
-      SmallVector<unsigned, 2> conformancePath;
+          SmallVector<unsigned, 2> path;
+          path.push_back(otherRuleID);
+          conformancePaths[candidateRuleID].push_back(path);
+        }
 
-      // Simplify U to get U'.
-      MutableTerm term = pair.first;
-      (void) simplify(term);
-
-      // Write U'.[domain(V)] as a product of left hand sides of protocol
-      // conformance rules.
-      decomposeTermIntoConformanceRuleLeftHandSides(term, pair.second,
-                                                    conformancePath);
-
-      candidatePaths.push_back(conformancePath);
-    }
-
-    for (unsigned candidateRuleID : notInContext) {
-      // If multiple conformance rules appear in an empty context, each one
-      // can be replaced with any other conformance rule.
-      for (unsigned otherRuleID : notInContext) {
-        if (otherRuleID == candidateRuleID)
-          continue;
-
-        SmallVector<unsigned, 2> path;
-        path.push_back(otherRuleID);
-        conformancePaths[candidateRuleID].push_back(path);
-      }
-
-      // If conformance rules appear in non-empty context, they define a
-      // conformance access path for each conformance rule in empty context.
-      for (const auto &path : candidatePaths) {
-        conformancePaths[candidateRuleID].push_back(path);
+        // If conformance rules appear in non-empty context, they define a
+        // conformance access path for each conformance rule in empty context.
+        for (const auto &path : candidatePaths) {
+          conformancePaths[candidateRuleID].push_back(path);
+        }
       }
     }
   }

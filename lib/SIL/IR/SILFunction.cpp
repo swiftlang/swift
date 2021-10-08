@@ -40,9 +40,10 @@ STATISTIC(MaxBitfieldID, "Max value of SILFunction::currentBitfieldID");
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      GenericSignature specializedSig,
                                      SILFunction *target, Identifier spiGroup,
-                                     const ModuleDecl *spiModule)
+                                     const ModuleDecl *spiModule,
+                                     AvailabilityContext availability)
     : kind(kind), exported(exported), specializedSignature(specializedSig),
-      spiGroup(spiGroup), spiModule(spiModule), targetFunction(target) {
+      spiGroup(spiGroup), availability(availability), spiModule(spiModule), targetFunction(target) {
   if (targetFunction)
     targetFunction->incrementRefCount();
 }
@@ -51,10 +52,11 @@ SILSpecializeAttr *
 SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
                           bool exported, SpecializationKind kind,
                           SILFunction *target, Identifier spiGroup,
-                          const ModuleDecl *spiModule) {
+                          const ModuleDecl *spiModule,
+                          AvailabilityContext availability) {
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
   return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig, target,
-                                       spiGroup, spiModule);
+                                       spiGroup, spiModule, availability);
 }
 
 void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {

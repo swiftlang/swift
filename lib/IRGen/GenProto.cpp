@@ -2599,14 +2599,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     CanType associatedType =
       sourceConformance.getAssociatedType(sourceType, association)
-      ->getCanonicalType();
-    if (sourceConformance.isConcrete() &&
-        isa<NormalProtocolConformance>(sourceConformance.getConcrete())) {
-      associatedType =
-        sourceConformance.getConcrete()->getDeclContext()
-          ->mapTypeIntoContext(associatedType)
-          ->getCanonicalType();
-    }
+        ->getCanonicalType();
     sourceKey.Type = associatedType;
 
     auto associatedConformance =
@@ -2621,10 +2614,77 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     if (!source) return MetadataResponse();
 
-    auto sourceMetadata =
-      IGF.emitAbstractTypeMetadataRef(sourceType);
-    auto associatedMetadata =
-      IGF.emitAbstractTypeMetadataRef(sourceKey.Type);
+    auto *sourceMetadata =
+        IGF.emitAbstractTypeMetadataRef(sourceType);
+
+    // Try to avoid circularity when realizing the associated metadata.
+    //
+    // Suppose we are asked to produce the witness table for some
+    // conformance access path (T : P)(Self.X : Q)(Self.Y : R).
+    //
+    // The associated conformance accessor for (Self.Y : R) takes the
+    // metadata for T.X and T.X : Q as arguments. If T.X is concrete,
+    // there are two ways of building it:
+    //
+    // a) Using the knowledge of the concrete type to build it directly,
+    // by first constructing the type metadata for its generic arguments.
+    //
+    // b) Obtaining T.X from the witness table for T : P. This will also
+    // construct the generic type, but from the generic environment
+    // of the concrete type of T, and not the abstract environment of
+    // our conformance access path.
+    //
+    // Now, say that T.X == Foo<T.X.Y>, with "Foo<A> where A : R".
+    //
+    // If approach a) is taken, then constructing Foo<T.X.Y> requires
+    // recovering the conformance T.X.Y : R, which recursively evaluates
+    // the same conformance access path, eventually causing a stack
+    // overflow.
+    //
+    // With approach b) on the other hand, the type metadata for
+    // Foo<T.X.Y> is constructed from the concrete type metadata for T,
+    // which must provide some other conformance access path for the
+    // conformance to R.
+    //
+    // This is not very principled, and a remaining issue is with conformance
+    // requirements where the subject type consists of multiple terms.
+    //
+    // A better approach would be for conformance access paths to directly
+    // record how type metadata at each intermediate step is constructed.
+    llvm::Value *associatedMetadata = nullptr;
+
+    if (auto response = IGF.tryGetLocalTypeMetadata(associatedType,
+                                                    MetadataState::Abstract)) {
+      // The associated type metadata was already cached, so we're fine.
+      associatedMetadata = response.getMetadata();
+    } else {
+      // If the associated type is concrete and the parent type is an archetype,
+      // it is better to realize the associated type metadata from the witness
+      // table of the parent's conformance, instead of realizing the concrete
+      // type directly.
+      auto depMemType = cast<DependentMemberType>(association);
+      CanType baseSubstType =
+        sourceConformance.getAssociatedType(sourceType, depMemType.getBase())
+          ->getCanonicalType();
+      if (auto archetypeType = cast<ArchetypeType>(baseSubstType)) {
+        AssociatedType baseAssocType(depMemType->getAssocType());
+
+        MetadataResponse response =
+          emitAssociatedTypeMetadataRef(IGF, archetypeType, baseAssocType,
+                                        MetadataState::Abstract);
+
+        // Cache this response in case we have to realize the associated type
+        // again later.
+        IGF.setScopedLocalTypeMetadata(associatedType, response);
+
+        associatedMetadata = response.getMetadata();
+      } else {
+        // Ok, fall back to realizing the (possibly concrete) type.
+        associatedMetadata =
+          IGF.emitAbstractTypeMetadataRef(sourceKey.Type);
+      }
+    }
+
     auto sourceWTable = source.getMetadata();
 
     AssociatedConformance associatedConformanceRef(sourceProtocol,

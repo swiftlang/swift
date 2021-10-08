@@ -109,16 +109,18 @@ Solution::computeSubstitutions(GenericSignature sig,
                               lookupConformanceFn);
 }
 
-static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
-    ASTContext &ctx, AbstractFunctionDecl *oldDecl, SubstitutionMap subst,
-    clang::FunctionDecl *specialized) {
+// Derive a concrete function type for fdecl by substituting the generic args
+// and use that to derive the corresponding function type and parameter list.
+static std::pair<FunctionType *, ParameterList *>
+substituteFunctionTypeAndParamList(ASTContext &ctx, AbstractFunctionDecl *fdecl,
+                                   SubstitutionMap subst) {
   FunctionType *newFnType = nullptr;
   // Create a new ParameterList with the substituted type.
   if (auto oldFnType = dyn_cast<GenericFunctionType>(
-          oldDecl->getInterfaceType().getPointer())) {
+          fdecl->getInterfaceType().getPointer())) {
     newFnType = oldFnType->substGenericArgs(subst);
   } else {
-    newFnType = cast<FunctionType>(oldDecl->getInterfaceType().getPointer());
+    newFnType = cast<FunctionType>(fdecl->getInterfaceType().getPointer());
   }
   // The constructor type is a function type as follows:
   //   (CType.Type) -> (Generic) -> CType
@@ -127,21 +129,48 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
   // In either case, we only want the result of that function type because that
   // is the function type with the generic params that need to be substituted:
   //   (Generic) -> CType
-  if (isa<ConstructorDecl>(oldDecl) || oldDecl->isInstanceMember() ||
-      oldDecl->isStatic())
+  if (isa<ConstructorDecl>(fdecl) || fdecl->isInstanceMember() ||
+      fdecl->isStatic())
     newFnType = cast<FunctionType>(newFnType->getResult().getPointer());
   SmallVector<ParamDecl *, 4> newParams;
   unsigned i = 0;
+
   for (auto paramTy : newFnType->getParams()) {
-    auto *oldParamDecl = oldDecl->getParameters()->get(i);
+    auto *oldParamDecl = fdecl->getParameters()->get(i);
     auto *newParamDecl =
-        ParamDecl::cloneWithoutType(oldDecl->getASTContext(), oldParamDecl);
+        ParamDecl::cloneWithoutType(fdecl->getASTContext(), oldParamDecl);
     newParamDecl->setInterfaceType(paramTy.getParameterType());
     newParams.push_back(newParamDecl);
     (void)++i;
   }
   auto *newParamList =
       ParameterList::create(ctx, SourceLoc(), newParams, SourceLoc());
+
+  return {newFnType, newParamList};
+}
+
+static ValueDecl *generateSpecializedCXXFunctionTemplate(
+    ASTContext &ctx, AbstractFunctionDecl *oldDecl, SubstitutionMap subst,
+    clang::FunctionDecl *specialized) {
+  auto newFnTypeAndParams = substituteFunctionTypeAndParamList(ctx, oldDecl, subst);
+  auto newFnType = newFnTypeAndParams.first;
+  auto paramList = newFnTypeAndParams.second;
+
+  SmallVector<ParamDecl *, 4> newParamsWithoutMetatypes;
+  for (auto param : *paramList ) {
+    if (isa<FuncDecl>(oldDecl) &&
+        isa<MetatypeType>(param->getType().getPointer())) {
+      // Metatype parameters are added synthetically to account for template
+      // params that don't make it to the function signature. These shouldn't
+      // exist in the resulting specialized FuncDecl. Note that this doesn't
+      // affect constructors because all template params for a constructor
+      // must be in the function signature by design.
+      continue;
+    }
+    newParamsWithoutMetatypes.push_back(param);
+  }
+  auto *newParamList =
+      ParameterList::create(ctx, SourceLoc(), newParamsWithoutMetatypes, SourceLoc());
 
   if (isa<ConstructorDecl>(oldDecl)) {
     DeclName ctorName(ctx, DeclBaseName::createConstructor(), newParamList);
@@ -152,7 +181,7 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
         /*throws=*/false, /*throwsLoc=*/SourceLoc(), 
         newParamList, /*genericParams=*/nullptr,
         oldDecl->getDeclContext());
-    return ConcreteDeclRef(newCtorDecl);
+    return newCtorDecl;
   }
 
   // Generate a name for the specialized function.
@@ -176,7 +205,48 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
     newFnDecl->setImportAsStaticMember();
   }
   newFnDecl->setSelfAccessKind(cast<FuncDecl>(oldDecl)->getSelfAccessKind());
-  return ConcreteDeclRef(newFnDecl);
+  return newFnDecl;
+}
+
+// Synthesizes the body of a thunk that takes extra metatype arguments and
+// skips over them to forward them along to the FuncDecl contained by context.
+// This is used when importing a C++ templated function where the template params
+// are not used in the function signature. We supply the type params as explicit
+// metatype arguments to aid in typechecking, but they shouldn't be forwarded to
+// the corresponding C++ function.
+static std::pair<BraceStmt *, bool>
+synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
+  ASTContext &ctx = afd->getASTContext();
+
+  auto thunkDecl = cast<FuncDecl>(afd);
+  auto specializedFuncDecl = static_cast<FuncDecl *>(context);
+
+  SmallVector<Argument, 8> forwardingParams;
+  for (auto param : *thunkDecl->getParameters()) {
+    if (isa<MetatypeType>(param->getType().getPointer())) {
+      continue;
+    }
+    auto paramRefExpr = new (ctx) DeclRefExpr(param, DeclNameLoc(),
+                                             /*Implicit=*/true);
+    paramRefExpr->setType(param->getType());
+    forwardingParams.push_back(Argument(SourceLoc(), Identifier(), paramRefExpr));
+  }
+
+  auto *specializedFuncDeclRef = new (ctx) DeclRefExpr(ConcreteDeclRef(specializedFuncDecl),
+                                                DeclNameLoc(), true);
+  specializedFuncDeclRef->setType(specializedFuncDecl->getInterfaceType());
+
+  auto argList = ArgumentList::createImplicit(ctx, forwardingParams);
+  auto *specializedFuncCallExpr = CallExpr::createImplicit(ctx, specializedFuncDeclRef, argList);
+  specializedFuncCallExpr->setType(thunkDecl->getResultInterfaceType());
+  specializedFuncCallExpr->setThrows(false);
+
+  auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), specializedFuncCallExpr,
+                                        /*implicit=*/true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
+                               /*implicit=*/true);
+  return {body, /*isTypeChecked=*/true};
 }
 
 ConcreteDeclRef
@@ -215,12 +285,34 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
                 const_cast<clang::FunctionTemplateDecl *>(
                     cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
                 subst);
-    return generateDeclRefForSpecializedCXXFunctionTemplate(
+    auto newDecl = generateSpecializedCXXFunctionTemplate(
         decl->getASTContext(), cast<AbstractFunctionDecl>(decl), subst, newFn);
+    if (auto fn = dyn_cast<FuncDecl>(decl)) {
+      if (newFn->getNumParams() != fn->getParameters()->size()) {
+        // We added additional metatype parameters to aid template
+        // specialization, which are no longer now that we've specialized
+        // this function. Create a thunk that only forwards the original
+        // parameters along to the clang function.
+        auto thunkTypeAndParamList = substituteFunctionTypeAndParamList(decl->getASTContext(),
+                                                                        fn, subst);
+        auto thunk = FuncDecl::createImplicit(
+                 fn->getASTContext(), fn->getStaticSpelling(), fn->getName(),
+                 fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
+                 /*genericParams=*/nullptr, thunkTypeAndParamList.second,
+                 thunkTypeAndParamList.first->getResult(), fn->getDeclContext());
+        thunk->copyFormalAccessFrom(fn);
+        thunk->setBodySynthesizer(synthesizeForwardingThunkBody, cast<FuncDecl>(newDecl));
+        thunk->setSelfAccessKind(fn->getSelfAccessKind());
+
+        return ConcreteDeclRef(thunk);
+      }
+    }
+    return ConcreteDeclRef(newDecl);
   }
 
   return ConcreteDeclRef(decl, subst);
 }
+
 
 ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
                                               bool lookThroughApply) const {
@@ -6634,7 +6726,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return result;
     }
     
-    case ConversionRestrictionKind::PointerToPointer: {
+    case ConversionRestrictionKind::PointerToPointer:
+    case ConversionRestrictionKind::PointerToCPointer: {
       TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc());
       Type unwrappedToTy = toType->getOptionalObjectType();
 

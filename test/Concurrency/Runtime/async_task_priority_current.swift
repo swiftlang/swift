@@ -42,8 +42,8 @@ func test_detach() async {
   await detach(priority: .default) {
     let a3 = Task.currentPriority
     // The priority of 'a3' may either be 21 (default) or elevated to that of
-    // the main function, whichever is greater.
-    print("a3: \(a3)") // CHECK: a3: TaskPriority(rawValue: [[#max(MAIN_PRIORITY,21)]]
+    // the main function.
+    print("a3: \(a3)") // CHECK: a3: TaskPriority(rawValue: {{21|[[#MAIN_PRIORITY]]}})
   }.get()
 
   let a4 = Task.currentPriority

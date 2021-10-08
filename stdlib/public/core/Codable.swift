@@ -3369,8 +3369,8 @@ public enum DecodingError: Error {
 // The following extensions allow for easier error construction.
 
 internal struct _GenericIndexKey: CodingKey, Sendable {
-    internal var stringValue: String
-    internal var intValue: Int?
+  internal var stringValue: String
+  internal var intValue: Int?
 
   internal init?(stringValue: String) {
     return nil

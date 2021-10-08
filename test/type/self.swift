@@ -355,7 +355,7 @@ do {
       let _: Self = super.property // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
       let _: Self = super[] // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
       let _: () -> Self = super.method
-      // expected-error@-1 {{partial application of 'super' instance method with metatype base is not allowed}}
+      // expected-error@-1 {{cannot reference 'super' instance method with metatype base as function value}}
       // expected-error@-2 {{cannot convert value of type '(C) -> () -> D' to specified type '() -> Self'}}
     }
   }

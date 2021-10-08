@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -parse-as-library
+// REQUIRES: concurrency
 // This should pass without any warnings or errors
 
 @MainActor
