@@ -8,7 +8,7 @@ Swift 5.6
 
 * References to `Self` or so-called "`Self` requirements" in the type signatures
   of protocol members are now correctly detected in the parent of a nested type.
-  As a result, protocol members that fall under this overseen case are no longer
+  As a result, protocol members that fall under this overlooked case are no longer
   available on values of protocol type:
 
   ```swift
