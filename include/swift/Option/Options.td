@@ -581,8 +581,13 @@ def experimental_cxx_stdlib :
 
 def experimental_emit_module_separately:
   Flag<["-"], "experimental-emit-module-separately">,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
-  HelpText<"Schedule a swift module emission job instead of a merge-modules job (new Driver only)">;
+  Flags<[NoInteractiveOption, HelpHidden]>,
+  HelpText<"Emit module files as a distinct job (new Driver only)">;
+
+def no_emit_module_separately:
+  Flag<["-"], "no-emit-module-separately">,
+  Flags<[NoInteractiveOption, HelpHidden]>,
+  HelpText<"Force using merge-module as the incremental build mode (new Driver only)">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
