@@ -214,12 +214,16 @@ bool swift::findInnerTransitiveGuaranteedUses(
       break;
 
     case OperandOwnership::InteriorPointer:
+      return false;
+
+#if 0 // FIXME!!! Enable in a following commit that fixes RAUW
       // If our base guaranteed value does not have any consuming uses (consider
       // function arguments), we need to be sure to include interior pointer
       // operands since we may not get a use from a end_scope instruction.
       if (!InteriorPointerOperand(use).findTransitiveUses(usePoints)) {
         return false;
       }
+#endif
       break;
 
     case OperandOwnership::ForwardingBorrow: {
