@@ -622,15 +622,33 @@ findRuleToDelete(bool firstPass,
           if (rule.isPermanent())
             return false;
 
-          // Other rules involving unresolved name symbols are eliminated in
-          // the first pass.
+          // Other rules involving unresolved name symbols are derived from an
+          // associated type introduction rule together with a conformance rule.
+          // They are eliminated in the first pass.
           if (firstPass)
-            return rule.containsUnresolvedSymbols();
+            return rule.getLHS().containsUnresolvedSymbols();
 
-          assert(!rule.containsUnresolvedSymbols());
+          // In the second and third pass we should not have any rules involving
+          // unresolved name symbols, except for permanent rules which were
+          // already skipped above.
+          //
+          // FIXME: This isn't true with invalid code.
+          assert(!rule.getLHS().containsUnresolvedSymbols());
 
           // Protocol conformance rules are eliminated via a different
           // algorithm which computes "generating conformances".
+          //
+          // The first and second passes skip protocol conformance rules.
+          //
+          // The third pass eliminates any protocol conformance rule which is
+          // redundant according to both homotopy reduction and the generating
+          // conformances algorithm.
+          //
+          // Later on, we verify that any conformance redundant via generating
+          // conformances was also redundant via homotopy reduction. This
+          // means that the set of generating conformances is always a superset
+          // (or equal to) of the set of minimal protocol conformance
+          // requirements that homotopy reduction alone would produce.
           if (rule.isProtocolConformanceRule()) {
             if (!redundantConformances)
               return false;
@@ -744,7 +762,13 @@ void RewriteSystem::performHomotopyReduction(
 /// Use the 3-cells to delete redundant rewrite rules via a series of Tietze
 /// transformations, updating and simplifying existing 3-cells as each rule
 /// is deleted.
+///
+/// Redundant rules are mutated to set their isRedundant() bit.
 void RewriteSystem::minimizeRewriteSystem() {
+  assert(Complete);
+  assert(!Minimized);
+  Minimized = 1;
+
   /// Begin by normalizing all 3-cells to cyclically-reduced left-canonical
   /// form.
   for (auto &loop : HomotopyGenerators) {
@@ -806,12 +830,53 @@ void RewriteSystem::minimizeRewriteSystem() {
       continue;
     }
 
-    if (rule.isSimplified() && !rule.isRedundant()) {
+    if (rule.isRedundant())
+      continue;
+
+    // Simplified rules should be redundant.
+    if (rule.isSimplified()) {
       llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
       dump(llvm::errs());
       abort();
     }
+
+    // Rules with unresolved name symbols (other than permanent rules for
+    // associated type introduction) should be redundant.
+    if (rule.getLHS().containsUnresolvedSymbols() ||
+        rule.getRHS().containsUnresolvedSymbols()) {
+      llvm::errs() << "Unresolved rule is not redundant: " << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
   }
+}
+
+/// Collect all non-permanent, non-redundant rules whose domain is equal to
+/// one of the protocols in \p proto. These rules form the requirement
+/// signatures of these protocols.
+llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
+RewriteSystem::getMinimizedRules(ArrayRef<const ProtocolDecl *> protos) {
+  assert(Minimized);
+
+  llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>> rules;
+  for (unsigned ruleID : indices(Rules)) {
+    const auto &rule = getRule(ruleID);
+
+    if (rule.isPermanent())
+      continue;
+
+    if (rule.isRedundant())
+      continue;
+
+    auto domain = rule.getLHS()[0].getProtocols();
+    assert(domain.size() == 1);
+
+    const auto *proto = domain[0];
+    if (std::find(protos.begin(), protos.end(), proto) != protos.end())
+      rules[proto].push_back(ruleID);
+  }
+
+  return rules;
 }
 
 /// Verify that each 3-cell is a valid loop around its basepoint.

@@ -147,6 +147,9 @@ namespace swift {
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
+    /// Only check the availability of the API, ignore function bodies.
+    bool CheckAPIAvailabilityOnly = false;
+
     /// Should conformance availability violations be diagnosed as errors?
     bool EnableConformanceAvailabilityErrors = false;
 

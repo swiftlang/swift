@@ -1640,6 +1640,20 @@ public:
   // "name: TheType" form, we can get better results by diagnosing the TypeRepr.
   UNINTERESTING(Var)
 
+  static bool shouldCheck(Decl *D) {
+    if (D && D->getASTContext().LangOpts.CheckAPIAvailabilityOnly) {
+      // Skip whole decl if not API-public.
+      if (auto valueDecl = dyn_cast<const ValueDecl>(D)) {
+        AccessScope scope =
+          valueDecl->getFormalAccessScope(/*useDC*/nullptr,
+                                          /*treatUsableFromInlineAsPublic*/true);
+        if (!scope.isPublic())
+          return false;
+      }
+    }
+    return true;
+  }
+
   /// \see visitPatternBindingDecl
   void checkNamedPattern(const NamedPattern *NP,
                          const llvm::DenseSet<const VarDecl *> &seenVars) {
@@ -1685,6 +1699,9 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    if (!shouldCheck(PBD->getAnchoringVarDecl(0)))
+      return;
+
     llvm::DenseSet<const VarDecl *> seenVars;
     for (auto idx : range(PBD->getNumPatternEntries())) {
       PBD->getPattern(idx)->forEachNode([&](const Pattern *P) {
@@ -1950,6 +1967,9 @@ void swift::checkAccessControl(Decl *D) {
 
   auto where = ExportContext::forDeclSignature(D);
   if (where.isImplicit())
+    return;
+
+  if (!DeclAvailabilityChecker::shouldCheck(D))
     return;
 
   DeclAvailabilityChecker(where).visit(D);
