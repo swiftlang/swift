@@ -26,7 +26,6 @@ Swift 5.6
     // protocol type (use a generic constraint instead).
     p.method
   }
-}
   ```
 
 * [SE-0315][]:
