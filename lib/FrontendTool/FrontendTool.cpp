@@ -2034,6 +2034,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
+  // Don't ask clients to report bugs when running a script in immediate mode.
+  // When a script asserts the compiler reports the error with the same
+  // stacktrace as a compiler crash. From here we can't tell which is which,
+  // for now let's not explicitly ask for bug reports.
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::Immediate) {
+    llvm::setBugReportMsg(nullptr);
+  }
+
   PrettyStackTraceFrontend frontendTrace(Invocation.getLangOptions());
 
   // Make an array of PrettyStackTrace objects to dump the configuration files
