@@ -109,6 +109,7 @@ class SILUndef;
 class SourceFile;
 class SerializedSILLoader;
 class SILFunctionBuilder;
+class SILOptFunctionBuilder;
 class SILRemarkStreamer;
 
 namespace Lowering {
@@ -352,6 +353,8 @@ private:
   /// lowering ownership in transparent functions.
   /// This gets set in OwnershipModelEliminator pass.
   bool regDeserializationNotificationHandlerForAllFuncOME;
+
+  bool prespecializedFunctionDeclsImported;
 
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
@@ -894,6 +897,10 @@ public:
   /// declaration context ought to be serialized as part of this module.
   bool
   shouldSerializeEntitiesAssociatedWithDeclContext(const DeclContext *DC) const;
+
+  /// Gather prespecialized from extensions.
+  void performOnceForPrespecializedImportedExtensions(
+      llvm::function_ref<void(AbstractFunctionDecl *)> action);
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
