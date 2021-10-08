@@ -673,6 +673,11 @@ void swift_task_enqueueGlobal(Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobalWithDelay(unsigned long long delay, Job *job);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueGlobalWithDeadline(long long seconds, 
+                                          long long nanoseconds, 
+                                          int clockId, Job *job);
+
 /// Enqueue the given job on the main executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
@@ -698,6 +703,14 @@ SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_hook)(
     unsigned long long delay, Job *job,
     swift_task_enqueueGlobalWithDelay_original original);
+
+/// A hook to take over global enqueuing with deadline.
+typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_original)(
+    long long seconds, long long nanoseconds, int clockId, Job *job);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDeadline_hook)(
+    long long seconds, long long nanoseconds, int clockId, Job *job,
+    swift_task_enqueueGlobalWithDeadline_original original);
 
 /// A hook to take over main executor enqueueing.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_original)(

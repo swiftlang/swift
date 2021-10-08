@@ -12,6 +12,13 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
+@usableFromInline
+enum swift_clock_id: Int32 {
+  case monotonic = 1
+  case wall = 2
+  case uptime = 3
+}
+
 @available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
   @available(*, deprecated, renamed: "Task.sleep(nanoseconds:)")
@@ -286,5 +293,105 @@ extension Task where Success == Never, Failure == Never {
       // still running.
       throw error
     }
+  }
+
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
+  static func sleep(until seconds: UInt64, _ nanoseconds: UInt64, clockId clock: swift_clock_id) async throws {
+    // Allocate storage for the storage word.
+    let wordPtr = UnsafeMutablePointer<Builtin.Word>.allocate(capacity: 1)
+    
+    // Initialize the flag word to "not started", which means the continuation
+    // has neither been created nor completed.
+    Builtin.atomicstore_seqcst_Word(
+      wordPtr._rawValue, SleepState.notStarted.word._builtinWordValue)
+    
+    do {
+      // Install a cancellation handler to resume the continuation by
+      // throwing CancellationError.
+      try await withTaskCancellationHandler {
+        let _: () = try await withUnsafeThrowingContinuation { continuation in
+          while true {
+            let state = SleepState(loading: wordPtr)
+            switch state {
+            case .notStarted:
+              // The word that describes the active continuation state.
+              let continuationWord =
+              SleepState.activeContinuation(continuation).word
+              
+              // Try to swap in the continuation word.
+              let (_, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
+                wordPtr._rawValue,
+                state.word._builtinWordValue,
+                continuationWord._builtinWordValue)
+              if !Bool(_builtinBooleanLiteral: won) {
+                // Keep trying!
+                continue
+              }
+              
+              // Create a task that resumes the continuation normally if it
+              // finishes first. Enqueue it directly with the delay, so it fires
+              // when we're done sleeping.
+              let sleepTaskFlags = taskCreateFlags(
+                priority: nil, isChildTask: false, copyTaskLocals: false,
+                inheritContext: false, enqueueJob: false,
+                addPendingGroupTaskUnconditionally: false)
+              let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
+                onSleepWake(wordPtr)
+              }
+              _enqueueJobGlobalWithDeadline(
+                seconds, nanoseconds, Int(clock.rawValue), Builtin.convertTaskToJob(sleepTask))
+              return
+              
+            case .activeContinuation, .finished:
+              fatalError("Impossible to have multiple active continuations")
+              
+            case .cancelled:
+              fatalError("Impossible to have cancelled before we began")
+              
+            case .cancelledBeforeStarted:
+              // Finish the continuation normally. We'll throw later, after
+              // we clean up.
+              continuation.resume()
+              return
+            }
+          }
+        }
+      } onCancel: {
+        onSleepCancel(wordPtr)
+      }
+      
+      // Determine whether we got cancelled before we even started.
+      let cancelledBeforeStarted: Bool
+      switch SleepState(loading: wordPtr) {
+      case .notStarted, .activeContinuation, .cancelled:
+        fatalError("Invalid state for non-cancelled sleep task")
+        
+      case .cancelledBeforeStarted:
+        cancelledBeforeStarted = true
+        
+      case .finished:
+        cancelledBeforeStarted = false
+      }
+      
+      // We got here without being cancelled, so deallocate the storage for
+      // the flag word and continuation.
+      wordPtr.deallocate()
+      
+      // If we got cancelled before we even started, through the cancellation
+      // error now.
+      if cancelledBeforeStarted {
+        throw _Concurrency.CancellationError()
+      }
+    } catch {
+      // The task was cancelled; propagate the error. The "on wake" task is
+      // responsible for deallocating the flag word and continuation, if it's
+      // still running.
+      throw error
+    }
+  }
+  
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
+  public static func sleep<C: ClockProtocol>(until deadine: C.Instant, clock: C) async throws {
+    try await clock.sleep(until: deadine)
   }
 }

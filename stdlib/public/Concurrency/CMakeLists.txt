@@ -109,6 +109,10 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncThrowingStream.swift
   AsyncStream.cpp
   Deque.swift
+  Clock.swift
+  MonotonicClock.swift
+  UptimeClock.swift
+  WallClock.swift
   ${swift_concurrency_extra_sources}
   linker-support/magic-symbols-for-install-name.c
 

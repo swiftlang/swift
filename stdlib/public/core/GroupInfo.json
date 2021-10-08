@@ -231,7 +231,14 @@
     "Codable.swift",
     "LegacyABI.swift",
     "MigrationSupport.swift",
-    "PtrAuth.swift"
+    "PtrAuth.swift",
+    
+  ],
+  "Clock": [
+    "Clock.swift",
+    "Date.swift",
+    "Duration.swift",
+    "Instant.swift"
   ],
   "Result": [
     "Result.swift"

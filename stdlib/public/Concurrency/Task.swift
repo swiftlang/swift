@@ -751,6 +751,10 @@ func _enqueueJobGlobal(_ task: Builtin.Job)
 @usableFromInline
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
+@_silgen_name("swift_task_enqueueGlobalWithDeadline")
+@usableFromInline
+func _enqueueJobGlobalWithDeadline(_ seconds: UInt64, _ nanoseconds: UInt64, _ clock: Int, _ task: Builtin.Job)
+
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_asyncMainDrainQueue")
 internal func _asyncMainDrainQueue() -> Never

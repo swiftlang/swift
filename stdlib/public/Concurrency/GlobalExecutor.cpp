@@ -80,6 +80,11 @@ void (*swift::swift_task_enqueueGlobalWithDelay_hook)(
     swift_task_enqueueGlobalWithDelay_original original) = nullptr;
 
 SWIFT_CC(swift)
+void (*swift::swift_task_enqueueGlobalWithDeadline_hook)(
+    long long seconds, long long nanoseconds, int clockId, Job *job,
+    swift_task_enqueueGlobalWithDeadline_original original) = nullptr;
+
+SWIFT_CC(swift)
 void (*swift::swift_task_enqueueMainExecutor_hook)(
     Job *job, swift_task_enqueueMainExecutor_original original) = nullptr;
 
@@ -421,6 +426,81 @@ void swift::swift_task_enqueueGlobalWithDelay(unsigned long long delay,
         delay, job, swift_task_enqueueGlobalWithDelayImpl);
   else
     swift_task_enqueueGlobalWithDelayImpl(delay, job);
+}
+
+typedef enum {
+  DISPATCH_CLOCK_UPTIME,
+  DISPATCH_CLOCK_MONOTONIC,
+  DISPATCH_CLOCK_WALL,
+#define DISPATCH_CLOCK_COUNT  (DISPATCH_CLOCK_WALL + 1)
+} dispatch_clock_t;
+
+#define DISPATCH_UP_OR_MONOTONIC_TIME_MASK  (1ULL << 63)
+#define DISPATCH_WALLTIME_MASK  (1ULL << 62)
+#define DISPATCH_TIME_MAX_VALUE (DISPATCH_WALLTIME_MASK - 1)
+
+static inline dispatch_time_t
+_dispatch_clock_and_value_to_time(dispatch_clock_t clock, uint64_t value)
+{
+  if (value >= DISPATCH_TIME_MAX_VALUE) {
+    return DISPATCH_TIME_FOREVER;
+  }
+  switch (clock) {
+  case DISPATCH_CLOCK_WALL:
+    return -value;
+  case DISPATCH_CLOCK_UPTIME:
+    return value;
+  case DISPATCH_CLOCK_MONOTONIC:
+    return value | DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
+  }
+  __builtin_unreachable();
+}
+
+SWIFT_CC(swift)
+void swift_task_enqueueGlobalWithDeadlineImpl(long long seconds, long long nanoseconds, int clockId,
+                                                  Job *job) {
+  assert(job && "no job provided");
+
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+  // insertIntoDelayedJobQueue(delay, job);
+  #error TODO
+#else
+
+  dispatch_function_t dispatchFunction = &__swift_run_job;
+  void *dispatchContext = job;
+
+  JobPriority priority = job->getPriority();
+
+  auto queue = getGlobalQueue(priority);
+
+  job->SchedulerPrivate[Job::DispatchQueueIndex] =
+      DISPATCH_QUEUE_GLOBAL_EXECUTOR;
+  if (clockId == 1) { // MONOTONIC
+    uint64_t q = seconds * NSEC_PER_SEC + nanoseconds;
+    dispatch_after_f(_dispatch_clock_and_value_to_time(DISPATCH_CLOCK_MONOTONIC , q), queue, dispatchContext, dispatchFunction);
+  } else if (clockId == 2) { // WALL
+    const struct timespec when = {
+      .tv_sec = seconds,
+      .tv_nsec = nanoseconds
+    };
+    
+    dispatch_after_f(dispatch_walltime(&when, 0), queue, dispatchContext, dispatchFunction);
+  } else if (clockId == 3) { // UPTIME
+    uint64_t q = seconds * NSEC_PER_SEC + nanoseconds;
+    dispatch_after_f(_dispatch_clock_and_value_to_time(DISPATCH_CLOCK_UPTIME, q), queue, dispatchContext, dispatchFunction);
+  } else {
+    // HALT
+  }
+#endif
+}
+
+void swift::swift_task_enqueueGlobalWithDeadline(long long seconds, long long nanoseconds, int clockId,
+                                              Job *job) {
+  if (swift_task_enqueueGlobalWithDeadline_hook)
+    swift_task_enqueueGlobalWithDeadline_hook(
+        seconds, nanoseconds, clockId, job, swift_task_enqueueGlobalWithDeadlineImpl);
+  else
+    swift_task_enqueueGlobalWithDeadlineImpl(seconds, nanoseconds, clockId, job);
 }
 
 /// Enqueues a task on the main executor.
