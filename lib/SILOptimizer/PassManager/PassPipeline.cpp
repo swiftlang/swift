@@ -163,6 +163,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
+  P.addMoveOperatorCheck();
   P.addEmitDFDiagnostics();
 
   // Only issue weak lifetime warnings for users who select object lifetime
