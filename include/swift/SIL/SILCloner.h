@@ -374,12 +374,16 @@ protected:
 
   /// This is called by either of the top-level visitors, cloneReachableBlocks
   /// or cloneSILFunction, after all other visitors are have been called.
+
+  /// `preFixUp` is called first.
+  void preFixUp(SILFunction *F) {}
+  /// After postFixUp, the SIL must be valid and semantically equivalent to the
+  /// SIL before cloning.
   ///
-  /// After fixUp, the SIL must be valid and semantically equivalent to the SIL
-  /// before cloning.
-  ///
-  /// Common fix-ups are handled first in `doFixUp` and may not be overridden.
-  void fixUp(SILFunction *F) {}
+  /// Common fix-ups are handled first in `commonFixUp` and may not be
+  /// overridden.
+  void postFixUp(SILFunction *F) {}
+
 private:
   /// MARK: SILCloner implementation details hidden from CRTP extensions.
 
@@ -388,8 +392,8 @@ private:
   void visitBlocksDepthFirst(SILBasicBlock *StartBB);
 
   /// Also perform fundamental cleanup first, then call the CRTP extension,
-  /// `fixUp`.
-  void doFixUp(SILFunction *F);
+  /// `postFixUp`.
+  void commonFixUp(SILFunction *F);
 };
 
 /// A SILBuilder that automatically invokes postprocess on each
@@ -581,7 +585,7 @@ void SILCloner<ImplClass>::cloneReachableBlocks(
   // Discover and map the region to be cloned.
   visitBlocksDepthFirst(startBB);
 
-  doFixUp(F);
+  commonFixUp(F);
 }
 
 template <typename ImplClass>
@@ -606,7 +610,7 @@ void SILCloner<ImplClass>::cloneFunctionBody(SILFunction *F,
   // This will layout all newly cloned blocks immediate after clonedEntryBB.
   visitBlocksDepthFirst(&*F->begin());
 
-  doFixUp(F);
+  commonFixUp(F);
 }
 
 template<typename ImplClass>
@@ -709,9 +713,11 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
 }
 
 /// Clean-up after cloning.
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::doFixUp(SILFunction *F) {
+template <typename ImplClass>
+void SILCloner<ImplClass>::commonFixUp(SILFunction *F) {
+  // Call any cleanup specific to the CRTP extensions.
+  asImpl().preFixUp(F);
+
   // If our source function is in ossa form, but the function into which we are
   // cloning is not in ossa, after we clone, eliminate default arguments.
   if (!getBuilder().hasOwnership() && F->hasOwnership()) {
@@ -745,7 +751,7 @@ SILCloner<ImplClass>::doFixUp(SILFunction *F) {
   }
 
   // Call any cleanup specific to the CRTP extensions.
-  asImpl().fixUp(F);
+  asImpl().postFixUp(F);
 }
 
 template<typename ImplClass>
