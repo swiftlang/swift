@@ -1432,6 +1432,9 @@ namespace {
       bool isPotentiallyIsolated = false;
       if (!var) {
         isPotentiallyIsolated = false;
+      } else if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
+        // FIXME(distributed): rdar://84029304 this must be implemented properly
+        isPotentiallyIsolated = true;
       } else if (auto param = dyn_cast<ParamDecl>(var)) {
         isPotentiallyIsolated = param->isIsolated();
       } else if (var->isSelfParamCapture()) {
