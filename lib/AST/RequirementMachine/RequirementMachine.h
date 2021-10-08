@@ -48,6 +48,7 @@ class RequirementMachine final {
   friend class swift::rewriting::RewriteContext;
 
   CanGenericSignature Sig;
+  ArrayRef<const ProtocolDecl *> Protos;
 
   RewriteContext &Context;
   RewriteSystem System;
@@ -61,14 +62,14 @@ class RequirementMachine final {
   UnifiedStatsReporter *Stats;
 
   /// All conformance access paths computed so far.
-  llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
+  llvm::DenseMap<std::pair<Term, ProtocolDecl *>,
                  ConformanceAccessPath> ConformanceAccessPaths;
 
   /// Conformance access paths computed during the last round. All elements
   /// have the same length. If a conformance access path of greater length
   /// is requested, we refill CurrentConformanceAccessPaths with all paths of
   /// length N+1, and add them to the ConformanceAccessPaths map.
-  std::vector<std::pair<CanType, ConformanceAccessPath>>
+  std::vector<std::pair<Term, ConformanceAccessPath>>
       CurrentConformanceAccessPaths;
 
   explicit RequirementMachine(RewriteContext &rewriteCtx);
@@ -79,6 +80,7 @@ class RequirementMachine final {
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
   void initWithGenericSignature(CanGenericSignature sig);
+  void initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
 
   bool isComplete() const;
 
@@ -111,7 +113,7 @@ public:
                                                  ProtocolDecl *protocol);
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
-  void computeMinimalRequirements(const ProtocolDecl *proto);
+  void computeMinimalRequirements();
 
   void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;

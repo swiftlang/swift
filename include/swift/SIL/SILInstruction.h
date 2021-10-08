@@ -2148,26 +2148,6 @@ public:
   }
 };
 
-/// AllocValueBufferInst - Allocate memory in a value buffer.
-class AllocValueBufferInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-                                  SILInstructionKind::AllocValueBufferInst,
-                                  AllocValueBufferInst,
-                                  AllocationInst> {
-  friend SILBuilder;
-
-  AllocValueBufferInst(SILDebugLocation DebugLoc, SILType valueType,
-                       SILValue operand,
-                       ArrayRef<SILValue> TypeDependentOperands);
-
-  static AllocValueBufferInst *
-  create(SILDebugLocation DebugLoc, SILType valueType, SILValue operand,
-         SILFunction &F);
-
-public:
-  SILType getValueType() const { return getType().getObjectType(); }
-};
-
 /// This represents the allocation of a heap box for a Swift value of some type.
 /// The instruction returns two values.  The first return value is the object
 /// pointer with Builtin.NativeObject type.  The second return value
@@ -4937,6 +4917,8 @@ public:
 
 /// A conversion inst that produces a static OwnershipKind set upon the
 /// instruction's construction.
+///
+/// The first operand is the ownership equivalent source.
 class OwnershipForwardingConversionInst : public ConversionInst,
                                           public OwnershipForwardingMixin {
 protected:
@@ -7529,22 +7511,6 @@ public:
   SILValue getMetatype() const { return getOperand(1); }
 };
 
-/// Deallocate memory allocated for an unsafe value buffer.
-class DeallocValueBufferInst
-    : public UnaryInstructionBase<SILInstructionKind::DeallocValueBufferInst,
-                                  DeallocationInst> {
-  friend SILBuilder;
-
-  SILType ValueType;
-
-  DeallocValueBufferInst(SILDebugLocation DebugLoc, SILType valueType,
-                         SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand), ValueType(valueType) {}
-
-public:
-  SILType getValueType() const { return ValueType; }
-};
-
 /// Deallocate memory allocated for a boxed value created by an AllocBoxInst.
 /// It is undefined behavior if the type of the boxed type does not match the
 /// type the box was allocated for.
@@ -7597,21 +7563,6 @@ class DestroyAddrInst
 
   DestroyAddrInst(SILDebugLocation DebugLoc, SILValue Operand)
       : UnaryInstructionBase(DebugLoc, Operand) {}
-};
-
-/// Project out the address of the value
-/// stored in the given Builtin.UnsafeValueBuffer.
-class ProjectValueBufferInst
-    : public UnaryInstructionBase<SILInstructionKind::ProjectValueBufferInst,
-                                  SingleValueInstruction> {
-  friend SILBuilder;
-
-  ProjectValueBufferInst(SILDebugLocation DebugLoc, SILType valueType,
-                         SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, valueType.getAddressType()) {}
-
-public:
-  SILType getValueType() const { return getType().getObjectType(); }
 };
 
 /// Project out the address of the value in a box.
@@ -7877,6 +7828,8 @@ public:
   TermKind getTermKind() const { return TermKind(getKind()); }
 
   /// Returns true if this is a transformation terminator.
+  ///
+  /// The first operand is the transformed source.
   bool isTransformationTerminator() const {
     switch (getTermKind()) {
     case TermKind::UnwindInst:
@@ -9396,6 +9349,7 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
   }
 }
 
+/// The first operand is the ownership equivalent source.
 class OwnershipForwardingMultipleValueInstruction
     : public MultipleValueInstruction,
       public OwnershipForwardingMixin {

@@ -2607,6 +2607,26 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose situations where Swift -> C pointer implicit conversion
+/// is attempted on a Swift function instead of one imported from C header.
+///
+/// \code
+/// func test(_: UnsafePointer<UInt8>) {}
+///
+/// func pass_ptr(ptr: UnsafeRawPointer) {
+///   test(ptr) // Only okay if `test` was an imported C function.
+/// }
+/// \endcode
+class SwiftToCPointerConversionInInvalidContext final
+    : public FailureDiagnostic {
+public:
+  SwiftToCPointerConversionInInvalidContext(const Solution &solution,
+                                            ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

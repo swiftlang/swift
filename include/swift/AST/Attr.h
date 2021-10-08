@@ -1302,7 +1302,8 @@ public:
 /// type list.
 class SpecializeAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<SpecializeAttr, Identifier> {
+      private llvm::TrailingObjects<SpecializeAttr, Identifier,
+                                    AvailableAttr *> {
   friend class SpecializeAttrTargetDeclRequest;
   friend TrailingObjects;
 
@@ -1321,35 +1322,44 @@ private:
   LazyMemberLoader *resolver = nullptr;
   uint64_t resolverContextData;
   size_t numSPIGroups;
+  size_t numAvailableAttrs;
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
                  SpecializationKind kind, GenericSignature specializedSignature,
-                 DeclNameRef targetFunctionName,
-                 ArrayRef<Identifier> spiGroups);
+                 DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+                 ArrayRef<AvailableAttr *> availabilityAttrs);
 
 public:
-  static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
-                                SourceRange Range, TrailingWhereClause *clause,
-                                bool exported, SpecializationKind kind,
-                                DeclNameRef targetFunctionName,
-                                ArrayRef<Identifier> spiGroups,
-                                GenericSignature specializedSignature
-                                    = nullptr);
+  static SpecializeAttr *
+  create(ASTContext &Ctx, SourceLoc atLoc, SourceRange Range,
+         TrailingWhereClause *clause, bool exported, SpecializationKind kind,
+         DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+         ArrayRef<AvailableAttr *> availabilityAttrs,
+         GenericSignature specializedSignature = nullptr);
 
   static SpecializeAttr *create(ASTContext &ctx, bool exported,
                                 SpecializationKind kind,
                                 ArrayRef<Identifier> spiGroups,
+                                ArrayRef<AvailableAttr *> availabilityAttrs,
                                 GenericSignature specializedSignature,
                                 DeclNameRef replacedFunction);
 
   static SpecializeAttr *create(ASTContext &ctx, bool exported,
                                 SpecializationKind kind,
                                 ArrayRef<Identifier> spiGroups,
+                                ArrayRef<AvailableAttr *> availabilityAttrs,
                                 GenericSignature specializedSignature,
                                 DeclNameRef replacedFunction,
                                 LazyMemberLoader *resolver, uint64_t data);
 
+  size_t numTrailingObjects(OverloadToken<Identifier>) const {
+    return numSPIGroups;
+  }
+
+  size_t numTrailingObjects(OverloadToken<AvailableAttr *>) const {
+    return numAvailableAttrs;
+  }
   /// Name of SPIs declared by the attribute.
   ///
   /// Note: A single SPI name per attribute is currently supported but this
@@ -1357,6 +1367,11 @@ public:
   ArrayRef<Identifier> getSPIGroups() const {
     return { this->template getTrailingObjects<Identifier>(),
              numSPIGroups };
+  }
+
+  ArrayRef<AvailableAttr *> getAvailabeAttrs() const {
+    return {this->template getTrailingObjects<AvailableAttr *>(),
+            numAvailableAttrs};
   }
 
   TrailingWhereClause *getTrailingWhereClause() const;

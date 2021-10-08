@@ -392,11 +392,10 @@ void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
 }
 
 bool SILPassManager::isMandatoryFunctionPass(SILFunctionTransform *sft) {
-  return isMandatory || sft->getPassKind() ==
-             PassKind::NonTransparentFunctionOwnershipModelEliminator ||
-         sft->getPassKind() == PassKind::OwnershipModelEliminator ||
+  return isMandatory ||
          sft->getPassKind() ==
-             PassKind::NonStdlibNonTransparentFunctionOwnershipModelEliminator;
+             PassKind::NonTransparentFunctionOwnershipModelEliminator ||
+         sft->getPassKind() == PassKind::OwnershipModelEliminator;
 }
 
 void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {

@@ -55,10 +55,6 @@ static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
 
-static llvm::cl::opt<bool>
-    SILEnableLateOME("sil-enable-late-ome", llvm::cl::init(false),
-                     llvm::cl::desc("Enable late OwnershipModel elimination"));
-
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
 //===----------------------------------------------------------------------===//
@@ -382,7 +378,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addDevirtualizer();
   P.addARCSequenceOpts();
 
-  if (P.getOptions().EnableOSSAModules || SILEnableLateOME) {
+  if (P.getOptions().EnableOSSAModules) {
     // We earlier eliminated ownership if we are not compiling the stdlib. Now
     // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
     if (!P.getOptions().DisableCopyPropagation) {
@@ -408,7 +404,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
 
   // Clean up Semantic ARC before we perform additional post-inliner opts.
-  if (P.getOptions().EnableOSSAModules || SILEnableLateOME) {
+  if (P.getOptions().EnableOSSAModules) {
     if (!P.getOptions().DisableCopyPropagation) {
       P.addCopyPropagation();
     }
@@ -475,7 +471,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addARCSequenceOpts();
 
   // Run a final round of ARC opts when ownership is enabled.
-  if (P.getOptions().EnableOSSAModules || SILEnableLateOME) {
+  if (P.getOptions().EnableOSSAModules) {
     if (!P.getOptions().DisableCopyPropagation) {
       P.addCopyPropagation();
     }
@@ -532,7 +528,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
     return;
 
-  if (!P.getOptions().EnableOSSAModules && !SILEnableLateOME)
+  if (!P.getOptions().EnableOSSAModules)
     P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Start by linking in referenced functions from other modules.
@@ -828,7 +824,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
 
   // Run one last copy propagation/semantic arc opts run before serialization/us
   // lowering ownership.
-  if (P.getOptions().EnableOSSAModules || SILEnableLateOME) {
+  if (P.getOptions().EnableOSSAModules) {
     if (!P.getOptions().DisableCopyPropagation) {
       P.addCopyPropagation();
     }

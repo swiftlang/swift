@@ -50,7 +50,7 @@ math_dependencies = [
 ]
 common_expected_dependencies = [
     "___bzero", "___divti3", "___error", "___stderrp", "___stdoutp",
-    "___truncsfhf2", "___udivti3", "_abort", "_arc4random_buf", "_backtrace",
+    "___truncsfhf2", "___udivti3", "_abort", "_arc4random_buf",
     "_calloc", "_close", "_environ", "_flockfile", "_floorl", "_fprintf",
     "_fputc", "_fputs", "_free", "_funlockfile", "_fwrite", "_malloc",
     "_malloc_size", "_memchr", "_memcmp", "_memcpy", "_memmove", "_memset",

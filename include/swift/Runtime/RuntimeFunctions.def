@@ -1148,6 +1148,12 @@ FUNCTION(LookUpClass, objc_lookUpClass, C_CC, AlwaysAvailable,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// Class objc_setSuperclass(Class cls, Class newSuper);
+FUNCTION(SetSuperclass, class_setSuperclass, C_CC, AlwaysAvailable,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCClassPtrTy, ObjCClassPtrTy),
+         ATTRS(NoUnwind))
+
 // Metadata *swift_getObjectType(id object);
 FUNCTION(GetObjectType, swift_getObjectType, C_CC, AlwaysAvailable,
          RETURNS(TypeMetadataPtrTy),
@@ -1405,6 +1411,10 @@ FUNCTION(ClassAddProtocol, class_addProtocol,
          ARGS(ObjCClassPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 FUNCTION(ObjCGetClass, objc_getClass, C_CC,  AlwaysAvailable,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ObjCGetRequiredClass, objc_getRequiredClass, C_CC,  AlwaysAvailable,
          RETURNS(ObjCClassPtrTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))

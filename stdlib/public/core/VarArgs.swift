@@ -444,9 +444,6 @@ final internal class __VaListBuilder {
   @frozen // c-abi
   @usableFromInline
   internal struct Header {
-    @inlinable // c-abi
-    internal init() {}
-
     @usableFromInline // c-abi
     internal var gp_offset = CUnsignedInt(0)
     @usableFromInline // c-abi
@@ -456,6 +453,9 @@ final internal class __VaListBuilder {
     internal var overflow_arg_area: UnsafeMutablePointer<Int>?
     @usableFromInline // c-abi
     internal var reg_save_area: UnsafeMutablePointer<Int>?
+
+    @inlinable // c-abi
+    internal init() {}
   }
   #endif
 

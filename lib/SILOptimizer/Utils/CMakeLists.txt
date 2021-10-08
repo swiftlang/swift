@@ -20,7 +20,6 @@ target_sources(swiftSILOptimizer PRIVATE
   OptimizerStatsUtils.cpp
   PartialApplyCombiner.cpp
   PerformanceInlinerUtils.cpp
-  PrunedLiveness.cpp
   SILInliner.cpp
   SILSSAUpdater.cpp
   SpecializationMangler.cpp

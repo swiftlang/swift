@@ -2389,11 +2389,16 @@ void SourceFile::lookupImportedSPIGroups(
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
   llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
+
+  // Objective-C SPIs are always imported implicitly.
+  if (targetDecl->hasClangNode())
+    return !targetDecl->getSPIGroups().empty();
+
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
-  if (importedSPIGroups.empty()) return false;
+  if (importedSPIGroups.empty())
+    return false;
 
   auto declSPIGroups = targetDecl->getSPIGroups();
-
   for (auto declSPI : declSPIGroups)
     if (importedSPIGroups.count(declSPI))
       return true;

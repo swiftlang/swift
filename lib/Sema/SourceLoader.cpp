@@ -34,13 +34,20 @@ using namespace swift;
 // FIXME: Basically the same as SerializedModuleLoader.
 using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
 
-static FileOrError findModule(ASTContext &ctx, StringRef moduleID,
+static FileOrError findModule(ASTContext &ctx, Identifier moduleID,
                               SourceLoc importLoc) {
   llvm::SmallString<128> inputFilename;
+  // Find a module with an actual, physical name on disk, in case
+  // -module-alias is used (otherwise same).
+  //
+  // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
+  // and a source file has 'import Foo', a module called Bar (real name)
+  // should be searched.
+  StringRef moduleNameRef = ctx.getRealModuleName(moduleID).str();
 
   for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
     inputFilename = Path;
-    llvm::sys::path::append(inputFilename, moduleID);
+    llvm::sys::path::append(inputFilename, moduleNameRef);
     inputFilename.append(".swift");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
       ctx.SourceMgr.getFileSystem()->getBufferForFile(inputFilename.str());
@@ -66,7 +73,7 @@ bool SourceLoader::canImportModule(ImportPath::Element ID,
                                    llvm::VersionTuple version,
                                    bool underlyingVersion) {
   // Search the memory buffers to see if we can find this file on disk.
-  FileOrError inputFileOrError = findModule(Ctx, ID.Item.str(),
+  FileOrError inputFileOrError = findModule(Ctx, ID.Item,
                                             ID.Loc);
   if (!inputFileOrError) {
     auto err = inputFileOrError.getError();
@@ -88,7 +95,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
 
   auto moduleID = path[0];
 
-  FileOrError inputFileOrError = findModule(Ctx, moduleID.Item.str(),
+  FileOrError inputFileOrError = findModule(Ctx, moduleID.Item,
                                             moduleID.Loc);
   if (!inputFileOrError) {
     auto err = inputFileOrError.getError();

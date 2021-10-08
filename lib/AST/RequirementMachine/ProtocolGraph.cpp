@@ -28,6 +28,14 @@ void ProtocolGraph::visitRequirements(ArrayRef<Requirement> reqs) {
   }
 }
 
+/// Adds information about all protocols transitvely referenced from
+/// \p protos.
+void ProtocolGraph::visitProtocols(ArrayRef<const ProtocolDecl *> protos) {
+  for (auto proto : protos) {
+    addProtocol(proto);
+  }
+}
+
 /// Return true if we know about this protocol.
 bool ProtocolGraph::isKnownProtocol(const ProtocolDecl *proto) const {
   return Info.count(proto) > 0;

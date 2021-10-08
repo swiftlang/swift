@@ -18,6 +18,31 @@
 
 using namespace swift;
 
+void ValueLifetimeBoundary::visitInsertionPoints(
+    llvm::function_ref<void(SILBasicBlock::iterator insertPt)> visitor,
+    DeadEndBlocks *deBlocks) {
+  for (SILInstruction *user : lastUsers) {
+    if (!isa<TermInst>(user)) {
+      visitor(std::next(user->getIterator()));
+      continue;
+    }
+    auto *predBB = user->getParent();
+    for (SILBasicBlock *succ : predBB->getSuccessors()) {
+      if (deBlocks && deBlocks->isDeadEnd(succ))
+        continue;
+
+      assert(succ->getSinglePredecessorBlock() == predBB);
+      visitor(succ->begin());
+    }
+  }
+  for (SILBasicBlock *edge : boundaryEdges) {
+    if (deBlocks && deBlocks->isDeadEnd(edge))
+      continue;
+
+    visitor(edge->begin());
+  }
+}
+
 void ValueLifetimeAnalysis::propagateLiveness() {
   bool defIsInstruction = defValue.is<SILInstruction *>();
   assert(liveBlocks.empty() && "frontier computed twice");

@@ -52,6 +52,16 @@ else()
   set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default FALSE)
 endif()
 
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "CYGWIN")
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "HAIKU")
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
+elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "WASI")
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default FALSE)
+else()
+  set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default TRUE)
+endif()
+
 #
 # User-configurable options for the standard library.
 #
@@ -74,6 +84,10 @@ option(SWIFT_ENABLE_COMPATIBILITY_OVERRIDES
 option(SWIFT_STDLIB_HAS_DLADDR
        "Build stdlib assuming the runtime environment runtime environment provides dladdr API."
        TRUE)
+
+option(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING
+       "Build stdlib assuming the runtime environment provides the backtrace(3) API."
+       "${SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default}")
 
 option(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION
        "Build stdlib assuming the runtime environment runtime environment only supports a single runtime image with Swift code."

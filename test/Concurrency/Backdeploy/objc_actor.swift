@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -target x86_64-apple-macosx10.15 %s -o %t/test_mangling -Xfrontend -disable-availability-checking -parse-as-library
-// RUN: %target-run %t/test_mangling
+// RUN: %target-build-swift -target x86_64-apple-macosx10.15 %s -o %t/test_backdeploy -Xfrontend -parse-as-library
+// RUN: %target-run %t/test_backdeploy
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
