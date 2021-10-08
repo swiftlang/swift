@@ -522,7 +522,7 @@ private:
     if (!isSupportedMultiStatementClosure())
       llvm_unreachable("Unsupported statement: If");
 
-    SmallVector<ElementInfo> elements;
+    SmallVector<ElementInfo, 4> elements;
 
     // Condition
     {
