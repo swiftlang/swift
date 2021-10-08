@@ -672,7 +672,6 @@ OwnershipLifetimeExtender::createPlusZeroBorrow(SILValue newValue,
     callbacks.createdNewInst(ebi);
     callbacks.createdNewInst(dvi);
   }
-
   return borrow;
 }
 
@@ -1032,7 +1031,7 @@ OwnershipRAUWHelper::replaceAddressUses(SingleValueInstruction *oldValue,
   // If we are replacing addresses, see if we need to handle interior pointer
   // fixups. If we don't have any extra info, then we know that we can just RAUW
   // without any further work.
-  if (!ctx->extraAddressFixupInfo.intPtrOp)
+  if (!ctx->extraAddressFixupInfo.base)
     return replaceAllUsesAndErase(oldValue, newValue, ctx->callbacks);
 
   // We are RAUWing two addresses and we found that:
@@ -1045,25 +1044,26 @@ OwnershipRAUWHelper::replaceAddressUses(SingleValueInstruction *oldValue,
   // interior pointer instruction and change the clone to use our new borrowed
   // value. Then we RAUW as appropriate.
   OwnershipLifetimeExtender extender{*ctx};
-  auto &extraInfo = ctx->extraAddressFixupInfo;
-  auto intPtr = *extraInfo.intPtrOp;
+  auto base = ctx->extraAddressFixupInfo.base;
+  // FIXME: why does this use allAddressUsesFromOldValue instead of
+  // guaranteedUsePoints?
   BeginBorrowInst *bbi = extender.createPlusZeroBorrow(
-      intPtr->get(), llvm::makeArrayRef(extraInfo.allAddressUsesFromOldValue));
+      base.getReference(),
+      llvm::makeArrayRef(
+        ctx->extraAddressFixupInfo.allAddressUsesFromOldValue));
   auto bbiNext = &*std::next(bbi->getIterator());
-  auto *newIntPtrUser =
-      cast<SingleValueInstruction>(intPtr->getUser()->clone(bbiNext));
-  ctx->callbacks.createdNewInst(newIntPtrUser);
-  newIntPtrUser->setOperand(0, bbi);
+  auto *refProjection = cast<SingleValueInstruction>(base.getBaseAddress());
+  auto *newBase = refProjection->clone(bbiNext);
+  ctx->callbacks.createdNewInst(newBase);
+  newBase->setOperand(0, bbi);
 
   // Now that we have extended our lifetime as appropriate, we need to recreate
-  // the access path from newValue to intPtr but upon newIntPtr. Then we make it
-  // use newIntPtr.
-  auto *intPtrUser = cast<SingleValueInstruction>(intPtr->getUser());
-
+  // the access path from newValue to refProjection but upon newBase.
+  //
   // This cloner invocation must match the canCloneUseDefChain check in the
   // constructor.
   auto checkBase = [&](SILValue srcAddr) {
-    return (srcAddr == intPtrUser) ? SILValue(newIntPtrUser) : SILValue();
+    return (srcAddr == refProjection) ? SILValue(newBase) : SILValue();
   };
   SILValue clonedAddr =
       cloneUseDefChain(newValue, /*insetPt*/ oldValue, checkBase);
@@ -1137,51 +1137,38 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   //
   // NOTE: We also need to handle this here since a pointer_to_address is not a
   // valid base value for an access path since it doesn't refer to any storage.
-  BorrowedAddress borrowedAddress(newValue);
-  if (!borrowedAddress.mayBeBorrowed)
+  AddressOwnership addressOwnership(newValue);
+  if (!addressOwnership.hasLocalOwnershipLifetime())
     return;
 
-  if (!borrowedAddress.interiorPointerOp) {
+  ctx->extraAddressFixupInfo.base = addressOwnership.base;
+
+  // For now, just gather up uses
+  //
+  // FIXME: get rid of allAddressUsesFromOldValue. Shouldn't this already be
+  // included in guaranteedUsePoints?
+  auto &oldValueUses = ctx->extraAddressFixupInfo.allAddressUsesFromOldValue;
+  // FIXME: The return value of findTransitiveUsesForAddress is currently
+  // inverted.
+  if (findTransitiveUsesForAddress(oldValue, oldValueUses)) {
     invalidate();
     return;
   }
-
-  ctx->extraAddressFixupInfo.intPtrOp = borrowedAddress.interiorPointerOp;
-  auto borrowedValue = borrowedAddress.interiorPointerOp.getSingleBaseValue();
-  if (!borrowedValue) {
-    invalidate();
+  if (addressOwnership.areUsesWithinLifetime(oldValueUses, ctx->deBlocks)) {
+    // We do not need to copy the base value! Clear the extra info we have.
+    ctx->extraAddressFixupInfo.clear();
     return;
   }
-
-  auto *intPtrInst =
-    cast<SingleValueInstruction>(borrowedAddress.interiorPointerOp.getUser());
-  auto checkBase = [&](SILValue srcAddr) {
-    return (srcAddr == intPtrInst) ? SILValue(intPtrInst) : SILValue();
-  };
   // This cloner check must match the later cloner invocation in
-  // replaceAddressUses()
+  // getReplacementAddress()
+  SILValue baseAddress = ctx->extraAddressFixupInfo.base.getBaseAddress();
+  auto *baseInst = cast<SingleValueInstruction>(baseAddress);
+  auto checkBase = [&](SILValue srcAddr) {
+    return (srcAddr == baseInst) ? SILValue(baseInst) : SILValue();
+  };
   if (!canCloneUseDefChain(newValue, checkBase)) {
     invalidate();
     return;
-  }
-
-  // For now, just gather up uses
-  auto &oldValueUses = ctx->extraAddressFixupInfo.allAddressUsesFromOldValue;
-  if (InteriorPointerOperand::findTransitiveUsesForAddress(oldValue,
-                                                           oldValueUses)) {
-    invalidate();
-    return;
-  }
-
-  // Ok, at this point we know that we can optimize. The only question is if we
-  // need to perform the copy or not when we actually RAUW. So perform the is
-  // within region check. If we succeed, clear our extra state so we perform a
-  // normal RAUW.
-  SmallVector<Operand *, 8> scratchSpace;
-  if (borrowedValue.areUsesWithinScope(oldValueUses, scratchSpace,
-                                       ctx->deBlocks)) {
-    // We do not need to copy the base value! Clear the extra info we have.
-    ctx->extraAddressFixupInfo.clear();
   }
 }
 
@@ -1190,8 +1177,25 @@ OwnershipRAUWHelper::perform(SingleValueInstruction *maybeTransformedNewValue) {
   assert(isValid() && "OwnershipRAUWHelper invalid?!");
 
   SILValue actualNewValue = newValue;
-  if (maybeTransformedNewValue)
+  if (maybeTransformedNewValue) {
+    // Temporary variable for rebasing
+    SILValue rewrittenNewValue = maybeTransformedNewValue;
+    // Everything about \n newValue that the constructor checks should also be
+    // true for rewrittenNewValue.
+    // FIXME: enable these...
+    // assert(rewrittenNewValue->getType() == newValue->getType());
+    // assert(rewrittenNewValue->getOwnershipKind()
+    //        == newValue->getOwnershipKind());
+    // assert(rewrittenNewValue->getParentBlock() == newValue->getParentBlock());
+    assert(!newValue->getType().isAddress() ||
+           AddressOwnership(rewrittenNewValue) == AddressOwnership(newValue));
+
     actualNewValue = maybeTransformedNewValue;
+
+    // TODO: newValue = rewrittenNewValue; (remove actualNewValue)
+  }
+  assert(newValue && "prepareReplacement can only be called once");
+  SWIFT_DEFER { newValue = SILValue(); };
 
   if (!oldValue->getFunction()->hasOwnership())
     return replaceAllUsesAndErase(oldValue, actualNewValue, ctx->callbacks);

@@ -74,11 +74,14 @@ struct OwnershipFixupContext {
     /// This is the interior pointer operand that the new value we want to RAUW
     /// is transitively derived from and enables us to know the underlying
     /// borrowed base value that we need to lifetime extend.
-    InteriorPointerOperand intPtrOp;
+    ///
+    /// This is only initialized when the interior pointer has uses that must be
+    /// replaced.
+    AccessBase base;
 
     void clear() {
       allAddressUsesFromOldValue.clear();
-      intPtrOp = InteriorPointerOperand();
+      base = AccessBase();
     }
   };
   AddressFixupContext extraAddressFixupInfo;
@@ -90,14 +93,14 @@ struct OwnershipFixupContext {
     transitiveBorrowedUses.clear();
     recursiveReborrows.clear();
     extraAddressFixupInfo.allAddressUsesFromOldValue.clear();
-    extraAddressFixupInfo.intPtrOp = InteriorPointerOperand();
+    extraAddressFixupInfo.base = AccessBase();
   }
 
 private:
   /// Helper method called to determine if we discovered we needed interior
   /// pointer fixups while simplifying.
   bool needsInteriorPointerFixups() const {
-    return bool(extraAddressFixupInfo.intPtrOp);
+    return bool(extraAddressFixupInfo.base);
   }
 };
 

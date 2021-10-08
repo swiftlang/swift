@@ -15,9 +15,10 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -29,6 +30,7 @@ class SILInstruction;
 class SILModule;
 class SILValue;
 class DeadEndBlocks;
+class PrunedLiveness;
 
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v);
@@ -148,7 +150,7 @@ bool findTransitiveGuaranteedUses(SILValue guaranteedValue,
 /// 1. If \p guaranteedValue introduces a borrow scope (begin_borrow,
 /// load_borrow, or phi), then its only use points are the extended scope-ending
 /// uses, and this function returns true. This is, in fact, equivalent to
-/// calling BorrowedValue::visitExtendedLocalScopeEndingUses().
+/// calling BorrowedValue::visitExtendedScopeEndingUses().
 ///
 /// 2. If \p guaranteedValue does not introduce a borrow scope (it is not a
 /// valid BorrowedValue), then its uses are discovered transitively by looking
@@ -172,8 +174,8 @@ public:
     return use->getOwnershipConstraint();
   }
 
-  ValueOwnershipKind getOwnershipKind() const;
-  void setOwnershipKind(ValueOwnershipKind newKind) const;
+  ValueOwnershipKind getForwardingOwnershipKind() const;
+  void setForwardingOwnershipKind(ValueOwnershipKind newKind) const;
   void replaceOwnershipKind(ValueOwnershipKind oldKind,
                             ValueOwnershipKind newKind) const;
 
@@ -304,13 +306,20 @@ struct BorrowingOperand {
   /// visits the end of the introduced borrow scope.
   bool visitScopeEndingUses(function_ref<bool(Operand *)> func) const;
 
+  /// Returns true for borrows that create a local borrow scope but have no
+  /// scope-ending uses (presumably all paths are dead-end blocks). This does
+  /// not include instantaneous borrows, which don't require explicit scope
+  /// ending uses.
+  ///
+  /// FIXME: Borrow scopes should have scope-ending uses on all paths, even to
+  /// dead end blocks. When the verifier enforces this, remove this check.
+  bool hasEmptyRequiredEndingUses() const;
+
   /// Visit the scope ending operands of the extended scope, after transitively
   /// searching through reborrows. These uses might not be dominated by this
   /// BorrowingOperand.
   ///
   /// Returns false and early exits if the visitor \p func returns false.
-  ///
-  /// Note: this does not visit the intermediate reborrows.
   bool visitExtendedScopeEndingUses(function_ref<bool(Operand *)> func) const;
 
   /// Returns true if this borrow scope operand consumes guaranteed
@@ -493,7 +502,7 @@ struct InteriorPointerOperand;
 /// jointly post-dominate this value (see visitLocalScopeEndingUses()). The
 /// extended scope, including reborrows has end points that are not dominated by
 /// this value but still jointly post-dominate (see
-/// visitExtendedLocalScopeEndingUses()).
+/// visitExtendedScopeEndingUses()).
 struct BorrowedValue {
   SILValue value;
   BorrowedValueKind kind = BorrowedValueKind::Invalid;
@@ -535,20 +544,25 @@ struct BorrowedValue {
 
   bool isLocalScope() const { return kind.isLocalScope(); }
 
-  /// Returns true if the passed in set of uses is completely within
-  /// the lifetime of this borrow introducer.
+  /// Add this scopes live blocks into the PrunedLiveness result.
+  void computeLiveness(PrunedLiveness &liveness) const;
+
+  /// Returns true if \p uses are completely within this borrow introducer's
+  /// local scope.
   ///
-  /// NOTE: Scratch space is used internally to this method to store the end
-  /// borrow scopes if needed.
-  bool areUsesWithinScope(ArrayRef<Operand *> uses,
-                          SmallVectorImpl<Operand *> &scratchSpace,
-                          DeadEndBlocks &deadEndBlocks) const;
+  /// Precondition: \p uses are dominated by the local borrow introducer.
+  ///
+  /// This ignores reborrows. The assumption is that, since \p uses are
+  /// dominated by this local scope, checking the extended borrow scope should
+  /// not be necessary to determine they are within the scope.
+  bool areUsesWithinLocalScope(ArrayRef<Operand *> uses,
+                               DeadEndBlocks &deadEndBlocks) const;
 
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments. \p
   /// visitor is *not* called on Reborrows, only on final scope ending uses.
-  bool visitExtendedLocalScopeEndingUses(
-      function_ref<bool(Operand *)> visitor) const;
+  bool
+  visitExtendedScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -583,6 +597,14 @@ struct BorrowedValue {
         func, InteriorPointerOperandVisitorKind::YesNestedYesReborrows);
   }
 
+  bool hasReborrow() const {
+    for (auto *op : value->getUses()) {
+      if (op->getOperandOwnership() == OperandOwnership::Reborrow)
+        return true;
+    }
+    return false;
+  }
+
   /// Visit all immediate uses of this borrowed value and if any of them are
   /// reborrows, place them in BorrowingOperand form into \p
   /// foundReborrows. Returns true if we appended any such reborrows to
@@ -591,12 +613,10 @@ struct BorrowedValue {
                            &foundReborrows) const {
     bool foundAnyReborrows = false;
     for (auto *op : value->getUses()) {
-      if (auto borrowingOperand = BorrowingOperand(op)) {
-        if (borrowingOperand.isReborrow()) {
-          foundReborrows.push_back(
-              {value->getParentBlock(), op->getOperandNumber()});
-          foundAnyReborrows = true;
-        }
+      if (op->getOperandOwnership() == OperandOwnership::Reborrow) {
+        foundReborrows.push_back(
+            {value->getParentBlock(), op->getOperandNumber()});
+        foundAnyReborrows = true;
       }
     }
     return foundAnyReborrows;
@@ -641,6 +661,13 @@ bool getAllBorrowIntroducingValues(SILValue value,
 /// we are able to understand all of the def-use graph and only find a single
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
 BorrowedValue getSingleBorrowIntroducingValue(SILValue inputValue);
+
+/// The algorithm that is used to determine what the verifier will consider to
+/// be transitive uses of the given address. Used to implement \see
+/// findTransitiveUses.
+bool findTransitiveUsesForAddress(
+    SILValue address, SmallVectorImpl<Operand *> &foundUses,
+    std::function<void(Operand *)> *onError = nullptr);
 
 class InteriorPointerOperandKind {
 public:
@@ -785,7 +812,7 @@ struct InteriorPointerOperand {
   }
 
   /// Return the base BorrowedValue of the incoming value's operand.
-  BorrowedValue getSingleBaseValue() const {
+  BorrowedValue getSingleBorrowedValue() const {
     return getSingleBorrowIntroducingValue(operand->get());
   }
 
@@ -820,14 +847,6 @@ struct InteriorPointerOperand {
                                         onError);
   }
 
-  /// The algorithm that is used to determine what the verifier will consider to
-  /// be transitive uses of the given address. Used to implement \see
-  /// findTransitiveUses.
-  static bool
-  findTransitiveUsesForAddress(SILValue address,
-                               SmallVectorImpl<Operand *> &foundUses,
-                               std::function<void(Operand *)> *onError = nullptr);
-
   Operand *operator->() { return operand; }
   const Operand *operator->() const { return operand; }
   Operand *operator*() { return operand; }
@@ -840,23 +859,70 @@ private:
       : operand(op), kind(kind) {}
 };
 
-/// Utility to check if an address may originate from a borrowed value. If so,
+/// Utility to check if an address may originate from an OSSA value. If so,
 /// then uses of the address cannot be replaced without ensuring that they are
-/// also within the same scope.
+/// also within the same owned lifetime or borrow scope.
 ///
-/// If mayBeBorrowed is false, then there is no enclosing borrow scope and
-/// interiorPointerOp is irrelevant.
+/// If hasOwnership() is false, then there is no enclosing lifetime or borrow
+/// scope and interiorPointerOp is irrelevant.
 ///
-/// If mayBeBorrowed is true, then interiorPointerOp refers to the operand that
+/// If hasOwnership() is true, then interiorPointerOp refers to the operand that
 /// converts a non-address value into the address from which the contructor's
 /// address is derived. If the best-effort to find an InteriorPointerOperand
 /// fails, then interiorPointerOp remains invalid, and clients must be
 /// conservative.
-struct BorrowedAddress {
-  bool mayBeBorrowed = true;
-  InteriorPointerOperand interiorPointerOp;
+///
+/// TODO: Handle implicit borrow scopes once they are legal in SIL. The operand
+/// of the base will be owned but mayBeBorrowed will remain true.
+struct AddressOwnership {
+  AccessBase base;
 
-  BorrowedAddress(SILValue address);
+  AddressOwnership() = default;
+
+  AddressOwnership(SILValue address) : base(AccessBase::compute(address)) {
+    assert(address->getType().isAddress());
+  }
+
+  AddressOwnership(AccessBase base) : base(base) {}
+
+  operator bool() const { return bool(base); }
+
+  bool operator==(const AddressOwnership &other) const {
+    return base.hasIdenticalAccessInfo(other.base);
+  }
+
+  bool operator!=(const AddressOwnership &other) const {
+    return !(*this == other);
+  }
+
+  /// Return true if this address may be derived from a value with a local OSSA
+  /// lifetime or borrow scope.
+  bool hasLocalOwnershipLifetime() const {
+    return base.hasLocalOwnershipLifetime();
+  }
+
+  /// Return the OSSA value from which this address is derived. This may be
+  /// invalid even if hasOSSALifetime() is true in cases where the
+  /// InteriorPointerOperand is unrecognized.
+  SILValue getOwnershipReferenceRoot() const {
+    if (base.isReference())
+      return base.getOwnershipReferenceRoot();
+
+    return SILValue();
+  }
+
+  /// Transitively compute uses of this base address.
+  bool findTransitiveUses(SmallVectorImpl<Operand *> &foundUses) {
+    return findTransitiveUsesForAddress(base.getBaseAddress(), foundUses);
+  }
+
+  /// Return true of all \p uses occur before the end of the address' lifetime
+  /// or borrow scope.
+  ///
+  /// Precondition: all \p uses are dominated by the beginning of the address'
+  /// lifetime or borrow scope.
+  bool areUsesWithinLifetime(ArrayRef<Operand *> uses,
+                             DeadEndBlocks &deadEndBlocks) const;
 };
 
 class OwnedValueIntroducerKind {
