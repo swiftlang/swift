@@ -79,9 +79,10 @@ call :build_swift %exitOnError%
 
 call :build_lldb %exitOnError%
 
+path %PATH%;C:\Program Files\Git\usr\bin
 call :build_libdispatch %exitOnError%
 
-path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%;C:\Program Files\Git\usr\bin
+path %source_root%\icu-%icu_version%\bin64;%install_directory%\bin;%build_root%\swift\bin;%build_root%\swift\libdispatch-prefix\bin;%PATH%
 call :test_swift %exitOnError%
 call :test_libdispatch %exitOnError%
 
@@ -268,6 +269,7 @@ cmake^
     -DSWIFT_BUILD_SOURCEKIT:BOOL=YES^
     -DSWIFT_ENABLE_SOURCEKIT_TESTS:BOOL=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES^
+    -DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED=YES^
     -DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING=YES^
     -DSWIFT_INSTALL_COMPONENTS="autolink-driver;compiler;clang-resource-dir-symlink;stdlib;sdk-overlay;editor-integration;tools;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers"^
     -DSWIFT_PARALLEL_LINK_JOBS=8^
@@ -275,6 +277,7 @@ cmake^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -DSWIFT_LIT_ARGS="--time-tests"^
     -S "%source_root%\swift" %exitOnError%
 
 cmake --build "%build_root%\swift" %exitOnError%
@@ -331,6 +334,8 @@ endlocal
 :: Configures, builds, and installs Dispatch
 setlocal enableextensions enabledelayedexpansion
 
+for /f "delims=" %%O in ('cygpath -m %install_directory%\lib\swift') do set RESOURCE_DIR=%%O
+
 cmake^
     -B "%build_root%\swift-corelibs-libdispatch"^
     -G Ninja^
@@ -350,8 +355,8 @@ cmake^
     -DCMAKE_EXE_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
     -DCMAKE_Swift_COMPILER_TARGET:STRING=x86_64-unknown-windows-msvc^
-    -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
-    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%install_directory%\lib\swift\""^
+    -DCMAKE_Swift_FLAGS:STRING="-resource-dir \"%RESOURCE_DIR%\""^
+    -DCMAKE_Swift_LINK_FLAGS:STRING="-resource-dir \"%RESOURCE_DIR%\""^
     -S "%source_root%\swift-corelibs-libdispatch" %exitOnError%
 
 cmake --build "%build_root%\swift-corelibs-libdispatch" %exitOnError%
