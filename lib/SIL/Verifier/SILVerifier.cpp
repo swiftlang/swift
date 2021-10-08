@@ -5255,6 +5255,9 @@ public:
             "Operand value should be an object");
     require(mvi->getType() == mvi->getOperand()->getType(),
             "Result and operand must have the same type, today.");
+    require(mvi->getModule().getStage() == SILStage::Raw ||
+            !mvi->requiresVerification(),
+            "Move only values only can require verification in raw SIL");
   }
 
   void verifyEpilogBlocks(SILFunction *F) {
