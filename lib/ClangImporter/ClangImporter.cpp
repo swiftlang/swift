@@ -2621,7 +2621,10 @@ public:
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
-    if (isDeclaredInModule(ModuleFilter, VD))
+    if (isDeclaredInModule(ModuleFilter, VD) ||
+        // Sometimes imported decls get put into the clang header module. If we
+        // found one of these decls, don't filter it out.
+        VD->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME)
       NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
