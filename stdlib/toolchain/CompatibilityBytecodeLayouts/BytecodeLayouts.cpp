@@ -23,8 +23,11 @@
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/HeapObject.h"
 #include "llvm/Support/SwapByteOrder.h"
-#include <Block.h>
 #include <cstdint>
+#if SWIFT_OBJC_INTEROP
+#include "swift/Runtime/ObjCBridge.h"
+#include <Block.h>
+#endif
 
 using namespace swift;
 
@@ -401,6 +404,7 @@ size_t computeSize(const uint8_t *typeLayout, Metadata *metadata) {
   case LayoutType::I32:
     return 4;
   case LayoutType::I64:
+    return 8;
   case LayoutType::ErrorReference:
   case LayoutType::NativeStrongReference:
   case LayoutType::NativeUnownedReference:
@@ -410,7 +414,7 @@ size_t computeSize(const uint8_t *typeLayout, Metadata *metadata) {
   case LayoutType::BlockReference:
   case LayoutType::BridgeReference:
   case LayoutType::ObjCReference:
-    return 8;
+    return sizeof(__swift_uintptr_t);
   case LayoutType::AlignedGroup:
     return readAlignedGroup(typeLayout, metadata).size();
   case LayoutType::MultiPayloadEnum:
@@ -450,17 +454,17 @@ BitVector spareBits(const uint8_t *typeLayout, Metadata *metadata) {
     return BitVector(32);
   case LayoutType::I64:
     return BitVector(64);
-  case LayoutType::ErrorReference:
   case LayoutType::NativeStrongReference:
   case LayoutType::NativeUnownedReference:
   case LayoutType::NativeWeakReference:
+    return pointerSpareBitMask();
   case LayoutType::UnknownUnownedReference:
   case LayoutType::UnknownWeakReference:
   case LayoutType::BlockReference:
   case LayoutType::BridgeReference:
-  case LayoutType::ObjCReference: {
-    return pointerSpareBitMask();
-  }
+  case LayoutType::ObjCReference:
+  case LayoutType::ErrorReference:
+    return BitVector(sizeof(__swift_uintptr_t) * 8);
   case LayoutType::SinglePayloadEnum:
     return readSinglePayloadEnum(typeLayout, metadata).spareBits;
   case LayoutType::MultiPayloadEnum:
@@ -529,7 +533,18 @@ BitVector AlignedGroup::spareBits() const {
     }
     uint64_t shiftValue = uint64_t(1) << (field.alignment - '0');
     uint64_t alignMask = shiftValue - 1;
+
+    // When we align, all the bits are spare and are considered a field we can
+    // put spare bits into
+    size_t oldOffset = offset;
     offset = ((uint64_t)offset + alignMask) & (~alignMask);
+
+    BitVector alignmentSpareBits = ~BitVector(8 * (offset - oldOffset));
+    if (alignmentSpareBits.count() >= maskOfBest.count()) {
+      offsetOfBest = oldOffset;
+      maskOfBest = alignmentSpareBits;
+    }
+
     offset += computeSize(field.fieldPtr, metadata);
   }
 
@@ -575,10 +590,12 @@ uint32_t MultiPayloadEnum::gatherSpareBits(const uint8_t *data,
   size_t currByteIdx = 0;
   size_t currWordIdx = 0;
   uint32_t currBitIdx = 0;
+  size_t wordSize = sizeof(__swift_uintptr_t);
 
   for (auto bit : spareBits().data) {
-    uint64_t currWord = *(((const uint64_t *)addr) + currWordIdx);
-    uint8_t currByte = currWord >> (8 * (7 - currByteIdx));
+    __swift_uintptr_t currWord =
+        *(((const __swift_uintptr_t *)addr) + currWordIdx);
+    uint8_t currByte = currWord >> (8 * (wordSize - 1 - currByteIdx));
     if (bit) {
       result <<= 1;
       if ((bit << (7 - currBitIdx)) & currByte) {
@@ -595,7 +612,7 @@ uint32_t MultiPayloadEnum::gatherSpareBits(const uint8_t *data,
       currByteIdx += 1;
     }
 
-    if (currByteIdx == 8) {
+    if (currByteIdx == wordSize) {
       currByteIdx = 0;
       currWordIdx += 1;
     }
@@ -654,7 +671,6 @@ uint32_t getEnumTagSinglePayload(void *addr, const uint8_t *layoutString,
     }
     return tag;
   }
-  case LayoutType::ErrorReference:
   case LayoutType::NativeStrongReference:
   case LayoutType::NativeUnownedReference:
   case LayoutType::NativeWeakReference: {
@@ -672,8 +688,9 @@ uint32_t getEnumTagSinglePayload(void *addr, const uint8_t *layoutString,
   case LayoutType::BlockReference:
   case LayoutType::BridgeReference:
   case LayoutType::ObjCReference:
+  case LayoutType::ErrorReference:
     // Non native references only have one safe extra inhabitant: 0
-    return *(uint32_t **)addr == nullptr ? 1 : UINT32_MAX;
+    return *(uint32_t **)addr == nullptr ? 1 : 0;
   case LayoutType::SinglePayloadEnum: {
     auto e = readSinglePayloadEnum(layoutString, metadata);
     auto payloadIndex = getEnumTagSinglePayload(addr, e.payloadLayoutPtr,
@@ -722,7 +739,6 @@ uint32_t numExtraInhabitants(const uint8_t *layoutString, Metadata *metadata) {
     }
     return maxXICount;
   }
-  case LayoutType::ErrorReference:
   case LayoutType::NativeStrongReference:
   case LayoutType::NativeUnownedReference:
   case LayoutType::NativeWeakReference: {
@@ -737,8 +753,9 @@ uint32_t numExtraInhabitants(const uint8_t *layoutString, Metadata *metadata) {
   case LayoutType::UnknownUnownedReference:
   case LayoutType::UnknownWeakReference:
   case LayoutType::BlockReference:
-  case LayoutType::BridgeReference:
   case LayoutType::ObjCReference:
+  case LayoutType::BridgeReference:
+  case LayoutType::ErrorReference:
     // Non native references only have one safe extra inhabitant: 0
     return 1;
   case LayoutType::SinglePayloadEnum: {
@@ -780,7 +797,6 @@ uint32_t extractPayloadTag(const MultiPayloadEnum e, const uint8_t *data) {
   unsigned requiredSpareBits = bitsToRepresent(numPayloads);
   unsigned numSpareBits = e.spareBits().count();
   uint32_t tag = 0;
-
   // Get the tag bits from spare bits, if any.
   if (numSpareBits > 0) {
     tag = e.gatherSpareBits(data, requiredSpareBits);
@@ -835,7 +851,7 @@ swift_generic_destroy(void *address, void *metadata,
   case LayoutType::I64:
     return;
   case LayoutType::ErrorReference:
-    swift_errorRelease((SwiftError *)MASK_PTR(*(void **)addr));
+    swift_errorRelease(*(SwiftError **)addr);
     return;
   case LayoutType::NativeStrongReference:
     swift_release((HeapObject *)MASK_PTR(*(void **)addr));
@@ -854,13 +870,24 @@ swift_generic_destroy(void *address, void *metadata,
     swift_unknownObjectWeakDestroy((WeakReference *)MASK_PTR(*(void **)addr));
     return;
   case LayoutType::BridgeReference:
-    swift_bridgeObjectRelease((HeapObject *)MASK_PTR(*(void **)addr));
+    swift_bridgeObjectRelease(*(HeapObject **)addr);
     return;
   case LayoutType::ObjCReference:
-  case LayoutType::BlockReference:
-    assert(false &&
-           "TODO: Figure out how to link against the blocks and objc runtime");
+#if SWIFT_OBJC_INTEROP
+    objc_release((*(id *)addr));
     return;
+#else
+    assert(false && "Got ObjCReference, but ObjCInterop is Disabled");
+    return;
+#endif
+  case LayoutType::BlockReference:
+#if SWIFT_OBJC_INTEROP
+    Block_release(*(void **)addr);
+    return;
+#else
+    assert(false && "Got ObjCBlock, but ObjCInterop is Disabled");
+    return;
+#endif
   case LayoutType::SinglePayloadEnum: {
     // A Single Payload Enum has a payload iff its index is 0
     uint32_t enumTag = getEnumTag(addr, typeLayout, typedMetadata);
@@ -958,9 +985,8 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
     memcpy(dest, src, 8);
     return;
   case LayoutType::ErrorReference:
-    memcpy(dest, src, sizeof(void *));
-    if (!isTake)
-      swift_errorRetain((SwiftError *)MASK_PTR(*(void **)destAddr));
+    *(void **)dest =
+        isTake ? *(void **)src : swift_errorRetain((SwiftError *)*(void **)src);
     return;
   case LayoutType::NativeStrongReference:
   case LayoutType::NativeUnownedReference:
@@ -985,18 +1011,32 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
     memcpy(dest, src, sizeof(void *));
     return;
   case LayoutType::BlockReference:
-    memcpy(dest, src, sizeof(void *));
-    //_Block_release(addr);
+#if SWIFT_OBJC_INTEROP
+    if (!isTake) {
+      *(void **)dest = Block_copy(*(void **)src);
+    } else {
+      memcpy(dest, src, sizeof(void *));
+    }
     return;
-  case LayoutType::BridgeReference:
-    memcpy(dest, src, sizeof(void *));
-    swift_bridgeObjectRetain((HeapObject *)MASK_PTR(*(void **)destAddr));
+#else
+    assert(false && "Got ObjCBlock, but ObjCInterop is Disabled");
     return;
+#endif
+  case LayoutType::BridgeReference: {
+    *(void **)dest =
+        isTake ? *(void **)src
+               : swift_bridgeObjectRetain((HeapObject *)*(void **)src);
+    return;
+  }
   case LayoutType::ObjCReference:
-#if 0
-      memcpy(dest, src, sizeof(void*));
-      objc_retain((HeapObject*)MASK_PTR(*(void**)addr));
-      return;
+#if SWIFT_OBJC_INTEROP
+    if (!isTake)
+      objc_retain((id) * (void **)src);
+    memcpy(dest, src, sizeof(void *));
+    return;
+#else
+    assert(false && "Got ObjCReference, but ObjCInterop is Disabled");
+    return;
 #endif
   case LayoutType::SinglePayloadEnum: {
     // We have a payload iff the enum tag is 0
@@ -1014,9 +1054,10 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
 
     BitVector payloadBits;
     std::vector<uint8_t> wordVec;
+    size_t wordSize = sizeof(__swift_uintptr_t);
     for (size_t i = 0; i < e.payloadSize(); i++) {
       wordVec.push_back(srcAddr[i]);
-      if (wordVec.size() == 8) {
+      if (wordVec.size() == wordSize) {
         // The data we read will be in little endian, so we need to reverse it
         // byte wise.
         for (auto j = wordVec.rbegin(); j != wordVec.rend(); j++) {
@@ -1028,7 +1069,7 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
 
     // If we don't have a multiple of 8 bytes, we need to top off
     if (!wordVec.empty()) {
-      while (wordVec.size() < 8) {
+      while (wordVec.size() < wordSize) {
         wordVec.push_back(0);
       }
       for (auto i = wordVec.rbegin(); i != wordVec.rend(); i++) {
