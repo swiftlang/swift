@@ -10,6 +10,8 @@
 // UNSUPPORTED: OS=linux-androideabi
 // UNSUPPORTED: OS=linux-android
 
+// REQUIRES: rdar84036022
+
 // CHECK-STD: import std.iosfwd
 // CHECK-STD: import std.string
 
