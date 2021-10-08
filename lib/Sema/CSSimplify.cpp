@@ -6735,7 +6735,7 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   // we need to store the difference as a signed integer.
   int extraOptionals = fromOptionals.size() - toOptionals.size();
 
-  // From expression could be a type variable with a value to optional
+  // "from" expression could be a type variable with value-to-optional
   // restrictions that we have to account for optionality mismatch.
   const auto subExprType = cs.getType(castExpr->getSubExpr());
   if (llvm::any_of(constraintRestrictions, [&](auto &entry) {

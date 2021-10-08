@@ -2953,9 +2953,9 @@ bool ContextualFailure::tryTypeCoercionFixIt(
   if (!toType->hasTypeRepr())
     return false;
 
-  // If optional unwrapped type is a subtype of the specified contextual type,
-  // let's suggest a force unwrap "!". Otherwise fallback to potential coercion
-  // or force cast.
+  // If object of the optional type is a subtype of the specified contextual
+  // type, let's suggest a force unwrap "!". Otherwise fallback to potential
+  // coercion or force cast.
   if (!bothOptional && fromType->getOptionalObjectType()) {
     if (TypeChecker::isSubtypeOf(fromType->lookThroughAllOptionalTypes(),
                                  toType, getDC())) {
