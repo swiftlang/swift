@@ -18,10 +18,13 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_H
 #define SWIFT_SEMA_CONSTRAINT_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/OverloadChoice.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
@@ -46,6 +49,23 @@ class ConstraintFix;
 class ConstraintLocator;
 class ConstraintSystem;
 enum class TrailingClosureMatching;
+
+/// Describes contextual type information about a particular element
+/// (expression, statement etc.) within a constraint system.
+struct ContextualTypeInfo {
+  TypeLoc typeLoc;
+  ContextualTypePurpose purpose;
+
+  ContextualTypeInfo() : typeLoc(TypeLoc()), purpose(CTP_Unused) {}
+
+  ContextualTypeInfo(Type contextualTy, ContextualTypePurpose purpose)
+      : typeLoc(TypeLoc::withoutLoc(contextualTy)), purpose(purpose) {}
+
+  ContextualTypeInfo(TypeLoc typeLoc, ContextualTypePurpose purpose)
+      : typeLoc(typeLoc), purpose(purpose) {}
+
+  Type getType() const { return typeLoc.getType(); }
+};
 
 /// Describes the kind of constraint placed on one or more types.
 enum class ConstraintKind : char {
@@ -129,6 +149,9 @@ enum class ConstraintKind : char {
   /// A disjunction constraint that specifies that one or more of the
   /// stored constraints must hold.
   Disjunction,
+  /// A conjunction constraint that specifies that all of the stored
+  /// constraints must hold.
+  Conjunction,
   /// The first type is an optional type whose object type is the second
   /// type, preserving lvalue-ness.
   OptionalObject,
@@ -192,6 +215,10 @@ enum class ConstraintKind : char {
   /// inferred from a conversion, so the check is more relax comparing to
   /// `ConformsTo`.
   TransitivelyConformsTo,
+  /// Represents an AST node contained in a body of a closure. It has only
+  /// one type - type variable representing type of a node, other side is
+  /// the AST node to infer the type for.
+  ClosureBodyElement,
 };
 
 /// Classification of the different kinds of constraints.
@@ -208,7 +235,13 @@ enum class ConstraintClassification : char {
   TypeProperty,
 
   /// A disjunction constraint.
-  Disjunction
+  Disjunction,
+
+  /// A conjunction constraint.
+  Conjunction,
+
+  /// An element of a closure body.
+  ClosureElement,
 };
 
 /// Specifies a restriction on the kind of conversion that should be
@@ -338,6 +371,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// in its disjunction.
   unsigned IsFavored : 1;
 
+  /// Whether or not this constraint should be solved in isolation from
+  /// the rest of the constraint system. Currently only applies to conjunctions.
+  unsigned IsIsolated : 1;
+
   /// The number of type variables referenced by this constraint.
   ///
   /// The type variables themselves are tail-allocated.
@@ -399,6 +436,13 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       /// The DC in which the use appears.
       DeclContext *UseDC;
     } Overload;
+
+    struct {
+      /// The node itself.
+      ASTNode Element;
+      /// Contextual information associated with the element (if any).
+      ContextualTypeInfo Context;
+    } ClosureElement;
   };
 
   /// The locator that describes where in the expression this
@@ -410,7 +454,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   void *operator new(size_t) = delete;
 
   Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
-             ConstraintLocator *locator,
+             bool isIsolated, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new constraint.
@@ -447,6 +491,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// Construct a relational constraint with a fix.
   Constraint(ConstraintKind kind, ConstraintFix *fix, Type first, Type second,
+             ConstraintLocator *locator,
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+
+  /// Construct a closure body element constraint.
+  Constraint(ASTNode node, ContextualTypeInfo context,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
@@ -518,11 +567,30 @@ public:
                                        RememberChoice_t shouldRememberChoice
                                          = ForgetChoice);
 
+  /// Create a new conjunction constraint.
+  ///
+  /// \param isIsolated - Indicates whether given constraint should be
+  /// solved in isolation from the rest of the constraint system i.e.
+  /// by removing all of the unrelated type variables and constraints.
+  static Constraint *
+  createConjunction(ConstraintSystem &cs, ArrayRef<Constraint *> constraints,
+                    bool isIsolated, ConstraintLocator *locator,
+                    ArrayRef<TypeVariableType *> referencedVars = {});
+
   /// Create a new Applicable Function constraint.
   static Constraint *createApplicableFunction(
       ConstraintSystem &cs, Type argumentFnType, Type calleeType,
       Optional<TrailingClosureMatching> trailingClosureMatching,
       ConstraintLocator *locator);
+
+  static Constraint *createClosureBodyElement(ConstraintSystem &cs,
+                                              ASTNode node,
+                                              ConstraintLocator *locator);
+
+  static Constraint *createClosureBodyElement(ConstraintSystem &cs,
+                                              ASTNode node,
+                                              ContextualTypeInfo context,
+                                              ConstraintLocator *locator);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -629,6 +697,12 @@ public:
 
     case ConstraintKind::Disjunction:
       return ConstraintClassification::Disjunction;
+
+    case ConstraintKind::Conjunction:
+      return ConstraintClassification::Conjunction;
+
+    case ConstraintKind::ClosureBodyElement:
+      return ConstraintClassification::ClosureElement;
     }
 
     llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -640,6 +714,9 @@ public:
     case ConstraintKind::Disjunction:
       llvm_unreachable("disjunction constraints have no type operands");
 
+    case ConstraintKind::Conjunction:
+      llvm_unreachable("conjunction constraints have no type operands");
+
     case ConstraintKind::BindOverload:
       return Overload.First;
 
@@ -647,6 +724,9 @@ public:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueWitness:
       return Member.First;
+
+    case ConstraintKind::ClosureBodyElement:
+      llvm_unreachable("closure body element constraint has no type operands");
 
     default:
       return Types.First;
@@ -657,7 +737,9 @@ public:
   Type getSecondType() const {
     switch (getKind()) {
     case ConstraintKind::Disjunction:
+    case ConstraintKind::Conjunction:
     case ConstraintKind::BindOverload:
+    case ConstraintKind::ClosureBodyElement:
       llvm_unreachable("constraint has no second type");
 
     case ConstraintKind::ValueMember:
@@ -710,7 +792,8 @@ public:
 
   /// Retrieve the set of constraints in a disjunction.
   ArrayRef<Constraint *> getNestedConstraints() const {
-    assert(Kind == ConstraintKind::Disjunction);
+    assert(Kind == ConstraintKind::Disjunction ||
+           Kind == ConstraintKind::Conjunction);
     return Nested;
   }
 
@@ -734,6 +817,10 @@ public:
   /// Determine if this constraint represents explicit conversion,
   /// e.g. coercion constraint "as X" which forms a disjunction.
   bool isExplicitConversion() const;
+
+  /// Determine whether this constraint should be solved in isolation
+  /// from the rest of the constraint system.
+  bool isIsolated() const { return IsIsolated; }
 
   /// Whether this is a one-way constraint.
   bool isOneWayConstraint() const {
@@ -759,6 +846,16 @@ public:
            Kind == ConstraintKind::UnresolvedValueMember ||
            Kind == ConstraintKind::ValueWitness);
     return Member.UseDC;
+  }
+
+  ASTNode getClosureElement() const {
+    assert(Kind == ConstraintKind::ClosureBodyElement);
+    return ClosureElement.Element;
+  }
+
+  ContextualTypeInfo getElementContext() const {
+    assert(Kind == ConstraintKind::ClosureBodyElement);
+    return ClosureElement.Context;
   }
 
   /// For an applicable function constraint, retrieve the trailing closure

@@ -2195,6 +2195,18 @@ Constraint *ConstraintSystem::selectDisjunction() {
   return nullptr;
 }
 
+Constraint *ConstraintSystem::selectConjunction() {
+  for (auto &constraint : InactiveConstraints) {
+    if (constraint.isDisabled())
+      continue;
+
+    if (constraint.getKind() == ConstraintKind::Conjunction)
+      return &constraint;
+  }
+
+  return nullptr;
+}
+
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
   cs.simplifyDisjunctionChoice(Choice);
 
@@ -2298,4 +2310,18 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   if (constraints.empty())
     cs.addConstraint(ConstraintKind::Bind, typeVar, conversionType,
                      Choice->getLocator());
+}
+
+bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
+  // First, let's bring all referenced variables into scope.
+  {
+    llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+    findReferencedVariables(cs, referencedVars);
+
+    for (auto *typeVar : referencedVars)
+      cs.addTypeVariable(typeVar);
+  }
+
+  auto result = cs.simplifyConstraint(*Element);
+  return result != ConstraintSystem::SolutionKind::Error;
 }

@@ -1970,7 +1970,7 @@ public:
         return nullptr;
 
       if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
-        if (shouldTypeCheckInEnclosingExpression(closure)) {
+        if (closure->hasSingleExpressionBody()) {
           hasError |= containsErrorExpr(closure->getSingleExpressionBody());
           return hasError ? nullptr : expr;
         }

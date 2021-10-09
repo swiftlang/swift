@@ -5494,9 +5494,9 @@ SolutionApplicationTarget SolutionApplicationTarget::forInitialization(
 
 SolutionApplicationTarget SolutionApplicationTarget::forForEachStmt(
     ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
-    bool bindPatternVarsOneWay) {
+    bool bindPatternVarsOneWay, ContextualTypePurpose purpose) {
   SolutionApplicationTarget target(
-      stmt->getSequence(), dc, CTP_ForEachStmt,
+      stmt->getSequence(), dc, purpose,
       sequenceProto->getDeclaredInterfaceType(), /*isDiscarded=*/false);
   target.expression.pattern = stmt->getPattern();
   target.expression.bindPatternVarsOneWay =
@@ -5533,7 +5533,8 @@ SolutionApplicationTarget::getContextualPattern() const {
 
   assert(kind == Kind::expression);
   assert(expression.contextualPurpose == CTP_Initialization ||
-         expression.contextualPurpose == CTP_ForEachStmt);
+         expression.contextualPurpose == CTP_ForEachStmt ||
+         expression.contextualPurpose == CTP_ForEachSequence);
   if (expression.contextualPurpose == CTP_Initialization &&
       expression.initialization.patternBinding) {
     return ContextualPattern::forPatternBindingDecl(
@@ -5564,12 +5565,14 @@ bool SolutionApplicationTarget::contextualTypeIsOnlyAHint() const {
   case CTP_Initialization:
     return !infersOpaqueReturnType() && !isOptionalSomePatternInit();
   case CTP_ForEachStmt:
+  case CTP_ForEachSequence:
     return true;
   case CTP_Unused:
   case CTP_ReturnStmt:
   case CTP_ReturnSingleExpr:
   case CTP_YieldByValue:
   case CTP_YieldByReference:
+  case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_EnumCaseRawValue:
   case CTP_DefaultParameter:

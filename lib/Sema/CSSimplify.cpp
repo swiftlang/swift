@@ -1619,6 +1619,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
+  case ConstraintKind::Conjunction:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
@@ -1638,6 +1639,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::ClosureBodyElement:
     llvm_unreachable("Not a conversion");
   }
 
@@ -1759,6 +1761,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
+  case ConstraintKind::Conjunction:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
@@ -1777,6 +1780,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::ClosureBodyElement:
     return true;
   }
 
@@ -2161,6 +2165,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
+  case ConstraintKind::Conjunction:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
@@ -2180,6 +2185,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::ClosureBodyElement:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -5249,6 +5255,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::Defaultable:
     case ConstraintKind::Disjunction:
+    case ConstraintKind::Conjunction:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
@@ -5267,6 +5274,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::DefaultClosureType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PropertyWrapper:
+    case ConstraintKind::ClosureBodyElement:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -9124,26 +9132,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
-  // If this closure should be type-checked as part of this expression,
-  // generate constraints for it now.
-  auto &ctx = getASTContext();
-  if (shouldTypeCheckInEnclosingExpression(closure)) {
-    if (generateConstraints(closure))
-      return false;
-  } else if (!hasExplicitResult(closure)) {
-    // If this closure has an empty body and no explicit result type
-    // let's bind result type to `Void` since that's the only type empty body
-    // can produce. Otherwise, if (multi-statement) closure doesn't have
-    // an explicit result (no `return` statements) let's default it to `Void`.
-    auto constraintKind = (closure->hasEmptyBody() && !closure->hasExplicitResultType())
-                              ? ConstraintKind::Bind
-                              : ConstraintKind::Defaultable;
-    addConstraint(
-        constraintKind, inferredClosureType->getResult(), ctx.TheEmptyTupleType,
-        getConstraintLocator(closure, ConstraintLocator::ClosureResult));
-  }
-
-  return true;
+  // Generate constraints from the body of this closure.
+  return !generateConstraints(closure);
 }
 
 ConstraintSystem::SolutionKind
@@ -12068,9 +12058,11 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::ValueWitness:
   case ConstraintKind::BindOverload:
   case ConstraintKind::Disjunction:
+  case ConstraintKind::Conjunction:
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::DefaultClosureType:
+  case ConstraintKind::ClosureBodyElement:
     llvm_unreachable("Use the correct addConstraint()");
   }
 
@@ -12306,6 +12298,12 @@ void ConstraintSystem::addContextualConversionConstraint(
     constraintKind = ConstraintKind::Bind;
     break;
 
+  case CTP_ForEachSequence:
+    // Sequence expression associated with `for-in` loop has to conform
+    // to `Sequence` or `AsyncSequence` protocol depending on the context.
+    constraintKind = ConstraintKind::ConformsTo;
+    break;
+
   case CTP_ArrayElement:
   case CTP_AssignSource:
   case CTP_CalleeResult:
@@ -12313,6 +12311,7 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_Condition:
   case CTP_Unused:
   case CTP_YieldByValue:
+  case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_EnumCaseRawValue:
   case CTP_DefaultParameter:
@@ -12584,7 +12583,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                                constraint.getLocator());
 
   case ConstraintKind::Disjunction:
-    // Disjunction constraints are never solved here.
+  case ConstraintKind::Conjunction:
+    // {Dis, Con}junction constraints are never solved here.
     return SolutionKind::Unsolved;
 
   case ConstraintKind::OneWayEqual:
@@ -12597,6 +12597,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::UnresolvedMemberChainBase:
     return simplifyUnresolvedMemberChainBaseConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
+        /*flags=*/None, constraint.getLocator());
+
+  case ConstraintKind::ClosureBodyElement:
+    return simplifyClosureBodyElementConstraint(
+        constraint.getClosureElement(), constraint.getElementContext(),
         /*flags=*/None, constraint.getLocator());
   }
 
