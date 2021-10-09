@@ -826,3 +826,38 @@ bb1(%6 : $(Int, Int)):
 bb2(%13 : @owned $Error):
   throw %13 : $Error
 }
+
+sil @return_tuple_nativeobject : $@convention(thin) () -> (@owned Klass, @owned Klass)
+
+// CHECK-LABEL: sil [ossa] @test_noopt_apply_result_tuple_destructure : $@convention(thin)
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'test_noopt_apply_result_tuple_destructure'
+sil [ossa] @test_noopt_apply_result_tuple_destructure : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @return_tuple_nativeobject : $@convention(thin) () -> (@owned Klass, @owned Klass)
+  %0 = apply %f() : $@convention(thin) () -> (@owned Klass, @owned Klass)
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  %3 = tuple(%1 : $Klass, %2: $Klass)
+  destroy_value %3 : $(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_noopt_apply_result_tuple_destructure_2 : $@convention(thin) () -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'test_noopt_apply_result_tuple_destructure_2'
+sil [ossa] @test_noopt_apply_result_tuple_destructure_2 : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_stack $(Klass, Klass)
+  %f = function_ref @return_tuple_nativeobject : $@convention(thin) () -> (@owned Klass, @owned Klass)
+  %result = apply %f() : $@convention(thin) () -> (@owned Klass, @owned Klass)
+  (%0, %1) = destructure_tuple %result : $(Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Klass, Klass), 0
+  store %0 to [init] %t0 : $*Klass
+  %t1 = tuple_element_addr %alloc : $*(Klass, Klass), 1
+  store %1 to [init] %t1 : $*Klass
+  destroy_addr %alloc : $*(Klass, Klass)
+  dealloc_stack %alloc : $*(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}

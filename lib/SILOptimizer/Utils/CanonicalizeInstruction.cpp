@@ -537,6 +537,12 @@ eliminateRoundTripTupleOfDestructure(TupleInst *tupleInst,
     return nextII;
   }
 
+  // See if the destructure_tuple is from a full apply site. For now we do not
+  // support optimizing such destructures. Instead we are going to wait for
+  // applies to be given multiple results.
+  if (isa<ApplyInst>(dti->getOperand()))
+    return nextII;
+
   // Make sure the types line up.
   if (tupleInst->getType() != dti->getOperand()->getType())
     return nextII;
@@ -634,6 +640,12 @@ canonicalizeAwayTupleEltAddrDestructurePairs(DestructureTupleInst *dti,
   // SILGen. In order to save a little compile time in later phases of the
   // compiler, just bail early if we are not in Raw SIL.
   if (dti->getModule().getStage() != SILStage::Raw)
+    return next;
+
+  // See if the destructure_tuple is from a full apply site. For now we do not
+  // support optimizing such destructures. Instead we are going to wait for
+  // applies to be given multiple results.
+  if (isa<ApplyInst>(dti->getOperand()))
     return next;
 
   auto results = dti->getResults();
