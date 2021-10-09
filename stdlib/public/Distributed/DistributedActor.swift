@@ -75,17 +75,6 @@ public protocol DistributedActor:
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
     nonisolated var id: AnyActorIdentity { get }
-
-
-    /// Executes the passed 'body' only when the distributed actor is local instance.
-    ///
-    /// The `Self` passed to the the body closure is isolated, meaning that the
-    /// closure can be used to call non-distributed functions, or even access actor
-    /// state.
-    ///
-    /// When the actor is remote, the closure won't be executed and this function will return nil.
-    nonisolated func whenLocal<T>(_ body: @Sendable (isolated Self) async throws -> T)
-        async rethrows -> T? where T: Sendable
 }
 
 // ==== Hashable conformance ---------------------------------------------------
@@ -132,14 +121,21 @@ extension DistributedActor {
 @available(SwiftStdlib 5.5, *)
 extension DistributedActor {
 
-    public nonisolated func whenLocal<T>(_ body: @Sendable (isolated Self) async throws -> T)
-        async rethrows -> T? where T: Sendable {
-        if __isLocalActor(self) {
-             return try await body(self)
-        } else {
-            return nil
-        }
+  /// Executes the passed 'body' only when the distributed actor is local instance.
+  ///
+  /// The `Self` passed to the the body closure is isolated, meaning that the
+  /// closure can be used to call non-distributed functions, or even access actor
+  /// state.
+  ///
+  /// When the actor is remote, the closure won't be executed and this function will return nil.
+  public nonisolated func whenLocal<T>(_ body: @Sendable (isolated Self) async throws -> T)
+    async rethrows -> T? where T: Sendable {
+    if __isLocalActor(self) {
+       return try await body(self)
+    } else {
+      return nil
     }
+  }
 }
 
 /******************************************************************************/

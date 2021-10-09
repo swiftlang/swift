@@ -1433,7 +1433,9 @@ namespace {
       if (!var) {
         isPotentiallyIsolated = false;
       } else if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
-        // FIXME(distributed): rdar://84029304 this must be implemented properly
+        // FIXME(distributed): we did a dynamic check and know that this actor is local,
+        //  but we can't express that to the type system; the real implementation
+        //  will have to mark 'self' as "known to be local" after an is-local check.
         isPotentiallyIsolated = true;
       } else if (auto param = dyn_cast<ParamDecl>(var)) {
         isPotentiallyIsolated = param->isIsolated();
