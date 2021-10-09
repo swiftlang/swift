@@ -293,9 +293,12 @@ protected:
   /// This hook is called after either of the top-level visitors:
   /// cloneReachableBlocks or cloneSILFunction.
   ///
-  /// After fixUp, the SIL must be valid and semantically equivalent to the SIL
-  /// before cloning.
-  void fixUp(SILFunction *calleeFunction);
+  /// After `preFixUp` is called `commonFixUp` will be called.
+  void preFixUp(SILFunction *calleeFunction);
+
+  /// After postFixUp, the SIL must be valid and semantically equivalent to the
+  /// SIL before cloning.
+  void postFixUp(SILFunction *calleeFunction);
 
   const SILDebugScope *getOrCreateInlineScope(const SILDebugScope *DS);
 
@@ -602,12 +605,14 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
   visit(BB->getTerminator());
 }
 
-void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
+void SILInlineCloner::preFixUp(SILFunction *calleeFunction) {
   // "Completing" the BeginApply only fixes the end of the apply scope. The
   // begin_apply itself lingers.
   if (BeginApply)
     BeginApply->complete();
+}
 
+void SILInlineCloner::postFixUp(SILFunction *calleeFunction) {
   NextIter = std::next(Apply.getInstruction()->getIterator());
 
   assert(!Apply.getInstruction()->hasUsesOfAnyResult());
