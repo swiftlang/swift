@@ -75,6 +75,8 @@ public:
     return begin()->getRootProtocols();
   }
 
+  bool containsUnresolvedSymbols() const;
+
   void dump(llvm::raw_ostream &out) const;
 
   friend bool operator==(Term lhs, Term rhs) {

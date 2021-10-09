@@ -367,10 +367,13 @@ RequirementMachine *RewriteContext::getRequirementMachine(
   // Store this requirement machine before adding the signature,
   // to catch re-entrant construction via initWithGenericSignature()
   // below.
-  machine = new rewriting::RequirementMachine(*this);
-  machine->initWithGenericSignature(sig);
+  auto *newMachine = new rewriting::RequirementMachine(*this);
+  machine = newMachine;
 
-  return machine;
+  // This might re-entrantly invalidate 'machine', which is a reference
+  // into Protos.
+  newMachine->initWithGenericSignature(sig);
+  return newMachine;
 }
 
 bool RewriteContext::isRecursivelyConstructingRequirementMachine(
@@ -484,14 +487,19 @@ RequirementMachine *RewriteContext::getRequirementMachine(
         llvm::errs() << " " << proto->getName();
       abort();
     }
-  } else {
-    // Construct a requirement machine from the structural requirements of
-    // the given set of protocols.
-    machine = new RequirementMachine(*this);
-    machine->initWithProtocols(component.Protos);
+
+    return machine;
   }
 
-  return machine;
+  // Construct a requirement machine from the structural requirements of
+  // the given set of protocols.
+  auto *newMachine = new RequirementMachine(*this);
+  machine = newMachine;
+
+  // This might re-entrantly invalidate 'machine', which is a reference
+  // into Protos.
+  newMachine->initWithProtocols(component.Protos);
+  return newMachine;
 }
 
 /// We print stats in the destructor, which should get executed at the end of
@@ -520,4 +528,6 @@ RewriteContext::~RewriteContext() {
 
   for (const auto &pair : Components)
     delete pair.second.Machine;
+
+  Components.clear();
 }

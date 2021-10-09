@@ -455,7 +455,8 @@ public:
     // Update this operand bypassing any copies.
     SILValue value = use->get();
     use->set(scope.findDefInBorrowScope(value));
-    ForwardingOperand(use).setOwnershipKind(OwnershipKind::Guaranteed);
+    ForwardingOperand(use).setForwardingOwnershipKind(
+        OwnershipKind::Guaranteed);
     deleteCopyChain(value, scope.getDeleter());
     return true;
   }
@@ -570,7 +571,8 @@ public:
       LLVM_DEBUG(llvm::dbgs() << "  Deleted " << *user);
     } else {
       use->set(scope.findDefInBorrowScope(use->get()));
-      ForwardingOperand(use).setOwnershipKind(OwnershipKind::Guaranteed);
+      ForwardingOperand(use).setForwardingOwnershipKind(
+          OwnershipKind::Guaranteed);
     }
     deleteCopyChain(innerValue, scope.getDeleter());
     return true;
@@ -659,7 +661,7 @@ SILValue RewriteOuterBorrowUses::createOuterValues(SILValue innerValue) {
   scope.getCallbacks().createdNewInst(clone);
   Operand *use = &clone->getOperandRef(0);
   use->set(incomingOuterVal);
-  ForwardingOperand(use).setOwnershipKind(OwnershipKind::Owned);
+  ForwardingOperand(use).setForwardingOwnershipKind(OwnershipKind::Owned);
 
   LLVM_DEBUG(llvm::dbgs() << "  Hoisted forward " << *clone);
 

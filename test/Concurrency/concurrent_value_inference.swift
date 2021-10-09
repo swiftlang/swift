@@ -10,7 +10,7 @@ struct S1 {
   var c: C2
 }
 
-enum E1 { // expected-note{{consider making enum 'E1' conform to the 'Sendable' protocol}}{{9-9=: Sendable }}
+enum E1 { // expected-note {{consider making enum 'E1' conform to the 'Sendable' protocol}}{{9-9=: Sendable}}
   case base
   indirect case nested(E1)
 }
@@ -95,6 +95,14 @@ actor MyGlobalActor {
 class C3 { }
 
 class C4: C3 { }
+
+// Make Sendable unavailable, but be sure not to diagnose it.
+struct S2 {
+  var c1: C1
+}
+
+@available(*, unavailable)
+extension S2: Sendable { }
 
 func testCV(
   c1: C1, c2: C2, c3: C3, c4: C4, s1: S1, e1: E1, e2: E2,

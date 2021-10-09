@@ -473,6 +473,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
+  Opts.CheckAPIAvailabilityOnly |=
+      Args.hasArg(OPT_check_api_availability_only);
 
   if (auto A = Args.getLastArg(OPT_enable_conformance_availability_errors,
                                OPT_disable_conformance_availability_errors)) {
@@ -573,6 +575,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.RequireExplicitSendable |= Args.hasArg(OPT_require_explicit_sendable);
   for (const Arg *A : Args.filtered(OPT_define_availability)) {
     Opts.AvailabilityMacros.push_back(A->getValue());
   }
@@ -914,6 +917,12 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressions |=
       Args.hasArg(OPT_debug_time_expression_type_checking);
+
+  // Checking availability of the API only relies on skipping non-inlinable
+  // function bodies. Define it first so it can be overridden by the other
+  // flags.
+  if (Args.hasArg(OPT_check_api_availability_only))
+    Opts.SkipFunctionBodies = FunctionBodySkipping::NonInlinable;
 
   // Check for SkipFunctionBodies arguments in order from skipping less to
   // skipping more.
