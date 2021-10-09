@@ -2203,8 +2203,13 @@ static CanSILFunctionType getSILFunctionType(
 
   // Lower the capture context parameters, if any.
   if (constant && constant->getAnyFunctionRef()) {
+    // Lower in the context of the closure. Since the set of captures is a
+    // private contract between the closure and its enclosing context, we
+    // don't need to keep its capture types opaque.
     auto expansion = TypeExpansionContext::maximal(
-        expansionContext.getContext(), expansionContext.isWholeModuleContext());
+        constant->getAnyFunctionRef()->getAsDeclContext(), false);
+    // ...unless it's inlinable, in which case it might get inlined into
+    // some place we need to keep opaque types opaque.
     if (constant->isSerialized())
       expansion = TypeExpansionContext::minimal();
     lowerCaptureContextParameters(TC, *constant, genericSig, expansion, inputs);

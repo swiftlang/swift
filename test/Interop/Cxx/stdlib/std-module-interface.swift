@@ -3,13 +3,14 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=std.string -source-filename=x -enable-cxx-interop -tools-directory=%llvm_obj_root/bin -module-cache-path %t | %FileCheck %s  -check-prefix=CHECK-STRING
 
 // Clang driver on Windows doesn't support -stdlib=libc++
-// XFAIL: OS=windows-msvc
+// UNSUPPORTED: OS=windows-msvc
 
-// libstdc++ cannot currently be imported.
-// XFAIL: OS=linux-gnu
+// libstdc++ cannot currently be imported
+// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=linux-androideabi
+// UNSUPPORTED: OS=linux-android
 
-// XFAIL: OS=linux-androideabi
-// XFAIL: OS=linux-android
+// REQUIRES: rdar84036022
 
 // CHECK-STD: import std.iosfwd
 // CHECK-STD: import std.string
