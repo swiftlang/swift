@@ -55,6 +55,12 @@ static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
 
+
+llvm::cl::opt<bool> SILDisableLateOMEByDefault(
+    "sil-disable-late-ome-by-default", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Disable late OME for non-transparent functions by default"));
+
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
 //===----------------------------------------------------------------------===//
@@ -518,6 +524,13 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // not blocked by any other passes' optimizations, so do it early.
   P.addDifferentiabilityWitnessDevirtualizer();
 
+  if (!P.getOptions().EnableOSSAModules && SILDisableLateOMEByDefault) {
+    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+      return;
+
+    P.addNonTransparentFunctionOwnershipModelEliminator();
+  }
+
   // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();
 
@@ -530,18 +543,12 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // optimization.
   P.addGlobalOpt();
 
-  // Strip ownership from non-transparent functions when we are not compiling
-  // the stdlib module. When compiling the stdlib, we eliminate ownership on
-  // these functions later with a nromal call to
-  // P.addNonTransparentFunctionOwnershipModelEliminator().
-  //
-  // This is done so we can push ownership through the pass pipeline first for
-  // the stdlib and then everything else.
-  if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-    return;
+  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
+    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+      return;
 
-  if (!P.getOptions().EnableOSSAModules)
     P.addNonTransparentFunctionOwnershipModelEliminator();
+  }
 
   // Add the outliner pass (Osize).
   P.addOutliner();
