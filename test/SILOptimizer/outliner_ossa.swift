@@ -14,21 +14,21 @@ public class MyGizmo {
      gizmo = Gizmo()
   }
 
-   // CHECK-LABEL: sil @$s8outliner7MyGizmoC11usePropertyyyF :
+   // CHECK-LABEL: sil @$s13outliner_ossa7MyGizmoC11usePropertyyyF :
    // CHECK: [[A_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTeab_
    // CHECK: apply [[A_FUN]]({{.*}}) : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
    // CHECK-NOT: return
    // CHECK: [[P_FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTepb_
    // CHECK: apply [[P_FUN]]({{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
    // CHECK: return
-   // CHECK: } // end sil function '$s8outliner7MyGizmoC11usePropertyyyF'
+   // CHECK: } // end sil function '$s13outliner_ossa7MyGizmoC11usePropertyyyF'
    public func useProperty() {
      print(gizmo.stringProperty)
      print(optionalGizmo!.stringProperty)
    }
 }
 
-// CHECK-LABEL: sil @$s8outliner13testOutliningyyF :
+// CHECK-LABEL: sil @$s13outliner_ossa13testOutliningyyF :
 // CHECK:  [[FUN:%.*]] = function_ref @$sSo5GizmoC14stringPropertySSSgvgToTepb_
 // CHECK:  apply [[FUN]](%{{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
 // CHECK:  apply [[FUN]](%{{.*}}) : $@convention(thin) (Gizmo) -> @owned Optional<String>
@@ -43,7 +43,7 @@ public class MyGizmo {
 // CHECK:  [[FUN:%.*]] = function_ref @$sSo5GizmoC11doSomethingyypSgSaySSGSgFToTembnn_
 // CHECK:  apply [[FUN]]({{.*}}) : $@convention(thin) (@owned Array<String>, Gizmo) -> @owned Optional<AnyObject>
 // CHECK: return
-// CHECK: } // end sil function '$s8outliner13testOutliningyyF'
+// CHECK: } // end sil function '$s13outliner_ossa13testOutliningyyF'
 public func testOutlining() {
   let gizmo = Gizmo()
   let foobar = Gizmo()
@@ -59,12 +59,12 @@ public func testOutlining() {
   gizmo.doSomething(arr)
 }
 
-// CHECK-LABEL: sil @$s8outliner9dontCrash1ayyp_tF : $@convention(thin) (@in_guaranteed Any) -> () {
+// CHECK-LABEL: sil @$s13outliner_ossa9dontCrash1ayyp_tF : $@convention(thin) (@in_guaranteed Any) -> () {
 // CHECK:  [[OBJ:%.*]] = open_existential_ref {{.*}} : $AnyObject to $@opened("{{.*}}") (AnyObject)
 // CHECK:  [[METH:%.*]] = objc_method [[OBJ]] : $@opened("{{.*}}") (AnyObject), #Treeish.treeishChildren!foreign : <Self where Self : Treeish> (Self) -> () -> [Any]?
 // CHECK:  [[RES:%.*]] = apply [[METH]]([[OBJ]]) : $@convention(objc_method)
 // CHECK:  switch_enum [[RES]]
-// CHECK: } // end sil function '$s8outliner9dontCrash1ayyp_tF'
+// CHECK: } // end sil function '$s13outliner_ossa9dontCrash1ayyp_tF'
 
 // CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvgToTeab_ : $@convention(thin) (@in_guaranteed Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $*Gizmo):
