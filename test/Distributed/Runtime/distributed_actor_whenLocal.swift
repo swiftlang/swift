@@ -1,10 +1,16 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
+
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+
+// FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
+// UNSUPPORTED: windows
+
 import _Distributed
 
 distributed actor Capybara {
