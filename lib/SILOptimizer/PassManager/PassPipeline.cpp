@@ -543,13 +543,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // optimization.
   P.addGlobalOpt();
 
-  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
-    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-      return;
-
-    P.addNonTransparentFunctionOwnershipModelEliminator();
-  }
-
   // Add the outliner pass (Osize).
   P.addOutliner();
 
@@ -560,6 +553,13 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // anyway, but for now keep the SerializeSILPass at the later stage of the
   // pipeline in case cross-module-optimization is not enabled.
   P.addCMOSerializeSILPass();
+
+  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
+    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+      return;
+
+    P.addNonTransparentFunctionOwnershipModelEliminator();
+  }
 }
 
 // The "high-level" pipeline serves two purposes:
