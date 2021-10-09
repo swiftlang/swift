@@ -660,8 +660,10 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_WrappedProperty:
     return diag::wrapped_value_mismatch;
 
+  case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
+  case CTP_ForEachSequence:
   case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
   case CTP_CannotFail:
@@ -2320,7 +2322,7 @@ bool ContextualFailure::diagnoseAsError() {
       }
     }
 
-    if (CTP == CTP_ForEachStmt) {
+    if (CTP == CTP_ForEachStmt || CTP == CTP_ForEachSequence) {
       if (fromType->isAnyExistentialType()) {
         emitDiagnostic(diag::type_cannot_conform,
                        /*isExistentialType=*/true, fromType, 
@@ -2469,8 +2471,10 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_ReturnStmt:
     return diag::cannot_convert_to_return_type_nil;
 
+  case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
+  case CTP_ForEachSequence:
   case CTP_YieldByReference:
   case CTP_WrappedProperty:
   case CTP_ComposedPropertyWrapper:
@@ -3211,8 +3215,10 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_WrappedProperty:
     return diag::wrapped_value_mismatch;
 
+  case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
+  case CTP_ForEachSequence:
   case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
   case CTP_CannotFail:
@@ -5444,11 +5450,12 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   }
 
   if (locator->isForSequenceElementType()) {
+    auto purpose = FailureDiagnostic::getContextualTypePurpose(getAnchor());
     // If this is a conversion failure related to binding of `for-each`
     // statement it has to be diagnosed as pattern match if there are
     // holes present in the contextual type.
-    if (FailureDiagnostic::getContextualTypePurpose(getAnchor()) ==
-            ContextualTypePurpose::CTP_ForEachStmt &&
+    if ((purpose == ContextualTypePurpose::CTP_ForEachStmt ||
+         purpose == ContextualTypePurpose::CTP_ForEachSequence) &&
         contextualType->hasUnresolvedType()) {
       diagnostic.emplace(emitDiagnostic(
           (contextualType->is<TupleType>() && !eltType->is<TupleType>())

@@ -1338,6 +1338,8 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::KeyPath:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
+  case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::Conjunction:
     // Constraints from which we can't do anything.
     break;
 

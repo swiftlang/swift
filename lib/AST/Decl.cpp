@@ -1658,18 +1658,23 @@ bool PatternBindingDecl::hasStorage() const {
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
-                                    DeclContext *InitContext) {
+                                    DeclContext *InitContext,
+                                    bool isFullyValidated) {
   auto PatternList = getMutablePatternList();
   PatternList[i].setPattern(P);
   PatternList[i].setInitContext(InitContext);
   
   // Make sure that any VarDecl's contained within the pattern know about this
   // PatternBindingDecl as their parent.
-  if (P)
+  if (P) {
     P->forEachVariable([&](VarDecl *VD) {
       if (!VD->isCaptureList())
         VD->setParentPatternBinding(this);
     });
+
+    if (isFullyValidated)
+      PatternList[i].setFullyValidated();
+  }
 }
 
 

@@ -60,6 +60,7 @@ namespace swift {
   class TypeDecl;
   class TypeRepr;
   class ValueDecl;
+  class CaseLabelItem;
 
   /// We frequently use three tag bits on all of these types.
   constexpr size_t AttrAlignInBits = 3;
@@ -150,6 +151,8 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::TrailingWhereClause,
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::AttributeBase, swift::AttrAlignInBits)
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeRepr, swift::TypeReprAlignInBits)
+
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::CaseLabelItem, swift::PatternAlignInBits);
 
 static_assert(alignof(void*) >= 2, "pointer alignment is too small");
 
