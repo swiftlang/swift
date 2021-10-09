@@ -572,7 +572,6 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 // of callee arguments.
 static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("HighLevel,Function+EarlyLoopOpt");
-  // FIXME: update EagerSpecializer to be a function pass!
   P.addEagerSpecializer();
 
   addFunctionPasses(P, OptimizationLevelKind::HighLevel);
