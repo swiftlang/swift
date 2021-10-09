@@ -568,6 +568,7 @@ ManglingError Remangler::mangleGenericArgs(Node *node, char &Separator,
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
+    case Node::Kind::Static:
       if (!fullSubstitutionMap)
         break;
 
@@ -2116,10 +2117,24 @@ ManglingError Remangler::mangleNominalTypeDescriptor(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleNominalTypeDescriptorRecord(Node *node,
+                                                           unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Hn";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleOpaqueTypeDescriptor(Node *node,
                                                     unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "MQ";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleOpaqueTypeDescriptorRecord(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
+  Buffer << "Ho";
   return ManglingError::Success;
 }
 
@@ -2419,6 +2434,13 @@ ManglingError Remangler::mangleProtocolDescriptor(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleProtocolDescriptorRecord(Node *node,
+                                                        unsigned depth) {
+  RETURN_IF_ERROR(manglePureProtocol(getSingleChild(node), depth + 1));
+  Buffer << "Hr";
+  return ManglingError::Success;
+}
+
 ManglingError
 Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node,
                                                     unsigned depth) {
@@ -2438,6 +2460,14 @@ ManglingError Remangler::mangleProtocolConformanceDescriptor(Node *node,
                                                              unsigned depth) {
   RETURN_IF_ERROR(mangleProtocolConformance(node->getChild(0), depth + 1));
   Buffer << "Mc";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleProtocolConformanceDescriptorRecord(Node *node,
+                                                     unsigned depth) {
+  RETURN_IF_ERROR(mangleProtocolConformance(node->getChild(0), depth + 1));
+  Buffer << "Hc";
   return ManglingError::Success;
 }
 
@@ -3419,6 +3449,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::ModifyAccessor:
     case Node::Kind::UnsafeAddressor:
     case Node::Kind::UnsafeMutableAddressor:
+    case Node::Kind::Static:
       assert(node->getNumChildren() > 0);
       return node->getNumChildren() > 0 && isSpecialized(node->getChild(0));
 
@@ -3455,6 +3486,7 @@ ManglingErrorOr<NodePointer> Demangle::getUnspecialized(Node *node,
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::Static:
       NumToCopy = node->getNumChildren();
       LLVM_FALLTHROUGH;
     case Node::Kind::Structure:

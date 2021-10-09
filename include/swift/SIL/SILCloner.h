@@ -1083,7 +1083,7 @@ void SILCloner<ImplClass>::visitBeginBorrowInst(BeginBorrowInst *Inst) {
 
   recordClonedInstruction(
       Inst, getBuilder().createBeginBorrow(getOpLocation(Inst->getLoc()),
-                                           getOpValue(Inst->getOperand()), 
+                                           getOpValue(Inst->getOperand()),
                                            Inst->isLexical()));
 }
 
@@ -2815,10 +2815,7 @@ SILCloner<ImplClass>::visitSelectValueInst(SelectValueInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createSelectValue(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                getOpType(Inst->getType()), DefaultResult, CaseResults,
-                getBuilder().hasOwnership()
-                    ? Inst->getForwardingOwnershipKind()
-                    : ValueOwnershipKind(OwnershipKind::None)));
+                getOpType(Inst->getType()), DefaultResult, CaseResults));
 }
 
 template <typename ImplClass>

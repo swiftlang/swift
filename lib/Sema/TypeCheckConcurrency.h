@@ -115,10 +115,6 @@ public:
     /// are permitted from elsewhere as a cross-actor reference, but
     /// contexts with unspecified isolation won't diagnose anything.
     GlobalActorUnsafe,
-
-    /// References to declarations that are part of a distributed actor are
-    /// only permitted if they are async.
-    DistributedActorSelf,
   };
 
 private:
@@ -149,8 +145,7 @@ public:
   /// Retrieve the actor type that the declaration is within.
   NominalTypeDecl *getActorType() const {
     assert(kind == ActorSelf || 
-           kind == CrossActorSelf || 
-           kind == DistributedActorSelf);
+           kind == CrossActorSelf);
     return data.actorType;
   }
 
@@ -174,6 +169,7 @@ public:
   /// the current actor or is a cross-actor access.
   static ActorIsolationRestriction forActorSelf(
       NominalTypeDecl *actor, bool isCrossActor) {
+
     ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf,
                                      isCrossActor);
     result.data.actorType = actor;
@@ -184,7 +180,8 @@ public:
   /// the current actor.
   static ActorIsolationRestriction forDistributedActorSelf(
       NominalTypeDecl *actor, bool isCrossActor) {
-    ActorIsolationRestriction result(DistributedActorSelf, isCrossActor);
+    ActorIsolationRestriction result(isCrossActor ? CrossActorSelf : ActorSelf,
+                                     isCrossActor);
     result.data.actorType = actor;
     return result;
   }

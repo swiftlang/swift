@@ -5,11 +5,9 @@
 
 actor SomeActor {}
 
-@available(SwiftStdlib 5.5, *)
 distributed actor DA {}
 // expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
 
-@available(SwiftStdlib 5.5, *)
 distributed actor class DAC {}
 // expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
 // expected-error@-2{{keyword 'class' cannot be used as an identifier here}}
@@ -27,7 +25,6 @@ actor A {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
 distributed actor DA2 {
   // expected-error@-1{{'distributed' modifier is only valid when experimental distributed support is enabled}}
   func normal() async {}

@@ -513,6 +513,64 @@ func getE(_ i: Int) -> E {
   }
 }
 
+func test_labeled_splats() {
+  enum E {
+  case multi(a: String, b: String)
+  case tuple((a: Int, b: Int))
+  case single(result: Int)
+  case single_multi(result: (a: Int, q: String))
+  }
+
+  func test_answer(_: String) -> Int { 42 }
+  func test_question(_: Int) -> String { "ultimate question" }
+
+  let e: E = E.single(result: 42)
+
+  tuplify(true) { _ in
+    switch e {
+    case .single(let result):
+      test_question(result)
+    case let .single_multi(result):
+      test_answer(result.q)
+      test_question(result.a)
+    case let .multi(value): // tuple splat preserves labels
+      test_answer(value.a)
+      test_answer(value.b)
+    case let .tuple(a: a, b: b): // un-splat preserves labels too
+      test_question(a)
+      test_question(b)
+    }
+
+    // compound names still work with and without splat
+    switch e {
+    case .single(_): 42
+    case .single_multi(result: (let a, let q)):
+      test_answer(q)
+      test_question(a)
+    case let .multi(a: a, b: b):
+      test_answer(a)
+      test_answer(b)
+    case let .tuple((a: a, b: b)):
+      test_question(a)
+      test_question(b)
+    }
+
+    // no labels, no problem regardless of splatting
+    switch e {
+    case .single(_): 42
+    case let .single_multi(result: (a, q)):
+      test_question(a)
+      test_answer(q)
+    case let .multi(a, b):
+      test_answer(a)
+      test_answer(b)
+    case let .tuple((a, b)):
+      test_question(a)
+      test_question(b)
+    }
+  }
+}
+
 tuplify(true) { c in
   "testIfLetMatching"
   if let theValue = getOptionalInt(c) {

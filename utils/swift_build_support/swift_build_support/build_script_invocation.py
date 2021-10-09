@@ -396,6 +396,11 @@ class BuildScriptInvocation(object):
                         args.build_jobs)
                 ]
 
+        if args.libswift_mode is not None:
+            impl_args += [
+                "--libswift=%s" % args.libswift_mode,
+            ]
+
         impl_args += args.build_script_impl_args
 
         if args.dry_run:

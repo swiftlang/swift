@@ -1117,7 +1117,7 @@ public:
 
     // Otherwise, we have a statically-dispatched call.
     auto constant = SILDeclRef(e->getDecl());
-    if (e->getDecl()->getAttrs().hasAttribute<DistributedActorAttr>()) {
+    if (callSite && callSite->shouldApplyDistributedThunk()) {
       constant = constant.asDistributed(true);
     } else {
       constant = constant.asForeign(

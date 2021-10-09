@@ -126,8 +126,7 @@ import SubE
 // CHECK: "commandLine": [
 // CHECK-NEXT: "-frontend"
 // CHECK-NEXT: "-only-use-extra-clang-opts"
-// CHECK-NEXT: "-Xcc"
-// CHECK-NEXT: "BUILD_DIR/bin/clang"
+// CHECK-NOT: "BUILD_DIR/bin/clang"
 // CHECK:      "-fsystem-module",
 // CHECK-NEXT: "-emit-pcm",
 // CHECK-NEXT: "-module-name",

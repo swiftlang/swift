@@ -104,6 +104,10 @@ static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
 
+static llvm::cl::opt<bool> EnableExperimentalLexicalLifetimes(
+    "enable-experimental-lexical-lifetimes",
+    llvm::cl::desc("Enable experimental lexical lifetimes."));
+
 static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
                    llvm::cl::desc("Enable experimental distributed actors."));
@@ -420,6 +424,8 @@ int main(int argc, char **argv) {
     EnableExperimentalConcurrency;
   Invocation.getLangOptions().EnableExperimentalDistributed =
     EnableExperimentalDistributed;
+  Invocation.getLangOptions().EnableExperimentalLexicalLifetimes =
+      EnableExperimentalLexicalLifetimes;
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :

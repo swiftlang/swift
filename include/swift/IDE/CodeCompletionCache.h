@@ -42,7 +42,7 @@ public:
     bool ResultsHaveLeadingDot;
     bool ForTestableLookup;
     bool ForPrivateImportLookup;
-    bool CodeCompleteInitsInPostfixExpr;
+    bool AddInitsInToplevel;
     bool Annotated;
 
     friend bool operator==(const Key &LHS, const Key &RHS) {
@@ -52,7 +52,8 @@ public:
         LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot &&
         LHS.ForTestableLookup == RHS.ForTestableLookup &&
         LHS.ForPrivateImportLookup == RHS.ForPrivateImportLookup &&
-        LHS.CodeCompleteInitsInPostfixExpr == RHS.CodeCompleteInitsInPostfixExpr;
+        LHS.AddInitsInToplevel == RHS.AddInitsInToplevel &&
+        LHS.Annotated == RHS.Annotated;
     }
   };
 
@@ -123,6 +124,7 @@ struct DenseMapInfo<swift::ide::CodeCompletionCache::Key> {
     H ^= std::hash<bool>()(Val.ResultsHaveLeadingDot);
     H ^= std::hash<bool>()(Val.ForTestableLookup);
     H ^= std::hash<bool>()(Val.ForPrivateImportLookup);
+    H ^= std::hash<bool>()(Val.AddInitsInToplevel);
     H ^= std::hash<bool>()(Val.Annotated);
     return static_cast<unsigned>(H);
   }

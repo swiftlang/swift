@@ -16,6 +16,8 @@ cmake_minimum_required(VERSION 3.19.6)
 include("${CMAKE_CURRENT_SOURCE_DIR}/../../../cmake/modules/StandaloneOverlay.cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/modules")
 set(SWIFT_STDLIB_STABLE_ABI TRUE)
+set(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME FALSE)
+set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR "dispatch")
 include(AddSwiftStdlib)
 
 # Don't build the libraries for 32-bit iOS targets; there is no back-deployment
@@ -47,7 +49,8 @@ set(swift_concurrency_options
   DARWIN_INSTALL_NAME_DIR "@rpath")
 set(swift_concurrency_extra_sources
   "../BackDeployConcurrency/Exclusivity.cpp"
-  "../BackDeployConcurrency/Metadata.cpp")
+  "../BackDeployConcurrency/Metadata.cpp"
+  "../stubs/SwiftNativeNSObject.mm")
 set(swift_concurrency_async_fp_mode "never")
 
 add_subdirectory(../Concurrency stdlib/public/BackDeployConcurrency)

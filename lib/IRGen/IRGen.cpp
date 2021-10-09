@@ -1105,9 +1105,9 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     } else {
       // Emit protocol conformances into a section we can recognize at runtime.
       // In JIT mode these are manually registered above.
-      IGM.emitSwiftProtocols();
-      IGM.emitProtocolConformances();
-      IGM.emitTypeMetadataRecords();
+      IGM.emitSwiftProtocols(/*asContiguousArray*/ false);
+      IGM.emitProtocolConformances(/*asContiguousArray*/ false);
+      IGM.emitTypeMetadataRecords(/*asContiguousArray*/ false);
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
       irgen.emitEagerClassInitialization();

@@ -4,20 +4,20 @@ public protocol Simple {}
 
 public struct Other : Simple {}
 
-// CHECK:      @"\01l_protocols" = private constant
+// CHECK:      @"$ss6SimpleHr" = private constant
 // CHECK-SAME: @"$ss6SimpleMp"
 // CHECK-SAME: , section "__TEXT, __swift5_protos, regular"
 
-// CHECK:      @"\01l_protocol_conformances" = private constant
+// CHECK:      @"$ss5OtherVs6SimplesHc" = private constant
 // CHECK-SAME: @"$ss5OtherVs6SimplesMc"
 // CHECK-SAME: , section "__TEXT, __swift5_proto, regular"
 
-// CHECK:      @"\01l_type_metadata_table" = private constant
+// CHECK:      @"$ss5OtherVHn" = private constant
 // CHECK-SAME: @"$ss5OtherVMn"
 // CHECK-SAME: , section "__TEXT, __swift5_types, regular"
 
 // CHECK:      @llvm.used = appending global [{{.*}} x i8*] [
-// CHECK-SAME: @"\01l_protocols"
-// CHECK-SAME: @"\01l_protocol_conformances"
-// CHECK-SAME: @"\01l_type_metadata_table"
+// CHECK-SAME: @"$ss6SimpleHr"
+// CHECK-SAME: @"$ss5OtherVs6SimplesHc"
+// CHECK-SAME: @"$ss5OtherVHn"
 // CHECK-SAME: ], section "llvm.metadata"

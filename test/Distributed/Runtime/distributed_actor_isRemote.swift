@@ -8,7 +8,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: rdar78290608
+// FIXME(distributed): remote functions dont seem to work on windows?
+// XFAIL: OS=windows-msvc
 
 import _Distributed
 

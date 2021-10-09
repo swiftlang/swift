@@ -36,7 +36,7 @@ public func setCxxRef() {
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main9setCxxRefyyF"()
-// CHECK: call void @{{_Z15setStaticIntRefRi|"\?setStaticIntRef@@YAXAEAH@Z"}}(i32* {{nonnull %val|%2}})
+// CHECK: call void @{{_Z15setStaticIntRefRi|"\?setStaticIntRef@@YAXAEAH@Z"}}(i32* %{{.*}})
 
 public func setCxxConstRef() {
   var val: CInt = 21
@@ -44,7 +44,7 @@ public func setCxxConstRef() {
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main14setCxxConstRefyyF"()
-// CHECK: call void @{{_Z20setConstStaticIntRefRKi|"\?setConstStaticIntRef@@YAXAEBH@Z"}}(i32* {{nonnull %val|%2}})
+// CHECK: call void @{{_Z20setConstStaticIntRefRKi|"\?setConstStaticIntRef@@YAXAEBH@Z"}}(i32* %{{.*}})
 
 public func setCxxRvalueRef() {
   var val: CInt = 21
@@ -52,7 +52,7 @@ public func setCxxRvalueRef() {
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main15setCxxRvalueRefyyF"()
-// CHECK: call void @{{_Z21setStaticIntRvalueRefOi|"\?setStaticIntRvalueRef@@YAX\$\$QEAH@Z"}}(i32* {{nonnull %val|%2}})
+// CHECK: call void @{{_Z21setStaticIntRvalueRefOi|"\?setStaticIntRvalueRef@@YAX\$\$QEAH@Z"}}(i32* %{{.*}})
 
 public func setCxxConstRvalueRef() {
   var val: CInt = 21
@@ -60,4 +60,4 @@ public func setCxxConstRvalueRef() {
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main20setCxxConstRvalueRefyyF"()
-// CHECK: call void @{{_Z26setConstStaticIntRvalueRefOKi|"\?setConstStaticIntRvalueRef@@YAX\$\$QEBH@Z"}}(i32* {{nonnull %val|%2}})
+// CHECK: call void @{{_Z26setConstStaticIntRvalueRefOKi|"\?setConstStaticIntRvalueRef@@YAX\$\$QEBH@Z"}}(i32* %{{.*}})

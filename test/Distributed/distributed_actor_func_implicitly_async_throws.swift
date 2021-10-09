@@ -48,12 +48,12 @@ func test_outside(distributed: D) async throws {
 
   distributed.distHelloAsync()// expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
-  // expected-note@-2{{calls to instance method 'distHelloAsync()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{call is 'async'}}
   // expected-note@-3{{did you mean to use 'try'?}}
   // expected-note@-4{{did you mean to disable error propagation?}}
   // expected-note@-5{{did you mean to handle error as optional value?}}
   try distributed.distHelloAsync() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to instance method 'distHelloAsync()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1{{call is 'async'}}
   await distributed.distHelloAsync() // expected-error{{call can throw but is not marked with 'try'}}
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to disable error propagation?}}
@@ -76,12 +76,12 @@ func test_outside(distributed: D) async throws {
 
   distributed.distHelloAsyncThrows() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}
-  // expected-note@-2{{calls to instance method 'distHelloAsyncThrows()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{call is 'async'}}
   // expected-note@-3{{did you mean to use 'try'?}}
   // expected-note@-4{{did you mean to disable error propagation?}}
   // expected-note@-5{{did you mean to handle error as optional value?}}
   try distributed.distHelloAsyncThrows() // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to instance method 'distHelloAsyncThrows()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-1{{call is 'async'}}
   await distributed.distHelloAsyncThrows() // expected-error{{call can throw but is not marked with 'try'}}
   // expected-note@-1{{did you mean to use 'try'?}}
   // expected-note@-2{{did you mean to disable error propagation?}}

@@ -3105,7 +3105,7 @@ The ``dynamic_lifetime`` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time.
 This is the case, e.g. for conditionally initialized objects.
 
-The optional ``lexical`` attribute specifies that the operand corresponds to a
+The optional ``lexical`` attribute specifies that the storage corresponds to a
 local variable in the Swift source.
 
 The memory is not retainable. To allocate a retainable box for a value
@@ -3842,7 +3842,7 @@ mark_function_escape
 
   sil-instruction ::= 'mark_function_escape' sil-operand (',' sil-operand)
 
-  %2 = mark_function_escape %1 : $*T
+  mark_function_escape %1 : $*T
 
 Indicates that a function definition closes over a symbolic memory location.
 This instruction is variadic, and all of its operands must be addresses.

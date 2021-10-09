@@ -161,6 +161,8 @@ public:
           std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
           bool isFramework);
 
+  bool isRequiredOSSAModules() const;
+
   /// Check whether the module with a given name can be imported without
   /// importing it.
   ///

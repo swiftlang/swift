@@ -77,7 +77,7 @@
 /// Each object's property or its tail storage is separately accessed.
 ///
 /// In addition to the free-standing functions, the AccessBase and
-/// AccessStorage classes encapsulte the identity of an access. They can be
+/// AccessStorage classes encapsulate the identity of an access. They can be
 /// used to:
 /// - directly compare and hash access identities
 /// - exhaustively switch over the kinds of accesses

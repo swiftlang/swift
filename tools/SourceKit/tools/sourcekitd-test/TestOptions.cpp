@@ -274,6 +274,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ModuleGroupName = InputArg->getValue();
       break;
 
+    case OPT_id:
+      RequestId = InputArg->getValue();
+      break;
+
     case OPT_interested_usr:
       InterestedUSR = InputArg->getValue();
       break;
@@ -416,8 +420,21 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       ModuleCachePath = InputArg->getValue();
       break;
 
+    case OPT_simulate_long_request:
+      unsigned SimulatedDuration;
+      if (StringRef(InputArg->getValue()).getAsInteger(10, SimulatedDuration)) {
+        llvm::errs() << "error: expected integer for 'simulate-long-request'\n";
+        return true;
+      }
+      SimulateLongRequest = SimulatedDuration;
+      break;
+
     case OPT_shell:
       ShellExecution = true;
+      break;
+
+    case OPT_cancel:
+      CancelRequest = InputArg->getValue();
       break;
 
     case OPT_disable_implicit_concurrency_module_import:

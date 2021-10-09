@@ -265,6 +265,8 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     }
     if (ShouldSerializeDeps)
       SerializationOpts.Dependencies = Deps;
+    SerializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
+
     SILMod->setSerializeSILAction([&]() {
       if (isTypeChecking)
         return;

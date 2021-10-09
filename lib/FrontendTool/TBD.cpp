@@ -76,6 +76,7 @@ static bool validateSymbols(DiagnosticEngine &diags,
     // symbol table, so make sure to mangle IRGen names before comparing them
     // with what TBDGen created.
     auto unmangledName = nameValue.getKey();
+
     SmallString<128> name;
     llvm::Mangler::getNameWithPrefix(name, unmangledName,
                                      IRModule.getDataLayout());

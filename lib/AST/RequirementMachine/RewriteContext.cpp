@@ -13,6 +13,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "ProtocolGraph.h"
+#include "RequirementMachine.h"
 #include "RewriteSystem.h"
 #include "RewriteContext.h"
 
@@ -34,6 +35,7 @@ static DebugOptions parseDebugFlags(StringRef debugFlags) {
       .Case("concrete-unification", DebugFlags::ConcreteUnification)
       .Case("concretize-nested-types", DebugFlags::ConcretizeNestedTypes)
       .Case("homotopy-reduction", DebugFlags::HomotopyReduction)
+      .Case("generating-conformances", DebugFlags::GeneratingConformances)
       .Default(None);
     if (!flag) {
       llvm::errs() << "Unknown debug flag in -debug-requirement-machine "
@@ -346,6 +348,37 @@ Type RewriteContext::getRelativeTypeForTerm(
       { }, protos, *this);
 }
 
+RequirementMachine *RewriteContext::getRequirementMachine(
+    CanGenericSignature sig) {
+  auto &machine = Machines[sig];
+  if (machine) {
+    if (!machine->isComplete()) {
+      llvm::errs() << "Re-entrant construction of requirement "
+                   << "machine for " << sig << "\n";
+      abort();
+    }
+
+    return machine;
+  }
+
+  // Store this requirement machine before adding the signature,
+  // to catch re-entrant construction via initWithGenericSignature()
+  // below.
+  machine = new rewriting::RequirementMachine(*this);
+  machine->initWithGenericSignature(sig);
+
+  return machine;
+}
+
+bool RewriteContext::isRecursivelyConstructingRequirementMachine(
+    CanGenericSignature sig) {
+  auto found = Machines.find(sig);
+  if (found == Machines.end())
+    return false;
+
+  return !found->second->isComplete();
+}
+
 /// We print stats in the destructor, which should get executed at the end of
 /// a compilation job.
 RewriteContext::~RewriteContext() {
@@ -364,4 +397,9 @@ RewriteContext::~RewriteContext() {
     llvm::dbgs() << "\n* Property trie root fanout:\n";
     PropertyTrieRootHistogram.dump(llvm::dbgs());
   }
+
+  for (const auto &pair : Machines)
+    delete pair.second;
+
+  Machines.clear();
 }

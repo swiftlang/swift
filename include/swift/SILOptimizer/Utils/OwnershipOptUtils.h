@@ -34,9 +34,6 @@ inline bool requiresOSSACleanup(SILValue v) {
     && v.getOwnershipKind() != OwnershipKind::Unowned;
 }
 
-// Defined in BasicBlockUtils.h
-struct JointPostDominanceSetComputer;
-
 /// Given a new phi that may use a guaranteed value, create nested borrow scopes
 /// for its incoming operands and end_borrows that cover the phi's extended
 /// borrow scope, which transitively includes any phis that use this phi.

@@ -252,6 +252,8 @@ public:
   std::string mangleTypeForTypeName(Type type);
 
   std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl);
+
+  std::string mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl);
   
   std::string mangleDeclType(const ValueDecl *decl);
   
