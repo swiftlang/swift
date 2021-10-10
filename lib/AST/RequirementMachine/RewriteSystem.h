@@ -379,6 +379,9 @@ class RewriteSystem final {
   /// Whether we've minimized the rewrite system.
   unsigned Minimized : 1;
 
+  /// If set, record homotopy generators in the completion procedure.
+  unsigned RecordHomotopyGenerators : 1;
+
 public:
   explicit RewriteSystem(RewriteContext &ctx);
   ~RewriteSystem();
@@ -394,7 +397,8 @@ public:
   /// Return the object recording information about known protocols.
   const ProtocolGraph &getProtocols() const { return Protos; }
 
-  void initialize(std::vector<std::pair<MutableTerm, MutableTerm>> &&assocaitedTypeRules,
+  void initialize(bool recordHomotopyGenerators,
+                  std::vector<std::pair<MutableTerm, MutableTerm>> &&assocaitedTypeRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
                   ProtocolGraph &&protos);
 
@@ -452,6 +456,21 @@ public:
   void verifyRewriteRules(ValidityPolicy policy) const;
 
 private:
+  void recordHomotopyGenerator(HomotopyGenerator loop) {
+    if (!RecordHomotopyGenerators)
+      return;
+
+    HomotopyGenerators.push_back(loop);
+  }
+
+  void recordHomotopyGenerator(MutableTerm basepoint,
+                               RewritePath path) {
+    if (!RecordHomotopyGenerators)
+      return;
+
+    HomotopyGenerators.emplace_back(basepoint, path);
+  }
+
   bool
   computeCriticalPair(
       ArrayRef<Symbol>::const_iterator from,
