@@ -243,8 +243,20 @@ void RewriteSystemBuilder::processProtocolDependencies() {
     for (auto *assocType : info.InheritedAssociatedTypes)
       addAssociatedType(assocType, proto);
 
-    for (auto req : info.Requirements)
-      addRequirement(req.getCanonical(), proto);
+    // If this protocol is part of the initial connected component, we're
+    // building requirement signatures for all protocols in this component,
+    // and so we must start with the structural requirements.
+    //
+    // Otherwise, we should either already have a requirement signature, or
+    // we can trigger the computation of the requirement signatures of the
+    // next component recursively.
+    if (info.InitialComponent) {
+      for (auto req : proto->getStructuralRequirements())
+        addRequirement(req.req.getCanonical(), proto);
+    } else {
+      for (auto req : proto->getRequirementSignature())
+        addRequirement(req.getCanonical(), proto);
+    }
 
     if (Dump) {
       llvm::dbgs() << "}\n";
@@ -397,7 +409,8 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 
   // Add the initial set of rewrite rules to the rewrite system, also
   // providing the protocol graph to use for the linear order on terms.
-  System.initialize(std::move(builder.AssociatedTypeRules),
+  System.initialize(/*recordHomotopyGenerators=*/false,
+                    std::move(builder.AssociatedTypeRules),
                     std::move(builder.RequirementRules),
                     std::move(builder.Protocols));
 
@@ -438,7 +451,8 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
 
   // Add the initial set of rewrite rules to the rewrite system, also
   // providing the protocol graph to use for the linear order on terms.
-  System.initialize(std::move(builder.AssociatedTypeRules),
+  System.initialize(/*recordHomotopyGenerators=*/true,
+                    std::move(builder.AssociatedTypeRules),
                     std::move(builder.RequirementRules),
                     std::move(builder.Protocols));
 
@@ -521,109 +535,4 @@ void RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy)
 
 bool RequirementMachine::isComplete() const {
   return Complete;
-}
-
-/// Convert a list of non-permanent, non-redundant rewrite rules into a minimal
-/// protocol requirement signature for \p proto. The requirements are sorted in
-/// canonical order, and same-type requirements are canonicalized.
-std::vector<Requirement>
-RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
-                                              const ProtocolDecl *proto) const {
-  std::vector<Requirement> reqs;
-  llvm::SmallDenseMap<TypeBase *, llvm::SmallVector<Type, 2>> sameTypeReqs;
-
-  auto genericParams = proto->getGenericSignature().getGenericParams();
-
-  // Convert a rewrite rule into a requirement.
-  auto createRequirementFromRule = [&](const Rule &rule) {
-    if (auto prop = rule.isPropertyRule()) {
-      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
-                                                System.getProtocols());
-
-      switch (prop->getKind()) {
-      case Symbol::Kind::Protocol:
-        reqs.emplace_back(RequirementKind::Conformance,
-                          subjectType,
-                          prop->getProtocol()->getDeclaredInterfaceType());
-        return;
-
-      case Symbol::Kind::Layout:
-      case Symbol::Kind::ConcreteType:
-      case Symbol::Kind::Superclass:
-        // FIXME
-        return;
-
-      case Symbol::Kind::Name:
-      case Symbol::Kind::AssociatedType:
-      case Symbol::Kind::GenericParam:
-        break;
-      }
-
-      llvm_unreachable("Invalid symbol kind");
-    } else if (rule.getLHS().back().getKind() != Symbol::Kind::Protocol) {
-      auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams,
-                                                   System.getProtocols());
-      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
-                                                System.getProtocols());
-
-      sameTypeReqs[subjectType.getPointer()].push_back(constraintType);
-    }
-  };
-
-  // Build the list of requirements, storing same-type requirements off
-  // to the side.
-  for (unsigned ruleID : rules) {
-    const auto &rule = System.getRule(ruleID);
-    createRequirementFromRule(rule);
-  }
-
-  // A set of rewrite rules of the form:
-  //
-  //   B => A
-  //   C => A
-  //   D => A
-  //
-  // Become a series of same-type requirements
-  //
-  //   A == B, B == C, C == D
-  //
-  for (auto &pair : sameTypeReqs) {
-    std::sort(pair.second.begin(), pair.second.end(),
-              [](Type first, Type second) -> bool {
-                return compareDependentTypes(first, second) < 0;
-              });
-
-    Type subjectType(pair.first);
-    for (auto constraintType : pair.second) {
-      reqs.emplace_back(RequirementKind::SameType, subjectType, constraintType);
-      subjectType = constraintType;
-    }
-  }
-
-  // Sort the requirements in canonical order.
-  std::sort(reqs.begin(), reqs.end(),
-            [](const Requirement &lhs, const Requirement &rhs) -> bool {
-              return lhs.compare(rhs) < 0;
-            });
-
-  return reqs;
-}
-
-/// Builds the requirement signatures for each protocol in this strongly
-/// connected component.
-llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>>
-RequirementMachine::computeMinimalRequirements() {
-  assert(Protos.size() > 0);
-  System.minimizeRewriteSystem();
-
-  auto rules = System.getMinimizedRules(Protos);
-
-  // Note that we build 'result' by iterating over 'Protos' rather than
-  // 'rules'; this is intentional, so that even if a protocol has no
-  // rules, we still end up creating an entry for it in 'result'.
-  llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>> result;
-  for (const auto *proto : Protos)
-    result[proto] = buildRequirementSignature(rules[proto], proto);
-
-  return result;
 }

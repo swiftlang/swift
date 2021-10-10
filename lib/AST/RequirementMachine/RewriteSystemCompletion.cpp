@@ -291,6 +291,10 @@ void RewriteSystem::processMergedAssociatedTypes() {
 /// If so, record this rule for later. We'll try to merge the associated
 /// types in RewriteSystem::processMergedAssociatedTypes().
 void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
+  // FIXME: Figure out 3-cell representation for merged associated types
+  if (RecordHomotopyGenerators)
+    return;
+
   if (lhs.size() == rhs.size() &&
       std::equal(lhs.begin(), lhs.end() - 1, rhs.begin()) &&
       lhs.back().getKind() == Symbol::Kind::AssociatedType &&
@@ -581,7 +585,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
               llvm::dbgs() << "\n\n";
 
               // Record the trivial loop.
-              HomotopyGenerators.push_back(loop);
+              recordHomotopyGenerator(loop);
             }
           }
         });

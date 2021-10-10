@@ -751,7 +751,7 @@ void RewriteSystem::performHomotopyReduction(
                                       redundantConformances,
                                       replacementPath);
 
-    // If there no redundant rules remain in this pass, stop.
+    // If no redundant rules remain which can be eliminated by this pass, stop.
     if (!optRuleID)
       return;
 

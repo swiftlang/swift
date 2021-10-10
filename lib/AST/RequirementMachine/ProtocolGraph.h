@@ -42,8 +42,8 @@ struct ProtocolInfo {
   /// ProtocolGraph::computeInheritedAssociatedTypes().
   llvm::TinyPtrVector<AssociatedTypeDecl *> InheritedAssociatedTypes;
 
-  /// The protocol's requirement signature.
-  ArrayRef<Requirement> Requirements;
+  /// The protocol's dependencies.
+  ArrayRef<ProtocolDecl *> Dependencies;
 
   /// Used by ProtocolGraph::computeProtocolDepth() to detect circularity.
   unsigned Mark : 1;
@@ -55,27 +55,34 @@ struct ProtocolInfo {
 
   /// Index of the protocol in the linear order. Computed by
   /// ProtocolGraph::computeLinearOrder().
-  unsigned Index : 32;
+  unsigned Index : 31;
+
+  /// When building a protocol requirement signature, the initial set of
+  /// protocols are marked with this bit.
+  unsigned InitialComponent : 1;
 
   ProtocolInfo() {
     Mark = 0;
     Depth = 0;
     Index = 0;
+    InitialComponent = 0;
   }
 
   ProtocolInfo(ArrayRef<ProtocolDecl *> inherited,
                ArrayRef<AssociatedTypeDecl *> &&types,
-               ArrayRef<Requirement> reqs)
+               ArrayRef<ProtocolDecl *> deps,
+               bool initialComponent)
     : Inherited(inherited),
       AssociatedTypes(types),
-      Requirements(reqs) {
+      Dependencies(deps) {
     Mark = 0;
     Depth = 0;
     Index = 0;
+    InitialComponent = initialComponent;
   }
 };
 
-/// Stores cached information about all protocols transtively
+/// Stores cached information about all protocols transitively
 /// referenced from a set of generic requirements.
 ///
 /// Out-of-line methods are documented in ProtocolGraph.cpp.
@@ -101,7 +108,8 @@ public:
       const ProtocolDecl *proto) const;
 
 private:
-  void addProtocol(const ProtocolDecl *proto);
+  void addProtocol(const ProtocolDecl *proto,
+                   bool initialComponent);
   void computeTransitiveClosure();
   void computeLinearOrder();
   void computeInheritedAssociatedTypes();
