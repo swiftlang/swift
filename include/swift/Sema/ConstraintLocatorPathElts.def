@@ -217,6 +217,9 @@ CUSTOM_LOCATOR_PATH_ELT(PlaceholderType)
 /// The implicit conversion applied at a given location.
 CUSTOM_LOCATOR_PATH_ELT(ImplicitConversion)
 
+/// The element of the closure body e.g. statement, declaration, or expression.
+CUSTOM_LOCATOR_PATH_ELT(ClosureBodyElement)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT

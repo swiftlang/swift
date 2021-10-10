@@ -1,0 +1,217 @@
+// RUN: %empty-directory(%t.tmp)
+// mkdir %t.tmp/module-cache && mkdir %t.tmp/dummy.sdk
+// RUN: %api-digester -diagnose-sdk -module _Concurrency -o %t.tmp/changes.txt -module-cache-path %t.tmp/module-cache -sdk %t.tmp/dummy.sdk -abi -avoid-location
+// RUN: %clang -E -P -x c %S/stability-concurrency-abi.test -o - > %t.tmp/stability-concurrency-abi.swift.expected
+// RUN: %clang -E -P -x c %t.tmp/stability-concurrency-abi.swift.expected -o - | sed '/^\s*$/d' | sort > %t.tmp/stability-concurrency-abi.swift.expected.sorted
+// RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed -E -e '/^\s*$/d' -e 's/ in _[0-9A-F]{32}/ in #UNSTABLE ID#/g' | sort > %t.tmp/changes.txt.tmp
+// RUN: diff -u %t.tmp/stability-concurrency-abi.swift.expected.sorted %t.tmp/changes.txt.tmp
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
+
+// Welcome, Build Wrangler!
+//
+// This file lists APIs that are unique to stdlib builds with assertions.
+// (It is combined with the stability-stdlib-abi-without-asserts.test file
+// to generate a full list of potentially breaking API changes. In most cases
+// you'll want to edit that file instead of this one.)
+//
+// A failure in this test indicates that there is a potential breaking change in
+// the Standard Library. If you observe a failure outside of a PR test, please
+// reach out to the Standard Library team directly to make sure this gets
+// resolved quickly! If your own PR fails in this test, you probably have an
+// ABI- or source-breaking change in your commits. Please go and fix it.
+//
+// Please DO NOT DISABLE THIS TEST. In addition to ignoring the current set of
+// ABI breaks, XFAILing this test also silences any future ABI breaks that may
+// land on this branch, which simply generates extra work for the next person
+// that picks up the mess.
+//
+// Instead of disabling this test, consider extending the list of expected
+// changes at the bottom. (You'll also need to do this if your own PR triggers
+// false positives, or if you have special permission to break things.) You can
+// find a diff of what needs to be added in the output of the failed test run.
+// The order of lines doesn't matter, and you can also include comments to refer
+// to any bugs you filed. Remember that in almost all cases you'll want to edit
+// the stability-stdlib-abi-without-asserts.test file instead of this one.
+//
+// Thank you for your help ensuring the stdlib remains compatible with its past!
+//                                            -- Your friendly stdlib engineers
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+
+// SR-13362
+// We currently only have a baseline for Intel CPUs on macOS.
+// REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
+// REQUIRES: concurrency
+
+// The digester can incorrectly register a generic signature change when
+// declarations are shuffled. rdar://problem/46618883
+// UNSUPPORTED: swift_evolve
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+Accessor Task._task.Get() has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Success : Swift.Sendable, Failure : Swift.Error>
+Accessor Task.hashValue.Get() has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Success : Swift.Sendable, Failure : Swift.Error>
+Accessor Task.isCancelled.Get() has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Success : Swift.Sendable, Failure : Swift.Error>
+Accessor Task.result.Get() has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Success : Swift.Sendable, Failure : Swift.Error>
+Accessor Task.value.Get() has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Success : Swift.Sendable, Failure : Swift.Error>
+Accessor Task.value.Get() has generic signature change from <Success, Failure where Failure == Swift.Never> to <Success, Failure where Success : Swift.Sendable, Failure == Swift.Never>
+Accessor TaskGroup.Iterator.finished.Get() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Accessor TaskGroup.Iterator.finished.Modify() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Accessor TaskGroup.Iterator.finished.Set() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Accessor TaskGroup.Iterator.group.Get() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Accessor TaskGroup.Iterator.group.Modify() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Accessor TaskGroup.Iterator.group.Set() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Accessor TaskGroup._group.Get() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Accessor TaskGroup.isCancelled.Get() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Accessor TaskGroup.isEmpty.Get() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Accessor TaskLocal.description.Get() has generic signature change from <Value> to <Value where Value : Swift.Sendable>
+Accessor TaskLocal.projectedValue.Get() has generic signature change from <Value> to <Value where Value : Swift.Sendable>
+Accessor TaskLocal.wrappedValue.Get() has generic signature change from <Value> to <Value where Value : Swift.Sendable>
+Accessor ThrowingTaskGroup.Iterator.finished.Get() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Accessor ThrowingTaskGroup.Iterator.finished.Modify() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Accessor ThrowingTaskGroup.Iterator.finished.Set() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Accessor ThrowingTaskGroup.Iterator.group.Get() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Accessor ThrowingTaskGroup.Iterator.group.Modify() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Accessor ThrowingTaskGroup.Iterator.group.Set() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Accessor ThrowingTaskGroup._group.Get() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Accessor ThrowingTaskGroup.isCancelled.Get() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Accessor ThrowingTaskGroup.isEmpty.Get() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Class TaskLocal has generic signature change from <Value> to <Value where Value : Swift.Sendable>
+Class TaskLocal has removed conformance to UnsafeSendable
+Constructor TaskGroup.init(group:) has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Constructor TaskLocal.init(wrappedValue:) has generic signature change from <Value> to <Value where Value : Swift.Sendable>
+Constructor ThrowingTaskGroup.init(group:) has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Func MainActor.run(resultType:body:) has generic signature change from <T> to <T where T : Swift.Sendable>
+Func MainActor.run(resultType:body:) has mangled name changing from 'static Swift.MainActor.run<A>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A' to 'static Swift.MainActor.run<A where A: Swift.Sendable>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A'
+Func Task.==(_:_:) has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Success : Swift.Sendable, Failure : Swift.Error>
+Func Task.cancel() has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Success : Swift.Sendable, Failure : Swift.Error>
+Func Task.hash(into:) has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Success : Swift.Sendable, Failure : Swift.Error>
+Func TaskGroup.Iterator.cancel() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Func TaskGroup.Iterator.next() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Func TaskGroup.awaitAllRemainingTasks() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Func TaskGroup.cancelAll() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Func TaskGroup.makeAsyncIterator() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Func TaskGroup.next() has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Func TaskLocal.get() has generic signature change from <Value> to <Value where Value : Swift.Sendable>
+Func TaskLocal.withValue(_:operation:file:line:) has generic signature change from <Value, R> to <Value, R where Value : Swift.Sendable>
+Func ThrowingTaskGroup.Iterator.cancel() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Func ThrowingTaskGroup.Iterator.next() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Func ThrowingTaskGroup._waitForAll() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Func ThrowingTaskGroup.awaitAllRemainingTasks() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Func ThrowingTaskGroup.cancelAll() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Func ThrowingTaskGroup.makeAsyncIterator() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Func ThrowingTaskGroup.next() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Func ThrowingTaskGroup.nextResult() has been renamed to Func nextResultForABI()
+Func ThrowingTaskGroup.nextResult() has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Func ThrowingTaskGroup.nextResult() has mangled name changing from 'Swift.ThrowingTaskGroup.nextResult() async throws -> Swift.Optional<Swift.Result<A, B>>' to 'Swift.ThrowingTaskGroup.nextResultForABI() async throws -> Swift.Optional<Swift.Result<A, B>>'
+Func _asyncMainDrainQueue() has been removed
+Func withTaskGroup(of:returning:body:) has generic signature change from <ChildTaskResult, GroupResult> to <ChildTaskResult, GroupResult where ChildTaskResult : Swift.Sendable>
+Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
+Func withThrowingTaskGroup(of:returning:body:) has generic signature change from <ChildTaskResult, GroupResult> to <ChildTaskResult, GroupResult where ChildTaskResult : Swift.Sendable>
+Func withThrowingTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withThrowingTaskGroup<A, B>(of: A.Type, returning: B.Type, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B' to '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B'
+Import Swift has been renamed to Import _SwiftConcurrencyShims
+Struct AsyncCompactMapSequence is now with @frozen
+Struct AsyncCompactMapSequence.Iterator is now with @frozen
+Struct AsyncDropFirstSequence is now with @frozen
+Struct AsyncDropFirstSequence.Iterator is now with @frozen
+Struct AsyncDropWhileSequence is now with @frozen
+Struct AsyncDropWhileSequence.Iterator is now with @frozen
+Struct AsyncFilterSequence is now with @frozen
+Struct AsyncFilterSequence.Iterator is now with @frozen
+Struct AsyncFlatMapSequence is now with @frozen
+Struct AsyncFlatMapSequence.Iterator is now with @frozen
+Struct AsyncMapSequence is now with @frozen
+Struct AsyncMapSequence.Iterator is now with @frozen
+Struct AsyncPrefixSequence is now with @frozen
+Struct AsyncPrefixSequence.Iterator is now with @frozen
+Struct AsyncPrefixWhileSequence is now with @frozen
+Struct AsyncPrefixWhileSequence.Iterator is now with @frozen
+Struct AsyncThrowingCompactMapSequence is now with @frozen
+Struct AsyncThrowingCompactMapSequence.Iterator is now with @frozen
+Struct AsyncThrowingDropWhileSequence is now with @frozen
+Struct AsyncThrowingDropWhileSequence.Iterator is now with @frozen
+Struct AsyncThrowingFilterSequence is now with @frozen
+Struct AsyncThrowingFilterSequence.Iterator is now with @frozen
+Struct AsyncThrowingFlatMapSequence is now with @frozen
+Struct AsyncThrowingFlatMapSequence.Iterator is now with @frozen
+Struct AsyncThrowingMapSequence is now with @frozen
+Struct AsyncThrowingMapSequence.Iterator is now with @frozen
+Struct AsyncThrowingPrefixWhileSequence is now with @frozen
+Struct AsyncThrowingPrefixWhileSequence.Iterator is now with @frozen
+Struct Task has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Success : Swift.Sendable, Failure : Swift.Error>
+Struct TaskGroup has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Struct TaskGroup.Iterator has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
+Struct ThrowingTaskGroup has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Struct ThrowingTaskGroup.Iterator has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
+Struct YieldingContinuation has been removed (deprecated)
+Subscript TaskLocal.subscript(_enclosingInstance:wrapped:storage:) has been removed
+Var AsyncCompactMapSequence.Iterator.baseIterator is now a stored property
+Var AsyncCompactMapSequence.Iterator.transform is now a stored property
+Var AsyncCompactMapSequence.base is now a stored property
+Var AsyncCompactMapSequence.transform is now a stored property
+Var AsyncDropFirstSequence.Iterator.baseIterator is now a stored property
+Var AsyncDropFirstSequence.Iterator.count is now a stored property
+Var AsyncDropFirstSequence.base is now a stored property
+Var AsyncDropFirstSequence.count is now a stored property
+Var AsyncDropWhileSequence.Iterator.baseIterator is now a stored property
+Var AsyncDropWhileSequence.Iterator.predicate is now a stored property
+Var AsyncDropWhileSequence.base is now a stored property
+Var AsyncDropWhileSequence.predicate is now a stored property
+Var AsyncFilterSequence.Iterator.baseIterator is now a stored property
+Var AsyncFilterSequence.Iterator.isIncluded is now a stored property
+Var AsyncFilterSequence.base is now a stored property
+Var AsyncFilterSequence.isIncluded is now a stored property
+Var AsyncFlatMapSequence.Iterator.baseIterator is now a stored property
+Var AsyncFlatMapSequence.Iterator.currentIterator is now a stored property
+Var AsyncFlatMapSequence.Iterator.finished is now a stored property
+Var AsyncFlatMapSequence.Iterator.transform is now a stored property
+Var AsyncFlatMapSequence.base is now a stored property
+Var AsyncFlatMapSequence.transform is now a stored property
+Var AsyncMapSequence.Iterator.baseIterator is now a stored property
+Var AsyncMapSequence.Iterator.transform is now a stored property
+Var AsyncMapSequence.base is now a stored property
+Var AsyncMapSequence.transform is now a stored property
+Var AsyncPrefixSequence.Iterator.baseIterator is now a stored property
+Var AsyncPrefixSequence.Iterator.remaining is now a stored property
+Var AsyncPrefixSequence.base is now a stored property
+Var AsyncPrefixSequence.count is now a stored property
+Var AsyncPrefixWhileSequence.Iterator.baseIterator is now a stored property
+Var AsyncPrefixWhileSequence.Iterator.predicate is now a stored property
+Var AsyncPrefixWhileSequence.Iterator.predicateHasFailed is now a stored property
+Var AsyncPrefixWhileSequence.base is now a stored property
+Var AsyncPrefixWhileSequence.predicate is now a stored property
+Var AsyncThrowingCompactMapSequence.Iterator.baseIterator is now a stored property
+Var AsyncThrowingCompactMapSequence.Iterator.finished is now a stored property
+Var AsyncThrowingCompactMapSequence.Iterator.transform is now a stored property
+Var AsyncThrowingCompactMapSequence.base is now a stored property
+Var AsyncThrowingCompactMapSequence.transform is now a stored property
+Var AsyncThrowingDropWhileSequence.Iterator.baseIterator is now a stored property
+Var AsyncThrowingDropWhileSequence.Iterator.doneDropping is now a stored property
+Var AsyncThrowingDropWhileSequence.Iterator.finished is now a stored property
+Var AsyncThrowingDropWhileSequence.Iterator.predicate is now a stored property
+Var AsyncThrowingDropWhileSequence.base is now a stored property
+Var AsyncThrowingDropWhileSequence.predicate is now a stored property
+Var AsyncThrowingFilterSequence.Iterator.baseIterator is now a stored property
+Var AsyncThrowingFilterSequence.Iterator.finished is now a stored property
+Var AsyncThrowingFilterSequence.Iterator.isIncluded is now a stored property
+Var AsyncThrowingFilterSequence.base is now a stored property
+Var AsyncThrowingFilterSequence.isIncluded is now a stored property
+Var AsyncThrowingFlatMapSequence.Iterator.baseIterator is now a stored property
+Var AsyncThrowingFlatMapSequence.Iterator.currentIterator is now a stored property
+Var AsyncThrowingFlatMapSequence.Iterator.finished is now a stored property
+Var AsyncThrowingFlatMapSequence.Iterator.transform is now a stored property
+Var AsyncThrowingFlatMapSequence.base is now a stored property
+Var AsyncThrowingFlatMapSequence.transform is now a stored property
+Var AsyncThrowingMapSequence.Iterator.baseIterator is now a stored property
+Var AsyncThrowingMapSequence.Iterator.finished is now a stored property
+Var AsyncThrowingMapSequence.Iterator.transform is now a stored property
+Var AsyncThrowingMapSequence.base is now a stored property
+Var AsyncThrowingMapSequence.transform is now a stored property
+Var AsyncThrowingPrefixWhileSequence.Iterator.baseIterator is now a stored property
+Var AsyncThrowingPrefixWhileSequence.Iterator.predicate is now a stored property
+Var AsyncThrowingPrefixWhileSequence.Iterator.predicateHasFailed is now a stored property
+Var AsyncThrowingPrefixWhileSequence.base is now a stored property
+Var AsyncThrowingPrefixWhileSequence.predicate is now a stored property
+Var UnownedJob.context has mangled name changing from 'Swift.UnownedJob.(context in #UNSTABLE ID#) : Builtin.Job' to 'Swift.UnownedJob.(context in #UNSTABLE ID#) : Builtin.Job'
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

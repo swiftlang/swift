@@ -1483,11 +1483,7 @@ int Requirement::compare(const Requirement &other) const {
   // We should only have multiple conformance requirements.
   assert(getKind() == RequirementKind::Conformance);
 
-  int compareProtos =
-    TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
-
-  assert(compareProtos != 0 && "Duplicate conformance requirement");
-  return compareProtos;
+  return TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
 }
 
 /// Compare two associated types.

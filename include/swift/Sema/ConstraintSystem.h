@@ -904,24 +904,6 @@ using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 using OpenedTypeMap =
     llvm::DenseMap<GenericTypeParamType *, TypeVariableType *>;
 
-/// Describes contextual type information about a particular expression
-/// within a constraint system.
-struct ContextualTypeInfo {
-  TypeLoc typeLoc;
-
-  ContextualTypePurpose purpose;
-
-  ContextualTypeInfo() : typeLoc(TypeLoc()), purpose(CTP_Unused) {}
-
-  ContextualTypeInfo(Type contextualTy, ContextualTypePurpose purpose)
-      : typeLoc(TypeLoc::withoutLoc(contextualTy)), purpose(purpose) {}
-
-  ContextualTypeInfo(TypeLoc typeLoc, ContextualTypePurpose purpose)
-      : typeLoc(typeLoc), purpose(purpose) {}
-
-  Type getType() const { return typeLoc.getType(); }
-};
-
 /// Describes the information about a case label item that needs to be tracked
 /// within the constraint system.
 struct CaseLabelItemInfo {
@@ -958,6 +940,7 @@ public:
     empty,
     tombstone,
     stmtCondElement,
+    expr,
     stmt,
     patternBindingEntry,
     varDecl,
@@ -968,6 +951,8 @@ private:
 
   union {
     const StmtConditionElement *stmtCondElement;
+
+    const Expr *expr;
 
     const Stmt *stmt;
 
@@ -988,6 +973,11 @@ public:
   SolutionApplicationTargetsKey(const StmtConditionElement *stmtCondElement) {
     kind = Kind::stmtCondElement;
     storage.stmtCondElement = stmtCondElement;
+  }
+
+  SolutionApplicationTargetsKey(const Expr *expr) {
+    kind = Kind::expr;
+    storage.expr = expr;
   }
 
   SolutionApplicationTargetsKey(const Stmt *stmt) {
@@ -1019,6 +1009,9 @@ public:
 
     case Kind::stmtCondElement:
       return lhs.storage.stmtCondElement == rhs.storage.stmtCondElement;
+
+    case Kind::expr:
+      return lhs.storage.expr == rhs.storage.expr;
 
     case Kind::stmt:
       return lhs.storage.stmt == rhs.storage.stmt;
@@ -1053,6 +1046,11 @@ public:
       return hash_combine(
           DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
           DenseMapInfo<void *>::getHashValue(storage.stmtCondElement));
+
+    case Kind::expr:
+      return hash_combine(
+          DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(kind)),
+          DenseMapInfo<void *>::getHashValue(storage.expr));
 
     case Kind::stmt:
       return hash_combine(
@@ -1735,7 +1733,8 @@ public:
   /// Form a target for a for-each loop.
   static SolutionApplicationTarget forForEachStmt(
       ForEachStmt *stmt, ProtocolDecl *sequenceProto, DeclContext *dc,
-      bool bindPatternVarsOneWay);
+      bool bindPatternVarsOneWay,
+      ContextualTypePurpose purpose = CTP_ForEachStmt);
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
@@ -1862,7 +1861,8 @@ public:
   /// Whether this target is for a for-in statement.
   bool isForEachStmt() const {
     return kind == Kind::expression &&
-           getExprContextualTypePurpose() == CTP_ForEachStmt;
+           (getExprContextualTypePurpose() == CTP_ForEachStmt ||
+            getExprContextualTypePurpose() == CTP_ForEachSequence);
   }
 
   /// Whether this is an initialization for an Optional.Some pattern.
@@ -1963,7 +1963,8 @@ public:
 
     assert(kind == Kind::expression);
     assert(expression.contextualPurpose == CTP_Initialization ||
-           expression.contextualPurpose == CTP_ForEachStmt);
+           expression.contextualPurpose == CTP_ForEachStmt ||
+           expression.contextualPurpose == CTP_ForEachSequence);
     expression.pattern = pattern;
   }
 
@@ -2224,6 +2225,8 @@ public:
   friend class SplitterStep;
   friend class ComponentStep;
   friend class TypeVariableStep;
+  friend class ConjunctionStep;
+  friend class ConjunctionElement;
   friend class RequirementFailure;
   friend class MissingMemberFailure;
 
@@ -4852,6 +4855,12 @@ private:
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
+  /// Simplify a closure body element constraint by generating required
+  /// constraints to represent the given element in constraint system.
+  SolutionKind simplifyClosureBodyElementConstraint(
+      ASTNode element, ContextualTypeInfo context, TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
+
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,
@@ -4984,6 +4993,11 @@ private:
   ///
   /// \returns The selected disjunction.
   Constraint *selectDisjunction();
+
+  /// Pick a conjunction from the InactiveConstraints list.
+  ///
+  /// \returns The selected conjunction.
+  Constraint *selectConjunction();
 
   /// Solve the system of constraints generated from provided expression.
   ///
@@ -5135,6 +5149,23 @@ public:
       std::function<
         Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>
           rewriteTarget);
+
+  /// Apply the given solution to the given closure body.
+  ///
+  ///
+  /// \param solution The solution to apply.
+  /// \param closure The closure to which the solution is being applied.
+  /// \param currentDC The declaration context in which transformations
+  /// will be applied.
+  /// \param rewriteTarget Function that performs a rewrite of any
+  /// solution application target within the context.
+  ///
+  /// \returns true if solution cannot be applied.
+  bool applySolutionToBody(Solution &solution, ClosureExpr *closure,
+                           DeclContext *&currentDC,
+                           std::function<Optional<SolutionApplicationTarget>(
+                               SolutionApplicationTarget)>
+                               rewriteTarget);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
@@ -5571,6 +5602,27 @@ private:
   }
 };
 
+class ConjunctionElement {
+  Constraint *Element;
+
+public:
+  ConjunctionElement(Constraint *element) : Element(element) {}
+
+  bool attempt(ConstraintSystem &cs) const;
+
+  void print(llvm::raw_ostream &Out, SourceManager *SM) const {
+    Out << "conjunction element ";
+    Element->print(Out, SM);
+  }
+
+private:
+  /// Find type variables referenced by this conjunction element.
+  /// If this is a closure body element, it would look inside \c ASTNode.
+  void
+  findReferencedVariables(ConstraintSystem &cs,
+                          SmallPtrSetImpl<TypeVariableType *> &typeVars) const;
+};
+
 class TypeVariableBinding {
   TypeVariableType *TypeVar;
   PotentialBinding Binding;
@@ -5812,6 +5864,32 @@ private:
   /// function type that the operator is applied to.
   void partitionGenericOperators(SmallVectorImpl<unsigned>::iterator first,
                                  SmallVectorImpl<unsigned>::iterator last);
+};
+
+class ConjunctionElementProducer : public BindingProducer<ConjunctionElement> {
+  ArrayRef<Constraint *> Elements;
+
+  unsigned Index = 0;
+
+public:
+  using Element = ConjunctionElement;
+
+  ConjunctionElementProducer(ConstraintSystem &cs, Constraint *conjunction)
+      : BindingProducer(cs, conjunction->getLocator()),
+        Elements(conjunction->getNestedConstraints()) {
+    assert(conjunction->getKind() == ConstraintKind::Conjunction);
+  }
+
+  Optional<Element> operator()() override {
+    if (Index >= Elements.size())
+      return None;
+
+    return ConjunctionElement(Elements[Index++]);
+  }
+
+  bool needsToComputeNext() const override { return false; }
+
+  bool isExhausted() const override { return Index >= Elements.size(); }
 };
 
 /// Determine whether given type is a known one

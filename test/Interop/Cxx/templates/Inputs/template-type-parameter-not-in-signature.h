@@ -11,7 +11,7 @@ template <typename T, typename U>
 U multiTemplateTypeParamOneUsedInSignature(U u) { return u; }
 
 template <typename T, typename U>
-void multiTemplateTypeParamNotUsedInSignatureWithUnrelatedParams(int x, long y) {}
+void multiTemplateTypeParamNotUsedInSignatureWithUnrelatedParams(int x, int y) {}
 
 template <typename T>
 T templateTypeParamUsedInReturnType(int x) { return x; }

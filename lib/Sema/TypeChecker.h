@@ -1287,6 +1287,21 @@ bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
 std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *method);
 
+/// Find the target of a break or continue statement.
+///
+/// \returns the target, if one was found, or \c nullptr if no such target
+/// exists.
+LabeledStmt *findBreakOrContinueStmtTarget(ASTContext &ctx,
+                                           SourceFile *sourceFile,
+                                           SourceLoc loc, Identifier targetName,
+                                           SourceLoc targetLoc, bool isContinue,
+                                           DeclContext *dc);
+
+/// Check the correctness of a 'fallthrough' statement.
+///
+/// \returns true if an error occurred.
+bool checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt);
+
 /// Check for restrictions on the use of the @unknown attribute on a
 /// case statement.
 void checkUnknownAttrRestrictions(

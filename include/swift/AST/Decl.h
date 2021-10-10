@@ -1805,7 +1805,12 @@ public:
     return getPatternList()[i].getPattern();
   }
   
-  void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext);
+  void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext,
+                  bool isFullyValidated = false);
+
+  bool isFullyValidated(unsigned i) const {
+    return getPatternList()[i].isFullyValidated();
+  }
 
   DeclContext *getInitContext(unsigned i) const {
     return getPatternList()[i].getInitContext();

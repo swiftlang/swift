@@ -34,6 +34,26 @@
 // decompositions can be found for all "derived" conformance rules, producing
 // a minimal set of generating conformances.
 //
+// There are two small complications to handle implementation details of
+// Swift generics:
+//
+// 1) Inherited witness tables must be derivable by following other protocol
+//    refinement requirements only, without looking at non-Self associated
+//    types. This is expressed by saying that the generating conformance
+//    equations for a protocol refinement can only be written in terms of
+//    other protocol refinements; conformance paths involving non-Self
+//    associated types are not considered.
+//
+// 2) The subject type of each conformance requirement must be derivable at
+//    runtime as well, so for each generating conformance, it must be
+//    possible to write down a conformance path for the parent type without
+//    using any generating conformance recursively in the parent path of
+//    itself.
+//
+// The generating conformances finds fewer conformance requirements to be
+// redundant than homotopy reduction, which is why homotopy reduction only
+// deletes non-protocol conformance requirements.
+//
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
@@ -283,23 +303,48 @@ void RewriteSystem::computeCandidateConformancePaths(
         llvm::dbgs() << "\n";
       }
 
+      // Two conformance rules in empty context (T.[P] => T) and (T'.[P] => T)
+      // are interchangeable, and contribute a trivial pair of conformance
+      // equations expressing that each one can be written in terms of the
+      // other:
+      //
+      //   (T.[P] => T) := (T'.[P])
+      //   (T'.[P] => T') := (T.[P])
+      for (unsigned candidateRuleID : notInContext) {
+        for (unsigned otherRuleID : notInContext) {
+          if (otherRuleID == candidateRuleID)
+            continue;
+
+          SmallVector<unsigned, 2> path;
+          path.push_back(otherRuleID);
+          conformancePaths[candidateRuleID].push_back(path);
+        }
+      }
+
       // Suppose a 3-cell contains a conformance rule (T.[P] => T) in an empty
-      // context, and a conformance rule (V.[P] => V) with a possibly non-empty
-      // left context U and empty right context.
+      // context, and a conformance rule (V.[P] => V) with a non-empty left
+      // context U.
+      //
+      // The 3-cell looks something like this:
+      //
+      //     ... ⊗ (T.[P] => T) ⊗ ... ⊗ U.(V => V.[P]) ⊗ ...
+      //    ^                                               ^
+      //    |                                               |
+      //    + basepoint ========================= basepoint +
       //
       // We can decompose U into a product of conformance rules:
       //
       //    (V1.[P1] => V1)...(Vn.[Pn] => Vn),
+      //
+      // Note that (V1)...(Vn) is canonically equivalent to U.
       //
       // Now, we can record a candidate decomposition of (T.[P] => T) as a
       // product of conformance rules:
       //
       //    (T.[P] => T) := (V1.[P1] => V1)...(Vn.[Pn] => Vn).(V.[P] => V)
       //
-      // Now if U is empty, this becomes the trivial candidate:
-      //
-      //    (T.[P] => T) := (V.[P] => V)
-      SmallVector<SmallVector<unsigned, 2>, 2> candidatePaths;
+      // Again, note that (V1)...(Vn).V is canonically equivalent to U.V,
+      // and therefore T.
       for (auto pair : inContext) {
         // We have a term U, and a rule V.[P] => V.
         SmallVector<unsigned, 2> conformancePath;
@@ -313,26 +358,10 @@ void RewriteSystem::computeCandidateConformancePaths(
         decomposeTermIntoConformanceRuleLeftHandSides(term, pair.second,
                                                       conformancePath);
 
-        candidatePaths.push_back(conformancePath);
-      }
-
-      for (unsigned candidateRuleID : notInContext) {
-        // If multiple conformance rules appear in an empty context, each one
-        // can be replaced with any other conformance rule.
-        for (unsigned otherRuleID : notInContext) {
-          if (otherRuleID == candidateRuleID)
-            continue;
-
-          SmallVector<unsigned, 2> path;
-          path.push_back(otherRuleID);
-          conformancePaths[candidateRuleID].push_back(path);
-        }
-
-        // If conformance rules appear in non-empty context, they define a
-        // conformance access path for each conformance rule in empty context.
-        for (const auto &path : candidatePaths) {
-          conformancePaths[candidateRuleID].push_back(path);
-        }
+        // This decomposition defines a conformance access path for each
+        // conformance rule we saw in empty context.
+        for (unsigned otherRuleID : notInContext)
+          conformancePaths[otherRuleID].push_back(conformancePath);
       }
     }
   }
@@ -492,6 +521,48 @@ void RewriteSystem::verifyGeneratingConformanceEquations(
 #endif
 }
 
+static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
+  // The last element is a protocol symbol, because this is the left hand side
+  // of a conformance rule.
+  assert(lhs.back().getKind() == Symbol::Kind::Protocol);
+
+  // The second to last symbol is either an associated type, protocol or generic
+  // parameter symbol.
+  assert(lhs.size() >= 2);
+
+  auto parentSymbol = lhs[lhs.size() - 2];
+
+  switch (parentSymbol.getKind()) {
+  case Symbol::Kind::AssociatedType: {
+    // In a conformance rule of the form [P:T].[Q] => [P:T], the parent type is
+    // trivial.
+    if (lhs.size() == 2)
+      return nullptr;
+
+    // If we have a rule of the form X.[P:Y].[Q] => X.[P:Y] wih non-empty X,
+    // then the parent type is X.[P].
+    const auto protos = parentSymbol.getProtocols();
+    assert(protos.size() == 1);
+
+    return protos[0];
+  }
+
+  case Symbol::Kind::GenericParam:
+  case Symbol::Kind::Protocol:
+    // The parent type is trivial (either a generic parameter, or the protocol
+    // 'Self' type).
+    return nullptr;
+
+  case Symbol::Kind::Name:
+  case Symbol::Kind::Layout:
+  case Symbol::Kind::Superclass:
+  case Symbol::Kind::ConcreteType:
+    break;
+  }
+
+  llvm_unreachable("Bad symbol kind");
+}
+
 /// Computes a minimal set of generating conformances, assuming that homotopy
 /// reduction has already eliminated all redundant rewrite rules that are not
 /// conformance rules.
@@ -536,49 +607,21 @@ void RewriteSystem::computeGeneratingConformances(
 
     auto lhs = rule.getLHS();
 
-    auto parentSymbol = lhs[lhs.size() - 2];
-
-    // The last element is a protocol symbol, because this is a conformance rule.
-    // The second to last symbol is either an associated type, protocol or generic
-    // parameter symbol.
-    switch (parentSymbol.getKind()) {
-    case Symbol::Kind::AssociatedType: {
-      // If we have a rule of the form X.[P:Y].[Q] => X.[P:Y] wih non-empty X,
-      // then the parent type is X.[P].
-      if (lhs.size() == 2)
-        continue;
-
+    // Record a parent path if the subject type itself requires a non-trivial
+    // conformance path to derive.
+    if (auto *parentProto = getParentConformanceForTerm(lhs)) {
       MutableTerm mutTerm(lhs.begin(), lhs.end() - 2);
       assert(!mutTerm.empty());
-
-      const auto protos = parentSymbol.getProtocols();
-      assert(protos.size() == 1);
 
       bool simplified = simplify(mutTerm);
       assert(!simplified || rule.isSimplified());
       (void) simplified;
 
-      mutTerm.add(Symbol::forProtocol(protos[0], Context));
+      mutTerm.add(Symbol::forProtocol(parentProto, Context));
 
       // Get a conformance path for X.[P] and record it.
       decomposeTermIntoConformanceRuleLeftHandSides(mutTerm, parentPaths[ruleID]);
-      continue;
     }
-
-    case Symbol::Kind::GenericParam:
-    case Symbol::Kind::Protocol:
-      // Don't record a parent path, since the parent type is trivial (either a
-      // generic parameter, or the protocol 'Self' type).
-      continue;
-
-    case Symbol::Kind::Name:
-    case Symbol::Kind::Layout:
-    case Symbol::Kind::Superclass:
-    case Symbol::Kind::ConcreteType:
-      break;
-    }
-
-    llvm_unreachable("Bad symbol kind");
   }
 
   computeCandidateConformancePaths(conformancePaths);

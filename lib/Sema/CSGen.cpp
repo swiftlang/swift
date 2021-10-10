@@ -3931,13 +3931,13 @@ bool ConstraintSystem::generateConstraints(
       if (!patternType || patternType->hasError())
         return true;
 
-      if (!patternBinding->isInitialized(index) &&
-          patternBinding->isDefaultInitializable(index) &&
+      auto *init = patternBinding->getInit(index);
+
+      if (!init && patternBinding->isDefaultInitializable(index) &&
           pattern->hasStorage()) {
-        llvm_unreachable("default initialization is unsupported");
+        init = TypeChecker::buildDefaultInitializer(patternType);
       }
 
-      auto init = patternBinding->getInit(index);
       auto target = init ? SolutionApplicationTarget::forInitialization(
                                init, dc, patternType, patternBinding, index,
                                /*bindPatternVarsOneWay=*/true)

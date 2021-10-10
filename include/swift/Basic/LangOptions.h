@@ -481,6 +481,11 @@ namespace swift {
     /// algorithm.
     unsigned RequirementMachineDepthLimit = 10;
 
+    /// Enable the new experimental protocol requirement signature minimization
+    /// algorithm.
+    RequirementMachineMode RequirementMachineProtocolSignatures =
+        RequirementMachineMode::Disabled;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
@@ -667,6 +672,10 @@ namespace swift {
     /// Enable experimental support for one-way constraints for the
     /// parameters of closures.
     bool EnableOneWayClosureParameters = false;
+
+    /// Enable experimental support for type inference through multi-statement
+    /// closures.
+    bool EnableMultiStatementClosureInference = false;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
