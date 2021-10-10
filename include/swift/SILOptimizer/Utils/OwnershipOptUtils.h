@@ -104,7 +104,7 @@ private:
   }
 };
 
-/// A utility composed ontop of OwnershipFixupContext that knows how to RAUW a
+/// A utility composed on top of OwnershipFixupContext that knows how to RAUW a
 /// value or a single value instruction with a new value and then fixup
 /// ownership invariants afterwards.
 class OwnershipRAUWHelper {

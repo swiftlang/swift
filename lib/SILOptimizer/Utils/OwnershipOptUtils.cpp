@@ -410,7 +410,7 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   auto visitReborrow = [&](Operand *endScope) {
     auto borrowingOper = BorrowingOperand(endScope);
     assert(borrowingOper.isReborrow());
-    // TODO: if non-phi reborrows even exist, handle them using a separate
+    // TODO: if non-phi reborrows ever exist, handle them using a separate
     // SILValue list since we don't want to refer directly to phi SILValues.
     reborrows.insert(borrowingOper.getBorrowIntroducingUserResult().value);
     context.recursiveReborrows.push_back(endScope);
