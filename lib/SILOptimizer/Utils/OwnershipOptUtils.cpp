@@ -891,7 +891,6 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     auto extender = getLifetimeExtender();
     SILValue borrow =
         extender.createPlusZeroBorrow(newValue, oldValue->getUses());
-    SILBuilderWithScope builder(oldValue);
     return replaceAllUsesAndErase(oldValue, borrow, callbacks);
   }
   case OwnershipKind::Owned: {
@@ -921,7 +920,6 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     }
     auto extender = getLifetimeExtender();
     SILValue copy = extender.createPlusZeroCopy(newValue, oldValue->getUses());
-    SILBuilderWithScope builder(oldValue);
     auto result = replaceAllUsesAndErase(oldValue, copy, callbacks);
     return result;
   }
