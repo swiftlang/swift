@@ -231,9 +231,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
   for (auto restriction : solution.ConstraintRestrictions) {
-    ConstraintRestrictions.push_back(
-        std::make_tuple(restriction.first.first, restriction.first.second,
-                        restriction.second));
+    auto &types = restriction.first;
+    ConstraintRestrictions.push_back(std::make_tuple(types.first.getPointer(),
+                                                     types.second.getPointer(),
+                                                     restriction.second));
   }
 
   // Register the solution's disjunction choices.

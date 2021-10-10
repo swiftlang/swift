@@ -52,9 +52,8 @@ actor A2: DistributedActor {
   }
 }
 
-class C2: DistributedActor {
+final class C2: DistributedActor {
   // expected-error@-1{{non-actor type 'C2' cannot conform to the 'Actor' protocol}}
-  // expected-error@-2{{non-final class 'C2' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
   nonisolated var id: AnyActorIdentity {
     fatalError()
   }

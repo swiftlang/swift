@@ -2181,6 +2181,10 @@ public:
 using RewriteTargetFn = std::function<
     Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>;
 
+/// Represents a conversion restriction between two types.
+using ConversionRestriction =
+    std::tuple<TypeBase *, TypeBase *, ConversionRestrictionKind>;
+
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
   Solving,
@@ -2367,8 +2371,7 @@ private:
   /// there are multiple ways in which one type could convert to another, e.g.,
   /// given class types A and B, the solver might choose either a superclass
   /// conversion or a user-defined conversion.
-  std::vector<std::tuple<Type, Type, ConversionRestrictionKind>>
-      ConstraintRestrictions;
+  std::vector<ConversionRestriction> ConstraintRestrictions;
 
   /// The set of fixes applied to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;

@@ -3908,9 +3908,8 @@ bool ConstraintSystem::repairFailures(
       // If the result type of the coercion has an value to optional conversion
       // we can instead suggest the conditional downcast as it is safer in
       // situations like conditional binding.
-      auto useConditionalCast = llvm::any_of(
-          ConstraintRestrictions,
-          [&](std::tuple<Type, Type, ConversionRestrictionKind> restriction) {
+      auto useConditionalCast =
+          llvm::any_of(ConstraintRestrictions, [&](auto &restriction) {
             ConversionRestrictionKind restrictionKind;
             Type type1, type2;
             std::tie(type1, type2, restrictionKind) = restriction;
@@ -6717,7 +6716,9 @@ static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
 static ConstraintFix *maybeWarnAboutExtraneousCast(
     ConstraintSystem &cs, Type origFromType, Type origToType, Type fromType,
     Type toType, SmallVector<Type, 4> fromOptionals,
-    SmallVector<Type, 4> toOptionals, ConstraintSystem::TypeMatchOptions flags,
+    SmallVector<Type, 4> toOptionals,
+    const std::vector<ConversionRestriction> &constraintRestrictions,
+    ConstraintSystem::TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
 
   auto last = locator.last();
@@ -6739,6 +6740,18 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   // "from" could be less optional than "to" e.g. `0 as Any?`, so
   // we need to store the difference as a signed integer.
   int extraOptionals = fromOptionals.size() - toOptionals.size();
+
+  // "from" expression could be a type variable with value-to-optional
+  // restrictions that we have to account for optionality mismatch.
+  const auto subExprType = cs.getType(castExpr->getSubExpr());
+  if (llvm::is_contained(
+          constraintRestrictions,
+          std::make_tuple(fromType.getPointer(), subExprType.getPointer(),
+                          ConversionRestrictionKind::ValueToOptional))) {
+    extraOptionals++;
+    origFromType = OptionalType::get(origFromType);
+  }
+
   // Removing the optionality from to type when the force cast expr is an IUO.
   const auto *const TR = castExpr->getCastTypeRepr();
   if (isExpr<ForcedCheckedCastExpr>(anchor) && TR &&
@@ -6894,7 +6907,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     if (auto *fix = maybeWarnAboutExtraneousCast(
             *this, origFromType, origToType, fromType, toType, fromOptionals,
-            toOptionals, flags, locator)) {
+            toOptionals, ConstraintRestrictions, flags, locator)) {
       (void)recordFix(fix);
     }
   };
@@ -6962,7 +6975,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // succeed or fail.
     if (auto *fix = maybeWarnAboutExtraneousCast(
             *this, origFromType, origToType, fromType, toType, fromOptionals,
-            toOptionals, flags, locator)) {
+            toOptionals, ConstraintRestrictions, flags, locator)) {
       (void)recordFix(fix);
     }
 
@@ -11372,7 +11385,8 @@ ConstraintSystem::simplifyRestrictedConstraint(
       addFixConstraint(fix, matchKind, type1, type2, locator);
     }
 
-    ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
+    ConstraintRestrictions.push_back(
+        std::make_tuple(type1.getPointer(), type2.getPointer(), restriction));
     return SolutionKind::Solved;
   }
   case SolutionKind::Unsolved:
