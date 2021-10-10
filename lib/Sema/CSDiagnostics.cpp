@@ -2957,6 +2957,20 @@ bool ContextualFailure::tryTypeCoercionFixIt(
   if (!toType->hasTypeRepr())
     return false;
 
+  // If object of the optional type is a subtype of the specified contextual
+  // type, let's suggest a force unwrap "!". Otherwise fallback to potential
+  // coercion or force cast.
+  if (!bothOptional && fromType->getOptionalObjectType()) {
+    if (TypeChecker::isSubtypeOf(fromType->lookThroughAllOptionalTypes(),
+                                 toType, getDC())) {
+      diagnostic.fixItInsert(
+          Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
+                                     getSourceRange().End),
+          "!");
+      return true;
+    }
+  }
+
   CheckedCastKind Kind =
       TypeChecker::typeCheckCheckedCast(fromType, toType,
                                         CheckedCastContextKind::None, getDC(),
