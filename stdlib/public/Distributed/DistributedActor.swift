@@ -116,6 +116,28 @@ extension DistributedActor {
   }
 }
 
+// ==== Local actor special handling -------------------------------------------
+
+@available(SwiftStdlib 5.5, *)
+extension DistributedActor {
+
+  /// Executes the passed 'body' only when the distributed actor is local instance.
+  ///
+  /// The `Self` passed to the the body closure is isolated, meaning that the
+  /// closure can be used to call non-distributed functions, or even access actor
+  /// state.
+  ///
+  /// When the actor is remote, the closure won't be executed and this function will return nil.
+  public nonisolated func whenLocal<T>(_ body: @Sendable (isolated Self) async throws -> T)
+    async rethrows -> T? where T: Sendable {
+    if __isLocalActor(self) {
+       return try await body(self)
+    } else {
+      return nil
+    }
+  }
+}
+
 /******************************************************************************/
 /***************************** Actor Identity *********************************/
 /******************************************************************************/
