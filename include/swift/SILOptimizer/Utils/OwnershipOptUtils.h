@@ -153,11 +153,6 @@ struct OwnershipFixupContext {
   // used again to extend the lifetime of the replacement value.
   SmallVector<Operand *, 8> guaranteedUsePoints;
 
-  // FIXME: remove these two vectors once BorrowedLifetimeExtender is used
-  // everywhere.
-  SmallVector<Operand *, 8> transitiveBorrowedUses;
-  SmallVector<PhiOperand, 8> recursiveReborrows;
-
   /// Extra state initialized by OwnershipRAUWFixupHelper::get() that we use
   /// when RAUWing addresses. This ensures we do not need to recompute this
   /// state when we perform the actual RAUW.
@@ -191,8 +186,6 @@ struct OwnershipFixupContext {
 
   void clear() {
     guaranteedUsePoints.clear();
-    transitiveBorrowedUses.clear();
-    recursiveReborrows.clear();
     extraAddressFixupInfo.allAddressUsesFromOldValue.clear();
     extraAddressFixupInfo.base = AccessBase();
   }
