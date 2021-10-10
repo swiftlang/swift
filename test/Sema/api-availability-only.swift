@@ -1,7 +1,7 @@
 /// Test that -check-api-availability-only skips what is expected while checking
 /// the module API and SPI.
 
-// RUN: %target-typecheck-verify-swift -module-name MyModule -target x86_64-apple-macosx10.15 -check-api-availability-only -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -module-name MyModule -target %target-cpu-apple-macosx10.15 -check-api-availability-only -enable-library-evolution
 
 // REQUIRES: OS=macosx
 
