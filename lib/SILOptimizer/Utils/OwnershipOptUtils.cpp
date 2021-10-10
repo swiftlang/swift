@@ -654,6 +654,9 @@ OwnershipLifetimeExtender::createPlusZeroBorrow(SILValue newValue,
   }
   assert(copy && borrow);
 
+  // We don't expect an empty useRange. If it happens, then the newly created
+  // copy will never be destroyed.
+  assert(!useRange.empty());
   auto opRange = makeUserRange(useRange);
   ValueLifetimeAnalysis lifetimeAnalysis(copy, opRange);
   ValueLifetimeAnalysis::Frontier frontier;
