@@ -1718,10 +1718,7 @@ function(add_swift_target_library name)
   endif()
 
   # Turn off implicit import of _Concurrency when building libraries
-  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS 
-                      "-Xfrontend;-disable-implicit-concurrency-module-import")
-  endif()
+  list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-concurrency-module-import")
 
   # Turn off implicit import of _Distributed when building libraries
   if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
