@@ -108,6 +108,14 @@ private:
 /// value or a single value instruction with a new value and then fixup
 /// ownership invariants afterwards.
 class OwnershipRAUWHelper {
+public:
+  /// Return true if \p oldValue can be replaced with \p newValue in terms of
+  /// their value ownership. This ignores any current uses of \p oldValue. To
+  /// determine whether \p oldValue can be replaced as-is with it's existing
+  /// uses, create an instance of OwnershipRAUWHelper and check its validity.
+  static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue);
+
+private:
   OwnershipFixupContext *ctx;
   SingleValueInstruction *oldValue;
   SILValue newValue;
