@@ -1061,6 +1061,13 @@ SILValue OwnershipRAUWPrepare::prepareUnowned(SILValue newValue) {
 
 SILValue OwnershipRAUWPrepare::prepareReplacement(SILValue newValue) {
   assert(oldValue->getFunction()->hasOwnership());
+
+  // A value with no uses can be "replaced" without fixup.
+  // (e.g. a dead no-ownership value can be replaced by an owned value even
+  // though hasValidRAUWOwnership will be false).
+  if (oldValue->use_empty())
+    return newValue;
+
   assert(OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue) &&
       "Should have checked if can perform this operation before calling it?!");
   // If our new value is just none, we can pass anything to it so just RAUW
@@ -1199,6 +1206,12 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
 
   // Clear the context before populating it anew.
   ctx->clear();
+
+  // A value with no uses can be "replaced" regardless of its uses. Bypass all
+  // the use-checking logic, which assumes a non-empty use list.
+  if (oldValue->use_empty()) {
+    return;
+  }
 
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
