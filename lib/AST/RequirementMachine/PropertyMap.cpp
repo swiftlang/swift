@@ -910,7 +910,19 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
 
       MutableTerm constraintType;
 
-      if (concreteType == typeWitness &&
+      auto simplify = [&](CanType t) -> CanType {
+        return CanType(t.transformRec([&](Type t) -> Optional<Type> {
+          if (!t->isTypeParameter())
+            return None;
+
+          auto term = getRelativeTermForType(t->getCanonicalType(),
+                                             substitutions, Context);
+          System.simplify(term);
+          return Context.getTypeForTerm(term, { }, Protos);
+        }));
+      };
+
+      if (simplify(concreteType) == simplify(typeWitness) &&
           requirementKind == RequirementKind::SameType) {
         // FIXME: ConcreteTypeInDomainMap should support substitutions so
         // that we can remove this.
