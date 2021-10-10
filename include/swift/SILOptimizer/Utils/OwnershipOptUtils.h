@@ -196,6 +196,8 @@ public:
   OwnershipReplaceSingleUseHelper(OwnershipFixupContext &ctx, Operand *use,
                                   SILValue newValue);
 
+  ~OwnershipReplaceSingleUseHelper() { if (ctx) ctx->clear(); }
+
   /// Returns true if this helper was initialized into a valid state.
   operator bool() const { return isValid(); }
   bool isValid() const { return bool(ctx) && bool(use) && bool(newValue); }
