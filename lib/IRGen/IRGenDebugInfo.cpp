@@ -475,6 +475,9 @@ private:
         Dir = DirBuf;
         File = FileBuf;
       }
+    } else if (llvm::sys::path::is_absolute(FileName)) {
+      Dir = llvm::sys::path::parent_path(RemappedFile);
+      File = llvm::sys::path::filename(RemappedFile);
     } else {
       File = RemappedFile;
       // Leave <compiler-generated> & friends as is, without directory.
