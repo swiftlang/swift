@@ -600,7 +600,7 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
   auto enableLexicalLifetimes = Apply.getFunction()
                                     ->getModule()
                                     .getASTContext()
-                                    .LangOpts.EnableExperimentalLexicalLifetimes;
+                                    .SILOpts.EnableExperimentalLexicalLifetimes;
   if (!AI.getFunction()->hasOwnership() ||
       (callArg.getOwnershipKind() != OwnershipKind::Owned &&
        !enableLexicalLifetimes)) {
