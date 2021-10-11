@@ -702,6 +702,9 @@ namespace swift {
 
     /// Whether any error diagnostics have been emitted.
     bool anyErrorOccurred = false;
+    
+    /// Use the DiagnoseVarUsage SIL pass for variable usage diagnostics.
+    bool silUsageDiagnostics = false;
 
     /// Track the previous emitted Behavior, useful for notes
     DiagnosticBehavior previousBehavior = DiagnosticBehavior::Unspecified;
@@ -736,6 +739,10 @@ namespace swift {
     void setWarningsAsErrors(bool val) { warningsAsErrors = val; }
     bool getWarningsAsErrors() const { return warningsAsErrors; }
 
+    /// Whether to use the sil diagnostic pass for var usage
+    void setSilUsageDiagnostics(bool val) { silUsageDiagnostics = val; }
+    bool getSilUsageDiagnostics() const { return silUsageDiagnostics; }
+    
     void resetHadAnyError() {
       anyErrorOccurred = false;
       fatalErrorOccurred = false;
@@ -869,6 +876,12 @@ namespace swift {
     void setWarningsAsErrors(bool val) { state.setWarningsAsErrors(val); }
     bool getWarningsAsErrors() const {
       return state.getWarningsAsErrors();
+    }
+    
+    /// Whether to use the sil diagnostic pass for var usage
+    void setSilUsageDiagnostics(bool val) { state.setSilUsageDiagnostics(val); }
+    bool getSilUsageDiagnostics() const {
+      return state.getSilUsageDiagnostics();
     }
 
     /// Whether to print diagnostic names after their messages

@@ -306,6 +306,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::AssignByWrapperInst:
+  case SILInstructionKind::MarkDiscardedInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::DebugValueInst:
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)             \

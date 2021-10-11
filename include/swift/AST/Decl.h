@@ -367,12 +367,17 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 1,
 
     /// Whether this declaration captures the 'self' param under the same name.
     IsSelfParamCapture : 1,
+                        
+    /// Whether usage of this is debug variable should be tracked.
+    /// False if the variable appears in inactive if-config clauses, where
+    /// def-use can not be constructed.
+    DiagnoseUsage : 1,
 
     /// Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
@@ -5065,6 +5070,13 @@ public:
   /// From the standpoint of access control and exportability checking, this
   /// var will behave as if it was public, even if it is internal or private.
   bool isLayoutExposedToClients() const;
+  
+  bool shouldDiagnoseUsage() const {
+    return Bits.VarDecl.DiagnoseUsage;
+  }
+  void setDiagnoseUsage(bool V) {
+    Bits.VarDecl.DiagnoseUsage = V;
+  }
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }

@@ -247,6 +247,9 @@ protected:
 
   // Ensure that BindMemoryInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(BindMemoryInst, NonValueInstruction);
+  
+  // Ensure that MarkDiscardedInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(MarkDiscardedInst, NonValueInstruction);
 
   // Ensure that MarkFunctionEscapeInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(MarkFunctionEscapeInst, NonValueInstruction);

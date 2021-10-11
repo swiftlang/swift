@@ -65,6 +65,9 @@ public:
   /// If set to true, include educational notes in printed output if available.
   /// Educational notes are documentation which supplement diagnostics.
   bool PrintEducationalNotes = false;
+  
+  /// Use the DiagnoseVarUsage SIL pass for variable usage diagnostics.
+  bool SilUsageDiagnostics = false;
 
   /// Whether to emit diagnostics in the terse LLVM style or in a more
   /// descriptive style that's specific to Swift (currently experimental).

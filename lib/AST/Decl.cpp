@@ -5639,7 +5639,7 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 {
   Bits.VarDecl.Introducer = unsigned(introducer);
   Bits.VarDecl.IsSelfParamCapture = false;
-  Bits.VarDecl.IsDebuggerVar = false;
+  Bits.VarDecl.DiagnoseUsage = true;
   Bits.VarDecl.IsLazyStorageProperty = false;
   Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
   Bits.VarDecl.IsTopLevelGlobal = false;

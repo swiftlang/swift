@@ -1593,6 +1593,10 @@ public:
           << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
   }
+  
+  void visitMarkDiscardedInst(MarkDiscardedInst *MD) {
+    *this << getIDAndType(MD->getOperand());
+  }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
     switch (MU->getMarkUninitializedKind()) {

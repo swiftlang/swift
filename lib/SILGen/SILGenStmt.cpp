@@ -391,6 +391,25 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       if (isa<ThrowStmt>(S))
         StmtType = ThrowStmtType;
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
+      if (SGF.getOptions().SilUsageDiagnostics) {
+        if (auto AE = dyn_cast<AssignExpr>(E)) {
+          auto dest = AE->getDest()->getSemanticsProvidingExpr();
+          if (isa<DiscardAssignmentExpr>(dest)) {
+            if (isa<LoadExpr>(AE->getSrc()) &&
+                !AE->getDest()->getType()->hasLValueType()) {
+              // Emit the destination to force the load
+              SGF.emitIgnoredExpr(AE->getDest());
+              SGF.emitIgnoredExpr(AE->getSrc(), true);
+              continue;
+            }
+            
+            if (isa<DeclRefExpr>(AE->getSrc())) {
+              SGF.emitIgnoredExpr(AE->getSrc(), true);
+              continue;
+            }
+          }
+        }
+      }
       SGF.emitIgnoredExpr(E);
     } else {
       auto *D = ESD.get<Decl*>();
