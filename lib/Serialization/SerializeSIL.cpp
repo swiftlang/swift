@@ -66,7 +66,6 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
   case SILLinkage::PublicExternal: return SIL_LINKAGE_PUBLIC_EXTERNAL;
   case SILLinkage::HiddenExternal: return SIL_LINKAGE_HIDDEN_EXTERNAL;
   case SILLinkage::SharedExternal: return SIL_LINKAGE_SHARED_EXTERNAL;
-  case SILLinkage::PrivateExternal: return SIL_LINKAGE_PRIVATE_EXTERNAL;
   }
   llvm_unreachable("bad linkage");
 }
@@ -2666,7 +2665,8 @@ void SILSerializer::writeSILWitnessTableEntry(
   SmallVector<ValueID, 4> ListOfValues;
   handleSILDeclRef(S, methodWitness.Requirement, ListOfValues);
   IdentifierID witnessID = 0;
-  if (SILFunction *witness = methodWitness.Witness) {
+  SILFunction *witness = methodWitness.Witness;
+  if (witness && witness->hasValidLinkageForFragileRef()) {
     addReferencedSILFunction(witness, true);
     witnessID = S.addUniquedStringRef(witness->getName());
   }

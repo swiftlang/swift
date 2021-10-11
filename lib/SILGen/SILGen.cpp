@@ -65,6 +65,26 @@ SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
 
 SILGenModule::~SILGenModule() {
   assert(!TopLevelSGF && "active source file lowering!?");
+
+  // Update the linkage of external private functions to public_external,
+  // because there is no private_external linkage. External private functions
+  // can occur in the following cases:
+  //
+  // * private class methods which are referenced from the vtable of a derived
+  //   class  in a different file/module. Such private methods are always
+  //   generated with public linkage in the other file/module.
+  //
+  // * in lldb: lldb can access private declarations in other files/modules
+  //
+  // * private functions with a @_silgen_name attribute but without a body
+  //
+  // * when compiling with -disable-access-control
+  //
+  for (SILFunction &f : M.getFunctionList()) {
+    if (f.getLinkage() == SILLinkage::Private && f.isExternalDeclaration())
+      f.setLinkage(SILLinkage::PublicExternal);
+  }
+
   M.verify();
 }
 
