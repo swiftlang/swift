@@ -503,7 +503,8 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   // Set the low bit.
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  addr = llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+  addr = llvm::ConstantExpr::getGetElementPtr(
+    addr->getType()->getPointerElementType(), addr, bitConstant);
 
   // Update the entry.
   entry = {var, addr};

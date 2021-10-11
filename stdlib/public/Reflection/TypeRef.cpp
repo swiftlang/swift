@@ -784,7 +784,6 @@ public:
 
   Demangle::NodePointer
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    assert(false && "not tested");
     auto node = Dem.createNode(Node::Kind::DependentGenericParamType);
     node->addChild(Dem.createNode(Node::Kind::Index, GTP->getDepth()), Dem);
     node->addChild(Dem.createNode(Node::Kind::Index, GTP->getIndex()), Dem);
@@ -793,7 +792,6 @@ public:
 
   Demangle::NodePointer
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    assert(false && "not tested");
     assert(DM->getProtocol().empty() && "not implemented");
     auto node = Dem.createNode(Node::Kind::DependentMemberType);
     node->addChild(visit(DM->getBase()), Dem);

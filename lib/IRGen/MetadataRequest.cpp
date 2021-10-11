@@ -269,7 +269,8 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
       return addr;
 
     auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
-    return llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+    return llvm::ConstantExpr::getGetElementPtr(
+      addr->getType()->getPointerElementType(), addr, bitConstant);
   };
 
   // Check whether we already have an entry with this name.
@@ -1114,7 +1115,8 @@ static llvm::Constant *emitEmptyTupleTypeMetadataRef(IRGenModule &IGM) {
     llvm::ConstantInt::get(IGM.Int32Ty, 1)
   };
   return llvm::ConstantExpr::getInBoundsGetElementPtr(
-        /*Ty=*/nullptr, fullMetadata, indices);
+        fullMetadata->getType()->getPointerElementType(), fullMetadata,
+        indices);
 }
 
 using GetElementMetadataFn =
@@ -1663,7 +1665,8 @@ namespace {
         };
         return MetadataResponse::forComplete(
           llvm::ConstantExpr::getInBoundsGetElementPtr(
-            /*Ty=*/nullptr, singletonMetadata, indices));
+            singletonMetadata->getType()->getPointerElementType(),
+            singletonMetadata, indices));
       }
 
       auto layout = type.getExistentialLayout();

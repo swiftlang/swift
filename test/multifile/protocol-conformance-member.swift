@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-library %s %S/Inputs/protocol-conformance-member-helper.swift -o %t/%target-library-name(Test) -module-name Test
-// RUN: llvm-readobj -symbols -coff-exports %t/%target-library-name(Test) | %FileCheck %s
+// RUN: llvm-readobj --symbols --coff-exports %t/%target-library-name(Test) | %FileCheck %s
 
 // CHECK: Name: {{_?}}$s4Test10CoolStructV10coolFactorSdvg
 

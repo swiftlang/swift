@@ -47,10 +47,10 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/YAMLParser.h"
-#include "llvm/TextAPI/MachO/InterfaceFile.h"
-#include "llvm/TextAPI/MachO/Symbol.h"
-#include "llvm/TextAPI/MachO/TextAPIReader.h"
-#include "llvm/TextAPI/MachO/TextAPIWriter.h"
+#include "llvm/TextAPI/InterfaceFile.h"
+#include "llvm/TextAPI/Symbol.h"
+#include "llvm/TextAPI/TextAPIReader.h"
+#include "llvm/TextAPI/TextAPIWriter.h"
 
 #include "APIGen.h"
 #include "TBDGenVisitor.h"
@@ -68,7 +68,7 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
 
 TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
                              APIRecorder &recorder)
-    : TBDGenVisitor(desc.getTarget(), desc.getDataLayout(),
+    : TBDGenVisitor(desc.getTarget(), desc.getDataLayoutString(),
                     desc.getParentModule(), desc.getOptions(), recorder) {}
 
 void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
@@ -390,7 +390,9 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
   if (kind == SymbolKind::ObjectiveCClass) {
     mangled = name;
   } else {
-    llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
+    if (!DataLayout)
+      DataLayout = llvm::DataLayout(DataLayoutDescription);
+    llvm::Mangler::getNameWithPrefix(mangled, name, *DataLayout);
   }
 
   addSymbolInternal(mangled, kind, source);

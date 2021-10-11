@@ -1250,6 +1250,11 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   if (!file)
     return nullptr;
 
+  // The MemoryBuffer loader is used by LLDB during debugging. Modules imported
+  // from .swift_ast sections are never produced from textual interfaces. By
+  // disabling resilience the debugger can directly access private members.
+  if (BypassResilience)
+    M->setBypassResilience();
   M->addFile(*file);
   Ctx.addLoadedModule(M);
   return M;

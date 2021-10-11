@@ -17,6 +17,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include <memory>
 
 namespace swift {

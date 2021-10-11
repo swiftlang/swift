@@ -99,7 +99,7 @@ public func createTemplatedConstructor() {
   // ITANIUM_X64: call void @_ZN20TemplatedConstructorC1I7ArgTypeEET_(%struct.TemplatedConstructor* [[OBJ_AS_STRUCT]], i32 [[IVAL]])
   // ITANIUM_X64: ret void
   
-  // ITANIUM_X64-LABEL: define linkonce_odr void @_ZN20TemplatedConstructorC1I7ArgTypeEET_(%struct.TemplatedConstructor* nonnull dereferenceable(4) {{.*}}, i32 {{.*}})
+  // ITANIUM_X64-LABEL: define linkonce_odr void @_ZN20TemplatedConstructorC1I7ArgTypeEET_(%struct.TemplatedConstructor* nonnull align 4 dereferenceable(4) {{.*}}, i32 {{.*}})
   
   // ITANIUM_ARM-LABEL: define protected swiftcc void @"$ss26createTemplatedConstructoryyF"()
   // ITANIUM_ARM: [[OBJ:%.*]] = alloca %TSo20TemplatedConstructorV
@@ -108,7 +108,7 @@ public func createTemplatedConstructor() {
   // ITANIUM_ARM:  call %struct.TemplatedConstructor* @_ZN20TemplatedConstructorC2I7ArgTypeEET_(%struct.TemplatedConstructor* [[OBJ_AS_STRUCT]], [1 x i32] [[IVAL]])
   // ITANIUM_ARM: ret void
   
-  // ITANIUM_ARM-LABEL: define linkonce_odr %struct.TemplatedConstructor* @_ZN20TemplatedConstructorC2I7ArgTypeEET_(%struct.TemplatedConstructor* nonnull returned dereferenceable(4) {{.*}}, [1 x i32] {{.*}})
+  // ITANIUM_ARM-LABEL: define linkonce_odr %struct.TemplatedConstructor* @_ZN20TemplatedConstructorC2I7ArgTypeEET_(%struct.TemplatedConstructor* nonnull returned align 4 dereferenceable(4) {{.*}}, [1 x i32] {{.*}})
 
   // MICROSOFT_X64-LABEL: define dllexport swiftcc void @"$ss26createTemplatedConstructoryyF"()
   // MICROSOFT_X64: [[OBJ:%.*]] = alloca %TSo20TemplatedConstructorV
@@ -117,6 +117,6 @@ public func createTemplatedConstructor() {
   // MICROSOFT_X64: call %struct.TemplatedConstructor* @"??$?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z"(%struct.TemplatedConstructor* [[OBJ_AS_STRUCT]], i32 [[IVAL]])
   // MICROSOFT_X64: ret void
   
-  // MICROSOFT_X64-LABEL: define linkonce_odr dso_local %struct.TemplatedConstructor* @"??$?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z"(%struct.TemplatedConstructor* nonnull returned dereferenceable(4) {{.*}}, i32 {{.*}})
+  // MICROSOFT_X64-LABEL: define linkonce_odr dso_local %struct.TemplatedConstructor* @"??$?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z"(%struct.TemplatedConstructor* nonnull returned align 4 dereferenceable(4) {{.*}}, i32 {{.*}})
   let templated = TemplatedConstructor(ArgType())
 }

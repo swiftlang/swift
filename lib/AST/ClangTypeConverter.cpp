@@ -85,6 +85,10 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.Id##Ty;
 #include "clang/Basic/PPCTypes.def"
+#define RVV_TYPE(Name, Id, SingletonId)                                        \
+  case clang::BuiltinType::Id:                                                 \
+    return context.Id##Ty;
+#include "clang/Basic/RISCVVTypes.def"
   }
 
   // Not a valid BuiltinType.

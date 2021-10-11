@@ -1681,7 +1681,11 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
   // All operators that we currently support
   static const SILDIExprOperator AllOps[] = {
     SILDIExprOperator::Dereference,
-    SILDIExprOperator::Fragment
+    SILDIExprOperator::Fragment,
+    SILDIExprOperator::Plus,
+    SILDIExprOperator::Minus,
+    SILDIExprOperator::ConstUInt,
+    SILDIExprOperator::ConstSInt
   };
 
   do {
@@ -1712,6 +1716,22 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
             return true;
           }
           auto NewOperand = SILDIExprElement::createDecl(Result.getDecl());
+          DIExpr.push_back(NewOperand);
+          break;
+        }
+        case SILDIExprElement::ConstIntKind: {
+          bool IsNegative = false;
+          if (P.Tok.is(tok::oper_prefix) && P.Tok.getRawText() == "-") {
+            P.consumeToken();
+            IsNegative = true;
+          }
+          int64_t Val;
+          if (parseInteger(Val, diag::sil_invalid_constant))
+            return true;
+          if (IsNegative)
+            Val = -Val;
+          auto NewOperand =
+            SILDIExprElement::createConstInt(static_cast<uint64_t>(Val));
           DIExpr.push_back(NewOperand);
           break;
         }

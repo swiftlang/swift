@@ -209,7 +209,7 @@ static void autoApplyFixes(SourceManager &SM, unsigned BufferID,
 
   std::error_code error;
   llvm::raw_fd_ostream outs(memBuffer->getBufferIdentifier(), error,
-                            llvm::sys::fs::OpenFlags::F_None);
+                            llvm::sys::fs::OpenFlags::OF_None);
   if (!error)
     outs << Result;
 }

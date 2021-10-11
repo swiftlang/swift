@@ -216,6 +216,7 @@ sil [ossa] @unknown_use : $@convention(thin) () -> () {
 // CHECK:      [[ASFUN:%.*]] = function_ref @arrayAdoptStorage
 // CHECK-NEXT: [[ARR:%.*]] = apply [[ASFUN]]
 // CHECK-NEXT: ([[OWNER:%[0-9]+]], [[PTR:%[0-9]+]]) = destructure_tuple [[ARR]]{{.*}}
+// CHECK:      [[ACFUN:%.*]] = function_ref @arrayAppendContentsOf
 // CHECK-NOT:  apply [[ACFUN]]
 // CHECK:      [[AEFUN:%.*]] = function_ref @$sSa6appendyyxnF
 // CHECK-NEXT: [[STACK:%.*]] = alloc_stack $MyInt

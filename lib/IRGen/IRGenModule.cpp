@@ -192,19 +192,18 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
-                         SourceFile *SF,
-                         StringRef ModuleName, StringRef OutputFilename,
+                         SourceFile *SF, StringRef ModuleName,
+                         StringRef OutputFilename,
                          StringRef MainInputFilenameForDebugInfo,
                          StringRef PrivateDiscriminator)
-    : LLVMContext(new llvm::LLVMContext()),
-      IRGen(irgen), Context(irgen.SIL.getASTContext()),
+    : LLVMContext(new llvm::LLVMContext()), IRGen(irgen),
+      Context(irgen.SIL.getASTContext()),
       // The LLVMContext (and the IGM itself) will get deleted by the IGMDeleter
       // as long as the IGM is registered with the IRGenerator.
-      ClangCodeGen(createClangCodeGenerator(Context, *LLVMContext,
-                                            irgen.Opts,
+      ClangCodeGen(createClangCodeGenerator(Context, *LLVMContext, irgen.Opts,
                                             ModuleName, PrivateDiscriminator)),
       Module(*ClangCodeGen->GetModule()),
-      DataLayout(irgen.getClangDataLayout()),
+      DataLayout(irgen.getClangDataLayoutString()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
       silConv(irgen.SIL), OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
@@ -1251,7 +1250,7 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
     if (quote)
       buffer += '"';
     buffer += library;
-    if (!library.endswith_lower(".lib"))
+    if (!library.endswith_insensitive(".lib"))
       buffer += ".lib";
     if (quote)
       buffer += '"';
@@ -1482,13 +1481,6 @@ void AutolinkKind::writeEntries(llvm::SetVector<llvm::MDNode *, Vector, Set> Ent
     }
     auto EntriesConstant = llvm::ConstantDataArray::getString(
         IGM.getLLVMContext(), EntriesString, /*AddNull=*/false);
-    // Mark the swift1_autolink_entries section with the SHF_EXCLUDE attribute
-    // to get the linker to drop it in the final linked binary.
-    // LLVM doesn't provide an interface to specify section attributs in the
-    // IR so we pass the attribute with inline assembly.
-    if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::ELF)
-      IGM.Module.appendModuleInlineAsm(".section .swift1_autolink_entries,"
-                                       "\"0x80000000\"");
     auto var =
         new llvm::GlobalVariable(*IGM.getModule(), EntriesConstant->getType(),
                                  true, llvm::GlobalValue::PrivateLinkage,
@@ -1778,12 +1770,12 @@ llvm::Triple IRGenerator::getEffectiveClangTriple() {
   return llvm::Triple(CI->getTargetInfo().getTargetOpts().Triple);
 }
 
-const llvm::DataLayout &IRGenerator::getClangDataLayout() {
+const llvm::StringRef IRGenerator::getClangDataLayoutString() {
   return static_cast<ClangImporter *>(
              SIL.getASTContext().getClangModuleLoader())
       ->getTargetInfo()
-      .getDataLayout();
-  }
+      .getDataLayoutString();
+}
 
 TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
   return TypeExpansionContext::maximal(getSwiftModule(),

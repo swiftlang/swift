@@ -69,7 +69,7 @@
        "main": {
             "aliases": ["master", "swift/main", "main"],
             "repos": {
-                "llvm-project": "swift/main",
+                "llvm-project": "stable/20210726",
                 "swift": "main",
                 "cmark": "main",
                 "llbuild": "main",

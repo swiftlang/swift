@@ -30,9 +30,9 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/Serialization/ModuleDependencyScanner.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Serialization/ModuleDependencyScanner.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
@@ -44,6 +44,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include <llvm/ADT/StringExtras.h>
 
 using namespace swift;
 
@@ -61,7 +62,7 @@ std::string CompilerInvocation::getPCHHash() const {
                            SILOpts.getPCHHashComponents(),
                            IRGenOpts.getPCHHashComponents());
 
-  return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
+  return llvm::toString(llvm::APInt(64, Code), 36, /*Signed=*/false);
 }
 
 const PrimarySpecificPaths &

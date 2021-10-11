@@ -1598,26 +1598,26 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::IntegerLiteralInst: {
     // Use SILOneOperandLayout to specify the type and the literal.
-    std::string Str;
+    llvm::SmallString<10> Str;
     SILType Ty;
     switch (SI.getKind()) {
     default: llvm_unreachable("Out of sync with parent switch");
     case SILInstructionKind::IntegerLiteralInst:
-      Str = cast<IntegerLiteralInst>(&SI)->getValue().toString(10, true);
+      cast<IntegerLiteralInst>(&SI)->getValue().toString(Str, 10,
+                                                         /*signed*/ true);
       Ty = cast<IntegerLiteralInst>(&SI)->getType();
       break;
     case SILInstructionKind::FloatLiteralInst:
-      Str = cast<FloatLiteralInst>(&SI)->getBits().toString(16,
-                                                            /*Signed*/false);
+      cast<FloatLiteralInst>(&SI)->getBits().toString(Str, 16,
+                                                      /*signed*/ true);
       Ty = cast<FloatLiteralInst>(&SI)->getType();
       break;
     }
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
-    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
-        (unsigned)SI.getKind(), 0,
-        S.addTypeRef(Ty.getASTType()),
-        (unsigned)Ty.getCategory(),
-        S.addUniquedStringRef(Str));
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), 0,
+        S.addTypeRef(Ty.getASTType()), (unsigned)Ty.getCategory(),
+        S.addUniquedStringRef(Str.str()));
     break;
   }
   case SILInstructionKind::MarkFunctionEscapeInst: {

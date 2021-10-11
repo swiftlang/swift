@@ -649,7 +649,7 @@ public:
     if (Name.empty()) {
       {
         llvm::raw_svector_ostream S(Name);
-        S << '_' << NumAnonVars++;
+        S << "$_" << NumAnonVars++;
       }
       AnonymousVariables.insert({Decl, Name});
     }
@@ -952,9 +952,6 @@ public:
         if (ValueVariables.insert(shadow).second)
           ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
       }
-      auto inst = cast<llvm::Instruction>(shadow);
-      llvm::IRBuilder<> builder(inst->getNextNode());
-      shadow = builder.CreateLoad(shadow);
     }
 
     return shadow;
@@ -1027,16 +1024,9 @@ public:
       LTI.initialize(*this, e, Alloca, false /* isOutlined */);
       auto shadow = Alloca.getAddress();
       // Async functions use the value of the artificial address.
-      if (CurSILFn->isAsync() && emitLifetimeExtendingUse(shadow)) {
+      if (CurSILFn->isAsync() && emitLifetimeExtendingUse(shadow))
         if (ValueVariables.insert(shadow).second)
           ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
-        auto inst = cast<llvm::Instruction>(shadow);
-        llvm::IRBuilder<> builder(inst->getNextNode());
-        shadow = builder.CreateLoad(shadow);
-        copy.push_back(shadow);
-        return;
-      }
-
     }
     copy.push_back(Alloca.getAddress());
   }
@@ -4745,11 +4735,15 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   VarInfo->Name = getVarName(i, IsAnonymous);
   DebugTypeInfo DbgTy;
   SILType SILTy;
-  if (auto MaybeSILTy = VarInfo->Type)
+  bool IsFragmentType = false;
+  if (auto MaybeSILTy = VarInfo->Type) {
     // If there is auxiliary type info, use it
     SILTy = *MaybeSILTy;
-  else
+  } else {
     SILTy = SILVal->getType();
+    if (VarInfo->DIExpr)
+      IsFragmentType = VarInfo->DIExpr.hasFragment();
+  }
 
   auto RealTy = SILTy.getASTType();
   if (IsAddrVal && IsInCoro)
@@ -4765,11 +4759,12 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   // Figure out the debug variable type
   if (VarDecl *Decl = i->getDecl()) {
-    DbgTy = DebugTypeInfo::getLocalVariable(
-        Decl, RealTy, getTypeInfo(SILVal->getType()));
+    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealTy, getTypeInfo(SILTy),
+                                            IsFragmentType);
   } else if (!SILTy.hasArchetype() && !VarInfo->Name.empty()) {
     // Handle the cases that read from a SIL file
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy));
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy),
+                                           IsFragmentType);
   } else
     return;
 
@@ -5124,18 +5119,24 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   }
 
   SILType SILTy;
-  if (auto MaybeSILTy = VarInfo->Type)
+  bool IsFragmentType = false;
+  if (auto MaybeSILTy = VarInfo->Type) {
     // If there is auxiliary type info, use it
     SILTy = *MaybeSILTy;
-  else
+  } else {
     SILTy = i->getType();
+    if (VarInfo->DIExpr)
+      IsFragmentType = VarInfo->DIExpr.hasFragment();
+  }
   auto RealType = SILTy.getASTType();
   DebugTypeInfo DbgTy;
   if (Decl) {
-    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type);
+    DbgTy =
+        DebugTypeInfo::getLocalVariable(Decl, RealType, type, IsFragmentType);
   } else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
              !VarInfo->Name.empty()) {
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy));
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy),
+                                           IsFragmentType);
   } else
     return;
 
@@ -5355,7 +5356,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       IGM.getMaximalTypeExpansionContext(),
       i->getBoxType(), IGM.getSILModule().Types, 0);
   auto RealType = SILTy.getASTType();
-  auto DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type);
+  auto DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type, false);
 
   auto VarInfo = i->getVarInfo();
   assert(VarInfo && "debug_value without debug info");

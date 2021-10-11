@@ -84,7 +84,7 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName =
           llvm::sys::path::stem(MainExecutablePath).str();
-      Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
+      Table->printHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Autolink Extract", options::AutolinkExtractOption,
                        0, /*ShowAllAliases*/false);
       return 1;
@@ -252,7 +252,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 
   std::string OutputFilename = Invocation.getOutputFilename();
   std::error_code EC;
-  llvm::raw_fd_ostream OutOS(OutputFilename, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream OutOS(OutputFilename, EC, llvm::sys::fs::OF_None);
   if (OutOS.has_error() || EC) {
     Instance.getDiags().diagnose(SourceLoc(), diag::error_opening_output,
                                  OutputFilename, EC.message());

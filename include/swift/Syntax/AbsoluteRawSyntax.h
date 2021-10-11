@@ -16,6 +16,8 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Syntax/RawSyntax.h"
 
+#include "llvm/ADT/STLForwardCompat.h"
+
 namespace swift {
 namespace syntax {
 
@@ -388,8 +390,7 @@ public:
   OptionalStorage(OptionalStorage &&other) = default;
 
   template <class... ArgTypes>
-  explicit OptionalStorage(llvm::optional_detail::in_place_t,
-                           ArgTypes &&...Args)
+  explicit OptionalStorage(llvm::in_place_t, ArgTypes &&...Args)
       : Storage(std::forward<ArgTypes>(Args)...) {}
 
   void reset() { Storage = AbsoluteRawSyntax(nullptr); }

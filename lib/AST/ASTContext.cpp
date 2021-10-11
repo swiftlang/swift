@@ -2123,7 +2123,7 @@ void ASTContext::getVisibleTopLevelModuleNames(
 
   // Sort and unique.
   std::sort(names.begin(), names.end(), [](Identifier LHS, Identifier RHS) {
-    return LHS.str().compare_lower(RHS.str()) < 0;
+    return LHS.str().compare_insensitive(RHS.str()) < 0;
   });
   names.erase(std::unique(names.begin(), names.end()), names.end());
 }

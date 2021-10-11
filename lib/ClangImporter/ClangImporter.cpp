@@ -1180,7 +1180,7 @@ ClangImporter::create(ASTContext &ctx,
   //
   // FIXME: We shouldn't need to do this, the target should be immutable once
   // created. This complexity should be lifted elsewhere.
-  instance.getTarget().adjust(instance.getLangOpts());
+  instance.getTarget().adjust(clangDiags, instance.getLangOpts());
 
   if (importerOpts.Mode == ClangImporterOptions::Modes::EmbedBitcode)
     return importer;

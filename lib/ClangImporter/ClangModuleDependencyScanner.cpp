@@ -80,26 +80,6 @@ llvm::ErrorOr<StringRef> ClangModuleDependenciesCacheImpl::getImportHackFile(Str
   return importHackFileCache[moduleName];
 }
 
-namespace {
-  class SingleCommandCompilationDatabase : public CompilationDatabase {
-  public:
-    SingleCommandCompilationDatabase(CompileCommand Cmd)
-        : Command(std::move(Cmd)) {}
-
-    virtual std::vector<CompileCommand>
-    getCompileCommands(StringRef FilePath) const override {
-      return {Command};
-    }
-
-    virtual std::vector<CompileCommand> getAllCompileCommands() const override {
-      return {Command};
-    }
-
-  private:
-    CompileCommand Command;
-  };
-}
-
 // Add search paths.
 // Note: This is handled differently for the Clang importer itself, which
 // adds search paths to Clang's data structures rather than to its
@@ -206,7 +186,7 @@ void ClangImporter::recordModuleDependencies(
   for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
     // If we've already cached this information, we're done.
     if (cache.hasDependencies(
-                    clangModuleDep.ModuleName,
+                    clangModuleDep.ID.ModuleName,
                     {ModuleDependenciesKind::Clang, currentSwiftSearchPathSet}))
       continue;
 
@@ -261,7 +241,8 @@ void ClangImporter::recordModuleDependencies(
 
     // Add all args the non-path arguments required to be passed in, according
     // to the Clang scanner
-    for (const auto &clangArg : clangModuleDep.NonPathCommandLine) {
+    for (const auto &clangArg :
+         clangModuleDep.getAdditionalArgsWithoutModulePaths()) {
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back("-Xclang");
       swiftArgs.push_back("-Xcc");
@@ -281,7 +262,7 @@ void ClangImporter::recordModuleDependencies(
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
-    swiftArgs.push_back(clangModuleDep.ModuleName);
+    swiftArgs.push_back(clangModuleDep.ID.ModuleName);
 
     // Pass down search paths to the -emit-module action.
     // Unlike building Swift modules, we need to include all search paths to
@@ -301,7 +282,7 @@ void ClangImporter::recordModuleDependencies(
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(
         clangModuleDep.ClangModuleMapFile,
-        clangModuleDep.ContextHash,
+        clangModuleDep.ID.ContextHash,
         swiftArgs,
         fileDeps,
         capturedPCMArgs);
@@ -309,7 +290,7 @@ void ClangImporter::recordModuleDependencies(
       dependencies.addModuleDependency(moduleName.ModuleName, &alreadyAddedModules);
     }
 
-    cache.recordDependencies(clangModuleDep.ModuleName,
+    cache.recordDependencies(clangModuleDep.ID.ModuleName,
                              std::move(dependencies));
   }
 }
@@ -336,17 +317,13 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   }
 
   // Determine the command-line arguments for dependency scanning.
-
   std::vector<std::string> commandLineArgs =
     getClangDepScanningInvocationArguments(ctx, *importHackFile);
-
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
-  CompileCommand command(workingDir, *importHackFile, commandLineArgs, "-");
-  SingleCommandCompilationDatabase database(command);
 
   auto clangDependencies = clangImpl->tool.getFullDependencies(
-      database, workingDir, clangImpl->alreadySeen);
+      commandLineArgs, workingDir, clangImpl->alreadySeen);
   if (!clangDependencies) {
     // FIXME: Route this to a normal diagnostic.
     llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());
@@ -394,14 +371,11 @@ bool ClangImporter::addBridgingHeaderDependencies(
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
     getClangDepScanningInvocationArguments(ctx, bridgingHeader);
-
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
-  CompileCommand command(workingDir, bridgingHeader, commandLineArgs, "-");
-  SingleCommandCompilationDatabase database(command);
 
   auto clangDependencies = clangImpl->tool.getFullDependencies(
-      database, workingDir, clangImpl->alreadySeen);
+      commandLineArgs, workingDir, clangImpl->alreadySeen);
 
   if (!clangDependencies) {
     // FIXME: Route this to a normal diagnostic.

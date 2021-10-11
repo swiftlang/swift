@@ -222,7 +222,8 @@ sil @unknown_use : $@convention(thin) () -> () {
 // CHECK:      [[ASFUN:%.*]] = function_ref @arrayAdoptStorage
 // CHECK-NEXT: [[ARR:%.*]] = apply [[ASFUN]]
 // CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[ARR]]{{.*}}, 0
-// CHECK-NOT:    apply [[ACFUN]]
+// CHECK:      [[ACFUN:%.*]] = function_ref @arrayAppendContentsOf
+// CHECK-NOT:  apply [[ACFUN]]
 // CHECK:      [[AEFUN:%.*]] = function_ref @$sSa6appendyyxnF
 // CHECK-NEXT: [[STACK:%.*]] = alloc_stack $MyInt
 // CHECK-NEXT: store %{{[0-9]+}} to [[STACK]]

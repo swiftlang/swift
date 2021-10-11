@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # ==-- jobstats - support for reading the contents of stats dirs --==#
 #

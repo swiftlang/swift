@@ -97,7 +97,7 @@ bool swift::emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
     return false;
 
   std::error_code EC;
-  llvm::raw_fd_ostream out(dependenciesFilePath, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(dependenciesFilePath, EC, llvm::sys::fs::OF_None);
 
   if (out.has_error() || EC) {
     diags.diagnose(SourceLoc(), diag::error_opening_output,
