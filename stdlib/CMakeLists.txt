@@ -109,6 +109,10 @@ option(SWIFT_STDLIB_OS_VERSIONING
        "Build stdlib with availability based on OS versions (Darwin only)."
        TRUE)
 
+option(SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
+       "Build stdlib without a custom implementation of MetadataAllocator, relying on malloc+free instead."
+       FALSE)
+
 option(SWIFT_BUILD_TEST_SUPPORT_MODULES
        "Whether to build StdlibUnittest and other test support modules. Defaults to On when SWIFT_BUILD_SDK_OVERLAY is On, or when SWIFT_INCLUDE_TESTS is On."
        "${SWIFT_BUILD_TEST_SUPPORT_MODULES_default}")
