@@ -80,6 +80,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/FileSystem.h"
 
 #if __has_include(<unistd.h>)
 #include <unistd.h>
@@ -660,6 +661,22 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   }
 }
 
+static bool writeModuleSemanticInfoIfNeeded(CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (!frontendOpts.InputsAndOutputs.hasModuleSemanticInfoOutputPath())
+    return false;
+  std::error_code EC;
+  assert(frontendOpts.InputsAndOutputs.isWholeModule() &&
+         "TBDPath only makes sense when the whole module can be seen");
+  auto ModuleSemanticPath = frontendOpts.InputsAndOutputs
+    .getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs
+    .ModuleSemanticInfoOutputPath;
+  llvm::raw_fd_ostream OS(ModuleSemanticPath, EC, llvm::sys::fs::OF_None);
+  OS << "{}\n";
+  return false;
+}
+
 static bool writeTBDIfNeeded(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &frontendOpts = Invocation.getFrontendOptions();
@@ -842,6 +859,9 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     hadAnyError |= writeTBDIfNeeded(Instance);
   }
 
+  {
+    hadAnyError |= writeModuleSemanticInfoIfNeeded(Instance);
+  }
   return hadAnyError;
 }
 
