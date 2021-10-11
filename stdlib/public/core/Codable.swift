@@ -5626,7 +5626,8 @@ extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
         let codingKey = _DictionaryCodingKey(intValue: key as! Int)
         try container.encode(value, forKey: codingKey)
       }
-    } else if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *), Key.self is CodingKeyRepresentable.Type {
+    } else if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *),
+              Key.self is CodingKeyRepresentable.Type {
       // Since the keys are CodingKeyRepresentable, we can use the `codingKey`
       // to create `_DictionaryCodingKey` instances.
       var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
