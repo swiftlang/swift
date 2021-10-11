@@ -2025,7 +2025,6 @@ namespace {
       case SILLinkage::Hidden:
       case SILLinkage::HiddenExternal:
       case SILLinkage::Private:
-      case SILLinkage::PrivateExternal:
         return true;
         
       case SILLinkage::Shared:

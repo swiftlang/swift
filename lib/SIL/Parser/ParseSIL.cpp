@@ -779,7 +779,6 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
     .Case("public_external", SILLinkage::PublicExternal)
     .Case("hidden_external", SILLinkage::HiddenExternal)
     .Case("shared_external", SILLinkage::SharedExternal)
-    .Case("private_external", SILLinkage::PrivateExternal)
     .Default(None);
 
   // If we succeed, consume the token.

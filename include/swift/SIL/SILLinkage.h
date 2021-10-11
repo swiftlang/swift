@@ -85,11 +85,6 @@ enum class SILLinkage : uint8_t {
   /// shared.
   SharedExternal,
 
-  /// The same as SharedExternal, except that the definition is private in the
-  /// other module. This can only occur if an inlined fragile function from
-  /// another module references a private definition in the other module.
-  PrivateExternal,
-
   /// The default linkage for a definition.
   DefaultForDefinition = Public,
 
@@ -138,8 +133,6 @@ inline SILLinkage stripExternalFromLinkage(SILLinkage linkage) {
     return SILLinkage::Hidden;
   if (linkage == SILLinkage::SharedExternal)
     return SILLinkage::Shared;
-  if (linkage == SILLinkage::PrivateExternal)
-    return SILLinkage::Private;
   return linkage;
 }
 
@@ -158,10 +151,8 @@ inline SILLinkage addExternalToLinkage(SILLinkage linkage) {
   case SILLinkage::Hidden:
     return SILLinkage::HiddenExternal;
   case SILLinkage::Private:
-    return SILLinkage::PrivateExternal;
   case SILLinkage::PublicExternal:
   case SILLinkage::SharedExternal:
-  case SILLinkage::PrivateExternal:
   case SILLinkage::HiddenExternal:
     return linkage;
   }
@@ -197,7 +188,6 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
   case SILLinkage::Shared:
   case SILLinkage::SharedExternal:
   case SILLinkage::Private:
-  case SILLinkage::PrivateExternal:
   case SILLinkage::HiddenExternal:
     return false;
   }
@@ -216,7 +206,6 @@ inline bool hasSharedVisibility(SILLinkage linkage) {
   case SILLinkage::Hidden:
   case SILLinkage::HiddenExternal:
   case SILLinkage::Private:
-  case SILLinkage::PrivateExternal:
     return false;
   }
 
@@ -226,7 +215,6 @@ inline bool hasSharedVisibility(SILLinkage linkage) {
 inline bool hasPrivateVisibility(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Private:
-  case SILLinkage::PrivateExternal:
     return true;
   case SILLinkage::Public:
   case SILLinkage::PublicExternal:
@@ -247,8 +235,7 @@ inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
   case SubclassScope::External:
     if (linkage == SILLinkage::Private || linkage == SILLinkage::Hidden)
       return SILLinkage::Public;
-    if (linkage == SILLinkage::PrivateExternal ||
-        linkage == SILLinkage::HiddenExternal)
+    if (linkage == SILLinkage::HiddenExternal)
       return SILLinkage::PublicExternal;
     break;
 

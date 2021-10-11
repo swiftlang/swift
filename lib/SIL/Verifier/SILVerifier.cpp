@@ -5996,6 +5996,8 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
       continue;
 
     SILFunction *F = E.getMethodWitness().Witness;
+    if (!F)
+      continue;
 
 #if 0
     // FIXME: For now, all default witnesses are private.

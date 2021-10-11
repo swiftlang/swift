@@ -609,7 +609,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     auto *nominal = getType().getAnyNominal();
     if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
       return SILLinkage::Shared;
-    return forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal;
+    assert(forDefinition);
+    return SILLinkage::Private;
   }
 
   case Kind::TypeMetadataAccessFunction:
