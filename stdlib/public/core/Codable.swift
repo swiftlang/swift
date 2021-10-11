@@ -5690,23 +5690,20 @@ extension Dictionary: Decodable where Key: Decodable, Value: Decodable {
         let value = try container.decode(Value.self, forKey: key)
         self[key.intValue! as! Key] = value
       }
-    } else if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *), let codingKeyRepresentableType = Key.self as? CodingKeyRepresentable.Type {
-      // The keys are CodingKeyRepresentable, so we should be able to expect a keyed container.
+    } else if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *),
+              let keyType = Key.self as? CodingKeyRepresentable.Type {
+      // The keys are CodingKeyRepresentable, so we should be able to expect
+      // a keyed container.
       let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
-      for dictionaryCodingKey in container.allKeys {
-        guard let key: Key = codingKeyRepresentableType.init(
-          codingKey: dictionaryCodingKey
-        ) as? Key else {
+      for codingKey in container.allKeys {
+        guard let key: Key = keyType.init(codingKey: codingKey) as? Key else {
           throw DecodingError.dataCorruptedError(
-            forKey: dictionaryCodingKey,
+            forKey: codingKey,
             in: container,
             debugDescription: "Could not convert key to type \(Key.self)"
           )
         }
-        let value: Value = try container.decode(
-          Value.self,
-          forKey: dictionaryCodingKey
-        )
+        let value: Value = try container.decode(Value.self, forKey: codingKey)
         self[key] = value
       }
     } else {
