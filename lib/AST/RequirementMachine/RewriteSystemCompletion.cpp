@@ -583,9 +583,6 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
               llvm::dbgs() << "$$ Loop: ";
               loop.dump(llvm::dbgs(), *this);
               llvm::dbgs() << "\n\n";
-
-              // Record the trivial loop.
-              recordHomotopyGenerator(loop);
             }
           }
         });
