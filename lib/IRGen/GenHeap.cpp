@@ -1852,7 +1852,9 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
         structTy = dyn_cast<llvm::StructType>(eltTy);
       } while (structTy != nullptr);
 
-      slot = IGF.Builder.CreateInBoundsGEP(object, indexes);
+      slot = IGF.Builder.CreateInBoundsGEP(
+          object->getType()->getScalarType()->getPointerElementType(), object,
+          indexes);
 
       if (!suppressCast) {
         slot = IGF.Builder.CreateBitCast(slot,

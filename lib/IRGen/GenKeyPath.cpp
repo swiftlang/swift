@@ -87,7 +87,9 @@ bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
       requirements.size() * IGF.IGM.getPointerSize().getValue());
 
     auto genericArgsOffset = IGF.Builder.CreateSub(size, genericArgsSize);
-    args = IGF.Builder.CreateInBoundsGEP(args, genericArgsOffset);
+    args = IGF.Builder.CreateInBoundsGEP(
+        args->getType()->getScalarType()->getPointerElementType(), args,
+        genericArgsOffset);
   }
   bindFromGenericRequirementsBuffer(IGF, requirements,
     Address(args, IGF.IGM.getPointerAlignment()),
@@ -414,7 +416,10 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         } else {
           offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
         }
-        auto elt = IGF.Builder.CreateInBoundsGEP(componentArgsBuf, offset);
+        auto elt = IGF.Builder.CreateInBoundsGEP(componentArgsBuf->getType()
+                                                     ->getScalarType()
+                                                     ->getPointerElementType(),
+                                                 componentArgsBuf, offset);
         auto eltAddr = ti.getAddressForPointer(
           IGF.Builder.CreateBitCast(elt, ti.getStorageType()->getPointerTo()));
         ti.destroy(IGF, eltAddr, ty,
@@ -466,8 +471,12 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         } else {
           offset = llvm::ConstantInt::get(IGM.SizeTy, 0);
         }
-        auto sourceElt = IGF.Builder.CreateInBoundsGEP(sourceArgsBuf, offset);
-        auto destElt = IGF.Builder.CreateInBoundsGEP(destArgsBuf, offset);
+        auto sourceElt = IGF.Builder.CreateInBoundsGEP(
+            sourceArgsBuf->getType()->getScalarType()->getPointerElementType(),
+            sourceArgsBuf, offset);
+        auto destElt = IGF.Builder.CreateInBoundsGEP(
+            destArgsBuf->getType()->getScalarType()->getPointerElementType(),
+            destArgsBuf, offset);
         auto sourceEltAddr = ti.getAddressForPointer(
           IGF.Builder.CreateBitCast(sourceElt,
                                     ti.getStorageType()->getPointerTo()));
@@ -487,10 +496,14 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto notAlignMask = IGF.Builder.CreateNot(envAlignMask);
         offset = IGF.Builder.CreateAdd(offset, envAlignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
-        
-        auto sourceEnv = IGF.Builder.CreateInBoundsGEP(sourceArgsBuf, offset);
-        auto destEnv = IGF.Builder.CreateInBoundsGEP(destArgsBuf, offset);
-        
+
+        auto sourceEnv = IGF.Builder.CreateInBoundsGEP(
+            sourceArgsBuf->getType()->getScalarType()->getPointerElementType(),
+            sourceArgsBuf, offset);
+        auto destEnv = IGF.Builder.CreateInBoundsGEP(
+            destArgsBuf->getType()->getScalarType()->getPointerElementType(),
+            destArgsBuf, offset);
+
         auto align = IGM.getPointerAlignment().getValue();
         IGF.Builder.CreateMemCpy(destEnv, llvm::MaybeAlign(align), sourceEnv,
                                  llvm::MaybeAlign(align),
@@ -601,8 +614,10 @@ getInitializerForComputedComponent(IRGenModule &IGM,
         offset = IGF.Builder.CreateAdd(offset, alignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
       }
-      
-      auto ptr = IGF.Builder.CreateInBoundsGEP(src, offset);
+
+      auto ptr = IGF.Builder.CreateInBoundsGEP(
+          src->getType()->getScalarType()->getPointerElementType(), src,
+          offset);
       auto addr = ti.getAddressForPointer(IGF.Builder.CreateBitCast(
         ptr, ti.getStorageType()->getPointerTo()));
       srcAddresses.push_back(addr);
@@ -630,8 +645,10 @@ getInitializerForComputedComponent(IRGenModule &IGM,
         offset = IGF.Builder.CreateAdd(offset, alignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
       }
-      
-      auto ptr = IGF.Builder.CreateInBoundsGEP(dest, offset);
+
+      auto ptr = IGF.Builder.CreateInBoundsGEP(
+          dest->getType()->getScalarType()->getPointerElementType(), dest,
+          offset);
       auto destAddr = ti.getAddressForPointer(IGF.Builder.CreateBitCast(
         ptr, ti.getStorageType()->getPointerTo()));
       
@@ -660,7 +677,9 @@ getInitializerForComputedComponent(IRGenModule &IGM,
         auto notGenericEnvAlignMask = IGF.Builder.CreateNot(genericEnvAlignMask);
         offset = IGF.Builder.CreateAdd(offset, genericEnvAlignMask);
         offset = IGF.Builder.CreateAnd(offset, notGenericEnvAlignMask);
-        destGenericEnv = IGF.Builder.CreateInBoundsGEP(dest, offset);
+        destGenericEnv = IGF.Builder.CreateInBoundsGEP(
+            dest->getType()->getScalarType()->getPointerElementType(), dest,
+            offset);
       }
       
       auto align = IGM.getPointerAlignment().getValue();
