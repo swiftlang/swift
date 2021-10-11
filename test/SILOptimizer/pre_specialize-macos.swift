@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -I %t -O -emit-sil -target x86_64-apple-macos11 %s | %FileCheck %s --check-prefix=OPT --check-prefix=CHECK
 // RUN: %target-swift-frontend -I %t -O -emit-sil -target x86_64-apple-macosx10.9 %s | %FileCheck %s --check-prefix=NOOPT --check-prefix=CHECK
 
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx && CPU=x86_64
 
 import pre_specialized_module
 import pre_specialized_module2
