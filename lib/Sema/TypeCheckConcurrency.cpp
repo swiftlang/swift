@@ -3230,9 +3230,9 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // An actor's convenience init is assumed to be actor-independent.
+  // Every actor's convenience init is assumed to be actor-independent.
   if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl())
-    if (nominal->isActor())
+    if (nominal->isAnyActor())
       if (auto ctor = dyn_cast<ConstructorDecl>(value))
         if (ctor->isConvenienceInit())
           defaultIsolation = ActorIsolation::forIndependent();

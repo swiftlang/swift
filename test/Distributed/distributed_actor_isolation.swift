@@ -172,3 +172,13 @@ func test_params(
   _ = try await distributed.distInt(int: 42) // ok
   _ = try await distributed.dist(notCodable: .init())
 }
+
+// Actor initializer isolation (through typechecking only!)
+distributed actor DijonMustard {
+  convenience init(conv: ActorTransport) {
+    self.init(transport: conv)
+    self.f() // expected-error {{actor-isolated instance method 'f()' can not be referenced from a non-isolated context}}
+  }
+
+  func f() {} // expected-note {{distributed actor-isolated instance method 'f()' declared here}}
+}
