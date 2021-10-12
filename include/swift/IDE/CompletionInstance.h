@@ -122,16 +122,6 @@ class CompletionInstance {
       llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
           Callback);
 
-public:
-  CompletionInstance() : CachedCIShouldBeInvalidated(false) {}
-
-  // Mark the cached compiler instance "should be invalidated". In the next
-  // completion, new compiler instance will be used. (Thread safe.)
-  void markCachedCompilerInstanceShouldBeInvalidated();
-
-  // Update options with \c NewOpts. (Thread safe.)
-  void setOptions(Options NewOpts);
-
   /// Calls \p Callback with a \c CompilerInstance which is prepared for the
   /// second pass. \p Callback is resposible to perform the second pass on it.
   /// The \c CompilerInstance may be reused from the previous completions,
@@ -149,6 +139,16 @@ public:
       DiagnosticConsumer *DiagC,
       llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
           Callback);
+
+public:
+  CompletionInstance() : CachedCIShouldBeInvalidated(false) {}
+
+  // Mark the cached compiler instance "should be invalidated". In the next
+  // completion, new compiler instance will be used. (Thread safe.)
+  void markCachedCompilerInstanceShouldBeInvalidated();
+
+  // Update options with \c NewOpts. (Thread safe.)
+  void setOptions(Options NewOpts);
 
   void codeComplete(
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
