@@ -21,6 +21,15 @@ struct Two {
   var b: Klass
 }
 
+struct NonTrivialStruct {
+  var val:Klass
+}
+
+public enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
 sil @unknown : $@convention(thin) () -> ()
 
 sil [ossa] @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
@@ -1408,5 +1417,51 @@ bb2:
   destroy_addr %1 : $*Two
   dealloc_stack %1 : $*Two
   unwind
+}
+
+// This does not get optimized correctly because of the conservative treatment of load_borrow/end_borrow in MemBehavior
+// CHECK-LABEL: sil [ossa] @test_temprvoborrowboundary1 :
+// CHECK: copy_addr
+// TODO-CHECK-NOT:   alloc_stack
+// TODO-CHECK-NOT:   copy_addr
+// TODO-CHECK: [[ADDR:%.*]] = unchecked_take_enum_data_addr %0 : $*FakeOptional<NonTrivialStruct>, #FakeOptional.some!enumelt
+// TODO-CHECK: [[ELE:%.*]] = struct_element_addr [[ADDR]] : $*NonTrivialStruct, #NonTrivialStruct.val
+// TODO-CHECK: [[LD:%.*]] = load_borrow [[ELE]] : $*Klass
+// TODO-CHECK: end_borrow [[LD]] : $Klass
+// TODO-CHECK: destroy_addr [[ADDR]]
+// CHECK: } // end sil function 'test_temprvoborrowboundary1'
+sil [ossa] @test_temprvoborrowboundary1 : $@convention(thin) (@in FakeOptional<NonTrivialStruct>) -> () {
+bb0(%0 : $*FakeOptional<NonTrivialStruct>):
+  %1 = alloc_stack $NonTrivialStruct
+  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<NonTrivialStruct>, #FakeOptional.some!enumelt
+  copy_addr [take] %2 to [initialization] %1 : $*NonTrivialStruct
+  %4 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %5 = load_borrow %4 : $*Klass
+  end_borrow %5 : $Klass
+  destroy_addr %1 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  %res = tuple ()
+  return %res : $()
+}
+
+// This does not get optimized because of the end borrow in a different block 
+// CHECK-LABEL: sil [ossa] @test_temprvoborrowboundary2 :
+// CHECK:   copy_addr
+// CHECK: } // end sil function 'test_temprvoborrowboundary2'
+sil [ossa] @test_temprvoborrowboundary2 : $@convention(thin) (@in FakeOptional<NonTrivialStruct>) -> () {
+bb0(%0 : $*FakeOptional<NonTrivialStruct>):
+  %1 = alloc_stack $NonTrivialStruct
+  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<NonTrivialStruct>, #FakeOptional.some!enumelt
+  copy_addr [take] %2 to [initialization] %1 : $*NonTrivialStruct
+  %4 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %5 = load_borrow %4 : $*Klass
+  br bb1(%5 : $Klass)
+
+bb1(%6 : @guaranteed $Klass):
+  end_borrow %6 : $Klass
+  destroy_addr %1 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  %res = tuple ()
+  return %res : $()
 }
 
