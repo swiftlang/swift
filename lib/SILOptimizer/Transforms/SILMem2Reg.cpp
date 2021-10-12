@@ -666,6 +666,11 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
         runningVals = beginLexicalLifetimeAfterStore(asi, si);
         // Create a use of the newly created copy in order to keep phi pruning
         // from deleting our lifetime beginning instructions.
+        //
+        // TODO: Remove this hack, it is only necessary because erasePhiArgument
+        //       calls deleteEdgeValue which calls
+        //       deleteTriviallyDeadOperandsOfDeadArgument and deletes the copy
+        //       and borrow that we added and want not to have deleted.
         SILBuilderWithScope::insertAfter(
             runningVals->value.copy->getDefiningInstruction(),
             [&](auto builder) {
