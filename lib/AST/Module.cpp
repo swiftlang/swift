@@ -1501,7 +1501,7 @@ StringRef ModuleDecl::ReverseFullNameIterator::operator*() const {
   assert(current && "all name components exhausted");
 
   if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>())
-    return swiftModule->getName().str();
+    return swiftModule->getRealName().str();
 
   auto *clangModule =
       static_cast<const clang::Module *>(current.get<const void *>());

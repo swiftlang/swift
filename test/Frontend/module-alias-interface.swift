@@ -20,7 +20,7 @@
 
 // RUN: %FileCheck %s -input-file %t/FooInterface.swiftinterface -check-prefix CHECK-IMPORT
 // CHECK-IMPORT: -module-alias Cat=Baz
-// CHECK-IMPORT: import Cat
+// CHECK-IMPORT: import Baz
 
 // RUN: %FileCheck %s -input-file %t/load-result.output -check-prefix CHECK-LOAD
 // CHECK-LOAD: remark: loaded module at {{.*}}Baz.swiftmodule

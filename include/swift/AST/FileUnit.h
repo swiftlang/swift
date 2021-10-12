@@ -293,7 +293,7 @@ public:
   /// Usually this is the module name itself, but certain Clang features allow
   /// substituting another name instead.
   virtual StringRef getExportedModuleName() const {
-    return getParentModule()->getName().str();
+    return getParentModule()->getRealName().str();
   }
 
   /// Traverse the decls within this file.

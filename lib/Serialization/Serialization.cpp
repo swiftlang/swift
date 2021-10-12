@@ -752,7 +752,7 @@ IdentifierID Serializer::addModuleRef(const ModuleDecl *module) {
   if (module == this->M->getASTContext().TheBuiltinModule)
     return BUILTIN_MODULE_ID;
   auto moduleName =
-      module->getASTContext().getIdentifier(module->getName().str());
+      module->getASTContext().getIdentifier(module->getRealName().str());
   return addDeclBaseNameRef(moduleName);
 }
 
@@ -961,7 +961,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     control_block::RevisionLayout Revision(Out);
     control_block::IsOSSALayout IsOSSA(Out);
 
-    ModuleName.emit(ScratchRecord, M->getName().str());
+    ModuleName.emit(ScratchRecord, M->getRealName().str());
 
     SmallString<32> versionStringBuf;
     llvm::raw_svector_ostream versionString(versionStringBuf);
