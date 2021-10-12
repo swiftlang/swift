@@ -39,15 +39,8 @@ func test_detach() async {
     print("a2: \(a2)") // CHECK: a2: TaskPriority(rawValue: 25)
   }.get()
 
-  await detach(priority: .default) {
-    let a3 = Task.currentPriority
-    // The priority of 'a3' may either be 21 (default) or elevated to that of
-    // the main function.
-    print("a3: \(a3)") // CHECK: a3: TaskPriority(rawValue: {{21|[[#MAIN_PRIORITY]]}})
-  }.get()
-
-  let a4 = Task.currentPriority
-  print("a4: \(a4)") // CHECK: a4: TaskPriority(rawValue: [[#MAIN_PRIORITY]])
+  let a3 = Task.currentPriority
+  print("a3: \(a3)") // CHECK: a3: TaskPriority(rawValue: [[#MAIN_PRIORITY]])
 }
 
 @available(SwiftStdlib 5.5, *)
