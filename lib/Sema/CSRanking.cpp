@@ -771,16 +771,18 @@ static void addKeyPathDynamicMemberOverloads(
 /// shouldn't be compared.
 static Optional<std::pair<Type, Type>>
 getConstructorParamsAsTuples(ASTContext &ctx, Type boundTy1, Type boundTy2) {
-  // If the bound types are placeholders, they haven't been resolved, so let's
-  // not try and rank them.
-  if (boundTy1->isPlaceholder() || boundTy2->isPlaceholder())
+  auto choiceTy1 =
+      boundTy1->lookThroughAllOptionalTypes()->getAs<FunctionType>();
+  auto choiceTy2 =
+      boundTy2->lookThroughAllOptionalTypes()->getAs<FunctionType>();
+
+  // If the type variables haven't been bound to functions yet, let's not try
+  // and rank them.
+  if (!choiceTy1 || !choiceTy2)
     return None;
 
-  auto choiceTy1 = boundTy1->lookThroughAllOptionalTypes();
-  auto choiceTy2 = boundTy2->lookThroughAllOptionalTypes();
-
-  auto initParams1 = choiceTy1->castTo<FunctionType>()->getParams();
-  auto initParams2 = choiceTy2->castTo<FunctionType>()->getParams();
+  auto initParams1 = choiceTy1->getParams();
+  auto initParams2 = choiceTy2->getParams();
   if (initParams1.size() != initParams2.size())
     return None;
 
