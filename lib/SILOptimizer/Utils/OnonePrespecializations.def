@@ -1,3 +1,5 @@
+_Pragma("clang diagnostic push")
+_Pragma("clang diagnostic ignored \"-Wdollar-in-identifier-extension\"")
 PRESPEC_SYMBOL($sS2ayxGycfCSJ_Tg5)
 PRESPEC_SYMBOL($sS2ayxGycfCSS_Tg5)
 PRESPEC_SYMBOL($sS2ayxGycfCSd_Tg5)
@@ -1196,3 +1198,4 @@ PRESPEC_SYMBOL($ss22_ContiguousArrayBufferVAByxGycfCs6UInt64V_Tg5)
 PRESPEC_SYMBOL($ss22_ContiguousArrayBufferVAByxGycfCs7UnicodeO6ScalarV_Tg5)
 PRESPEC_SYMBOL($ss27_allocateUninitializedArrayySayxG_BptBwlFyp_Tg5)
 
+_Pragma("clang diagnostic pop")
