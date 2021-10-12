@@ -6214,8 +6214,11 @@ ConstraintSystem::simplifyConstructionConstraint(
 
   auto fnLocator = getConstraintLocator(locator,
                                         ConstraintLocator::ApplyFunction);
-  auto memberType = createTypeVariable(fnLocator,
-                                       TVO_CanBindToNoEscape);
+  auto memberTypeLoc =
+      getConstraintLocator(fnLocator, LocatorPathElt::ConstructorMemberType(
+                                          /*shortFormOrSelfDelegating*/ true));
+
+  auto memberType = createTypeVariable(memberTypeLoc, TVO_CanBindToNoEscape);
 
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. T2 is the result type provided via the construction
@@ -11338,7 +11341,10 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       ArgumentLists.insert({memberLoc, argList});
     }
 
-    auto *memberTy = createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
+    auto *memberTypeLoc = getConstraintLocator(
+        applicationLoc, LocatorPathElt::ConstructorMemberType());
+
+    auto *memberTy = createTypeVariable(memberTypeLoc, TVO_CanBindToNoEscape);
 
     addValueMemberConstraint(MetatypeType::get(type2, getASTContext()),
                              DeclNameRef(DeclBaseName::createConstructor()),
