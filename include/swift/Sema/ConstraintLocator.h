@@ -1106,6 +1106,14 @@ public:
     return false;
   }
 
+  bool isForRequirement(RequirementKind kind) const {
+    if (auto lastElt = last()) {
+      auto requirement = lastElt->getAs<LocatorPathElt::AnyRequirement>();
+      return requirement && kind == requirement->getRequirementKind();
+    }
+    return false;
+  }
+
   /// Checks whether this locator is describing an argument application for a
   /// non-ephemeral parameter.
   bool isNonEphemeralParameterApplication() const {

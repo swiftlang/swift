@@ -1864,6 +1864,18 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
     if (!cs.findSelectedOverloadFor(calleeLoc))
       return 10;
   }
+  
+  auto resolvedTy = cs.simplifyType(requirementType);
+
+  // Increase the impact of a conformance fix for generic parameters on
+  // operators where such conformance failures are not as important as argument
+  // mismatches or contextual failures.
+  if (auto *ODRE = getAsExpr<OverloadedDeclRefExpr>(anchor)) {
+    if (locator.isForRequirement(RequirementKind::Conformance) &&
+        resolvedTy->is<ArchetypeType>() && ODRE->isForOperator()) {
+      ++impact;
+    }
+  }
 
   // Increase the impact of a conformance fix for a standard library
   // or foundation type, as it's unlikely to be a good suggestion.
@@ -1876,16 +1888,11 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   // rdar://60727310. Once we better handle the separation of conformance fixes
   // from argument mismatches in cases like SR-12438, we should be able to
   // remove it from the condition.
-  auto resolvedTy = cs.simplifyType(requirementType);
   if ((requirementType->is<TypeVariableType>() && resolvedTy->isStdlibType()) ||
       resolvedTy->isAny() || resolvedTy->isAnyObject() ||
       getKnownFoundationEntity(resolvedTy->getString())) {
-    if (auto last = locator.last()) {
-      if (auto requirement = last->getAs<LocatorPathElt::AnyRequirement>()) {
-        auto kind = requirement->getRequirementKind();
-        if (kind == RequirementKind::Conformance)
-          impact += 2;
-      }
+    if (locator.isForRequirement(RequirementKind::Conformance)) {
+      impact += 2;
     }
   }
 
