@@ -1893,7 +1893,7 @@ public:
     // elements.
     bool SimpleType = true;
     for (auto &Elt : TI->getType().castTo<TupleType>()->getElements()) {
-      if (Elt.hasName() || Elt.isVararg()) {
+      if (Elt.hasName()) {
         SimpleType = false;
         break;
       }

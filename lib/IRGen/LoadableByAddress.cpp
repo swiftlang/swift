@@ -453,10 +453,7 @@ SILType LargeSILTypeMapper::getNewTupleType(GenericEnvironment *GenericEnv,
     auto origCanType = CanType(canElem.getRawType());
     auto elem = SILType::getPrimitiveObjectType(origCanType);
     auto newElem = getNewSILType(GenericEnv, elem, Mod);
-    auto newTupleType =
-        TupleTypeElt(newElem.getASTType(), canElem.getName(),
-                     canElem.getParameterFlags());
-    newElems.push_back(newTupleType);
+    newElems.emplace_back(newElem.getASTType(), canElem.getName());
   }
   auto type = TupleType::get(newElems, nonOptionalType.getASTContext());
   auto canType = CanType(type);

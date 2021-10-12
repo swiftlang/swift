@@ -1649,11 +1649,7 @@ namespace {
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
-
-      auto &ctx = CS.getASTContext();
-      auto parenType = CS.getType(expr->getSubExpr())->getInOutObjectType();
-      auto parenFlags = ParameterTypeFlags().withInOut(expr->isSemanticallyInOutExpr());
-      return ParenType::get(ctx, parenType, parenFlags);
+      return ParenType::get(CS.getASTContext(), CS.getType(expr->getSubExpr()));
     }
 
     Type visitTupleExpr(TupleExpr *expr) {

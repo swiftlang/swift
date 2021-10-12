@@ -60,9 +60,6 @@ Expr *TypeChecker::buildDefaultInitializer(Type type) {
   if (auto tupleType = type->getAs<TupleType>()) {
     SmallVector<Expr *, 2> inits;
     for (const auto &elt : tupleType->getElements()) {
-      if (elt.isVararg())
-        return nullptr;
-
       auto eltInit = TypeChecker::buildDefaultInitializer(elt.getType());
       if (!eltInit)
         return nullptr;

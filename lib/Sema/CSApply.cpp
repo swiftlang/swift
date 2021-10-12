@@ -1245,9 +1245,7 @@ namespace {
 
       case ValueOwnership::Owned:
       case ValueOwnership::Shared:
-        auto selfArgTy = ParenType::get(context, selfParam.getPlainType(),
-                                        selfParam.getParameterFlags());
-        selfOpenedRef->setType(selfArgTy);
+        selfOpenedRef->setType(selfParam.getPlainType());
         cs.cacheType(selfOpenedRef);
         break;
       }
@@ -5428,7 +5426,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
 
     converted.push_back(toElt);
     labels.push_back(toLabel);
-    convertedElts.emplace_back(toEltType, toLabel, ParameterTypeFlags());
+    convertedElts.emplace_back(toEltType, toLabel);
   }
 
   // Shuffling tuple elements is an anti-pattern worthy of a diagnostic.  We

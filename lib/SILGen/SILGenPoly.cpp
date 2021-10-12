@@ -1182,8 +1182,6 @@ namespace {
                                     CanTupleType inputTupleType,
                                     AbstractionPattern outputOrigType,
                                     CanTupleType outputTupleType) {
-      assert(!inputTupleType->hasElementWithOwnership() &&
-             !outputTupleType->hasElementWithOwnership());
       assert(inputTupleType->getNumElements() ==
              outputTupleType->getNumElements());
 
@@ -1272,8 +1270,6 @@ namespace {
                                    CanTupleType outputSubstType) {
       assert(inputOrigType.matchesTuple(inputSubstType));
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasElementWithOwnership() &&
-             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -1294,8 +1290,6 @@ namespace {
                                   ManagedValue inputTupleAddr) {
       assert(inputOrigType.isTypeParameter());
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasElementWithOwnership() &&
-             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -1341,8 +1335,6 @@ namespace {
                                  TemporaryInitialization &tupleInit) {
       assert(inputOrigType.matchesTuple(inputSubstType));
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasElementWithOwnership() &&
-             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
