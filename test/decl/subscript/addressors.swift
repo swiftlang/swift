@@ -67,19 +67,6 @@ struct RepeatedMutable {
   }
 }
 
-struct AddressorAndGet {
-  var base: UnsafePointer<Int>
-
-  subscript(index: Int) -> Int {
-    unsafeAddress { // expected-error {{subscript cannot provide both an addressor and a getter}}
-      return base
-    }
-    get { // expected-note {{getter defined here}}
-      return base.get() // expected-error {{value of type 'UnsafePointer<Int>' has no member 'get'}}
-    }
-  }
-}
-
 struct AddressorAndSet {
   var base: UnsafePointer<Int>
 
