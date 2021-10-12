@@ -849,11 +849,29 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
     // There could be a local ambiguity related to
     // the current element, let's try to resolve it.
-    if (Solutions.size() > 1) {
+    if (Solutions.size() > 1)
       filterSolutions(Solutions, /*minimize=*/true);
 
-      if (Solutions.size() != 1)
-        return failConjunction();
+    // In diagnostic mode we need to stop a conjunction
+    // but consider it successful if there are:
+    //
+    // - More than one solution for this element. Ambiguity
+    //   needs to get propagated back to the outer context
+    //   to be diagnosed.
+    // - A single solution that requires one or more fixes,
+    //   continuing would result in more errors associated
+    //   with the failed element.
+    if (CS.shouldAttemptFixes()) {
+      if (Solutions.size() > 1)
+        Producer.markExhausted();
+
+      if (Solutions.size() == 1) {
+        auto score = Solutions.front().getFixedScore();
+        if (score.Data[SK_Fix] > 0)
+          Producer.markExhausted();
+      }
+    } else if (Solutions.size() != 1) {
+      return failConjunction();
     }
 
     // Since there is only one solution, let's
@@ -888,6 +906,33 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
       assert(
           Snapshot &&
           "Isolated conjunction requires a snapshot of the constraint system");
+
+      // In diagnostic mode it's valid for an element to have
+      // multiple solutions. Ambiguity just needs to be merged
+      // into the outer context to be property diagnosed.
+      if (Solutions.size() > 1) {
+        assert(CS.shouldAttemptFixes());
+
+        // Restore all outer type variables, constraints
+        // and scoring information.
+        Snapshot.reset();
+        restoreOuterState();
+
+        // Apply all of the information deduced from the
+        // conjunction (up to the point of ambiguity)
+        // back to the outer context and form a joined solution.
+        for (auto &solution : Solutions) {
+          ConstraintSystem::SolverScope scope(CS);
+
+          CS.applySolution(solution);
+          // Note that `worseThanBestSolution` isn't checked
+          // here because `Solutions` were pre-filtered, and
+          // outer score is the same for all of them.
+          OuterSolutions.push_back(CS.finalize());
+        }
+
+        return done(/*isSuccess=*/true);
+      }
 
       // Restore outer type variables and prepare to solve
       // constraints associated with outer context together
