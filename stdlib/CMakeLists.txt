@@ -62,6 +62,12 @@ else()
   set(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING_default TRUE)
 endif()
 
+if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_STDLIB_HAS_ASL_default TRUE)
+else()
+  set(SWIFT_STDLIB_HAS_ASL_default FALSE)
+endif()
+
 #
 # User-configurable options for the standard library.
 #
@@ -96,6 +102,10 @@ option(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION
 option(SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
        "Build stdlib assuming the Darwin build of stdlib can use extended libmalloc APIs"
        TRUE)
+
+option(SWIFT_STDLIB_HAS_ASL
+       "Build stdlib assuming we can use the asl_log API."
+       "${SWIFT_STDLIB_HAS_ASL_default}")
 
 option(SWIFT_STDLIB_HAS_STDIN
        "Build stdlib assuming the platform supports stdin and getline API."
