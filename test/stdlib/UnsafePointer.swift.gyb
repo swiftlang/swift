@@ -472,4 +472,21 @@ ${SelfName}TestSuite.test("withMemoryRebound") {
 
 % end
 
+struct TestStruct {
+  var x: Float
+  var y: Int
+}
+
+UnsafeMutablePointerTestSuite.test("dynamicMember") {
+  let mut = UnsafeMutablePointer<TestStruct>.allocate(capacity: 1)
+  defer { mut.deallocate() }
+
+  let test = TestStruct(x: .random(in: 0..<100), y: .random(in: 0..<100))
+  mut.initialize(to: test)
+  defer { mut.deinitialize(count: 1) }
+
+  expectEqual(test.x, mut.x?.pointee)
+  expectEqual(test.y, mut.y?.pointee)
+}
+
 runAllTests()
