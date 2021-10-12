@@ -3582,6 +3582,7 @@ StringRef ClangModuleUnit::getExportedModuleName() const {
   if (clangModule && !clangModule->ExportAsModule.empty())
     return clangModule->ExportAsModule;
 
+  // Return module real name (see FileUnit::getExportedModuleName)
   return getParentModule()->getRealName().str();
 }
 

@@ -751,6 +751,8 @@ IdentifierID Serializer::addModuleRef(const ModuleDecl *module) {
     return CURRENT_MODULE_ID;
   if (module == this->M->getASTContext().TheBuiltinModule)
     return BUILTIN_MODULE_ID;
+  // Use module 'real name', which can be different from 'name'
+  // in case module aliasing was used (-module-alias flag)
   auto moduleName =
       module->getASTContext().getIdentifier(module->getRealName().str());
   return addDeclBaseNameRef(moduleName);
@@ -961,6 +963,8 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     control_block::RevisionLayout Revision(Out);
     control_block::IsOSSALayout IsOSSA(Out);
 
+    // Write module 'real name', which can be different from 'name'
+    // in case module aliasing is used (-module-alias flag)
     ModuleName.emit(ScratchRecord, M->getRealName().str());
 
     SmallString<32> versionStringBuf;
@@ -1101,6 +1105,9 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 static void flattenImportPath(const ImportedModule &import,
                               SmallVectorImpl<char> &out) {
   llvm::raw_svector_ostream outStream(out);
+  // Write module 'real name' (returned by getReverseFullModuleName),
+  // which can be different from 'name' in case module aliasing was
+  // used (-module-alias flag)
   import.importedModule->getReverseFullModuleName().printForward(
       outStream, StringRef("\0", 1));
 
