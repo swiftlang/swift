@@ -1632,8 +1632,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
   case ConstraintKind::BridgingConversion:
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
@@ -1773,8 +1771,6 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
@@ -2178,8 +2174,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::ValueMember:
   case ConstraintKind::ValueWitness:
   case ConstraintKind::BridgingConversion:
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
@@ -5266,8 +5260,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
     case ConstraintKind::ValueWitness:
-    case ConstraintKind::FunctionInput:
-    case ConstraintKind::FunctionResult:
     case ConstraintKind::OneWayEqual:
     case ConstraintKind::OneWayBindParam:
     case ConstraintKind::DefaultClosureType:
@@ -7055,71 +7047,6 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
 
   // Equate it to the other type in the constraint.
   addConstraint(ConstraintKind::Bind, objectTy, second, locator);
-  return SolutionKind::Solved;
-}
-
-/// Attempt to simplify a function input or result constraint.
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyFunctionComponentConstraint(
-                                        ConstraintKind kind,
-                                        Type first, Type second,
-                                        TypeMatchOptions flags,
-                                        ConstraintLocatorBuilder locator) {
-  auto simplified = simplifyType(first);
-  auto simplifiedCopy = simplified;
-
-  unsigned unwrapCount = 0;
-  if (shouldAttemptFixes()) {
-    while (auto objectTy = simplified->getOptionalObjectType()) {
-      simplified = objectTy;
-
-      // Track how many times we do this so that we can record a fix for each.
-      ++unwrapCount;
-    }
-
-    if (simplified->isPlaceholder()) {
-      if (auto *typeVar = second->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-      return SolutionKind::Solved;
-    }
-  }
-
-  if (simplified->isTypeVariableOrMember()) {
-    if (!flags.contains(TMF_GenerateConstraints))
-      return SolutionKind::Unsolved;
-
-    addUnsolvedConstraint(
-      Constraint::create(*this, kind, simplified, second,
-                         getConstraintLocator(locator)));
-  } else if (auto *funcTy = simplified->getAs<FunctionType>()) {
-    // Equate it to the other type in the constraint.
-    Type type;
-    ConstraintLocator::PathElementKind locKind;
-
-    if (kind == ConstraintKind::FunctionInput) {
-      type = AnyFunctionType::composeTuple(getASTContext(),
-                                           funcTy->getParams());
-      locKind = ConstraintLocator::FunctionArgument;
-    } else if (kind == ConstraintKind::FunctionResult) {
-      type = funcTy->getResult();
-      locKind = ConstraintLocator::FunctionResult;
-    } else {
-      llvm_unreachable("Bad function component constraint kind");
-    }
-
-    addConstraint(ConstraintKind::Bind, type, second,
-                  locator.withPathElement(locKind));
-  } else {
-    return SolutionKind::Error;
-  }
-
-  if (unwrapCount > 0) {
-    auto *fix = ForceOptional::create(*this, simplifiedCopy, second,
-                                      getConstraintLocator(locator));
-    if (recordFix(fix, /*impact=*/unwrapCount))
-      return SolutionKind::Error;
-  }
-
   return SolutionKind::Solved;
 }
 
@@ -12048,11 +11975,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::PropertyWrapper:
     return simplifyPropertyWrapperConstraint(first, second, subflags, locator);
 
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
-    return simplifyFunctionComponentConstraint(kind, first, second,
-                                               subflags, locator);
-
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
     return simplifyOneWayConstraint(kind, first, second, subflags, locator);
@@ -12581,14 +12503,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                              constraint.getSecondType(),
                                              /*flags*/ None,
                                              constraint.getLocator());
-
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
-    return simplifyFunctionComponentConstraint(constraint.getKind(),
-                                               constraint.getFirstType(),
-                                               constraint.getSecondType(),
-                                               /*flags*/ None,
-                                               constraint.getLocator());
 
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
