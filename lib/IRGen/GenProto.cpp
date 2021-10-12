@@ -2666,7 +2666,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       CanType baseSubstType =
         sourceConformance.getAssociatedType(sourceType, depMemType.getBase())
           ->getCanonicalType();
-      if (auto archetypeType = cast<ArchetypeType>(baseSubstType)) {
+      if (auto archetypeType = dyn_cast<ArchetypeType>(baseSubstType)) {
         AssociatedType baseAssocType(depMemType->getAssocType());
 
         MetadataResponse response =
