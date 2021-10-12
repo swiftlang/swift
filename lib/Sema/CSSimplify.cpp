@@ -6232,18 +6232,6 @@ ConstraintSystem::simplifyConstructionConstraint(
                              fnLocator, 
                              ConstraintLocator::ConstructorMember));
 
-  // FIXME: Once TVO_PrefersSubtypeBinding is replaced with something
-  // better, we won't need the second type variable at all.
-  {
-    auto argType = createTypeVariable(
-        getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
-        (TVO_CanBindToLValue |
-         TVO_CanBindToInOut |
-         TVO_CanBindToNoEscape |
-         TVO_PrefersSubtypeBinding));
-    addConstraint(ConstraintKind::FunctionInput, memberType, argType, locator);
-  }
-
   addConstraint(ConstraintKind::ApplicableFunction, fnType, memberType,
                 fnLocator);
 
