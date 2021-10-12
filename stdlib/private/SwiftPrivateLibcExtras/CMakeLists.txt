@@ -3,6 +3,13 @@ if(SWIFT_STDLIB_HAS_ENVIRON)
   set(swift_private_libc_extras_flags "-D" "SWIFT_STDLIB_HAS_ENVIRON")
 endif()
 
+set(swift_private_libc_extras_incorporate_object_libraries)
+if(SWIFT_STDLIB_HAS_COMMANDLINE)
+  list(APPEND swift_private_libc_extras_flags "-D" "SWIFT_STDLIB_HAS_COMMANDLINE")
+else()
+  set(swift_private_libc_extras_incorporate_object_libraries "swiftCommandLineSupport")
+endif()
+
 add_swift_target_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
@@ -25,5 +32,6 @@ add_swift_target_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUIL
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK
+  INCORPORATE_OBJECT_LIBRARIES ${swift_private_libc_extras_incorporate_object_libraries}
   INSTALL_IN_COMPONENT stdlib-experimental
   DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}")
