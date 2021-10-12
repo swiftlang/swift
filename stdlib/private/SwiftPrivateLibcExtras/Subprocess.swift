@@ -213,6 +213,23 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
   return (fds[0], fds[1])
 }
 
+#if !SWIFT_STDLIB_HAS_ENVIRON
+@_silgen_name("_NSGetEnviron")
+func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>>
+
+var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
+  #if os(macOS)
+  return _NSGetEnviron().pointee
+  #elseif os(Windows)
+  return __p_environ().pointee
+  #elseif os(Linux)
+  return __environ
+  #else
+  #error("unsupported platform")
+  #endif
+}
+#endif
+
 /// Start the same executable as a child process, redirecting its stdout and
 /// stderr.
 public func spawnChild(_ args: [String])

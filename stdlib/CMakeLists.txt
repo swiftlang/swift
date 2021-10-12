@@ -111,6 +111,10 @@ option(SWIFT_STDLIB_HAS_STDIN
        "Build stdlib assuming the platform supports stdin and getline API."
        TRUE)
 
+option(SWIFT_STDLIB_HAS_ENVIRON
+       "Build stdlib assuming the platform supports environment variables."
+       TRUE)
+
 option(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
