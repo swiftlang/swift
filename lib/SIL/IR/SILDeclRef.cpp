@@ -16,6 +16,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
@@ -170,14 +171,29 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
 }
 
 Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
-  if (auto vd = loc.dyn_cast<ValueDecl*>()) {
-    if (auto afd = dyn_cast<AbstractFunctionDecl>(vd)) {
+  switch (getLocKind()) {
+  case LocKind::Decl:
+    if (auto *afd = getAbstractFunctionDecl())
       return AnyFunctionRef(afd);
-    } else {
-      return None;
-    }
+    return None;
+  case LocKind::Closure:
+    return AnyFunctionRef(getAbstractClosureExpr());
+  case LocKind::File:
+    return None;
   }
-  return AnyFunctionRef(loc.get<AbstractClosureExpr*>());
+  llvm_unreachable("Unhandled case in switch");
+}
+
+ASTContext &SILDeclRef::getASTContext() const {
+  switch (getLocKind()) {
+  case LocKind::Decl:
+    return getDecl()->getASTContext();
+  case LocKind::Closure:
+    return getAbstractClosureExpr()->getASTContext();
+  case LocKind::File:
+    return getFileUnit()->getASTContext();
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 bool SILDeclRef::isThunk() const {
@@ -226,9 +242,16 @@ bool SILDeclRef::isClangGenerated(ClangNode node) {
 }
 
 bool SILDeclRef::isImplicit() const {
-  if (hasDecl())
+  switch (getLocKind()) {
+  case LocKind::Decl:
     return getDecl()->isImplicit();
-  return getAbstractClosureExpr()->isImplicit();
+  case LocKind::Closure:
+    return getAbstractClosureExpr()->isImplicit();
+  case LocKind::File:
+    // Files are currently never considered implicit.
+    return false;
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
@@ -241,6 +264,12 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (getAbstractClosureExpr()) {
     return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
   }
+
+  // The main entry-point is public.
+  if (kind == Kind::EntryPoint)
+    return SILLinkage::Public;
+  if (kind == Kind::AsyncEntryPoint)
+    return SILLinkage::Hidden;
 
   // Add External to the linkage (e.g. Public -> PublicExternal) if this is a
   // declaration not a definition.
@@ -407,6 +436,32 @@ SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
   return result;
 }
 
+SILDeclRef SILDeclRef::getMainDeclEntryPoint(ValueDecl *decl) {
+  auto *file = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
+  assert(file->getMainDecl() == decl);
+  SILDeclRef result;
+  result.loc = decl;
+  result.kind = Kind::EntryPoint;
+  return result;
+}
+
+SILDeclRef SILDeclRef::getAsyncMainDeclEntryPoint(ValueDecl *decl) {
+  auto *file = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
+  assert(file->getMainDecl() == decl);
+  SILDeclRef result;
+  result.loc = decl;
+  result.kind = Kind::AsyncEntryPoint;
+  return result;
+}
+
+SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
+  assert(file->hasEntryPoint() && !file->getMainDecl());
+  SILDeclRef result;
+  result.loc = file;
+  result.kind = Kind::EntryPoint;
+  return result;
+}
+
 bool SILDeclRef::hasClosureExpr() const {
   return loc.is<AbstractClosureExpr *>()
     && isa<ClosureExpr>(getAbstractClosureExpr());
@@ -489,6 +544,9 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
     return IsNotSerialized;
   }
+
+  if (kind == Kind::EntryPoint || kind == Kind::AsyncEntryPoint)
+    return IsNotSerialized;
 
   if (isIVarInitializerOrDestroyer())
     return IsNotSerialized;
@@ -681,17 +739,23 @@ bool SILDeclRef::isNativeToForeignThunk() const {
   if (!isForeign)
     return false;
 
-  // We can have native-to-foreign thunks over closures.
-  if (!hasDecl())
+  switch (getLocKind()) {
+  case LocKind::Decl:
+    // A decl with a clang node doesn't have a native entry-point to forward
+    // onto.
+    if (getDecl()->hasClangNode())
+      return false;
+
+    // Only certain kinds of SILDeclRef can expose native-to-foreign thunks.
+    return kind == Kind::Func || kind == Kind::Initializer ||
+           kind == Kind::Deallocator;
+  case LocKind::Closure:
+    // We can have native-to-foreign thunks over closures.
     return true;
-
-  // A decl with a clang node doesn't have a native entry-point to forward onto.
-  if (getDecl()->hasClangNode())
+  case LocKind::File:
     return false;
-
-  // Only certain kinds of SILDeclRef can expose native-to-foreign thunks.
-  return kind == Kind::Func || kind == Kind::Initializer ||
-         kind == Kind::Deallocator;
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 /// Use the Clang importer to mangle a Clang declaration.
@@ -784,8 +848,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   switch (kind) {
   case SILDeclRef::Kind::Func:
-    if (!hasDecl())
-      return mangler.mangleClosureEntity(getAbstractClosureExpr(), SKind);
+    if (auto *ACE = getAbstractClosureExpr())
+      return mangler.mangleClosureEntity(ACE, SKind);
 
     // As a special case, functions can have manually mangled names.
     // Use the SILGen name only for the original non-thunked, non-curried entry
@@ -856,6 +920,13 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
                                                       SKind);
+
+  case SILDeclRef::Kind::AsyncEntryPoint: {
+    return "async_Main";
+  }
+  case SILDeclRef::Kind::EntryPoint: {
+    return getASTContext().getEntryPointFunctionName();
+  }
   }
 
   llvm_unreachable("bad entity kind!");
@@ -1059,9 +1130,15 @@ SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {
 }
 
 SILLocation SILDeclRef::getAsRegularLocation() const {
-  if (hasDecl())
+  switch (getLocKind()) {
+  case LocKind::Decl:
     return RegularLocation(getDecl());
-  return RegularLocation(getAbstractClosureExpr());
+  case LocKind::Closure:
+    return RegularLocation(getAbstractClosureExpr());
+  case LocKind::File:
+    return RegularLocation::getModuleLocation();
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 SubclassScope SILDeclRef::getSubclassScope() const {
@@ -1168,7 +1245,13 @@ SubclassScope SILDeclRef::getSubclassScope() const {
 }
 
 unsigned SILDeclRef::getParameterListCount() const {
-  if (!hasDecl() || kind == Kind::DefaultArgGenerator)
+  // Only decls can introduce currying.
+  if (!hasDecl())
+    return 1;
+
+  // Always uncurried even if the underlying function is curried.
+  if (kind == Kind::DefaultArgGenerator || kind == Kind::EntryPoint ||
+      kind == Kind::AsyncEntryPoint)
     return 1;
 
   auto *vd = getDecl();

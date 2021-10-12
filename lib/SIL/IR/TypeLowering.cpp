@@ -2553,6 +2553,72 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
       innerExtInfo);
 }
 
+static CanAnyFunctionType getAsyncEntryPoint(ASTContext &C) {
+
+  // @main struct Main {
+  //    static func main() async throws {}
+  //    static func $main() async throws { try await main() }
+  //  }
+  //
+  // func @async_main() async -> Void {
+  //   do {
+  //      try await Main.$main()
+  //      exit(0)
+  //   } catch {
+  //      _emitErrorInMain(error)
+  //   }
+  // }
+  //
+  // This generates the type signature for @async_main
+  // TODO: 'Never' return type would be more accurate.
+
+  CanType returnType =
+      C.getVoidDecl()->getDeclaredInterfaceType()->getCanonicalType();
+  FunctionType::ExtInfo extInfo =
+      FunctionType::ExtInfoBuilder().withAsync(true).withThrows(false).build();
+  return CanAnyFunctionType::get(/*genericSig*/ nullptr, {}, returnType,
+                                 extInfo);
+}
+
+static CanAnyFunctionType getEntryPointInterfaceType(ASTContext &C) {
+  // Use standard library types if we have them; otherwise, fall back to
+  // builtins.
+  CanType Int32Ty;
+  if (auto Int32Decl = C.getInt32Decl()) {
+    Int32Ty = Int32Decl->getDeclaredInterfaceType()->getCanonicalType();
+  } else {
+    Int32Ty = CanType(BuiltinIntegerType::get(32, C));
+  }
+
+  CanType PtrPtrInt8Ty = C.TheRawPointerType;
+  if (auto PointerDecl = C.getUnsafeMutablePointerDecl()) {
+    if (auto Int8Decl = C.getInt8Decl()) {
+      Type Int8Ty = Int8Decl->getDeclaredInterfaceType();
+      Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
+                                                 nullptr,
+                                                 Int8Ty);
+      Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
+      PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
+                                           nullptr,
+                                           OptPointerInt8Ty)
+        ->getCanonicalType();
+    }
+  }
+
+  using Param = FunctionType::Param;
+  Param params[] = {Param(Int32Ty), Param(PtrPtrInt8Ty)};
+
+  auto rep = FunctionTypeRepresentation::CFunctionPointer;
+  auto *clangTy = C.getClangFunctionType(params, Int32Ty, rep);
+  auto extInfo = FunctionType::ExtInfoBuilder()
+                     .withRepresentation(rep)
+                     .withClangFunctionType(clangTy)
+                     .build();
+
+  return CanAnyFunctionType::get(/*genericSig*/ nullptr,
+                                 llvm::makeArrayRef(params), Int32Ty, extInfo);
+}
+
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   if (auto *derivativeId = c.getDerivativeFunctionIdentifier()) {
     auto originalFnTy =
@@ -2627,6 +2693,10 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   case SILDeclRef::Kind::IVarDestroyer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, true);
+  case SILDeclRef::Kind::AsyncEntryPoint:
+    return getAsyncEntryPoint(Context);
+  case SILDeclRef::Kind::EntryPoint:
+    return getEntryPointInterfaceType(Context);
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -2678,6 +2748,9 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return vd->getDeclContext()->getGenericSignatureOfContext();
+  case SILDeclRef::Kind::EntryPoint:
+  case SILDeclRef::Kind::AsyncEntryPoint:
+    llvm_unreachable("Doesn't have generic signature");
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");

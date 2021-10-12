@@ -2875,6 +2875,42 @@ static ActorIsolation getActorIsolationFromWrappedProperty(VarDecl *var) {
   return ActorIsolation::forUnspecified();
 }
 
+static Optional<ActorIsolation>
+getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
+  // Ensure that the base type that this function is declared in has @main
+  // attribute
+  NominalTypeDecl *declContext =
+      dyn_cast<NominalTypeDecl>(fnDecl->getDeclContext());
+  if (ExtensionDecl *exDecl =
+          dyn_cast<ExtensionDecl>(fnDecl->getDeclContext())) {
+    declContext = exDecl->getExtendedNominal();
+  }
+
+  // We're not even in a nominal decl type, this can't be the main function decl
+  if (!declContext)
+    return {};
+  const bool isMainDeclContext =
+      declContext->getAttrs().hasAttribute<MainTypeAttr>();
+
+  ASTContext &ctx = fnDecl->getASTContext();
+
+  const bool isMainMain = fnDecl->isMainTypeMainMethod();
+  const bool isMainInternalMain =
+      fnDecl->getBaseIdentifier() == ctx.getIdentifier("$main") &&
+      !fnDecl->isInstanceMember() &&
+      fnDecl->getResultInterfaceType()->isVoid() &&
+      fnDecl->getParameters()->size() == 0;
+  const bool isMainFunction =
+      isMainDeclContext && (isMainMain || isMainInternalMain);
+  const bool hasMainActor = !ctx.getMainActorType().isNull();
+
+  return isMainFunction && hasMainActor
+             ? ActorIsolation::forGlobalActor(
+                   ctx.getMainActorType()->mapTypeOutOfContext(),
+                   /*isUnsafe*/ false)
+             : Optional<ActorIsolation>();
+}
+
 /// Check rules related to global actor attributes on a class declaration.
 ///
 /// \returns true if an error occurred.
@@ -2941,9 +2977,26 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return ActorIsolation::forActorInstance(actor);
   }
 
+  auto isolationFromAttr = getIsolationFromAttributes(value);
+  if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) {
+    // Main.main() and Main.$main are implicitly MainActor-protected.
+    // Any other isolation is an error.
+    Optional<ActorIsolation> mainIsolation =
+        getActorIsolationForMainFuncDecl(fd);
+    if (mainIsolation) {
+      if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
+        if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
+                           mainIsolation->getGlobalActor())) {
+          fd->getASTContext().Diags.diagnose(
+              fd->getLoc(), diag::main_function_must_be_mainActor);
+        }
+      }
+      return *mainIsolation;
+    }
+  }
   // If this declaration has one of the actor isolation attributes, report
   // that.
-  if (auto isolationFromAttr = getIsolationFromAttributes(value)) {
+  if (isolationFromAttr) {
     // Nonisolated declarations must involve Sendable types.
     if (*isolationFromAttr == ActorIsolation::Independent) {
       SubstitutionMap subs;

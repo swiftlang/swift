@@ -55,23 +55,24 @@ func virtualWait<T>(orThrow: Bool, _ c: BaseClass<T>) async throws {
   return try await c.wait(orThrow: orThrow)
 }
 
-
-
-
 @main struct Main {
   static func main() async {
-    var AsyncVTableMethodSuite = TestSuite("ResilientClass")
-    AsyncVTableMethodSuite.test("AsyncVTableMethod") {
-      let x = MyDerived(value: 321)
+    let task = Task.detached {
+      var AsyncVTableMethodSuite = TestSuite("ResilientClass")
+      AsyncVTableMethodSuite.test("AsyncVTableMethod") {
+        let x = MyDerived(value: 321)
 
-      await virtualWaitForNothing(x)
+        await virtualWaitForNothing(x)
 
-      expectEqual(642, await virtualWait(x))
-      expectEqual(246, await virtualWaitForInt(x))
+        expectEqual(642, await virtualWait(x))
+        expectEqual(246, await virtualWaitForInt(x))
 
-      expectNil(try? await virtualWait(orThrow: true, x))
-      try! await virtualWait(orThrow: false, x)
+        expectNil(try? await virtualWait(orThrow: true, x))
+        try! await virtualWait(orThrow: false, x)
+      }
+      await runAllTestsAsync()
     }
-    await runAllTestsAsync()
+
+    await task.value
   }
 }

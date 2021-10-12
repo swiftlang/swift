@@ -29,6 +29,21 @@ CHANGELOG
 Swift 5.5
 ---------
 
+* [SE-0323][]:
+
+  The main function is executed with `MainActor` isolation applied, so functions
+  and variables with `MainActor` isolation may be called and modified
+  synchronously from the main function. If the main function is annotated with a
+  global actor explicitly, it must be the main actor or an error is emitted. If
+  no global actor annotation is present, the main function is implicitly run on
+  the main actor.
+
+  The main function is executed synchronously up to the first suspension point.
+  Any tasks enqueued by initializers in Objective-C or C++ will run after the
+  main function runs to the first suspension point. At the suspension point, the
+  main function suspends and the tasks are executed according to the Swift
+  concurrency mechanisms.
+
 * [SE-0313][]:
 
   Parameters of actor type can be declared as `isolated`, which means that they
