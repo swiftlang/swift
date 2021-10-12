@@ -482,7 +482,8 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
     auto *fnType = baseTy->getAs<AnyFunctionType>();
     baseTy = fnType->getResult();
     Type argTy = FunctionType::composeTuple(
-        ctx, baseTy->getAs<AnyFunctionType>()->getParams());
+        ctx, baseTy->getAs<AnyFunctionType>()->getParams(),
+        ParameterFlagHandling::Drop);
     auto diagKind = diag::override_type_mismatch_with_fixits_init;
     unsigned numArgs = baseInit->getParameters()->size();
     return computeFixitsForOverridenDeclaration(
