@@ -404,3 +404,24 @@ actor EscapeArtist {
     func isolatedMethod() { x += 1 }
     nonisolated func nonisolated() {}
 }
+
+@available(SwiftStdlib 5.5, *)
+actor Ahmad {
+  func f() {}
+  
+  nonisolated init(v1: Void) {
+    Task.detached { await self.f() } // expected-warning {{actor 'self' cannot be captured by a closure from a non-isolated, designated initializer}}
+                                     // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+    
+    f()   // expected-warning {{this use of actor 'self' cannot appear in a non-isolated, designated initializer}}
+          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+  }
+  
+  nonisolated init(v2: Void) async {
+    Task.detached { await self.f() } // expected-warning {{actor 'self' cannot be captured by a closure from a non-isolated, designated initializer}} {{3-15=}}
+    // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+    
+    f()   // expected-warning {{this use of actor 'self' cannot appear in a non-isolated, designated initializer}}
+    // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+  }
+}

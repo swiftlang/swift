@@ -243,3 +243,12 @@ actor SomeActor {
     // CHECK: } // end sil function '$s4test9SomeActorCACyYacfc'
     init() async {}
 }
+
+actor Ahmad {
+  var x: Int = 0
+  
+  // CHECK-LABEL: sil hidden @$s4test5AhmadCACyYacfc : $@convention(method) @async (@owned Ahmad) -> @owned Ahmad {
+  // CHECK:           store {{%[0-9]+}} to {{%[0-9]+}} : $*Int
+  // CHECK: } // end sil function '$s4test5AhmadCACyYacfc'
+  nonisolated init() async {} // no hop should appear here because of explicit nonisolated marking.
+}
