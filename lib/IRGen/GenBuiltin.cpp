@@ -1087,6 +1087,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     out.add(DebugAssert);
     return;
   }
+
+  if (Builtin.ID == BuiltinValueKind::PrintDisabled) {
+    llvm_unreachable("PrintDisabled not constant folded");
+  }
   
   if (Builtin.ID == BuiltinValueKind::DestroyArray) {
     // The input type is (T.Type, Builtin.RawPointer, Builtin.Word).

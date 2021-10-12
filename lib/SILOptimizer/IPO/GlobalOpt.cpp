@@ -409,7 +409,8 @@ replaceLoadsByKnownValue(SILFunction *InitF, SILGlobalVariable *SILG,
     // constant, e.g.
     //    let a = 1
     //    let b = a + 1
-    ConstantFolder constFolder(FunctionBuilder, PM->getOptions().AssertConfig);
+    ConstantFolder constFolder(FunctionBuilder, PM->getOptions().AssertConfig,
+                               PM->getOptions().PrintConfig);
     for (SILInstruction *inst : insertedInsts) {
       constFolder.addToWorklist(inst);
     }

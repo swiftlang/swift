@@ -446,6 +446,10 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
+def experimental_disable_print : Flag<["-"], "experimental-disable-print">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Turn print() calls into no-ops.">;
+
 def enable_experimental_named_opaque_types :
   Flag<["-"], "enable-experimental-named-opaque-types">,
   HelpText<"Enable experimental support for named opaque result types">;

@@ -123,6 +123,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::ShuffleVector:
     case BuiltinValueKind::StaticReport:
     case BuiltinValueKind::AssertConf:
+    case BuiltinValueKind::PrintDisabled:
     case BuiltinValueKind::StringObjectOr:
     case BuiltinValueKind::UToSCheckedTrunc:
     case BuiltinValueKind::SToUCheckedTrunc:

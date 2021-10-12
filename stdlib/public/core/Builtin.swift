@@ -768,6 +768,19 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
   return true._value
 }
 
+/// Whether client code is built with -print-disabled.
+@_alwaysEmitIntoClient
+private func _isPrintingDisabled() -> Bool {
+  return Bool(Builtin.print_disabled())
+}
+
+// For testing only.
+@_alwaysEmitIntoClient
+private func _customPrint(_ s: String) {
+  if _isPrintingDisabled() { return }
+  print(s)
+}
+
 /// Returns the dynamic type of a value.
 ///
 /// You can use the `type(of:)` function to find the dynamic type of a value,

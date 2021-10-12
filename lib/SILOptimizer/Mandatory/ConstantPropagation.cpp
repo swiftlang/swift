@@ -35,7 +35,7 @@ private:
   void run() override {
     SILOptFunctionBuilder FuncBuilder(*this);
     ConstantFolder Folder(FuncBuilder, getOptions().AssertConfig,
-                          EnableDiagnostics);
+                          getOptions().PrintConfig, EnableDiagnostics);
     Folder.initializeWorklist(*getFunction());
     auto Invalidation = Folder.processWorkList();
 

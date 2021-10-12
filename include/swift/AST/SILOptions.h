@@ -127,6 +127,15 @@ public:
   /// The assert configuration controls how assertions behave.
   unsigned AssertConfig = Debug;
 
+  enum PrintConfiguration: unsigned {
+    // Used by stdlib code to tell whether client is built with -disable-print
+    Normal = 0,
+    Disabled = 1,
+  };
+
+  /// The print configuration how printing from stdlib should behave.
+  unsigned PrintConfig = Normal;
+
   /// Should we print out instruction counts if -print-stats is passed in?
   bool PrintInstCounts = false;
 

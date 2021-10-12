@@ -1397,6 +1397,13 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
         (IRGenOpts.shouldOptimize() ? SILOptions::Release : SILOptions::Debug);
   }
 
+  Opts.PrintConfig = Args.hasArg(OPT_experimental_disable_print)
+                         ? SILOptions::Disabled
+                         : SILOptions::Normal;
+  if (FEOpts.ParseStdlib) {
+    Opts.PrintConfig = SILOptions::DisableReplacement;
+  }
+
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 

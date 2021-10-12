@@ -64,6 +64,9 @@ private:
   /// The assert configuration of SILOptions.
   unsigned AssertConfiguration;
 
+  /// The print configuration of SILOptions.
+  unsigned PrintConfiguration;
+
   /// Print diagnostics as part of mandatory constant propagation.
   bool EnableDiagnostics;
 
@@ -79,11 +82,13 @@ public:
   /// \param Callback Called for each constant folded instruction.
   ConstantFolder(SILOptFunctionBuilder &FuncBuilder,
                  unsigned AssertConfiguration,
+                 unsigned PrintConfiguration,
                  bool EnableDiagnostics = false,
                  std::function<void (SILInstruction *)> Callback =
                  [](SILInstruction *){}) :
     FuncBuilder(FuncBuilder),
     AssertConfiguration(AssertConfiguration),
+    PrintConfiguration(PrintConfiguration),
     EnableDiagnostics(EnableDiagnostics),
     Callback(Callback) { }
 

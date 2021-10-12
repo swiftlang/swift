@@ -138,6 +138,7 @@ public:
               bool EnableJumpThread)
       : FuncBuilder(T), Fn(Fn), PM(T.getPassManager()),
         ConstFolder(FuncBuilder, PM->getOptions().AssertConfig,
+                    PM->getOptions().PrintConfig,
                     /* EnableDiagnostics */ false,
                     [&](SILInstruction *I) { constFoldingCallback(I); }),
         ShouldVerify(Verify), EnableJumpThread(EnableJumpThread) {}

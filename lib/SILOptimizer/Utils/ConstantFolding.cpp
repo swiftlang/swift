@@ -1152,6 +1152,15 @@ static SILValue constantFoldIsConcrete(BuiltinInst *BI) {
   return inst;
 }
 
+static SILValue constantFoldPrintDisabled(BuiltinInst *BI, bool PrintDisabled) {
+  SILBuilderWithScope builder(BI);
+  auto *inst = builder.createIntegerLiteral(
+      BI->getLoc(), SILType::getBuiltinIntegerType(1, builder.getASTContext()),
+      PrintDisabled);
+  BI->replaceAllUsesWith(inst);
+  return inst;
+}
+
 static SILValue constantFoldBuiltin(BuiltinInst *BI,
                                     Optional<bool> &ResultsInError) {
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
@@ -1569,7 +1578,8 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
       }
 
       if (isApplyOfBuiltin(*inst, BuiltinValueKind::GlobalStringTablePointer) ||
-          isApplyOfBuiltin(*inst, BuiltinValueKind::IsConcrete)) {
+          isApplyOfBuiltin(*inst, BuiltinValueKind::IsConcrete) ||
+          isApplyOfBuiltin(*inst, BuiltinValueKind::PrintDisabled)) {
         WorkList.insert(inst);
         continue;
       }
@@ -1779,7 +1789,7 @@ ConstantFolder::processWorkList() {
     if (isApplyOfBuiltin(*I, BuiltinValueKind::GlobalStringTablePointer)) {
       if (constantFoldGlobalStringTablePointerBuiltin(cast<BuiltinInst>(I),
                                                       EnableDiagnostics)) {
-        // Here, the bulitin instruction got folded, so clean it up.
+        // Here, the builtin instruction got folded, so clean it up.
         eliminateDeadInstruction(I, callbacks);
       }
       continue;
@@ -1804,11 +1814,23 @@ ConstantFolder::processWorkList() {
 
     if (isApplyOfBuiltin(*I, BuiltinValueKind::IsConcrete)) {
       if (constantFoldIsConcrete(cast<BuiltinInst>(I))) {
-        // Here, the bulitin instruction got folded, so clean it up.
+        // Here, the builtin instruction got folded, so clean it up.
         recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true,
                                                    callbacks);
       }
       continue;
+    }
+
+    if (PrintConfiguration != SILOptions::DisableReplacement) {
+      if (isApplyOfBuiltin(*I, BuiltinValueKind::PrintDisabled)) {
+        if (constantFoldPrintDisabled(cast<BuiltinInst>(I),
+                                      PrintConfiguration ==
+                                          SILOptions::Disabled)) {
+          // Here, the builtin instruction got folded, so clean it up.
+          eliminateDeadInstruction(I, callbacks);
+        }
+        continue;
+      }
     }
 
     if (auto *bi = dyn_cast<BuiltinInst>(I)) {
