@@ -4751,13 +4751,6 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
-  /// Attempt to simplify a function input or result constraint.
-  SolutionKind simplifyFunctionComponentConstraint(
-                                          ConstraintKind kind,
-                                          Type first, Type second,
-                                          TypeMatchOptions flags,
-                                          ConstraintLocatorBuilder locator);
-
   /// Attempt to simplify the BridgingConversion constraint.
   SolutionKind simplifyBridgingConstraint(Type type1,
                                          Type type2,

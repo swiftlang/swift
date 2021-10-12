@@ -60,6 +60,9 @@ CUSTOM_LOCATOR_PATH_ELT(ClosureBody)
 /// The lookup for a constructor member.
 SIMPLE_LOCATOR_PATH_ELT(ConstructorMember)
 
+/// The constructor member type in the lookup of a constructor.
+CUSTOM_LOCATOR_PATH_ELT(ConstructorMemberType)
+
 /// The desired contextual type passed in to the constraint system.
 CUSTOM_LOCATOR_PATH_ELT(ContextualType)
 

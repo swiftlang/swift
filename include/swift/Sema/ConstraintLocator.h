@@ -960,6 +960,25 @@ public:
   }
 };
 
+class LocatorPathElt::ConstructorMemberType final
+    : public StoredIntegerElement<1> {
+public:
+  ConstructorMemberType(bool isShortFormOrSelfDelegating = false)
+      : StoredIntegerElement(ConstraintLocator::ConstructorMemberType,
+                             isShortFormOrSelfDelegating) {}
+
+  /// Whether this constructor overload is for a short-form init call such as
+  /// 'X(...)', or a 'self.init(...)' call. Such calls have additional ranking
+  /// rules.
+  bool isShortFormOrSelfDelegatingConstructor() const {
+    return bool(getValue());
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ConstructorMemberType;
+  }
+};
+
 class LocatorPathElt::ClosureBodyElement final
     : public StoredPointerElement<void> {
 public:
