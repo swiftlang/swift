@@ -20,6 +20,7 @@
 #include "SourceKit/Support/ThreadSafeRefCntPtr.h"
 #include "SourceKit/Support/Tracing.h"
 #include "SwiftInterfaceGenContext.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/CompletionInstance.h"
@@ -471,6 +472,23 @@ public:
       llvm::function_ref<void(
           swift::ide::CancellableResult<swift::ide::CompletionInstanceResult>)>
           Callback);
+
+  /// The result returned from \c performWithParamsToCompletionLikeOperation.
+  struct CompletionLikeOperationParams {
+    swift::CompilerInvocation &Invocation;
+    llvm::MemoryBuffer *completionBuffer;
+    swift::DiagnosticConsumer *DiagC;
+  };
+
+  /// Execute \p PerformOperation sychronously with the parameters necessary to
+  /// invoke a completion-like operation on \c CompletionInstance.
+  void performWithParamsToCompletionLikeOperation(
+      llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+      ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      llvm::function_ref<
+          void(swift::ide::CancellableResult<CompletionLikeOperationParams>)>
+          PerformOperation);
 
   //==========================================================================//
   // LangSupport Interface

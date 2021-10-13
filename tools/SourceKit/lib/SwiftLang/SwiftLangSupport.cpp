@@ -1000,12 +1000,12 @@ SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
   return llvm::vfs::getRealFileSystem();
 }
 
-void SwiftLangSupport::performCompletionLikeOperation(
+void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
-        Callback) {
+    llvm::function_ref<void(CancellableResult<CompletionLikeOperationParams>)>
+        PerformOperation) {
   assert(FileSystem);
 
   // Resolve symlinks for the input file; we resolve them for the input files
@@ -1050,12 +1050,12 @@ void SwiftLangSupport::performCompletionLikeOperation(
       Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
       CompilerInvocationError);
   if (CreatingInvocationFailed) {
-    Callback(CancellableResult<CompletionInstanceResult>::failure(
+    PerformOperation(CancellableResult<CompletionLikeOperationParams>::failure(
         CompilerInvocationError));
     return;
   }
   if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Callback(CancellableResult<CompletionInstanceResult>::failure(
+    PerformOperation(CancellableResult<CompletionLikeOperationParams>::failure(
         "no input filenames specified"));
     return;
   }
@@ -1063,8 +1063,30 @@ void SwiftLangSupport::performCompletionLikeOperation(
   // Pin completion instance.
   auto CompletionInst = getCompletionInstance();
 
-  CompletionInst->performOperation(Invocation, Args, FileSystem,
-                                   newBuffer.get(), Offset, &CIDiags, Callback);
+  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(),
+                                          &CIDiags};
+  PerformOperation(
+      CancellableResult<CompletionLikeOperationParams>::success(Params));
+}
+
+void SwiftLangSupport::performCompletionLikeOperation(
+    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+    ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+        Callback) {
+  performWithParamsToCompletionLikeOperation(
+      UnresolvedInputFile, Offset, Args, FileSystem,
+      [&](CancellableResult<CompletionLikeOperationParams> ParamsResult) {
+        ParamsResult.mapAsync<CompletionInstanceResult>(
+            [&](auto &CIParams, auto DeliverTransformed) {
+              getCompletionInstance()->performOperation(
+                  CIParams.Invocation, Args, FileSystem,
+                  CIParams.completionBuffer, Offset, CIParams.DiagC,
+                  DeliverTransformed);
+            },
+            Callback);
+      });
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

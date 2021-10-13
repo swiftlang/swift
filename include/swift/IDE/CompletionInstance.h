@@ -15,6 +15,7 @@
 
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CancellableResult.h"
+#include "swift/IDE/TypeContextInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
@@ -46,6 +47,14 @@ struct CompletionInstanceResult {
   /// file. If this is \c false, the user will most likely want to return empty
   /// results.
   bool DidFindCodeCompletionToken;
+};
+
+/// The results returned from \c CompletionInstance::typeContextInfo.
+struct TypeContextInfoResult {
+  /// The actual results. If empty, no results were found.
+  ArrayRef<ide::TypeContextInfoItem> Results;
+  /// Whether an AST was reused to produce the results.
+  bool DidReuseAST;
 };
 
 /// Manages \c CompilerInstance for completion like operations.
@@ -123,6 +132,14 @@ public:
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       DiagnosticConsumer *DiagC,
       llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
+          Callback);
+
+  void typeContextInfo(
+      swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      DiagnosticConsumer *DiagC,
+      llvm::function_ref<void(CancellableResult<TypeContextInfoResult>)>
           Callback);
 };
 

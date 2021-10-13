@@ -655,3 +655,59 @@ void swift::ide::CompletionInstance::performOperation(
   performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
                       Offset, DiagC, Callback);
 }
+
+void swift::ide::CompletionInstance::typeContextInfo(
+    swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    DiagnosticConsumer *DiagC,
+    llvm::function_ref<void(CancellableResult<TypeContextInfoResult>)>
+        Callback) {
+  using ResultType = CancellableResult<TypeContextInfoResult>;
+
+  struct ConsumerToCallbackAdapter : public ide::TypeContextInfoConsumer {
+    bool ReusingASTContext;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultsCalled = false;
+
+    ConsumerToCallbackAdapter(bool ReusingASTContext,
+                              llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext), Callback(Callback) {}
+
+    void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) override {
+      HandleResultsCalled = true;
+      Callback(ResultType::success({Results, ReusingASTContext}));
+    }
+  };
+
+  performOperation(
+      Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      [&](CancellableResult<CompletionInstanceResult> CIResult) {
+        CIResult.mapAsync<TypeContextInfoResult>(
+            [](auto &Result, auto DeliverTransformed) {
+              ConsumerToCallbackAdapter Consumer(Result.DidReuseAST,
+                                                 DeliverTransformed);
+              std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+                  ide::makeTypeContextInfoCallbacksFactory(Consumer));
+
+              if (!Result.DidFindCodeCompletionToken) {
+                // Deliver empty results if we didn't find a code completion
+                // token.
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+
+              performCodeCompletionSecondPass(
+                  *Result.CI.getCodeCompletionFile(), *callbacksFactory);
+              if (!Consumer.HandleResultsCalled) {
+                // If we didn't receive a handleResult call from the second
+                // pass, we didn't receive any results. To make sure
+                // DeliverTransformed gets called exactly once, call it with
+                // no results here.
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+            },
+            Callback);
+      });
+}

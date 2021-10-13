@@ -140,6 +140,36 @@ public:
     assert(getKind() == CancellableResultKind::Failure);
     return Error;
   }
+
+  /// If the result represents success, invoke \p Transform to asynchronously
+  /// transform the wrapped result type and produce a new result type that is
+  /// provided by the callback function passed to \p Transform. Afterwards call
+  /// \p Handle with either the transformed value or the failure or cancelled
+  /// result.
+  /// The \c async part of the map means that the transform might happen
+  /// asyncronously. This function does not introduce asynchronicity by itself.
+  /// \p Transform might also invoke the callback synchronously.
+  template <typename NewResultType>
+  void
+  mapAsync(llvm::function_ref<
+               void(ResultType &,
+                    llvm::function_ref<void(CancellableResult<NewResultType>)>)>
+               Transform,
+           llvm::function_ref<void(CancellableResult<NewResultType>)> Handle) {
+    switch (getKind()) {
+    case CancellableResultKind::Success:
+      Transform(getResult(), [&](CancellableResult<NewResultType> NewResult) {
+        Handle(NewResult);
+      });
+      break;
+    case CancellableResultKind::Failure:
+      Handle(CancellableResult<NewResultType>::failure(getError()));
+      break;
+    case CancellableResultKind::Cancelled:
+      Handle(CancellableResult<NewResultType>::cancelled());
+      break;
+    }
+  }
 };
 
 } // namespace ide
