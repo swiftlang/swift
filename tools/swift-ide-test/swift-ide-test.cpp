@@ -36,6 +36,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ConformingMethodList.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
@@ -891,63 +892,6 @@ static bool performWithCompletionLikeOperationParams(
   return PerformOperation(Params);
 }
 
-static bool
-doCodeCompletionImpl(CodeCompletionCallbacksFactory *callbacksFactory,
-                     const CompilerInvocation &InitInvok,
-                     StringRef SourceFilename, StringRef SecondSourceFileName,
-                     StringRef CodeCompletionToken,
-                     bool CodeCompletionDiagnostics) {
-  return performWithCompletionLikeOperationParams(
-      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
-      CodeCompletionDiagnostics,
-      [&](CompletionLikeOperationParams Params) -> bool {
-        PrintingDiagnosticConsumer PrintDiags;
-        CompletionInstance CompletionInst;
-        std::string CompletionError;
-        bool CallbackCalled = false;
-        CompletionInst.performOperation(
-            Params.Invocation, Params.Args, Params.FileSystem,
-            Params.CompletionBuffer, Params.Offset, Params.DiagC,
-            [&](CancellableResult<CompletionInstanceResult> Result) {
-              CallbackCalled = true;
-              switch (Result.getKind()) {
-              case CancellableResultKind::Success: {
-                assert(!Result->DidReuseAST &&
-                       "reusing AST context without enabling it");
-
-                if (!Result->DidFindCodeCompletionToken) {
-                  // Return empty results by not performing the second pass and
-                  // never calling the consumer of the callback factory.
-                  return;
-                }
-
-                performCodeCompletionSecondPass(
-                    *Result->CI.getCodeCompletionFile(), *callbacksFactory);
-                break;
-              }
-              case CancellableResultKind::Failure:
-                CompletionError = "error: " + Result.getError();
-                break;
-              case CancellableResultKind::Cancelled:
-                CompletionError = "request cancelled";
-                break;
-              }
-            });
-        assert(CallbackCalled &&
-               "Expected callback to be called synchronously");
-        if (CompletionError == "error: did not find code completion token") {
-          // Do not consider failure to find the code completion token as a
-          // critical failure that returns a non-zero exit code. Instead, allow
-          // the caller to match the error message.
-          llvm::outs() << CompletionError << '\n';
-        } else if (!CompletionError.empty()) {
-          llvm::errs() << CompletionError << '\n';
-          return true;
-        }
-        return false;
-      });
-}
-
 template <typename ResultType>
 static int printResult(CancellableResult<ResultType> Result,
                        llvm::function_ref<int(ResultType &)> PrintSuccess) {
@@ -1095,6 +1039,92 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
       });
 }
 
+static void
+printCodeCompletionResultsImpl(MutableArrayRef<CodeCompletionResult *> Results,
+                               llvm::raw_ostream &OS, bool IncludeKeywords,
+                               bool IncludeComments, bool IncludeSourceText,
+                               bool PrintAnnotatedDescription) {
+  unsigned NumResults = 0;
+  for (auto Result : Results) {
+    if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
+      continue;
+    ++NumResults;
+  }
+  if (NumResults == 0)
+    return;
+
+  OS << "Begin completions, " << NumResults << " items\n";
+  for (auto Result : Results) {
+    if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
+      continue;
+    Result->printPrefix(OS);
+    if (PrintAnnotatedDescription) {
+      printCodeCompletionResultDescriptionAnnotated(
+          *Result, OS, /*leadingPunctuation=*/false);
+      OS << "; typename=";
+      printCodeCompletionResultTypeNameAnnotated(*Result, OS);
+    } else {
+      Result->getCompletionString()->print(OS);
+    }
+
+    OS << "; name=";
+    printCodeCompletionResultFilterName(*Result, OS);
+
+    if (IncludeSourceText) {
+      OS << "; sourcetext=";
+      SmallString<64> buf;
+      {
+        llvm::raw_svector_ostream bufOS(buf);
+        printCodeCompletionResultSourceText(*Result, bufOS);
+      }
+      OS.write_escaped(buf);
+    }
+
+    StringRef comment = Result->getBriefDocComment();
+    if (IncludeComments && !comment.empty()) {
+      OS << "; comment=" << comment;
+    }
+
+    if (Result->getDiagnosticSeverity() !=
+        CodeCompletionDiagnosticSeverity::None) {
+      OS << "; diagnostics=" << comment;
+      switch (Result->getDiagnosticSeverity()) {
+      case CodeCompletionDiagnosticSeverity::Error:
+        OS << "error";
+        break;
+      case CodeCompletionDiagnosticSeverity::Warning:
+        OS << "warning";
+        break;
+      case CodeCompletionDiagnosticSeverity::Remark:
+        OS << "remark";
+        break;
+      case CodeCompletionDiagnosticSeverity::Note:
+        OS << "note";
+        break;
+      case CodeCompletionDiagnosticSeverity::None:
+        llvm_unreachable("none");
+      }
+      OS << ":" << Result->getDiagnosticMessage();
+    }
+
+    OS << "\n";
+  }
+  OS << "End completions\n";
+}
+
+static int printCodeCompletionResults(
+    CancellableResult<CodeCompleteResult> CancellableResult,
+    bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
+    bool PrintAnnotatedDescription) {
+  return printResult<CodeCompleteResult>(
+      CancellableResult, [&](CodeCompleteResult &Result) {
+        printCodeCompletionResultsImpl(
+            Result.Results, llvm::outs(), IncludeKeywords, IncludeComments,
+            IncludeSourceText, PrintAnnotatedDescription);
+        return 0;
+      });
+}
+
 static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             StringRef SourceFilename,
                             StringRef SecondSourceFileName,
@@ -1117,20 +1147,23 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
   CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
 
-  // Create a CodeCompletionConsumer.
-  std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
-      new ide::PrintingCodeCompletionConsumer(
-          llvm::outs(), CodeCompletionKeywords, CodeCompletionComments,
-          CodeCompletionSourceText, CodeCompletionAnnotateResults));
-
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-      ide::makeCodeCompletionCallbacksFactory(CompletionContext, *Consumer));
-
-  return doCodeCompletionImpl(callbacksFactory.get(), InitInvok, SourceFilename,
-                              SecondSourceFileName, CodeCompletionToken,
-                              CodeCompletionDiagnostics);
+  return performWithCompletionLikeOperationParams(
+      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
+      CodeCompletionDiagnostics,
+      [&](CompletionLikeOperationParams Params) -> bool {
+        CompletionInstance Inst;
+        int ExitCode = 2;
+        Inst.codeComplete(
+            Params.Invocation, Params.Args, Params.FileSystem,
+            Params.CompletionBuffer, Params.Offset, Params.DiagC,
+            std::move(CompletionContext),
+            [&](CancellableResult<CodeCompleteResult> Result) {
+              ExitCode = printCodeCompletionResults(
+                  Result, CodeCompletionKeywords, CodeCompletionComments,
+                  CodeCompletionSourceText, CodeCompletionAnnotateResults);
+            });
+        return ExitCode;
+      });
 }
 
 namespace {
@@ -1438,45 +1471,30 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     auto completionBuffer = ide::makeCodeCompletionMemoryBuffer(
         CleanFile.get(), Offset, CleanFile->getBufferIdentifier());
 
+    ide::CodeCompletionContext CompletionContext(CompletionCache);
+    CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
+    CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
+    CompletionContext.setCallPatternHeuristics(
+        CodeCompletionCallPatternHeuristics);
+
     PrintingDiagnosticConsumer PrintDiags;
     auto completionStart = std::chrono::high_resolution_clock::now();
     bool wasASTContextReused = false;
     std::string completionError = "";
     bool CallbackCalled = false;
-    CompletionInst.performOperation(
+    CompletionInst.codeComplete(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
         CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-        [&](CancellableResult<CompletionInstanceResult> Result) {
+        std::move(CompletionContext),
+        [&](CancellableResult<CodeCompleteResult> Result) {
           CallbackCalled = true;
           switch (Result.getKind()) {
           case CancellableResultKind::Success: {
-            if (!Result->DidFindCodeCompletionToken) {
-              // Return empty results by not performing the second pass and
-              // never calling the consumer of the callback factory.
-              return;
-            }
-            wasASTContextReused = Result->DidReuseAST;
-
-            // Create a CodeCompletionConsumer.
-            std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
-                new ide::PrintingCodeCompletionConsumer(
-                    OS, IncludeKeywords, IncludeComments,
-                    CodeCompletionAnnotateResults, IncludeSourceText));
-
-            // Create a factory for code completion callbacks that will feed the
-            // Consumer.
-            ide::CodeCompletionContext CompletionContext(CompletionCache);
-            CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
-            CompletionContext.setAddInitsToTopLevel(
-                CodeCompletionAddInitsToTopLevel);
-            CompletionContext.setCallPatternHeuristics(
-                CodeCompletionCallPatternHeuristics);
-            std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-                ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                                        *Consumer));
-
-            performCodeCompletionSecondPass(*Result->CI.getCodeCompletionFile(),
-                                            *callbacksFactory);
+            wasASTContextReused =
+                Result->Info.completionContext->ReusingASTContext;
+            printCodeCompletionResultsImpl(Result->Results, OS, IncludeKeywords,
+                                           IncludeComments, IncludeSourceText,
+                                           CodeCompletionAnnotateResults);
             break;
           }
           case CancellableResultKind::Failure:
@@ -4045,18 +4063,17 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    ide::PrintingCodeCompletionConsumer Consumer(
-        llvm::outs(), options::CodeCompletionKeywords,
-        options::CodeCompletionComments,
-        options::CodeCompletionSourceText,
-        options::CodeCompletionAnnotateResults);
     for (StringRef filename : options::InputFilenames) {
       auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(filename);
       if (!resultsOpt) {
         // FIXME: error?
         continue;
       }
-      Consumer.handleResults(resultsOpt->get()->Sink.Results);
+      printCodeCompletionResultsImpl(
+          resultsOpt->get()->Sink.Results, llvm::outs(),
+          options::CodeCompletionKeywords, options::CodeCompletionComments,
+          options::CodeCompletionSourceText,
+          options::CodeCompletionAnnotateResults);
     }
 
     return 0;

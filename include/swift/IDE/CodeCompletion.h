@@ -1094,32 +1094,6 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
   virtual void handleResults(CodeCompletionContext &context) = 0;
 };
 
-/// A code completion result consumer that prints the results to a
-/// \c raw_ostream.
-class PrintingCodeCompletionConsumer
-    : public SimpleCachingCodeCompletionConsumer {
-  llvm::raw_ostream &OS;
-  bool IncludeKeywords;
-  bool IncludeComments;
-  bool IncludeSourceText;
-  bool PrintAnnotatedDescription;
-
-public:
- PrintingCodeCompletionConsumer(llvm::raw_ostream &OS,
-                                bool IncludeKeywords = true,
-                                bool IncludeComments = true,
-                                bool IncludeSourceText = false,
-                                bool PrintAnnotatedDescription = false)
-     : OS(OS),
-       IncludeKeywords(IncludeKeywords),
-       IncludeComments(IncludeComments),
-       IncludeSourceText(IncludeSourceText),
-       PrintAnnotatedDescription(PrintAnnotatedDescription) {}
-
-  void handleResults(CodeCompletionContext &context) override;
-  void handleResults(MutableArrayRef<CodeCompletionResult *> Results);
-};
-
 /// Create a factory for code completion callbacks.
 CodeCompletionCallbacksFactory *
 makeCodeCompletionCallbacksFactory(CodeCompletionContext &CompletionContext,
