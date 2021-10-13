@@ -583,6 +583,15 @@ extension String {
     _print_unlocked(instance, &self)
   }
 
+  // An overload for metatypes because the generic function above goes through
+  // various hoops to unperformantly print metatypes. This overload simplifies
+  // this scenario and provides the same performance characteristics as
+  // `"\(Int.self)"`.
+  @_alwaysEmitIntoClient
+  public init<Subject>(describing instance: Subject.Type) {
+    self = _typeName(instance, qualified: false)
+  }
+
   // These overloads serve as fast paths for init(describing:), but they 
   // also preserve source compatibility for clients which accidentally  
   // used init(stringInterpolationSegment:) through constructs like 
