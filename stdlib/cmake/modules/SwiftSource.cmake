@@ -289,6 +289,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "SWIFT_RUNTIME_OS_VERSIONING")
   endif()
 
+  if(SWIFT_STDLIB_HAS_COMMANDLINE)
+    list(APPEND result "-D" "SWIFT_STDLIB_HAS_COMMANDLINE")
+  endif()
+
   if(SWIFT_STDLIB_HAS_STDIN)
     list(APPEND result "-D" "SWIFT_STDLIB_HAS_STDIN")
   endif()
