@@ -15,6 +15,7 @@
 
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/CancellableResult.h"
+#include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/ConformingMethodList.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "llvm/ADT/Hashing.h"
@@ -48,6 +49,12 @@ struct CompletionInstanceResult {
   /// file. If this is \c false, the user will most likely want to return empty
   /// results.
   bool DidFindCodeCompletionToken;
+};
+
+/// The results returned from \c CompletionInstance::codeComplete.
+struct CodeCompleteResult {
+  MutableArrayRef<CodeCompletionResult *> Results;
+  SwiftCompletionInfo &Info;
 };
 
 /// The results returned from \c CompletionInstance::typeContextInfo.
@@ -142,6 +149,13 @@ public:
       DiagnosticConsumer *DiagC,
       llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
           Callback);
+
+  void codeComplete(
+      swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      DiagnosticConsumer *DiagC, ide::CodeCompletionContext &&CompletionContext,
+      llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback);
 
   void typeContextInfo(
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,

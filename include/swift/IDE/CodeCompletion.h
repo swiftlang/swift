@@ -17,6 +17,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Frontend/Frontend.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -1060,6 +1061,12 @@ public:
   CodeCompletionResultSink &getResultSink() {
     return CurrentResults;
   }
+};
+
+struct SwiftCompletionInfo {
+  swift::ASTContext *swiftASTContext = nullptr;
+  const swift::CompilerInvocation *invocation = nullptr;
+  CodeCompletionContext *completionContext = nullptr;
 };
 
 /// An abstract base class for consumers of code completion results.
