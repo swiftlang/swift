@@ -754,7 +754,7 @@ public struct UnsafeCurrentTask {
   /// There is no way to uncancel a task.
   ///
   /// - SeeAlso: `checkCancellation()`
-  public var isCancelled: Bool {
+  @_transparent public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }
 
@@ -860,6 +860,7 @@ func _taskCancel(_ task: Builtin.NativeObject)
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_isCancelled")
+@usableFromInline
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
 @available(SwiftStdlib 5.5, *)
