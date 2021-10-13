@@ -535,7 +535,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           if (from == lhs.getLHS().begin()) {
             // While every rule will have an overlap of the first kind
             // with itself, it's not useful to consider since the
-            // resulting trivial pair is always trivial.
+            // resulting critical pair is always trivial.
             if (i == j)
               return;
 
