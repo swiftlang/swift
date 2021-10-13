@@ -698,7 +698,7 @@ public struct UnsafeCurrentTask {
   /// Returns `true` if the task is cancelled, and should stop executing.
   ///
   /// - SeeAlso: `checkCancellation()`
-  @_transparent public var isCancelled: Bool {
+  public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }
 
