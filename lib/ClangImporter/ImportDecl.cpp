@@ -2486,8 +2486,8 @@ namespace {
         // that we add this to the parent enum (in the "__ObjC" module) and not
         // to the extension.
         auto parentNS = cast<clang::NamespaceDecl>(decl->getParent());
-        auto parent =
-            Impl.importDecl(parentNS, getVersion(), /*UseCanonicalDecl*/ false);
+        Decl *parent = Impl.importDecl(parentNS, getVersion(),
+                                       /*UseCanonicalDecl*/ false);
         // Sometimes when the parent namespace is imported, this namespace
         // also gets imported. If that's the case, then the parent namespace
         // will be an enum (because it was able to be fully imported) in which
@@ -3590,7 +3590,7 @@ namespace {
           }
         }
 
-        auto member = Impl.importDecl(nd, getActiveSwiftVersion());
+        Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
             // We don't know what this member is.
@@ -5938,8 +5938,7 @@ namespace {
       auto name = importedName.getDeclName().getBaseIdentifier();
 
       if (name.empty()) return nullptr;
-
-      auto importedDecl =
+      Decl *importedDecl =
           Impl.importDecl(decl->getClassInterface(), getActiveSwiftVersion());
       auto typeDecl = dyn_cast_or_null<TypeDecl>(importedDecl);
       if (!typeDecl) return nullptr;
@@ -9990,7 +9989,7 @@ bool ClangImporter::Implementation::addMemberAndAlternatesToExtension(
       return true;
 
   // Then try to import the decl under the specified name.
-  auto *member = importDecl(decl, nameVersion);
+  Decl *member = importDecl(decl, nameVersion);
   if (!member)
     return false;
 
