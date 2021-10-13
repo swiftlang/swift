@@ -2097,12 +2097,13 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     }
   }
 
-  if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) {
+  if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I) ||
+      isa<DestroyValueInst>(I)) {
     // Treat the release instruction as if it is the invocation
     // of a deinit function.
     if (RecursionDepth < MaxRecursionDepth) {
       // Check if the destructor is known.
-      auto OpV = cast<RefCountingInst>(I)->getOperand(0);
+      auto OpV = I->getOperand(0);
       if (buildConnectionGraphForDestructor(OpV, I, FInfo, BottomUpOrder,
                                             RecursionDepth))
         return;
@@ -2157,10 +2158,21 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return isPointer(result);
       }));
       return;
-
+    case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::CopyValueInst: {
+      auto svi = cast<SingleValueInstruction>(I);
+      CGNode *resultNode = ConGraph->getNode(svi);
+      if (CGNode *opNode = ConGraph->getNode(svi->getOperand(0))) {
+        ConGraph->defer(resultNode, opNode);
+        return;
+      }
+      ConGraph->setEscapesGlobal(svi);
+      return;
+    }
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     case SILInstructionKind::Name##ReleaseInst:
 #include "swift/AST/ReferenceStorage.def"
+    case SILInstructionKind::DestroyValueInst:
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::ReleaseValueInst: {
       // A release instruction may deallocate the pointer operand. This may
