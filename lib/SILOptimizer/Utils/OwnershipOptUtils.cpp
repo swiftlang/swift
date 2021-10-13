@@ -1142,15 +1142,15 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
     return;
 
   ctx->extraAddressFixupInfo.base = addressOwnership.base;
+  SILValue baseAddress = ctx->extraAddressFixupInfo.base.getBaseAddress();
 
   // For now, just gather up uses
   //
   // FIXME: get rid of allAddressUsesFromOldValue. Shouldn't this already be
   // included in guaranteedUsePoints?
   auto &oldValueUses = ctx->extraAddressFixupInfo.allAddressUsesFromOldValue;
-  // FIXME: The return value of findTransitiveUsesForAddress is currently
-  // inverted.
-  if (findTransitiveUsesForAddress(oldValue, oldValueUses)) {
+  if (findTransitiveUsesForAddress(oldValue, &oldValueUses)
+      != AddressUseKind::NonEscaping) {
     invalidate();
     return;
   }
@@ -1161,7 +1161,6 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   }
   // This cloner check must match the later cloner invocation in
   // getReplacementAddress()
-  SILValue baseAddress = ctx->extraAddressFixupInfo.base.getBaseAddress();
   auto *baseInst = cast<SingleValueInstruction>(baseAddress);
   auto checkBase = [&](SILValue srcAddr) {
     return (srcAddr == baseInst) ? SILValue(baseInst) : SILValue();
@@ -1520,7 +1519,7 @@ void GuaranteedPhiBorrowFixup::insertEndBorrowsAndFindPhis(
     return;
   }
   SmallVector<Operand *, 16> usePoints;
-  bool result = findInnerTransitiveGuaranteedUses(phi, usePoints);
+  bool result = findInnerTransitiveGuaranteedUses(phi, &usePoints);
   assert(result && "should be checked by canCloneTerminator");
   (void)result;
 
