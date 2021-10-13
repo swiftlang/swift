@@ -31,7 +31,7 @@ entry(%instance : $S):
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_address : $@convention(thin) (@in S) -> () {
+sil [ossa] [always_inline] @callee_in : $@convention(thin) (@in S) -> () {
 entry(%instance : $*S):
     %retval = tuple ()
     return %retval : $()
@@ -102,15 +102,15 @@ entry(%instance : $S):
   return %result : $()
 }
 
-// CHECK-LABEL: sil [ossa] @caller_address_callee_address : $@convention(thin) (@in S) -> () {
+// CHECK-LABEL: sil [ossa] @caller_in_callee_in : $@convention(thin) (@in S) -> () {
 // CHECK:       {{bb[^,]+}}({{%[^,]+}} : $*S):
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK-LABEL: } // end sil function 'caller_address_callee_address'
-sil [ossa] @caller_address_callee_address : $@convention(thin) (@in S) -> () {
+// CHECK-LABEL: } // end sil function 'caller_in_callee_in'
+sil [ossa] @caller_in_callee_in : $@convention(thin) (@in S) -> () {
 entry(%instance : $*S):
-    %callee_address = function_ref @callee_address : $@convention(thin) (@in S) -> ()
-    %result = apply %callee_address(%instance) : $@convention(thin) (@in S) -> ()
+    %callee_in = function_ref @callee_in : $@convention(thin) (@in S) -> ()
+    %result = apply %callee_in(%instance) : $@convention(thin) (@in S) -> ()
     return %result : $()
 }
 
@@ -167,7 +167,7 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_address : $@yield_once @convention(thin) (@in S) -> @yields @inout S {
+sil hidden [ossa] [always_inline] @callee_coro_in : $@yield_once @convention(thin) (@in S) -> @yields @inout S {
 bb0(%instance : $*S):
   yield %instance : $*S, resume bb1, unwind bb2
 bb1:
@@ -279,18 +279,18 @@ bb0(%instance : $S):
   return %retval : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @caller_address_callee_coro_address : $@convention(thin) (@in S) -> () {
+// CHECK-LABEL: sil hidden [ossa] @caller_in_callee_coro_in : $@convention(thin) (@in S) -> () {
 // CHECK:       {{bb[^,]+}}({{%[^,]+}} : $*S):
 // CHECK:         {{%[^,]+}} = tuple ()
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK:       {{bb[^,]+}}:
 // CHECK:         unreachable
-// CHECK-LABEL: } // end sil function 'caller_address_callee_coro_address'
-sil hidden [ossa] @caller_address_callee_coro_address : $@convention(thin) (@in S) -> () {
+// CHECK-LABEL: } // end sil function 'caller_in_callee_coro_in'
+sil hidden [ossa] @caller_in_callee_coro_in : $@convention(thin) (@in S) -> () {
 bb0(%instance : $*S):
-  %callee_coro_address = function_ref @callee_coro_address : $@yield_once @convention(thin) (@in S) -> @yields @inout S
-  (%addr, %continuation) = begin_apply %callee_coro_address(%instance) : $@yield_once @convention(thin) (@in S) -> @yields @inout S
+  %callee_coro_in = function_ref @callee_coro_in : $@yield_once @convention(thin) (@in S) -> @yields @inout S
+  (%addr, %continuation) = begin_apply %callee_coro_in(%instance) : $@yield_once @convention(thin) (@in S) -> @yields @inout S
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
@@ -334,7 +334,7 @@ bb2:
   return %18 : $()
 }
 
-sil [ossa] @callee_error_address : $@convention(thin) (@in S) -> @error Error {
+sil [ossa] @callee_error_in : $@convention(thin) (@in S) -> @error Error {
 bb0(%0 : $*S):
   cond_br undef, bb1, bb2
 bb1:
@@ -449,7 +449,7 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil hidden [ossa] @caller_address_callee_error_address : $@convention(thin) (@in S) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @caller_in_callee_error_in : $@convention(thin) (@in S) -> @error Error {
 // CHECK:       {{bb[^,]+}}({{%[^,]+}} : $*S):
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[0-9]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
@@ -458,11 +458,11 @@ bb2(%12 : @owned $Error):
 // CHECK:         {{%[^,]+}} = tuple ()
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK-LABEL: } // end sil function 'caller_address_callee_error_address'
-sil hidden [ossa] @caller_address_callee_error_address : $@convention(thin) (@in S) -> @error Error {
+// CHECK-LABEL: } // end sil function 'caller_in_callee_error_in'
+sil hidden [ossa] @caller_in_callee_error_in : $@convention(thin) (@in S) -> @error Error {
 bb0(%instance : $*S):
-  %callee_error_address = function_ref @callee_error_address : $@convention(thin) (@in S) -> @error Error
-  try_apply %callee_error_address(%instance) : $@convention(thin) (@in S) -> @error Error, normal bb1, error bb2
+  %callee_error_in = function_ref @callee_error_in : $@convention(thin) (@in S) -> @error Error
+  try_apply %callee_error_in(%instance) : $@convention(thin) (@in S) -> @error Error, normal bb1, error bb2
 bb1(%9 : $()):
   %10 = tuple ()
   return %10 : $()
