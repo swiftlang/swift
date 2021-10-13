@@ -4051,7 +4051,8 @@ ClangImporter::Implementation::loadNamedMembers(
   auto table = findLookupTable(*CMO);
   assert(table && "clang module without lookup table");
 
-  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
+  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD) ||
+         isa<clang::RecordDecl>(CD));
 
   // Force the members of the entire inheritance hierarchy to be loaded and
   // deserialized before loading the named member of a class. This warms up

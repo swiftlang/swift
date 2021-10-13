@@ -2401,48 +2401,6 @@ namespace {
         if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
           return importFullName(typedefForAnon);
       }
-
-      if (!decl->isRecord())
-        return {ImportedName(), None};
-
-      // If the type has no name and no structure name, but is not anonymous,
-      // generate a name for it. Specifically this is for cases like:
-      //   struct a {
-      //     struct {} z;
-      //   }
-      // Where the member z is an unnamed struct, but does have a member-name
-      // and is accessible as a member of struct a.
-      if (auto recordDecl = dyn_cast<clang::RecordDecl>(
-                              decl->getLexicalDeclContext())) {
-        for (auto field : recordDecl->fields()) {
-          if (field->getType()->getAsTagDecl() == decl) {
-            // Create a name for the declaration from the field name.
-            std::string Id;
-            llvm::raw_string_ostream IdStream(Id);
-
-            const char *kind;
-            if (decl->isStruct())
-              kind = "struct";
-            else if (decl->isUnion())
-              kind = "union";
-            else
-              llvm_unreachable("unknown decl kind");
-
-            IdStream << "__Unnamed_" << kind << "_";
-            if (field->isAnonymousStructOrUnion()) {
-              IdStream << "__Anonymous_field" << field->getFieldIndex();
-            } else {
-              assert(!field->getDeclName().isEmpty() &&
-                     "Microsoft anonymous struct extension?");
-              IdStream << field->getName();
-            }
-            ImportedName Result;
-            Result.setDeclName(Impl.SwiftContext.getIdentifier(IdStream.str()));
-            Result.setEffectiveContext(decl->getDeclContext());
-            return {Result, None};
-          }
-        }
-      }
       
       return {ImportedName(), None};
     }
@@ -3634,7 +3592,7 @@ namespace {
         if (auto nominalDecl =
                 dyn_cast<NominalTypeDecl>(nestedType->getDeclContext())) {
           assert(nominalDecl == result && "interesting nesting of C types?");
-          nominalDecl->addMember(nestedType);
+          nominalDecl->addMemberToLookupTable(nestedType);
         }
       }
 
@@ -3675,7 +3633,7 @@ namespace {
                                                   /*wantBody=*/true);
           ctors.push_back(valueCtor);
         }
-        result->addMember(member);
+        result->addMemberToLookupTable(member);
       }
 
       const clang::CXXRecordDecl *cxxRecordDecl =
@@ -3710,12 +3668,14 @@ namespace {
         ctors.push_back(valueCtor);
       }
 
+      // Add ctors directly as they cannot always be looked up from the clang
+      // decl (some are synthesized by Swift).
       for (auto ctor : ctors) {
         result->addMember(ctor);
       }
 
       for (auto method : methods) {
-        result->addMember(method);
+        result->addMemberToLookupTable(method);
       }
 
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
@@ -3731,10 +3691,13 @@ namespace {
           auto getterAndSetter = subscriptInfo.second;
           auto subscript = makeSubscript(getterAndSetter.first,
                                          getterAndSetter.second);
+          // Also add subscripts directly because they won't be found from the
+          // clang decl.
           result->addMember(subscript);
         }
       }
 
+      result->setMemberLoader(&Impl, 0);
       return result;
     }
 
@@ -4363,21 +4326,9 @@ namespace {
       Optional<ImportedName> correctSwiftName;
       ImportedName importedName;
 
-      if (!decl->isAnonymousStructOrUnion() && !decl->getDeclName().isEmpty()) {
-        std::tie(importedName, correctSwiftName) = importFullName(decl);
-        if (!importedName) {
-          return nullptr;
-        }
-      } else {
-        // Generate a field name for anonymous fields, this will be used in
-        // order to be able to expose the indirect fields injected from there
-        // as computed properties forwarding the access to the subfield.
-        std::string Id;
-        llvm::raw_string_ostream IdStream(Id);
-
-        IdStream << "__Anonymous_field" << decl->getFieldIndex();
-        importedName.setDeclName(Impl.SwiftContext.getIdentifier(IdStream.str()));
-        importedName.setEffectiveContext(decl->getDeclContext());
+      std::tie(importedName, correctSwiftName) = importFullName(decl);
+      if (!importedName) {
+        return nullptr;
       }
 
       auto name = importedName.getDeclName().getBaseIdentifier();
@@ -9874,6 +9825,38 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
     E->loadAllMembers();
 }
 
+static void loadAllMembersOfRecordDecl(StructDecl *recordDecl) {
+  auto &ctx = recordDecl->getASTContext();
+  auto clangRecord = cast<clang::RecordDecl>(recordDecl->getClangDecl());
+
+  // This is only to keep track of the members we've already seen.
+  llvm::SmallPtrSet<Decl *, 16> addedMembers;
+  for (auto member : recordDecl->getCurrentMembersWithoutLoading())
+    addedMembers.insert(member);
+
+  for (auto member : clangRecord->decls()) {
+    auto namedDecl = dyn_cast<clang::NamedDecl>(member);
+    if (!namedDecl)
+      continue;
+
+    // Don't try to load ourselves (this will create an infinite loop).
+    if (auto possibleSelf = dyn_cast<clang::RecordDecl>(member))
+      if (possibleSelf->getDefinition() == clangRecord)
+        continue;
+
+    auto name = ctx.getClangModuleLoader()->importName(namedDecl);
+    if (!name)
+      continue;
+
+    for (auto found : recordDecl->lookupDirect(name)) {
+      if (addedMembers.insert(found).second &&
+          // TODO: remove this check once PR#38675 lands.
+          found->getDeclContext() == recordDecl)
+        recordDecl->addMember(found);
+    }
+  }
+}
+
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
@@ -9892,26 +9875,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     return;
   }
 
-  auto namespaceDecl =
-      dyn_cast_or_null<clang::NamespaceDecl>(D->getClangDecl());
-  if (namespaceDecl) {
-    auto *enumDecl = cast<EnumDecl>(D);
-    // TODO: This redecls should only match redecls that are in the same
-    // module as namespaceDecl after we import one namespace per clang module.
-    for (auto ns : namespaceDecl->redecls()) {
-      for (auto m : ns->decls()) {
-        auto nd = dyn_cast<clang::NamedDecl>(m);
-        if (!nd)
-          continue;
-        auto member = importDecl(nd, CurrentVersion);
-        if (!member)
-          continue;
-
-        // TODO: remove this change when #34706 lands.
-        if (!member->NextDecl)
-          enumDecl->addMember(member);
-      }
-    }
+  if (D->getClangDecl() && isa<clang::RecordDecl>(D->getClangDecl())) {
+    loadAllMembersOfRecordDecl(cast<StructDecl>(D));
     return;
   }
 
