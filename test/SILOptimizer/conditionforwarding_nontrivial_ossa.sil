@@ -1,0 +1,372 @@
+// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -condition-forwarding | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil_stage canonical
+
+class Klass {}
+
+enum E { case A(Klass), B(Klass) }
+
+enum E3 { case A(Klass), B(Klass), C(Klass) }
+
+class C {
+  @_hasStorage var x : Builtin.Int64
+  init()
+}
+
+enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
+sil [ossa] @callee : $@convention(thin) () -> ()
+sil [ossa] @use_enum : $@convention(thin) (@guaranteed E) -> ()
+sil [ossa] @use_int : $@convention(thin) (Builtin.Int64) -> ()
+
+// CHECK-LABEL: sil [ossa] @simple_forwarding1 :
+// CHECK: bb0(%0 : $Builtin.Int1, %1 : @owned $Klass):
+// CHECK-NEXT: br bb3
+// CHECK: bb1:
+// CHECK:  br bb4(%1 : $Klass)
+// CHECK: bb2:
+// CHECK:  br bb5(%1 : $Klass)
+// CHECK: bb3:
+// CHECK:   apply
+// CHECK:   cond_br %0, bb1, bb2
+// CHECK: bb4({{.*}}):
+// CHECK:   br bb6
+// CHECK: bb5({{.*}}):
+// CHECK:   br bb6
+// CHECK: bb6:
+// CHECK-LABEL: } // end sil function 'simple_forwarding1'
+sil [ossa] @simple_forwarding1 : $@convention(thin) (Builtin.Int1, @owned Klass) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @owned $Klass):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = enum $E, #E.A!enumelt, %1 : $Klass
+  br bb3(%2 : $E)
+
+bb2:
+  %3 = enum $E, #E.B!enumelt, %1 : $Klass
+  br bb3(%3 : $E)
+
+bb3(%14 : @owned $E):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4(%17 : @owned $Klass):
+  destroy_value %17 : $Klass
+  br bb6
+
+bb5(%18 : @owned $Klass):
+  destroy_value %18 : $Klass
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Currently, this is not optimized away because memory behavior of begin_borrow is conservative
+// CHECK-LABEL: sil [ossa] @simple_forwarding2 :
+// CHECK: switch_enum
+// CHECK-LABEL: } // end sil function 'simple_forwarding2'
+sil [ossa] @simple_forwarding2 : $@convention(thin) (Builtin.Int1, @guaranteed Klass) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @guaranteed $Klass):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = enum $E, #E.A!enumelt, %1 : $Klass
+  %borrow2 = begin_borrow %2 : $E
+  br bb3(%borrow2 : $E)
+
+bb2:
+  %3 = enum $E, #E.B!enumelt, %1 : $Klass
+  %borrow3 = begin_borrow %3 : $E
+  br bb3(%borrow3 : $E)
+
+bb3(%14 : @guaranteed $E):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4(%17 : @guaranteed $Klass):
+  br bb6
+
+bb5(%18 : @guaranteed $Klass):
+  br bb6
+
+bb6:
+  end_borrow %14 : $E
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_forwarding3 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'simple_forwarding3'
+sil [ossa] @simple_forwarding3 : $@convention(thin) (Builtin.Int1, @owned Klass) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @owned $Klass):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = enum $E, #E.A!enumelt, %1 : $Klass
+  debug_value %2 : $E
+  br bb3(%2 : $E)
+
+bb2:
+  %3 = enum $E, #E.B!enumelt, %1 : $Klass
+  br bb3(%3 : $E)
+
+bb3(%14 : @owned $E):
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4(%17 : @owned $Klass):
+  destroy_value %17 : $Klass
+  br bb6
+
+bb5(%18 : @owned $Klass):
+  destroy_value %18 : $Klass
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_switch_enum_forwarding1 : 
+// CHECK: bb0({{.*}}):
+// CHECK-NEXT: br bb3
+// CHECK: bb1({{.*}}):
+// CHECK:   br bb4({{.*}})
+// CHECK: bb2({{.*}}):
+// CHECK:   br bb5({{.*}})
+// CHECK: bb3:
+// CHECK:   apply
+// CHECK:   switch_enum %0 : $E3, case #E3.A!enumelt: bb1, default bb2
+// CHECK: bb4({{.*}}):
+// CHECK:   br bb6
+// CHECK: bb5({{.*}}):
+// CHECK:   br bb6
+// CHECK: bb6:
+// CHECK-LABEL: } // end sil function 'simple_switch_enum_forwarding1'
+sil [ossa] @simple_switch_enum_forwarding1 : $@convention(thin) (@owned E3) -> () {
+bb0(%0 : @owned $E3):
+  switch_enum %0 : $E3, case #E3.A!enumelt: bb1, default bb2
+
+bb1(%1 : @owned $Klass):
+  %2 = enum $E, #E.A!enumelt, %1 : $Klass
+  br bb3(%2 : $E)
+
+bb2(%defaultenum : @owned $E3):
+  %defaultklass = unchecked_enum_data %defaultenum : $E3, #E3.B!enumelt
+  %3 = enum $E, #E.B!enumelt, %defaultklass : $Klass
+  br bb3(%3 : $E)
+
+bb3(%14 : @owned $E):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4(%4 : @owned $Klass):
+  destroy_value %4 : $Klass
+  br bb6
+
+bb5(%5 : @owned $Klass):
+  destroy_value %5 : $Klass
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_switch_enum_forwarding2 : 
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK-LABEL: } // end sil function 'simple_switch_enum_forwarding2'
+sil [ossa] @simple_switch_enum_forwarding2 : $@convention(thin) (@guaranteed E3) -> () {
+bb0(%0 : @guaranteed $E3):
+  switch_enum %0 : $E3, case #E3.A!enumelt: bb1, default bb2
+
+bb1(%1 : @guaranteed $Klass):
+  %2 = enum $E, #E.A!enumelt, %1 : $Klass
+  %borrow2 = begin_borrow %2 : $E
+  br bb3(%borrow2 : $E)
+
+bb2(%defaultenum : @guaranteed $E3):
+  %defaultklass = unchecked_enum_data %defaultenum : $E3, #E3.B!enumelt
+  %3 = enum $E, #E.B!enumelt, %defaultklass : $Klass
+  %borrow3 = begin_borrow %3 : $E
+  br bb3(%borrow3 : $E)
+
+bb3(%14 : @guaranteed $E):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4(%4 : @guaranteed $Klass):
+  br bb6
+
+bb5(%5 : @guaranteed $Klass):
+  br bb6
+
+bb6:
+  end_borrow %14 : $E
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// TODO : This is not optimized today, it needs lifetime extension 
+// CHECK-LABEL: sil [ossa] @simple_switch_enum_forwarding3 : 
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK-LABEL: } // end sil function 'simple_switch_enum_forwarding3'
+sil [ossa] @simple_switch_enum_forwarding3 : $@convention(thin) (@in_guaranteed E3) -> () {
+bb0(%0 : $*E3):
+  %ldb = load_borrow %0 : $*E3
+  switch_enum %ldb : $E3, case #E3.A!enumelt: bb1, default bb2
+
+bb1(%1 : @guaranteed $Klass):
+  %2 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%2 : $FakeOptional<Klass>)
+
+bb2(%defaultenum : @guaranteed $E3):
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%3 : $FakeOptional<Klass>)
+
+bb3(%14 : $FakeOptional<Klass>):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  end_borrow %ldb : $E3
+  switch_enum %14 : $FakeOptional<Klass>, case #FakeOptional.some: bb4, case #FakeOptional.none: bb5
+
+bb4(%4 : $Klass):
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// TODO : This is not optimized today, it needs lifetime extension 
+// CHECK-LABEL: sil [ossa] @simple_switch_enum_forwarding4 : 
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK-LABEL: } // end sil function 'simple_switch_enum_forwarding4'
+sil [ossa] @simple_switch_enum_forwarding4 : $@convention(thin) (@in_guaranteed E3) -> () {
+bb0(%0 : $*E3):
+  %ld = load [copy] %0 : $*E3
+  %borrow = begin_borrow %ld : $E3
+  switch_enum %borrow : $E3, case #E3.A!enumelt: bb1, default bb2
+
+bb1(%1 : @guaranteed $Klass):
+  %2 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%2 : $FakeOptional<Klass>)
+
+bb2(%defaultenum : @guaranteed $E3):
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%3 : $FakeOptional<Klass>)
+
+bb3(%14 : $FakeOptional<Klass>):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  end_borrow %borrow : $E3
+  destroy_value %ld : $E3
+  switch_enum %14 : $FakeOptional<Klass>, case #FakeOptional.some: bb4, case #FakeOptional.none: bb5
+
+bb4(%4 : $Klass):
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// TODO : This is not optimized today, it needs lifetime extension 
+// CHECK-LABEL: sil [ossa] @simple_switch_enum_forwarding5 : 
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK-LABEL: } // end sil function 'simple_switch_enum_forwarding5'
+sil [ossa] @simple_switch_enum_forwarding5 : $@convention(thin) (@in_guaranteed E3) -> () {
+bb0(%0 : $*E3):
+  %ld = load [copy] %0 : $*E3
+  %borrow = begin_borrow %ld : $E3
+  switch_enum %borrow : $E3, case #E3.A!enumelt: bb1, default bb2
+
+bb1(%1 : @guaranteed $Klass):
+  %2 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  end_borrow %borrow : $E3
+  destroy_value %ld : $E3
+  br bb3(%2 : $FakeOptional<Klass>)
+
+bb2(%defaultenum : @guaranteed $E3):
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  end_borrow %borrow : $E3
+  destroy_value %ld : $E3
+  br bb3(%3 : $FakeOptional<Klass>)
+
+bb3(%14 : $FakeOptional<Klass>):
+  %15 = function_ref @callee : $@convention(thin) () -> ()
+  %16 = apply %15() : $@convention(thin) () -> ()
+  switch_enum %14 : $FakeOptional<Klass>, case #FakeOptional.some: bb4, case #FakeOptional.none: bb5
+
+bb4(%4 : $Klass):
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @no_forwarding_second_enum_use :
+// CHECK: bb0({{.*}}):
+// CHECK:   cond_br %0
+// CHECK: bb3({{.*}}):
+// CHECK:   switch_enum
+// CHECK: bb6
+// CHECK-LABEL: } // end sil function 'no_forwarding_second_enum_use'
+sil [ossa] @no_forwarding_second_enum_use : $@convention(thin) (Builtin.Int1, @owned Klass) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @owned $Klass):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = enum $E, #E.A!enumelt, %1 : $Klass
+  br bb3(%2 : $E)
+
+bb2:
+  %3 = enum $E, #E.B!enumelt, %1 : $Klass
+  br bb3(%3 : $E)
+
+bb3(%14 : @owned $E):
+  %15 = function_ref @use_enum : $@convention(thin) (@guaranteed E) -> ()
+  %16 = apply %15(%14) : $@convention(thin) (@guaranteed E) -> ()
+  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+
+bb4(%17 : @owned $Klass):
+  destroy_value %17 : $Klass
+  br bb6
+
+bb5(%18 : @owned $Klass):
+  destroy_value %18 : $Klass
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
