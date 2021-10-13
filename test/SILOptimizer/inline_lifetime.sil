@@ -120,7 +120,7 @@ entry(%instance : $*S):
 
 // declarations
 
-sil [ossa] [always_inline] @callee_coro_owned : $@yield_once @convention(method) (@owned C) -> @yields @inout C {
+sil [ossa] [always_inline] @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C {
 bb0(%instance : @owned $C):
   %addr = alloc_stack $C
   store %instance to [init] %addr : $*C
@@ -136,7 +136,7 @@ bb2:
   unwind
 }
 
-sil [ossa] [always_inline] @callee_coro_guaranteed : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout C {
+sil [ossa] [always_inline] @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C {
 bb0(%instance : @guaranteed $C):
   %copy = copy_value %instance : $C
   %addr = alloc_stack $C
@@ -153,7 +153,7 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_trivial : $@yield_once @convention(method) (S) -> @yields @inout S {
+sil hidden [ossa] [always_inline] @callee_coro_trivial : $@yield_once @convention(thin) (S) -> @yields @inout S {
 bb0(%instance : $S):
   %addr = alloc_stack $S
   store %instance to [trivial] %addr : $*S
@@ -167,7 +167,7 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_address : $@yield_once @convention(method) (@in S) -> @yields @inout S {
+sil hidden [ossa] [always_inline] @callee_coro_address : $@yield_once @convention(thin) (@in S) -> @yields @inout S {
 bb0(%instance : $*S):
   yield %instance : $*S, resume bb1, unwind bb2
 bb1:
@@ -179,19 +179,19 @@ bb2:
 
 // tests
 
-// CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_owned : $@convention(method) (@owned C) -> () {
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_owned : $@convention(thin) (@owned C) -> () {
 // CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_coro_owned'
-sil [ossa] @caller_owned_callee_coro_owned : $@convention(method) (@owned C) -> () {
+sil [ossa] @caller_owned_callee_coro_owned : $@convention(thin) (@owned C) -> () {
 bb0(%instance : @owned $C):
-  %callee_coro_owned = function_ref @callee_coro_owned : $@yield_once @convention(method) (@owned C) -> @yields @inout C
-  (%addr, %continuation) = begin_apply %callee_coro_owned(%instance) : $@yield_once @convention(method) (@owned C) -> @yields @inout C
+  %callee_coro_owned = function_ref @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
+  (%addr, %continuation) = begin_apply %callee_coro_owned(%instance) : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(method) (@owned C) -> () {
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
@@ -209,30 +209,30 @@ bb0(%instance : @owned $C):
 // CHECK:         dealloc_stack [[ADDR]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_coro_guaranteed'
-sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(method) (@owned C) -> () {
+sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(thin) (@owned C) -> () {
 bb0(%instance : @owned $C):
-  %callee_coro_guaranteed = function_ref @callee_coro_guaranteed : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout C
-  (%addr, %continuation) = begin_apply %callee_coro_guaranteed(%instance) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout C
+  %callee_coro_guaranteed = function_ref @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
+  (%addr, %continuation) = begin_apply %callee_coro_guaranteed(%instance) : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
   end_apply %continuation
   destroy_value %instance : $C
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_owned : $@convention(method) (@guaranteed C) -> () {
+// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_owned : $@convention(thin) (@guaranteed C) -> () {
 // CHECK-NOT:         begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_coro_owned'
-sil [ossa] @caller_guaranteed_callee_coro_owned : $@convention(method) (@guaranteed C) -> () {
+sil [ossa] @caller_guaranteed_callee_coro_owned : $@convention(thin) (@guaranteed C) -> () {
 bb0(%instance : @guaranteed $C):
   %copy = copy_value %instance : $C
-  %callee_coro_owned = function_ref @callee_coro_owned : $@yield_once @convention(method) (@owned C) -> @yields @inout C
-  (%addr, %continuation) = begin_apply %callee_coro_owned(%copy) : $@yield_once @convention(method) (@owned C) -> @yields @inout C
+  %callee_coro_owned = function_ref @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
+  (%addr, %continuation) = begin_apply %callee_coro_owned(%copy) : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(method) (@guaranteed C) -> () {
+// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
@@ -249,16 +249,16 @@ bb0(%instance : @guaranteed $C):
 // CHECK:         dealloc_stack [[ADDR]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_coro_guaranteed'
-sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(method) (@guaranteed C) -> () {
+sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 bb0(%instance : @guaranteed $C):
-  %callee_coro_guaranteed = function_ref @callee_coro_guaranteed : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout C
-  (%addr, %continuation) = begin_apply %callee_coro_guaranteed(%instance) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout C
+  %callee_coro_guaranteed = function_ref @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
+  (%addr, %continuation) = begin_apply %callee_coro_guaranteed(%instance) : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(method) (S) -> () {
+// CHECK-LABEL: sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(thin) (S) -> () {
 // CHECK:       {{bb[0-9]+}}([[REGISTER_0:%[^,]+]] : $S):
 // CHECK:         [[REGISTER_1:%[^,]+]] = alloc_stack $S
 // CHECK:         store [[REGISTER_0]] to [trivial] [[REGISTER_1]] : $*S
@@ -270,16 +270,16 @@ bb0(%instance : @guaranteed $C):
 // CHECK:         dealloc_stack [[REGISTER_1]] : $*S
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_trivial_callee_coro_trivial'
-sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(method) (S) -> () {
+sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(thin) (S) -> () {
 bb0(%instance : $S):
-  %callee_coro_trivial = function_ref @callee_coro_trivial : $@yield_once @convention(method) (S) -> @yields @inout S
-  (%addr, %continuation) = begin_apply %callee_coro_trivial(%instance) : $@yield_once @convention(method) (S) -> @yields @inout S
+  %callee_coro_trivial = function_ref @callee_coro_trivial : $@yield_once @convention(thin) (S) -> @yields @inout S
+  (%addr, %continuation) = begin_apply %callee_coro_trivial(%instance) : $@yield_once @convention(thin) (S) -> @yields @inout S
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @caller_address_callee_coro_address : $@convention(method) (@in S) -> () {
+// CHECK-LABEL: sil hidden [ossa] @caller_address_callee_coro_address : $@convention(thin) (@in S) -> () {
 // CHECK:       {{bb[^,]+}}({{%[^,]+}} : $*S):
 // CHECK:         {{%[^,]+}} = tuple ()
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
@@ -287,10 +287,10 @@ bb0(%instance : $S):
 // CHECK:       {{bb[^,]+}}:
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_address_callee_coro_address'
-sil hidden [ossa] @caller_address_callee_coro_address : $@convention(method) (@in S) -> () {
+sil hidden [ossa] @caller_address_callee_coro_address : $@convention(thin) (@in S) -> () {
 bb0(%instance : $*S):
-  %callee_coro_address = function_ref @callee_coro_address : $@yield_once @convention(method) (@in S) -> @yields @inout S
-  (%addr, %continuation) = begin_apply %callee_coro_address(%instance) : $@yield_once @convention(method) (@in S) -> @yields @inout S
+  %callee_coro_address = function_ref @callee_coro_address : $@yield_once @convention(thin) (@in S) -> @yields @inout S
+  (%addr, %continuation) = begin_apply %callee_coro_address(%instance) : $@yield_once @convention(thin) (@in S) -> @yields @inout S
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
