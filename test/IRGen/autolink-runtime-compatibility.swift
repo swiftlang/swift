@@ -50,15 +50,15 @@ public func foo() {}
 // FORCE-LOAD-51-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
 // FORCE-LOAD-51-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"
 
+// FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility51"
+
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility51"
-// FORCE-LOAD-55-DAG: declare {{.*}} @"_swift_FORCE_LOAD_$_swiftCompatibilityConcurrency"
+// FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityConcurrency"
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility51"
-// FORCE-LOAD-55-DAG: [[AUTOLINK_SWIFT_COMPAT_CONCURRENCY:![0-9]+]] = !{!"-lswiftCompatibilityConcurrency"}
-// FORCE-LOAD-55-DAG: !llvm.linker.options = !{{{.*}}[[AUTOLINK_SWIFT_COMPAT_CONCURRENCY]]{{[,}]}}
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility51"
