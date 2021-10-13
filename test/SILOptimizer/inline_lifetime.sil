@@ -37,6 +37,12 @@ entry(%instance : $*S):
     return %retval : $()
 }
 
+sil [always_inline] [ossa] @callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+entry(%arg : $*T):
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // tests
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_owned : $@convention(thin) (@owned C) -> () {
@@ -114,6 +120,16 @@ entry(%instance : $*S):
     return %result : $()
 }
 
+// CHECK-LABEL: sil [ossa] @caller_inguaranteed_callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_inguaranteed_callee_inguaranteed'
+sil [ossa] @caller_inguaranteed_callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%instance : $*T):
+  %callee_inguaranteed = function_ref @callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %retval = apply %callee_inguaranteed<T>(%instance) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  return %retval : $()
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // begin_apply
 ////////////////////////////////////////////////////////////////////////////////
@@ -174,6 +190,22 @@ bb1:
   %result = tuple ()
   return %result : $()
 bb2:
+  unwind
+}
+
+sil hidden [ossa] [always_inline] @callee_coro_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T {
+bb0(%instance : $*T):
+  %addr = alloc_stack $T
+  copy_addr %instance to [initialization] %addr : $*T
+  yield %addr : $*T, resume bb1, unwind bb2
+bb1:
+  destroy_addr %addr : $*T
+  dealloc_stack %addr : $*T
+  %result = tuple ()
+  return %result : $()
+bb2:
+  destroy_addr %addr : $*T
+  dealloc_stack %addr : $*T
   unwind
 }
 
@@ -296,6 +328,18 @@ bb0(%instance : $*S):
   return %retval : $()
 }
 
+// CHECK-LABEL: sil hidden [ossa] @caller_inguaranteed_callee_coro_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK-NOTE:    begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_inguaranteed_callee_coro_inguaranteed'
+sil hidden [ossa] @caller_inguaranteed_callee_coro_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%instance : $*T):
+  %callee_coro_inguaranteed = function_ref @callee_coro_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
+  (%addr_out, %continuation) = begin_apply %callee_coro_inguaranteed<T>(%instance) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
+  end_apply %continuation
+  %retval = tuple ()
+  return %retval : $()
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // try_apply
 ////////////////////////////////////////////////////////////////////////////////
@@ -336,6 +380,16 @@ bb2:
 
 sil [ossa] @callee_error_in : $@convention(thin) (@in S) -> @error Error {
 bb0(%0 : $*S):
+  cond_br undef, bb1, bb2
+bb1:
+  throw undef : $Error
+bb2:
+  %18 = tuple ()
+  return %18 : $()
+}
+
+sil [ossa] @callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error Error {
+bb0(%0 : $*T):
   cond_br undef, bb1, bb2
 bb1:
   throw undef : $Error
@@ -463,6 +517,20 @@ sil hidden [ossa] @caller_in_callee_error_in : $@convention(thin) (@in S) -> @er
 bb0(%instance : $*S):
   %callee_error_in = function_ref @callee_error_in : $@convention(thin) (@in S) -> @error Error
   try_apply %callee_error_in(%instance) : $@convention(thin) (@in S) -> @error Error, normal bb1, error bb2
+bb1(%9 : $()):
+  %10 = tuple ()
+  return %10 : $()
+bb2(%12 : @owned $Error):
+  throw %12 : $Error
+}
+
+// CHECK-LABEL: sil hidden [ossa] @caller_inguaranteed_callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error Error {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: // end sil function 'caller_inguaranteed_callee_error_inguaranteed'
+sil hidden [ossa] @caller_inguaranteed_callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error Error {
+bb0(%instance : $*T):
+  %callee_error_inguaranteed = function_ref @callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error Error
+  try_apply %callee_error_inguaranteed<T>(%instance) : $@convention(thin) <T> (@in_guaranteed T) -> @error Error, normal bb1, error bb2
 bb1(%9 : $()):
   %10 = tuple ()
   return %10 : $()
