@@ -409,11 +409,11 @@ actor EscapeArtist {
 actor Ahmad {
   func f() {}
   
-  nonisolated init(v1: Void) {
-    Task.detached { await self.f() } // expected-warning {{actor 'self' cannot be captured by a closure from a non-isolated, designated initializer}}
+  init(v1: Void) {
+    Task.detached { await self.f() } // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
                                      // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
     
-    f()   // expected-warning {{this use of actor 'self' cannot appear in a non-isolated, designated initializer}}
+    f()   // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
           // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
   }
   

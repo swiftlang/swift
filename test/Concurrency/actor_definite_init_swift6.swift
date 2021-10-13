@@ -406,19 +406,19 @@ actor EscapeArtist {
 @available(SwiftStdlib 5.5, *)
 actor Ahmad {
   func f() {}
-  
-  nonisolated init(v1: Void) {
-    Task.detached { await self.f() } // expected-error {{actor 'self' cannot be captured by a closure from a non-isolated, designated initializer}}
-    // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-    
-    f()   // expected-error {{this use of actor 'self' cannot appear in a non-isolated, designated initializer}}
-    // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
+  init(v1: Void) {
+    Task.detached { await self.f() } // expected-error {{actor 'self' can only be captured by a closure from an async initializer}}
+                                     // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
+    f()   // expected-error {{this use of actor 'self' can only appear in an async initializer}}
+          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
   }
-  
+
   nonisolated init(v2: Void) async {
     Task.detached { await self.f() } // expected-error {{actor 'self' cannot be captured by a closure from a non-isolated, designated initializer}} {{3-15=}}
     // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-    
+
     f()   // expected-error {{this use of actor 'self' cannot appear in a non-isolated, designated initializer}}
     // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
   }

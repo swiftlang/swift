@@ -991,3 +991,18 @@ class GenericSub1<T>: GenericSuper<[T]> { }
 
 @GenericGlobalActor<T>
 class GenericSub2<T>: GenericSuper<[T]> { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated class 'GenericSub2' has different actor isolation from global actor 'GenericGlobalActor<U>'-isolated superclass 'GenericSuper'}}
+
+/// Diagnostics for `nonisolated` on an actor initializer.
+actor Butterfly {
+  nonisolated init() {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+
+  nonisolated init(async: Void) async {}
+
+  nonisolated convenience init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+    self.init()
+  }
+
+  nonisolated convenience init(cookies: Void) async { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+    self.init()
+  }
+}

@@ -175,10 +175,16 @@ func test_params(
 
 // Actor initializer isolation (through typechecking only!)
 distributed actor DijonMustard {
+  nonisolated init(transport: ActorTransport) {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+
   convenience init(conv: ActorTransport) {
     self.init(transport: conv)
     self.f() // expected-error {{actor-isolated instance method 'f()' can not be referenced from a non-isolated context}}
   }
 
   func f() {} // expected-note {{distributed actor-isolated instance method 'f()' declared here}}
+
+  nonisolated convenience init(conv2: ActorTransport) { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+    self.init(transport: conv2)
+  }
 }
