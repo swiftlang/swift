@@ -701,9 +701,65 @@ void swift::ide::CompletionInstance::typeContextInfo(
                   *Result.CI.getCodeCompletionFile(), *callbacksFactory);
               if (!Consumer.HandleResultsCalled) {
                 // If we didn't receive a handleResult call from the second
-                // pass, we didn't receive any results. To make sure
-                // DeliverTransformed gets called exactly once, call it with
-                // no results here.
+                // pass, we didn't receive any results. To make sure Callback
+                // gets called exactly once, call it manually with no results
+                // here.
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+            },
+            Callback);
+      });
+}
+
+void swift::ide::CompletionInstance::conformingMethodList(
+    swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+    DiagnosticConsumer *DiagC, ArrayRef<const char *> ExpectedTypeNames,
+    llvm::function_ref<void(CancellableResult<ConformingMethodListResults>)>
+        Callback) {
+  using ResultType = CancellableResult<ConformingMethodListResults>;
+
+  struct ConsumerToCallbackAdapter
+      : public swift::ide::ConformingMethodListConsumer {
+    bool ReusingASTContext;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultsCalled = false;
+
+    ConsumerToCallbackAdapter(bool ReusingASTContext,
+                              llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext), Callback(Callback) {}
+
+    void handleResult(const ide::ConformingMethodListResult &result) override {
+      HandleResultsCalled = true;
+      Callback(ResultType::success({&result, ReusingASTContext}));
+    }
+  };
+
+  performOperation(
+      Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      [&](CancellableResult<CompletionInstanceResult> CIResult) {
+        CIResult.mapAsync<ConformingMethodListResults>(
+            [&ExpectedTypeNames](auto &Result, auto DeliverTransformed) {
+              ConsumerToCallbackAdapter Consumer(Result.DidReuseAST,
+                                                 DeliverTransformed);
+              std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+                  ide::makeConformingMethodListCallbacksFactory(
+                      ExpectedTypeNames, Consumer));
+
+              if (!Result.DidFindCodeCompletionToken) {
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+
+              performCodeCompletionSecondPass(
+                  *Result.CI.getCodeCompletionFile(), *callbacksFactory);
+              if (!Consumer.HandleResultsCalled) {
+                // If we didn't receive a handleResult call from the second
+                // pass, we didn't receive any results. To make sure Callback
+                // gets called exactly once, call it manually with no results
+                // here.
                 DeliverTransformed(
                     ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
               }
