@@ -1069,26 +1069,6 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
       CancellableResult<CompletionLikeOperationParams>::success(Params));
 }
 
-void SwiftLangSupport::performCompletionLikeOperation(
-    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
-        Callback) {
-  performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem,
-      [&](CancellableResult<CompletionLikeOperationParams> ParamsResult) {
-        ParamsResult.mapAsync<CompletionInstanceResult>(
-            [&](auto &CIParams, auto DeliverTransformed) {
-              getCompletionInstance()->performOperation(
-                  CIParams.Invocation, Args, FileSystem,
-                  CIParams.completionBuffer, Offset, CIParams.DiagC,
-                  DeliverTransformed);
-            },
-            Callback);
-      });
-}
-
 CloseClangModuleFiles::~CloseClangModuleFiles() {
   clang::Preprocessor &PP = loader.getClangPreprocessor();
   clang::ModuleMap &ModMap = PP.getHeaderSearchInfo().getModuleMap();
