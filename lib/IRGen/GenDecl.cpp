@@ -3720,7 +3720,10 @@ static void appendLLVMUsedConditionalEntry(IRGenModule &IGM,
           llvm::Type::getInt32Ty(IGM.Module.getContext()), 0)),
       // (3) the "edge" that holds the target alive, if it's missing the target
       // is allowed to be removed
-      llvm::ConstantAsMetadata::get(dependsOn),
+      llvm::MDNode::get(IGM.Module.getContext(),
+                        {
+                            llvm::ConstantAsMetadata::get(dependsOn),
+                        }),
   };
   auto *usedConditional =
       IGM.Module.getOrInsertNamedMetadata("llvm.used.conditional");
