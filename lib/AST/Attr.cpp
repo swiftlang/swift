@@ -1226,6 +1226,15 @@ StringRef DeclAttribute::getAttrName() const {
     }
     llvm_unreachable("Invalid inline kind");
   }
+  case DAK_NonSendable: {
+    switch (cast<NonSendableAttr>(this)->Specificity) {
+    case NonSendableKind::Specific:
+      return "_nonSendable";
+    case NonSendableKind::Assumed:
+      return "_nonSendable(_assumed)";
+    }
+    llvm_unreachable("Invalid nonSendable kind");
+  }
   case DAK_Optimize: {
     switch (cast<OptimizeAttr>(this)->getMode()) {
     case OptimizationMode::NoOptimization:

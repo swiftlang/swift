@@ -2014,6 +2014,20 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+  case DAK_NonSendable: {
+    auto kind = parseSingleAttrOption<NonSendableKind>
+                         (*this, Loc, AttrRange, AttrName, DK)
+                    .when("_assumed", NonSendableKind::Assumed)
+                    .whenOmitted(NonSendableKind::Specific);
+    if (!kind)
+      return false;
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) NonSendableAttr(AtLoc, AttrRange, *kind));
+
+    break;
+  }
+
   case DAK_AccessControl: {
 
     // Diagnose using access control in a local scope, which isn't meaningful.

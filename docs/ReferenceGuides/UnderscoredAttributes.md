@@ -376,6 +376,22 @@ override.
 This attribute and the corresponding `-warn-implicit-overrides` flag are
 used when compiling the standard library and overlays.
 
+## `@_nonSendable`
+
+There is no clang attribute to add a Swift conformance to an imported type, but
+there *is* a clang attribute to add a Swift attribute to an imported type. So
+`@Sendable` (which is not normally allowed on types) is used from clang headers
+to indicate that an unconstrained, fully available `Sendable` conformance should
+be added to a given type, while `@_nonSendable` indicates that an unavailable
+`Sendable` conformance should be added to it.
+
+`@_nonSendable` can have no options after it, in which case it "beats"
+`@Sendable` if both are applied to the same declaration, or it can have
+`(_assumed)` after it, in which case `@Sendable` "beats" it.
+`@_nonSendable(_assumed)` is intended to be used when mass-marking whole regions
+of a header as non-`Sendable` so that you can make spot exceptions with
+`@Sendable`.   
+
 ## `@_objc_non_lazy_realization`
 
 Marks a class as being non-lazily (i.e. eagerly) [realized](/docs/Lexicon.md#realization).

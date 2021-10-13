@@ -2422,6 +2422,31 @@ bool swift::diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
   });
 }
 
+static DiagnosticBehavior
+behaviorLimitForExplicitUnavailability(const RootProtocolConformance *rootConf) {
+  auto protoDecl = rootConf->getProtocol();
+
+  // Soften errors about unavailable `Sendable` conformances depending on the
+  // concurrency checking mode
+  if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      protoDecl->isSpecificProtocol(KnownProtocolKind::UnsafeSendable)) {
+    // TODO: Base this on concurrency checking mode from ExportContext so it
+    //       detects when you're in concurrency code without -warn-concurrency.
+    auto &langOpts = protoDecl->getASTContext().LangOpts;
+    if (langOpts.isSwiftVersionAtLeast(6))
+      /* fall through */;
+    else if (!langOpts.WarnConcurrency)
+      // TODO: Needs more conditions--should only do this if we aren't in a
+      //       concurrent context, and either the import or the declaration is
+      //       @predatesConcurrency.
+      return DiagnosticBehavior::Ignore;
+    else
+      return DiagnosticBehavior::Warning;
+  }
+
+  return DiagnosticBehavior::Unspecified;
+}
+
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
@@ -2457,12 +2482,10 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
       // This was platform-specific; indicate the platform.
       platform = attr->prettyPlatformString();
       break;
-    } else if (rootConf->getProtocol()->isSpecificProtocol(
-                   KnownProtocolKind::Sendable) &&
-               !ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+    } else {
       // Downgrade unavailable Sendable conformances to warnings prior to
       // Swift 6.
-      behavior = DiagnosticBehavior::Warning;
+      behavior = behaviorLimitForExplicitUnavailability(rootConf);
     }
     LLVM_FALLTHROUGH;
 
