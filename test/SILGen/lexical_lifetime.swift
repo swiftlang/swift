@@ -86,8 +86,8 @@ func lexical_borrow_let_class_in_enum() {
 
 // arguments:
 
-// CHECK-LABEL: sil hidden [ossa] @lexical_borrow_arg_guaranteed_class : $@convention(thin) (@guaranteed C) -> () {
-// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
+// CHECK-LABEL: sil hidden [ossa] @lexical_borrow_arg_owned_class : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] 
 // CHECK:         debug_value [[LIFETIME]] 
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
@@ -98,6 +98,15 @@ func lexical_borrow_let_class_in_enum() {
 // CHECK:         end_borrow [[LIFETIME]] 
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] 
+// CHECK-LABEL: } // end sil function 'lexical_borrow_arg_owned_class'
+@_silgen_name("lexical_borrow_arg_owned_class")
+func lexical_borrow_arg_owned_class(_ c: __owned C) {
+  use_generic(c)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @lexical_borrow_arg_guaranteed_class : $@convention(thin) (@guaranteed C) -> () {
+// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
+// CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'lexical_borrow_arg_guaranteed_class'
 @_silgen_name("lexical_borrow_arg_guaranteed_class")
 func lexical_borrow_arg_guaranteed_class(_ c: C) {
