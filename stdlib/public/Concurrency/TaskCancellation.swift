@@ -51,13 +51,7 @@ extension Task {
   ///
   /// - SeeAlso: `checkCancellation()`
   public var isCancelled: Bool {
-    withUnsafeCurrentTask { task in
-      guard let task = task else {
-        return false
-      }
-
-      return _taskIsCancelled(task._task)
-    }
+    _taskIsCancelled(_task)
   }
 }
 
