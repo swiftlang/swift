@@ -754,7 +754,7 @@ public struct UnsafeCurrentTask {
   /// There is no way to uncancel a task.
   ///
   /// - SeeAlso: `checkCancellation()`
-  @_transparent public var isCancelled: Bool {
+  public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }
 
