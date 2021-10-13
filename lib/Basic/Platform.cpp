@@ -445,44 +445,12 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
 }
 
 
-/// Remap the given version number via the version map, or produce \c None if
-/// there is no mapping for this version.
-static Optional<llvm::VersionTuple> remapVersion(
-    const llvm::StringMap<llvm::VersionTuple> &versionMap,
-    llvm::VersionTuple version) {
-  // The build number is never used in the lookup.
-  version = version.withoutBuild();
-
-  // Look for this specific version.
-  auto known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  // If an extra ".0" was specified (in the subminor version), drop that
-  // and look again.
-  if (!version.getSubminor() || *version.getSubminor() != 0)
-    return None;
-
-  version = llvm::VersionTuple(version.getMajor(), *version.getMinor());
-  known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  // If another extra ".0" wa specified (in the minor version), drop that
-  // and look again.
-  if (!version.getMinor() || *version.getMinor() != 0)
-    return None;
-
-  version = llvm::VersionTuple(version.getMajor());
-  known = versionMap.find(version.getAsString());
-  if (known != versionMap.end())
-    return known->second;
-
-  return None;
+static const llvm::VersionTuple minimumMacCatalystDeploymentTarget() {
+  return llvm::VersionTuple(13, 1);
 }
 
 llvm::VersionTuple
-swift::getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
+swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
                            const llvm::Triple &triple) {
   // Retrieve the SDK version.
   auto SDKVersion = SDKInfo.getVersion();
@@ -491,9 +459,12 @@ swift::getTargetSDKVersion(clang::driver::DarwinSDKInfo &SDKInfo,
   // SDK version. Map that to the corresponding iOS version number to pass
   // down to the linker.
   if (tripleIsMacCatalystEnvironment(triple)) {
-    return remapVersion(
-        SDKInfo.getVersionMap().MacOS2iOSMacMapping, SDKVersion)
-          .getValueOr(llvm::VersionTuple(0, 0, 0));
+    if (const auto *MacOStoMacCatalystMapping = SDKInfo.getVersionMapping(
+                clang::DarwinSDKInfo::OSEnvPair::macOStoMacCatalystPair())) {
+      return MacOStoMacCatalystMapping->map(
+            SDKVersion, minimumMacCatalystDeploymentTarget(), None).getValueOr(llvm::VersionTuple(0, 0, 0));
+    }
+    return llvm::VersionTuple(0, 0, 0);
   }
 
   return SDKVersion;

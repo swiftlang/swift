@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_MULTIMAPCACHE_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {

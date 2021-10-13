@@ -302,12 +302,11 @@ struct ArgumentInitHelper {
     // Emit debug information for the argument.
     SILLocation loc(PD);
     loc.markAsPrologue();
+    SILDebugVariable DebugVar(PD->isLet(), ArgNo);
     if (argrv.getType().isAddress())
-      SGF.B.createDebugValueAddr(loc, argrv.getValue(),
-                                 SILDebugVariable(PD->isLet(), ArgNo));
+      SGF.B.createDebugValueAddr(loc, argrv.getValue(), DebugVar);
     else
-      SGF.B.createDebugValue(loc, argrv.getValue(),
-                             SILDebugVariable(PD->isLet(), ArgNo));
+      SGF.B.createDebugValue(loc, argrv.getValue(), DebugVar);
   }
 };
 } // end anonymous namespace
@@ -391,7 +390,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     if (auto *AllocStack = dyn_cast<AllocStackInst>(val))
       AllocStack->setArgNo(ArgNo);
     else {
-      SILDebugVariable DbgVar(/*Constant*/ true, ArgNo);
+      SILDebugVariable DbgVar(VD->isLet(), ArgNo);
       SGF.B.createDebugValue(Loc, val, DbgVar);
     }
 
@@ -416,7 +415,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
         SILType::getPrimitiveObjectType(boxTy), VD);
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
-    SILDebugVariable DbgVar(/*Constant*/ false, ArgNo);
+    SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
     break;
   }
@@ -427,7 +426,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILType ty = SGF.getLoweredType(type).getAddressType();
     SILValue addr = SGF.F.begin()->createFunctionArgument(ty, VD);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
-    SILDebugVariable DbgVar(/*Constant*/ true, ArgNo);
+    SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
     break;
   }

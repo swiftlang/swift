@@ -467,6 +467,6 @@ void TestOptions::printHelp(bool ShowHidden) const {
 
   TestOptTable Table;
 
-  Table.PrintHelp(llvm::outs(), "sourcekitd-test [options] <inputs>",
+  Table.printHelp(llvm::outs(), "sourcekitd-test [options] <inputs>",
                   "SourceKit Testing Tool", ShowHidden);
 }

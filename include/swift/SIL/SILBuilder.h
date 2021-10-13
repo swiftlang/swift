@@ -363,16 +363,34 @@ public:
   // SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
 
+  /// Substitute anonymous function arguments with "_$ArgNo".
+  Optional<SILDebugVariable>
+  substituteAnonymousArgs(llvm::SmallString<4> Name,
+                          Optional<SILDebugVariable> Var, SILLocation Loc) {
+    if (!Var || !Var->ArgNo || !Var->Name.empty())
+      return Var;
+
+    auto *VD = Loc.getAsASTNode<VarDecl>();
+    if (VD && !VD->getName().empty())
+      return Var;
+
+    llvm::raw_svector_ostream(Name) << '_' << (Var->ArgNo - 1);
+    Var->Name = Name;
+    return Var;
+  }
+
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
                                    Optional<SILDebugVariable> Var = None,
                                    bool hasDynamicLifetime = false,
                                    bool isLexical = false) {
+    llvm::SmallString<4> Name;
     Loc.markAsPrologue();
     assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
-    return insert(AllocStackInst::create(getSILDebugLocation(Loc), elementType,
-                                         getFunction(), Var, hasDynamicLifetime,
-                                         isLexical));
+    return insert(AllocStackInst::create(
+        getSILDebugLocation(Loc), elementType, getFunction(),
+        substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime,
+        isLexical));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
@@ -402,11 +420,13 @@ public:
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
                                Optional<SILDebugVariable> Var = None,
                                bool hasDynamicLifetime = false) {
+    llvm::SmallString<4> Name;
     Loc.markAsPrologue();
     assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
-                                       Var, hasDynamicLifetime));
+                                       substituteAnonymousArgs(Name, Var, Loc),
+                                       hasDynamicLifetime));
   }
 
   AllocExistentialBoxInst *

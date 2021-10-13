@@ -412,7 +412,7 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   switch (effectiveAccess) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
-    return maybeAddExternal(SILLinkage::Private);
+    return SILLinkage::Private;
 
   case AccessLevel::Internal:
     if (limit == Limit::OnDemand)

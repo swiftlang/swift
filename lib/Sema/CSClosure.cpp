@@ -833,7 +833,6 @@ private:
                                      contextualTy,
                                      /*isDiscarded=*/false);
 
-    // FIXME: Use SolutionApplicationTarget?
     if (cs.generateConstraints(target, FreeTypeVariableBinding::Disallow)) {
       hadError = true;
       return;

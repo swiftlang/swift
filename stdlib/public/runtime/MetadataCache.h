@@ -26,6 +26,8 @@
 
 namespace swift {
 
+#if !SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
+
 class MetadataAllocator : public llvm::AllocatorBase<MetadataAllocator> {
 private:
   uint16_t Tag;
@@ -50,6 +52,26 @@ public:
     return Allocator;
   }
 };
+
+#else
+
+class MetadataAllocator {
+public:
+  MetadataAllocator(uint16_t tag) {}
+  void *Allocate(size_t size, size_t alignment) {
+    if (alignment < sizeof(void*)) alignment = sizeof(void*);
+    void *ptr = nullptr;
+    if (posix_memalign(&ptr, alignment, size) != 0) {
+      return nullptr;
+    }
+    return ptr;
+  }
+  void Deallocate(const void *ptr, size_t size = 0, size_t Alignment = 0) {
+    return free(const_cast<void *>(ptr));
+  }
+};
+
+#endif
 
 template <uint16_t StaticTag>
 class TaggedMetadataAllocator : public MetadataAllocator {

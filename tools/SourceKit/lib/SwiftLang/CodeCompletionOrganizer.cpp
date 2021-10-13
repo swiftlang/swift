@@ -541,10 +541,11 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     if (options.fuzzyMatching && filterText.size() >= options.minFuzzyLength) {
       match = pattern.matchesCandidate(completion->getName());
     } else {
-      match = completion->getName().startswith_lower(filterText);
+      match = completion->getName().startswith_insensitive(filterText);
     }
 
-    bool isExactMatch = match && completion->getName().equals_lower(filterText);
+    bool isExactMatch =
+        match && completion->getName().equals_insensitive(filterText);
 
     if (isExactMatch) {
       if (!exactMatch) { // first match
@@ -624,7 +625,7 @@ static double combinedScore(const Options &options, double matchScore,
 
 static int compareResultName(Item &a, Item &b) {
   // Sort first by filter name (case-insensitive).
-  if (int primary = StringRef(a.name).compare_lower(b.name))
+  if (int primary = StringRef(a.name).compare_insensitive(b.name))
     return primary;
 
   // Next, sort by full description text.

@@ -62,7 +62,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   if (ParsedArgs.getLastArg(OPT_help) || Args.empty()) {
     std::string ExecutableName =
         llvm::sys::path::stem(MainExecutablePath).str();
-    Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
+    Table->printHelp(llvm::outs(), ExecutableName.c_str(),
                      "Swift Symbol Graph Extractor",
                      SwiftSymbolGraphExtractOption, 0,
                      /*ShowAllAliases*/ false);
@@ -235,7 +235,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   // don't need to print these errors.
   CI.removeDiagnosticConsumer(&DiagPrinter);
   
-  SmallVector<ModuleDecl *> Overlays;
+  SmallVector<ModuleDecl *, 32> Overlays;
   M->findDeclaredCrossImportOverlaysTransitive(Overlays);
   for (const auto *OM : Overlays) {
     auto CIM = CI.getASTContext().getModuleByName(OM->getNameStr());

@@ -68,6 +68,10 @@ def emit_abi_descriptor_path
   : Separate<["-"], "emit-abi-descriptor-path">, MetaVarName<"<path>">,
     HelpText<"Output the ABI descriptor of current module to <path>">;
 
+def emit_module_semantic_info_path
+  : Separate<["-"], "emit-module-semantic-info-path">, MetaVarName<"<path>">,
+    HelpText<"Output semantic info of current module to <path>">;
+
 def serialize_module_interface_dependency_hashes
   : Flag<["-"], "serialize-module-interface-dependency-hashes">,
     Flags<[HelpHidden]>;

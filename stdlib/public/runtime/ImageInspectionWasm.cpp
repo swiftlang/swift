@@ -1,4 +1,4 @@
-//===--- ImageInspectionStatic.cpp - image inspection for static stdlib ---===//
+//===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -24,6 +24,11 @@
 using namespace swift;
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
+  // Currently, Wasm doesn't have a standard stable ABI for exporting address <->
+  // symbol table, it's work in progress. Also, there is no API to access such
+  // information from Wasm binary side. It's accessible only from host VM. 
+  // See https://github.com/WebAssembly/tool-conventions/blob/main/DynamicLinking.md
+  // Seems reasonable to use a stub for now.
   return 0;
 }
 

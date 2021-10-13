@@ -149,7 +149,7 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName =
           llvm::sys::path::stem(MainExecutablePath).str();
-      Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
+      Table->printHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Format Tool", options::SwiftIndentOption, 0,
                        /*ShowAllAliases*/false);
       return 1;
@@ -220,7 +220,7 @@ public:
         Destination = Filename;
       else
         Destination = OutputFilename;
-      llvm::raw_fd_ostream out(Destination, EC, llvm::sys::fs::F_None);
+      llvm::raw_fd_ostream out(Destination, EC, llvm::sys::fs::OF_None);
       if (out.has_error() || EC) {
         Diags.diagnose(SourceLoc(), diag::error_opening_output, Filename,
                        EC.message());

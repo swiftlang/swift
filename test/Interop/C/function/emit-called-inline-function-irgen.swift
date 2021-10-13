@@ -15,7 +15,7 @@ import EmitCalledInlineFunction
 
 // CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z15calledFromSwiftv|"\?calledFromSwift@@YAHXZ"}}()
 // CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z18calledTransitivelyv|"\?calledTransitively@@YAHXZ"}}()
-// CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_ZN1C32memberFunctionCalledTransitivelyEv|"\?memberFunctionCalledTransitively@C@@QEAAHXZ"}}(%class.C* nonnull dereferenceable(1) %this)
+// CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_ZN1C32memberFunctionCalledTransitivelyEv|"\?memberFunctionCalledTransitively@C@@QEAAHXZ"}}(%class.C* nonnull align 1 dereferenceable(1) %this)
 // CXX-DAG: define linkonce_odr{{( dso_local)?}} i32 @{{_Z29calledTransitivelyFromVarInitv|"\?calledTransitivelyFromVarInit@@YAHXZ"}}()
 
 calledFromSwift()

@@ -435,10 +435,10 @@ func createTrivial<T>(_ t: T) -> Trivial<T> {
 }
 
 // CHECK: sil @$s1A11testTrivialyyF : $@convention(thin) () -> ()
-// CHECK:   %0 = integer_literal $Builtin.Int64, 1
-// CHECK:   %1 = struct $Int64 (%0 : $Builtin.Int64)
-// CHECK:   %2 = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
-// CHECK:   %3 = apply %2(%1)
+// CHECK:   %[[LITERAL:.+]] = integer_literal $Builtin.Int64, 1
+// CHECK:   %[[STRUCT:.+]] = struct $Int64 (%[[LITERAL]] : $Builtin.Int64)
+// CHECK:   %[[FUNC:.+]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5 : $@convention(thin) (Int64) -> ()
+// CHECK:   apply %[[FUNC]](%[[STRUCT]])
 public func testTrivial() {
    let s = bar(10)
    let t = createTrivial(s)

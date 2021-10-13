@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend %s -S -g -o - | %FileCheck %s
 
-// REQUIRES: rdar73761019
-
 func markUsed<T>(_ t: T) {}
 // CHECK: {{_?}}main:
 // CHECK: Lfunc_begin0:

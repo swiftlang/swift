@@ -2194,7 +2194,7 @@ void SwiftDeclCollector::deSerialize(StringRef Filename) {
 // Serialize the content of all roots to a given file using JSON format.
 void SwiftDeclCollector::serialize(StringRef Filename, SDKNode *Root) {
   std::error_code EC;
-  llvm::raw_fd_ostream fs(Filename, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream fs(Filename, EC, llvm::sys::fs::OF_None);
   json::Output yout(fs);
   yout << Root;
 }
@@ -2290,7 +2290,7 @@ int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
 int swift::ide::api::deserializeSDKDump(StringRef dumpPath, StringRef OutputPath,
     CheckerOptions Opts) {
   std::error_code EC;
-  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::OF_None);
   if (!fs::exists(dumpPath)) {
     llvm::errs() << dumpPath << " does not exist\n";
     return 1;

@@ -1921,7 +1921,7 @@ static bool isDirectToStorageAccess(const DeclContext *UseDC,
   // If the storage is resilient, we cannot access it directly at all.
   if (var->isResilient(UseDC->getParentModule(),
                        UseDC->getResilienceExpansion()))
-    return false;
+    return var->getModuleContext()->getBypassResilience();
 
   if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD)) {
     // The access must also be a member access on 'self' in all language modes.

@@ -385,7 +385,7 @@ bool Migrator::emitRemap() const {
 
   std::error_code Error;
   llvm::raw_fd_ostream FileOS(RemapPath,
-                              Error, llvm::sys::fs::F_Text);
+                              Error, llvm::sys::fs::OF_Text);
   if (FileOS.has_error()) {
     return true;
   }
@@ -406,7 +406,7 @@ bool Migrator::emitMigratedFile() const {
 
   std::error_code Error;
   llvm::raw_fd_ostream FileOS(OutFilename,
-                              Error, llvm::sys::fs::F_Text);
+                              Error, llvm::sys::fs::OF_Text);
   if (FileOS.has_error()) {
     return true;
   }

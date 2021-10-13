@@ -404,7 +404,6 @@ bool CrossModuleSerializationSetup::canUseFromInline(SILFunction *func,
   case SILLinkage::Private:
   case SILLinkage::PublicExternal:
   case SILLinkage::SharedExternal:
-  case SILLinkage::PrivateExternal:
   case SILLinkage::HiddenExternal:
     break;
   }

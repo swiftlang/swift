@@ -437,7 +437,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  SmallVector<std::unique_ptr<SourceEditConsumer>> Consumers;
+  SmallVector<std::unique_ptr<SourceEditConsumer>, 32> Consumers;
   if (!options::RewrittenOutputFile.empty() ||
       options::DumpIn == options::DumpType::REWRITTEN) {
     Consumers.emplace_back(new SourceEditOutputConsumer(

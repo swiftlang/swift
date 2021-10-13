@@ -47,6 +47,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
+  case ConstraintLocator::ConstructorMemberType:
   case ConstraintLocator::ResultBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
@@ -321,6 +322,14 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     case ConstructorMember:
       out << "constructor member";
       break;
+
+    case ConstructorMemberType: {
+      auto memberTypeElt = elt.castTo<LocatorPathElt::ConstructorMemberType>();
+      out << "constructor member type";
+      if (memberTypeElt.isShortFormOrSelfDelegatingConstructor())
+        out << " (for short-form or self.init call)";
+      break;
+    }
 
     case FunctionArgument:
       out << "function argument";

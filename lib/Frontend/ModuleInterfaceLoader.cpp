@@ -33,6 +33,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
@@ -1571,7 +1572,7 @@ InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath) {
       // ensure that we compile all swift interface files with the option set.
       unsigned(genericSubInvocation.getSILOptions().EnableOSSAModules));
 
-  return llvm::APInt(64, H).toString(36, /*Signed=*/false);
+  return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }
 
 std::error_code

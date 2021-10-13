@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # RUN: ${python} %s %target-swiftmodule-name %platform-sdk-overlay-dir \
 # RUN:     %target-sil-opt -sdk %sdk -enable-sil-verify-all \
 # RUN:       -F %sdk/System/Library/PrivateFrameworks \
@@ -39,7 +39,7 @@ for module_file in os.listdir(sdk_overlay_dir):
 
     # llvm-bcanalyzer | not grep Unknown
     bcanalyzer_output = subprocess.check_output(["llvm-bcanalyzer",
-                                                 module_path])
+                                                 module_path]).decode("utf-8")
     if "Unknown" in bcanalyzer_output:
         print(bcanalyzer_output)
         sys.exit(1)

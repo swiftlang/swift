@@ -49,10 +49,10 @@ public func initStaticVars() -> CInt {
 // CHECK: ret i32 16
 
 // CHECK: define internal void @{{__cxx_global_var_init.4|"\?\?__EstaticNonTrivial@@YAXXZ"}}()
-// CHECK: call {{void|%class.NonTrivial\*}} {{@_ZN10NonTrivialC[12]Ei\(%class.NonTrivial\* nonnull dereferenceable\(4\) @_ZL16staticNonTrivial, i32 1024\)|@"\?\?0NonTrivial@@QEAA@H@Z"\(%class.NonTrivial\* nonnull dereferenceable\(4\) @staticNonTrivial, i32 1024\)}}
+// CHECK: call {{void|%class.NonTrivial\*}} {{@_ZN10NonTrivialC[12]Ei\(%class.NonTrivial\* nonnull align 4 dereferenceable\(4\) @_ZL16staticNonTrivial, i32 1024\)|@"\?\?0NonTrivial@@QEAA@H@Z"\(%class.NonTrivial\* nonnull align 4 dereferenceable\(4\) @staticNonTrivial, i32 1024\)}}
 
 // CHECK: define internal void @{{__cxx_global_var_init.5|"\?\?__EstaticConstNonTrivial@@YAXXZ"}}()
-// CHECK: call {{void|%class.NonTrivial\*}} {{@_ZN10NonTrivialC[12]Ei\(%class.NonTrivial\* nonnull dereferenceable\(4\) @_ZL21staticConstNonTrivial, i32 2048\)|@"\?\?0NonTrivial@@QEAA@H@Z"\(%class.NonTrivial\* nonnull dereferenceable\(4\) @staticConstNonTrivial, i32 2048\)}}
+// CHECK: call {{void|%class.NonTrivial\*}} {{@_ZN10NonTrivialC[12]Ei\(%class.NonTrivial\* nonnull align 4 dereferenceable\(4\) @_ZL21staticConstNonTrivial, i32 2048\)|@"\?\?0NonTrivial@@QEAA@H@Z"\(%class.NonTrivial\* nonnull align 4 dereferenceable\(4\) @staticConstNonTrivial, i32 2048\)}}
 
 public func readStaticVar() -> CInt {
   return staticVar

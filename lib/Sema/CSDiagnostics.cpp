@@ -3534,7 +3534,7 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
   auto candidate =
       corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
         return (isa<EnumElementDecl>(candidate) &&
-                candidate->getBaseIdentifier().str().equals_lower(
+                candidate->getBaseIdentifier().str().equals_insensitive(
                     memberName.getBaseIdentifier().str()));
       });
   return (candidate ? candidate->getName() : DeclName());
