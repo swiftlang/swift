@@ -1,55 +1,99 @@
 /// Test the -module-alias flag on the following scenario:
-/// Module 'Lib' imports module 'Logging', and module 'ClientN' imports both 'Lib' and 'Logging'.
-/// 'Logging' needs to be aliased due to a name collision, so is renamed 'AppleLogging'.
+/// Module 'ClientN' imports 'XLogging' and 'Lib', and 'Lib' imports 'XLogging'.
+/// 'XLogging' needs to be aliased due to a name collision, so is aliased 'AppleLogging'.
 
 // RUN: %empty-directory(%t)
+// RUN: %{python} %utils/split_file.py -o %t %s
 
-/// Input file with a reference to its enclosing module called Logging
-/// Create AppleLogging.swiftmodule by aliasing Logging via -module-alias Logging=AppleLogging
-// RUN: %target-swift-frontend -module-name AppleLogging -module-alias Logging=AppleLogging %S/Inputs/module_aliasing/Logging.swift -emit-module -emit-module-path %t/AppleLogging.swiftmodule
+/// Create AppleLogging.swiftmodule by aliasing XLogging via -module-alias XLogging=AppleLogging
+// RUN: %target-swift-frontend -module-name AppleLogging -module-alias XLogging=AppleLogging %t/FileLogging.swift -emit-module -emit-module-path %t/AppleLogging.swiftmodule
 
 /// Check AppleLogging.swiftmodule is created
 // RUN: test -f %t/AppleLogging.swiftmodule
-// RUN: not test -f %t/Logging.swiftmodule
+// RUN: not test -f %t/XLogging.swiftmodule
 
-/// Create a module Lib that imports Logging with -module-alias Logging=AppleLogging
-// RUN: echo 'import Logging' > %t/FileLib.swift
-// RUN: echo 'public func start() { Logging.setup() }' >> %t/FileLib.swift
-// RUN: %target-swift-frontend -module-name Lib %S/Inputs/module_aliasing/Lib.swift -module-alias Logging=AppleLogging -I %t -emit-module -emit-module-path %t/Lib.swiftmodule -Rmodule-loading 2> %t/result-Lib.output
+/// Create a module Lib that imports XLogging WITH -module-alias XLogging=AppleLogging
+// RUN: %target-swift-frontend -module-name Lib %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-path %t/Lib.swiftmodule -Rmodule-loading 2> %t/result-Lib.output
 
 /// Check Lib.swiftmodule is created and AppleLogging.swiftmodule is loaded
 // RUN: test -f %t/Lib.swiftmodule
 // RUN: test -f %t/AppleLogging.swiftmodule
-// RUN: not test -f %t/Logging.swiftmodule
+// RUN: not test -f %t/XLogging.swiftmodule
 
 // RUN: %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-Lib
 // CHECK-Lib: remark: loaded module at {{.*}}AppleLogging.swiftmodule
+// RUN: not %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-NOT-Lib
+// CHECK-NOT-Lib: remark: loaded module at {{.*}}XLogging.swiftmodule
 
-/// Create module Client1 that imports both Lib and Logging, with module aliasing for Logging
-// RUN: %target-swift-frontend -module-name Client1 %S/Inputs/module_aliasing/Client_imports_Lib_and_Logging.swift -module-alias Logging=AppleLogging -I %t -emit-module -emit-module-path %t/Client1.swiftmodule -Rmodule-loading 2>&1 | %FileCheck %s -check-prefix CHECK-1
+/// Create module Client1 that imports Lib and XLogging, WITH module aliasing for XLogging
+// RUN: %target-swift-frontend -module-name Client1 %t/FileClient.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-path %t/Client1.swiftmodule -Rmodule-loading -Rmodule-loading 2> %t/result-Client1.output
 
 /// Check Client1.swiftmodule is created and Lib.swiftmodule and AppleLogging.swiftmodule are loaded
 // RUN: test -f %t/Client1.swiftmodule
 // RUN: test -f %t/Lib.swiftmodule
 // RUN: test -f %t/AppleLogging.swiftmodule
-// RUN: not test -f %t/Logging.swiftmodule
-// CHECK-1: remark: loaded module at {{.*}}AppleLogging.swiftmodule
-// CHECK-1: remark: loaded module at {{.*}}Lib.swiftmodule
+// RUN: not test -f %t/XLogging.swiftmodule
+// RUN: %FileCheck %s -input-file %t/result-Client1.output -check-prefix CHECK-CLIENT1
+// CHECK-CLIENT1: remark: loaded module at {{.*}}AppleLogging.swiftmodule
+// CHECK-CLIENT1: remark: loaded module at {{.*}}Lib.swiftmodule
+// RUN: not %FileCheck %s -input-file %t/result-Client1.output -check-prefix CHECK-NOT-CLIENT1
+// CHECK-NOT-CLIENT1: remark: loaded module at {{.*}}XLogging.swiftmodule
 
-/// Try creating module Client2 that imports both Lib and Logging, without module aliasing
-// RUN: not %target-swift-frontend -module-name Client2 %S/Inputs/module_aliasing/Client_imports_Lib_and_Logging.swift -I %t -emit-module -emit-module-path %t/Client2.swiftmodule 2> %t/result-Client2.output
+/// Try creating module Client2 that imports Lib and XLogging, WITHOUT module aliasing
+// RUN: not %target-swift-frontend -module-name Client2 %t/FileClient.swift -I %t -emit-module -emit-module-path %t/Client2.swiftmodule 2> %t/result-Client2.output
 
 /// Check that it fails
-// RUN: %FileCheck %s -input-file %t/result-Client2.output -check-prefix CHECK-2
-// CHECK-2: {{.*}}error: no such module 'Logging'
+// RUN: %FileCheck %s -input-file %t/result-Client2.output -check-prefix CHECK-CLIENT2
+// CHECK-CLIENT2: {{.*}}error: no such module 'XLogging'
 
-/// Create module Client3 that imports both Lib and AppleLogging, without module aliasing
-// RUN: %target-swift-frontend -module-name Client3 %S/Inputs/module_aliasing/Client_imports_Lib_and_AppleLogging.swift -I %t -emit-module -emit-module-path %t/Client3.swiftmodule -Rmodule-loading 2>&1 | %FileCheck %s -check-prefix CHECK-3
+/// Create module Client3 that imports Lib and AppleLogging, WITHOUT module aliasing
+// RUN: %target-swift-frontend -module-name Client3 %t/FileClientOther.swift -I %t -emit-module -emit-module-path %t/Client3.swiftmodule -Rmodule-loading 2> %t/result-Client3.output
 
 /// Check Client3.swiftmodule is created and correct modules are loaded
 // RUN: test -f %t/Client3.swiftmodule
 // RUN: test -f %t/Lib.swiftmodule
 // RUN: test -f %t/AppleLogging.swiftmodule
-// RUN: not test -f %t/Logging.swiftmodule
-// CHECK-3: remark: loaded module at {{.*}}AppleLogging.swiftmodule
-// CHECK-3: remark: loaded module at {{.*}}Lib.swiftmodule
+// RUN: not test -f %t/XLogging.swiftmodule
+
+// RUN: %FileCheck %s -input-file %t/result-Client3.output -check-prefix CHECK-CLIENT3
+// CHECK-CLIENT3: remark: loaded module at {{.*}}AppleLogging.swiftmodule
+// CHECK-CLIENT3: remark: loaded module at {{.*}}Lib.swiftmodule
+// RUN: not %FileCheck %s -input-file %t/result-Client3.output -check-prefix CHECK-NOT-CLIENT3
+// CHECK-NOT-CLIENT3: remark: loaded module at {{.*}}XLogging.swiftmodule
+
+// BEGIN FileLogging.swift
+public struct Logger {
+  public init() {}
+}
+public func setup() -> XLogging.Logger? {
+  return Logger()
+}
+
+// BEGIN FileLib.swift
+import XLogging
+
+public func start() {
+  _ = XLogging.setup()
+}
+
+// BEGIN FileClient.swift
+import XLogging
+import Lib
+public func rubLib() {
+  Lib.start()
+}
+public func runLog() {
+  _ = XLogging.setup()
+}
+
+
+// BEGIN FileClientOther.swift
+import AppleLogging
+import Lib
+public func rubLib() {
+  Lib.start()
+}
+public func runLog() {
+  _ = AppleLogging.setup()
+}
+
