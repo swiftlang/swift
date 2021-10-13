@@ -10,17 +10,22 @@
 @available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
-    let handle = detach {
+    let task = Task.detached {
       while (!Task.isCancelled) { // no need for await here, yay
         print("waiting")
       }
 
-      print("done")
+      print("inside: Task.isCancelled = \(Task.isCancelled)")
     }
 
-    handle.cancel()
+    task.cancel()
 
-    // CHECK: done
-    await handle.get()
+    await task.value
+    print("outside: task.isCancelled = \(task.isCancelled)")
+    print("outside: Task.isCancelled = \(Task.isCancelled)")
+
+    // CHECK-DAG: inside: Task.isCancelled = true
+    // CHECK-DAG: outside: task.isCancelled = true
+    // CHECK-DAG: outside: Task.isCancelled = false
   }
 }
