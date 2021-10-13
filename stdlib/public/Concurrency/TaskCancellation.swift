@@ -50,7 +50,7 @@ extension Task {
   /// There is no way to uncancel a task.
   ///
   /// - SeeAlso: `checkCancellation()`
-  public var isCancelled: Bool {
+  @_transparent public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }
 }
