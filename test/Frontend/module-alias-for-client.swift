@@ -5,14 +5,17 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
+/// 1a. XLogging
 /// Create XLogging.swiftmodule
 // RUN: %target-swift-frontend -module-name XLogging %t/FileLogging.swift -emit-module -emit-module-path %t/XLogging.swiftmodule
 // RUN: test -f %t/XLogging.swiftmodule
 
+/// 1b. AppleLogging
 /// Create AppleLogging.swiftmodule
 // RUN: %target-swift-frontend -module-name AppleLogging %t/FileLogging.swift -emit-module -emit-module-path %t/AppleLogging.swiftmodule
 // RUN: test -f %t/AppleLogging.swiftmodule
 
+/// 2. Lib
 /// Create module Lib that imports AppleLogging
 // RUN: %target-swift-frontend -module-name Lib %t/FileLib.swift -I %t -emit-module -emit-module-path %t/Lib.swiftmodule -Rmodule-loading 2> %t/result-Lib.output
 
@@ -21,6 +24,7 @@
 // RUN: %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-Lib
 // CHECK-Lib: remark: loaded module at {{.*}}AppleLogging.swiftmodule
 
+/// 3a. Client1
 /// Create module Client1 that imports Lib and XLogging, WITHOUT module aliasing for XLogging
 // RUN: %target-swift-frontend -module-name Client1 %t/FileClient.swift -I %t -emit-module -emit-module-path %t/Client1.swiftmodule -Rmodule-loading 2> %t/result-Client1.output
 
@@ -30,6 +34,7 @@
 // CHECK-1: remark: loaded module at {{.*}}XLogging.swiftmodule
 // CHECK-1: remark: loaded module at {{.*}}Lib.swiftmodule
 
+/// 3b. Client2
 /// Create a module Client2 that imports Lib and XLogging, WITH module aliasing for XLogging
 // RUN: %target-swift-frontend -module-name Client2 -module-alias XLogging=AppleLogging %t/FileClient.swift -I %t -emit-module -emit-module-path %t/Client2.swiftmodule -Rmodule-loading 2> %t/result-Client2.output
 
@@ -47,7 +52,7 @@
 public struct Logger {
   public init() {}
 }
-public func setup() -> XLogging.Logger? {
+public func setup() -> Logger? {
   return Logger()
 }
 

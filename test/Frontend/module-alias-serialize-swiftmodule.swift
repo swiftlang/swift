@@ -6,6 +6,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
+/// 1. AppleLogging
 /// Create AppleLogging.swiftmodule by aliasing XLogging via -module-alias XLogging=AppleLogging
 // RUN: %target-swift-frontend -module-name AppleLogging -module-alias XLogging=AppleLogging %t/FileLogging.swift -emit-module -emit-module-path %t/AppleLogging.swiftmodule
 
@@ -17,10 +18,10 @@
 // RUN: llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-FOUND
 // BCANALYZER-FOUND: MODULE_NAME{{.*}}AppleLogging
 
-// RUN: not llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-NOT-FOUND
-// BCANALYZER-NOT-FOUND: MODULE_NAME{{.*}}XLogging
+// RUN: llvm-bcanalyzer --dump %t/AppleLogging.swiftmodule | not grep XLogging
 
-/// Create module Lib that imports XLogging with -module-alias XLogging=AppleLogging
+/// 2. Lib
+/// Create module Lib that imports XLogging WITH -module-alias XLogging=AppleLogging
 // RUN: %target-swift-frontend -module-name Lib %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-path %t/Lib.swiftmodule -Rmodule-loading 2> %t/result-Lib.output
 
 /// Check Lib.swiftmodule is created
@@ -28,23 +29,20 @@
 // RUN: test -f %t/AppleLogging.swiftmodule
 // RUN: not test -f %t/XLogging.swiftmodule
 
-/// Check AppleLogging.swiftmodule is loaded
+/// Check AppleLogging.swiftmodule is loaded, and XLogging.swiftmodule is not loaded
 // RUN: %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-LOAD1
 // CHECK-LOAD1: remark: loaded module at {{.*}}AppleLogging.swiftmodule
-
-/// Check XLogging.swiftmodule is not loaded
 // RUN: not %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-NOT-LOAD1
 // CHECK-NOT-LOAD1: remark: loaded module at {{.*}}XLogging.swiftmodule
 
-/// Check Lib.swiftmodule contains AppleLogging and not XLogging as an imported module
+/// Check Lib.swiftmodule contains AppleLogging and NOT XLogging as an imported module
 /// in the binary
 // RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-IMPORT1
 // BCANALYZER-IMPORT1: IMPORTED_MODULE{{.*}}AppleLogging
+// RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | not grep XLogging
 
-// RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-NOT-IMPORT1
-// BCANALYZER-NOT-IMPORT1: IMPORTED_MODULE{{.*}}XLogging
-
-/// Create a module Client that imports Lib, without module aliasing for XLogging
+/// 3. Client
+/// Create a module Client that imports Lib, WITHOUT module aliasing for XLogging
 // RUN: %target-swift-frontend -module-name Client %t/FileClient.swift -I %t -emit-module -emit-module-path %t/Client.swiftmodule -Rmodule-loading 2> %t/result-Client.output
 
 /// Check Client.swiftmodule is created and Lib.swiftmodule and AppleLogging.swiftmodule are loaded
@@ -59,6 +57,7 @@
 /// Check Client.swiftmodule contains Lib as an imported module in the binary
 // RUN: llvm-bcanalyzer --dump %t/Client.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER-IMPORT2
 // BCANALYZER-IMPORT2: IMPORTED_MODULE{{.*}}Lib
+// RUN: llvm-bcanalyzer --dump %t/Client.swiftmodule | not grep XLogging
 
 
 // BEGIN FileLogging.swift
@@ -77,11 +76,7 @@ public func start() {
 }
 
 // BEGIN FileClient.swift
-import XLogging
 import Lib
 public func rubLib() {
   Lib.start()
-}
-public func runLog() {
-  _ = XLogging.setup()
 }
