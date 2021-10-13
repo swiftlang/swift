@@ -301,6 +301,11 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-DSWIFT_STDLIB_SINGLE_THREADED_RUNTIME")
   endif()
 
+  if(SWIFT_STDLIB_HAS_ENVIRON)
+    list(APPEND result "-D" "SWIFT_STDLIB_HAS_ENVIRON")
+    list(APPEND result "-Xcc" "-DSWIFT_STDLIB_HAS_ENVIRON")
+  endif()
+
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -897,6 +902,10 @@ function(_compile_swift_files
         COMMENT "Generating ${module_file}")
 
     if(SWIFTFILE_STATIC)
+      set(command_copy_interface_file)
+      if(interface_file)
+        set(command_copy_interface_file COMMAND "${CMAKE_COMMAND}" "-E" "copy" ${interface_file} ${interface_file_static})
+      endif()
       add_custom_command_target(
         module_dependency_target_static
         COMMAND
@@ -906,8 +915,7 @@ function(_compile_swift_files
           "${CMAKE_COMMAND}" "-E" "copy" ${module_file} ${module_file_static}
         COMMAND
           "${CMAKE_COMMAND}" "-E" "copy" ${module_doc_file} ${module_doc_file_static}
-        COMMAND
-          "${CMAKE_COMMAND}" "-E" "copy" ${interface_file} ${interface_file_static}
+        ${command_copy_interface_file}
         OUTPUT ${module_outputs_static}
         DEPENDS
           "${module_dependency_target}"

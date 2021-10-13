@@ -84,7 +84,7 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName =
           llvm::sys::path::stem(MainExecutablePath).str();
-      Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
+      Table->printHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Autolink Extract", options::AutolinkExtractOption,
                        0, /*ShowAllAliases*/false);
       return 1;
@@ -140,30 +140,6 @@ extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
       llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
       SectionData->split(SplitFlags, llvm::StringRef("\0", 1), -1,
                          /*KeepEmpty=*/false);
-      for (const auto &Flag : SplitFlags)
-        LinkerFlags.push_back(Flag.str());
-    }
-  }
-  return false;
-}
-
-/// Look inside the object file 'WasmObjectFile' and append any linker flags
-/// found in its ".swift1_autolink_entries" section to 'LinkerFlags'. Return
-/// 'true' if there was an error, and 'false' otherwise.
-static bool
-extractLinkerFlagsFromObjectFile(const llvm::object::WasmObjectFile *ObjectFile,
-                                 std::vector<std::string> &LinkerFlags,
-                                 CompilerInstance &Instance) {
-  // Search for the data segment we hold autolink entries in
-  for (const llvm::object::WasmSegment &Segment : ObjectFile->dataSegments()) {
-    if (Segment.Data.Name == ".swift1_autolink_entries") {
-
-      StringRef SegmentData = llvm::toStringRef(Segment.Data.Content);
-      // entries are null-terminated, so extract them and push them into
-      // the set.
-      llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
-      SegmentData.split(SplitFlags, llvm::StringRef("\0", 1), -1,
-                        /*KeepEmpty=*/false);
       for (const auto &Flag : SplitFlags)
         LinkerFlags.push_back(Flag.str());
     }
@@ -252,7 +228,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 
   std::string OutputFilename = Invocation.getOutputFilename();
   std::error_code EC;
-  llvm::raw_fd_ostream OutOS(OutputFilename, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream OutOS(OutputFilename, EC, llvm::sys::fs::OF_None);
   if (OutOS.has_error() || EC) {
     Instance.getDiags().diagnose(SourceLoc(), diag::error_opening_output,
                                  OutputFilename, EC.message());

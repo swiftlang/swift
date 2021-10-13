@@ -757,7 +757,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(cmp->getType()));
     llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(
-        pointer, cmp, newval, successOrdering, failureOrdering,
+        pointer, cmp, newval, llvm::MaybeAlign(),
+        successOrdering, failureOrdering,
         isSingleThread ? llvm::SyncScope::SingleThread
                        : llvm::SyncScope::System);
     cast<llvm::AtomicCmpXchgInst>(value)->setVolatile(isVolatile);
@@ -825,7 +826,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(val->getType()));
     llvm::Value *value = IGF.Builder.CreateAtomicRMW(
-        SubOpcode, pointer, val, ordering,
+        SubOpcode, pointer, val, llvm::MaybeAlign(), ordering,
         isSingleThread ? llvm::SyncScope::SingleThread
                        : llvm::SyncScope::System);
     cast<AtomicRMWInst>(value)->setVolatile(isVolatile);

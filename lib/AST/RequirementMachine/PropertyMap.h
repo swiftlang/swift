@@ -139,6 +139,7 @@ public:
 /// Out-of-line methods are documented in PropertyMap.cpp.
 class PropertyMap {
   RewriteContext &Context;
+  RewriteSystem &System;
   std::vector<PropertyBag *> Entries;
   Trie<PropertyBag *, MatchKind::Longest> Trie;
 
@@ -156,10 +157,11 @@ class PropertyMap {
   PropertyMap &operator=(PropertyMap &&) = delete;
 
 public:
-  explicit PropertyMap(RewriteContext &ctx,
-                       const ProtocolGraph &protos)
-      : Context(ctx), Protos(protos) {
-    Debug = ctx.getDebugOptions();
+  explicit PropertyMap(RewriteSystem &system)
+      : Context(system.getRewriteContext()),
+        System(system),
+        Protos(system.getProtocols()) {
+    Debug = Context.getDebugOptions();
   }
 
   ~PropertyMap();

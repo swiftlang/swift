@@ -68,3 +68,13 @@ class MoviesViewController {
     _ = itemType // expected-error {{ambiguous use of 'itemType'}}
   }
 }
+
+// SR-15053
+func SR15053<T : Numeric>(_ a: T, _ b: T) -> T {
+  (a + b) / 2 // expected-error{{cannot convert return expression of type 'Int' to return type 'T'}}
+  // expected-error@-1{{cannot convert value of type 'T' to expected argument type 'Int'}}
+}
+
+func SR15053<T : Numeric>(_ a: T, _ b: T) {
+  (a + b) / 2 // expected-error{{cannot convert value of type 'T' to expected argument type 'Int'}}
+}

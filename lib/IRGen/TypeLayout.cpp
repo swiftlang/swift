@@ -402,7 +402,9 @@ llvm::Value *TypeLayoutEntry::getEnumTagSinglePayloadGeneric(
   // Read the value stored in the extra tag bytes.
   auto *valueAddr =
       Builder.CreateBitOrPointerCast(addr.getAddress(), IGM.Int8PtrTy);
-  auto *extraTagBitsAddr = Builder.CreateInBoundsGEP(valueAddr, size);
+  auto *extraTagBitsAddr = Builder.CreateInBoundsGEP(
+      valueAddr->getType()->getScalarType()->getPointerElementType(), valueAddr,
+      size);
   auto *extraTagBits = emitGetTag(IGF, Address(extraTagBitsAddr, Alignment(1)),
                                   numExtraTagBytes);
 
@@ -505,8 +507,11 @@ void TypeLayoutEntry::storeEnumTagSinglePayloadGeneric(
 
   auto *valueAddr =
       Builder.CreateBitOrPointerCast(addr.getAddress(), IGM.Int8PtrTy);
-  auto extraTagBitsAddr =
-      Address(Builder.CreateInBoundsGEP(valueAddr, size), Alignment(1));
+  auto extraTagBitsAddr = Address(
+      Builder.CreateInBoundsGEP(
+          valueAddr->getType()->getScalarType()->getPointerElementType(),
+          valueAddr, size),
+      Alignment(1));
 
   // Do we need extra tag bytes.
   auto *entryBB = Builder.GetInsertBlock();
@@ -2226,8 +2231,11 @@ EnumTypeLayoutEntry::getMultiPalyloadEnumTagByteAddrAndNumBytes(
   auto payloadSize = maxPayloadSize(IGF);
   auto *valueAddr =
       Builder.CreateBitOrPointerCast(addr.getAddress(), IGM.Int8PtrTy);
-  auto extraTagBytesAddr =
-      Address(Builder.CreateInBoundsGEP(valueAddr, payloadSize), Alignment(1));
+  auto extraTagBytesAddr = Address(
+      Builder.CreateInBoundsGEP(
+          valueAddr->getType()->getScalarType()->getPointerElementType(),
+          valueAddr, payloadSize),
+      Alignment(1));
   auto numPayloads = IGM.getInt32(cases.size());
   auto emptyCaseCount = IGM.getInt32(numEmptyCases);
 

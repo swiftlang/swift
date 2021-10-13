@@ -17,7 +17,10 @@
 #define MANGLE_AS_STRING(M) STRINGIFY_MANGLING(M)
 
 /// The mangling prefix for the new mangling.
+_Pragma("clang diagnostic push")
+_Pragma("clang diagnostic ignored \"-Wdollar-in-identifier-extension\"")
 #define MANGLING_PREFIX $s
+_Pragma("clang diagnostic pop")
 
 #define MANGLING_PREFIX_STR MANGLE_AS_STRING(MANGLING_PREFIX)
 

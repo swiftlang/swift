@@ -17,6 +17,8 @@
 #include <stddef.h>
 #include <string>
 
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+
 typedef struct {
   const unsigned char * _Nullable data;
   size_t length;
@@ -234,5 +236,7 @@ BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedType operandType, BridgedType resultType, BridgedValueArray arguments);
 BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
           BridgedLocation loc, BridgedValue condition, BridgedStringRef messge);
+
+SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif

@@ -523,7 +523,7 @@ public:
   /// Return the effective triple used by clang.
   llvm::Triple getEffectiveClangTriple();
 
-  const llvm::DataLayout &getClangDataLayout();
+  const llvm::StringRef getClangDataLayoutString();
 };
 
 class ConstantReference {

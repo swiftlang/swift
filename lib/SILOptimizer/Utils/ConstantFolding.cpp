@@ -23,6 +23,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Debug.h"
 
@@ -245,24 +246,23 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
         break;
     }
 
+    SmallString<10> LhsStr;
+    SmallString<10> RhsStr;
+    LHSInt.toString(LhsStr, /*Radix*/ 10, Signed);
+    RHSInt.toString(RhsStr, /*Radix*/ 10, Signed);
     if (!OpType.isNull()) {
-      diagnose(BI->getModule().getASTContext(),
-               Loc.getSourceLoc(),
-               diag::arithmetic_operation_overflow,
-               LHSInt.toString(/*Radix*/ 10, Signed),
-               Operator,
-               RHSInt.toString(/*Radix*/ 10, Signed),
-               OpType).highlight(LHSRange).highlight(RHSRange);
+      diagnose(BI->getModule().getASTContext(), Loc.getSourceLoc(),
+               diag::arithmetic_operation_overflow, LhsStr, Operator, RhsStr,
+               OpType)
+          .highlight(LHSRange)
+          .highlight(RHSRange);
     } else {
       // If we cannot get the type info in an expected way, describe the type.
-      diagnose(BI->getModule().getASTContext(),
-               Loc.getSourceLoc(),
-               diag::arithmetic_operation_overflow_generic_type,
-               LHSInt.toString(/*Radix*/ 10, Signed),
-               Operator,
-               RHSInt.toString(/*Radix*/ 10, Signed),
-               Signed,
-               LHSInt.getBitWidth()).highlight(LHSRange).highlight(RHSRange);
+      diagnose(BI->getModule().getASTContext(), Loc.getSourceLoc(),
+               diag::arithmetic_operation_overflow_generic_type, LhsStr,
+               Operator, RhsStr, Signed, LHSInt.getBitWidth())
+          .highlight(LHSRange)
+          .highlight(RHSRange);
     }
     ResultsInError = Optional<bool>(true);
   }
@@ -570,12 +570,11 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
 
     // Otherwise emit the diagnostic, set ResultsInError to be true, and return
     // nullptr.
-    diagnose(M.getASTContext(),
-             BI->getLoc().getSourceLoc(),
+    diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
              diag::division_overflow,
-             NumVal.toString(/*Radix*/ 10, /*Signed*/true),
+             llvm::toString(NumVal, /*Radix*/ 10, /*Signed*/ true),
              IsRem ? "%" : "/",
-             DenomVal.toString(/*Radix*/ 10, /*Signed*/true));
+             llvm::toString(DenomVal, /*Radix*/ 10, /*Signed*/ true));
     ResultsInError = Optional<bool>(true);
     return nullptr;
   }
@@ -1321,7 +1320,7 @@ case BuiltinValueKind::id:
     if (VInt.isNegative() && ResultsInError.hasValue()) {
       diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
                diag::wrong_non_negative_assumption,
-               VInt.toString(/*Radix*/ 10, /*Signed*/ true));
+               llvm::toString(VInt, /*Radix*/ 10, /*Signed*/ true));
       ResultsInError = Optional<bool>(true);
     }
     return V;

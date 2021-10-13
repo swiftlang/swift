@@ -339,8 +339,16 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC=0")
   endif()
 
+  if(SWIFT_STDLIB_HAS_ASL)
+    list(APPEND result "-DSWIFT_STDLIB_HAS_ASL")
+  endif()
+
   if(SWIFT_STDLIB_HAS_STDIN)
     list(APPEND result "-DSWIFT_STDLIB_HAS_STDIN")
+  endif()
+
+  if(SWIFT_STDLIB_HAS_ENVIRON)
+    list(APPEND result "-DSWIFT_STDLIB_HAS_ENVIRON")
   endif()
 
   if(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
@@ -349,6 +357,10 @@ function(_add_target_variant_c_compile_flags)
 
   if(SWIFT_STDLIB_OS_VERSIONING)
     list(APPEND result "-DSWIFT_RUNTIME_OS_VERSIONING")
+  endif()
+
+  if(SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR)
+    list(APPEND result "-DSWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR")
   endif()
 
   if(SWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING)
@@ -1722,10 +1734,7 @@ function(add_swift_target_library name)
   endif()
 
   # Turn off implicit import of _Concurrency when building libraries
-  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS 
-                      "-Xfrontend;-disable-implicit-concurrency-module-import")
-  endif()
+  list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-concurrency-module-import")
 
   # Turn off implicit import of _Distributed when building libraries
   if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)

@@ -1462,13 +1462,13 @@ void CodeCompletionContext::sortCompletionResults(
   // Sort nameCache, and then transform Results to return the pointers in order.
   std::sort(nameCache.begin(), nameCache.end(),
             [](const ResultAndName &LHS, const ResultAndName &RHS) {
-    int Result = StringRef(LHS.name).compare_lower(RHS.name);
-    // If the case insensitive comparison is equal, then secondary sort order
-    // should be case sensitive.
-    if (Result == 0)
-      Result = LHS.name.compare(RHS.name);
-    return Result < 0;
-  });
+              int Result = StringRef(LHS.name).compare_insensitive(RHS.name);
+              // If the case insensitive comparison is equal, then secondary
+              // sort order should be case sensitive.
+              if (Result == 0)
+                Result = LHS.name.compare(RHS.name);
+              return Result < 0;
+            });
 
   llvm::transform(nameCache, Results.begin(),
                   [](const ResultAndName &entry) { return entry.result; });

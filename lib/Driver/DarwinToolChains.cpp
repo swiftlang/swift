@@ -22,7 +22,7 @@
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
-#include "clang/Driver/DarwinSDKInfo.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Option/Options.h"
@@ -960,7 +960,7 @@ toolchains::Darwin::validateOutputInfo(DiagnosticEngine &diags,
                                        const OutputInfo &outputInfo) const {
   // If we have been provided with an SDK, go read the SDK information.
   if (!outputInfo.SDKPath.empty()) {
-    auto SDKInfoOrErr = clang::driver::parseDarwinSDKInfo(
+    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
         *llvm::vfs::getRealFileSystem(), outputInfo.SDKPath);
     if (SDKInfoOrErr) {
       SDKInfo = *SDKInfoOrErr;

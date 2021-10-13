@@ -19,14 +19,15 @@
 
 #include "swift/AST/ArgumentList.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeAlignments.h"
-#include "swift/AST/Availability.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -1452,6 +1453,8 @@ public:
   DeclNameLoc getNameLoc() const { return Loc; }
   SourceLoc getLoc() const { return Loc.getBaseNameLoc(); }
   SourceRange getSourceRange() const { return Loc.getSourceRange(); }
+
+  bool isForOperator() const { return getDecls().front()->isOperator(); }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OverloadedDeclRef;

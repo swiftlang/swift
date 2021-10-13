@@ -341,9 +341,9 @@ swift::markup::MarkupASTNode *swift::markup::createSimpleField(
   if (false) {
 
   }
-#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
-  else if (Tag.compare_lower(#Keyword) == 0) { \
-    return Id::create(MC, Children); \
+#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind)                              \
+  else if (Tag.compare_insensitive(#Keyword) == 0) {                           \
+    return Id::create(MC, Children);                                           \
   }
 #include "swift/Markup/SimpleFields.def"
   llvm_unreachable("Given tag not for any simple markup field");
@@ -353,9 +353,9 @@ bool swift::markup::isAFieldTag(StringRef Tag) {
   if (false) {
 
   }
-#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
-  else if (Tag.compare_lower(#Keyword) == 0) { \
-    return true; \
+#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind)                              \
+  else if (Tag.compare_insensitive(#Keyword) == 0) {                           \
+    return true;                                                               \
   }
 #include "swift/Markup/SimpleFields.def"
   return false;

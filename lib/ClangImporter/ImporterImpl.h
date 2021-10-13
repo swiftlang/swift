@@ -1612,7 +1612,9 @@ public:
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
                            const PlatformAvailability &avail)
-      : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
+      : // Update in response to D97702 landing.
+        clang::ModuleFileExtension(),
+        pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
         buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;

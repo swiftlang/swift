@@ -607,6 +607,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(char)
   SIMPLE_PRINTER(unsigned)
   SIMPLE_PRINTER(uint64_t)
+  SIMPLE_PRINTER(int64_t)
   SIMPLE_PRINTER(StringRef)
   SIMPLE_PRINTER(Identifier)
   SIMPLE_PRINTER(ID)
@@ -1191,32 +1192,46 @@ public:
     assert(DIExpr && "DIExpression empty?");
     *this << ", expr ";
     bool IsFirst = true;
-    for (const auto &E : DIExpr.elements()) {
+    for (const auto &Operand : DIExpr.operands()) {
       if (IsFirst)
         IsFirst = false;
       else
         *this << ":";
 
-      switch (E.getKind()) {
-      case SILDIExprElement::OperatorKind: {
-        SILDIExprOperator Op = E.getAsOperator();
-        assert(Op != SILDIExprOperator::INVALID &&
-               "Invalid SILDIExprOperator kind");
-        *this << SILDIExprInfo::get(Op)->OpText;
-        break;
-      }
-      case SILDIExprElement::DeclKind: {
-        const Decl *D = E.getAsDecl();
-        // FIXME: Can we generalize this special handling for VarDecl
-        // to other kinds of Decl?
-        if (const auto *VD = dyn_cast<VarDecl>(D)) {
-          *this << "#";
-          printFullContext(VD->getDeclContext(), PrintState.OS);
-          *this << VD->getName().get();
-        } else
-          D->print(PrintState.OS, PrintState.ASTOptions);
-        break;
-      }
+      // Print the operator
+      SILDIExprOperator Op = Operand.getOperator();
+      assert(Op != SILDIExprOperator::INVALID &&
+             "Invalid SILDIExprOperator kind");
+      *this << SILDIExprInfo::get(Op)->OpText;
+
+      // Print arguments
+      for (const auto &Arg : Operand.args()) {
+        *this << ":";
+        switch (Arg.getKind()) {
+        case SILDIExprElement::OperatorKind:
+          llvm_unreachable("Cannot use operator as argument");
+          break;
+        case SILDIExprElement::DeclKind: {
+          const Decl *D = Arg.getAsDecl();
+          // FIXME: Can we generalize this special handling for VarDecl
+          // to other kinds of Decl?
+          if (const auto *VD = dyn_cast<VarDecl>(D)) {
+            *this << "#";
+            printFullContext(VD->getDeclContext(), PrintState.OS);
+            *this << VD->getName().get();
+          } else
+            D->print(PrintState.OS, PrintState.ASTOptions);
+          break;
+        }
+        case SILDIExprElement::ConstIntKind: {
+          uint64_t V = *Arg.getAsConstInt();
+          if (Op == SILDIExprOperator::ConstSInt)
+            *this << static_cast<int64_t>(V);
+          else
+            *this << V;
+          break;
+        }
+        }
       }
     }
   }
@@ -1449,12 +1464,12 @@ public:
     *this << ILI->getType() << ", " << lit;
   }
   void visitFloatLiteralInst(FloatLiteralInst *FLI) {
-    *this << FLI->getType() << ", 0x";
-    APInt bits = FLI->getBits();
-    *this << bits.toString(16, /*Signed*/ false);
+    llvm::SmallString<12> hex;
     llvm::SmallString<12> decimal;
+    FLI->getBits().toString(hex, 16, /*Signed*/ false);
     FLI->getValue().toString(decimal);
-    *this << " // " << decimal;
+    *this << FLI->getType()
+          << (llvm::Twine(", 0x") + hex + " // " + decimal).str();
   }
   static StringRef getStringEncodingName(StringLiteralInst::Encoding kind) {
     switch (kind) {
@@ -2732,7 +2747,7 @@ void SILFunction::dump() const {
 
 void SILFunction::dump(const char *FileName) const {
   std::error_code EC;
-  llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::F_None);
+  llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::OF_None);
   print(os);
 }
 
@@ -2746,7 +2761,6 @@ static StringRef getLinkageString(SILLinkage linkage) {
   case SILLinkage::PublicExternal: return "public_external ";
   case SILLinkage::HiddenExternal: return "hidden_external ";
   case SILLinkage::SharedExternal: return "shared_external ";
-  case SILLinkage::PrivateExternal: return "private_external ";
   }
   llvm_unreachable("bad linkage");
 }
@@ -2981,7 +2995,7 @@ void SILModule::dump(bool Verbose) const {
 void SILModule::dump(const char *FileName, bool Verbose,
                      bool PrintASTDecls) const {
   std::error_code EC;
-  llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::F_None);
+  llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::OF_None);
   SILPrintContext Ctx(os, Verbose);
   print(Ctx, getSwiftModule(), PrintASTDecls);
 }

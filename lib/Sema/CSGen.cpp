@@ -1214,8 +1214,14 @@ namespace {
       auto *memberLoc =
           CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember);
 
+      auto *fnLoc =
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction);
+
+      auto *memberTypeLoc = CS.getConstraintLocator(
+          fnLoc, LocatorPathElt::ConstructorMemberType());
+
       auto *memberType =
-          CS.createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
+          CS.createTypeVariable(memberTypeLoc, TVO_CanBindToNoEscape);
 
       CS.addValueMemberConstraint(MetatypeType::get(witnessType, ctx),
                                   DeclNameRef(constrName), memberType, CurDC,
@@ -1228,10 +1234,9 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
           TVO_CanBindToNoEscape);
 
-      CS.addConstraint(
-          ConstraintKind::ApplicableFunction,
-          FunctionType::get(params, resultType), memberType,
-          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
+      CS.addConstraint(ConstraintKind::ApplicableFunction,
+                       FunctionType::get(params, resultType), memberType,
+                       fnLoc);
 
       if (constr->isFailable())
         return OptionalType::get(witnessType);
@@ -1500,25 +1505,12 @@ namespace {
         //   self.super = Super.init()
         baseTy = MetatypeType::get(baseTy, ctx);
 
-        auto methodTy = CS.createTypeVariable(
-            CS.getConstraintLocator(expr,
-                                    ConstraintLocator::ApplyFunction),
-            TVO_CanBindToNoEscape);
+        auto memberTypeLoc = CS.getConstraintLocator(
+            expr, LocatorPathElt::ConstructorMemberType(
+                      /*shortFormOrSelfDelegating*/ true));
 
-        // FIXME: Once TVO_PrefersSubtypeBinding is replaced with something
-        // better, we won't need the second type variable at all.
-        {
-          auto argTy = CS.createTypeVariable(
-              CS.getConstraintLocator(expr,
-                                      ConstraintLocator::ApplyArgument),
-              (TVO_CanBindToLValue |
-               TVO_CanBindToInOut |
-               TVO_CanBindToNoEscape |
-               TVO_PrefersSubtypeBinding));
-          CS.addConstraint(
-              ConstraintKind::FunctionInput, methodTy, argTy,
-              CS.getConstraintLocator(expr));
-        }
+        auto methodTy =
+            CS.createTypeVariable(memberTypeLoc, TVO_CanBindToNoEscape);
 
         CS.addValueMemberConstraint(
             baseTy, expr->getName(), methodTy, CurDC,

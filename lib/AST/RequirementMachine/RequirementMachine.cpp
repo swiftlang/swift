@@ -371,7 +371,7 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
 }
 
 RequirementMachine::RequirementMachine(RewriteContext &ctx)
-    : Context(ctx), System(ctx), Map(ctx, System.getProtocols()) {
+    : Context(ctx), System(ctx), Map(System) {
   auto &langOpts = ctx.getASTContext().LangOpts;
   Dump = langOpts.DumpRequirementMachine;
   RequirementMachineStepLimit = langOpts.RequirementMachineStepLimit;

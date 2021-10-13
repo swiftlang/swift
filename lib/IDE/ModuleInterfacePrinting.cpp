@@ -207,8 +207,9 @@ void swift::ide::collectModuleGroups(ModuleDecl *M,
   for (auto File : M->getFiles()) {
     File->collectAllGroups(Into);
   }
-  std::sort(Into.begin(), Into.end(),
-            [](StringRef L, StringRef R) { return L.compare_lower(R) < 0; });
+  std::sort(Into.begin(), Into.end(), [](StringRef L, StringRef R) {
+    return L.compare_insensitive(R) < 0;
+  });
 }
 
 /// Determine whether the given extension has a Clang node that

@@ -528,6 +528,8 @@ ERROR(sil_invalid_column_in_sil_location,none,
       "column number must be a positive integer", ())
 ERROR(sil_invalid_scope_slot,none,
       "scope number must be a positive integer ", ())
+ERROR(sil_invalid_constant,none,
+      "constant operand must be an integer literal ", ())
 ERROR(sil_scope_undeclared,none,
       "scope number %0 needs to be declared before first use", (unsigned))
 ERROR(sil_scope_redefined,none,

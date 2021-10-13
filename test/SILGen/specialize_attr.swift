@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -module-name A -emit-module-path %t/A.swiftmodule -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module.swift
 // RUN: %target-swift-frontend -I %t -module-name B -emit-module-path %t/B.swiftmodule -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module2.swift
 // RUN: %target-swift-emit-silgen -I %t -module-name specialize_attr -emit-verbose-sil %s -swift-version 5 | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-os
-// RUN: %target-swift-emit-sil -I %t -sil-verify-all -O -module-name specialize_attr -emit-verbose-sil %s | %FileCheck -check-prefix=CHECK-OPT -check-prefix=CHECK-OPT-EVO %s
+// RUN: %target-swift-emit-sil -I %t -sil-verify-all -O -module-name specialize_attr -emit-verbose-sil %s | %FileCheck -check-prefix=CHECK-OPT -check-prefix=CHECK-OPT-EVO -check-prefix=CHECK-OPT-%target-os %s
 
 // Test .swiftinterface
 // RUN: %empty-directory(%t)
@@ -124,15 +124,15 @@ public struct CC2<T : PP> {
 }
 
 // Import from module A and B.
-// CHECK-macosx-LABEL: sil [serialized] [_specialize exported: true, kind: full, where T == Double] [_specialize exported: true, kind: full, available: 10.50, where T == Int16] [_specialize exported: true, kind: full, where T == Int] @$s1A11PublicThingV11doStuffWithyyxF : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, PublicThing<τ_0_0>) -> ()
-// CHECK-linux-gnu-LABEL: sil [serialized] [_specialize exported: true, kind: full, where T == Double] [_specialize exported: true, kind: full, where T == Int16] [_specialize exported: true, kind: full, where T == Int] @$s1A11PublicThingV11doStuffWithyyxF : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, PublicThing<τ_0_0>) -> ()
-// CHECK-LABEL: sil [serialized] [_specialize exported: true, kind: full, where T == Double] [_specialize exported: true, kind: full, where T == Int] @$s1A13InternalThingV11doStuffWith5boxedyAA05BoxedB0VyxG_tF : $@convention(method) <τ_0_0> (BoxedThing<τ_0_0>, InternalThing<τ_0_0>) -> ()
+// CHECK-OPT-macosx-DAG: sil {{.*}} [_specialize exported: true, kind: full, where T == Double] [_specialize exported: true, kind: full, available: 10.50, where T == Int16] [_specialize exported: true, kind: full, where T == Int] @$s1A11PublicThingV11doStuffWithyyxF : $@convention(method) <T> (@in_guaranteed T, PublicThing<T>) -> ()
+// CHECK-OPT-linux-gnu-DAG: sil {{.*}} [_specialize exported: true, kind: full, where T == Double] [_specialize exported: true, kind: full, where T == Int16] [_specialize exported: true, kind: full, where T == Int] @$s1A11PublicThingV11doStuffWithyyxF : $@convention(method) <T> (@in_guaranteed T, PublicThing<T>) -> ()
+// CHECK-OPT-DAG: sil {{.*}} [_specialize exported: true, kind: full, where T == Double] [_specialize exported: true, kind: full, where T == Int] @$s1A13InternalThingV11doStuffWith5boxedyAA05BoxedB0VyxG_tF : $@convention(method) <T> (BoxedThing<T>, InternalThing<T>) -> ()
 
-// CHECK-DAG: sil [serialized] [_specialize exported: true, kind: full, where T == Int] @$s1A14InternalThing2V9computedZxvM : $@yield_once @convention(method) <τ_0_0> (@inout InternalThing2<τ_0_0>) -> @yields @inout τ_0_0
-// CHECK-DAG: sil [serialized] [_specialize exported: true, kind: full, where T == Int] @$s1A14InternalThing2V9computedZxvr : $@yield_once @convention(method) <τ_0_0> (@in_guaranteed InternalThing2<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+// CHECK-OPT-DAG: sil {{.*}} [_specialize exported: true, kind: full, where T == Int] @$s1A14InternalThing2V9computedZxvM : $@yield_once @convention(method) <T> (@inout InternalThing2<T>) -> @yields @inout T
+// CHECK-OPT-DAG: sil {{.*}} [_specialize exported: true, kind: full, where T == Int] @$s1A14InternalThing2V9computedZxvr : $@yield_once @convention(method) <T> (@in_guaranteed InternalThing2<T>) -> @yields @in_guaranteed T
 
-// CHECK-DAG: sil [serialized] [_specialize exported: true, kind: full, where T == Int] @$s1A14InternalThing2VyxSicig : $@convention(method) <τ_0_0> (Int, @in_guaranteed InternalThing2<τ_0_0>) -> @out τ_0_0
-// CHECK-DAG: sil [serialized] [_specialize exported: true, kind: full, where T == Int] @$s1A14InternalThing2VyxSicis : $@convention(method) <τ_0_0> (@in τ_0_0, Int, @inout InternalThing2<τ_0_0>) -> ()
+// CHECK-OPT-DAG: sil {{.*}} [_specialize exported: true, kind: full, where T == Int] @$s1A14InternalThing2VyxSicig : $@convention(method) <T> (Int, @in_guaranteed InternalThing2<T>) -> @out T
+// CHECK-OPT-DAG: sil {{.*}} [_specialize exported: true, kind: full, where T == Int] @$s1A14InternalThing2VyxSicis : $@convention(method) <T> (@in T, Int, @inout InternalThing2<T>) -> ()
 
 // CHECK-LABEL: sil [_specialize exported: false, kind: full, where T == Klass1, U == FakeString] [_specialize exported: false, kind: full, where T == Int, U == Float] [ossa] @$s15specialize_attr0A4This_1uyx_q_tr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> () {
 

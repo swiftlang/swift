@@ -133,7 +133,7 @@ public:
     std::error_code EC;
     std::unique_ptr<llvm::raw_fd_ostream> OS;
     OS.reset(new llvm::raw_fd_ostream(State->SerializedDiagnosticsPath, EC,
-                                      llvm::sys::fs::F_None));
+                                      llvm::sys::fs::OF_None));
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
       SourceManager dummyMgr;

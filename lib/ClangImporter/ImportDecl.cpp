@@ -1171,14 +1171,14 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
     
     auto cGetterSelfExpr = new (Ctx) clang::DeclRefExpr(Ctx, cGetterSelf, false,
                                                         recordType,
-                                                        clang::VK_RValue,
+                                                        clang::VK_PRValue,
                                                         clang::SourceLocation());
     auto cGetterExpr = clang::MemberExpr::CreateImplicit(Ctx,
                                                          cGetterSelfExpr,
                                                          /*isarrow=*/ false,
                                                          fieldDecl,
                                                          fieldType,
-                                                         clang::VK_RValue,
+                                                         clang::VK_PRValue,
                                                          clang::OK_BitField);
 
     
@@ -1215,7 +1215,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
     
     auto cSetterSelfExpr = new (Ctx) clang::DeclRefExpr(Ctx, cSetterSelf, false,
                                                         recordPointerType,
-                                                        clang::VK_RValue,
+                                                        clang::VK_PRValue,
                                                         clang::SourceLocation());
     
     auto cSetterMemberExpr = clang::MemberExpr::CreateImplicit(Ctx,
@@ -1228,7 +1228,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
     
     auto cSetterValueExpr = new (Ctx) clang::DeclRefExpr(Ctx, cSetterValue, false,
                                                          fieldType,
-                                                         clang::VK_RValue,
+                                                         clang::VK_PRValue,
                                                          clang::SourceLocation());
 
     auto cSetterExpr = clang::BinaryOperator::Create(Ctx,
@@ -1236,7 +1236,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                      cSetterValueExpr,
                                                      clang::BO_Assign,
                                                      fieldType,
-                                                     clang::VK_RValue,
+                                                     clang::VK_PRValue,
                                                      clang::OK_Ordinary,
                                                      clang::SourceLocation(),
                                                      clang::FPOptionsOverride());

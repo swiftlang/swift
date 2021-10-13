@@ -202,6 +202,7 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
     TypeDependentOperands.size();
   assert(SILNode::Bits.AllocStackInst.NumOperands ==
          TypeDependentOperands.size() && "Truncation");
+  auto *VD = Loc.getLocation().getAsASTNode<VarDecl>();
   SILNode::Bits.AllocStackInst.VarInfo =
       TailAllocatedDebugVariable(Var, getTrailingObjects<char>(),
                                  getTrailingObjects<SILType>(),
@@ -209,7 +210,7 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                  getTrailingObjects<const SILDebugScope *>(),
                                  getTrailingObjects<SILDIExprElement>())
           .getRawValue();
-  if (auto *VD = Loc.getLocation().getAsASTNode<VarDecl>()) {
+  if (Var && VD) {
     TailAllocatedDebugVariable DbgVar(SILNode::Bits.AllocStackInst.VarInfo);
     DbgVar.setImplicit(VD->isImplicit() || DbgVar.isImplicit());
     SILNode::Bits.AllocStackInst.VarInfo = DbgVar.getRawValue();
@@ -308,11 +309,10 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
                            SILFunction &F, Optional<SILDebugVariable> Var,
                            bool hasDynamicLifetime)
-    : InstructionBaseWithTrailingOperands(TypeDependentOperands, Loc,
-                                      SILType::getPrimitiveObjectType(BoxType)),
+    : InstructionBaseWithTrailingOperands(
+          TypeDependentOperands, Loc, SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()),
-      dynamicLifetime(hasDynamicLifetime) {
-}
+      dynamicLifetime(hasDynamicLifetime) {}
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
                                    CanSILBoxType BoxType,

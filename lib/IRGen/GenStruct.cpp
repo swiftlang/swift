@@ -306,9 +306,12 @@ namespace {
           // the compiler's idea of the offset.
           auto metadataBytes =
             IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy);
-          auto fieldOffsetPtr =
-            IGF.Builder.CreateInBoundsGEP(metadataBytes,
-                  IGF.IGM.getSize(scanner.FieldOffset - scanner.AddressPoint));
+          auto fieldOffsetPtr = IGF.Builder.CreateInBoundsGEP(
+              metadataBytes->getType()
+                  ->getScalarType()
+                  ->getPointerElementType(),
+              metadataBytes,
+              IGF.IGM.getSize(scanner.FieldOffset - scanner.AddressPoint));
           fieldOffsetPtr =
             IGF.Builder.CreateBitCast(fieldOffsetPtr,
                                       IGF.IGM.Int32Ty->getPointerTo());
