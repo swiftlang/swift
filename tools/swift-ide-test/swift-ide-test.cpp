@@ -1024,6 +1024,51 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
       });
 }
 
+static int printConformingMethodList(
+    CancellableResult<ConformingMethodListResults> CancellableResult) {
+  return printResult<ConformingMethodListResults>(
+      CancellableResult, [](ConformingMethodListResults &Results) {
+        auto Result = Results.Result;
+        if (!Result) {
+          return 0;
+        }
+        llvm::outs() << "-----BEGIN CONFORMING METHOD LIST-----\n";
+
+        llvm::outs() << "- TypeName: ";
+        Result->ExprType.print(llvm::outs());
+        llvm::outs() << "\n";
+
+        llvm::outs() << "- Members: ";
+        if (Result->Members.empty())
+          llvm::outs() << " []";
+        llvm::outs() << "\n";
+        for (auto VD : Result->Members) {
+          auto funcTy = cast<FuncDecl>(VD)->getMethodInterfaceType();
+          funcTy = Result->ExprType->getTypeOfMember(
+              Result->DC->getParentModule(), VD, funcTy);
+          auto resultTy = funcTy->castTo<FunctionType>()->getResult();
+
+          llvm::outs() << "   - Name: ";
+          VD->getName().print(llvm::outs());
+          llvm::outs() << "\n";
+
+          llvm::outs() << "     TypeName: ";
+          resultTy.print(llvm::outs());
+          llvm::outs() << "\n";
+
+          StringRef BriefDoc = VD->getBriefComment();
+          if (!BriefDoc.empty()) {
+            llvm::outs() << "     DocBrief: \"";
+            llvm::outs() << VD->getBriefComment();
+            llvm::outs() << "\"\n";
+          }
+        }
+
+        llvm::outs() << "-----END CONFORMING METHOD LIST-----\n";
+        return 0;
+      });
+}
+
 static int
 doConformingMethodList(const CompilerInvocation &InitInvok,
                        StringRef SourceFilename, StringRef SecondSourceFileName,
@@ -1034,18 +1079,20 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
   for (auto &name : expectedTypeNames)
     typeNames.push_back(name.c_str());
 
-  // Create a CodeCompletionConsumer.
-  std::unique_ptr<ide::ConformingMethodListConsumer> Consumer(
-      new ide::PrintingConformingMethodListConsumer(llvm::outs()));
-
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-      ide::makeConformingMethodListCallbacksFactory(typeNames, *Consumer));
-
-  return doCodeCompletionImpl(callbacksFactory.get(), InitInvok, SourceFilename,
-                              SecondSourceFileName, CodeCompletionToken,
-                              CodeCompletionDiagnostics);
+  return performWithCompletionLikeOperationParams(
+      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
+      CodeCompletionDiagnostics,
+      [&](CompletionLikeOperationParams Params) -> bool {
+        CompletionInstance CompletionInst;
+        int ExitCode = 2;
+        CompletionInst.conformingMethodList(
+            Params.Invocation, Params.Args, Params.FileSystem,
+            Params.CompletionBuffer, Params.Offset, Params.DiagC, typeNames,
+            [&](CancellableResult<ConformingMethodListResults> Result) {
+              ExitCode = printConformingMethodList(Result);
+            });
+        return ExitCode;
+      });
 }
 
 static int doCodeCompletion(const CompilerInvocation &InitInvok,

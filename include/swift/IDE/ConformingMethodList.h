@@ -44,17 +44,6 @@ public:
   virtual void handleResult(const ConformingMethodListResult &result) = 0;
 };
 
-/// Printing consumer
-class PrintingConformingMethodListConsumer
-    : public ConformingMethodListConsumer {
-  llvm::raw_ostream &OS;
-
-public:
-  PrintingConformingMethodListConsumer(llvm::raw_ostream &OS) : OS(OS) {}
-
-  void handleResult(const ConformingMethodListResult &result) override;
-};
-
 /// Create a factory for code completion callbacks.
 CodeCompletionCallbacksFactory *makeConformingMethodListCallbacksFactory(
     ArrayRef<const char *> expectedTypeNames,
