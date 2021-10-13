@@ -68,7 +68,7 @@
         "wasm": {
             "aliases": ["wasm", "swiftwasm"],
             "repos": {
-                "llvm-project": "swiftwasm",
+                "llvm-project": "swiftwasm-stable/20210726",
                 "swift": "swiftwasm",
                 "cmark": "main",
                 "llbuild": "main",
