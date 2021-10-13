@@ -698,7 +698,7 @@ public struct UnsafeCurrentTask {
   /// Returns `true` if the task is cancelled, and should stop executing.
   ///
   /// - SeeAlso: `checkCancellation()`
-  public var isCancelled: Bool {
+  @_transparent public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }
 
@@ -796,6 +796,7 @@ func _taskCancel(_ task: Builtin.NativeObject)
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_isCancelled")
+@usableFromInline
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
 @available(SwiftStdlib 5.5, *)

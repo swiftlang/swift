@@ -45,7 +45,7 @@ extension Task {
   /// Returns `true` if the task is cancelled, and should stop executing.
   ///
   /// - SeeAlso: `checkCancellation()`
-  public var isCancelled: Bool {
+  @_transparent public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }
 }
