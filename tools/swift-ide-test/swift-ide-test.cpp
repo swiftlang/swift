@@ -831,13 +831,27 @@ static bool setBufferForFile(StringRef SourceFilename,
   return false;
 }
 
-static bool doCodeCompletionImpl(
-    CodeCompletionCallbacksFactory *callbacksFactory,
-    const CompilerInvocation &InitInvok,
-    StringRef SourceFilename,
-    StringRef SecondSourceFileName,
-    StringRef CodeCompletionToken,
-    bool CodeCompletionDiagnostics) {
+/// Result returned from \c performWithCompletionLikeOperationParams.
+struct CompletionLikeOperationParams {
+  swift::CompilerInvocation &Invocation;
+  llvm::ArrayRef<const char *> Args;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
+  llvm::MemoryBuffer *CompletionBuffer;
+  unsigned int Offset;
+  swift::DiagnosticConsumer *DiagC;
+};
+
+/// Run \p PerformOperation with the parameters that are needed to perform a
+/// completion like operation on a \c CompletionInstance. This function will
+/// return the same value as \p PerformOperation.
+/// In case there was an error setting up the parameters for the operation,
+/// this method returns \c true and does not call \p PerformOperation.
+static bool performWithCompletionLikeOperationParams(
+    const CompilerInvocation &InitInvok, StringRef SourceFilename,
+    StringRef SecondSourceFileName, StringRef CodeCompletionToken,
+    bool CodeCompletionDiagnostics,
+    llvm::function_ref<bool(CompletionLikeOperationParams Params)>
+        PerformOperation) {
   std::unique_ptr<llvm::MemoryBuffer> FileBuf;
   if (setBufferForFile(SourceFilename, FileBuf))
     return true;
@@ -865,49 +879,128 @@ static bool doCodeCompletionImpl(
   }
 
   PrintingDiagnosticConsumer PrintDiags;
-  CompletionInstance CompletionInst;
-  std::string CompletionError;
-  bool CallbackCalled = false;
-  CompletionInst.performOperation(
-      Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
-      Offset, CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-      [&](CancellableResult<CompletionInstanceResult> Result) {
-        CallbackCalled = true;
-        switch (Result.getKind()) {
-        case CancellableResultKind::Success: {
-          assert(!Result->DidReuseAST &&
-                 "reusing AST context without enabling it");
 
-          if (!Result->DidFindCodeCompletionToken) {
-            // Return empty results by not performing the second pass and never
-            // calling the consumer of the callback factory.
-            return;
-          }
+  CompletionLikeOperationParams Params{Invocation,
+                                       /*Args=*/{},
+                                       llvm::vfs::getRealFileSystem(),
+                                       CleanFile.get(),
+                                       Offset,
+                                       CodeCompletionDiagnostics ? &PrintDiags
+                                                                 : nullptr};
 
-          performCodeCompletionSecondPass(*Result->CI.getCodeCompletionFile(),
-                                          *callbacksFactory);
-          break;
+  return PerformOperation(Params);
+}
+
+static bool
+doCodeCompletionImpl(CodeCompletionCallbacksFactory *callbacksFactory,
+                     const CompilerInvocation &InitInvok,
+                     StringRef SourceFilename, StringRef SecondSourceFileName,
+                     StringRef CodeCompletionToken,
+                     bool CodeCompletionDiagnostics) {
+  return performWithCompletionLikeOperationParams(
+      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
+      CodeCompletionDiagnostics,
+      [&](CompletionLikeOperationParams Params) -> bool {
+        PrintingDiagnosticConsumer PrintDiags;
+        CompletionInstance CompletionInst;
+        std::string CompletionError;
+        bool CallbackCalled = false;
+        CompletionInst.performOperation(
+            Params.Invocation, Params.Args, Params.FileSystem,
+            Params.CompletionBuffer, Params.Offset, Params.DiagC,
+            [&](CancellableResult<CompletionInstanceResult> Result) {
+              CallbackCalled = true;
+              switch (Result.getKind()) {
+              case CancellableResultKind::Success: {
+                assert(!Result->DidReuseAST &&
+                       "reusing AST context without enabling it");
+
+                if (!Result->DidFindCodeCompletionToken) {
+                  // Return empty results by not performing the second pass and
+                  // never calling the consumer of the callback factory.
+                  return;
+                }
+
+                performCodeCompletionSecondPass(
+                    *Result->CI.getCodeCompletionFile(), *callbacksFactory);
+                break;
+              }
+              case CancellableResultKind::Failure:
+                CompletionError = "error: " + Result.getError();
+                break;
+              case CancellableResultKind::Cancelled:
+                CompletionError = "request cancelled";
+                break;
+              }
+            });
+        assert(CallbackCalled &&
+               "Expected callback to be called synchronously");
+        if (CompletionError == "error: did not find code completion token") {
+          // Do not consider failure to find the code completion token as a
+          // critical failure that returns a non-zero exit code. Instead, allow
+          // the caller to match the error message.
+          llvm::outs() << CompletionError << '\n';
+        } else if (!CompletionError.empty()) {
+          llvm::errs() << CompletionError << '\n';
+          return true;
         }
-        case CancellableResultKind::Failure:
-          CompletionError = "error: " + Result.getError();
-          break;
-        case CancellableResultKind::Cancelled:
-          CompletionError = "request cancelled";
-          break;
-        }
+        return false;
       });
-  assert(CallbackCalled &&
-         "We should always receive a callback call for code completion");
-  if (CompletionError == "error: did not find code completion token") {
-    // Do not consider failure to find the code completion token as a critical
-    // failure that returns a non-zero exit code. Instead, allow the caller to
-    // match the error message.
-    llvm::outs() << CompletionError << '\n';
-  } else if (!CompletionError.empty()) {
-    llvm::errs() << CompletionError << '\n';
-    return true;
+}
+
+template <typename ResultType>
+static int printResult(CancellableResult<ResultType> Result,
+                       llvm::function_ref<int(ResultType &)> PrintSuccess) {
+  switch (Result.getKind()) {
+  case CancellableResultKind::Success: {
+    return PrintSuccess(Result.getResult());
   }
-  return false;
+  case CancellableResultKind::Failure:
+    llvm::errs() << "error: " << Result.getError() << '\n';
+    return 1;
+  case CancellableResultKind::Cancelled:
+    llvm::errs() << "request cancelled\n";
+    return 1;
+    break;
+  }
+}
+
+static int printTypeContextInfo(
+    CancellableResult<TypeContextInfoResult> CancellableResult) {
+  return printResult<TypeContextInfoResult>(
+      CancellableResult, [](TypeContextInfoResult &Result) {
+        llvm::outs() << "-----BEGIN TYPE CONTEXT INFO-----\n";
+        for (auto resultItem : Result.Results) {
+          llvm::outs() << "- TypeName: ";
+          resultItem.ExpectedTy.print(llvm::outs());
+          llvm::outs() << "\n";
+
+          llvm::outs() << "  TypeUSR: ";
+          printTypeUSR(resultItem.ExpectedTy, llvm::outs());
+          llvm::outs() << "\n";
+
+          llvm::outs() << "  ImplicitMembers:";
+          if (resultItem.ImplicitMembers.empty())
+            llvm::outs() << " []";
+          llvm::outs() << "\n";
+          for (auto VD : resultItem.ImplicitMembers) {
+            llvm::outs() << "   - ";
+
+            llvm::outs() << "Name: ";
+            VD->getName().print(llvm::outs());
+            llvm::outs() << "\n";
+
+            StringRef BriefDoc = VD->getBriefComment();
+            if (!BriefDoc.empty()) {
+              llvm::outs() << "     DocBrief: \"";
+              llvm::outs() << VD->getBriefComment();
+              llvm::outs() << "\"\n";
+            }
+          }
+        }
+        llvm::outs() << "-----END TYPE CONTEXT INFO-----\n";
+        return 0;
+      });
 }
 
 static int doTypeContextInfo(const CompilerInvocation &InitInvok,
@@ -915,18 +1008,20 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
                              StringRef SecondSourceFileName,
                              StringRef CodeCompletionToken,
                              bool CodeCompletionDiagnostics) {
-  // Create a CodeCompletionConsumer.
-  std::unique_ptr<ide::TypeContextInfoConsumer> Consumer(
-      new ide::PrintingTypeContextInfoConsumer(llvm::outs()));
-
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-      ide::makeTypeContextInfoCallbacksFactory(*Consumer));
-
-  return doCodeCompletionImpl(callbacksFactory.get(), InitInvok, SourceFilename,
-                              SecondSourceFileName, CodeCompletionToken,
-                              CodeCompletionDiagnostics);
+  return performWithCompletionLikeOperationParams(
+      InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
+      CodeCompletionDiagnostics,
+      [&](CompletionLikeOperationParams Params) -> bool {
+        CompletionInstance CompletionInst;
+        int ExitCode = 2;
+        CompletionInst.typeContextInfo(
+            Params.Invocation, Params.Args, Params.FileSystem,
+            Params.CompletionBuffer, Params.Offset, Params.DiagC,
+            [&](CancellableResult<TypeContextInfoResult> Result) {
+              ExitCode = printTypeContextInfo(Result);
+            });
+        return ExitCode;
+      });
 }
 
 static int

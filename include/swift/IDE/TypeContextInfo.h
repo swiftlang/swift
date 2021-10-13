@@ -40,16 +40,6 @@ public:
   virtual void handleResults(ArrayRef<TypeContextInfoItem>) = 0;
 };
 
-/// Printing consumer
-class PrintingTypeContextInfoConsumer : public TypeContextInfoConsumer {
-  llvm::raw_ostream &OS;
-
-public:
-  PrintingTypeContextInfoConsumer(llvm::raw_ostream &OS) : OS(OS) {}
-
-  void handleResults(ArrayRef<TypeContextInfoItem>) override;
-};
-
 /// Create a factory for code completion callbacks.
 CodeCompletionCallbacksFactory *
 makeTypeContextInfoCallbacksFactory(TypeContextInfoConsumer &Consumer);
