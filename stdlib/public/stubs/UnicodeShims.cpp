@@ -24,6 +24,7 @@
 extern "C" {
 
 // Types
+typedef struct UBreakIterator UBreakIterator;
 typedef enum UErrorCode {} UErrorCode;
 typedef enum UCharNameChoice {} UCharNameChoice;
 typedef uint16_t UChar;

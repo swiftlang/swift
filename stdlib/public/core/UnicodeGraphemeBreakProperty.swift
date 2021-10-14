@@ -13,14 +13,12 @@
 import SwiftShims
 
 extension Unicode {
-  internal enum GraphemeBreakProperty {
+  internal enum _GraphemeBreakProperty {
     case any
     case control
-    case cr
     case extend
     case extendedPictographic
     case l
-    case lf
     case lv
     case lvt
     case prepend
@@ -32,11 +30,6 @@ extension Unicode {
 
     init(from scalar: Unicode.Scalar) {
       switch scalar.value {
-      case 0xA:
-        self = .lf
-      case 0xD:
-        self = .cr
-
       // Some fast paths for ascii characters...
       case 0x0 ... 0x1F:
         self = .control

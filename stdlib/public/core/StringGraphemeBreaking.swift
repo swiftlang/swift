@@ -10,18 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftShims
-
 /// CR and LF are common special cases in grapheme breaking logic
 private var _CR: UInt8 { return 0x0d }
 private var _LF: UInt8 { return 0x0a }
 
-private func _hasGraphemeBreakBetween(
+internal func _hasGraphemeBreakBetween(
   _ lhs: Unicode.Scalar, _ rhs: Unicode.Scalar
-) -> Bool {
+) -> Bool? {
 
   // CR-LF is a special case: no break between these
-  if lhs == Unicode.Scalar(_CR) && rhs == Unicode.Scalar(_LF) { return false }
+  if lhs == Unicode.Scalar(_CR) && rhs == Unicode.Scalar(_LF) {
+    return false
+  }
 
   // Whether the given scalar, when it appears paired with another scalar
   // satisfying this property, has a grapheme break between it and the other
@@ -78,67 +78,54 @@ private func _hasGraphemeBreakBetween(
     default: return false
     }
   }
-  return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
+  return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs) ? true : nil
 }
 
 extension _StringGuts {
-  @usableFromInline @inline(never)
+  @usableFromInline
+  @inline(never)
   @_effects(releasenone)
   internal func isOnGraphemeClusterBoundary(_ i: String.Index) -> Bool {
-    guard i.transcodedOffset == 0 else { return false }
+    guard i.transcodedOffset == 0 else {
+      return false
+    }
 
     let offset = i._encodedOffset
-    if offset == 0 || offset == self.count { return true }
+    if offset == 0 || offset == self.count {
+      return true
+    }
 
-    guard isOnUnicodeScalarBoundary(i) else { return false }
+    guard isOnUnicodeScalarBoundary(i) else {
+      return false
+    }
 
     let str = String(self)
     return i == str.index(before: str.index(after: i))
   }
 
-  @usableFromInline @inline(never)
+  @usableFromInline
+  @inline(never)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
-    var idx = String.Index(_encodedOffset: i)
+    let idx = String.Index(_encodedOffset: i)
     let scalars = String.UnicodeScalarView(self)
 
-    let sc1 = scalars[idx]
-    scalars.formIndex(after: &idx)
+    let iter = Unicode._GraphemeWalker(scalars)
+    let nextIdx = iter.nextBoundary(startingAt: idx)
 
-    if idx == scalars.endIndex {
-      // Last scalar is last grapheme
-      return idx._encodedOffset &- i
-    }
-
-    let sc2 = scalars[idx]
-    if _fastPath(_hasGraphemeBreakBetween(sc1, sc2)) {
-      return idx._encodedOffset &- i
-    }
-
-    var iter = GraphemeIterator(scalars, offset: i)
-    return iter.next()
+    return nextIdx._encodedOffset &- i
   }
 
-  @usableFromInline @inline(never)
+  @usableFromInline
+  @inline(never)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(endingAt i: Int) -> Int {
-    var idx = String.Index(_encodedOffset: i)
+    let idx = String.Index(_encodedOffset: i)
     let scalars = String.UnicodeScalarView(self)
-    scalars.formIndex(before: &idx)
 
-    let sc2 = scalars[idx]
-    if idx == scalars.startIndex {
-      // First scalar is first grapheme
-      return i &- idx._encodedOffset
-    }
+    let iter = Unicode._GraphemeWalker(scalars)
+    let previousIdx = iter.previousBoundary(endingAt: idx)
 
-    let sc1 = scalars[scalars.index(before: idx)]
-    if _fastPath(_hasGraphemeBreakBetween(sc1, sc2)) {
-      return i &- idx._encodedOffset
-    }
-
-    var iter = GraphemeIterator(scalars, offset: i)
-    return iter.previous()
+    return i &- previousIdx._encodedOffset
   }
 }
-
