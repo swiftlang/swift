@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
 @frozen
 public struct Duration: Sendable {
   @frozen
@@ -80,6 +81,7 @@ public struct Duration: Sendable {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
 extension Duration {
   @inlinable
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
@@ -129,10 +131,13 @@ extension Duration {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
 extension Duration: Codable { }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
 extension Duration: Hashable { }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
 extension Duration: Equatable {
   @inlinable
   public static func == (_ lhs: Duration, _ rhs: Duration) -> Bool {
@@ -140,6 +145,7 @@ extension Duration: Equatable {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
 extension Duration: Comparable {
   @inlinable
   public static func < (_ lhs: Duration, _ rhs: Duration) -> Bool {
@@ -149,6 +155,7 @@ extension Duration: Comparable {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
 extension Duration: AdditiveArithmetic {
   @inlinable
   public static var zero: Duration { Duration(_seconds: 0, nanoseconds: 0) }
@@ -174,6 +181,7 @@ extension Duration: AdditiveArithmetic {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
 extension Duration {
   @inlinable
   public static func / (_ lhs: Duration, _ rhs: Double) -> Duration {
@@ -211,6 +219,7 @@ extension Duration {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
 extension Duration: CustomStringConvertible {
   @inlinable
   public var description: String {

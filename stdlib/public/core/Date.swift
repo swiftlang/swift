@@ -19,18 +19,15 @@ func _getTime(
   realtimeNanoseconds: UnsafeMutablePointer<Int64>?
 )
 
-@available(macOS 10.9, iOS 7.0, tvOS 9.0, watchOS 2.0, macCatalyst 13.0, *)
-@_originallyDefinedIn(module: "Foundation", 
-  macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999)
-public struct Date {
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
+public struct _Date {
   public var durationSince1970: Duration
   
   public init(durationSince1970: Duration) {
     self.durationSince1970 = durationSince1970
   }
 
-  @available(macOS 12, iOS 15, tvOS 15, watchOS 8, *)
-  public static var now: Date { 
+  public static var now: _Date { 
     var realtimeSeconds = Int64(0)
     var realtimeNanoseconds = Int64(0)
     _getTime(
@@ -39,40 +36,43 @@ public struct Date {
       realtimeSeconds: &realtimeSeconds, 
       realtimeNanoseconds: &realtimeNanoseconds
     )
-    return Date(durationSince1970: 
+    return _Date(durationSince1970: 
       .seconds(realtimeSeconds) + .nanoseconds(realtimeNanoseconds))
   }
 }
 
-extension Date: Equatable {
-  public static func == (lhs: Date, rhs: Date) -> Bool {
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
+extension _Date: Equatable {
+  public static func == (lhs: _Date, rhs: _Date) -> Bool {
     return lhs.durationSince1970 == rhs.durationSince1970
   }
 }
 
-extension Date: Hashable {
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
+extension _Date: Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(durationSince1970)
   }
 }
 
-extension Date: Comparable {
-  public static func < (lhs: Date, rhs: Date) -> Bool {
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
+extension _Date: Comparable {
+  public static func < (lhs: _Date, rhs: _Date) -> Bool {
     lhs.durationSince1970 < rhs.durationSince1970
   }
   
-  public static func > (lhs: Date, rhs: Date) -> Bool {
+  public static func > (lhs: _Date, rhs: _Date) -> Bool {
     lhs.durationSince1970 > rhs.durationSince1970
   }
 }
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
-extension Date: InstantProtocol {
-  public func advanced(by duration: Duration) -> Date {
-    Date(durationSince1970: durationSince1970 + duration)
+extension _Date: InstantProtocol {
+  public func advanced(by duration: Duration) -> _Date {
+    _Date(durationSince1970: durationSince1970 + duration)
   }
   
-  public func duration(to other: Date) -> Duration {
+  public func duration(to other: _Date) -> Duration {
     return other.durationSince1970 - durationSince1970
   }
 }

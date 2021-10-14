@@ -22,15 +22,15 @@ extension ClockProtocol where Self == WallClock {
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
 extension WallClock: ClockProtocol {
-  public var now: Date {
-    Date.now
+  public var now: _Date {
+    _Date.now
   }
   
-  public static var now: Date {
-    Date.now
+  public static var now: _Date {
+    _Date.now
   }
   
-  public func sleep(until deadline: Date) async throws {
+  public func sleep(until deadline: _Date) async throws {
     if deadline.durationSince1970 > .zero {
       try await Task.sleep(until: 
         UInt64(deadline.durationSince1970.seconds), 

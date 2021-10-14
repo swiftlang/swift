@@ -29,7 +29,7 @@ public struct MonotonicClock {
       self.nanoseconds = nanoseconds
     }
     
-    public init?(converting deadline: Date) {
+    public init?(converting deadline: _Date) {
       var monotonicNanoseconds = UInt64(0)
       var realtimeSeconds = Int64(0)
       var realtimeNanoseconds = Int64(0)
@@ -39,7 +39,7 @@ public struct MonotonicClock {
         realtimeSeconds: &realtimeSeconds, realtimeNanoseconds: &realtimeNanoseconds
       )
       let monotonicNow = Instant(nanoseconds: monotonicNanoseconds)
-      let realtimeNow = Date(durationSince1970: .seconds(realtimeSeconds) + .nanoseconds(realtimeNanoseconds))
+      let realtimeNow = _Date(durationSince1970: .seconds(realtimeSeconds) + .nanoseconds(realtimeNanoseconds))
       
       let duration = realtimeNow.duration(to: deadline)
       if duration > Duration.nanoseconds(Int64.max) {
@@ -50,8 +50,8 @@ public struct MonotonicClock {
   }
 }
 
-extension Date {
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, macCatalyst 9999, *)
+extension _Date {
   public init(converting deadline: MonotonicClock.Instant) {
     var monotonicNanoseconds = UInt64(0)
     var realtimeSeconds = Int64(0)
@@ -62,7 +62,7 @@ extension Date {
       realtimeSeconds: &realtimeSeconds, realtimeNanoseconds: &realtimeNanoseconds
     )
     
-    let realtimeNow = Date(durationSince1970: .seconds(realtimeSeconds) + .nanoseconds(realtimeNanoseconds))
+    let realtimeNow = _Date(durationSince1970: .seconds(realtimeSeconds) + .nanoseconds(realtimeNanoseconds))
     let monotonicNow = MonotonicClock.Instant(nanoseconds: monotonicNanoseconds)
     let duration = monotonicNow.duration(to: deadline)
     self = realtimeNow.advanced(by: .nanoseconds(duration.nanoseconds))

@@ -21,7 +21,7 @@ public struct UptimeClock {
       self.nanoseconds = nanoseconds
     }
   
-    public init?(converting deadline: Date) {
+    public init?(converting deadline: _Date) {
       var absoluteNanoseconds = UInt64(0)
       var realtimeSeconds = Int64(0)
       var realtimeNanoseconds = Int64(0)
@@ -31,7 +31,7 @@ public struct UptimeClock {
         realtimeSeconds: &realtimeSeconds, realtimeNanoseconds: &realtimeNanoseconds
       )
       let monotonicNow = Instant(nanoseconds: absoluteNanoseconds)
-      let realtimeNow = Date(durationSince1970: .seconds(realtimeSeconds) + .nanoseconds(realtimeNanoseconds))
+      let realtimeNow = _Date(durationSince1970: .seconds(realtimeSeconds) + .nanoseconds(realtimeNanoseconds))
       
       let duration = realtimeNow.duration(to: deadline)
       if duration > Duration.nanoseconds(Int64.max) {
