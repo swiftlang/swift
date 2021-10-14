@@ -146,6 +146,16 @@ public:
                       const MutableTerm &term, const MutableTerm &prefix,
                       const ProtocolGraph &protos) const;
 
+  MutableTerm getRelativeTermForType(CanType typeWitness,
+                                     ArrayRef<Term> substitutions);
+
+  Type getTypeFromSubstitutionSchema(
+                      Type schema,
+                      ArrayRef<Term> substitutions,
+                      TypeArrayView<GenericTypeParamType> genericParams,
+                      const MutableTerm &prefix,
+                      const ProtocolGraph &protos) const;
+
   AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol,
                                                  const ProtocolGraph &protos);
 
