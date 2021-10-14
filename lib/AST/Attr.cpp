@@ -17,6 +17,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -111,7 +112,23 @@ const char *TypeAttributes::getAttrName(TypeAttrKind kind) {
   }
 }
 
+/// Given a name like "_moveOnly", return the type attribute ID that
+/// corresponds to it.  This returns FRA_Count on failure.
+FunctionResultAttrKind FunctionResultAttributes::getAttrKindFromString(StringRef Str) {
+  return llvm::StringSwitch<FunctionResultAttrKind>(Str)
+#define FUNCTION_RESULT_ATTR(X) .Case(#X, FRA_##X)
+#include "swift/AST/Attr.def"
+    .Default(FRA_Count);
+}
 
+/// Return the name (like "_movenly") for an attribute ID.
+const char *FunctionResultAttributes::getAttrName(FunctionResultAttrKind kind) {
+  switch (kind) {
+  default: llvm_unreachable("Invalid attribute ID");
+#define FUNCTION_RESULT_ATTR(X) case FRA_##X: return #X;
+#include "swift/AST/Attr.def"
+  }
+}
 
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier

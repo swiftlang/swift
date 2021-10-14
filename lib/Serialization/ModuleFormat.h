@@ -1046,7 +1046,8 @@ namespace decls_block {
     BCFixed<1>,          // non-ephemeral?
     ValueOwnershipField, // inout, shared or owned?
     BCFixed<1>,          // isolated
-    BCFixed<1>           // noDerivative?
+    BCFixed<1>,          // noDerivative?
+    BCFixed<1>           // isMoveOnly
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<

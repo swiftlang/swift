@@ -941,6 +941,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
       /*Async=*/false,
       /*Throws=*/false,
       /*GenericParams*/ nullptr, params, TupleType::getEmpty(Context),
+      /*hasMoveOnlyResult*/false,
       CurDeclContext);
   setLocalDiscriminator(tempDecl);
   ParserStatus Status;

@@ -403,7 +403,7 @@ deriveEquatable_eq(
       C, StaticSpellingKind::KeywordStatic, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
       /*Throws=*/false,
-      /*GenericParams=*/nullptr, params, boolTy, parentDC);
+      /*GenericParams=*/nullptr, params, boolTy, /*isMoveOnly*/false, parentDC);
   eqDecl->setUserAccessible(false);
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
@@ -542,7 +542,7 @@ deriveHashable_hashInto(
       C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
       /*Throws=*/false,
-      /*GenericParams=*/nullptr, params, returnType, parentDC);
+      /*GenericParams=*/nullptr, params, returnType, /*isMoveOnly*/false, parentDC);
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
   hashDecl->copyFormalAccessFrom(derived.Nominal,

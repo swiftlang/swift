@@ -1916,7 +1916,7 @@ public:
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {
-  enum ParameterFlags : uint8_t {
+  enum ParameterFlags : uint16_t {
     None         = 0,
     Variadic     = 1 << 0,
     AutoClosure  = 1 << 1,
@@ -1925,12 +1925,13 @@ class ParameterTypeFlags {
     Ownership    = 7 << OwnershipShift,
     NoDerivative = 1 << 6,
     Isolated     = 1 << 7,
-    NumBits = 8
+    MoveOnly     = 1 << 8,
+    NumBits = 16,
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
 
-  ParameterTypeFlags(OptionSet<ParameterFlags, uint8_t> val) : value(val) {}
+  ParameterTypeFlags(OptionSet<ParameterFlags, uint16_t> val) : value(val) {}
 
 public:
   ParameterTypeFlags() = default;
@@ -1939,18 +1940,21 @@ public:
   }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
-                     ValueOwnership ownership, bool isolated, bool noDerivative)
+                     ValueOwnership ownership, bool isolated, bool noDerivative,
+                     bool isMoveOnly)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(ownership) << OwnershipShift |
               (isolated ? Isolated : 0) |
-              (noDerivative ? NoDerivative : 0)) {}
+              (noDerivative ? NoDerivative : 0) |
+              (isMoveOnly ? MoveOnly : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ValueOwnership ownership,
-                    bool isolated, bool isNoDerivative);
+                    bool isolated, bool isNoDerivative,
+                    bool isMoveOnly);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -1961,6 +1965,7 @@ public:
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
   bool isIsolated() const { return value.contains(Isolated); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
+  bool isMoveOnly() const { return value.contains(MoveOnly); }
 
   ValueOwnership getValueOwnership() const {
     return ValueOwnership((value.toRaw() & Ownership) >> OwnershipShift);
@@ -2013,6 +2018,12 @@ public:
     return ParameterTypeFlags(noDerivative
                                   ? value | ParameterTypeFlags::NoDerivative
                                   : value - ParameterTypeFlags::NoDerivative);
+  }
+
+  ParameterTypeFlags withMoveOnly(bool newValue) const {
+    return ParameterTypeFlags(newValue
+                                  ? value | ParameterTypeFlags::MoveOnly
+                                  : value - ParameterTypeFlags::MoveOnly);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2082,7 +2093,10 @@ public:
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
                               /*nonEphemeral*/ false, getValueOwnership(),
-                              /*isolated*/ false, /*noDerivative*/ false);
+                              /*isolated*/ false, /*noDerivative*/ false,
+                              // TODO: We should be able to yield move only
+                              // types.
+                              /*isMoveOnly*/ false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -6277,7 +6291,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
-    ValueOwnership ownership, bool isolated, bool isNoDerivative) {
+    ValueOwnership ownership, bool isolated, bool isNoDerivative, bool isMoveOnly) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -6288,7 +6302,7 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     ownership = ValueOwnership::InOut;
   }
   return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isolated,
-          isNoDerivative};
+          isNoDerivative, isMoveOnly};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

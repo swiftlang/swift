@@ -191,7 +191,8 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
       /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
       /*Throws=*/false,
-      /*GenericParams=*/nullptr, params, selfInterfaceType, parentDC);
+      /*GenericParams=*/nullptr, params, selfInterfaceType, /*isMoveOnly*/false,
+      parentDC);
   auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl,
                             void *ctx) -> std::pair<BraceStmt *, bool> {
     auto op = (MathOperator) reinterpret_cast<intptr_t>(ctx);

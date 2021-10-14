@@ -166,7 +166,7 @@ AbstractFunctionDecl *TypeChecker::addImplicitDistributedActorRemoteFunction(
       C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/true, /*Throws=*/true,
       /*GenericParams=*/genericParams, params,
-      resultTy, parentDC);
+      resultTy, /*isMoveOnly*/false, parentDC);
 
   // *dynamic* because we'll be replacing it with specific transports
   remoteFuncDecl->getAttrs().add(

@@ -22,6 +22,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -262,9 +263,20 @@ public:
 
   void visitReasyncAttr(ReasyncAttr *attr);
   void visitNonisolatedAttr(NonisolatedAttr *attr);
+
+  void visitMoveOnlyAttr(MoveOnlyAttr *attr);
 };
 
 } // end anonymous namespace
+
+void AttributeChecker::visitMoveOnlyAttr(MoveOnlyAttr *attr) {
+  if (auto *vd = dyn_cast<VarDecl>(D)) {
+    if (isa<StructDecl>(vd->getDeclContext()) && vd->hasStorage()) {
+      diagnoseAndRemoveAttr(attr, diag::attribute_invalid_on_stored_property,
+                            attr);
+    }
+  }
+}
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
   DeclContext *dc = D->getDeclContext();
@@ -2030,7 +2042,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
       /*Async=*/mainFunction->hasAsync(),
       /*Throws=*/mainFunction->hasThrows(),
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
-      /*FnRetType=*/TupleType::getEmpty(context), declContext);
+      /*FnRetType=*/TupleType::getEmpty(context), /*isMoveOnly*/false, declContext);
   func->setSynthesized(true);
 
   auto *params = context.Allocate<MainTypeAttrParams>();

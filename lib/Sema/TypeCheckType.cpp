@@ -2735,6 +2735,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     if (auto *ATR = dyn_cast<AttributedTypeRepr>(eltTypeRepr))
       autoclosure = ATR->getAttrs().has(TAK_autoclosure);
 
+    bool isMoveOnly = false;
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr))
+      isMoveOnly = attrTypeRepr->getAttrs().has(TAK__moveOnly);
+
     ValueOwnership ownership = ValueOwnership::Default;
 
     auto *nestedRepr = eltTypeRepr;
@@ -2791,7 +2795,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative);
+        isolated, noDerivative, isMoveOnly);
     elements.emplace_back(ty, Identifier(), paramFlags,
                           inputRepr->getElementName(i));
   }

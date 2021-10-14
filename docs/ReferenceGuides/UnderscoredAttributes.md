@@ -604,3 +604,8 @@ within Swift 5 code that has adopted concurrency, but non-`@MainActor`
 
 See the forum post on [Concurrency in Swift 5 and 6](https://forums.swift.org/t/concurrency-in-swift-5-and-6/49337)
 for more details.
+
+## `@_moveOnly`
+
+Marks a parameter, var decl, or result type as being as containing a move only
+value.

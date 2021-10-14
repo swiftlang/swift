@@ -5315,6 +5315,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
+
+    /// Whether or not this parameter is 'moveOnly'.
+    IsMoveOnly = 1 << 3,
   };
 
   /// The default value, if any, along with flags.
@@ -5481,6 +5484,17 @@ public:
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsIsolated
                                       : flags - Flags::IsIsolated);
+  }
+
+  /// Whether or not this parameter is marked with 'isolated'.
+  bool isMoveOnly() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsMoveOnly);
+  }
+
+  void setIsMoveOnly(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsMoveOnly
+                                      : flags - Flags::IsMoveOnly);
   }
 
   /// Does this parameter reject temporary pointer conversions?
@@ -6298,6 +6312,7 @@ class FuncDecl : public AbstractFunctionDecl {
   SourceLoc FuncLoc;    // Location of the 'func' token.
 
   TypeLoc FnRetType;
+  bool IsRetMoveOnly = false;
 
 protected:
   FuncDecl(DeclKind Kind,
@@ -6360,7 +6375,8 @@ public:
                                       StaticSpellingKind StaticSpelling,
                                       DeclName Name, bool Async, bool Throws,
                                       GenericParamList *GenericParams,
-                                      Type FnRetType, DeclContext *Parent);
+                                      Type FnRetType,
+                                      bool IsFnRetMoveOnly, DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
                           StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
@@ -6368,6 +6384,7 @@ public:
                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
                           GenericParamList *GenericParams,
                           ParameterList *BodyParams, TypeRepr *ResultTyR,
+                          bool IsRetMoveOnly,
                           DeclContext *Parent);
 
   static FuncDecl *createImplicit(ASTContext &Context,
@@ -6375,6 +6392,7 @@ public:
                                   DeclName Name, SourceLoc NameLoc, bool Async,
                                   bool Throws, GenericParamList *GenericParams,
                                   ParameterList *BodyParams, Type FnRetType,
+                                  bool IsFnRetTypeMoveOnly,
                                   DeclContext *Parent);
 
   static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,
