@@ -1499,7 +1499,6 @@ ModuleDecl::ReverseFullNameIterator::ReverseFullNameIterator(
 
 StringRef ModuleDecl::ReverseFullNameIterator::operator*() const {
   assert(current && "all name components exhausted");
-
   if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>())
     return swiftModule->getName().str();
 
@@ -1564,8 +1563,8 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
 }
 
 Identifier ModuleDecl::getRealName() const {
-  // This will return the real name for an alias (if used) or getName()
-  return getASTContext().getRealModuleName(getName());
+  // FIXME: now that this returns getName, remove this function
+  return getName();
 }
 
 Identifier ModuleDecl::getABIName() const {

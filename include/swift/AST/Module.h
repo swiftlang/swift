@@ -170,6 +170,8 @@ class ModuleDecl
 
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
+  /// The alias of this module, which differs from the module name, set if -module-alias is passed.
+  mutable Identifier ModuleAlias;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -365,6 +367,14 @@ public:
   ///
   /// If no module aliasing is set, it will return getName(), i.e. Foo.
   Identifier getRealName() const;
+
+  /// Sets this module's alias if module aliasing is used. For example, '-module-alias Foo=Bar' would
+  /// be parsed to set Foo as the alias and Bar as the (real) name of this module. Foo (alias) is the name
+  /// that appears in source files, while Bar (name) is the physical binary name of this module and used
+  /// for contents of this module.
+  void setAlias(Identifier name) {
+    ModuleAlias = name;
+  }
 
   /// User-defined module version number.
   llvm::VersionTuple UserModuleVersion;

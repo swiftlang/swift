@@ -1188,7 +1188,9 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   assert(moduleInputBuffer);
 
-  auto M = ModuleDecl::create(moduleID.Item, Ctx);
+  auto moduleRealID = Ctx.getRealModuleName(moduleID.Item);
+  auto M = ModuleDecl::create(moduleRealID, Ctx);
+  M->setAlias(moduleID.Item);
   M->setIsSystemModule(isSystemModule);
   Ctx.addLoadedModule(M);
   SWIFT_DEFER { M->setHasResolvedImports(); };
