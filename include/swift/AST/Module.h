@@ -194,6 +194,9 @@ public:
       current = clangModule;
     }
 
+    /// Returns the name of the current module.
+    /// Note that for a Swift module, it returns the current module's real (binary) name,
+    /// which can be different from the name if module aliasing was used (see -module-alias).
     StringRef operator*() const;
     ReverseFullNameIterator &operator++();
 
