@@ -1188,6 +1188,10 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   assert(moduleInputBuffer);
 
+  // Use module real name to create a ModuleDecl and set the alias in
+  // case module aliasing is used. If not, they are the same.
+  // For example, passing '-module-alias Foo=Bar' would result in a module
+  // with Bar as the name and Foo as the alias, which appears in source files.
   auto moduleRealID = Ctx.getRealModuleName(moduleID.Item);
   auto M = ModuleDecl::create(moduleRealID, Ctx);
   M->setAlias(moduleID.Item);
