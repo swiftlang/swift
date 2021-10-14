@@ -2020,7 +2020,7 @@ public:
   /// Notify transport that actor has initialized successfully,
   /// and is ready to receive messages.
   void emitDistributedActorReady(
-      ConstructorDecl *ctor, ManagedValue selfArg);
+      SILLocation loc, ConstructorDecl *ctor, ManagedValue actorSelf);
 
   /// Inject distributed actor and transport interaction code into the destructor.
   void emitDistributedActor_resignAddress(
