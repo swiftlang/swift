@@ -4252,12 +4252,12 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
     if (!anchor)
       continue;
 
-    auto it = indexMap.find(castToExpr(anchor));
+    auto it = indexMap.find(anchor);
     if (it == indexMap.end())
       continue;
     unsigned index = it->second;
 
-    auto optDepth = getExprDepth(castToExpr(anchor));
+    auto optDepth = getExprDepth(anchor);
     if (!optDepth)
       continue;
     unsigned depth = *optDepth;
