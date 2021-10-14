@@ -65,7 +65,7 @@
                 "llbuild": "main",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
-                "swift-argument-parser": "0.4.1",
+                "swift-argument-parser": "0.4.3",
                 "swift-crypto": "1.1.5",
                 "swift-driver": "main",
                 "swift-syntax": "main",
