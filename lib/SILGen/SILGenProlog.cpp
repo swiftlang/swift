@@ -254,7 +254,7 @@ struct ArgumentInitHelper {
     SILValue value = argrv.getValue();
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
-      if (SGF.getASTContext().LangOpts.EnableExperimentalLexicalLifetimes &&
+      if (SGF.getASTContext().SILOpts.EnableExperimentalLexicalLifetimes &&
           value->getOwnershipKind() == OwnershipKind::Owned) {
         value =
             SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
