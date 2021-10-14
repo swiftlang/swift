@@ -40,14 +40,7 @@ entry(%instance : $*S):
 // tests
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_owned : $@convention(thin) (@owned C) -> () {
-// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
-// CHECK:         return [[RETVAL]]
+// CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_owned'
 sil [ossa] @caller_owned_callee_owned : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
@@ -87,15 +80,7 @@ entry(%instance : @guaranteed $C):
 }
 
 // CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_owned : $@convention(thin) (@guaranteed C) -> () {
-// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[COPY]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         destroy_value [[LIFETIME_OWNED]]
-// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         return [[RETVAL]]
+// CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_owned'
 sil [ossa] @caller_guaranteed_callee_owned : $@convention(thin) (@guaranteed C) -> () {
 entry(%instance : @guaranteed $C):
@@ -195,22 +180,7 @@ bb2:
 // tests
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_owned : $@convention(method) (@owned C) -> () {
-// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
-// CHECK:         store [[LIFETIME_OWNED]] to [init] [[ADDR]]
-// CHECK:         destroy_addr [[ADDR]]
-// CHECK:         dealloc_stack [[ADDR]]
-// CHECK:         [[ORIGINAL_RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
-// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
-// CHECK:         return [[RETVAL]]
-// CHECK:       bb1:
-// CHECK:         destroy_addr [[ADDR]]
-// CHECK:         dealloc_stack [[ADDR]]
-// CHECK:         unreachable
+// CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_coro_owned'
 sil [ossa] @caller_owned_callee_coro_owned : $@convention(method) (@owned C) -> () {
 bb0(%instance : @owned $C):
@@ -250,23 +220,7 @@ bb0(%instance : @owned $C):
 }
 
 // CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_owned : $@convention(method) (@guaranteed C) -> () {
-// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[COPY]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
-// CHECK:         store [[LIFETIME_OWNED]] to [init] [[ADDR]]
-// CHECK:         destroy_addr [[ADDR]]
-// CHECK:         dealloc_stack [[ADDR]]
-// CHECK:         [[ORIGINAL_RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
-// CHECK:         return [[RETVAL]]
-// CHECK:       bb1:
-// CHECK:         destroy_addr [[ADDR]]
-// CHECK:         dealloc_stack [[ADDR]]
-// CHECK:         unreachable
+// CHECK-NOT:         begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_coro_owned'
 sil [ossa] @caller_guaranteed_callee_coro_owned : $@convention(method) (@guaranteed C) -> () {
 bb0(%instance : @guaranteed $C):
@@ -393,22 +347,7 @@ bb2:
 // tests
 
 // CHECK-LABEL: sil [ossa] @callee_owned_callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
-// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
-// CHECK:       [[THROW_BLOCK]]:
-// CHECK:         destroy_value [[LIFETIME_OWNED]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
-// CHECK:         throw undef
-// CHECK:       [[REGULAR_BLOCK]]:
-// CHECK:         destroy_value [[LIFETIME_OWNED]]
-// CHECK:         [[ORIGINAL_RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
-// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
-// CHECK:         return [[RETVAL]]
+// CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'callee_owned_callee_error_owned'
 sil [ossa] @callee_owned_callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
 bb0(%instance : @owned $C):
@@ -451,23 +390,7 @@ bb2(%12 : @owned $Error):
 }
 
 // CHECK-LABEL: sil [ossa] @callee_guaranteed_callee_error_owned : $@convention(thin) (@guaranteed C) -> @error Error {
-// CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[COPY]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
-// CHECK:       [[THROW_BLOCK]]:
-// CHECK:         destroy_value [[LIFETIME_OWNED]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         throw undef
-// CHECK:       [[REGULAR_BLOCK]]:
-// CHECK:         destroy_value [[LIFETIME_OWNED]]
-// CHECK:         [[ORIGINAL_RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         [[RETVAL:%[^,]+]] = tuple ()
-// CHECK:         return [[RETVAL]]
+// CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'callee_guaranteed_callee_error_owned'
 sil [ossa] @callee_guaranteed_callee_error_owned : $@convention(thin) (@guaranteed C) -> @error Error {
 bb0(%instance : @guaranteed $C):

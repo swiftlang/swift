@@ -395,32 +395,46 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
         }
       }
     } else if (Major == 11) {
-      return floorFor64(llvm::VersionTuple(5, 3));
+      if (Minor <= 3)
+        return floorFor64(llvm::VersionTuple(5, 3));
+
+      return floorFor64(llvm::VersionTuple(5, 4));
+    } else if (Major == 12) {
+      return floorFor64(llvm::VersionTuple(5, 5));
     }
   } else if (Triple.isiOS()) { // includes tvOS
     Triple.getiOSVersion(Major, Minor, Micro);
 
-    auto floorFor64e = [&Triple](llvm::VersionTuple v) {
+    auto floorForArchitecture = [&Triple, Major](llvm::VersionTuple v) {
+      // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
+      // with Swift 5.3
+      if (Triple.isAArch64() && Major <= 14 &&
+          (Triple.isSimulatorEnvironment() ||
+           Triple.isMacCatalystEnvironment()))
+        return MAX(v, llvm::VersionTuple(5, 3));
+
       if (Triple.getArchName() != "arm64e") return v;
+
       // iOS got first arm64e support in 12.0, which has a Swift runtime version
       // older than 5.0, so let's floor at VersionTuple(5, 0) instead.
       return MAX(v, llvm::VersionTuple(5, 0));
     };
 
-    // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
-    // with Swift 5.3
-    if (Triple.isAArch64() && Major <= 14 &&
-        (Triple.isSimulatorEnvironment() || Triple.isMacCatalystEnvironment()))
-      return floorFor64e(llvm::VersionTuple(5, 3));
-
     if (Major <= 12) {
-      return floorFor64e(llvm::VersionTuple(5, 0));
+      return floorForArchitecture(llvm::VersionTuple(5, 0));
     } else if (Major <= 13) {
       if (Minor <= 3) {
-        return floorFor64e(llvm::VersionTuple(5, 1));
+        return floorForArchitecture(llvm::VersionTuple(5, 1));
       } else {
-        return floorFor64e(llvm::VersionTuple(5, 2));
+        return floorForArchitecture(llvm::VersionTuple(5, 2));
       }
+    } else if (Major <= 14) {
+      if (Minor <= 4)
+        return floorForArchitecture(llvm::VersionTuple(5, 3));
+
+      return floorForArchitecture(llvm::VersionTuple(5, 4));
+    } else if (Major <= 15) {
+      return floorForArchitecture(llvm::VersionTuple(5, 5));
     }
   } else if (Triple.isWatchOS()) {
     auto floorFor64bits = [&Triple](llvm::VersionTuple v) {
@@ -438,6 +452,13 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
       } else {
         return floorFor64bits(llvm::VersionTuple(5, 2));
       }
+    } else if (Major <= 7) {
+      if (Minor <= 4)
+        return floorFor64bits(llvm::VersionTuple(5, 3));
+
+      return floorFor64bits(llvm::VersionTuple(5, 4));
+    } else if (Major <= 8) {
+      return floorFor64bits(llvm::VersionTuple(5, 5));
     }
   }
 

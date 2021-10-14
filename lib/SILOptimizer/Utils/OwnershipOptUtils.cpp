@@ -101,6 +101,106 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
 }
 
 //===----------------------------------------------------------------------===//
+//                      Ownership RAUW Helper Functions
+//===----------------------------------------------------------------------===//
+
+// Determine whether it is valid to replace \p oldValue with \p newValue by
+// directly checking ownership requirements. This does not determine whether the
+// scope of the newValue can be fully extended.
+bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
+                                                SILValue newValue) {
+  auto newOwnershipKind = newValue.getOwnershipKind();
+
+  // If our new kind is ValueOwnershipKind::None, then we are fine. We
+  // trivially support that. This check also ensures that we can always
+  // replace any value with a ValueOwnershipKind::None value.
+  if (newOwnershipKind == OwnershipKind::None)
+    return true;
+
+  // If our old ownership kind is ValueOwnershipKind::None and our new kind is
+  // not, we may need to do more work that has not been implemented yet. So
+  // bail.
+  //
+  // Due to our requirement that types line up, this can only occur given a
+  // non-trivial typed value with None ownership. This can only happen when
+  // oldValue is a trivial payloaded or no-payload non-trivially typed
+  // enum. That doesn't occur that often so we just bail on it today until we
+  // implement this functionality.
+  if (oldValue.getOwnershipKind() == OwnershipKind::None)
+    return false;
+
+  // First check if oldValue is SILUndef. If it is, then we know that:
+  //
+  // 1. SILUndef (and thus oldValue) must have OwnershipKind::None.
+  // 2. newValue is not OwnershipKind::None due to our check above.
+  //
+  // Thus we know that we would be replacing a value with OwnershipKind::None
+  // with a value with non-None ownership. This is a case we don't support, so
+  // we can bail now.
+  if (isa<SILUndef>(oldValue))
+    return false;
+
+  // Ok, we now know that we do not have SILUndef implying that we must be able
+  // to get a module from our value since we must have an argument or an
+  // instruction.
+  auto *m = oldValue->getModule();
+  assert(m);
+
+  // If we are in Raw SIL, just bail at this point. We do not support
+  // ownership fixups.
+  if (m->getStage() == SILStage::Raw)
+    return false;
+
+  return true;
+}
+
+// Determine whether it is valid to replace \p oldValue with \p newValue and
+// extend the lifetime of \p oldValue to cover the new uses.
+//
+// This updates the OwnershipFixupContext, populating transitiveBorrowedUses and
+// recursiveReborrows.
+static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
+                                     OwnershipFixupContext &context) {
+  if (!OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue))
+    return false;
+
+  if (oldValue.getOwnershipKind() != OwnershipKind::Guaranteed)
+    return true;
+
+  // Check that the old lifetime can be extended and record the necessary
+  // book-keeping in the OwnershipFixupContext.
+  context.clear();
+
+  // Note: The following code is the same logic as
+  // findExtendedTransitiveGuaranteedUses(), but it handles the reborrows
+  // itself to maintain book-keeping. This is intended to be moved into a
+  // different utility in a follow-up commit.
+  SmallSetVector<SILValue, 4> reborrows;
+  auto visitReborrow = [&](Operand *endScope) {
+    auto borrowingOper = BorrowingOperand(endScope);
+    assert(borrowingOper.isReborrow());
+    // TODO: if non-phi reborrows ever exist, handle them using a separate
+    // SILValue list since we don't want to refer directly to phi SILValues.
+    reborrows.insert(borrowingOper.getBorrowIntroducingUserResult().value);
+    context.recursiveReborrows.push_back(endScope);
+  };
+  if (!findTransitiveGuaranteedUses(oldValue, context.transitiveBorrowedUses,
+                                    visitReborrow))
+    return false;
+
+  for (unsigned idx = 0; idx < reborrows.size(); ++idx) {
+    bool result =
+      findTransitiveGuaranteedUses(reborrows[idx],
+                                   context.transitiveBorrowedUses,
+                                   visitReborrow);
+    // It is impossible to find a Pointer escape while traversing reborrows.
+    assert(result && "visiting reborrows always succeeds");
+    (void)result;
+  }
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 //                          BorrowedLifetimeExtender
 //===----------------------------------------------------------------------===//
 
@@ -130,7 +230,7 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
 /// extending %ownedValue's liveness to new paths and hopefully simplifies
 /// downstream optimization and debugging. Unnecessary copies could be
 /// avoided with simple dominance check if it becomes desirable to do so.
-struct BorrowedLifetimeExtender {
+class BorrowedLifetimeExtender {
   BorrowedValue borrowedValue;
 
   // Owned value currently being extended over borrowedValue.
@@ -145,6 +245,21 @@ struct BorrowedLifetimeExtender {
   /// utility and OSSA representation are stable.
   SWIFT_ASSERT_ONLY_DECL(llvm::SmallDenseSet<PhiOperand, 4> reborrowedOperands);
 
+public:
+  /// Precondition: \p borrowedValue must introduce a local borrow scope
+  /// (begin_borrow, load_borrow, & phi).
+  BorrowedLifetimeExtender(BorrowedValue borrowedValue,
+                           InstModCallbacks &callbacks)
+      : borrowedValue(borrowedValue), callbacks(callbacks) {
+    assert(borrowedValue.isLocalScope() && "expect a valid borrowed value");
+  }
+
+  /// Extend \p ownedValue over this extended borrow scope.
+  ///
+  /// Precondition: \p ownedValue dominates this borrowed value.
+  void extendOverBorrowScopeAndConsume(SILValue ownedValue);
+
+protected:
   /// Initially map the reborrowed phi to an invalid value prior to creating the
   /// owned phi.
   void discoverReborrow(PhiValue reborrowedPhi) {
@@ -182,21 +297,6 @@ struct BorrowedLifetimeExtender {
     return SILValue();
   }
 
-public:
-  /// Precondition: \p borrowedValue must introduce a local borrow scope
-  /// (begin_borrow, load_borrow, & phi).
-  BorrowedLifetimeExtender(BorrowedValue borrowedValue,
-                           InstModCallbacks &callbacks)
-      : borrowedValue(borrowedValue), callbacks(callbacks) {
-    assert(borrowedValue.isLocalScope() && "expect a valid borrowed value");
-  }
-
-  /// Extend \p ownedValue over this extended borrow scope.
-  ///
-  /// Precondition: \p ownedValue dominates this borrowed value.
-  void extendOverBorrowScopeAndConsume(SILValue ownedValue);
-
-protected:
   void analyzeExtendedScope();
 
   SILValue createCopyAtEdge(PhiOperand reborrowOper);
@@ -333,105 +433,6 @@ extendOverBorrowScopeAndConsume(SILValue ownedValue) {
 }
 
 //===----------------------------------------------------------------------===//
-//                      Ownership RAUW Helper Functions
-//===----------------------------------------------------------------------===//
-
-// Determine whether it is valid to replace \p oldValue with \p newValue by
-// directly checking ownership requirements. This does not determine whether
-// the scope of the newValue can be fully extended.
-static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue) {
-  auto newOwnershipKind = newValue.getOwnershipKind();
-
-  // If our new kind is ValueOwnershipKind::None, then we are fine. We
-  // trivially support that. This check also ensures that we can always
-  // replace any value with a ValueOwnershipKind::None value.
-  if (newOwnershipKind == OwnershipKind::None)
-    return true;
-
-  // If our old ownership kind is ValueOwnershipKind::None and our new kind is
-  // not, we may need to do more work that has not been implemented yet. So
-  // bail.
-  //
-  // Due to our requirement that types line up, this can only occur given a
-  // non-trivial typed value with None ownership. This can only happen when
-  // oldValue is a trivial payloaded or no-payload non-trivially typed
-  // enum. That doesn't occur that often so we just bail on it today until we
-  // implement this functionality.
-  if (oldValue.getOwnershipKind() == OwnershipKind::None)
-    return false;
-
-  // First check if oldValue is SILUndef. If it is, then we know that:
-  //
-  // 1. SILUndef (and thus oldValue) must have OwnershipKind::None.
-  // 2. newValue is not OwnershipKind::None due to our check above.
-  //
-  // Thus we know that we would be replacing a value with OwnershipKind::None
-  // with a value with non-None ownership. This is a case we don't support, so
-  // we can bail now.
-  if (isa<SILUndef>(oldValue))
-    return false;
-
-  // Ok, we now know that we do not have SILUndef implying that we must be able
-  // to get a module from our value since we must have an argument or an
-  // instruction.
-  auto *m = oldValue->getModule();
-  assert(m);
-
-  // If we are in Raw SIL, just bail at this point. We do not support
-  // ownership fixups.
-  if (m->getStage() == SILStage::Raw)
-    return false;
-
-  return true;
-}
-
-// Determine whether it is valid to replace \p oldValue with \p newValue and
-// extend the lifetime of \p oldValue to cover the new uses.
-//
-// This updates the OwnershipFixupContext, populating transitiveBorrowedUses and
-// recursiveReborrows.
-static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
-                                     OwnershipFixupContext &context) {
-  if (!hasValidRAUWOwnership(oldValue, newValue))
-    return false;
-
-  if (oldValue.getOwnershipKind() != OwnershipKind::Guaranteed)
-    return true;
-
-  // Check that the old lifetime can be extended and record the necessary
-  // book-keeping in the OwnershipFixupContext.
-  context.clear();
-
-  // Note: The following code is the same logic as
-  // findExtendedTransitiveGuaranteedUses(), but it handles the reborrows
-  // itself to maintain book-keeping. This is intended to be moved into a
-  // different utility in a follow-up commit.
-  SmallSetVector<SILValue, 4> reborrows;
-  auto visitReborrow = [&](Operand *endScope) {
-    auto borrowingOper = BorrowingOperand(endScope);
-    assert(borrowingOper.isReborrow());
-    // TODO: if non-phi reborrows even exist, handle them using a separate
-    // SILValue list since we don't want to refer directly to phi SILValues.
-    reborrows.insert(borrowingOper.getBorrowIntroducingUserResult().value);
-    context.recursiveReborrows.push_back(endScope);
-  };
-  if (!findTransitiveGuaranteedUses(oldValue, context.transitiveBorrowedUses,
-                                    visitReborrow))
-    return false;
-
-  for (unsigned idx = 0; idx < reborrows.size(); ++idx) {
-    bool result =
-      findTransitiveGuaranteedUses(reborrows[idx],
-                                   context.transitiveBorrowedUses,
-                                   visitReborrow);
-    // It is impossible to find a Pointer escape while traversing reborrows.
-    assert(result && "visiting reborrows always succeeds");
-    (void)result;
-  }
-  return true;
-}
-
-//===----------------------------------------------------------------------===//
 //                        Ownership Lifetime Extender
 //===----------------------------------------------------------------------===//
 
@@ -491,9 +492,14 @@ struct OwnershipLifetimeExtender {
 
 } // end anonymous namespace
 
-// Lifetime extend newValue over owned oldValue assuming that our copy will have
-// its lifetime ended by oldValue's lifetime ending uses after RAUWing by our
-// caller.
+/// Lifetime extend \p value over \p consumingPoint, assuming that \p
+/// consumingPoint will consume \p value after the client performs replacement
+/// (this implicit destruction on the caller-side makes it a "plus-one"
+/// copy). Destroy \p copy on all paths that don't reach \p consumingPoint.
+///
+/// Precondition: \p value is owned
+///
+/// Precondition: \p consumingPoint is dominated by \p value
 CopyValueInst *
 OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
                                              SILInstruction *consumingPoint) {
@@ -506,28 +512,23 @@ OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
 
   auto *result = copy;
   findJointPostDominatingSet(
-      copyPoint->getParent(), consumingPoint->getParent(),
+      copy->getParent(), consumingPoint->getParent(),
       // inputBlocksFoundDuringWalk.
       [&](SILBasicBlock *loopBlock) {
-        // This must be consumingPoint->getParent() since we only have one
-        // consuming use. In this case, we know that this is the consuming
-        // point where we will need a control equivalent copy_value (and that
-        // destroy_value will be put for the out of loop value as appropriate.
+        // Since copy dominates consumingPoint, it must be outside the
+        // loop. Otherwise backward traversal would have stopped at copyPoint.
+        //
+        // Create an extra copy when the consumingPoint is inside a loop and the
+        // original copy is outside the loop. The new copy will be consumed
+        // within the loop in the same block as the consume. The original copy
+        // will be destroyed on all paths exiting the loop.
         assert(loopBlock == consumingPoint->getParent());
         auto front = loopBlock->begin();
         SILBuilderWithScope newBuilder(front);
-
-        // Create an extra copy when the consuming point is inside a
-        // loop and both copyPoint and the destroy points are outside the
-        // loop. This copy will be consumed in the same block. The original
-        // value will be destroyed on all paths exiting the loop.
-        //
-        // Since copyPoint dominates consumingPoint, it must be outside the
-        // loop. Otherwise backward traversal would have stopped at copyPoint.
         result = newBuilder.createCopyValue(front->getLoc(), copy);
         callbacks.createdNewInst(result);
       },
-      // Input blocks in joint post dom set. We don't care about thse.
+      // Leaky blocks that never reach consumingPoint.
       [&](SILBasicBlock *postDomBlock) {
         auto front = postDomBlock->begin();
         SILBuilderWithScope newBuilder(front);
@@ -653,6 +654,9 @@ OwnershipLifetimeExtender::createPlusZeroBorrow(SILValue newValue,
   }
   assert(copy && borrow);
 
+  // We don't expect an empty useRange. If it happens, then the newly created
+  // copy will never be destroyed.
+  assert(!useRange.empty());
   auto opRange = makeUserRange(useRange);
   ValueLifetimeAnalysis lifetimeAnalysis(copy, opRange);
   ValueLifetimeAnalysis::Frontier frontier;
@@ -826,9 +830,19 @@ rewriteReborrows(SILValue newBorrowedValue,
 namespace {
 
 struct OwnershipRAUWUtility {
-  SingleValueInstruction *oldValue;
+  SILValue oldValue;
   SILValue newValue;
   OwnershipFixupContext &ctx;
+
+  // For terminator results, the consuming point is the predecessor's
+  // terminator. This avoids destroys on unused paths. It is also the
+  // instruction which will be deleted, thus needs operand cleanup.
+  SILInstruction *getConsumingPoint() const {
+    if (auto *blockArg = dyn_cast<SILPhiArgument>(oldValue))
+      return blockArg->getTerminatorForResult();
+
+    return cast<SingleValueInstruction>(oldValue);
+  }
 
   SILBasicBlock::iterator handleUnowned();
 
@@ -887,7 +901,6 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     auto extender = getLifetimeExtender();
     SILValue borrow =
         extender.createPlusZeroBorrow(newValue, oldValue->getUses());
-    SILBuilderWithScope builder(oldValue);
     return replaceAllUsesAndErase(oldValue, borrow, callbacks);
   }
   case OwnershipKind::Owned: {
@@ -917,7 +930,6 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleUnowned() {
     }
     auto extender = getLifetimeExtender();
     SILValue copy = extender.createPlusZeroCopy(newValue, oldValue->getUses());
-    SILBuilderWithScope builder(oldValue);
     auto result = replaceAllUsesAndErase(oldValue, copy, callbacks);
     return result;
   }
@@ -979,7 +991,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::handleGuaranteed() {
 
 SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
   assert(oldValue->getFunction()->hasOwnership());
-  assert(hasValidRAUWOwnership(oldValue, newValue) &&
+  assert(OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue) &&
       "Should have checked if can perform this operation before calling it?!");
   // If our new value is just none, we can pass anything to do it so just RAUW
   // and return.
@@ -987,9 +999,9 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
   // NOTE: This handles RAUWing with undef.
   if (newValue.getOwnershipKind() == OwnershipKind::None)
     return replaceAllUsesAndErase(oldValue, newValue, ctx.callbacks);
-  assert(SILValue(oldValue).getOwnershipKind() != OwnershipKind::None);
+  assert(oldValue.getOwnershipKind() != OwnershipKind::None);
 
-  switch (SILValue(oldValue).getOwnershipKind()) {
+  switch (oldValue.getOwnershipKind()) {
   case OwnershipKind::None:
     // If our old value was none and our new value is not, we need to do
     // something more complex that we do not support yet, so bail. We should
@@ -1003,13 +1015,15 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
   case OwnershipKind::Owned: {
     // If we have an owned value that we want to replace with a value with any
     // other non-None ownership, we need to copy the other value for a
-    // lifetimeEnding RAUW, then RAUW the value, and insert a destroy_value on
+    // lifetimeEnding RAUW, RAUW the value, and insert a destroy_value of
     // the original value.
     auto extender = getLifetimeExtender();
-    SILValue copy = extender.createPlusOneCopy(newValue, oldValue);
-    cleanupOperandsBeforeDeletion(oldValue, ctx.callbacks);
-    auto result = replaceAllUsesAndErase(oldValue, copy, ctx.callbacks);
-    return result;
+    auto *consumingPoint = getConsumingPoint();
+    SILValue copy = extender.createPlusOneCopy(newValue, consumingPoint);
+
+    cleanupOperandsBeforeDeletion(consumingPoint, ctx.callbacks);
+
+    return replaceAllUsesAndErase(oldValue, copy, ctx.callbacks);
   }
   case OwnershipKind::Unowned: {
     return handleUnowned();
@@ -1025,8 +1039,7 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
 SILBasicBlock::iterator
 OwnershipRAUWHelper::replaceAddressUses(SingleValueInstruction *oldValue,
                                         SILValue newValue) {
-  assert(oldValue->getType().isAddress() &&
-         oldValue->getType() == newValue->getType());
+  assert(oldValue->getType().isAddress() && newValue->getType().isAddress());
 
   // If we are replacing addresses, see if we need to handle interior pointer
   // fixups. If we don't have any extra info, then we know that we can just RAUW
@@ -1078,7 +1091,7 @@ OwnershipRAUWHelper::replaceAddressUses(SingleValueInstruction *oldValue,
 //===----------------------------------------------------------------------===//
 
 OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
-                                         SingleValueInstruction *inputOldValue,
+                                         SILValue inputOldValue,
                                          SILValue inputNewValue)
     : ctx(&inputCtx), oldValue(inputOldValue), newValue(inputNewValue) {
   // If we are already not valid, just bail.
@@ -1089,6 +1102,14 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // and leave the object valid.
   if (!oldValue->getFunction()->hasOwnership())
     return;
+
+  // This utility currently only handles erasing SingleValueInstructions and
+  // terminator results.
+  assert(isa<SingleValueInstruction>(inputOldValue)
+         || cast<SILPhiArgument>(inputOldValue)->isTerminatorResult());
+
+  // Clear the context before populating it anew.
+  ctx->clear();
 
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
@@ -1142,15 +1163,15 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
     return;
 
   ctx->extraAddressFixupInfo.base = addressOwnership.base;
+  SILValue baseAddress = ctx->extraAddressFixupInfo.base.getBaseAddress();
 
   // For now, just gather up uses
   //
   // FIXME: get rid of allAddressUsesFromOldValue. Shouldn't this already be
   // included in guaranteedUsePoints?
   auto &oldValueUses = ctx->extraAddressFixupInfo.allAddressUsesFromOldValue;
-  // FIXME: The return value of findTransitiveUsesForAddress is currently
-  // inverted.
-  if (findTransitiveUsesForAddress(oldValue, oldValueUses)) {
+  if (findTransitiveUsesForAddress(oldValue, &oldValueUses)
+      != AddressUseKind::NonEscaping) {
     invalidate();
     return;
   }
@@ -1161,7 +1182,6 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   }
   // This cloner check must match the later cloner invocation in
   // getReplacementAddress()
-  SILValue baseAddress = ctx->extraAddressFixupInfo.base.getBaseAddress();
   auto *baseInst = cast<SingleValueInstruction>(baseAddress);
   auto checkBase = [&](SILValue srcAddr) {
     return (srcAddr == baseInst) ? SILValue(baseInst) : SILValue();
@@ -1203,9 +1223,12 @@ OwnershipRAUWHelper::perform(SingleValueInstruction *maybeTransformedNewValue) {
   // Make sure to always clear our context after we transform.
   SWIFT_DEFER { ctx->clear(); };
 
-  if (oldValue->getType().isAddress())
-    return replaceAddressUses(oldValue, actualNewValue);
-
+  if (oldValue->getType().isAddress()) {
+    assert(isa<SingleValueInstruction>(oldValue)
+           && "block argument cannot be an address");
+    return replaceAddressUses(cast<SingleValueInstruction>(oldValue),
+                              actualNewValue);
+  }
   OwnershipRAUWUtility utility{oldValue, actualNewValue, *ctx};
   return utility.perform();
 }
@@ -1424,10 +1447,14 @@ OwnershipReplaceSingleUseHelper::OwnershipReplaceSingleUseHelper(
 
   // Otherwise, lets check if we can perform this RAUW operation. If we can't,
   // set ctx to nullptr to invalidate the helper and return.
-  if (!hasValidRAUWOwnership(use->get(), newValue)) {
+  if (!OwnershipRAUWHelper::hasValidRAUWOwnership(use->get(), newValue)) {
     invalidate();
     return;
   }
+
+  // FIXME: If this does not use canFixUpOwnershipForRAUW, then it needs to
+  // do the equivalent safety checks. At least ensure that the use is not a
+  // PointerEscape. But we should put that check behind a standard utility.
 
   // Then see if our use is a lifetime ending use of a guaranteed value that is
   // a reborrow.
@@ -1457,10 +1484,10 @@ SILBasicBlock::iterator OwnershipReplaceSingleUseHelper::perform() {
 //===----------------------------------------------------------------------===//
 
 /// Given a phi that has been newly created or converted from terminator
-/// results, check for inner guaranteed operands (which do not introduce a
-/// borrow scope). This is invalid OSSA because the phi is a reborrow, and all
-/// borrow-scope-ending instructions must directly use the BorrowedValue that
-/// introduces the scope.
+/// results, check if any of the phi's operands are inner guaranteed values.
+/// This is invalid OSSA because the phi is a reborrow. Like all
+/// borrow-scope-ending instructions a phi must directly use the BorrowedValue
+/// that introduces the scope.
 ///
 /// Create nested borrow scopes for its operands.
 ///
@@ -1520,7 +1547,7 @@ void GuaranteedPhiBorrowFixup::insertEndBorrowsAndFindPhis(
     return;
   }
   SmallVector<Operand *, 16> usePoints;
-  bool result = findInnerTransitiveGuaranteedUses(phi, usePoints);
+  bool result = findInnerTransitiveGuaranteedUses(phi, &usePoints);
   assert(result && "should be checked by canCloneTerminator");
   (void)result;
 
@@ -1605,5 +1632,9 @@ createExtendedNestedBorrowScope(SILPhiArgument *newPhi) {
 // assumes that this API will eventually be called for all such new phis until
 // OSSA is fully valid.
 bool swift::createBorrowScopeForPhiOperands(SILPhiArgument *newPhi) {
+  if (newPhi->getOwnershipKind() != OwnershipKind::Guaranteed
+      && newPhi->getOwnershipKind() != OwnershipKind::None) {
+      return false;
+  }
   return GuaranteedPhiBorrowFixup().createExtendedNestedBorrowScope(newPhi);
 }

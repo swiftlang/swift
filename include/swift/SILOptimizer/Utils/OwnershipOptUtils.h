@@ -104,19 +104,36 @@ private:
   }
 };
 
-/// A utility composed ontop of OwnershipFixupContext that knows how to RAUW a
+/// A utility composed on top of OwnershipFixupContext that knows how to RAUW a
 /// value or a single value instruction with a new value and then fixup
 /// ownership invariants afterwards.
 class OwnershipRAUWHelper {
+public:
+  /// Return true if \p oldValue can be replaced with \p newValue in terms of
+  /// their value ownership. This ignores any current uses of \p oldValue. To
+  /// determine whether \p oldValue can be replaced as-is with it's existing
+  /// uses, create an instance of OwnershipRAUWHelper and check its validity.
+  static bool hasValidRAUWOwnership(SILValue oldValue, SILValue newValue);
+
+private:
   OwnershipFixupContext *ctx;
-  SingleValueInstruction *oldValue;
+  SILValue oldValue;
   SILValue newValue;
 
 public:
-  OwnershipRAUWHelper() : ctx(nullptr), oldValue(nullptr), newValue(nullptr) {}
+  OwnershipRAUWHelper() : ctx(nullptr) {}
+
+  ~OwnershipRAUWHelper() { if (ctx) ctx->clear(); }
 
   /// Return an instance of this class if we can perform the specific RAUW
   /// operation ignoring if the types line up. Returns None otherwise.
+  ///
+  /// \p oldValue may be either a SingleValueInstruction or a terminator result.
+  ///
+  /// Precondition: If \p oldValue is a BorrowedValue that introduces a local
+  /// borrow scope, then \p newValue must either be defined in the same block as
+  /// \p oldValue, or it must dominate \p oldValue (rather than merely
+  /// dominating its uses).
   ///
   /// DISCUSSION: We do not check that the types line up here so that we can
   /// allow for our users to transform our new value in ways that preserve
@@ -125,8 +142,8 @@ public:
   /// from \p newValue at \p oldValue's must be forwarding. If \p newValue is an
   /// address, then these transforms can only transform the address into a
   /// derived address.
-  OwnershipRAUWHelper(OwnershipFixupContext &ctx,
-                      SingleValueInstruction *oldValue, SILValue newValue);
+  OwnershipRAUWHelper(OwnershipFixupContext &ctx, SILValue oldValue,
+                      SILValue newValue);
 
   /// Returns true if this helper was initialized into a valid state.
   operator bool() const { return isValid(); }
@@ -149,7 +166,6 @@ private:
                                              SILValue newValue);
 
   void invalidate() {
-    ctx->clear();
     ctx = nullptr;
   }
 };
@@ -157,6 +173,9 @@ private:
 /// A utility composed ontop of OwnershipFixupContext that knows how to replace
 /// a single use of a value with another value with a different ownership. We
 /// allow for the values to have different types.
+///
+/// Precondition: if \p use ends a borrow scope, then \p newValue dominates the
+/// BorrowedValue that begins the scope.
 ///
 /// NOTE: When not in OSSA, this just performs a normal set use, so this code is
 /// safe to use with all code.
@@ -176,6 +195,8 @@ public:
   /// always yield an invalid helper.
   OwnershipReplaceSingleUseHelper(OwnershipFixupContext &ctx, Operand *use,
                                   SILValue newValue);
+
+  ~OwnershipReplaceSingleUseHelper() { if (ctx) ctx->clear(); }
 
   /// Returns true if this helper was initialized into a valid state.
   operator bool() const { return isValid(); }

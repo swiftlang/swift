@@ -1981,3 +1981,37 @@ bb0 (%0 : $*X):
   return %2 : $()
 }
 
+// CHECK-LABEL: CG of test_localval_ossarefcountinsts
+// CHECK:   Val [ref] %0 Esc: , Succ: (%0.1)
+// CHECK:   Con [int] %0.1 Esc: %2, Succ: (%0.2)
+// CHECK:   Con [ref] %0.2 Esc: %2, Succ:
+// CHECK:   Val [ref] %1 Esc: , Succ: %0
+// CHECK: End
+// CHECK: MayEscape:   %0 = alloc_ref $X
+// CHECK:  to   destroy_value %1 : $X
+// CHECK: MayEscape:   %1 = copy_value %0 : $X
+// CHECK:  to   destroy_value %1 : $X
+sil [ossa] @test_localval_ossarefcountinsts : $@convention(thin) () -> () {
+bb0:
+  %o1 = alloc_ref $X
+  %copy = copy_value %o1 : $X
+  destroy_value %copy : $X
+  dealloc_ref %o1 : $X
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: CG of test_localval_borrowinsts
+// CHECK:   Val [ref] %0 Esc: , Succ:
+// CHECK:   Val [ref] %1 Esc: , Succ: %0
+// CHECK: End
+sil [ossa] @test_localval_borrowinsts : $@convention(thin) () -> () {
+bb0:
+  %o1 = alloc_ref $X
+  %borrow = begin_borrow %o1 : $X
+  end_borrow %borrow : $X
+  dealloc_ref %o1 : $X
+  %2 = tuple()
+  return %2 : $()
+}
+
