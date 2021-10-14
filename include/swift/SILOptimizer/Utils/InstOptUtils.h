@@ -647,10 +647,32 @@ FullApplySite cloneFullApplySiteReplacingCallee(FullApplySite applySite,
                                                 SILValue newCallee,
                                                 SILBuilderContext &builderCtx);
 
+/// Replace all uses of \p oldValue with \p newValue, notifying the callbacks
+/// of new uses and when end-of-scope instructions are deleted.
+SILBasicBlock::iterator replaceAllUses(SILValue oldValue, SILValue newValue,
+                                       SILBasicBlock::iterator nextii,
+                                       InstModCallbacks &callbacks);
+
 /// This is a low level routine that makes all uses of \p svi uses of \p
 /// newValue (ignoring end scope markers) and then deletes \p svi and all end
 /// scope markers. Then returns the next inst to process.
 SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
+                                               SILValue newValue,
+                                               InstModCallbacks &callbacks);
+
+/// Replace all uses of \p oldValue with \p newValue, delete the instruction
+/// that defines \p oldValue, and notify the callbacks of new uses and when
+/// the defining instruction and its end-of-scope instructions are deleted.
+///
+/// Precondition: \p oldValue must be a SingleValueInstruction or a terminator
+/// result. \p oldValue must be the only result with remaining uses. For
+/// terminators with multiple results, remove all other results for, e.g. via
+/// replaceAllUsesWithUndef().
+///
+/// If \p oldValue is a terminator result, a new branch instruction is inserted
+/// in place of the old terminator and all basic block successors become
+/// unreachable except for the successor containing the replaced result.
+SILBasicBlock::iterator replaceAllUsesAndErase(SILValue oldValue,
                                                SILValue newValue,
                                                InstModCallbacks &callbacks);
 
