@@ -1216,7 +1216,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
   // Lookup into a type.
   if (auto moduleType = parentType->getAs<ModuleType>()) {
     diags.diagnose(comp->getNameLoc(), diag::no_module_type,
-                   comp->getNameRef(), moduleType->getModule()->getName());
+                   comp->getNameRef(), moduleType->getModule()->getNameForDiags());
   } else {
     LookupResult memberLookup;
     // Let's try to look any member of the parent type with the given name,
@@ -1459,7 +1459,7 @@ static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
   auto &diags = ctx.Diags;
   if (auto moduleTy = baseTy->getAs<ModuleType>()) {
     diags.diagnose(nameLoc, diag::ambiguous_module_type, name,
-                   moduleTy->getModule()->getName())
+                   moduleTy->getModule()->getNameForDiags())
       .highlight(baseRange);
   } else {
     diags.diagnose(nameLoc, diag::ambiguous_member_type, name, baseTy)
@@ -3434,7 +3434,7 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
       return moduleTy;
     // Otherwise, emit an error.
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      auto moduleName = moduleTy->getModule()->getName();
+      auto moduleName = moduleTy->getModule()->getNameForDiags();
       diagnose(Components.back()->getNameLoc(),
                diag::cannot_find_type_in_scope, DeclNameRef(moduleName));
       diagnose(Components.back()->getNameLoc(),

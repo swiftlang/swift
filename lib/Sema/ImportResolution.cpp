@@ -725,7 +725,7 @@ CheckInconsistentImplementationOnlyImportsRequest::evaluate(
     {
       InFlightDiagnostic warning =
           diags.diagnose(normalImport, diag::warn_implementation_only_conflict,
-                         normalImport->getModule()->getName());
+                         normalImport->getModule()->getNameForDiags());
       if (normalImport->getAttrs().isEmpty()) {
         // Only try to add a fix-it if there's no other annotations on the
         // import to avoid creating things like

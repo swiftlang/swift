@@ -3634,7 +3634,7 @@ bool MissingMemberFailure::diagnoseAsError() {
     }
   } else if (auto moduleTy = baseType->getAs<ModuleType>()) {
     emitDiagnosticAt(::getLoc(memberBase), diag::no_member_of_module,
-                     moduleTy->getModule()->getName(), getName())
+                     moduleTy->getModule()->getNameForDiags(), getName())
         .highlight(getSourceRange())
         .highlight(nameLoc.getSourceRange());
     return true;

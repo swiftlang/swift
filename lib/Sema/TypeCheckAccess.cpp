@@ -1864,7 +1864,7 @@ public:
     auto diag =
         DE.diagnose(diagLoc, diag::decl_from_hidden_module,
                     PGD->getDescriptiveKind(), PGD->getName(),
-                    static_cast<unsigned>(ExportabilityReason::General), M->getName(),
+                    static_cast<unsigned>(ExportabilityReason::General), M->getNameForDiags(),
                     static_cast<unsigned>(DisallowedOriginKind::ImplementationOnly)
                     );
     if (refRange.isValid())

@@ -366,6 +366,11 @@ public:
   /// If no module aliasing is set, it will return getName(), i.e. Foo.
   Identifier getRealName() const;
 
+  /// Used for diagnostics. In case module aliasing is used, the alias which appears in source files
+  /// could be different from the actual name of this module. This returns the alias to be consistent
+  /// with what's written in source files.
+  Identifier getNameForDiags() const;
+
   /// User-defined module version number.
   llvm::VersionTuple UserModuleVersion;
   void setUserModuleVersion(llvm::VersionTuple UserVer) {

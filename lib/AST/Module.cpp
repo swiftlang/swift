@@ -1568,6 +1568,13 @@ Identifier ModuleDecl::getRealName() const {
   return getASTContext().getRealModuleName(getName());
 }
 
+Identifier ModuleDecl::getNameForDiags() const {
+  if (!ModuleAlias.empty()) {
+    return ModuleAlias;
+  }
+  return getName();
+}
+
 Identifier ModuleDecl::getABIName() const {
   if (!ModuleABIName.empty())
     return ModuleABIName;
