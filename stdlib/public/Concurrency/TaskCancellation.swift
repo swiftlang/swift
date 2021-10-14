@@ -50,14 +50,8 @@ extension Task {
   /// There is no way to uncancel a task.
   ///
   /// - SeeAlso: `checkCancellation()`
-  public var isCancelled: Bool {
-    withUnsafeCurrentTask { task in
-      guard let task = task else {
-        return false
-      }
-
-      return _taskIsCancelled(task._task)
-    }
+  @_transparent public var isCancelled: Bool {
+    _taskIsCancelled(_task)
   }
 }
 
