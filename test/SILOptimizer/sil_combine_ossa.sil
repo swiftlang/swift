@@ -1,6 +1,8 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -generic-specializer | %FileCheck %s  --check-prefix=CHECK_FORWARDING_OWNERSHIP_KIND
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -enable-copy-propagation
+//
+// FIXME: check copy-propagation output instead once it is the default mode
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -enable-copy-propagation | %FileCheck %s --check-prefix=CHECK_COPYPROP
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -5154,4 +5156,66 @@ bb0(%0 : $Builtin.Int64, %1 : @owned $MyContiguousArrayStorage):
   destroy_value %2 : $MyContiguousArray
   %10 = tuple ()
   return %10 : $()
+}
+
+// Test Ownership RAUW when the replacement address requires an additional unchecked_addr_cast.
+//
+//
+// CHECK-LABEL: sil [ossa] @testAddrCast : $@convention(thin) (UnsafePointer<AnyObject>) -> @owned Optional<AnyObject> {
+// CHECK: bb0(%0 : $UnsafePointer<AnyObject>):
+// CHECK:   [[A1:%.*]] = index_addr %{{.*}} : $*AnyObject, undef : $Builtin.Word
+// CHECK:   [[A2:%.*]] = unchecked_addr_cast [[A1]] : $*AnyObject to $*Optional<AnyObject>
+// CHECK:   load [copy] [[A2]] : $*Optional<AnyObject>
+// CHECK-LABEL: } // end sil function 'testAddrCast'
+sil [ossa] @testAddrCast : $@convention(thin) (UnsafePointer<AnyObject>) -> @owned Optional<AnyObject> {
+bb0(%0 : $UnsafePointer<AnyObject>):
+  %1 = struct_extract %0 : $UnsafePointer<AnyObject>, #UnsafePointer._rawValue
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*AnyObject
+  %3 = index_addr %2 : $*AnyObject, undef : $Builtin.Word
+  %4 = address_to_pointer %3 : $*AnyObject to $Builtin.RawPointer
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Optional<AnyObject>
+  %6 = load [copy] %5 : $*Optional<AnyObject>
+  return %6 : $Optional<AnyObject>
+}
+
+// CHECK-LABEL: sil [ossa] @test_pointer_to_address : $@convention(thin) (@owned Klass, Builtin.Word) -> @owned AnyObject {
+// CHECK: bb0(%0 : @owned $Klass, %1 : $Builtin.Word):
+// CHECK:   [[CP1:%.*]] = copy_value %0 : $Klass
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[CP1]] : $Klass
+// CHECK:   ref_tail_addr [[BORROW]] : $Klass, $AnyObject
+// CHECK:   index_addr %{{.*}} : $*AnyObject, %1 : $Builtin.Word
+// CHECK:   index_addr %{{.*}} : $*AnyObject, %1 : $Builtin.Word
+// CHECK:   load [copy] %{{.*}} : $*AnyObject
+// CHECK:   end_borrow [[BORROW]] : $Klass
+// CHECK:   destroy_value [[CP1]] : $Klass
+// CHECK:   fix_lifetime %0 : $Klass
+// CHECK-LABEL: } // end sil function 'test_pointer_to_address'
+//
+// CHECK_COPYPROP-LABEL: sil [ossa] @test_pointer_to_address : $@convention(thin) (@owned Klass, Builtin.Word) -> @owned AnyObject {
+// CHECK_COPYPROP: bb0(%0 : @owned $Klass, %1 : $Builtin.Word):
+// CHECK_COPYPROP-NOT: copy_value
+// CHECK_COPYPROP:   [[BORROW:%.*]] = begin_borrow %0 : $Klass
+// CHECK_COPYPROP:   ref_tail_addr [[BORROW]] : $Klass, $AnyObject
+// CHECK_COPYPROP:   index_addr %{{.*}} : $*AnyObject, %1 : $Builtin.Word
+// CHECK_COPYPROP:   index_addr %{{.*}} : $*AnyObject, %1 : $Builtin.Word
+// CHECK_COPYPROP:   load [copy] %{{.*}} : $*AnyObject
+// CHECK_COPYPROP:   end_borrow [[BORROW]] : $Klass
+// CHECK_COPYPROP:   fix_lifetime %0 : $Klass
+// CHECK_COPYPROP:   destroy_value %0 : $Klass
+// CHECK_COPYPROP-LABEL: } // end sil function 'test_pointer_to_address'
+sil [ossa] @test_pointer_to_address : $@convention(thin) (@owned Klass, Builtin.Word) -> @owned AnyObject {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Word):
+  %2 = begin_borrow %0 : $Klass
+  %3 = ref_tail_addr %2 : $Klass, $AnyObject
+  %4 = index_addr %3 : $*AnyObject, %1 : $Builtin.Word
+  %5 = address_to_pointer %4 : $*AnyObject to $Builtin.RawPointer
+  end_borrow %2 : $Klass
+  %7 = pointer_to_address %5 : $Builtin.RawPointer to [strict] $*AnyObject
+  %8 = index_addr %7 : $*AnyObject, %1 : $Builtin.Word
+  %9 = address_to_pointer %8 : $*AnyObject to $Builtin.RawPointer
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*AnyObject
+  %11 = load [copy] %10 : $*AnyObject
+  fix_lifetime %0 : $Klass
+  destroy_value %0 : $Klass
+  return %11 : $AnyObject
 }
