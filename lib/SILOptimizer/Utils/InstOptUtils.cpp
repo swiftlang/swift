@@ -1925,15 +1925,19 @@ swift::cloneFullApplySiteReplacingCallee(FullApplySite applySite,
   llvm_unreachable("Unhandled case?!");
 }
 
-SILBasicBlock::iterator
-swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
-                              InstModCallbacks &callbacks) {
-  assert(svi != newValue && "Cannot RAUW a value with itself");
-  SILBasicBlock::iterator nextii = std::next(svi->getIterator());
-
-  // Only SingleValueInstructions are currently simplified.
-  while (!svi->use_empty()) {
-    Operand *use = *svi->use_begin();
+// FIXME: For any situation where this may be called on an unbounded number of
+// uses, it should perform a single callback invocation to notify the client
+// that newValue has new uses rather than a callback for every new use.
+//
+// FIXME: This should almost certainly replace end_lifetime uses rather than
+// deleting them.
+SILBasicBlock::iterator swift::replaceAllUses(SILValue oldValue,
+                                              SILValue newValue,
+                                              SILBasicBlock::iterator nextii,
+                                              InstModCallbacks &callbacks) {
+  assert(oldValue != newValue && "Cannot RAUW a value with itself");
+  while (!oldValue->use_empty()) {
+    Operand *use = *oldValue->use_begin();
     SILInstruction *user = use->getUser();
     // Erase the end of scope marker.
     if (isEndOfScopeMarker(user)) {
@@ -1944,10 +1948,60 @@ swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
     }
     callbacks.setUseValue(use, newValue);
   }
+  return nextii;
+}
+
+SILBasicBlock::iterator
+swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
+                              InstModCallbacks &callbacks) {
+  SILBasicBlock::iterator nextii = replaceAllUses(
+      svi, newValue, std::next(svi->getIterator()), callbacks);
 
   callbacks.deleteInst(svi);
 
   return nextii;
+}
+
+SILBasicBlock::iterator
+swift::replaceAllUsesAndErase(SILValue oldValue, SILValue newValue,
+                              InstModCallbacks &callbacks) {
+  auto *blockArg = dyn_cast<SILPhiArgument>(oldValue);
+  if (!blockArg) {
+    // SingleValueInstruction SSA replacement.
+    return replaceAllUsesAndErase(cast<SingleValueInstruction>(oldValue),
+                                  newValue, callbacks);
+  }
+  llvm_unreachable("Untested");
+#if 0 // FIXME: to be enabled in a following commit
+  TermInst *oldTerm = blockArg->getTerminatorForResult();
+  assert(oldTerm && "can only replace and erase terminators, not phis");
+
+  // Before:
+  //     oldTerm bb1, bb2
+  //   bb1(%oldValue):
+  //     use %oldValue
+  //   bb2:
+  //
+  // After:
+  //     br bb1
+  //   bb1:
+  //     use %newValue
+  //   bb2:
+
+  auto nextii = replaceAllUses(blockArg, newValue,
+                               oldTerm->getParent()->end(), callbacks);
+  // Now that oldValue is replaced, the terminator should have no uses
+  // left. The caller should have removed uses from other results.
+  for (auto *succBB : oldTerm->getSuccessorBlocks()) {
+    assert(succBB->getNumArguments() == 1 && "expected terminator result");
+    succBB->eraseArgument(0);
+  }
+  auto *newBr = SILBuilderWithScope(oldTerm).createBranch(
+    oldTerm->getLoc(), blockArg->getParent());
+  callbacks.createdNewInst(newBr);
+  callbacks.deleteInst(oldTerm);
+  return nextii;
+#endif
 }
 
 /// Given that we are going to replace use's underlying value, if the use is a

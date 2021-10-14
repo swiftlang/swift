@@ -207,7 +207,7 @@ KNOWN_SETTINGS=(
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
     sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
-    swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Apple platfors, 0 otherwise"
+    swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Darwin platforms, 0 otherwise"
     swift-enable-compatibility-overrides          "1"               "whether to support back-deploying compatibility fixes for newer apps running on older runtimes"
     swift-enable-reflection                       "1"               "whether to support reflection and mirrors"
     swift-stdlib-has-dladdr                       "1"               "whether to build stdlib assuming the runtime environment provides dladdr API"
@@ -215,6 +215,7 @@ KNOWN_SETTINGS=(
     swift-runtime-static-image-inspection         "0"               "whether to build stdlib assuming the runtime environment only supports a single runtime image with Swift code"
     swift-stdlib-single-threaded-runtime          "0"               "whether to build stdlib as a single-threaded runtime only"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
+    swift-stdlib-has-commandline                  "1"               "whether to build stdlib with the CommandLine enum and support for argv/argc"
     swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
     swift-stdlib-has-darwin-libmalloc             "1"               "whether the Darwin build of stdlib can use extended libmalloc APIs"
     swift-stdlib-has-asl                          ""                "whether the stdlib can use the asl_log API, defaults to true on Darwin, false otherwise"
@@ -2009,6 +2010,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_HAS_DLADDR:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DLADDR}")
                     -DSWIFT_RUNTIME_STATIC_IMAGE_INSPECTION:BOOL=$(true_false "${SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION}")
                     -DSWIFT_STDLIB_OS_VERSIONING:BOOL=$(true_false "${SWIFT_STDLIB_OS_VERSIONING}")
+                    -DSWIFT_STDLIB_HAS_COMMANDLINE:BOOL=$(true_false "${SWIFT_STDLIB_HAS_COMMANDLINE}")
                     -DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC:BOOL=$(true_false "${SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC}")
                     -DSWIFT_STDLIB_HAS_STDIN:BOOL=$(true_false "${SWIFT_STDLIB_HAS_STDIN}")
                     -DSWIFT_STDLIB_HAS_ENVIRON:BOOL=$(true_false "${SWIFT_STDLIB_HAS_ENVIRON}")
@@ -2091,10 +2093,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${SWIFT_OBJC_INTEROP}" == "0" ]] ; then
+                if [[ "${SWIFT_OBJC_INTEROP}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DSWIFT_DISABLE_OBJC_INTEROP:BOOL=True
+                        -DSWIFT_STDLIB_ENABLE_OBJC_INTEROP:BOOL=$(true_false "${SWIFT_OBJC_INTEROP}")
                     )
                 fi
 

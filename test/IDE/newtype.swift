@@ -128,9 +128,9 @@
 // PRINT-NEXT:  func takeMyABIOldTypeNonNullNS(_: String)
 //
 // PRINT-NEXT:  struct NSSomeContext {
-// PRINT-NEXT:    var i: Int32
 // PRINT-NEXT:    init()
 // PRINT-NEXT:    init(i: Int32)
+// PRINT-NEXT:    var i: Int32
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSSomeContext {
 // PRINT-NEXT:    struct Name : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
