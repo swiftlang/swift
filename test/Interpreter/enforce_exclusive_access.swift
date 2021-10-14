@@ -5,6 +5,8 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
+// UNSUPPORTED: use_os_stdlib
+
 // Tests for traps at run time when enforcing exclusive access.
 
 import StdlibUnittest
