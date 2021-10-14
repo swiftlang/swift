@@ -22,6 +22,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
@@ -33,6 +34,31 @@ inline bool requiresOSSACleanup(SILValue v) {
     && v.getOwnershipKind() != OwnershipKind::None
     && v.getOwnershipKind() != OwnershipKind::Unowned;
 }
+
+/// Rewrite the lifetime of \p ownedValue to match \p lifetimeBoundary. This may
+/// insert copies at forwarding consumes, including phis.
+///
+/// Precondition: lifetimeBoundary is dominated by ownedValue.
+///
+/// Precondition: lifetimeBoundary is a superset of ownedValue's current
+/// lifetime (therefore, none of the safety checks done during
+/// CanonicalizeOSSALifetime are needed here).
+void extendOwnedLifetime(SILValue ownedValue,
+                         PrunedLivenessBoundary &lifetimeBoundary,
+                         InstructionDeleter &deleter);
+
+/// Rewrite the local borrow scope introduced by \p beginBorrow to match \p
+/// guaranteedBoundary.
+///
+/// Precondition: guaranteedBoundary is dominated by beginBorrow which has no
+/// reborrows.
+///
+/// Precondition: guaranteedBoundary is a superset of beginBorrow's current
+/// scope (therefore, none of the safety checks done during
+/// CanonicalizeBorrowScope are needed here).
+void extendLocalBorrow(BeginBorrowInst *beginBorrow,
+                       PrunedLivenessBoundary &guaranteedBoundary,
+                       InstructionDeleter &deleter);
 
 /// Given a new phi that may use a guaranteed value, create nested borrow scopes
 /// for its incoming operands and end_borrows that cover the phi's extended
@@ -46,6 +72,73 @@ inline bool requiresOSSACleanup(SILValue v) {
 /// Note: This may be called on partially invalid OSSA form, where multiple
 /// newly created phis do not yet have a borrow scope.
 bool createBorrowScopeForPhiOperands(SILPhiArgument *newPhi);
+
+//===----------------------------------------------------------------------===//
+//                        GuaranteedOwnershipExtension
+//===----------------------------------------------------------------------===//
+
+/// Extend existing guaranteed ownership to cover new guaranteeed uses that are
+/// dominated by the borrow introducer.
+class GuaranteedOwnershipExtension {
+  // --- context
+  InstructionDeleter &deleter;
+  DeadEndBlocks &deBlocks;
+
+  // --- analysis state
+  PrunedLiveness guaranteedLiveness;
+  PrunedLiveness ownedLifetime;
+  SmallVector<SILBasicBlock *, 4> ownedConsumeBlocks;
+  BeginBorrowInst *beginBorrow = nullptr;
+
+public:
+  GuaranteedOwnershipExtension(InstructionDeleter &deleter,
+                               DeadEndBlocks &deBlocks)
+      : deleter(deleter), deBlocks(deBlocks) {}
+
+  void clear() {
+    guaranteedLiveness.clear();
+    ownedLifetime.clear();
+    ownedConsumeBlocks.clear();
+    beginBorrow = nullptr;
+  }
+
+  /// Invalid indicates that the current guaranteed scope is insufficient, and
+  /// it does not meet the precondition for scope extension.
+  ///
+  /// Valid indicates that the current guaranteed scope is sufficient with no
+  /// transformation required.
+  ///
+  /// ExtendBorrow indicates that the local borrow scope can be extended without
+  /// affecting the owned lifetime or introducing copies.
+  ///
+  /// ExtendLifetime indicates that the owned lifetime can be extended possibly
+  /// requiring additional copies.
+  enum Status { Invalid, Valid, ExtendBorrow, ExtendLifetime };
+
+  /// Can the OSSA ownership of the \p parentAddress cover all uses of the \p
+  /// childAddress?
+  ///
+  /// Precondition: \p parentAddress dominates \p childAddress
+  Status checkAddressOwnership(SILValue parentAddress, SILValue childAddress);
+
+  /// Can the OSSA scope of \p borrow cover all \p newUses?
+  ///
+  /// Precondition: \p borrow dominates \p newUses
+  Status checkBorrowExtension(BorrowedValue borrow,
+                              ArrayRef<Operand *> newUses);
+
+  /// Can the OSSA scope of \p ownedValue cover all the guaranteed \p newUses?
+  ///
+  /// Precondition: \p ownedValue dominates \p newUses
+  Status checkLifetimeExtension(SILValue ownedValue,
+                                ArrayRef<Operand *> newUses);
+
+  void transform(Status status);
+};
+
+//===----------------------------------------------------------------------===//
+//                      RAUW - Replace All Uses With...
+//===----------------------------------------------------------------------===//
 
 /// A struct that contains context shared in between different operation +
 /// "ownership fixup" utilities. Please do not put actual methods on this, it is
