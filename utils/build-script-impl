@@ -203,7 +203,7 @@ KNOWN_SETTINGS=(
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
     sil-verify-all                                "0"               "If enabled, run the SIL verifier after each transform when building Swift files during this build process"
     stdlib-deployment-targets                     ""                "space-separated list of targets to configure the Swift standard library to be compiled or cross-compiled for"
-    swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Apple platfors, 0 otherwise"
+    swift-objc-interop                            ""                "whether to enable interoperability with Objective-C, default is 1 on Darwin platforms, 0 otherwise"
     swift-enable-compatibility-overrides          "1"               "whether to support back-deploying compatibility fixes for newer apps running on older runtimes"
     swift-enable-reflection                       "1"               "whether to support reflection and mirrors"
     swift-stdlib-has-dladdr                       "1"               "whether to build stdlib assuming the runtime environment provides dladdr API"
@@ -2074,10 +2074,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${SWIFT_OBJC_INTEROP}" == "0" ]] ; then
+                if [[ "${SWIFT_OBJC_INTEROP}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DSWIFT_DISABLE_OBJC_INTEROP:BOOL=True
+                        -DSWIFT_STDLIB_ENABLE_OBJC_INTEROP:BOOL=$(true_false "${SWIFT_OBJC_INTEROP}")
                     )
                 fi
 

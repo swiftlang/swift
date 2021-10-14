@@ -498,7 +498,7 @@ function(_compile_swift_files
     list(APPEND swift_flags "-warn-swift3-objc-inference-complete")
   endif()
 
-  if(SWIFT_DISABLE_OBJC_INTEROP)
+  if(NOT SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
     list(APPEND swift_flags "-Xfrontend" "-disable-objc-interop")
   endif()
 
