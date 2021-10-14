@@ -4230,10 +4230,25 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
 
   for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
     auto &overload = diff.overloads[i];
+    auto *locator = overload.locator;
+
+    Expr *anchor = nullptr;
+
+    // Simplification of member locator would produce a base expression,
+    // this is what we want for diagnostics but not for comparisons here
+    // because base expression is located at a different depth which would
+    // lead to incorrect results if both reference and base expression are
+    // ambiguous e.g. `test[x].count` if both `[x]` and `count` are ambiguous
+    // than simplification of `count` would produce `[x]` which is incorrect.
+    if (locator->isLastElement<LocatorPathElt::Member>() ||
+        locator->isLastElement<LocatorPathElt::ConstructorMember>()) {
+      anchor = getAsExpr(locator->getAnchor());
+    } else {
+      anchor = getAsExpr(simplifyLocatorToAnchor(overload.locator));
+    }
 
     // If we can't resolve the locator to an anchor expression with no path,
     // we can't diagnose this well.
-    auto *anchor = getAsExpr(simplifyLocatorToAnchor(overload.locator));
     if (!anchor)
       continue;
 
