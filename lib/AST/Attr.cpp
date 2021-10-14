@@ -874,6 +874,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_ReferenceOwnership:
   case DAK_Effects:
   case DAK_Optimize:
+  case DAK_NonSendable:
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName(), Options);
     } else if (Options.IsForSwiftInterface && getKind() == DAK_ResultBuilder) {
@@ -1225,6 +1226,15 @@ StringRef DeclAttribute::getAttrName() const {
       return "inline(__always)";
     }
     llvm_unreachable("Invalid inline kind");
+  }
+  case DAK_NonSendable: {
+    switch (cast<NonSendableAttr>(this)->Specificity) {
+    case NonSendableKind::Specific:
+      return "_nonSendable";
+    case NonSendableKind::Assumed:
+      return "_nonSendable(_assumed)";
+    }
+    llvm_unreachable("Invalid nonSendable kind");
   }
   case DAK_Optimize: {
     switch (cast<OptimizeAttr>(this)->getMode()) {

@@ -4404,6 +4404,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::NonSendable_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::NonSendableDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) NonSendableAttr((NonSendableKind)kind);
+        break;
+      }
+
       case decls_block::Optimize_DECL_ATTR: {
         unsigned kind;
         serialization::decls_block::OptimizeDeclAttrLayout::readRecord(
