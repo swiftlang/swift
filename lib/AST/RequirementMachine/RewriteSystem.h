@@ -509,6 +509,11 @@ public:
 
   void verifyHomotopyGenerators() const;
 
+  void verifyRedundantConformances(
+      llvm::DenseSet<unsigned> redundantConformances) const;
+
+  void verifyMinimizedRules() const;
+
   //////////////////////////////////////////////////////////////////////////////
   ///
   /// Generating conformances

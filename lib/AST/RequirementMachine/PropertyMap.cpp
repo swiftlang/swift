@@ -129,53 +129,6 @@ void PropertyBag::dump(llvm::raw_ostream &out) const {
   out << " }";
 }
 
-/// Concrete type terms are written in terms of generic parameter types that
-/// have a depth of 0, and an index into an array of substitution terms.
-///
-/// See RewriteSystemBuilder::getConcreteSubstitutionSchema().
-static unsigned getGenericParamIndex(Type type) {
-  auto *paramTy = type->castTo<GenericTypeParamType>();
-  assert(paramTy->getDepth() == 0);
-  return paramTy->getIndex();
-}
-
-/// Reverses the transformation performed by
-/// RewriteSystemBuilder::getConcreteSubstitutionSchema().
-static Type getTypeFromSubstitutionSchema(Type schema,
-                                          ArrayRef<Term> substitutions,
-                              TypeArrayView<GenericTypeParamType> genericParams,
-                                          const MutableTerm &prefix,
-                                          const ProtocolGraph &protos,
-                                          RewriteContext &ctx) {
-  assert(!schema->isTypeParameter() && "Must have a concrete type here");
-
-  if (!schema->hasTypeParameter())
-    return schema;
-
-  return schema.transformRec([&](Type t) -> Optional<Type> {
-    if (t->is<GenericTypeParamType>()) {
-      auto index = getGenericParamIndex(t);
-      auto substitution = substitutions[index];
-
-      // Prepend the prefix of the lookup key to the substitution.
-      if (prefix.empty()) {
-        // Skip creation of a new MutableTerm in the case where the
-        // prefix is empty.
-        return ctx.getTypeForTerm(substitution, genericParams, protos);
-      } else {
-        // Otherwise build a new term by appending the substitution
-        // to the prefix.
-        MutableTerm result(prefix);
-        result.append(substitution);
-        return ctx.getTypeForTerm(result, genericParams, protos);
-      }
-    }
-
-    assert(!t->isTypeParameter());
-    return None;
-  });
-}
-
 /// Given a term \p lookupTerm whose suffix must equal this property bag's
 /// key, return a new term with that suffix stripped off. Will be empty if
 /// \p lookupTerm exactly equals the key.
@@ -205,10 +158,10 @@ Type PropertyBag::getSuperclassBound(
     const ProtocolGraph &protos,
     RewriteContext &ctx) const {
   MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
-  return getTypeFromSubstitutionSchema(Superclass->getSuperclass(),
-                                       Superclass->getSubstitutions(),
-                                       genericParams, prefix,
-                                       protos, ctx);
+  return ctx.getTypeFromSubstitutionSchema(Superclass->getSuperclass(),
+                                           Superclass->getSubstitutions(),
+                                           genericParams, prefix,
+                                           protos);
 }
 
 /// Get the concrete type of the term represented by this property bag.
@@ -226,70 +179,10 @@ Type PropertyBag::getConcreteType(
     const ProtocolGraph &protos,
     RewriteContext &ctx) const {
   MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
-  return getTypeFromSubstitutionSchema(ConcreteType->getConcreteType(),
-                                       ConcreteType->getSubstitutions(),
-                                       genericParams, prefix,
-                                       protos, ctx);
-}
-
-/// Computes the term corresponding to a member type access on a substitution.
-///
-/// The type witness is a type parameter of the form τ_0_n.X.Y.Z,
-/// where 'n' is an index into the substitution array.
-///
-/// If the nth entry in the array is S, this will produce S.X.Y.Z.
-///
-/// There is a special behavior if the substitution is a term consisting of a
-/// single protocol symbol [P]. If the innermost associated type in
-/// \p typeWitness is [Q:Foo], the result will be [P:Foo], not [P].[Q:Foo] or
-/// [Q:Foo].
-static MutableTerm getRelativeTermForType(CanType typeWitness,
-                                          ArrayRef<Term> substitutions,
-                                          RewriteContext &ctx) {
-  MutableTerm result;
-
-  // Get the substitution S corresponding to τ_0_n.
-  unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
-  result = MutableTerm(substitutions[index]);
-
-  // If the substitution is a term consisting of a single protocol symbol
-  // [P], save P for later.
-  const ProtocolDecl *proto = nullptr;
-  if (result.size() == 1 &&
-      result[0].getKind() == Symbol::Kind::Protocol) {
-    proto = result[0].getProtocol();
-  }
-
-  // Collect zero or more member type names in reverse order.
-  SmallVector<Symbol, 3> symbols;
-  while (auto memberType = dyn_cast<DependentMemberType>(typeWitness)) {
-    typeWitness = memberType.getBase();
-
-    auto *assocType = memberType->getAssocType();
-    assert(assocType != nullptr &&
-           "Conformance checking should not produce unresolved member types");
-
-    // If the substitution is a term consisting of a single protocol symbol [P],
-    // produce [P:Foo] instead of [P].[Q:Foo] or [Q:Foo].
-    const auto *thisProto = assocType->getProtocol();
-    if (proto && isa<GenericTypeParamType>(typeWitness)) {
-      thisProto = proto;
-
-      assert(result.size() == 1);
-      assert(result[0].getKind() == Symbol::Kind::Protocol);
-      assert(result[0].getProtocol() == proto);
-      result = MutableTerm();
-    }
-
-    symbols.push_back(Symbol::forAssociatedType(thisProto,
-                                                assocType->getName(), ctx));
-  }
-
-  // Add the member type names.
-  for (auto iter = symbols.rbegin(), end = symbols.rend(); iter != end; ++iter)
-    result.add(*iter);
-
-  return result;
+  return ctx.getTypeFromSubstitutionSchema(ConcreteType->getConcreteType(),
+                                           ConcreteType->getSubstitutions(),
+                                           genericParams, prefix,
+                                           protos);
 }
 
 /// This method takes a concrete type that was derived from a concrete type
@@ -327,7 +220,7 @@ remapConcreteSubstitutionSchema(CanType concreteType,
       if (!t->isTypeParameter())
         return None;
 
-      auto term = getRelativeTermForType(CanType(t), substitutions, ctx);
+      auto term = ctx.getRelativeTermForType(CanType(t), substitutions);
 
       unsigned newIndex = result.size();
       result.push_back(Term::get(term, ctx));
@@ -368,10 +261,10 @@ namespace {
 
       if (firstAbstract && secondAbstract) {
         // Both sides are type parameters; add a same-type requirement.
-        auto lhsTerm = getRelativeTermForType(CanType(firstType),
-                                              lhsSubstitutions, ctx);
-        auto rhsTerm = getRelativeTermForType(CanType(secondType),
-                                              rhsSubstitutions, ctx);
+        auto lhsTerm = ctx.getRelativeTermForType(CanType(firstType),
+                                                  lhsSubstitutions);
+        auto rhsTerm = ctx.getRelativeTermForType(CanType(secondType),
+                                                  rhsSubstitutions);
         if (lhsTerm != rhsTerm) {
           if (debug) {
             llvm::dbgs() << "%% Induced rule " << lhsTerm
@@ -385,8 +278,8 @@ namespace {
       if (firstAbstract && !secondAbstract) {
         // A type parameter is equated with a concrete type; add a concrete
         // type requirement.
-        auto subjectTerm = getRelativeTermForType(CanType(firstType),
-                                                  lhsSubstitutions, ctx);
+        auto subjectTerm = ctx.getRelativeTermForType(CanType(firstType),
+                                                      lhsSubstitutions);
 
         SmallVector<Term, 3> result;
         auto concreteType = remapConcreteSubstitutionSchema(CanType(secondType),
@@ -407,8 +300,8 @@ namespace {
       if (!firstAbstract && secondAbstract) {
         // A concrete type is equated with a type parameter; add a concrete
         // type requirement.
-        auto subjectTerm = getRelativeTermForType(CanType(secondType),
-                                                  rhsSubstitutions, ctx);
+        auto subjectTerm = ctx.getRelativeTermForType(CanType(secondType),
+                                                      rhsSubstitutions);
 
         SmallVector<Term, 3> result;
         auto concreteType = remapConcreteSubstitutionSchema(CanType(firstType),
@@ -915,8 +808,8 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
           if (!t->isTypeParameter())
             return None;
 
-          auto term = getRelativeTermForType(t->getCanonicalType(),
-                                             substitutions, Context);
+          auto term = Context.getRelativeTermForType(t->getCanonicalType(),
+                                                     substitutions);
           System.simplify(term);
           return Context.getTypeForTerm(term, { }, Protos);
         }));
@@ -998,7 +891,7 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     // where 'n' is an index into the substitution array.
     //
     // Add a rule T => S.X.Y...Z, where S is the nth substitution term.
-    return getRelativeTermForType(typeWitness, substitutions, Context);
+    return Context.getRelativeTermForType(typeWitness, substitutions);
   }
 
   // The type witness is a concrete type.

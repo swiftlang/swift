@@ -778,6 +778,9 @@ void RewriteSystem::minimizeRewriteSystem() {
     loop.normalize(*this);
   }
 
+  // Check invariants before homotopy reduction.
+  verifyHomotopyGenerators();
+
   // First pass: Eliminate all redundant rules involving unresolved types.
   performHomotopyReduction(/*firstPass=*/true,
                            /*redundantConformances=*/nullptr);
@@ -798,57 +801,10 @@ void RewriteSystem::minimizeRewriteSystem() {
   performHomotopyReduction(/*firstPass=*/false,
                            /*redundantConformances=*/&redundantConformances);
 
-  // Assert if homotopy reduction failed to eliminate a redundant conformance,
-  // since this suggests a misunderstanding on my part.
-  for (unsigned ruleID : redundantConformances) {
-    const auto &rule = getRule(ruleID);
-    assert(rule.isProtocolConformanceRule() &&
-           "Redundant conformance is not a conformance rule?");
-
-    if (!rule.isRedundant()) {
-      llvm::errs() << "Homotopy reduction did not eliminate redundant "
-                   << "conformance?\n";
-      llvm::errs() << "(#" << ruleID << ") " << rule << "\n\n";
-      dump(llvm::errs());
-      abort();
-    }
-  }
-
-  // Assert if homotopy reduction failed to eliminate a rewrite rule which was
-  // deleted because either it's left hand side can be reduced by some other
-  // rule, or because it's right hand side can be reduced further.
-  for (const auto &rule : Rules) {
-    // Note that sometimes permanent rules can be simplified, but they can never
-    // be redundant.
-    if (rule.isPermanent()) {
-      if (rule.isRedundant()) {
-        llvm::errs() << "Permanent rule is redundant: " << rule << "\n\n";
-        dump(llvm::errs());
-        abort();
-      }
-
-      continue;
-    }
-
-    if (rule.isRedundant())
-      continue;
-
-    // Simplified rules should be redundant.
-    if (rule.isSimplified()) {
-      llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
-      dump(llvm::errs());
-      abort();
-    }
-
-    // Rules with unresolved name symbols (other than permanent rules for
-    // associated type introduction) should be redundant.
-    if (rule.getLHS().containsUnresolvedSymbols() ||
-        rule.getRHS().containsUnresolvedSymbols()) {
-      llvm::errs() << "Unresolved rule is not redundant: " << rule << "\n\n";
-      dump(llvm::errs());
-      abort();
-    }
-  }
+  // Check invariants after homotopy reduction.
+  verifyHomotopyGenerators();
+  verifyRedundantConformances(redundantConformances);
+  verifyMinimizedRules();
 }
 
 /// Collect all non-permanent, non-redundant rules whose domain is equal to
@@ -897,4 +853,60 @@ void RewriteSystem::verifyHomotopyGenerators() const {
     }
   }
 #endif
+}
+
+/// Assert if homotopy reduction failed to eliminate a redundant conformance,
+/// since this suggests a misunderstanding on my part.
+void RewriteSystem::verifyRedundantConformances(
+    llvm::DenseSet<unsigned> redundantConformances) const {
+  for (unsigned ruleID : redundantConformances) {
+    const auto &rule = getRule(ruleID);
+    assert(rule.isProtocolConformanceRule() &&
+           "Redundant conformance is not a conformance rule?");
+
+    if (!rule.isRedundant()) {
+      llvm::errs() << "Homotopy reduction did not eliminate redundant "
+                   << "conformance?\n";
+      llvm::errs() << "(#" << ruleID << ") " << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
+}
+
+// Assert if homotopy reduction failed to eliminate a rewrite rule it was
+// supposed to delete.
+void RewriteSystem::verifyMinimizedRules() const {
+  for (const auto &rule : Rules) {
+    // Note that sometimes permanent rules can be simplified, but they can never
+    // be redundant.
+    if (rule.isPermanent()) {
+      if (rule.isRedundant()) {
+        llvm::errs() << "Permanent rule is redundant: " << rule << "\n\n";
+        dump(llvm::errs());
+        abort();
+      }
+
+      continue;
+    }
+
+    if (rule.isRedundant())
+      continue;
+
+    // Simplified rules should be redundant.
+    if (rule.isSimplified()) {
+      llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+
+    // Rules with unresolved name symbols (other than permanent rules for
+    // associated type introduction) should be redundant.
+    if (rule.getLHS().containsUnresolvedSymbols() ||
+        rule.getRHS().containsUnresolvedSymbols()) {
+      llvm::errs() << "Unresolved rule is not redundant: " << rule << "\n\n";
+      dump(llvm::errs());
+      abort();
+    }
+  }
 }
