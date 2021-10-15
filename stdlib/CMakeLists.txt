@@ -138,6 +138,10 @@ option(SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
        "Build stdlib without a custom implementation of MetadataAllocator, relying on malloc+free instead."
        FALSE)
 
+option(SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS
+       "Build stdlib with fast-path context descriptor lookups based on well-known short manglings."
+       TRUE)
+
 option(SWIFT_STDLIB_HAS_COMMANDLINE
        "Build stdlib with the CommandLine enum and support for argv/argc."
        TRUE)

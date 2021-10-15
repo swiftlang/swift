@@ -1033,7 +1033,10 @@ bool CSE::processNode(DominanceInfoNode *Node) {
         OwnershipRAUWHelper helper(RAUWFixupContext,
                                    cast<SingleValueInstruction>(Inst),
                                    cast<SingleValueInstruction>(AvailInst));
-        if (!helper.isValid())
+        // If RAUW requires cloning the original, then there's no point. If it
+        // also requires introducing a copy and new borrow scope, then it's a
+        // very bad idea.
+        if (!helper.isValid() || helper.requiresCopyBorrowAndClone())
           continue;
         // Replace SingleValueInstruction using OSSA RAUW here
         nextI = helper.perform();

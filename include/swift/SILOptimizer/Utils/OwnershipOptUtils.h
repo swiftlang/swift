@@ -71,9 +71,10 @@ struct OwnershipFixupContext {
     /// and use this to seed that new lifetime.
     SmallVector<Operand *, 8> allAddressUsesFromOldValue;
 
-    /// This is the interior pointer operand that the new value we want to RAUW
-    /// is transitively derived from and enables us to know the underlying
-    /// borrowed base value that we need to lifetime extend.
+    /// This is the interior pointer (e.g. ref_element_addr)
+    /// that the new value we want to RAUW is transitively derived from and
+    /// enables us to know the underlying borrowed base value that we need to
+    /// lifetime extend.
     ///
     /// This is only initialized when the interior pointer has uses that must be
     /// replaced.
@@ -149,9 +150,15 @@ public:
   operator bool() const { return isValid(); }
   bool isValid() const { return bool(ctx) && bool(oldValue) && bool(newValue); }
 
-  /// Perform the actual RAUW. We require that \p newValue and \p oldValue have
-  /// the same type at this point (in contrast to when calling
-  /// OwnershipRAUWFixupHelper::get()).
+  /// True if replacement requires copying the original instruction's source
+  /// operand, creating a new borrow scope for that copy, then cloning the
+  /// original.
+  bool requiresCopyBorrowAndClone() const {
+    return ctx->extraAddressFixupInfo.base;
+  }
+
+  /// Perform OSSA fixup on newValue and return a fixed-up value based that can
+  /// be used to replace all uses of oldValue.
   ///
   /// This is so that we can avoid creating "forwarding" transformation
   /// instructions before we know if we can perform the RAUW. Any such
