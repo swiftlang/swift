@@ -5,6 +5,8 @@
 
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar84222794
+
 import Newtype
 
 // CHECK-CANONICAL-LABEL: sil hidden @$s7newtype17createErrorDomain{{[_0-9a-zA-Z]*}}F
