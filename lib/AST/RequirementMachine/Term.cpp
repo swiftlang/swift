@@ -122,20 +122,32 @@ bool Term::containsUnresolvedSymbols() const {
   return false;
 }
 
-/// Shortlex order on terms.
+namespace {
+
+/// Shortlex order on symbol ranges.
 ///
 /// First we compare length, then perform a lexicographic comparison
-/// on symbols if the two terms have the same length.
-int MutableTerm::compare(const MutableTerm &other,
-                         const ProtocolGraph &graph) const {
-  if (size() != other.size())
-    return size() < other.size() ? -1 : 1;
+/// on symbols if the two ranges have the same length.
+///
+/// This is used to implement Term::compare() and MutableTerm::compare()
+/// below.
+template<typename Iter>
+int shortlexCompare(Iter lhsBegin, Iter lhsEnd,
+                    Iter rhsBegin, Iter rhsEnd,
+                    const ProtocolGraph &protos) {
+  unsigned lhsSize = (lhsEnd - lhsBegin);
+  unsigned rhsSize = (rhsEnd - rhsBegin);
+  if (lhsSize != rhsSize)
+    return lhsSize < rhsSize ? -1 : 1;
 
-  for (unsigned i = 0, e = size(); i < e; ++i) {
-    auto lhs = (*this)[i];
-    auto rhs = other[i];
+  while (lhsBegin != lhsEnd) {
+    auto lhs = *lhsBegin;
+    auto rhs = *rhsBegin;
 
-    int result = lhs.compare(rhs, graph);
+    ++lhsBegin;
+    ++rhsBegin;
+
+    int result = lhs.compare(rhs, protos);
     if (result != 0) {
       assert(lhs != rhs);
       return result;
@@ -145,6 +157,20 @@ int MutableTerm::compare(const MutableTerm &other,
   }
 
   return 0;
+}
+
+}
+
+/// Shortlex order on terms.
+int Term::compare(Term other,
+                  const ProtocolGraph &protos) const {
+  return shortlexCompare(begin(), end(), other.begin(), other.end(), protos);
+}
+
+/// Shortlex order on mutable terms.
+int MutableTerm::compare(const MutableTerm &other,
+                         const ProtocolGraph &protos) const {
+  return shortlexCompare(begin(), end(), other.begin(), other.end(), protos);
 }
 
 /// Replace the subterm in the range [from,to) with \p rhs.
