@@ -24,9 +24,10 @@ func transparent(_ x: Int64) -> Int64 { return noinline(x) }
 
 @inline(__always)
 func inlined(_ x: Int64) -> Int64 {
-// CHECK-DAG: ![[CALL]] = !DILocation(line: [[@LINE+3]], column: {{.*}}, scope: ![[SCOPE:.*]], inlinedAt: ![[INLINED:.*]])
+// CHECK-DAG: ![[CALL]] = !DILocation(line: [[@LINE+4]], column: {{.*}}, scope: ![[SCOPE:.*]], inlinedAt: ![[INLINED:.*]])
 // Check if the inlined and removed function still has the correct linkage name.
-// CHECK-DAG: ![[SCOPE]] = distinct !DISubprogram(name: "inlined", linkageName: "$s4main7inlinedys5Int64VADF"
+// CHECK-DAG: ![[SCOPE]] = distinct !DILexicalBlock(scope: ![[INLINED:[0-9]+]],
+// CHECK-DAG: ![[INLINED]] = distinct !DISubprogram(name: "inlined", linkageName: "$s4main7inlinedys5Int64VADF"
   let result = transparent(x)
 // TRANSPARENT-CHECK-NOT: !DISubprogram(name: "transparent"
   return result

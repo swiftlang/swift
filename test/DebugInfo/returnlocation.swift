@@ -185,8 +185,9 @@ public class Class1 {
     print("hello")
     // CHECK_INIT: call {{.*}}@"$ss5print_9separator10terminatoryypd_S2StF"{{.*}}, !dbg [[printLoc:![0-9]+]]
     // FIXME: Why doesn't ret have the correct line number?
-    // CHECK_INIT: ret i{{32|64}} 0, !dbg [[printLoc]]
-    // CHECK_INIT: [[printLoc]] = !DILocation(line: [[@LINE-4]]
+    // CHECK_INIT: ret i{{32|64}} 0, !dbg ![[RETLOC:[0-9]+]]
+    // CHECK_INIT: [[RETLOC]] = !DILocation(line: 0
+    // CHECK_INIT: [[printLoc]] = !DILocation(line: [[@LINE-5]]
     return nil
   }
 }
