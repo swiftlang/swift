@@ -33,14 +33,14 @@ public class M {
 
 // CHECK-LABEL: sil [ossa] @$s3del1MC4fromAcA12WithDelegate_p_tKcfc : $@convention(method) (@in WithDelegate, @owned M) -> (@owned M, @error Error)
 
-// CHECK:   [[I:%.*]] = integer_literal $Builtin.Int2, 1, loc {{.*}}:23:12, scope 4
-// CHECK:   [[V:%.*]] = load [trivial] %2 : $*Builtin.Int2, loc {{.*}}:23:12, scope 4
-// CHECK:   [[OR:%.*]] = builtin "or_Int2"([[V]] : $Builtin.Int2, [[I]] : $Builtin.Int2) : $Builtin.Int2, loc {{.*}}:23:12, scope 4
-// CHECK:   store [[OR]] to [trivial] %2 : $*Builtin.Int2, loc {{.*}}:23:12, scope 4
-// CHECK:   store %{{.*}} to [init] %{{.*}} : $*C, loc {{.*}}:26:20, scope 4
+// CHECK:   [[I:%.*]] = integer_literal $Builtin.Int2, 1, loc {{.*}}:23:12, scope 5
+// CHECK:   [[V:%.*]] = load [trivial] %2 : $*Builtin.Int2, loc {{.*}}:23:12, scope 5
+// CHECK:   [[OR:%.*]] = builtin "or_Int2"([[V]] : $Builtin.Int2, [[I]] : $Builtin.Int2) : $Builtin.Int2, loc {{.*}}:23:12, scope 5
+// CHECK:   store [[OR]] to [trivial] %2 : $*Builtin.Int2, loc {{.*}}:23:12, scope 5
+// CHECK:   store %{{.*}} to [init] %{{.*}} : $*C, loc {{.*}}:26:20, scope 5
 
 // Make sure the dealloc_stack gets the same scope of the instructions surrounding it.
 
-// CHECK:   destroy_addr %0 : $*WithDelegate, loc {{.*}}:29:5, scope 4
-// CHECK:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:23:12, scope 4
+// CHECK:   destroy_addr %0 : $*WithDelegate, loc {{.*}}:29:5, scope 5
+// CHECK:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:23:12, scope 5
 // CHECK:   throw %{{.*}} : $Error, loc {{.*}}:23:12, scope 1
