@@ -493,6 +493,11 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
+  bool
+  isCandidateForDeletion(unsigned ruleID,
+                         bool firstPass,
+                         const llvm::DenseSet<unsigned> *redundantConformances) const;
+
   Optional<unsigned>
   findRuleToDelete(bool firstPass,
                    const llvm::DenseSet<unsigned> *redundantConformances,
