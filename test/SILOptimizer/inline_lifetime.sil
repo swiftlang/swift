@@ -31,10 +31,16 @@ entry(%instance : $S):
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_address : $@convention(thin) (@in S) -> () {
+sil [ossa] [always_inline] @callee_in : $@convention(thin) (@in S) -> () {
 entry(%instance : $*S):
     %retval = tuple ()
     return %retval : $()
+}
+
+sil [always_inline] [ossa] @callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+entry(%arg : $*T):
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // tests
@@ -102,16 +108,26 @@ entry(%instance : $S):
   return %result : $()
 }
 
-// CHECK-LABEL: sil [ossa] @caller_address_callee_address : $@convention(thin) (@in S) -> () {
+// CHECK-LABEL: sil [ossa] @caller_in_callee_in : $@convention(thin) (@in S) -> () {
 // CHECK:       {{bb[^,]+}}({{%[^,]+}} : $*S):
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK-LABEL: } // end sil function 'caller_address_callee_address'
-sil [ossa] @caller_address_callee_address : $@convention(thin) (@in S) -> () {
+// CHECK-LABEL: } // end sil function 'caller_in_callee_in'
+sil [ossa] @caller_in_callee_in : $@convention(thin) (@in S) -> () {
 entry(%instance : $*S):
-    %callee_address = function_ref @callee_address : $@convention(thin) (@in S) -> ()
-    %result = apply %callee_address(%instance) : $@convention(thin) (@in S) -> ()
+    %callee_in = function_ref @callee_in : $@convention(thin) (@in S) -> ()
+    %result = apply %callee_in(%instance) : $@convention(thin) (@in S) -> ()
     return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_inguaranteed_callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_inguaranteed_callee_inguaranteed'
+sil [ossa] @caller_inguaranteed_callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%instance : $*T):
+  %callee_inguaranteed = function_ref @callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %retval = apply %callee_inguaranteed<T>(%instance) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  return %retval : $()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -120,7 +136,7 @@ entry(%instance : $*S):
 
 // declarations
 
-sil [ossa] [always_inline] @callee_coro_owned : $@yield_once @convention(method) (@owned C) -> @yields @inout C {
+sil [ossa] [always_inline] @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C {
 bb0(%instance : @owned $C):
   %addr = alloc_stack $C
   store %instance to [init] %addr : $*C
@@ -136,7 +152,7 @@ bb2:
   unwind
 }
 
-sil [ossa] [always_inline] @callee_coro_guaranteed : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout C {
+sil [ossa] [always_inline] @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C {
 bb0(%instance : @guaranteed $C):
   %copy = copy_value %instance : $C
   %addr = alloc_stack $C
@@ -153,7 +169,7 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_trivial : $@yield_once @convention(method) (S) -> @yields @inout S {
+sil hidden [ossa] [always_inline] @callee_coro_trivial : $@yield_once @convention(thin) (S) -> @yields @inout S {
 bb0(%instance : $S):
   %addr = alloc_stack $S
   store %instance to [trivial] %addr : $*S
@@ -167,7 +183,7 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_address : $@yield_once @convention(method) (@in S) -> @yields @inout S {
+sil hidden [ossa] [always_inline] @callee_coro_in : $@yield_once @convention(thin) (@in S) -> @yields @inout S {
 bb0(%instance : $*S):
   yield %instance : $*S, resume bb1, unwind bb2
 bb1:
@@ -177,21 +193,37 @@ bb2:
   unwind
 }
 
+sil hidden [ossa] [always_inline] @callee_coro_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T {
+bb0(%instance : $*T):
+  %addr = alloc_stack $T
+  copy_addr %instance to [initialization] %addr : $*T
+  yield %addr : $*T, resume bb1, unwind bb2
+bb1:
+  destroy_addr %addr : $*T
+  dealloc_stack %addr : $*T
+  %result = tuple ()
+  return %result : $()
+bb2:
+  destroy_addr %addr : $*T
+  dealloc_stack %addr : $*T
+  unwind
+}
+
 // tests
 
-// CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_owned : $@convention(method) (@owned C) -> () {
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_owned : $@convention(thin) (@owned C) -> () {
 // CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_coro_owned'
-sil [ossa] @caller_owned_callee_coro_owned : $@convention(method) (@owned C) -> () {
+sil [ossa] @caller_owned_callee_coro_owned : $@convention(thin) (@owned C) -> () {
 bb0(%instance : @owned $C):
-  %callee_coro_owned = function_ref @callee_coro_owned : $@yield_once @convention(method) (@owned C) -> @yields @inout C
-  (%addr, %continuation) = begin_apply %callee_coro_owned(%instance) : $@yield_once @convention(method) (@owned C) -> @yields @inout C
+  %callee_coro_owned = function_ref @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
+  (%addr, %continuation) = begin_apply %callee_coro_owned(%instance) : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(method) (@owned C) -> () {
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
@@ -209,30 +241,30 @@ bb0(%instance : @owned $C):
 // CHECK:         dealloc_stack [[ADDR]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_coro_guaranteed'
-sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(method) (@owned C) -> () {
+sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(thin) (@owned C) -> () {
 bb0(%instance : @owned $C):
-  %callee_coro_guaranteed = function_ref @callee_coro_guaranteed : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout C
-  (%addr, %continuation) = begin_apply %callee_coro_guaranteed(%instance) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout C
+  %callee_coro_guaranteed = function_ref @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
+  (%addr, %continuation) = begin_apply %callee_coro_guaranteed(%instance) : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
   end_apply %continuation
   destroy_value %instance : $C
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_owned : $@convention(method) (@guaranteed C) -> () {
+// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_owned : $@convention(thin) (@guaranteed C) -> () {
 // CHECK-NOT:         begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_coro_owned'
-sil [ossa] @caller_guaranteed_callee_coro_owned : $@convention(method) (@guaranteed C) -> () {
+sil [ossa] @caller_guaranteed_callee_coro_owned : $@convention(thin) (@guaranteed C) -> () {
 bb0(%instance : @guaranteed $C):
   %copy = copy_value %instance : $C
-  %callee_coro_owned = function_ref @callee_coro_owned : $@yield_once @convention(method) (@owned C) -> @yields @inout C
-  (%addr, %continuation) = begin_apply %callee_coro_owned(%copy) : $@yield_once @convention(method) (@owned C) -> @yields @inout C
+  %callee_coro_owned = function_ref @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
+  (%addr, %continuation) = begin_apply %callee_coro_owned(%copy) : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(method) (@guaranteed C) -> () {
+// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
@@ -249,16 +281,16 @@ bb0(%instance : @guaranteed $C):
 // CHECK:         dealloc_stack [[ADDR]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_coro_guaranteed'
-sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(method) (@guaranteed C) -> () {
+sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 bb0(%instance : @guaranteed $C):
-  %callee_coro_guaranteed = function_ref @callee_coro_guaranteed : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout C
-  (%addr, %continuation) = begin_apply %callee_coro_guaranteed(%instance) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout C
+  %callee_coro_guaranteed = function_ref @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
+  (%addr, %continuation) = begin_apply %callee_coro_guaranteed(%instance) : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(method) (S) -> () {
+// CHECK-LABEL: sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(thin) (S) -> () {
 // CHECK:       {{bb[0-9]+}}([[REGISTER_0:%[^,]+]] : $S):
 // CHECK:         [[REGISTER_1:%[^,]+]] = alloc_stack $S
 // CHECK:         store [[REGISTER_0]] to [trivial] [[REGISTER_1]] : $*S
@@ -270,27 +302,39 @@ bb0(%instance : @guaranteed $C):
 // CHECK:         dealloc_stack [[REGISTER_1]] : $*S
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_trivial_callee_coro_trivial'
-sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(method) (S) -> () {
+sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(thin) (S) -> () {
 bb0(%instance : $S):
-  %callee_coro_trivial = function_ref @callee_coro_trivial : $@yield_once @convention(method) (S) -> @yields @inout S
-  (%addr, %continuation) = begin_apply %callee_coro_trivial(%instance) : $@yield_once @convention(method) (S) -> @yields @inout S
+  %callee_coro_trivial = function_ref @callee_coro_trivial : $@yield_once @convention(thin) (S) -> @yields @inout S
+  (%addr, %continuation) = begin_apply %callee_coro_trivial(%instance) : $@yield_once @convention(thin) (S) -> @yields @inout S
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @caller_address_callee_coro_address : $@convention(method) (@in S) -> () {
+// CHECK-LABEL: sil hidden [ossa] @caller_in_callee_coro_in : $@convention(thin) (@in S) -> () {
 // CHECK:       {{bb[^,]+}}({{%[^,]+}} : $*S):
 // CHECK:         {{%[^,]+}} = tuple ()
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK:       {{bb[^,]+}}:
 // CHECK:         unreachable
-// CHECK-LABEL: } // end sil function 'caller_address_callee_coro_address'
-sil hidden [ossa] @caller_address_callee_coro_address : $@convention(method) (@in S) -> () {
+// CHECK-LABEL: } // end sil function 'caller_in_callee_coro_in'
+sil hidden [ossa] @caller_in_callee_coro_in : $@convention(thin) (@in S) -> () {
 bb0(%instance : $*S):
-  %callee_coro_address = function_ref @callee_coro_address : $@yield_once @convention(method) (@in S) -> @yields @inout S
-  (%addr, %continuation) = begin_apply %callee_coro_address(%instance) : $@yield_once @convention(method) (@in S) -> @yields @inout S
+  %callee_coro_in = function_ref @callee_coro_in : $@yield_once @convention(thin) (@in S) -> @yields @inout S
+  (%addr, %continuation) = begin_apply %callee_coro_in(%instance) : $@yield_once @convention(thin) (@in S) -> @yields @inout S
+  end_apply %continuation
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @caller_inguaranteed_callee_coro_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK-NOTE:    begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_inguaranteed_callee_coro_inguaranteed'
+sil hidden [ossa] @caller_inguaranteed_callee_coro_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%instance : $*T):
+  %callee_coro_inguaranteed = function_ref @callee_coro_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
+  (%addr_out, %continuation) = begin_apply %callee_coro_inguaranteed<T>(%instance) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
   end_apply %continuation
   %retval = tuple ()
   return %retval : $()
@@ -334,8 +378,18 @@ bb2:
   return %18 : $()
 }
 
-sil [ossa] @callee_error_address : $@convention(thin) (@in S) -> @error Error {
+sil [ossa] @callee_error_in : $@convention(thin) (@in S) -> @error Error {
 bb0(%0 : $*S):
+  cond_br undef, bb1, bb2
+bb1:
+  throw undef : $Error
+bb2:
+  %18 = tuple ()
+  return %18 : $()
+}
+
+sil [ossa] @callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error Error {
+bb0(%0 : $*T):
   cond_br undef, bb1, bb2
 bb1:
   throw undef : $Error
@@ -346,10 +400,10 @@ bb2:
 
 // tests
 
-// CHECK-LABEL: sil [ossa] @callee_owned_callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
 // CHECK-NOT:     begin_borrow [lexical]
-// CHECK-LABEL: } // end sil function 'callee_owned_callee_error_owned'
-sil [ossa] @callee_owned_callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_error_owned'
+sil [ossa] @caller_owned_callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
 bb0(%instance : @owned $C):
   %callee_error_owned = function_ref @callee_error_owned : $@convention(thin) (@owned C) -> @error Error
   try_apply %callee_error_owned(%instance) : $@convention(thin) (@owned C) -> @error Error, normal bb1, error bb2
@@ -361,7 +415,7 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil [ossa] @callee_owned_callee_error_guaranteed : $@convention(thin) (@owned C) -> @error Error {
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_error_guaranteed : $@convention(thin) (@owned C) -> @error Error {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
@@ -375,8 +429,8 @@ bb2(%12 : @owned $Error):
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK-LABEL: } // end sil function 'callee_owned_callee_error_guaranteed'
-sil [ossa] @callee_owned_callee_error_guaranteed : $@convention(thin) (@owned C) -> @error Error {
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_error_guaranteed'
+sil [ossa] @caller_owned_callee_error_guaranteed : $@convention(thin) (@owned C) -> @error Error {
 bb0(%instance : @owned $C):
   %callee_error_guaranteed = function_ref @callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error
   try_apply %callee_error_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> @error Error, normal bb1, error bb2
@@ -389,10 +443,10 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil [ossa] @callee_guaranteed_callee_error_owned : $@convention(thin) (@guaranteed C) -> @error Error {
+// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_error_owned : $@convention(thin) (@guaranteed C) -> @error Error {
 // CHECK-NOT:     begin_borrow [lexical]
-// CHECK-LABEL: } // end sil function 'callee_guaranteed_callee_error_owned'
-sil [ossa] @callee_guaranteed_callee_error_owned : $@convention(thin) (@guaranteed C) -> @error Error {
+// CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_error_owned'
+sil [ossa] @caller_guaranteed_callee_error_owned : $@convention(thin) (@guaranteed C) -> @error Error {
 bb0(%instance : @guaranteed $C):
   %copy = copy_value %instance : $C
   %callee_error_owned = function_ref @callee_error_owned : $@convention(thin) (@owned C) -> @error Error
@@ -404,7 +458,7 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil [ossa] @callee_guaranteed_callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error {
+// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
@@ -416,8 +470,8 @@ bb2(%12 : @owned $Error):
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK-LABEL: } // end sil function 'callee_guaranteed_callee_error_guaranteed'
-sil [ossa] @callee_guaranteed_callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error {
+// CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_error_guaranteed'
+sil [ossa] @caller_guaranteed_callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error {
 bb0(%instance : @guaranteed $C):
   %callee_error_guaranteed = function_ref @callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error
   try_apply %callee_error_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> @error Error, normal bb1, error bb2
@@ -428,7 +482,7 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil hidden [ossa] @callee_trivial_callee_error_trivial : $@convention(thin) (S) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @caller_trivial_callee_error_trivial : $@convention(thin) (S) -> @error Error {
 // CHECK:       {{bb[^,]+}}({{%[^,]+}} : $S):
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
@@ -437,8 +491,8 @@ bb2(%12 : @owned $Error):
 // CHECK:         [[ORIGINAL_RETVAL:%[^,]+]] = tuple ()
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK-LABEL: } // end sil function 'callee_trivial_callee_error_trivial'
-sil hidden [ossa] @callee_trivial_callee_error_trivial : $@convention(thin) (S) -> @error Error {
+// CHECK-LABEL: } // end sil function 'caller_trivial_callee_error_trivial'
+sil hidden [ossa] @caller_trivial_callee_error_trivial : $@convention(thin) (S) -> @error Error {
 bb0(%instance : $S):
   %callee_error_trivial = function_ref @callee_error_trivial : $@convention(thin) (S) -> @error Error
   try_apply %callee_error_trivial(%instance) : $@convention(thin) (S) -> @error Error, normal bb1, error bb2
@@ -449,7 +503,7 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil hidden [ossa] @callee_address_callee_error_address : $@convention(thin) (@in S) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @caller_in_callee_error_in : $@convention(thin) (@in S) -> @error Error {
 // CHECK:       {{bb[^,]+}}({{%[^,]+}} : $*S):
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[0-9]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
@@ -458,11 +512,25 @@ bb2(%12 : @owned $Error):
 // CHECK:         {{%[^,]+}} = tuple ()
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK-LABEL: } // end sil function 'callee_address_callee_error_address'
-sil hidden [ossa] @callee_address_callee_error_address : $@convention(thin) (@in S) -> @error Error {
+// CHECK-LABEL: } // end sil function 'caller_in_callee_error_in'
+sil hidden [ossa] @caller_in_callee_error_in : $@convention(thin) (@in S) -> @error Error {
 bb0(%instance : $*S):
-  %callee_error_address = function_ref @callee_error_address : $@convention(thin) (@in S) -> @error Error
-  try_apply %callee_error_address(%instance) : $@convention(thin) (@in S) -> @error Error, normal bb1, error bb2
+  %callee_error_in = function_ref @callee_error_in : $@convention(thin) (@in S) -> @error Error
+  try_apply %callee_error_in(%instance) : $@convention(thin) (@in S) -> @error Error, normal bb1, error bb2
+bb1(%9 : $()):
+  %10 = tuple ()
+  return %10 : $()
+bb2(%12 : @owned $Error):
+  throw %12 : $Error
+}
+
+// CHECK-LABEL: sil hidden [ossa] @caller_inguaranteed_callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error Error {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: // end sil function 'caller_inguaranteed_callee_error_inguaranteed'
+sil hidden [ossa] @caller_inguaranteed_callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error Error {
+bb0(%instance : $*T):
+  %callee_error_inguaranteed = function_ref @callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error Error
+  try_apply %callee_error_inguaranteed<T>(%instance) : $@convention(thin) <T> (@in_guaranteed T) -> @error Error, normal bb1, error bb2
 bb1(%9 : $()):
   %10 = tuple ()
   return %10 : $()

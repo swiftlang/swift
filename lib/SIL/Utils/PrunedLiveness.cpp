@@ -209,6 +209,7 @@ static void findLastUserInBlock(SILBasicBlock *bb,
       continue;
 
     boundary.lastUsers.push_back(inst);
+    return;
   }
   llvm_unreachable("No user in LiveWithin block");
 }

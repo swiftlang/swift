@@ -2030,6 +2030,37 @@ public:
   }
 };
 
+enum class NonSendableKind : uint8_t {
+  /// A plain '@_nonSendable' attribute. Should be applied directly to
+  /// particular declarations; overrides even an explicit 'Sendable'
+  /// conformance.
+  Specific,
+
+  /// A '@_nonSendable(_assumed)' attribute. Should be applied to large swaths
+  /// of declarations; does not override explicit 'Sendable' conformances.
+  Assumed
+};
+
+/// Marks a declaration as explicitly non-Sendable.
+class NonSendableAttr : public DeclAttribute {
+public:
+  NonSendableAttr(SourceLoc AtLoc, SourceRange Range,
+                  NonSendableKind Specificity, bool Implicit = false)
+    : DeclAttribute(DAK_NonSendable, AtLoc, Range, Implicit),
+      Specificity(Specificity)
+  {}
+
+  NonSendableAttr(NonSendableKind Specificity, bool Implicit = false)
+    : NonSendableAttr(SourceLoc(), SourceRange(), Specificity, Implicit) {}
+
+  /// Was this '@_nonSendable(_assumed)'?
+  const NonSendableKind Specificity;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_NonSendable;
+  }
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.

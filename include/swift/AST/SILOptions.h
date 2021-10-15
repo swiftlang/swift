@@ -44,6 +44,9 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
+  /// Enable experimental support for emitting defined borrow scopes.
+  bool EnableExperimentalLexicalLifetimes = false;
+
   /// Force-run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
   /// When this is 'false' the pipeline has default behavior.

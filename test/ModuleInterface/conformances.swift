@@ -237,6 +237,12 @@ public struct NestedAvailabilityOuter {
   public struct Inner: PrivateSubProto {}
 }
 
+@_nonSendable public struct NonSendable {}
+// NEGATIVE-NOT: @_nonSendable
+// CHECK-LABEL: public struct NonSendable {
+// CHECK: @available(*, unavailable)
+// CHECK-NEXT: extension conformances.NonSendable : @unchecked Swift.Sendable {
+
 // CHECK-END: @available(macOS 10.97, iOS 23, *)
 // CHECK-END: @available(tvOS, unavailable)
 // CHECK-END: extension conformances.NestedAvailabilityOuter.Inner : conformances.PublicBaseProto {}

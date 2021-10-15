@@ -303,9 +303,6 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
-    /// Enable experimental support for emitting defined borrow scopes.
-    bool EnableExperimentalLexicalLifetimes = false;
-
     /// Enable experimental support for named opaque result types, e.g.
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;

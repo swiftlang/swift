@@ -1284,6 +1284,8 @@ public:
   SourceLoc getStartLoc() const { return ExtensionLoc; }
   SourceLoc getLocFromSource() const { return ExtensionLoc; }
   SourceRange getSourceRange() const {
+    if (!Braces.isValid())
+      return SourceRange(ExtensionLoc);
     return { ExtensionLoc, Braces.End };
   }
 

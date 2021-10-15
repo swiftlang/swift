@@ -600,10 +600,19 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
   auto enableLexicalLifetimes = Apply.getFunction()
                                     ->getModule()
                                     .getASTContext()
-                                    .LangOpts.EnableExperimentalLexicalLifetimes;
-  if (!AI.getFunction()->hasOwnership() ||
-      (callArg.getOwnershipKind() != OwnershipKind::Owned &&
-       !enableLexicalLifetimes)) {
+                                    .SILOpts.EnableExperimentalLexicalLifetimes;
+  auto argOwnershipRequiresBorrow = [&]() {
+    auto kind = callArg.getOwnershipKind();
+    if (enableLexicalLifetimes) {
+      // At this point, we know that the function argument is @guaranteed.
+      // If the value passed as that parameter has ownership, always add a
+      // lexical borrow scope to ensure that the value stays alive for the
+      // duration of the inlined callee.
+      return kind != OwnershipKind::None;
+    }
+    return kind == OwnershipKind::Owned;
+  };
+  if (!AI.getFunction()->hasOwnership() || !argOwnershipRequiresBorrow()) {
     return SILValue();
   }
 

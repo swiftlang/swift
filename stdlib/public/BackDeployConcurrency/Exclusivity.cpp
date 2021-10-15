@@ -14,36 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 #include <cinttypes>
-
-#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Exclusivity.h"
-#include "swift/Runtime/ThreadLocalStorage.h"
-#include "../runtime/ExclusivityPrivate.h"
-#include "../runtime/SwiftTLSContext.h"
 
 using namespace swift;
-using namespace swift::runtime;
 
-SwiftTLSContext &SwiftTLSContext::get() {
-  SwiftTLSContext *ctx = static_cast<SwiftTLSContext *>(
-      SWIFT_THREAD_GETSPECIFIC(SWIFT_RUNTIME_TLS_KEY));
-  if (ctx)
-    return *ctx;
+void swift::swift_task_enterThreadLocalContextBackDeploy(char *state) { }
 
-  static OnceToken_t setupToken;
-  SWIFT_ONCE_F(
-      setupToken,
-      [](void *) {
-        pthread_key_init_np(SWIFT_RUNTIME_TLS_KEY, [](void *pointer) {
-          delete static_cast<SwiftTLSContext *>(pointer);
-        });
-      },
-      nullptr);
+void swift::swift_task_exitThreadLocalContextBackDeploy(char *state) { }
 
-  ctx = new SwiftTLSContext();
-  SWIFT_THREAD_SETSPECIFIC(SWIFT_RUNTIME_TLS_KEY, ctx);
-  return *ctx;
+// Forcibly disable exclusivity checking, because the back-deployed concurrency
+// library cannot communicate with older Swift runtimes effectively.
+__attribute__((constructor)) static void disableExclusivityChecking() {
+  _swift_disableExclusivityChecking = true;
 }
-
-// Bring in the concurrency-specific exclusivity code.
-#include "../runtime/ConcurrencyExclusivity.inc"
