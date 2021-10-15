@@ -1105,9 +1105,8 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 static void flattenImportPath(const ImportedModule &import,
                               SmallVectorImpl<char> &out) {
   llvm::raw_svector_ostream outStream(out);
-  // Write module 'real name' (returned by getReverseFullModuleName),
-  // which can be different from 'name' in case module aliasing was
-  // used (-module-alias flag)
+  // This will write the module 'real name', which can be different
+  // from the 'name' in case module aliasing was used (see `-module-alias`)
   import.importedModule->getReverseFullModuleName().printForward(
       outStream, StringRef("\0", 1));
 
