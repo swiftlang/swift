@@ -4779,6 +4779,7 @@ ArgumentList *Solution::getArgumentList(ConstraintLocator *locator) const {
   return nullptr;
 }
 
+#ifndef NDEBUG
 /// Given an apply expr, returns true if it is expected to have a direct callee
 /// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
 static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
@@ -4807,6 +4808,7 @@ static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
   // Assume that anything else would have a direct callee.
   return true;
 }
+#endif
 
 Type Solution::resolveInterfaceType(Type type) const {
   auto resolvedType = type.transform([&](Type type) -> Type {
@@ -4856,9 +4858,11 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   if (!applyArgElt)
     return None;
 
+#ifndef NDEBUG
   auto nextIter = iter + 1;
   assert(!locator->findLast<LocatorPathElt::ApplyArgToParam>(nextIter) &&
          "Multiple ApplyArgToParam components?");
+#endif
 
   // Form a new locator that ends at the apply-arg-to-param element, and
   // simplify it to get the full argument expression.
@@ -5778,9 +5782,11 @@ getRequirementInfo(ConstraintSystem &cs, ConstraintLocator *reqLocator) {
 
   auto path = reqLocator->getPath();
   auto iter = path.rbegin();
+
   auto openedGeneric =
       reqLocator->findLast<LocatorPathElt::OpenedGeneric>(iter);
   assert(openedGeneric);
+  (void)openedGeneric;
 
   auto newPath = path.drop_back(iter - path.rbegin() + 1);
   auto *baseLoc = cs.getConstraintLocator(reqLocator->getAnchor(), newPath);
