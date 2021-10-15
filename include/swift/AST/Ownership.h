@@ -24,9 +24,9 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
-#include <stdint.h>
 #include <assert.h>
-#include <climits>
+#include <limits.h>
+#include <stdint.h>
 
 namespace swift {
 
