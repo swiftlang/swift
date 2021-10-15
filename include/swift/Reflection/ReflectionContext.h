@@ -1153,7 +1153,6 @@ public:
     MetadataAllocation<Runtime> Allocation) {
     if (Allocation.Tag == GenericMetadataCacheTag) {
         struct GenericMetadataCacheEntry {
-          StoredPointer Left, Right;
           StoredPointer LockedStorage;
           uint8_t LockedStorageKind;
           uint8_t TrackingInfo;
