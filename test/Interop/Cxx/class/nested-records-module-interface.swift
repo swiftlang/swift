@@ -28,10 +28,10 @@
 // CHECK: }
  
 // CHECK: struct S6 {
+// CHECK:   init()
 // CHECK:   struct E3 : Equatable, RawRepresentable {
 // CHECK:     typealias RawValue = {{UInt32|Int32}}
 // CHECK:   }
-// CHECK:   init()
 // CHECK: }
  
 // CHECK: struct S7 {
@@ -57,22 +57,22 @@
 // CHECK: }
 
 // CHECK: struct HasForwardDeclaredNestedType {
+// CHECK:   init()
 // CHECK:   struct ForwardDeclaredType {
 // CHECK:     init()
 // CHECK:   }
 // CHECK:   struct NormalSubType {
 // CHECK:     init()
 // CHECK:   }
-// CHECK:   init()
 // CHECK: }
 
 // CHECK: struct HasForwardDeclaredTemplateChild {
+// CHECK:   init()
 // CHECK:   struct ForwardDeclaredClassTemplate<T> {
 // CHECK:   }
 // CHECK:   struct DeclaresForwardDeclaredClassTemplateFriend {
 // CHECK:     init()
 // CHECK:   }
-// CHECK:   init()
 // CHECK: }
 
 // CHECK: extension NestedDeclIsAFirstForwardDeclaration {
@@ -84,12 +84,12 @@
 // CHECK:   }
 // CHECK:   static func takesFriend(_ b: NestedDeclIsAFirstForwardDeclaration.ForwardDeclaredFriend)
 // CHECK:   struct HasNestedForwardDeclaration {
+// CHECK:     init()
 // CHECK:     struct IsNestedForwardDeclaration {
-// CHECK:       var a: Int32
 // CHECK:       init()
 // CHECK:       init(a: Int32)
+// CHECK:       var a: Int32
 // CHECK:     }
-// CHECK:     init()
 // CHECK:   }
 // CHECK:   static func takesHasNestedForwardDeclaration(_: NestedDeclIsAFirstForwardDeclaration.HasNestedForwardDeclaration)
 // CHECK: }

@@ -61,6 +61,21 @@ struct NativeObjectStruct {
   var ele : Builtin.NativeObject
 }
 
+struct MyContiguousArrayBody {
+  @_hasStorage var count: Builtin.Int64 { get }
+  init(count: Builtin.Int64)
+}
+
+class MyContiguousArrayStorage {
+  @_hasStorage var body: MyContiguousArrayBody { get }
+  @objc deinit
+}
+
+struct MyContiguousArray {
+  @_hasStorage var storage: MyContiguousArrayStorage { get set }
+  init(storage: MyContiguousArrayStorage)
+}
+
 sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 
 sil [ossa] @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
@@ -5123,3 +5138,20 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   return %7 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @testTransitiveAddressUse : $@convention(thin) (Builtin.Int64, @owned MyContiguousArrayStorage) -> () {
+// CHECK: [[VAL:%.*]] = struct $MyContiguousArrayBody (%0 : $Builtin.Int64)
+// CHECK: store [[VAL]] to [trivial] %{{.*}} : $*MyContiguousArrayBody
+// CHECK-LABEL: } // end sil function 'testTransitiveAddressUse'
+sil [ossa] @testTransitiveAddressUse : $@convention(thin) (Builtin.Int64, @owned MyContiguousArrayStorage) -> () {
+bb0(%0 : $Builtin.Int64, %1 : @owned $MyContiguousArrayStorage):
+  %2 = struct $MyContiguousArray (%1 : $MyContiguousArrayStorage)
+  %3 = begin_borrow %2 : $MyContiguousArray
+  %4 = struct_extract %3 : $MyContiguousArray, #MyContiguousArray.storage
+  %5 = ref_element_addr %4 : $MyContiguousArrayStorage, #MyContiguousArrayStorage.body
+  %6 = struct_element_addr %5 : $*MyContiguousArrayBody, #MyContiguousArrayBody.count
+  store %0 to [trivial] %6 : $*Builtin.Int64
+  end_borrow %3 : $MyContiguousArray
+  destroy_value %2 : $MyContiguousArray
+  %10 = tuple ()
+  return %10 : $()
+}

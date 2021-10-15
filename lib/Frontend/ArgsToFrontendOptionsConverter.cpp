@@ -680,6 +680,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_abi_descriptor);
     return true;
   }
+  if (!FrontendOptions::canActionEmitModuleSemanticInfo(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasModuleSemanticInfoOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_semantic_info);
+    return true;
+  }
   // If we cannot emit module doc, we cannot emit source information file either.
   if (!FrontendOptions::canActionEmitModuleDoc(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasModuleSourceInfoOutputPath()) {

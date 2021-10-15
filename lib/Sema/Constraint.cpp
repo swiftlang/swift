@@ -73,8 +73,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::UnresolvedMemberChainBase:
@@ -157,8 +155,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::BindOverload:
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
@@ -302,8 +298,6 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
@@ -448,10 +442,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       break;
   case ConstraintKind::OptionalObject:
       Out << " optional with object type "; break;
-  case ConstraintKind::FunctionInput:
-    Out << " bind function input of "; break;
-  case ConstraintKind::FunctionResult:
-    Out << " bind function result of "; break;
   case ConstraintKind::BindOverload: {
     Out << " bound to ";
     auto overload = getOverloadChoice();
@@ -668,8 +658,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
-  case ConstraintKind::FunctionInput:
-  case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:

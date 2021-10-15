@@ -766,6 +766,40 @@ static void addKeyPathDynamicMemberOverloads(
   }
 }
 
+/// Given the bound types of two constructor overloads, returns their parameter
+/// list types as tuples to compare for solution ranking, or \c None if they
+/// shouldn't be compared.
+static Optional<std::pair<Type, Type>>
+getConstructorParamsAsTuples(ASTContext &ctx, Type boundTy1, Type boundTy2) {
+  auto choiceTy1 =
+      boundTy1->lookThroughAllOptionalTypes()->getAs<FunctionType>();
+  auto choiceTy2 =
+      boundTy2->lookThroughAllOptionalTypes()->getAs<FunctionType>();
+
+  // If the type variables haven't been bound to functions yet, let's not try
+  // and rank them.
+  if (!choiceTy1 || !choiceTy2)
+    return None;
+
+  auto initParams1 = choiceTy1->getParams();
+  auto initParams2 = choiceTy2->getParams();
+  if (initParams1.size() != initParams2.size())
+    return None;
+
+  // Don't compare if there are variadic differences. This preserves the
+  // behavior of when we'd compare through matchTupleTypes with the parameter
+  // flags intact.
+  for (auto idx : indices(initParams1)) {
+    if (initParams1[idx].isVariadic() != initParams2[idx].isVariadic())
+      return None;
+  }
+  auto tuple1 = AnyFunctionType::composeTuple(ctx, initParams1,
+                                              /*wantParamFlags*/ false);
+  auto tuple2 = AnyFunctionType::composeTuple(ctx, initParams2,
+                                              /*wantParamFlags*/ false);
+  return std::make_pair(tuple1, tuple2);
+}
+
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
@@ -1127,11 +1161,23 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   for (const auto &binding1 : bindings1) {
     auto *typeVar = binding1.first;
+    auto *loc = typeVar->getImpl().getLocator();
+
+    // Check whether this is the overload type for a short-form init call
+    // 'X(...)' or 'self.init(...)' call.
+    auto isShortFormOrSelfDelegatingConstructorBinding = false;
+    if (auto initMemberTypeElt =
+            loc->getLastElementAs<LocatorPathElt::ConstructorMemberType>()) {
+      isShortFormOrSelfDelegatingConstructorBinding =
+          initMemberTypeElt->isShortFormOrSelfDelegatingConstructor();
+    }
 
     // If the type variable isn't one for which we should be looking at the
     // bindings, don't.
-    if (!typeVar->getImpl().prefersSubtypeBinding())
+    if (!typeVar->getImpl().prefersSubtypeBinding() &&
+        !isShortFormOrSelfDelegatingConstructorBinding) {
       continue;
+    }
 
     // If both solutions have a binding for this type variable
     // let's consider it.
@@ -1142,9 +1188,24 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     auto concreteType1 = binding1.second;
     auto concreteType2 = binding2->second;
 
-    if (!concreteType1->isEqual(concreteType2)) {
-      typeDiff.insert({typeVar, {concreteType1, concreteType2}});
+    // For short-form and self-delegating init calls, we want to prefer
+    // parameter lists with subtypes over supertypes. To do this, compose tuples
+    // for the bound parameter lists, and compare them in the type diff. This
+    // logic preserves the behavior of when we used to bind the parameter list
+    // as a tuple to a TVO_PrefersSubtypeBinding type variable for such calls.
+    // FIXME: We should come up with a better way of doing this, though note we
+    // have some ranking and subtyping rules specific to tuples that we may need
+    // to preserve to avoid breaking source.
+    if (isShortFormOrSelfDelegatingConstructorBinding) {
+      auto diffs = getConstructorParamsAsTuples(cs.getASTContext(),
+                                                concreteType1, concreteType2);
+      if (!diffs)
+        continue;
+      std::tie(concreteType1, concreteType2) = *diffs;
     }
+
+    if (!concreteType1->isEqual(concreteType2))
+      typeDiff.insert({typeVar, {concreteType1, concreteType2}});
   }
 
   for (auto &binding : typeDiff) {

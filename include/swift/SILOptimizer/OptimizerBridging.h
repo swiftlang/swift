@@ -15,6 +15,8 @@
 
 #include "../SIL/SILBridging.h"
 
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -71,5 +73,7 @@ BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif

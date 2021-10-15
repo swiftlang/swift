@@ -33,8 +33,9 @@ func work() {
   myProtocolType.printit()
 }
 
-// CHECK-IR: call {{.*}} @swift_getObjectType({{.*}}) #[[M:[0-9]]]
-// CHECK-IR: declare {{.*}} @swift_getObjectType{{.*}} #[[M]]
+// CHECK-IR: call {{.*}} @swift_getObjectType({{.*}}) #[[M:[0-9]+]]
+// CHECK-IR: declare {{.*}} @swift_getObjectType{{.*}} local_unnamed_addr #[[N:[0-9]+]]
+// CHECK-IR: attributes #[[N]] = { nofree nounwind readonly }
 // CHECK-IR: attributes #[[M]] = { nounwind readonly }
 
 // CHECK: okay

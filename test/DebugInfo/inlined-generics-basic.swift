@@ -29,11 +29,13 @@ func yes() -> Bool { return true }
 }
 
 // SIL: sil_scope [[F:.*]] { {{.*}}parent @$s1A1CC1fyyqd__lF
-// SIL: sil_scope [[F1G:.*]] { loc "f.swift":2:5 parent [[F]] }
+// SIL: sil_scope [[F1:.*]] { {{.*}}parent [[F]] }
+// SIL: sil_scope [[F1G:.*]] { loc "f.swift":2:5 parent [[F1]] }
 // SIL: sil_scope [[F1G1:.*]] { loc "g.swift":2:3 {{.*}}inlined_at [[F1G]] }
 // SIL: sil_scope [[F1G3:.*]] { loc "g.swift":3:5 {{.*}}inlined_at [[F1G]] }
 // SIL: sil_scope [[F1G3H:.*]] { loc "h.swift":1:24
 // SIL-SAME:                     parent @{{.*}}1h{{.*}} inlined_at [[F1G3]] }
+// SIL: sil_scope [[F1G3H1:.*]] { {{.*}} parent [[F1G3H]] inlined_at [[F1G3]] }
 
 #sourceLocation(file: "C.swift", line: 1)
 public class C<R> {
@@ -46,7 +48,7 @@ public class C<R> {
   public func f<S>(_ s: S) {
     // SIL: debug_value %0 : $*S, let, name "s", argno 1, expr op_deref, {{.*}} scope [[F]]
     // SIL: function_ref {{.*}}yes{{.*}} scope [[F1G1]]
-    // SIL: function_ref {{.*}}use{{.*}} scope [[F1G3H]]
+    // SIL: function_ref {{.*}}use{{.*}} scope [[F1G3H1]]
     // IR: dbg.value(metadata %swift.type* %S, metadata ![[MD_1_0:[0-9]+]]
     // IR: dbg.value(metadata %swift.opaque* %0, metadata ![[S:[0-9]+]]
     // IR: dbg.value(metadata %swift.opaque* %0, metadata ![[GS_T:[0-9]+]]

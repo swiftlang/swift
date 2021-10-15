@@ -184,10 +184,13 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     // assert.
     assert(mod.getStage() == SILStage::Raw ||
            fn->getLoweredFunctionType() == constantType);
+    auto linkageForDef = constant.getLinkage(ForDefinition_t::ForDefinition);
+    auto fnLinkage = fn->getLinkage();
     assert(mod.getStage() == SILStage::Raw || fn->getLinkage() == linkage ||
            (forDefinition == ForDefinition_t::NotForDefinition &&
-            fn->getLinkage() ==
-                constant.getLinkage(ForDefinition_t::ForDefinition)));
+            (fnLinkage == linkageForDef ||
+             (linkageForDef == SILLinkage::PublicNonABI &&
+              fnLinkage == SILLinkage::SharedExternal))));
     if (forDefinition) {
       // In all the cases where getConstantLinkage returns something
       // different for ForDefinition, it returns an available-externally

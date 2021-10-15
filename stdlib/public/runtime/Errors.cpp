@@ -314,7 +314,7 @@ reportNow(uint32_t flags, const char *message)
 #else
   write(STDERR_FILENO, message, strlen(message));
 #endif
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_HAS_ASL
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
 #elif defined(__ANDROID__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);

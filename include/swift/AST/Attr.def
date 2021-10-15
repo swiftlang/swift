@@ -665,6 +665,13 @@ SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   120)
 
+DECL_ATTR(_nonSendable, NonSendable,
+  OnNominalType |
+  UserInaccessible | AllowMultipleAttributes |
+  ABIStableToAdd | ABIBreakingToRemove |
+  APIStableToAdd | APIBreakingToRemove,
+  121)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 

@@ -849,11 +849,29 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
     // There could be a local ambiguity related to
     // the current element, let's try to resolve it.
-    if (Solutions.size() > 1) {
+    if (Solutions.size() > 1)
       filterSolutions(Solutions, /*minimize=*/true);
 
-      if (Solutions.size() != 1)
-        return failConjunction();
+    // In diagnostic mode we need to stop a conjunction
+    // but consider it successful if there are:
+    //
+    // - More than one solution for this element. Ambiguity
+    //   needs to get propagated back to the outer context
+    //   to be diagnosed.
+    // - A single solution that requires one or more fixes,
+    //   continuing would result in more errors associated
+    //   with the failed element.
+    if (CS.shouldAttemptFixes()) {
+      if (Solutions.size() > 1)
+        Producer.markExhausted();
+
+      if (Solutions.size() == 1) {
+        auto score = Solutions.front().getFixedScore();
+        if (score.Data[SK_Fix] > 0)
+          Producer.markExhausted();
+      }
+    } else if (Solutions.size() != 1) {
+      return failConjunction();
     }
 
     // Since there is only one solution, let's
@@ -885,34 +903,44 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
         log << "(applying conjunction result to outer context\n";
       }
 
-      // Restore constraint system state before conjunction.
-      //
-      // Note that this doesn't include conjunction constraint
-      // itself because we don't want to re-solve it at this
-      // point.
       assert(
           Snapshot &&
           "Isolated conjunction requires a snapshot of the constraint system");
-      Snapshot->setupOuterContext(Solutions.pop_back_val());
 
-      // Restore best score, since upcoming step is going to
-      // work with outer scope in relation to the conjunction.
-      CS.solverState->BestScore = BestScore;
+      // In diagnostic mode it's valid for an element to have
+      // multiple solutions. Ambiguity just needs to be merged
+      // into the outer context to be property diagnosed.
+      if (Solutions.size() > 1) {
+        assert(CS.shouldAttemptFixes());
 
-      // Active all of the previously out-of-scope constraints
-      // because conjunction can propagate type information up
-      // by allowing its elements to reference type variables
-      // from outer scope (e.g. variable declarations and or captures).
-      {
-        CS.ActiveConstraints.splice(CS.ActiveConstraints.end(),
-                                    CS.InactiveConstraints);
-        for (auto &constraint : CS.ActiveConstraints)
-          constraint.setActive(true);
+        // Restore all outer type variables, constraints
+        // and scoring information.
+        Snapshot.reset();
+        restoreOuterState();
+
+        // Apply all of the information deduced from the
+        // conjunction (up to the point of ambiguity)
+        // back to the outer context and form a joined solution.
+        for (auto &solution : Solutions) {
+          ConstraintSystem::SolverScope scope(CS);
+
+          CS.applySolution(solution);
+          // Note that `worseThanBestSolution` isn't checked
+          // here because `Solutions` were pre-filtered, and
+          // outer score is the same for all of them.
+          OuterSolutions.push_back(CS.finalize());
+        }
+
+        return done(/*isSuccess=*/true);
       }
 
-      // Restore score to the one before conjunction. This has
-      // be done after solution, reached for the body, is applied.
-      CS.CurrentScore = CurrentScore;
+      // Restore outer type variables and prepare to solve
+      // constraints associated with outer context together
+      // with information deduced from the conjunction.
+      Snapshot->setupOuterContext(Solutions.pop_back_val());
+
+      // Pretend that conjunction never happend.
+      restoreOuterState();
 
       // Now that all of the information from the conjunction has
       // been applied, let's attempt to solve the outer scope.
@@ -922,4 +950,25 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
   // Attempt next conjunction choice.
   return take(prevFailed);
+}
+
+void ConjunctionStep::restoreOuterState() const {
+  // Restore best score, since upcoming step is going to
+  // work with outer scope in relation to the conjunction.
+  CS.solverState->BestScore = BestScore;
+
+  // Active all of the previously out-of-scope constraints
+  // because conjunction can propagate type information up
+  // by allowing its elements to reference type variables
+  // from outer scope (e.g. variable declarations and or captures).
+  {
+    CS.ActiveConstraints.splice(CS.ActiveConstraints.end(),
+                                CS.InactiveConstraints);
+    for (auto &constraint : CS.ActiveConstraints)
+      constraint.setActive(true);
+  }
+
+  // Restore score to the one before conjunction. This has
+  // be done after solution, reached for the body, is applied.
+  CS.CurrentScore = CurrentScore;
 }

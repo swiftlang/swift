@@ -1604,10 +1604,6 @@ ERROR(opened_attribute_id_value,none,
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
 
-// effects
-ERROR(effects_attribute_expect_option,none,
-      "expected '%0' option (readnone, readonly, readwrite)", (StringRef))
-
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,
       "expected 'safe' or 'unsafe'", ())

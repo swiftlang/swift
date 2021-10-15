@@ -427,6 +427,7 @@ public func sem_open(
 //===----------------------------------------------------------------------===//
 
 // Some platforms don't have `extern char** environ` imported from C.
+#if SWIFT_STDLIB_HAS_ENVIRON
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(OpenBSD) || os(PS4)
 public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
   return _swift_stdlib_getEnviron()
@@ -436,3 +437,4 @@ public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
   return __environ
 }
 #endif
+#endif // SWIFT_STDLIB_HAS_ENVIRON

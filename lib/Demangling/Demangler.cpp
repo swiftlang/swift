@@ -542,10 +542,12 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
   DemangleInitRAII state(*this, MangledName,
                          std::move(SymbolicReferenceResolver));
 
+#if SWIFT_SUPPORT_OLD_MANGLING
   // Demangle old-style class and protocol names, which are still used in the
   // ObjC metadata.
   if (nextIf("_Tt"))
     return demangleOldSymbolAsNode(Text, *this);
+#endif
 
   unsigned PrefixLength = getManglingPrefixLength(MangledName);
   if (PrefixLength == 0)

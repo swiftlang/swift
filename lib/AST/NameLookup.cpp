@@ -1220,6 +1220,12 @@ void ExtensionDecl::addedMember(Decl *member) {
   }
 }
 
+void NominalTypeDecl::addMemberToLookupTable(Decl *member) {
+  prepareLookupTable();
+
+  LookupTable->addMember(member);
+}
+
 // For lack of anywhere more sensible to put it, here's a diagram of the pieces
 // involved in finding members and extensions of a NominalTypeDecl.
 //
@@ -1332,7 +1338,9 @@ void NominalTypeDecl::prepareLookupTable() {
   } else {
     LookupTable->addMembers(getMembers());
   }
+}
 
+void NominalTypeDecl::addLoadedExtensions() {
   for (auto e : getExtensions()) {
     // If we can lazy-load this extension, only take the members we've loaded
     // so far.
@@ -1424,10 +1432,10 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   decl->prepareLookupTable();
 
-  // If we're allowed to load extensions, call prepareExtensions to ensure we
+  // If we're allowed to load extensions, call addLoadedExtensions to ensure we
   // properly invalidate the lazily-complete cache for any extensions brought in
   // by modules loaded after-the-fact. This can happen with the LLDB REPL.
-  decl->prepareExtensions();
+  decl->addLoadedExtensions();
 
   auto &Table = *decl->LookupTable;
   if (!useNamedLazyMemberLoading) {

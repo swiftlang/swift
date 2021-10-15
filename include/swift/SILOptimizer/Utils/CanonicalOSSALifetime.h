@@ -357,8 +357,8 @@ protected:
 
   void findOrInsertDestroys();
 
-  void insertDestroyOnCFGEdge(SILBasicBlock *predBB, SILBasicBlock *succBB,
-                              bool needsPoison);
+  void findOrInsertDestroyOnCFGEdge(SILBasicBlock *predBB,
+                                    SILBasicBlock *succBB, bool needsPoison);
 
   void rewriteCopies();
 
