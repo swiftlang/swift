@@ -24,14 +24,14 @@
 
 // RUN: not %api-digester -diagnose-sdk -baseline-dir %t.baseline -module Foo -I %t.mod2 -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -compiler-style-diags
 
-// RUN: not %api-digester -diagnose-sdk -baseline-dir %t.baseline -module Foo -I %t.mod2 -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -compiler-style-diags -breakage-allowlist-path %t/incomplete-allowlist.txt
+// RUN: %api-digester -diagnose-sdk -baseline-dir %t.baseline -module Foo -I %t.mod2 -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -compiler-style-diags -breakage-allowlist-path %t/incomplete-allowlist.txt
 
 // RUN: %api-digester -diagnose-sdk -baseline-dir %t.baseline -module Foo -I %t.mod2 -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -compiler-style-diags -breakage-allowlist-path %t/complete-allowlist.txt
 
 // RUN: not %api-digester -diagnose-sdk -baseline-dir %t.baseline -module Foo -I %t.mod2 -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -serialize-diagnostics-path %t/serialized-diag.dia
 // RUN: ls %t/serialized-diag.dia
 
-// RUN: not %api-digester -diagnose-sdk -baseline-dir %t.baseline -module Foo -I %t.mod2 -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -serialize-diagnostics-path %t/serialized-diag.dia -breakage-allowlist-path %t/incomplete-allowlist.txt
+// RUN: %api-digester -diagnose-sdk -baseline-dir %t.baseline -module Foo -I %t.mod2 -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -serialize-diagnostics-path %t/serialized-diag.dia -breakage-allowlist-path %t/incomplete-allowlist.txt
 // RUN: ls %t/serialized-diag.dia
 
 // RUN: %api-digester -diagnose-sdk -baseline-dir %t.baseline -module Foo -I %t.mod2 -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -serialize-diagnostics-path %t/serialized-diag.dia -breakage-allowlist-path %t/complete-allowlist.txt
