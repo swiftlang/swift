@@ -719,6 +719,9 @@ private:
   // from currently selected representative.
   void pruneOverloadSet(Constraint *disjunction) {
     auto *choice = disjunction->getNestedConstraints().front();
+    if (choice->getKind() != ConstraintKind::BindOverload)
+      return;
+
     auto *typeVar = choice->getFirstType()->getAs<TypeVariableType>();
     if (!typeVar)
       return;
