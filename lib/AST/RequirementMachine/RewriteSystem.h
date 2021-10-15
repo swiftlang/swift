@@ -122,6 +122,8 @@ public:
     return LHS.size();
   }
 
+  int compare(const Rule &other, const ProtocolGraph &protos) const;
+
   void dump(llvm::raw_ostream &out) const;
 
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,

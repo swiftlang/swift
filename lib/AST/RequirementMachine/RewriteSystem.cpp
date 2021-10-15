@@ -73,6 +73,15 @@ bool Rule::isProtocolRefinementRule() const {
           LHS[0] != LHS[1]);
 }
 
+/// Linear order on rules; compares LHS followed by RHS.
+int Rule::compare(const Rule &other, const ProtocolGraph &protos) const {
+  int compare = LHS.compare(other.LHS, protos);
+  if (compare != 0)
+    return compare;
+
+  return RHS.compare(other.RHS, protos);
+}
+
 void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
   if (Permanent)
