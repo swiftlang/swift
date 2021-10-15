@@ -3933,21 +3933,62 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
   }
 
   // Local function to form the implicit conformance.
-  auto formConformance = [&]() -> NormalProtocolConformance * {
+  auto formConformance = [&](const DeclAttribute *attrMakingUnavailable)
+        -> NormalProtocolConformance * {
     ASTContext &ctx = nominal->getASTContext();
     auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
     if (!proto)
       return nullptr;
 
+    DeclContext *conformanceDC = nominal;
+    if (attrMakingUnavailable) {
+      llvm::VersionTuple NoVersion;
+      auto attr = new (ctx) AvailableAttr(SourceLoc(), SourceRange(),
+                                          PlatformKind::none, "", "", nullptr,
+                                          NoVersion, SourceRange(),
+                                          NoVersion, SourceRange(),
+                                          NoVersion, SourceRange(),
+                                          PlatformAgnosticAvailabilityKind::Unavailable,
+                                          false);
+
+      // Conformance availability is currently tied to the declaring extension.
+      // FIXME: This is a hack--we should give conformances real availability.
+      auto inherits = ctx.AllocateCopy(makeArrayRef(
+          InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
+                         /*isUnchecked*/true)));
+      auto extension = ExtensionDecl::create(ctx, attrMakingUnavailable->AtLoc,
+                                             nullptr, inherits,
+                                             nominal->getModuleScopeContext(),
+                                             nullptr);
+      extension->setImplicit();
+      extension->getAttrs().add(attr);
+
+      ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
+                                nominal->getDeclaredType());
+      ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
+                                std::move(nominal));
+      nominal->addExtension(extension);
+
+      // Make it accessible to getTopLevelDecls()
+      if (auto sf = dyn_cast<SourceFile>(nominal->getModuleScopeContext()))
+        sf->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
+
+      conformanceDC = extension;
+    }
+
     auto conformance = ctx.getConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
-        nominal, ProtocolConformanceState::Complete, false);
+        conformanceDC, ProtocolConformanceState::Complete,
+        /*isUnchecked=*/attrMakingUnavailable != nullptr);
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 
     nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
     return conformance;
   };
+
+  if (auto nonSendable = nominal->getAttrs().getAttribute<NonSendableAttr>())
+    return formConformance(nonSendable);
 
   // A non-protocol type with a global actor is implicitly Sendable.
   if (nominal->getGlobalActorAttr()) {
@@ -3966,7 +4007,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     }
 
     // Form the implicit conformance to Sendable.
-    return formConformance();
+    return formConformance(nullptr);
   }
 
   // Only structs and enums can get implicit Sendable conformances by
@@ -3991,7 +4032,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
           nominal, nominal, SendableCheck::Implicit))
     return nullptr;
 
-  return formConformance();
+  return formConformance(nullptr);
 }
 
 AnyFunctionType *swift::applyGlobalActorType(

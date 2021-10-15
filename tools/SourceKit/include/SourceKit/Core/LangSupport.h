@@ -500,6 +500,9 @@ struct CursorInfoData {
   llvm::ArrayRef<RefactoringInfo> AvailableActions;
 };
 
+/// The result type of `LangSupport::getDiagnostics`
+typedef ArrayRef<DiagnosticEntryInfo> DiagnosticsResult;
+
 struct RangeInfo {
   UIdent RangeKind;
   StringRef ExprType;
@@ -831,6 +834,13 @@ public:
       ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
+
+  virtual void
+  getDiagnostics(StringRef InputFile, ArrayRef<const char *> Args,
+                 Optional<VFSOptions> VfsOptions,
+                 SourceKitCancellationToken CancellationToken,
+                 std::function<void(const RequestResult<DiagnosticsResult> &)>
+                     Receiver) = 0;
 
   virtual void
   getNameInfo(StringRef Filename, unsigned Offset, NameTranslatingInfo &Input,

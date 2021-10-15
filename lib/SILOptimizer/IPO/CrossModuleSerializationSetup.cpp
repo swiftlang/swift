@@ -63,9 +63,13 @@ class CrossModuleSerializationSetup {
 
   bool canSerialize(SILInstruction *inst, bool lookIntoThunks);
 
+  bool canSerialize(SILGlobalVariable *global);
+
   bool canSerialize(SILType type);
 
   void setUpForSerialization(SILFunction *F);
+
+  void setUpForSerialization(SILGlobalVariable *global);
 
   void prepareInstructionForSerialization(SILInstruction *inst);
 
@@ -241,9 +245,6 @@ static void makeFunctionUsableFromInline(SILFunction *F) {
 /// referenced function onto the worklist.
 void CrossModuleSerializationSetup::
 prepareInstructionForSerialization(SILInstruction *inst) {
-  // Make all types of the instruction usable from inline.
-  InstructionVisitor::visitInst(inst, *this);
-
   // Put callees onto the worklist if they should be serialized as well.
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(inst)) {
     SILFunction *callee = FRI->getReferencedFunctionOrNull();
@@ -252,8 +253,11 @@ prepareInstructionForSerialization(SILInstruction *inst) {
     return;
   }
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
-    GAI->getReferencedGlobal()->setSerialized(IsSerialized);
-    GAI->getReferencedGlobal()->setLinkage(SILLinkage::Public);
+    SILGlobalVariable *gl = GAI->getReferencedGlobal();
+    if (canSerialize(gl)) {
+      setUpForSerialization(gl);
+    }
+    gl->setLinkage(SILLinkage::Public);
     return;
   }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
@@ -353,6 +357,15 @@ bool CrossModuleSerializationSetup::canSerialize(SILInstruction *inst,
   return true;
 }
 
+bool CrossModuleSerializationSetup::canSerialize(SILGlobalVariable *global) {
+  for (const SILInstruction &initInst : *global) {
+    if (!canSerialize(const_cast<SILInstruction *>(&initInst),
+                      /*lookIntoThunks*/ true))
+      return false;
+  }
+  return true;
+}
+
 bool CrossModuleSerializationSetup::canSerialize(SILType type) {
   auto iter = typesChecked.find(type);
   if (iter != typesChecked.end())
@@ -421,6 +434,9 @@ void CrossModuleSerializationSetup::setUpForSerialization(SILFunction *F) {
   // for serialization.
   for (SILBasicBlock &block : *F) {
     for (SILInstruction &inst : block) {
+      // Make all types of the instruction usable from inline.
+      InstructionVisitor::visitInst(&inst, *this);
+
       prepareInstructionForSerialization(&inst);
     }
   }
@@ -437,6 +453,14 @@ void CrossModuleSerializationSetup::setUpForSerialization(SILFunction *F) {
   } else {
     F->setLinkage(SILLinkage::Public);
   }
+}
+
+void CrossModuleSerializationSetup::
+setUpForSerialization(SILGlobalVariable *global) {
+  for (const SILInstruction &initInst : *global) {
+    prepareInstructionForSerialization(const_cast<SILInstruction *>(&initInst));
+  }
+  global->setSerialized(IsSerialized);
 }
 
 /// Select functions in the module which should be serialized.

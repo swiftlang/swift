@@ -569,6 +569,13 @@ public:
                      std::function<void(const RequestResult<CursorInfoData> &)>
                          Receiver) override;
 
+  void
+  getDiagnostics(StringRef InputFile, ArrayRef<const char *> Args,
+                 Optional<VFSOptions> VfsOptions,
+                 SourceKitCancellationToken CancellationToken,
+                 std::function<void(const RequestResult<DiagnosticsResult> &)>
+                     Receiver) override;
+
   void getNameInfo(
       StringRef Filename, unsigned Offset, NameTranslatingInfo &Input,
       ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,

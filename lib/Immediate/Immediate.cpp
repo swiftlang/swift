@@ -239,7 +239,7 @@ int swift::RunImmediately(CompilerInstance &CI,
   // This must be done here, before any library loading has been done, to avoid
   // racing with the static initializers in user code.
   // Setup interpreted process arguments.
-  using ArgOverride = void (*)(const char **, int);
+  using ArgOverride = void (* SWIFT_CC(swift))(const char **, int);
 #if defined(_WIN32)
   auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPaths);
   if (!stdlib) {

@@ -504,9 +504,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
   addr = llvm::ConstantExpr::getGetElementPtr(
-      cast<llvm::PointerType>(addr->getType()->getScalarType())
-          ->getElementType(),
-      addr, bitConstant);
+    addr->getType()->getPointerElementType(), addr, bitConstant);
 
   // Update the entry.
   entry = {var, addr};

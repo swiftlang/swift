@@ -262,6 +262,7 @@ UID_REQUESTS = [
     REQUEST('CollectVariableType', 'source.request.variable.type'),
     REQUEST('GlobalConfiguration', 'source.request.configuration.global'),
     REQUEST('DependencyUpdated', 'source.request.dependency_updated'),
+    REQUEST('Diagnostics', 'source.request.diagnostics'),
 ]
 
 

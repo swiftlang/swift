@@ -1499,9 +1499,7 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
   return llvm::ConstantExpr::getInBoundsGetElementPtr(
-      cast<llvm::PointerType>(witness->getType()->getScalarType())
-          ->getElementType(),
-      witness, bitConstant);
+    witness->getType()->getPointerElementType(), witness, bitConstant);
 }
 
 static void buildAssociatedTypeValueName(CanType depAssociatedType,
@@ -2668,7 +2666,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       CanType baseSubstType =
         sourceConformance.getAssociatedType(sourceType, depMemType.getBase())
           ->getCanonicalType();
-      if (auto archetypeType = cast<ArchetypeType>(baseSubstType)) {
+      if (auto archetypeType = dyn_cast<ArchetypeType>(baseSubstType)) {
         AssociatedType baseAssocType(depMemType->getAssocType());
 
         MetadataResponse response =

@@ -376,8 +376,9 @@ bool SILValueOwnershipChecker::gatherUsers(
                          << "Address User: " << *op->getUser();
           });
         };
-        foundError |= interiorPointerOperand.findTransitiveUses(
-            nonLifetimeEndingUsers, &onError);
+        foundError |= (interiorPointerOperand.findTransitiveUses(
+                           &nonLifetimeEndingUsers, &onError)
+                       == AddressUseKind::Unknown);
       }
 
       // Finally add the op to the non lifetime ending user list.

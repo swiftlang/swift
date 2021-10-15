@@ -450,7 +450,9 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     // perform the concrete type adjustment:
     //
     //     (σ - T)
-    if (xv.back().isSuperclassOrConcreteType() && t.size() > 0) {
+    if (xv.back().isSuperclassOrConcreteType() &&
+        !xv.back().getSubstitutions().empty() &&
+        t.size() > 0) {
       path.add(RewriteStep::forAdjustment(t.size(), /*inverse=*/true));
 
       xv.back() = xv.back().prependPrefixToConcreteSubstitutions(
@@ -535,7 +537,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           if (from == lhs.getLHS().begin()) {
             // While every rule will have an overlap of the first kind
             // with itself, it's not useful to consider since the
-            // resulting trivial pair is always trivial.
+            // resulting critical pair is always trivial.
             if (i == j)
               return;
 

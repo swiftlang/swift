@@ -331,19 +331,23 @@ namespace {
         CanSILFunctionType type, AbstractionPattern origType) {
       auto &M = TC.M;
       auto origTy = type->getWithoutDifferentiability();
-      // Pass the `AbstractionPattern` generic signature to
-      // `SILFunctionType:getAutoDiffDerivativeFunctionType` for correct type
-      // lowering.
+      // Pass the original type of abstraction pattern to
+      // `SILFunctionType:getAutoDiffDerivativeFunctionType` to get the
+      // necessary generic requirements.
+      auto origTypeOfAbstraction =
+          origType.hasGenericSignature() ? origType.getType() : CanType();
       auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiabilityParameterIndices(),
           type->getDifferentiabilityResultIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(&M), CanGenericSignature());
+          LookUpConformanceInModule(&M), CanGenericSignature(),
+          false, origTypeOfAbstraction);
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiabilityParameterIndices(),
           type->getDifferentiabilityResultIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(&M), CanGenericSignature());
+          LookUpConformanceInModule(&M), CanGenericSignature(),
+          false, origTypeOfAbstraction);
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
       props.addSubobject(classifyType(origType, jvpTy, TC, Expansion));

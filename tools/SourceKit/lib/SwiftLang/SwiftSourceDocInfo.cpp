@@ -10,12 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SwiftASTManager.h"
-#include "SwiftLangSupport.h"
 #include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/ImmutableTextBuffer.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
+#include "SwiftASTManager.h"
+#include "SwiftEditorDiagConsumer.h"
+#include "SwiftLangSupport.h"
 
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -1588,6 +1589,36 @@ static void resolveCursor(
                                         CancellationToken, fileSystem);
 }
 
+static void computeDiagnostics(
+    SwiftLangSupport &Lang, StringRef InputFile, SwiftInvocationRef Invok,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<DiagnosticsResult> &)> Receiver) {
+
+  class DiagnosticsConsumer : public SwiftASTConsumer {
+    std::function<void(const RequestResult<DiagnosticsResult> &)> Receiver;
+
+  public:
+    DiagnosticsConsumer(
+        std::function<void(const RequestResult<DiagnosticsResult> &)> Receiver)
+        : Receiver(Receiver) {}
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      unsigned BufferID =
+          AstUnit->getPrimarySourceFile().getBufferID().getValue();
+      auto &DiagConsumer = AstUnit->getEditorDiagConsumer();
+      auto Diagnostics = DiagConsumer.getDiagnosticsForBuffer(BufferID);
+      Receiver(RequestResult<DiagnosticsResult>::fromResult(Diagnostics));
+    }
+  };
+
+  auto Consumer = std::make_shared<DiagnosticsConsumer>(std::move(Receiver));
+
+  Lang.getASTManager()->processASTAsync(Invok, std::move(Consumer),
+                                        /*OncePerASTToken=*/nullptr,
+                                        CancellationToken, FileSystem);
+}
+
 static void resolveName(
     SwiftLangSupport &Lang, StringRef InputFile, unsigned Offset,
     SwiftInvocationRef Invok, bool TryExistingAST, NameTranslatingInfo &Input,
@@ -1844,6 +1875,33 @@ void SwiftLangSupport::getCursorInfo(
   resolveCursor(*this, InputFile, Offset, Length, Actionables, SymbolGraph,
                 Invok, /*TryExistingAST=*/true, CancelOnSubsequentRequest,
                 fileSystem, CancellationToken, Receiver);
+}
+
+void SwiftLangSupport::getDiagnostics(
+    StringRef InputFile, ArrayRef<const char *> Args,
+    Optional<VFSOptions> VfsOptions,
+    SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<DiagnosticsResult> &)> Receiver) {
+  std::string FileSystemError;
+  auto FileSystem = getFileSystem(VfsOptions, InputFile, FileSystemError);
+  if (!FileSystem) {
+    Receiver(RequestResult<DiagnosticsResult>::fromError(FileSystemError));
+    return;
+  }
+
+  std::string InvocationError;
+  SwiftInvocationRef Invok =
+      ASTMgr->getInvocation(Args, InputFile, FileSystem, InvocationError);
+  if (!InvocationError.empty()) {
+    LOG_WARN_FUNC("error creating ASTInvocation: " << InvocationError);
+  }
+  if (!Invok) {
+    Receiver(RequestResult<DiagnosticsResult>::fromError(InvocationError));
+    return;
+  }
+
+  computeDiagnostics(*this, InputFile, Invok, FileSystem, CancellationToken,
+                     Receiver);
 }
 
 void SwiftLangSupport::getRangeInfo(

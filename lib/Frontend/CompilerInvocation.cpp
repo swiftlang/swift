@@ -434,9 +434,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
-  Opts.EnableExperimentalLexicalLifetimes |=
-      Args.hasArg(OPT_enable_experimental_lexical_lifetimes);
-
   Opts.EnableExperimentalNamedOpaqueTypes |=
       Args.hasArg(OPT_enable_experimental_named_opaque_types);
 
@@ -1400,6 +1397,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
+  Opts.EnableExperimentalLexicalLifetimes |=
+      Args.hasArg(OPT_enable_experimental_lexical_lifetimes);
   Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
   Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);

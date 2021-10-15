@@ -46,7 +46,8 @@ add_compile_definitions(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
 set(swift_concurrency_install_component back-deployment)
 set(swift_concurrency_options
   BACK_DEPLOYMENT_LIBRARY 5.5
-  DARWIN_INSTALL_NAME_DIR "@rpath")
+  DARWIN_INSTALL_NAME_DIR "@rpath"
+  LINK_FLAGS -lobjc)
 set(swift_concurrency_extra_sources
   "../BackDeployConcurrency/Exclusivity.cpp"
   "../BackDeployConcurrency/Metadata.cpp"

@@ -351,6 +351,112 @@ Type RewriteContext::getRelativeTypeForTerm(
       { }, protos, *this);
 }
 
+/// Concrete type terms are written in terms of generic parameter types that
+/// have a depth of 0, and an index into an array of substitution terms.
+///
+/// See RewriteSystemBuilder::getConcreteSubstitutionSchema().
+static unsigned getGenericParamIndex(Type type) {
+  auto *paramTy = type->castTo<GenericTypeParamType>();
+  assert(paramTy->getDepth() == 0);
+  return paramTy->getIndex();
+}
+
+/// Computes the term corresponding to a member type access on a substitution.
+///
+/// The type witness is a type parameter of the form τ_0_n.X.Y.Z,
+/// where 'n' is an index into the substitution array.
+///
+/// If the nth entry in the array is S, this will produce S.X.Y.Z.
+///
+/// There is a special behavior if the substitution is a term consisting of a
+/// single protocol symbol [P]. If the innermost associated type in
+/// \p typeWitness is [Q:Foo], the result will be [P:Foo], not [P].[Q:Foo] or
+/// [Q:Foo].
+MutableTerm
+RewriteContext::getRelativeTermForType(CanType typeWitness,
+                                       ArrayRef<Term> substitutions) {
+  MutableTerm result;
+
+  // Get the substitution S corresponding to τ_0_n.
+  unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
+  result = MutableTerm(substitutions[index]);
+
+  // If the substitution is a term consisting of a single protocol symbol
+  // [P], save P for later.
+  const ProtocolDecl *proto = nullptr;
+  if (result.size() == 1 &&
+      result[0].getKind() == Symbol::Kind::Protocol) {
+    proto = result[0].getProtocol();
+  }
+
+  // Collect zero or more member type names in reverse order.
+  SmallVector<Symbol, 3> symbols;
+  while (auto memberType = dyn_cast<DependentMemberType>(typeWitness)) {
+    typeWitness = memberType.getBase();
+
+    auto *assocType = memberType->getAssocType();
+    assert(assocType != nullptr &&
+           "Conformance checking should not produce unresolved member types");
+
+    // If the substitution is a term consisting of a single protocol symbol [P],
+    // produce [P:Foo] instead of [P].[Q:Foo] or [Q:Foo].
+    const auto *thisProto = assocType->getProtocol();
+    if (proto && isa<GenericTypeParamType>(typeWitness)) {
+      thisProto = proto;
+
+      assert(result.size() == 1);
+      assert(result[0].getKind() == Symbol::Kind::Protocol);
+      assert(result[0].getProtocol() == proto);
+      result = MutableTerm();
+    }
+
+    symbols.push_back(Symbol::forAssociatedType(thisProto,
+                                                assocType->getName(), *this));
+  }
+
+  // Add the member type names.
+  for (auto iter = symbols.rbegin(), end = symbols.rend(); iter != end; ++iter)
+    result.add(*iter);
+
+  return result;
+}
+
+/// Reverses the transformation performed by
+/// RewriteSystemBuilder::getConcreteSubstitutionSchema().
+Type RewriteContext::getTypeFromSubstitutionSchema(
+    Type schema, ArrayRef<Term> substitutions,
+    TypeArrayView<GenericTypeParamType> genericParams,
+    const MutableTerm &prefix,
+    const ProtocolGraph &protos) const {
+  assert(!schema->isTypeParameter() && "Must have a concrete type here");
+
+  if (!schema->hasTypeParameter())
+    return schema;
+
+  return schema.transformRec([&](Type t) -> Optional<Type> {
+    if (t->is<GenericTypeParamType>()) {
+      auto index = getGenericParamIndex(t);
+      auto substitution = substitutions[index];
+
+      // Prepend the prefix of the lookup key to the substitution.
+      if (prefix.empty()) {
+        // Skip creation of a new MutableTerm in the case where the
+        // prefix is empty.
+        return getTypeForTerm(substitution, genericParams, protos);
+      } else {
+        // Otherwise build a new term by appending the substitution
+        // to the prefix.
+        MutableTerm result(prefix);
+        result.append(substitution);
+        return getTypeForTerm(result, genericParams, protos);
+      }
+    }
+
+    assert(!t->isTypeParameter());
+    return None;
+  });
+}
+
 RequirementMachine *RewriteContext::getRequirementMachine(
     CanGenericSignature sig) {
   auto &machine = Machines[sig];

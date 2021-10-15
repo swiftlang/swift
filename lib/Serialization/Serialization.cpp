@@ -2490,6 +2490,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_NonSendable: {
+      auto *theAttr = cast<NonSendableAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[NonSendableDeclAttrLayout::Code];
+      NonSendableDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                        (unsigned)theAttr->getKind());
+      return;
+    }
+
     case DAK_Optimize: {
       auto *theAttr = cast<OptimizeAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[OptimizeDeclAttrLayout::Code];

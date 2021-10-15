@@ -111,34 +111,6 @@ Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurre
 Func withThrowingTaskGroup(of:returning:body:) has generic signature change from <ChildTaskResult, GroupResult> to <ChildTaskResult, GroupResult where ChildTaskResult : Swift.Sendable>
 Func withThrowingTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withThrowingTaskGroup<A, B>(of: A.Type, returning: B.Type, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B' to '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B'
 Import Swift has been renamed to Import _SwiftConcurrencyShims
-Struct AsyncCompactMapSequence is now with @frozen
-Struct AsyncCompactMapSequence.Iterator is now with @frozen
-Struct AsyncDropFirstSequence is now with @frozen
-Struct AsyncDropFirstSequence.Iterator is now with @frozen
-Struct AsyncDropWhileSequence is now with @frozen
-Struct AsyncDropWhileSequence.Iterator is now with @frozen
-Struct AsyncFilterSequence is now with @frozen
-Struct AsyncFilterSequence.Iterator is now with @frozen
-Struct AsyncFlatMapSequence is now with @frozen
-Struct AsyncFlatMapSequence.Iterator is now with @frozen
-Struct AsyncMapSequence is now with @frozen
-Struct AsyncMapSequence.Iterator is now with @frozen
-Struct AsyncPrefixSequence is now with @frozen
-Struct AsyncPrefixSequence.Iterator is now with @frozen
-Struct AsyncPrefixWhileSequence is now with @frozen
-Struct AsyncPrefixWhileSequence.Iterator is now with @frozen
-Struct AsyncThrowingCompactMapSequence is now with @frozen
-Struct AsyncThrowingCompactMapSequence.Iterator is now with @frozen
-Struct AsyncThrowingDropWhileSequence is now with @frozen
-Struct AsyncThrowingDropWhileSequence.Iterator is now with @frozen
-Struct AsyncThrowingFilterSequence is now with @frozen
-Struct AsyncThrowingFilterSequence.Iterator is now with @frozen
-Struct AsyncThrowingFlatMapSequence is now with @frozen
-Struct AsyncThrowingFlatMapSequence.Iterator is now with @frozen
-Struct AsyncThrowingMapSequence is now with @frozen
-Struct AsyncThrowingMapSequence.Iterator is now with @frozen
-Struct AsyncThrowingPrefixWhileSequence is now with @frozen
-Struct AsyncThrowingPrefixWhileSequence.Iterator is now with @frozen
 Struct Task has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Success : Swift.Sendable, Failure : Swift.Error>
 Struct TaskGroup has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
 Struct TaskGroup.Iterator has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
@@ -146,72 +118,5 @@ Struct ThrowingTaskGroup has generic signature change from <ChildTaskResult, Fai
 Struct ThrowingTaskGroup.Iterator has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
 Struct YieldingContinuation has been removed (deprecated)
 Subscript TaskLocal.subscript(_enclosingInstance:wrapped:storage:) has been removed
-Var AsyncCompactMapSequence.Iterator.baseIterator is now a stored property
-Var AsyncCompactMapSequence.Iterator.transform is now a stored property
-Var AsyncCompactMapSequence.base is now a stored property
-Var AsyncCompactMapSequence.transform is now a stored property
-Var AsyncDropFirstSequence.Iterator.baseIterator is now a stored property
-Var AsyncDropFirstSequence.Iterator.count is now a stored property
-Var AsyncDropFirstSequence.base is now a stored property
-Var AsyncDropFirstSequence.count is now a stored property
-Var AsyncDropWhileSequence.Iterator.baseIterator is now a stored property
-Var AsyncDropWhileSequence.Iterator.predicate is now a stored property
-Var AsyncDropWhileSequence.base is now a stored property
-Var AsyncDropWhileSequence.predicate is now a stored property
-Var AsyncFilterSequence.Iterator.baseIterator is now a stored property
-Var AsyncFilterSequence.Iterator.isIncluded is now a stored property
-Var AsyncFilterSequence.base is now a stored property
-Var AsyncFilterSequence.isIncluded is now a stored property
-Var AsyncFlatMapSequence.Iterator.baseIterator is now a stored property
-Var AsyncFlatMapSequence.Iterator.currentIterator is now a stored property
-Var AsyncFlatMapSequence.Iterator.finished is now a stored property
-Var AsyncFlatMapSequence.Iterator.transform is now a stored property
-Var AsyncFlatMapSequence.base is now a stored property
-Var AsyncFlatMapSequence.transform is now a stored property
-Var AsyncMapSequence.Iterator.baseIterator is now a stored property
-Var AsyncMapSequence.Iterator.transform is now a stored property
-Var AsyncMapSequence.base is now a stored property
-Var AsyncMapSequence.transform is now a stored property
-Var AsyncPrefixSequence.Iterator.baseIterator is now a stored property
-Var AsyncPrefixSequence.Iterator.remaining is now a stored property
-Var AsyncPrefixSequence.base is now a stored property
-Var AsyncPrefixSequence.count is now a stored property
-Var AsyncPrefixWhileSequence.Iterator.baseIterator is now a stored property
-Var AsyncPrefixWhileSequence.Iterator.predicate is now a stored property
-Var AsyncPrefixWhileSequence.Iterator.predicateHasFailed is now a stored property
-Var AsyncPrefixWhileSequence.base is now a stored property
-Var AsyncPrefixWhileSequence.predicate is now a stored property
-Var AsyncThrowingCompactMapSequence.Iterator.baseIterator is now a stored property
-Var AsyncThrowingCompactMapSequence.Iterator.finished is now a stored property
-Var AsyncThrowingCompactMapSequence.Iterator.transform is now a stored property
-Var AsyncThrowingCompactMapSequence.base is now a stored property
-Var AsyncThrowingCompactMapSequence.transform is now a stored property
-Var AsyncThrowingDropWhileSequence.Iterator.baseIterator is now a stored property
-Var AsyncThrowingDropWhileSequence.Iterator.doneDropping is now a stored property
-Var AsyncThrowingDropWhileSequence.Iterator.finished is now a stored property
-Var AsyncThrowingDropWhileSequence.Iterator.predicate is now a stored property
-Var AsyncThrowingDropWhileSequence.base is now a stored property
-Var AsyncThrowingDropWhileSequence.predicate is now a stored property
-Var AsyncThrowingFilterSequence.Iterator.baseIterator is now a stored property
-Var AsyncThrowingFilterSequence.Iterator.finished is now a stored property
-Var AsyncThrowingFilterSequence.Iterator.isIncluded is now a stored property
-Var AsyncThrowingFilterSequence.base is now a stored property
-Var AsyncThrowingFilterSequence.isIncluded is now a stored property
-Var AsyncThrowingFlatMapSequence.Iterator.baseIterator is now a stored property
-Var AsyncThrowingFlatMapSequence.Iterator.currentIterator is now a stored property
-Var AsyncThrowingFlatMapSequence.Iterator.finished is now a stored property
-Var AsyncThrowingFlatMapSequence.Iterator.transform is now a stored property
-Var AsyncThrowingFlatMapSequence.base is now a stored property
-Var AsyncThrowingFlatMapSequence.transform is now a stored property
-Var AsyncThrowingMapSequence.Iterator.baseIterator is now a stored property
-Var AsyncThrowingMapSequence.Iterator.finished is now a stored property
-Var AsyncThrowingMapSequence.Iterator.transform is now a stored property
-Var AsyncThrowingMapSequence.base is now a stored property
-Var AsyncThrowingMapSequence.transform is now a stored property
-Var AsyncThrowingPrefixWhileSequence.Iterator.baseIterator is now a stored property
-Var AsyncThrowingPrefixWhileSequence.Iterator.predicate is now a stored property
-Var AsyncThrowingPrefixWhileSequence.Iterator.predicateHasFailed is now a stored property
-Var AsyncThrowingPrefixWhileSequence.base is now a stored property
-Var AsyncThrowingPrefixWhileSequence.predicate is now a stored property
 Var UnownedJob.context has mangled name changing from 'Swift.UnownedJob.(context in #UNSTABLE ID#) : Builtin.Job' to 'Swift.UnownedJob.(context in #UNSTABLE ID#) : Builtin.Job'
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

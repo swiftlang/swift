@@ -83,10 +83,12 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/AccessStorageAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
 
@@ -1003,10 +1005,30 @@ canMerge(PostDominanceInfo *postDomTree,
   return canMergeEnd(parentIns, childIns);
 }
 
+static bool extendOwnership(BeginAccessInst *parentInst,
+                            BeginAccessInst *childInst,
+                            InstructionDeleter &deleter,
+                            DeadEndBlocks &deBlocks) {
+  GuaranteedOwnershipExtension extension(deleter, deBlocks);
+  auto status = extension.checkAddressOwnership(parentInst, childInst);
+  switch (status) {
+  case GuaranteedOwnershipExtension::Invalid:
+    return false;
+  case GuaranteedOwnershipExtension::Valid:
+    return true;
+  case GuaranteedOwnershipExtension::ExtendLifetime:
+  case GuaranteedOwnershipExtension::ExtendBorrow:
+    break;
+  }
+  extension.transform(status);
+  return true;
+}
+
 /// Perform access merging.
-static bool mergeAccesses(
-    SILFunction *F, PostDominanceInfo *postDomTree,
-    const AccessConflictAndMergeAnalysis::MergeablePairs &mergePairs) {
+static bool
+mergeAccesses(SILFunction *F, PostDominanceInfo *postDomTree,
+              const AccessConflictAndMergeAnalysis::MergeablePairs &mergePairs,
+              InstModCallbacks &callbacks, DeadEndBlocks &deBlocks) {
 
   if (mergePairs.empty()) {
     LLVM_DEBUG(llvm::dbgs() << "Skipping SCC Analysis...\n");
@@ -1042,6 +1064,7 @@ static bool mergeAccesses(
   // begin_access instruction. We store (begin_access %2 -> begin_access %1)
   // to re-map a merged begin_access to it's replaced instruction.
   llvm::DenseMap<BeginAccessInst *, BeginAccessInst *> oldToNewMap;
+  InstructionDeleter deleter(callbacks);
 
   while (!workPairs.empty()) {
     auto curr = workPairs.pop_back_val();
@@ -1057,6 +1080,9 @@ static bool mergeAccesses(
     // If the current pattern is not supported - skip
     if (!canMerge(postDomTree, blockToSCCMap, parentIns, childIns))
       continue;
+
+    if (!extendOwnership(parentIns, childIns, deleter, deBlocks))
+      return false;
 
     LLVM_DEBUG(llvm::dbgs()
                << "Merging " << *childIns << " into " << *parentIns << "\n");
@@ -1084,8 +1110,9 @@ static bool mergeAccesses(
     auto curr = oldToNewMap.begin();
     auto *oldIns = curr->getFirst();
     oldToNewMap.erase(oldIns);
-    oldIns->eraseFromParent();
+    deleter.forceDelete(oldIns);
   }
+  deleter.cleanupDeadInstructions();
   return changed;
 }
 
@@ -1101,6 +1128,8 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
 
     LoopRegionFunctionInfo *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
     PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(F);
+    DeadEndBlocksAnalysis *deBlocksAnalysis =
+        PM->getAnalysis<DeadEndBlocksAnalysis>();
     AccessStorageAnalysis *ASA = getAnalysis<AccessStorageAnalysis>();
     AccessConflictAndMergeAnalysis a(LRFI, PO, ASA);
     if (!a.analyze())
@@ -1132,7 +1161,9 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     PostDominanceAnalysis *postDomAnalysis =
         getAnalysis<PostDominanceAnalysis>();
     PostDominanceInfo *postDomTree = postDomAnalysis->get(F);
-    if (mergeAccesses(F, postDomTree, result.mergePairs))
+    DeadEndBlocks *deBlocks = deBlocksAnalysis->get(F);
+    InstModCallbacks callbacks;
+    if (mergeAccesses(F, postDomTree, result.mergePairs, callbacks, *deBlocks))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
