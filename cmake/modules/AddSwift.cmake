@@ -145,12 +145,9 @@ function(_add_host_variant_c_compile_link_flags name)
   endif()
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
-    # lld can handle targeting the android build.  However, if lld is not
-    # enabled, then fallback to the linker included in the android NDK.
-    if(NOT SWIFT_USE_LINKER STREQUAL "lld")
-      swift_android_tools_path(${SWIFT_HOST_VARIANT_ARCH} tools_path)
-      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-B${tools_path}>)
-    endif()
+    # Make sure the Android NDK lld is used.
+    swift_android_tools_path(${SWIFT_HOST_VARIANT_ARCH} tools_path)
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-B${tools_path}>)
   endif()
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -384,11 +381,6 @@ function(_add_host_variant_link_flags target)
       cxx_link_libraries)
     target_link_libraries(${target} PRIVATE
       ${cxx_link_libraries})
-
-    swift_android_libgcc_for_arch_cross_compile(${SWIFT_HOST_VARIANT_ARCH}
-      ${SWIFT_HOST_VARIANT_ARCH}_LIB)
-    target_link_directories(${target} PRIVATE
-      ${${SWIFT_HOST_VARIANT_ARCH}_LIB})
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
     # generator leaves the intermediate object file in a place where it will not

@@ -42,8 +42,8 @@ config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 
 # --- android ---
+config.android_linker_name = "lld"
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
-config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 config.android_api_level = "@SWIFT_ANDROID_API_LEVEL@"
 
 # --- Windows ---
@@ -126,12 +126,6 @@ if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
 
 if "@SWIFT_HAVE_LIBXML2@" == "TRUE":
     config.available_features.add('libxml2')
-
-if "@SWIFT_USE_LINKER@" == "lld":
-    config.android_linker_name = "lld"
-else:
-    # even if SWIFT_USE_LINKER isn't set, we cannot use BFD for Android
-    config.android_linker_name = "gold"
 
 if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':
     config.available_features.add('swift_tools_extra')

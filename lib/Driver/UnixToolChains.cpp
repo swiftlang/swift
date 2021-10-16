@@ -85,6 +85,9 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
 }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
+  if (getTriple().isAndroid())
+    return "lld";
+
   switch (getTriple().getArch()) {
   case llvm::Triple::arm:
   case llvm::Triple::aarch64:

@@ -36,8 +36,8 @@ config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 
 # --- Android Configuration ---
+config.android_linker_name = "lld"
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
-config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 config.android_api_level = "@SWIFT_ANDROID_API_LEVEL@"
 
 # --- Windows MSVC Configuration ---
@@ -109,12 +109,6 @@ if "@CMAKE_GENERATOR@" == "Xcode":
       os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
-
-if "@SWIFT_USE_LINKER@" == "lld":
-    config.android_linker_name = "lld"
-else:
-    # even if SWIFT_USE_LINKER isn't set, we cannot use BFD for Android
-    config.android_linker_name = "gold"
 
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
