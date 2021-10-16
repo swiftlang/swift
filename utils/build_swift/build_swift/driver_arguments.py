@@ -1154,6 +1154,15 @@ def create_argument_parser():
            help='The Android API level to target when building for Android. '
                 'Currently only 21 or above is supported')
 
+    option('--android-ndk-gcc-version', store,
+           choices=['4.8', '4.9'],
+           default='4.9',
+           help='The GCC version to use when building for Android. Currently '
+                'only 4.9 is supported. %(default)s is also the default '
+                'value. This option may be used when experimenting with '
+                'versions of the Android NDK not officially supported by '
+                'Swift')
+
     option('--android-icu-uc', store_path,
            help='Path to libicuuc.so')
     option('--android-icu-uc-include', store_path,

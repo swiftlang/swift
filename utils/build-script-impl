@@ -95,6 +95,7 @@ KNOWN_SETTINGS=(
     android-icu-uc                                ""                "Path to libicuuc.so"
     android-icu-uc-include                        ""                "Path to a directory containing headers for libicuuc"
     android-ndk                                   ""                "An absolute path to the NDK that will be used as a libc implementation for Android builds"
+    android-ndk-gcc-version                       ""                "The GCC version to use when building for Android. Currently only 4.9 is supported"
 
     ## Darwin Options
     darwin-crash-reporter-client                  ""                "whether to enable CrashReporter integration"
@@ -1894,6 +1895,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
+                        -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC:STRING="${ANDROID_ICU_UC}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
                         -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
