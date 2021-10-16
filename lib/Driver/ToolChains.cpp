@@ -12,6 +12,7 @@
 
 #include "ToolChains.h"
 
+#include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
@@ -196,6 +197,13 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-Xcc");
     arguments.push_back(
         inputArgs.MakeArgString(Twine("-stdlib=") + arg->getValue()));
+  }
+
+  if (inputArgs.hasArg(options::OPT_experimental_hermetic_seal_at_link)) {
+    arguments.push_back("-enable-llvm-vfe");
+    arguments.push_back("-enable-llvm-wme");
+    arguments.push_back("-conditional-runtime-records");
+    arguments.push_back("-internalize-at-link");
   }
 
   // Handle the CPU and its preferences.
