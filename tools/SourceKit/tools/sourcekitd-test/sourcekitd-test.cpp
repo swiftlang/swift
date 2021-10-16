@@ -216,9 +216,9 @@ static void skt_main(skt_args *args);
 int main(int argc, const char **argv) {
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
     skt_args args = {argc, argv, 0};
-    llvm::thread Thread(llvm::thread::DefaultStackSize,
+    llvm::thread thread(llvm::thread::DefaultStackSize,
                         skt_main, &args);
-    Thread.join();
+    thread.join();
     exit(args.ret);
   });
 
