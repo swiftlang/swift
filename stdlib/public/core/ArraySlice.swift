@@ -195,11 +195,7 @@ extension ArraySlice {
   func _checkSubscript(
     _ index: Int, wasNativeTypeChecked: Bool
   ) -> _DependenceToken {
-#if _runtime(_ObjC)
     _buffer._checkValidSubscript(index)
-#else
-    _buffer._checkValidSubscript(index)
-#endif
     return _DependenceToken()
   }
 
