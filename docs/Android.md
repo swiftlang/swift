@@ -33,8 +33,8 @@ To follow along with this guide, you'll need:
    Ubuntu 18.04 or Ubuntu 16.04. Before attempting to build for Android,
    please make sure you are able to build for Linux by following the
    instructions in the Swift project README.
-2. The latest version of the Android NDK (r21e at the time of this writing,
-   only r19 or later are supported), available to download here:
+2. The latest version of the Android NDK (r23 at the time of this writing),
+   available to download here:
    https://developer.android.com/ndk/downloads/index.html.
 3. An Android device with remote debugging enabled or the emulator. We require
    remote debugging in order to deploy built stdlib products to the device. You
@@ -73,7 +73,7 @@ Android NDK, as well as the directories that contain the `libicuucswift.so` and
 
 ```
 $ ARM_DIR=path/to/libiconv-libicu-android/armeabi-v7a
-$ NDK_PATH=path/to/android-ndk-r21e
+$ NDK_PATH=path/to/android-ndk-r23
 $ utils/build-script \
     -R \                                       # Build in ReleaseAssert mode.
     --android \                                # Build for Android.
@@ -99,7 +99,7 @@ Then use the built Swift compiler from the previous step to compile a Swift
 source file, targeting Android:
 
 ```
-$ NDK_PATH="path/to/android-ndk-r21e"
+$ NDK_PATH="path/to/android-ndk-r23"
 $ build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swiftc \          # The Swift compiler built in the previous step
                                                                      # The location of the tools used to build Android binaries
     -tools-directory ${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/bin/ \
@@ -153,7 +153,7 @@ adb push /path/to/libicu-android/armeabi-v7a/libicuucswift.so /data/local/tmp
 In addition, you'll also need to copy the Android NDK's libc++:
 
 ```
-$ adb push /path/to/android-ndk-r21e/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so /data/local/tmp
+$ adb push /path/to/android-ndk-r23/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so /data/local/tmp
 ```
 
 Finally, you'll need to copy the `hello` executable you built in the
@@ -196,7 +196,7 @@ $ utils/build-script \
   -R \                               # Build in ReleaseAssert mode.
   -T \                               # Run all tests, including on the Android device (add --host-test to only run Android tests on the linux host).
   --android \                        # Build for Android.
-  --android-ndk ~/android-ndk-r21e \ # Path to an Android NDK.
+  --android-ndk ~/android-ndk-r23 \  # Path to an Android NDK.
   --android-arch armv7 \             # Optionally specify Android architecture, alternately aarch64
   --android-ndk-version 21 \
   --android-icu-uc ~/libicu-android/armeabi-v7a/libicuuc.so \
