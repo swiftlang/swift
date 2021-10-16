@@ -6,6 +6,7 @@
 
 // REQUIRES: objc_interop
 
+import Foundation
 #if canImport(AppKit)
 import AppKit
 typealias XXColor = NSColor
