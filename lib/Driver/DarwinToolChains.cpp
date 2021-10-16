@@ -600,11 +600,11 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
         micro = 0;
       }
 
-      // Mac Catalyst was introduced with an iOS deployment target of 13.0;
+      // Mac Catalyst was introduced with an iOS deployment target of 13.1;
       // the linker doesn't want to see a deployment target before that.
       if (major < 13) {
         major = 13;
-        minor = 0;
+        minor = 1;
         micro = 0;
       }
     } else {
