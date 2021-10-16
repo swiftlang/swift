@@ -5943,6 +5943,9 @@ ERROR(marker_protocol_requirement, none,
 ERROR(marker_protocol_inherit_nonmarker, none,
       "marker protocol %0 cannot inherit non-marker protocol %1",
       (DeclName, DeclName))
+ERROR(marker_protocol_inherit_class, none,
+      "marker protocol %0 cannot inherit class %1",
+      (DeclName, Type))
 ERROR(marker_protocol_cast,none,
       "marker protocol %0 cannot be used in a conditional cast", (DeclName))
 ERROR(marker_protocol_conditional_conformance,none,

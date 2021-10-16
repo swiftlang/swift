@@ -5575,6 +5575,12 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
     }
   }
 
+  if (Type superclass = proto->getSuperclass()) {
+    proto->diagnose(
+        diag::marker_protocol_inherit_class,
+        proto->getName(), superclass);
+  }
+
   // A marker protocol cannot have any requirements.
   for (auto member : proto->getAllMembers()) {
     auto value = dyn_cast<ValueDecl>(member);

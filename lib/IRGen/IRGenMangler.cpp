@@ -159,6 +159,8 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
       AllowConcurrencyStandardSubstitutions = false;
   }
 
+  llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(
+      AllowMarkerProtocols, false);
   return withSymbolicReferences(IGM, [&]{
     appendType(Ty, Sig);
   });
