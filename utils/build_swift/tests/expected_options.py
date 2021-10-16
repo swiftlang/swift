@@ -48,6 +48,7 @@ EXPECTED_DEFAULTS = {
     'android_icu_uc_include': None,
     'android_icu_data': None,
     'android_ndk': None,
+    'android_ndk_gcc_version': '4.9',
     'android_arch': 'armv7',
     'assertions': True,
     'benchmark': False,
@@ -650,6 +651,8 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-build-clang-tools-extra',
                   dest='build_clang_tools_extra'),
 
+    ChoicesOption('--android-ndk-gcc-version',
+                  choices=['4.8', '4.9']),
     ChoicesOption('--compiler-vendor',
                   choices=['none', 'apple']),
     ChoicesOption('--swift-analyze-code-coverage',

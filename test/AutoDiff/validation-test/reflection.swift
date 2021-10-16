@@ -1,5 +1,4 @@
 // REQUIRES: no_asan
-// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
 // RUN: %empty-directory(%t)
 import _Differentiation
 
