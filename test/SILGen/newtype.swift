@@ -18,7 +18,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
 
 // CHECK-RAW-LABEL: sil shared [transparent] [serializable] [ossa] @$sSo14SNTErrorDomaina8rawValueABSS_tcfC
 // CHECK-RAW: bb0([[STR:%[0-9]+]] : @owned $String,
-// CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }, var, name "self"
+// CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }
 // CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
 // CHECK-RAW: [[PB_BOX:%[0-9]+]] = project_box [[MARKED_SELF_BOX]]
 // CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
