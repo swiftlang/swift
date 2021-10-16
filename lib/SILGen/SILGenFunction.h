@@ -590,12 +590,9 @@ public:
     auto *Parent = DebugScopeStack.size() ? DebugScopeStack.back().getPointer()
                                           : F.getDebugScope();
     auto *DS = Parent;
-    // Don't create a pointless scope for the function body's BraceStmt.
-    if (!DebugScopeStack.empty())
-      // Don't nest a scope for Loc under Parent unless it's actually different.
-      if (RegularLocation(DS->getLoc()) != RegularLocation(Loc))
-        DS = new (SGM.M)
-          SILDebugScope(RegularLocation(Loc), &getFunction(), DS);
+    // Don't nest a scope for Loc under Parent unless it's actually different.
+    if (RegularLocation(DS->getLoc()) != RegularLocation(Loc))
+      DS = new (SGM.M) SILDebugScope(RegularLocation(Loc), &getFunction(), DS);
     DebugScopeStack.emplace_back(DS, isBindingScope);
     B.setCurrentDebugScope(DS);
   }

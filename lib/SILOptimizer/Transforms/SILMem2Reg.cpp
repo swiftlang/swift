@@ -927,7 +927,7 @@ void StackAllocationPromoter::propagateLiveness(
   // If liveness has not been propagated, go over the incoming operands and mark
   // any operand values that are proactivePhis as live
   livePhis.insert(proactivePhi);
-  SmallVector<SILValue, 16> incomingPhiVals;
+  SmallVector<SILValue, 4> incomingPhiVals;
   proactivePhi->getIncomingPhiValues(incomingPhiVals);
   for (auto &inVal : incomingPhiVals) {
     auto *inPhi = dyn_cast<SILPhiArgument>(inVal);

@@ -336,7 +336,6 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(FunctionConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CovariantFunctionConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CovariantReturnConversion, getSubExpr);
-  PASS_THROUGH_REFERENCE(ImplicitlyUnwrappedFunctionConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(MetatypeConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CollectionUpcastConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(Erasure, getSubExpr);
@@ -661,7 +660,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::FunctionConversion:
   case ExprKind::CovariantFunctionConversion:
   case ExprKind::CovariantReturnConversion:
-  case ExprKind::ImplicitlyUnwrappedFunctionConversion:
   case ExprKind::MetatypeConversion:
   case ExprKind::CollectionUpcastConversion:
   case ExprKind::Erasure:
@@ -828,7 +826,6 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::FunctionConversion:
   case ExprKind::CovariantFunctionConversion:
   case ExprKind::CovariantReturnConversion:
-  case ExprKind::ImplicitlyUnwrappedFunctionConversion:
   case ExprKind::MetatypeConversion:
   case ExprKind::CollectionUpcastConversion:
   case ExprKind::Erasure:

@@ -465,14 +465,12 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
   return None;
 }
 
-
 static const llvm::VersionTuple minimumMacCatalystDeploymentTarget() {
   return llvm::VersionTuple(13, 1);
 }
 
-llvm::VersionTuple
-swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
-                           const llvm::Triple &triple) {
+llvm::VersionTuple swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
+                                              const llvm::Triple &triple) {
   // Retrieve the SDK version.
   auto SDKVersion = SDKInfo.getVersion();
 
@@ -481,9 +479,10 @@ swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
   // down to the linker.
   if (tripleIsMacCatalystEnvironment(triple)) {
     if (const auto *MacOStoMacCatalystMapping = SDKInfo.getVersionMapping(
-                clang::DarwinSDKInfo::OSEnvPair::macOStoMacCatalystPair())) {
-      return MacOStoMacCatalystMapping->map(
-            SDKVersion, minimumMacCatalystDeploymentTarget(), None).getValueOr(llvm::VersionTuple(0, 0, 0));
+            clang::DarwinSDKInfo::OSEnvPair::macOStoMacCatalystPair())) {
+      return MacOStoMacCatalystMapping
+          ->map(SDKVersion, minimumMacCatalystDeploymentTarget(), None)
+          .getValueOr(llvm::VersionTuple(0, 0, 0));
     }
     return llvm::VersionTuple(0, 0, 0);
   }

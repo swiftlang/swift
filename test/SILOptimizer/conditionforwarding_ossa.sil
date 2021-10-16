@@ -14,11 +14,11 @@ class C {
   init()
 }
 
-sil @callee : $@convention(thin) () -> ()
-sil @use_enum : $@convention(thin) (E) -> ()
-sil @use_int : $@convention(thin) (Builtin.Int64) -> ()
+sil [ossa] @callee : $@convention(thin) () -> ()
+sil [ossa] @use_enum : $@convention(thin) (E) -> ()
+sil [ossa] @use_int : $@convention(thin) (Builtin.Int64) -> ()
 
-// CHECK-LABEL: sil @simple_forwarding
+// CHECK-LABEL: sil [ossa] @simple_forwarding
 // CHECK: bb0({{.*}}):
 // CHECK-NEXT: br bb3
 // CHECK: bb1:
@@ -34,7 +34,7 @@ sil @use_int : $@convention(thin) (Builtin.Int64) -> ()
 // CHECK:   br bb6
 // CHECK: bb6:
 // CHECK:   return
-sil @simple_forwarding : $@convention(thin) (Builtin.Int1) -> () {
+sil [ossa] @simple_forwarding : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
 
@@ -62,7 +62,7 @@ bb6:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @closed_range_iterator_example
+// CHECK-LABEL: sil [ossa] @closed_range_iterator_example
 // CHECK: bb0({{.*}}):
 // CHECK-NEXT: br bb3
 // CHECK: bb1:
@@ -80,7 +80,7 @@ bb6:
 // CHECK:   br bb6([[O2]] : $Optional<Int64>)
 // CHECK: bb6
 // CHECK:   return
-sil @closed_range_iterator_example : $@convention(thin) (Builtin.Int1, Builtin.Int64) -> Optional<Int64> {
+sil [ossa] @closed_range_iterator_example : $@convention(thin) (Builtin.Int1, Builtin.Int64) -> Optional<Int64> {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int64):
   cond_br %0, bb1, bb2
 
@@ -119,12 +119,12 @@ bb6(%22 : $Optional<Int64>):
   return %22 : $Optional<Int64>
 }
 
-// CHECK-LABEL: sil @simple_switch_enum_forwarding
+// CHECK-LABEL: sil [ossa] @simple_switch_enum_forwarding
 // CHECK: bb0({{.*}}):
 // CHECK-NEXT: br bb3
 // CHECK: bb1:
 // CHECK:   br bb4,
-// CHECK: bb2:
+// CHECK: bb2({{.*}}):
 // CHECK:   br bb5,
 // CHECK: bb3:
 // CHECK:   apply
@@ -135,7 +135,7 @@ bb6(%22 : $Optional<Int64>):
 // CHECK:   br bb6
 // CHECK: bb6:
 // CHECK:   return
-sil @simple_switch_enum_forwarding : $@convention(thin) (E3) -> () {
+sil [ossa] @simple_switch_enum_forwarding : $@convention(thin) (E3) -> () {
 bb0(%0 : $E3):
   switch_enum %0 : $E3, case #E3.A!enumelt: bb1, default bb2
 
@@ -143,7 +143,7 @@ bb1:
   %1 = enum $E, #E.A!enumelt
   br bb3(%1 : $E)
 
-bb2:
+bb2(%defaultcase : $E3):
   %2 = enum $E, #E.B!enumelt
   br bb3(%2 : $E)
 
@@ -163,15 +163,15 @@ bb6:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @no_forwarding_side_effect_inst
+// CHECK-LABEL: sil [ossa] @no_forwarding_side_effect_inst
 // CHECK: bb0({{.*}}):
 // CHECK:   cond_br %0
 // CHECK: bb3({{.*}}):
 // CHECK:   switch_enum
 // CHECK: bb6
 // CHECK:   return
-sil @no_forwarding_side_effect_inst : $@convention(thin) (Builtin.Int1, C) -> () {
-bb0(%0 : $Builtin.Int1, %1 : $C):
+sil [ossa] @no_forwarding_side_effect_inst : $@convention(thin) (Builtin.Int1, @guaranteed C) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @guaranteed $C):
   %e = ref_element_addr %1 : $C, #C.x
   cond_br %0, bb1, bb2
 
@@ -181,7 +181,7 @@ bb1:
 
 bb2:
   %3 = enum $E, #E.B!enumelt
-  %4 = load %e : $*Builtin.Int64
+  %4 = load [trivial] %e : $*Builtin.Int64
   br bb3(%3 : $E)
 
 bb3(%14 : $E):
@@ -200,14 +200,14 @@ bb6:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @no_forwarding_second_enum_use
+// CHECK-LABEL: sil [ossa] @no_forwarding_second_enum_use
 // CHECK: bb0({{.*}}):
 // CHECK:   cond_br %0
 // CHECK: bb3({{.*}}):
 // CHECK:   switch_enum
 // CHECK: bb6
 // CHECK:   return
-sil @no_forwarding_second_enum_use : $@convention(thin) (Builtin.Int1) -> () {
+sil [ossa] @no_forwarding_second_enum_use : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
 
@@ -235,14 +235,14 @@ bb6:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @no_forwarding_bad_control_flow
+// CHECK-LABEL: sil [ossa] @no_forwarding_bad_control_flow
 // CHECK: bb0({{.*}}):
 // CHECK:   cond_br %0
 // CHECK: bb3({{.*}}):
 // CHECK:   switch_enum
 // CHECK: bb6
 // CHECK:   return
-sil @no_forwarding_bad_control_flow : $@convention(thin) (Builtin.Int1) -> () {
+sil [ossa] @no_forwarding_bad_control_flow : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb9, bb2
 
@@ -282,14 +282,14 @@ bb10:
   br bb7
 }
 
-// CHECK-LABEL: sil @no_forwarding_multiple_block_args
+// CHECK-LABEL: sil [ossa] @no_forwarding_multiple_block_args
 // CHECK: bb0({{.*}}):
 // CHECK:   cond_br %0
 // CHECK: bb3({{.*}}):
 // CHECK:   switch_enum
 // CHECK: bb6
 // CHECK:   return
-sil @no_forwarding_multiple_block_args : $@convention(thin) (Builtin.Int1) -> () {
+sil [ossa] @no_forwarding_multiple_block_args : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
 
@@ -319,14 +319,14 @@ bb6:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @no_forwarding_additional_successor
+// CHECK-LABEL: sil [ossa] @no_forwarding_additional_successor
 // CHECK: bb0({{.*}}):
 // CHECK:   switch_enum %0
 // CHECK: bb3({{.*}}):
 // CHECK:   switch_enum
 // CHECK: bb6
 // CHECK:   return
-sil @no_forwarding_additional_successor : $@convention(thin) (E3) -> () {
+sil [ossa] @no_forwarding_additional_successor : $@convention(thin) (E3) -> () {
 bb0(%0 : $E3):
   switch_enum %0 : $E3, case #E3.A!enumelt: bb1, case #E3.B!enumelt: bb2, case #E3.C!enumelt: bb6
 
@@ -357,10 +357,10 @@ bb7:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @forwarding_second_enum_use : 
+// CHECK-LABEL: sil [ossa] @forwarding_second_enum_use : 
 // CHECK-NOT: switch_enum
 // CHECK-LABEL:} // end sil function 'forwarding_second_enum_use'
-sil @forwarding_second_enum_use : $@convention(thin) (Builtin.Int1) -> () {
+sil [ossa] @forwarding_second_enum_use : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
 

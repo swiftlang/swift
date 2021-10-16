@@ -4170,15 +4170,6 @@ public:
   }
 
 private:
-  /// Adjust the constraint system to accommodate the given selected overload, and
-  /// recompute the type of the referenced declaration.
-  ///
-  /// \returns a pair containing the adjusted opened type of a reference to
-  /// this member and a bit indicating whether or not a bind constraint was added.
-  std::pair<Type, bool> adjustTypeOfOverloadReference(
-      const OverloadChoice &choice, ConstraintLocator *locator, Type boundType,
-      Type refType);
-
   /// Add the constraints needed to bind an overload's type variable.
   void bindOverloadType(
       const SelectedOverload &overload, Type boundType,
@@ -4490,6 +4481,12 @@ public:
       TypeMatchOptions flags, ConstraintLocatorBuilder locator,
       llvm::function_ref<TypeMatchResult()> formUnsolvedResult);
 
+  /// Matches two function result types for a function application. This is
+  /// usually a bind, but also handles e.g IUO unwraps.
+  TypeMatchResult matchFunctionResultTypes(Type expectedResult, Type fnResult,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator);
+
 public: // FIXME: public due to statics in CSSimplify.cpp
   /// Attempt to match up types \c type1 and \c type2, which in effect
   /// is solving the given type constraint between these two types.
@@ -4525,40 +4522,6 @@ public: // FIXME: public due to statics in CSSimplify.cpp
   }
 
 public:
-  /// Given a function type where the eventual result type is an optional,
-  /// where "eventual result type" is defined as:
-  ///   1. The result type is an optional
-  ///   2. The result type is a function type with an eventual result
-  ///      type that is an optional.
-  ///
-  /// return the same function type but with the eventual result type
-  /// replaced by its underlying type.
-  ///
-  /// i.e. return (S) -> T for (S) -> T?
-  //       return (X) -> () -> Y for (X) -> () -> Y?
-  Type replaceFinalResultTypeWithUnderlying(AnyFunctionType *fnTy) {
-    auto resultTy = fnTy->getResult();
-    if (auto *resultFnTy = resultTy->getAs<AnyFunctionType>())
-      resultTy = replaceFinalResultTypeWithUnderlying(resultFnTy);
-    else {
-      auto objType =
-          resultTy->getWithoutSpecifierType()->getOptionalObjectType();
-      // Preserve l-value through force operation.
-      resultTy =
-          resultTy->is<LValueType>() ? LValueType::get(objType) : objType;
-    }
-
-    assert(resultTy);
-
-    if (auto *genericFn = fnTy->getAs<GenericFunctionType>()) {
-      return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                      genericFn->getParams(), resultTy,
-                                      genericFn->getExtInfo());
-    }
-
-    return FunctionType::get(fnTy->getParams(), resultTy, fnTy->getExtInfo());
-  }
-
   // Build a disjunction that attempts both T? and T for a particular
   // type binding. The choice of T? is preferred, and we will not
   // attempt T if we can type check with T?
@@ -5886,6 +5849,10 @@ public:
   bool needsToComputeNext() const override { return false; }
 
   bool isExhausted() const override { return Index >= Elements.size(); }
+
+  void markExhausted() {
+    Index = Elements.size();
+  }
 };
 
 /// Determine whether given type is a known one

@@ -719,6 +719,9 @@ private:
   // from currently selected representative.
   void pruneOverloadSet(Constraint *disjunction) {
     auto *choice = disjunction->getNestedConstraints().front();
+    if (choice->getKind() != ConstraintKind::BindOverload)
+      return;
+
     auto *typeVar = choice->getFirstType()->getAs<TypeVariableType>();
     if (!typeVar)
       return;
@@ -949,6 +952,13 @@ protected:
     // successfully by use of fixes, and ignore the rest.
     AnySolved = false;
   }
+
+private:
+  // Restore constraint system state before conjunction.
+  //
+  // Note that this doesn't include conjunction constraint
+  // itself because we don't want to re-solve it.
+  void restoreOuterState() const;
 };
 
 } // end namespace constraints

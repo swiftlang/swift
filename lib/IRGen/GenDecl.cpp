@@ -697,7 +697,7 @@ void IRGenModule::emitRuntimeRegistration() {
       llvm::ConstantInt::get(Int32Ty, 0),
     };
     auto begin = llvm::ConstantExpr::getGetElementPtr(
-      protocols->getType()->getPointerElementType(), protocols, beginIndices);
+        protocols->getType()->getPointerElementType(), protocols, beginIndices);
     llvm::Constant *endIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, SwiftProtocols.size()),
@@ -725,7 +725,7 @@ void IRGenModule::emitRuntimeRegistration() {
     auto end = llvm::ConstantExpr::getGetElementPtr(
         conformances->getType()->getPointerElementType(),
         conformances, endIndices);
-    
+
     RegIGF.Builder.CreateCall(getRegisterProtocolConformancesFn(), {begin, end});
   }
 
