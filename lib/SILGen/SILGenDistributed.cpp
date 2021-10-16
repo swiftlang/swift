@@ -951,8 +951,20 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     auto nativeFnSILTy = SILType::getPrimitiveObjectType(nativeMethodTy);
     auto nativeSilFnType = nativeFnSILTy.castTo<SILFunctionType>();
 
-    SILValue nativeFn = emitClassMethodRef(
+    bool isClassMethod = false;
+    if (auto classDecl = dyn_cast<ClassDecl>(fd->getDeclContext())) {
+      if (!classDecl->isFinal() && !fd->isFinal() &&
+          !fd->hasForcedStaticDispatch())
+        isClassMethod = true;
+    }
+
+    SILValue nativeFn;
+    if (isClassMethod) {
+      nativeFn = emitClassMethodRef(
         loc, params[params.size() - 1], native, nativeMethodTy);
+    } else {
+      nativeFn = emitGlobalFunctionRef(loc, native);
+    }
     auto subs = F.getForwardingSubstitutionMap();
 
     if (nativeSilFnType->hasErrorResult()) {

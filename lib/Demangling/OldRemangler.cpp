@@ -730,6 +730,12 @@ ManglingError Remangler::mangleMergedFunction(Node *node, unsigned depth) {
 }
 
 ManglingError
+Remangler::mangleDistributedThunk(Node *node, unsigned depth) {
+  Buffer << "TE";
+  return ManglingError::Success;
+}
+
+ManglingError
 Remangler::mangleDynamicallyReplaceableFunctionImpl(Node *node,
                                                     unsigned depth) {
   Buffer << "TI";

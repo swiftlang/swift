@@ -137,9 +137,10 @@ static Identifier makeRemoteFuncIdentifier(FuncDecl* distributedFunc) {
 ///
 /// and is intended to be replaced by a transport library by providing an
 /// appropriate @_dynamicReplacement function.
-AbstractFunctionDecl *TypeChecker::addImplicitDistributedActorRemoteFunction(
-    ClassDecl *decl, AbstractFunctionDecl *AFD) {
-  if (!decl->isDistributedActor())
+static AbstractFunctionDecl *addImplicitDistributedActorRemoteFunction(
+    DeclContext *parentDC, AbstractFunctionDecl *AFD) {
+  auto nominal = parentDC->getSelfNominalTypeDecl();
+  if (!nominal || !nominal->isDistributedActor())
     return nullptr;
 
   auto func = dyn_cast<FuncDecl>(AFD);
@@ -147,14 +148,12 @@ AbstractFunctionDecl *TypeChecker::addImplicitDistributedActorRemoteFunction(
     return nullptr;
 
   // ==== if the remote func already exists, return it
-  if (auto existing = decl->lookupDirectRemoteFunc(func))
+  if (auto existing = nominal->lookupDirectRemoteFunc(func))
     return existing;
 
   // ==== Synthesize and add 'remote' func to the actor decl
 
-  auto &C = decl->getASTContext();
-  auto parentDC = decl;
-
+  auto &C = func->getASTContext();
   auto remoteFuncIdent = makeRemoteFuncIdentifier(func);
 
   auto params = ParameterList::clone(C, func->getParameters());
@@ -189,7 +188,24 @@ AbstractFunctionDecl *TypeChecker::addImplicitDistributedActorRemoteFunction(
   // same access control as the original function is fine
   remoteFuncDecl->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
 
-  decl->addMember(remoteFuncDecl);
+  cast<IterableDeclContext>(parentDC->getAsDecl())->addMember(remoteFuncDecl);
 
   return remoteFuncDecl;
+}
+
+AbstractFunctionDecl *GetDistributedRemoteFuncRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *func) const {
+
+  if (!func->isDistributed())
+    return nullptr;
+
+  auto &C = func->getASTContext();
+  DeclContext *DC = func->getDeclContext();
+
+  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+  // we won't be emitting the offending decl after all.
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return nullptr;
+
+  return addImplicitDistributedActorRemoteFunction(DC, func);
 }
