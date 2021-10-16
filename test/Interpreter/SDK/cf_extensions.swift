@@ -3,7 +3,6 @@
 
 // REQUIRES: objc_interop
 
-import Foundation
 import StdlibUnittest
 
 #if canImport(AppKit)

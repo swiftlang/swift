@@ -23,7 +23,6 @@
 // REQUIRES: OS=ios
 // REQUIRES: objc_interop
 
-import Foundation
 import UIKit
 
 @UIApplicationMain

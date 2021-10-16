@@ -1,4 +1,3 @@
-import Foundation
 import UIKit
 
 public func publicFoo(x: AnyObject.Type) -> String {

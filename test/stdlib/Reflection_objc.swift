@@ -18,7 +18,6 @@
 
 
 import Swift
-import Foundation
 import simd
 
 #if canImport(AppKit)
