@@ -60,6 +60,9 @@ protected:
   /// concurrency library.
   bool AllowConcurrencyStandardSubstitutions = true;
 
+  /// If enabled, marker protocols can be encoded in the mangled name.
+  bool AllowMarkerProtocols = true;
+
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
                                               const OpaqueTypeDecl *>;
@@ -293,6 +296,10 @@ public:
 
   static const clang::NamedDecl *
   getClangDeclForMangling(const ValueDecl *decl);
+
+  void appendExistentialLayout(
+      const ExistentialLayout &layout, GenericSignature sig,
+      const ValueDecl *forDecl);
 
 protected:
 
