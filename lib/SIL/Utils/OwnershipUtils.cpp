@@ -1438,11 +1438,11 @@ void swift::findTransitiveReborrowBaseValuePairs(
 void swift::visitTransitiveEndBorrows(
     BorrowedValue beginBorrow,
     function_ref<void(EndBorrowInst *)> visitEndBorrow) {
-  SmallSetVector<SILValue, 4> worklist;
+  DAGNodeWorklist<SILValue, 4> worklist;
   worklist.insert(beginBorrow.value);
 
   while (!worklist.empty()) {
-    auto val = worklist.pop_back_val();
+    auto val = worklist.pop();
     for (auto *consumingUse : val->getConsumingUses()) {
       auto *consumingUser = consumingUse->getUser();
       if (auto *branch = dyn_cast<BranchInst>(consumingUser)) {
