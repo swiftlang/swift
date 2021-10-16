@@ -1348,8 +1348,16 @@ extension Array: RangeReplaceableCollection {
     if !keepCapacity {
       _buffer = _Buffer()
     }
-    else {
+    else if _buffer.isMutableAndUniquelyReferenced() {
       self.replaceSubrange(indices, with: EmptyCollection())
+    }
+    else {
+      let buffer = _ContiguousArrayBuffer<Element>(
+        _uninitializedCount: capacity,
+        minimumCapacity: 0
+      )
+      buffer.count = 0
+      _buffer = _Buffer(_buffer: buffer, shiftedToStartIndex: startIndex)
     }
   }
 
