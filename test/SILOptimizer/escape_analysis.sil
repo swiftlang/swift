@@ -1331,7 +1331,7 @@ bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error Error)):
   return %r : $()
 }
 
-// CHECK-LABEL: CG of arraysemantics_createUninitialized
+// CHECK-LABEL: CG of arraysemantics_createUninitialized1
 // CHECK-NEXT:    Arg [ref] %0 Esc: A, Succ: 
 // CHECK-NEXT:    Val [ref] %2 Esc: , Succ: (%6)
 // CHECK-NEXT:    Val [ref] %5 Esc: , Succ: %2
@@ -1339,7 +1339,7 @@ bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error Error)):
 // CHECK-NEXT:    Con %6.1 Esc: R, Succ: %0
 // CHECK-NEXT:    Ret [ref] return Esc: , Succ: %5
 // CHECK-NEXT:  End
-sil @arraysemantics_createUninitialized : $@convention(thin) (@owned X) -> @owned Array<X> {
+sil @arraysemantics_createUninitialized1 : $@convention(thin) (@owned X) -> @owned Array<X> {
 bb0(%0 : $X):
   %1 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
   %2 = apply %1() : $@convention(thin) () -> @owned AnyObject
@@ -1350,6 +1350,27 @@ bb0(%0 : $X):
   %7 = struct_extract %6 : $UnsafeMutablePointer<X>, #UnsafeMutablePointer._rawValue
   %8 = pointer_to_address %7 : $Builtin.RawPointer to $*X
   store %0 to %8 : $*X
+  return %5 : $Array<X>
+}
+
+// CHECK-LABEL: CG of arraysemantics_createUninitialized2
+// CHECK-NEXT:   Arg [ref] %0 Esc: A, Succ: 
+// CHECK-NEXT:   Val [ref] %2 Esc: , Succ: (%6)
+// CHECK-NEXT:   Val [ref] %5 Esc: , Succ: %2
+// CHECK-NEXT:   Con [int] %6 Esc: R, Succ: (%6.1)
+// CHECK-NEXT:   Con %6.1 Esc: R, Succ: %0
+// CHECK-NEXT:   Ret [ref] return Esc: , Succ: %5
+// CHECK-NEXT: End
+sil [ossa] @arraysemantics_createUninitialized2 : $@convention(thin) (@owned X) -> @owned Array<X> {
+bb0(%0 : @owned $X):
+  %1 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
+  %2 = apply %1() : $@convention(thin) () -> @owned AnyObject
+  %3 = function_ref @createUninitialized : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+  %4 = apply %3(%2) : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+  (%5, %6) = destructure_tuple %4 : $(Array<X>, UnsafeMutablePointer<X>)
+  %7 = struct_extract %6 : $UnsafeMutablePointer<X>, #UnsafeMutablePointer._rawValue
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to $*X
+  store %0 to [init] %8 : $*X
   return %5 : $Array<X>
 }
 
