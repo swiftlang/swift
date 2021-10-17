@@ -192,6 +192,9 @@ public:
   /// }
   bool EnableDynamicReplacementCanCallPreviousImplementation = true;
 
+  /// Are we parsing the stdlib, i.e. -parse-stdlib?
+  bool ParseStdlib = false;
+
   /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;

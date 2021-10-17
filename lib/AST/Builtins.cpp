@@ -1028,6 +1028,10 @@ static ValueDecl *getFenceOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
 }
 
+static ValueDecl *getIfdefOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _int(1));
+}
+
 static ValueDecl *getVoidErrorOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(_error), _void);
 }
@@ -2280,6 +2284,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy))
       return getBuiltinFunction(Id, ArgElts, ResultTy);
   }
+
+  // If this starts with fence, we have special suffixes to handle.
+  if (OperationName.startswith("ifdef_")) {
+    OperationName = OperationName.drop_front(strlen("ifdef_"));
+    if (!Types.empty()) return nullptr;
+    if (OperationName.empty()) return nullptr;
+    return getIfdefOperation(Context, Id);
+  }
   
   // If this starts with fence, we have special suffixes to handle.
   if (OperationName.startswith("fence_")) {
@@ -2469,6 +2481,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   switch (BV) {
   case BuiltinValueKind::Fence:
+  case BuiltinValueKind::Ifdef:
   case BuiltinValueKind::CmpXChg:
   case BuiltinValueKind::AtomicRMW:
   case BuiltinValueKind::AtomicLoad:
