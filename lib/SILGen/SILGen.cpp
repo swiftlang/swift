@@ -1144,6 +1144,7 @@ static void emitOrDelayFunction(SILGenModule &SGM,
   auto linkage = constant.getLinkage(ForDefinition);
   bool mayDelay = !forceEmission &&
              (constant.isImplicit() &&
+              !constant.isDynamicallyReplaceable() &&
               !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule()));
 
   // Avoid emitting a delayable definition if it hasn't already been referenced.

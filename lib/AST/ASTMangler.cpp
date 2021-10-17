@@ -842,7 +842,7 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::DynamicThunk: return appendOperator("TD");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
-    case SymbolKind::DistributedThunk: return appendOperator("Td");
+    case SymbolKind::DistributedThunk: return appendOperator("TE");
   }
 }
 
@@ -1023,6 +1023,41 @@ void ASTMangler::appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl) {
   }
 }
 
+void ASTMangler::appendExistentialLayout(
+    const ExistentialLayout &layout, GenericSignature sig,
+    const ValueDecl *forDecl) {
+  bool First = true;
+  bool DroppedRequiresClass = false;
+  bool SawRequiresClass = false;
+  for (Type protoTy : layout.getProtocols()) {
+    auto proto = protoTy->castTo<ProtocolType>()->getDecl();
+    // If we aren't allowed to emit marker protocols, suppress them here.
+    if (!AllowMarkerProtocols && proto->isMarkerProtocol()) {
+      if (proto->requiresClass())
+        DroppedRequiresClass = true;
+
+      continue;
+    }
+
+    if (proto->requiresClass())
+      SawRequiresClass = true;
+
+    appendProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
+    appendListSeparator(First);
+  }
+  if (First)
+    appendOperator("y");
+
+  if (auto superclass = layout.explicitSuperclass) {
+    appendType(superclass, sig, forDecl);
+    return appendOperator("Xc");
+  } else if (layout.hasExplicitAnyObject ||
+             (DroppedRequiresClass && !SawRequiresClass)) {
+    return appendOperator("Xl");
+  }
+  return appendOperator("p");
+}
+
 /// Mangle a type into the buffer.
 ///
 void ASTMangler::appendType(Type type, GenericSignature sig,
@@ -1199,31 +1234,15 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendOperator("t");
 
     case TypeKind::Protocol: {
-      bool First = true;
-      appendProtocolName(cast<ProtocolType>(tybase)->getDecl());
-      appendListSeparator(First);
-      return appendOperator("p");
+      return appendExistentialLayout(
+          ExistentialLayout(cast<ProtocolType>(tybase)), sig, forDecl);
     }
 
     case TypeKind::ProtocolComposition: {
       // We mangle ProtocolType and ProtocolCompositionType using the
       // same production:
-      bool First = true;
       auto layout = type->getExistentialLayout();
-      for (Type protoTy : layout.getProtocols()) {
-        appendProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
-        appendListSeparator(First);
-      }
-      if (First)
-        appendOperator("y");
-
-      if (auto superclass = layout.explicitSuperclass) {
-        appendType(superclass, sig, forDecl);
-        return appendOperator("Xc");
-      } else if (layout.hasExplicitAnyObject) {
-        return appendOperator("Xl");
-      }
-      return appendOperator("p");
+      return appendExistentialLayout(layout, sig, forDecl);
     }
 
     case TypeKind::UnboundGeneric:
@@ -2220,6 +2239,8 @@ void ASTMangler::appendModule(const ModuleDecl *module,
 /// Mangle the name of a protocol as a substitution candidate.
 void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
                                     bool allowStandardSubstitution) {
+  assert(AllowMarkerProtocols || !protocol->isMarkerProtocol());
+
   if (allowStandardSubstitution && tryAppendStandardSubstitution(protocol))
     return;
 
@@ -2370,6 +2391,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
       appendOperator("a");
       break;
     case DeclKind::Protocol:
+      assert(AllowMarkerProtocols ||
+             !cast<ProtocolDecl>(decl)->isMarkerProtocol());
       appendOperator("P");
       break;
     case DeclKind::Class:
@@ -2689,6 +2712,11 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   case RequirementKind::Layout: {
   } break;
   case RequirementKind::Conformance: {
+    // If we don't allow marker protocols but we have one here, skip it.
+    if (!AllowMarkerProtocols &&
+        reqt.getProtocolDecl()->isMarkerProtocol())
+      return;
+
     appendProtocolName(reqt.getProtocolDecl());
   } break;
   case RequirementKind::Superclass:
@@ -3226,6 +3254,12 @@ void ASTMangler::appendAnyProtocolConformance(
                                            GenericSignature genericSig,
                                            CanType conformingType,
                                            ProtocolConformanceRef conformance) {
+  // If we have a conformance to a marker protocol but we aren't allowed to
+  // emit marker protocols, skip it.
+  if (!AllowMarkerProtocols &&
+      conformance.getRequirement()->isMarkerProtocol())
+    return;
+
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
     auto path = genericSig->getConformanceAccessPath(conformingType,
