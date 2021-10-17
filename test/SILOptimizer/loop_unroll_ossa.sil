@@ -378,6 +378,7 @@ bb2:
   %5 = builtin "sadd_with_overflow_Int64"(%4 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
   %7 = builtin "cmp_eq_Int64"(%6 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+  destroy_value %a : $B
   dealloc_ref [stack] %a : $B
   cond_br %7, bb4, bb3
 
@@ -413,10 +414,12 @@ bb1(%4 : $Builtin.Int64):
   cond_br %7, bb3, bb2
 
 bb2:
+  destroy_value %a : $B
   dealloc_ref [stack] %a : $B
   br bb1(%6 : $Builtin.Int64)
 
 bb3:
+  destroy_value %a : $B
   dealloc_ref [stack] %a : $B
   %8 = tuple()
   return %8 : $()

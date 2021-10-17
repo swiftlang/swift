@@ -852,6 +852,7 @@ bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
   store %0 to [trivial] %1a : $*Int
+  destroy_value %as1 : $SomeClass
   dealloc_ref [stack] %as1 : $SomeClass
   %3 = load [trivial] %1a : $*Int
   destroy_value %1 : ${ var Int }
