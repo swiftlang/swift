@@ -618,8 +618,13 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       again = true;
     }
 
+    for (const auto &loop : resolvedLoops) {
+      recordHomotopyGenerator(loop);
+    }
+
     resolvedCriticalPairs.clear();
     resolvedPaths.clear();
+    resolvedLoops.clear();
 
     // If the added rules merged any associated types, process the merges now
     // before we continue with the completion procedure. This is important
