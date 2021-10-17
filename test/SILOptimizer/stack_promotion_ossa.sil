@@ -1,0 +1,886 @@
+// RUN: %target-sil-opt -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class XX {
+	@_hasStorage var x: Int32
+
+	init()
+}
+
+class YY {
+	@_hasStorage var xx: XX
+
+	init(newx: XX)
+}
+
+class DummyArrayStorage<Element> {
+  @_hasStorage var count : Int
+  @_hasStorage var capacity : Int
+  init()
+}
+
+sil [ossa] @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX {
+bb0(%0 : @guaranteed $XX):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %3 = ref_element_addr %0 : $XX, #XX.x
+  store %2 to [trivial] %3 : $*Int32
+  %copy = copy_value %0 : $XX
+  return %copy : $XX
+}
+
+sil [ossa] @take_y : $@convention(thin) (@owned YY) -> () {
+bb0(%0 : @owned $YY):
+  // Currently escape analysis cannot see that this release does not capture
+  // anything.
+  destroy_value %0 : $YY
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [ossa] @consume_int : $@convention(thin) (Int32) -> ()
+
+// CHECK-LABEL: sil [ossa] @simple_promote
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK: destroy_value
+// CHECK: dealloc_ref [stack] [[O]] : $XX
+// CHECK: return
+sil [ossa] @simple_promote : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %n1 : $XX
+  destroy_value %o1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @dont_promote_escaping
+// CHECK: alloc_ref $XX
+// CHECK-NOT: dealloc_ref
+// CHECK: return
+sil [ossa] @dont_promote_escaping : $@convention(thin) () -> @owned XX {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  destroy_value %o1 : $XX
+  return %n1 : $XX
+}
+
+// CHECK-LABEL: sil [ossa] @dont_promote_in_unreachable
+// CHECK: bb1:
+// CHECK-NEXT: alloc_ref $XX
+sil [ossa] @dont_promote_in_unreachable : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX  
+  %f2 = function_ref @consume_int : $@convention(thin) (Int32) -> ()
+  %a = apply %f2(%l2) : $@convention(thin) (Int32) -> ()
+  // An unreachable block may be missing the final release.
+  unreachable
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @promote_nested
+// CHECK: [[X:%[0-9]+]] = alloc_ref $XX
+// CHECK: [[Y:%[0-9]+]] = alloc_ref [stack] $YY
+// CHECK: apply
+// CHECK: dealloc_ref [stack] [[Y]] : $YY
+// CHECK: return
+sil [ossa] @promote_nested : $@convention(thin) () -> () {
+bb0:
+  %x = alloc_ref $XX
+  %y = alloc_ref $YY
+  %borrowy = begin_borrow %y : $YY
+  %rea = ref_element_addr %borrowy : $YY, #YY.xx
+  store %x to [init] %rea : $*XX
+  end_borrow %borrowy : $YY
+  %f1 = function_ref @take_y : $@convention(thin) (@owned YY) -> ()
+  %a = apply %f1(%y) : $@convention(thin) (@owned YY) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @promote_with_unreachable_block
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK: bb1:
+// CHECK-NEXT: unreachable
+// CHECK: bb2:
+// CHECK: destroy_value
+// CHECK: dealloc_ref [stack] [[O]] : $XX
+// CHECK: return
+sil [ossa] @promote_with_unreachable_block : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %n1 : $XX
+  destroy_value %o1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @no_return_function
+// Just check that we don't crash on this.
+// It's a corner case, so we don't care if stack promotion is done or not.
+// CHECK: unreachable
+sil [ossa] @no_return_function : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  br bb1
+
+bb1:
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %n1 : $XX
+  destroy_value %o1 : $XX
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @promote_in_loop_with_if
+// CHECK:        [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK:      bb2:
+// CHECK:        destroy_value
+// CHECK:        destroy_value
+// CHECK-NEXT:   dealloc_ref [stack] [[O]] : $XX
+// CHECK:      bb3:
+// CHECK:        destroy_value
+// CHECK:        destroy_value
+// CHECK-NEXT:   dealloc_ref [stack] [[O]] : $XX
+// CHECK: return
+sil [ossa] @promote_in_loop_with_if : $@convention(thin) () -> Int32 {
+bb0:
+  br bb1
+
+bb1:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  cond_br undef, bb2, bb3
+
+bb2:
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %n1 : $XX
+  destroy_value %o1 : $XX
+  br bb4(%l2 : $Int32)
+
+bb3:
+  destroy_value %n1 : $XX
+  %i1 = integer_literal $Builtin.Int32, 0
+  %i2 = struct $Int32 (%i1 : $Builtin.Int32)
+  destroy_value %o1 : $XX
+  br bb4(%i2 : $Int32)
+
+bb4(%a1 : $Int32):
+  cond_br undef, bb4a, bb5
+
+bb4a:
+  br bb1
+
+bb5:
+  return %a1 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @dont_promote_use_of_container_outside_loop
+// CHECK: bb0:
+// CHECK:   [[Y:%[0-9]+]] = alloc_ref [stack] $YY
+// CHECK: bb1:
+// CHECK:   alloc_ref $XX
+// CHECK-NOT: dealloc_ref
+// CHECK: bb2:
+// CHECK:   apply
+// CHECK:   dealloc_ref [stack] [[Y]] : $YY
+// CHECK:   return
+sil [ossa] @dont_promote_use_of_container_outside_loop : $@convention(thin) () -> () {
+bb0:
+  %y = alloc_ref $YY
+  br bb1
+
+bb1:
+  %x = alloc_ref $XX
+  %borrow = begin_borrow %y : $YY
+  %rea = ref_element_addr %borrow : $YY, #YY.xx
+  store %x to [init] %rea : $*XX
+  end_borrow %borrow : $YY
+  cond_br undef, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
+  %f1 = function_ref @take_y : $@convention(thin) (@owned YY) -> ()
+  %a = apply %f1(%y) : $@convention(thin) (@owned YY) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @promote_with_use_in_loop
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK: {{^}}bb3:
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: dealloc_ref [stack] [[O]] : $XX
+// CHECK-NEXT: return
+sil [ossa] @promote_with_use_in_loop : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  br bb1
+
+bb1:
+  %copy = copy_value %n1 : $XX
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %copy : $XX
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value %o1 : $XX
+  destroy_value %n1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @promote_with_use_in_multi_block_backedge_loop
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK: {{^}}bb4:
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: dealloc_ref [stack] [[O]] : $XX
+// CHECK-NEXT: return
+sil [ossa] @promote_with_use_in_multi_block_backedge_loop : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  br bb1
+
+bb1:
+  %copy = copy_value %n1 : $XX
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %copy : $XX
+  cond_br undef, bb2, bb4
+
+bb2:
+  br bb3
+
+bb3:
+  br bb1
+
+bb4:
+  destroy_value %n1 : $XX
+  destroy_value %o1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @promote_with_other_stack_allocs
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK: {{^}}bb6:
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: dealloc_ref [stack] [[O]] : $XX
+// CHECK-NEXT: return
+sil [ossa] @promote_with_other_stack_allocs : $@convention(thin) () -> Int32 {
+bb0:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  %s1 = alloc_stack $Int32
+  destroy_value %n1 : $XX
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4(%l2 : $Int32)
+
+bb3:
+  %i1 = integer_literal $Builtin.Int32, 0
+  %i2 = struct $Int32 (%i1 : $Builtin.Int32)
+  br bb4(%i2 : $Int32)
+
+bb4(%a1 : $Int32):
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  destroy_value %o1 : $XX
+  dealloc_stack %s1 : $*Int32
+  return %a1 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @promote_and_fix_stack_nesting1
+// CHECK: alloc_stack
+// CHECK: {{^}}bb2:
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] $XX
+// CHECK: destroy_value
+// CHECK: dealloc_ref [stack] [[O]] : $XX
+// CHECK: dealloc_stack
+// CHECK: return
+sil [ossa] @promote_and_fix_stack_nesting1 : $@convention(thin) () -> Int32 {
+bb0:
+  %s1 = alloc_stack $Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  dealloc_stack %s1 : $*Int32
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %n1 : $XX
+  destroy_value %o1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @promote_and_fix_stack_nesting2
+// CHECK: alloc_stack
+// CHECK-NEXT: alloc_ref [stack] $XX
+// CHECK: {{^}}bb3:
+// CHECK: destroy_value
+// CHECK: destroy_value
+// CHECK-NEXT: dealloc_ref [stack]
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
+sil [ossa] @promote_and_fix_stack_nesting2 : $@convention(thin) () -> Int32 {
+bb0:
+  %s1 = alloc_stack $Int32
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  dealloc_stack %s1 : $*Int32
+  unreachable
+
+bb3:
+  dealloc_stack %s1 : $*Int32
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %n1 : $XX
+  destroy_value %o1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @promote_and_fix_stack_nesting3
+// CHECK: alloc_stack
+// CHECK: {{^}}bb2:
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] [tail_elems{{.*}}] $XX
+// CHECK: destroy_value
+// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack
+// CHECK: return
+sil [ossa] @promote_and_fix_stack_nesting3 : $@convention(thin) () -> Int32 {
+bb0:
+  %s1 = alloc_stack $Int32
+  %i = integer_literal $Builtin.Word, 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %o1 = alloc_ref [tail_elems $Int32 * %i : $Builtin.Word] $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  dealloc_stack %s1 : $*Int32
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %n1 : $XX
+  destroy_value %o1 : $XX
+  return %l2 : $Int32
+}
+
+
+// CHECK-LABEL: sil [ossa] @promote_and_fix_stack_nesting4
+// CHECK: alloc_stack
+// CHECK: {{^}}bb2:
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] [tail_elems{{.*}}] $XX
+// CHECK: destroy_value
+// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack
+// CHECK: return
+sil [ossa] @promote_and_fix_stack_nesting4 : $@convention(thin) () -> Int32 {
+bb0:
+  %s1 = alloc_stack $Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %i = integer_literal $Builtin.Word, 1
+  %o1 = alloc_ref [tail_elems $Int32 * %i : $Builtin.Word] $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  dealloc_stack %s1 : $*Int32
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %n1 : $XX
+  destroy_value %o1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @promote_and_fix_stack_nesting5
+// CHECK: alloc_stack
+// CHECK: {{^}}bb3({{.*}}):
+// CHECK: [[O:%[0-9]+]] = alloc_ref [stack] [tail_elems{{.*}}] $XX
+// CHECK: destroy_value
+// CHECK: dealloc_ref [stack]
+// CHECK: dealloc_stack
+// CHECK: return
+sil [ossa] @promote_and_fix_stack_nesting5 : $@convention(thin) (Builtin.Word) -> Int32 {
+bb0(%0 : $Builtin.Word):
+  %s1 = alloc_stack $Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Builtin.Word)
+
+bb2:
+  br bb3(%0 : $Builtin.Word)
+
+bb3(%i : $Builtin.Word):
+  %o1 = alloc_ref [tail_elems $Int32 * %i : $Builtin.Word] $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> @owned XX
+  dealloc_stack %s1 : $*Int32
+  %borrow = begin_borrow %n1 : $XX
+  %l1 = ref_element_addr %borrow : $XX, #XX.x
+  %l2 = load [trivial] %l1 : $*Int32
+  end_borrow %borrow : $XX
+  destroy_value %n1 : $XX
+  destroy_value %o1 : $XX
+  return %l2 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @promote_array
+// CHECK: [[B:%[0-9]+]] = alloc_ref [stack] [tail_elems $Int
+// CHECK: [[IF:%[0-9]+]] = function_ref @init_array_with_buffer
+// CHECK: [[A:%[0-9]+]] = apply [[IF]]([[B]],
+// CHECK: destructure_tuple [[A]]
+// CHECK: [[TAF:%[0-9]+]] = function_ref @take_array
+// CHECK: apply [[TAF]]
+// CHECK: dealloc_ref [stack] [[B]]
+// CHECK: return
+sil [ossa] @promote_array : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  // allocate the buffer
+  %1 = integer_literal $Builtin.Word, 2
+  %2 = alloc_ref [tail_elems $Int * %1 : $Builtin.Word] $DummyArrayStorage<Int>
+  // initialize the buffer
+  %3 = integer_literal $Builtin.Int32, 2
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %10 = apply %9(%2, %4, %8) : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  (%11, %12) = destructure_tuple %10 : $(Array<Int>, UnsafeMutablePointer<Int>)
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int
+
+  // store the 2 elements
+  store %0 to [trivial] %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to [trivial] %17 : $*Int
+
+  // pass the array to a function
+  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> ()
+  %20 = apply %19(%11) : $@convention(thin) (@owned Array<Int>) -> ()
+  %21 = tuple ()
+  return %21 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_promote_escaping_array
+// CHECK: alloc_ref [tail_elems $Int
+// CHECK-NOT: dealloc_ref
+// CHECK: return
+sil [ossa] @dont_promote_escaping_array : $@convention(thin) (Int) -> @owned Array<Int> {
+bb0(%0 : $Int):
+  // allocate the buffer
+  %1 = integer_literal $Builtin.Word, 2
+  %2 = alloc_ref [tail_elems $Int * %1 : $Builtin.Word] $DummyArrayStorage<Int>
+
+  // initialize the buffer
+  %3 = integer_literal $Builtin.Int32, 2
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %10 = apply %9(%2, %4, %8) : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  (%11, %12) = destructure_tuple %10 : $(Array<Int>, UnsafeMutablePointer<Int>)
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int
+
+  // store the 2 elements
+  store %0 to [trivial] %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to [trivial] %17 : $*Int
+
+  // return the array
+  return %11 : $Array<Int>
+}
+
+sil [_semantics "array.uninitialized"] @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+
+sil [ossa] @take_array : $@convention(thin) (@owned Array<Int>) -> () {
+bb0(%0 : @owned $Array<Int>):
+  destroy_value %0 : $Array<Int>
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @promote_array_withUnsafeMutableBufferPointer_use
+// CHECK: [[ARR:%.*]] = alloc_stack $Array<Int>
+// CHECK: [[B:%[0-9]+]] = alloc_ref [stack] [tail_elems $Int
+// CHECK: [[IF:%[0-9]+]] = function_ref @init_array_with_buffer
+// CHECK: [[A:%[0-9]+]] = apply [[IF]]([[B]],
+// CHECK: dealloc_ref [stack] [[B]]
+// CHECK: return
+sil [ossa] @promote_array_withUnsafeMutableBufferPointer_use : $@convention(thin) (Int, @owned @callee_owned (@inout Int) -> (@out (), @error Error)) -> () {
+bb0(%0 : $Int, %closure: @owned $@callee_owned (@inout Int) -> (@out (), @error Error)):
+  %the_array = alloc_stack $Array<Int>
+
+  // allocate the buffer
+  %1 = integer_literal $Builtin.Word, 2
+  %2 = alloc_ref [tail_elems $Int * %1 : $Builtin.Word] $DummyArrayStorage<Int>
+
+  // initialize the buffer
+  %3 = integer_literal $Builtin.Int32, 2
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %10 = apply %9(%2, %4, %8) : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  (%11, %12) = destructure_tuple %10 : $(Array<Int>, UnsafeMutablePointer<Int>)
+  %copy2 = copy_value %11 : $Array<Int>
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int
+
+  // store the 2 elements
+  store %0 to [trivial] %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to [trivial] %17 : $*Int
+
+  store %11 to [init] %the_array : $*Array<Int>
+
+  // pass the array to a function
+  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> ()
+  %20 = apply %19(%copy2) : $@convention(thin) (@owned Array<Int>) -> ()
+
+  // pass the array to the withUnsafeMutableBufferPointer closure.
+  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+  %22 = alloc_stack $()
+  %23 = apply [nothrow] %21(%22, %closure, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+  
+  dealloc_stack %22 : $*()
+
+  %the_array_val = load [take] %the_array: $*Array<Int>
+  destroy_value %the_array_val: $Array<Int>
+  dealloc_stack %the_array: $*Array<Int>
+  %24 = tuple ()
+  return %24 : $()
+}
+
+sil [ossa] @array_capture_closure : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
+
+// CHECK-LABEL: sil [ossa] @dont_promote_array_withUnsafeMutableBufferPointer_capture
+// CHECK: alloc_ref [tail_elems $Int
+// CHECK-NOT: dealloc_ref
+// CHECK: return
+sil [ossa] @dont_promote_array_withUnsafeMutableBufferPointer_capture : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+
+  %the_array = alloc_stack $Array<Int>
+
+  // allocate the buffer
+  %1 = integer_literal $Builtin.Word, 2
+  %2 = alloc_ref [tail_elems $Int * %1 : $Builtin.Word] $DummyArrayStorage<Int>
+
+  // initialize the buffer
+  %3 = integer_literal $Builtin.Int32, 2
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %10 = apply %9(%2, %4, %8) : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  (%11, %12) = destructure_tuple %10 : $(Array<Int>, UnsafeMutablePointer<Int>)
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int
+
+  // store the 2 elements
+  store %0 to [trivial] %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to [trivial] %17 : $*Int
+
+  %copy1 = copy_value %11 : $Array<Int>
+  store %11 to [init] %the_array : $*Array<Int>
+
+  // pass the array to a function
+  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> ()
+  %copy2 = copy_value %copy1 : $Array<Int>
+  %20 = apply %19(%copy1) : $@convention(thin) (@owned Array<Int>) -> ()
+
+  // pass the array to the withUnsafeMutableBufferPointer closure.
+  %closure_fun = function_ref @array_capture_closure : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
+  %closure = partial_apply %closure_fun(%copy2) : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
+  %closure2 = convert_function %closure : $@callee_owned (@inout Int) -> (@out ()) to $@callee_owned (@inout Int) -> (@out (), @error Error)
+  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+  %22 = alloc_stack $()
+  %23 = apply [nothrow]%21(%22, %closure2, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+  
+  dealloc_stack %22 : $*()
+
+  destroy_addr %the_array: $*Array<Int>
+  dealloc_stack %the_array: $*Array<Int>
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @promote_array_withUnsafeMutableBufferPointer_capture
+// CHECK: [[ARR:%.*]] = alloc_stack $Array<Int>
+// CHECK: [[B:%[0-9]+]] = alloc_ref [stack] [tail_elems $Int
+// CHECK: [[IF:%[0-9]+]] = function_ref @init_array_with_buffer
+// CHECK: [[A:%[0-9]+]] = apply [[IF]]([[B]],
+// CHECK: dealloc_ref [stack] [[B]]
+// CHECK: return
+sil [ossa] @promote_array_withUnsafeMutableBufferPointer_capture : $@convention(thin) (Int, @owned Array<Int>) -> () {
+bb0(%0 : $Int, %another: @owned $Array<Int>):
+
+  %the_array = alloc_stack $Array<Int>
+
+  // allocate the buffer
+  %1 = integer_literal $Builtin.Word, 2
+  %2 = alloc_ref [tail_elems $Int * %1 : $Builtin.Word] $DummyArrayStorage<Int>
+
+  // initialize the buffer
+  %3 = integer_literal $Builtin.Int32, 2
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %8 = metatype $@thin Array<Int>.Type
+  %9 = function_ref @init_array_with_buffer : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  %10 = apply %9(%2, %4, %8) : $@convention(thin) (@owned DummyArrayStorage<Int>, Int32, @thin Array<Int>.Type) -> @owned (Array<Int>, UnsafeMutablePointer<Int>)
+  (%11, %12) = destructure_tuple %10 : $(Array<Int>, UnsafeMutablePointer<Int>)
+  %13 = struct_extract %12 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*Int
+
+  // store the 2 elements
+  store %0 to [trivial] %14 : $*Int
+  %16 = integer_literal $Builtin.Word, 1
+  %17 = index_addr %14 : $*Int, %16 : $Builtin.Word
+  store %0 to [trivial] %17 : $*Int
+
+  %copy = copy_value %11 : $Array<Int>
+  store %11 to [init] %the_array : $*Array<Int>
+
+  // pass the array to a function
+  %19 = function_ref @take_array : $@convention(thin) (@owned Array<Int>) -> ()
+  %20 = apply %19(%copy) : $@convention(thin) (@owned Array<Int>) -> ()
+
+  // pass the array to the withUnsafeMutableBufferPointer closure.
+  %closure_fun = function_ref @array_capture_closure : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
+  %closure = partial_apply %closure_fun(%another) : $@convention(thin) (@inout Int, @owned Array<Int>) -> (@out ())
+  %closure2 = convert_function %closure : $@callee_owned (@inout Int) -> (@out ()) to $@callee_owned (@inout Int) -> (@out (), @error Error)
+  %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+  %22 = alloc_stack $()
+  %23 = apply [nothrow]%21(%22, %closure2, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+  dealloc_stack %22 : $*()
+
+  %the_array_val = load [take] %the_array : $*Array<Int>
+  destroy_value %the_array_val: $Array<Int>
+  dealloc_stack %the_array: $*Array<Int>
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @promote_with_unreachable_block_nest_bug
+// CHECK: bb3:
+// CHECK: dealloc_ref [stack] %{{.*}}
+// CHECK: bb4:
+// CHECK: br bb5
+// CHECK: bb5:
+// CHECK: dealloc_ref [stack] %{{.*}}
+// CHECK: bb6:
+// CHECK: dealloc_ref [stack] %{{.*}}
+// CHECK: bb11:
+// CHECK: alloc_ref [stack] $XX
+// CHECK: return
+sil [ossa] @promote_with_unreachable_block_nest_bug : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = alloc_stack $Builtin.Int32                 
+  %1 = alloc_stack $Builtin.Int32                 
+  cond_br undef, bb1, bb7                         
+
+bb1:                                              
+  br bb14                                         
+
+bb2:                                              
+  cond_br undef, bb5, bb3                         
+
+bb3:                                              
+  destroy_value %20 : $XX                        
+  br bb6                                          
+
+bb4:                                              
+  %7 = integer_literal $Builtin.Int32, 0          
+  %8 = struct $Int32 (%7 : $Builtin.Int32)        
+  br bb13(%8 : $Int32)                            
+
+bb5:                                              
+  destroy_value %20 : $XX                        
+  br bb6                                          
+
+bb6:                                              
+  br bb12                                         
+
+bb7:                                              
+  cond_br undef, bb8, bb9                         
+
+bb8:                                              
+  cond_br undef, bb10, bb11                       
+
+bb9:                                              
+  %15 = integer_literal $Builtin.Int32, 0         
+  %16 = struct $Int32 (%15 : $Builtin.Int32)      
+  br bb13(%16 : $Int32)                           
+
+bb10:                                             
+  %18 = alloc_ref $XX                             
+  %19 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> @owned XX 
+  %20 = apply %19(%18) : $@convention(thin) (@guaranteed XX) -> @owned XX 
+  %borrow20  = begin_borrow %20 : $XX
+  %21 = ref_element_addr %borrow20 : $XX, #XX.x         
+  %22 = load [trivial] %21 : $*Int32
+  end_borrow %borrow20 : $XX
+  destroy_value %18 : $XX
+  cond_br undef, bb2, bb4                         
+
+bb11:                                             
+  unreachable                                     
+
+bb12:                                             
+  br bb14                                         
+
+bb13(%26 : $Int32):                               
+  dealloc_stack %1 : $*Builtin.Int32              
+  unreachable                                     
+
+bb14:                                             
+  dealloc_stack %1 : $*Builtin.Int32              
+  dealloc_stack %0 : $*Builtin.Int32              
+  %31 = integer_literal $Builtin.Int32, 0         
+  %32 = struct $Int32 (%31 : $Builtin.Int32)      
+  return %32 : $Int32                             
+} 
+
+// Take XX as an argument, but don't actually return or escape it. I'm
+// not sure how this happens in practice, but stack promotion requires
+// that the argument does not escape.
+sil [ossa] @tryInitXX : $@convention(method) (@owned XX) -> (@owned XX, @error Error) {
+bb0(%0 : @owned $XX):
+  %1 = alloc_ref $XX
+  destroy_value %0 : $XX
+  return %1 : $XX
+}
+
+// FIXME: Stack promotion currently fails whenever the last use is a
+// terminator. This is a ridiculous limitation.
+//
+// CHECK-LABEL: sil [ossa] @testUsedByTryApply : $@convention(thin) () -> (@owned XX, @error Error) {
+// CHECK:        alloc_ref $XX
+// CHECK:        try_apply
+// CHECK:      bb1(%{{.*}} : @owned $XX):
+// CHECK-NEXT:   return
+// CHECK:      bb2(%{{.*}}: $Error):
+// CHECK-NEXT:   throw
+// CHECK-LABEL: } // end sil function 'testUsedByTryApply'
+sil [ossa] @testUsedByTryApply : $@convention(thin) () -> (@owned XX, @error Error) {
+bb0:
+  %0 = alloc_ref $XX
+  %1 = function_ref @tryInitXX : $@convention(method) (@owned XX) -> (@owned XX, @error Error)
+  try_apply %1(%0) : $@convention(method) (@owned XX) -> (@owned XX, @error Error), normal bb1, error bb2
+
+bb1(%4 : @owned $XX):
+  return %4 : $XX
+
+bb2(%5 : $Error):
+  throw %5 : $Error
+}
+
