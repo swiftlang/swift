@@ -286,7 +286,7 @@ static dispatch_queue_t getGlobalQueue(JobPriority priority) {
   if (SWIFT_LIKELY(queue))
     return queue;
 
-#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__apple__)
+#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__APPLE__)
   const int DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS = -3;
 
   // Create a new cooperative concurrent queue and swap it in.
