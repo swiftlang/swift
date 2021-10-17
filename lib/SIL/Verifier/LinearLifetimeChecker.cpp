@@ -307,6 +307,8 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
   // must be instructions in the given block. Make sure that the non consuming
   // user is strictly before the consuming user.
   for (auto *nonConsumingUse : nonConsumingUsesInBlock) {
+    if (nonConsumingUse->getOperandOwnership() == OperandOwnership::NonUse)
+      continue;
     if (nonConsumingUse->getUser() != consumingUse->getUser()) {
       if (std::find_if(consumingUse->getUser()->getIterator(), userBlock->end(),
                        [&nonConsumingUse](const SILInstruction &i) -> bool {
@@ -598,6 +600,8 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     // are reachable. We flag those as additional use after frees. Any in the
     // same block, we would have flagged.
     for (auto *use : nonConsumingUses) {
+      if (use->getOperandOwnership() == OperandOwnership::NonUse)
+        continue;
       auto *useParent = use->getUser()->getParent();
       if (useParent == value->getParentBlock() ||
           deadEndBlocks.isDeadEnd(useParent)) {

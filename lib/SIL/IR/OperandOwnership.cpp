@@ -239,7 +239,6 @@ OPERAND_OWNERSHIP(BitwiseEscape, BridgeObjectToWord)
 OPERAND_OWNERSHIP(DestroyingConsume, AutoreleaseValue)
 OPERAND_OWNERSHIP(DestroyingConsume, DeallocBox)
 OPERAND_OWNERSHIP(DestroyingConsume, DeallocExistentialBox)
-OPERAND_OWNERSHIP(DestroyingConsume, DeallocRef)
 OPERAND_OWNERSHIP(DestroyingConsume, DestroyValue)
 OPERAND_OWNERSHIP(DestroyingConsume, EndLifetime)
 OPERAND_OWNERSHIP(DestroyingConsume, BeginCOWMutation)
@@ -412,6 +411,13 @@ OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
   }
   return destBlockArgOwnershipKind.getForwardingOperandOwnership(
     /*allowUnowned*/true);
+}
+
+OperandOwnership
+OperandOwnershipClassifier::visitDeallocRefInst(DeallocRefInst *dri) {
+  if (dri->canAllocOnStack())
+    return OperandOwnership::NonUse;
+  return OperandOwnership::DestroyingConsume;
 }
 
 OperandOwnership
