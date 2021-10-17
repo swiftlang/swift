@@ -379,7 +379,6 @@ static bool unifyConcreteTypes(
 /// When a type parameter has two superclasses, we have to both unify the
 /// type constructor arguments, and record the most derived superclass.
 ///
-///
 /// For example, if we have this setup:
 ///
 ///   class Base<T, T> {}
@@ -544,7 +543,7 @@ PropertyMap::~PropertyMap() {
   clear();
 }
 
-/// Look for an property bag corresponding to a suffix of the given key.
+/// Look for a property bag corresponding to a suffix of the given key.
 ///
 /// Returns nullptr if no information is known about this key.
 PropertyBag *
@@ -555,7 +554,7 @@ PropertyMap::lookUpProperties(const MutableTerm &key) const {
   return nullptr;
 }
 
-/// Look for an property bag corresponding to the given key, creating a new
+/// Look for a property bag corresponding to the given key, creating a new
 /// property bag if necessary.
 ///
 /// This must be called in monotonically non-decreasing key order.
@@ -567,7 +566,7 @@ PropertyMap::getOrCreateProperties(Term key) {
 
   auto *props = new PropertyBag(key);
 
-  // Look for the longest suffix of the key that has an property bag,
+  // Look for the longest suffix of the key that has a property bag,
   // recording it as the next property bag if we find one.
   //
   // For example, if our rewrite system contains the following three rules:
@@ -841,7 +840,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
   }
 }
 
-/// Given the key of an property bag known to have \p concreteType,
+/// Given the key of a property bag known to have \p concreteType,
 /// together with a \p typeWitness from a conformance on that concrete
 /// type, return the right hand side of a rewrite rule to relate
 /// \p subjectType with a term representing the type witness.
