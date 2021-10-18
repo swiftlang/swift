@@ -2820,10 +2820,11 @@ static ArrayRef<Decl *> evaluateMembersRequest(
         (void) var->getPropertyWrapperAuxiliaryVariables();
         (void) var->getPropertyWrapperInitializerInfo();
       }
+    }
 
-      if (auto *func = dyn_cast<FuncDecl>(member)) {
-        (void) func->getDistributedActorRemoteFuncDecl();
-      }
+    // For a distributed function, add the remote function.
+    if (auto *func = dyn_cast<FuncDecl>(member)) {
+      (void) func->getDistributedActorRemoteFuncDecl();
     }
   }
 

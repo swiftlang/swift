@@ -169,3 +169,29 @@ bb3:
   return %res : $()
 }
 
+// CHECK-LABEL: sil [ossa] @guaranteed_phi_argument : $@convention(thin) (@owned Klass) -> () {
+// CHECK:         {{bb[0-9]+}}({{%[^,]+}} : @guaranteed $Klass):
+// CHECK-LABEL: } // end sil function 'guaranteed_phi_argument'
+sil [ossa] @guaranteed_phi_argument : $@convention(thin) (@owned Klass) -> () {
+entry(%instance : @owned $Klass):
+  %lifetime_1 = begin_borrow [lexical] %instance : $Klass
+  br loop_header(%lifetime_1 : $Klass)
+
+loop_header(%lifetime_2 : @guaranteed $Klass):
+  cond_br undef, loop_back_1, loop_back_2_or_exit
+
+loop_back_1:
+  br loop_header(%lifetime_2 : $Klass)
+
+loop_back_2_or_exit:
+  cond_br undef, loop_back_2, exit
+
+loop_back_2:
+  br loop_header(%lifetime_2 : $Klass)
+
+exit:
+  end_borrow %lifetime_2 : $Klass
+  destroy_value %instance : $Klass
+  %retval = tuple ()
+  return %retval : $()
+}
