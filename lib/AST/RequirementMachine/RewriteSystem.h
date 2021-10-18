@@ -122,6 +122,8 @@ public:
     return LHS.size();
   }
 
+  int compare(const Rule &other, const ProtocolGraph &protos) const;
+
   void dump(llvm::raw_ostream &out) const;
 
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
@@ -491,6 +493,11 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
+  bool
+  isCandidateForDeletion(unsigned ruleID,
+                         bool firstPass,
+                         const llvm::DenseSet<unsigned> *redundantConformances) const;
+
   Optional<unsigned>
   findRuleToDelete(bool firstPass,
                    const llvm::DenseSet<unsigned> *redundantConformances,
@@ -508,6 +515,11 @@ public:
   getMinimizedRules(ArrayRef<const ProtocolDecl *> protos);
 
   void verifyHomotopyGenerators() const;
+
+  void verifyRedundantConformances(
+      llvm::DenseSet<unsigned> redundantConformances) const;
+
+  void verifyMinimizedRules() const;
 
   //////////////////////////////////////////////////////////////////////////////
   ///

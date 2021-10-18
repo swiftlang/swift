@@ -107,6 +107,7 @@ public:
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(SpecializeExtension)
   IGNORED_ATTR(Sendable)
+  IGNORED_ATTR(NonSendable)
   IGNORED_ATTR(AtRethrows)
   IGNORED_ATTR(AtReasync)
   IGNORED_ATTR(UnsafeSendable)
@@ -5572,6 +5573,12 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
       inheritedProto->diagnose(
           diag::decl_declared_here, inheritedProto->getName());
     }
+  }
+
+  if (Type superclass = proto->getSuperclass()) {
+    proto->diagnose(
+        diag::marker_protocol_inherit_class,
+        proto->getName(), superclass);
   }
 
   // A marker protocol cannot have any requirements.

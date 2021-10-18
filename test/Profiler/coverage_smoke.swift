@@ -134,8 +134,8 @@ var g2: Int = 0
 
 class Class3 {
   var m1 = g2 == 0     // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
-             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
-             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
 }
 
 // rdar://34244637: Wrong coverage for do/catch sequence
@@ -150,7 +150,7 @@ func throwError(_ b: Bool) throws {
 func catchError(_ b: Bool) -> Int {
   do {
     try throwError(b) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
-  } catch {           // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  } catch {           // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
     return 1          // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
   }                   // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
   let _ = 1 + 1       // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1

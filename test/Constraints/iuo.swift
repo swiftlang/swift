@@ -230,15 +230,6 @@ let _: Int = r
 class C<T> {}
 var sub: C! = C<Int>()
 
-// FIXME: We probably shouldn't support this, we don't support other
-// 'direct call' features such as default arguments for curried calls.
-struct CurriedIUO {
-  func silly() -> Int! { nil }
-  func testSilly() {
-    let _: Int = CurriedIUO.silly(self)()
-  }
-}
-
 // SR-15219 (rdar://83352038): Make sure we don't crash if an IUO param becomes
 // a placeholder.
 func rdar83352038() {
@@ -251,3 +242,14 @@ func rdar83352038() {
 // Make sure we reject an attempt at a function conversion.
 func returnsIUO() -> Int! { 0 }
 let _ = (returnsIUO as () -> Int)() // expected-error {{cannot convert value of type '() -> Int?' to type '() -> Int' in coercion}}
+
+// Make sure we only permit an IUO unwrap on the first application.
+func returnsIUOFn() -> (() -> Int?)! { nil }
+let _: (() -> Int?)? = returnsIUOFn()
+let _: (() -> Int)? = returnsIUOFn() // expected-error {{cannot convert value of type '(() -> Int?)?' to specified type '(() -> Int)?'}}
+let _: () -> Int? = returnsIUOFn()
+let _: () -> Int = returnsIUOFn() // expected-error {{cannot convert value of type '(() -> Int?)?' to specified type '() -> Int'}}
+let _: Int? = returnsIUOFn()()
+let _: Int = returnsIUOFn()() // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+// expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+// expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}

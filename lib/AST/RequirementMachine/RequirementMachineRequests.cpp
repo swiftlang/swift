@@ -40,6 +40,63 @@ STATISTIC(NumLazyRequirementSignaturesLoaded,
 
 #undef DEBUG_TYPE
 
+namespace {
+
+/// Represents a set of types related by same-type requirements, and an
+/// optional concrete type requirement.
+struct ConnectedComponent {
+  llvm::SmallVector<Type, 2> Members;
+  Type ConcreteType;
+
+  void buildRequirements(Type subjectType, std::vector<Requirement> &reqs);
+};
+
+/// Case 1: A set of rewrite rules of the form:
+///
+///   B => A
+///   C => A
+///   D => A
+///
+/// Become a series of same-type requirements
+///
+///   A == B, B == C, C == D
+///
+/// Case 2: A set of rewrite rules of the form:
+///
+///   A.[concrete: X] => A
+///   B => A
+///   C => A
+///   D => A
+///
+/// Become a series of same-type requirements
+///
+///   A == X, B == X, C == X, D == X
+void ConnectedComponent::buildRequirements(Type subjectType,
+                                           std::vector<Requirement> &reqs) {
+  std::sort(Members.begin(), Members.end(),
+            [](Type first, Type second) -> bool {
+              return compareDependentTypes(first, second) < 0;
+            });
+
+  if (!ConcreteType) {
+    for (auto constraintType : Members) {
+      reqs.emplace_back(RequirementKind::SameType,
+                        subjectType, constraintType);
+      subjectType = constraintType;
+    }
+  } else {
+    reqs.emplace_back(RequirementKind::SameType,
+                      subjectType, ConcreteType);
+
+    for (auto constraintType : Members) {
+      reqs.emplace_back(RequirementKind::SameType,
+                        constraintType, ConcreteType);
+    }
+  }
+}
+
+}  // end namespace
+
 /// Convert a list of non-permanent, non-redundant rewrite rules into a minimal
 /// protocol requirement signature for \p proto. The requirements are sorted in
 /// canonical order, and same-type requirements are canonicalized.
@@ -47,15 +104,16 @@ std::vector<Requirement>
 RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
                                               const ProtocolDecl *proto) const {
   std::vector<Requirement> reqs;
-  llvm::SmallDenseMap<TypeBase *, llvm::SmallVector<Type, 2>> sameTypeReqs;
+  llvm::SmallDenseMap<TypeBase *, ConnectedComponent> sameTypeReqs;
 
   auto genericParams = proto->getGenericSignature().getGenericParams();
+  const auto &protos = System.getProtocols();
 
   // Convert a rewrite rule into a requirement.
   auto createRequirementFromRule = [&](const Rule &rule) {
     if (auto prop = rule.isPropertyRule()) {
       auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
-                                                System.getProtocols());
+                                                protos);
 
       switch (prop->getKind()) {
       case Symbol::Kind::Protocol:
@@ -65,10 +123,33 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
         return;
 
       case Symbol::Kind::Layout:
-      case Symbol::Kind::ConcreteType:
-      case Symbol::Kind::Superclass:
-        // FIXME
+        reqs.emplace_back(RequirementKind::Layout,
+                          subjectType,
+                          prop->getLayoutConstraint());
         return;
+
+      case Symbol::Kind::Superclass:
+        reqs.emplace_back(RequirementKind::Superclass,
+                          subjectType,
+                          Context.getTypeFromSubstitutionSchema(
+                              prop->getSuperclass(),
+                              prop->getSubstitutions(),
+                              genericParams, MutableTerm(),
+                              protos));
+        return;
+
+      case Symbol::Kind::ConcreteType: {
+        auto concreteType = Context.getTypeFromSubstitutionSchema(
+                                prop->getConcreteType(),
+                                prop->getSubstitutions(),
+                                genericParams, MutableTerm(),
+                                protos);
+
+        auto &component = sameTypeReqs[subjectType.getPointer()];
+        assert(!component.ConcreteType);
+        component.ConcreteType = concreteType;
+        return;
+      }
 
       case Symbol::Kind::Name:
       case Symbol::Kind::AssociatedType:
@@ -79,45 +160,45 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
       llvm_unreachable("Invalid symbol kind");
     } else if (rule.getLHS().back().getKind() != Symbol::Kind::Protocol) {
       auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams,
-                                                   System.getProtocols());
+                                                   protos);
       auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
-                                                System.getProtocols());
+                                                protos);
 
-      sameTypeReqs[subjectType.getPointer()].push_back(constraintType);
+      sameTypeReqs[subjectType.getPointer()].Members.push_back(constraintType);
     }
   };
+
+  if (getDebugOptions().contains(DebugFlags::Minimization)) {
+    llvm::dbgs() << "Minimized rules:\n";
+  }
 
   // Build the list of requirements, storing same-type requirements off
   // to the side.
   for (unsigned ruleID : rules) {
     const auto &rule = System.getRule(ruleID);
+
+    if (getDebugOptions().contains(DebugFlags::Minimization)) {
+      llvm::dbgs() << "- " << rule << "\n";
+    }
+
     createRequirementFromRule(rule);
   }
 
-  // A set of rewrite rules of the form:
-  //
-  //   B => A
-  //   C => A
-  //   D => A
-  //
-  // Become a series of same-type requirements
-  //
-  //   A == B, B == C, C == D
-  //
+  // Now, convert each connected component into a series of same-type
+  // requirements.
   for (auto &pair : sameTypeReqs) {
-    std::sort(pair.second.begin(), pair.second.end(),
-              [](Type first, Type second) -> bool {
-                return compareDependentTypes(first, second) < 0;
-              });
+    pair.second.buildRequirements(pair.first, reqs);
+  }
 
-    Type subjectType(pair.first);
-    for (auto constraintType : pair.second) {
-      reqs.emplace_back(RequirementKind::SameType, subjectType, constraintType);
-      subjectType = constraintType;
+  if (getDebugOptions().contains(DebugFlags::Minimization)) {
+    llvm::dbgs() << "Requirements:\n";
+    for (const auto &req : reqs) {
+      req.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
     }
   }
 
-  // Sort the requirements in canonical order.
+  // Finally, sort the requirements in canonical order.
   std::sort(reqs.begin(), reqs.end(),
             [](const Requirement &lhs, const Requirement &rhs) -> bool {
               return lhs.compare(rhs) < 0;

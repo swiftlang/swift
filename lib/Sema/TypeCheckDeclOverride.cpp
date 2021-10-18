@@ -1545,6 +1545,7 @@ namespace  {
     UNINTERESTING_ATTR(GlobalActor)
     UNINTERESTING_ATTR(Async)
     UNINTERESTING_ATTR(Sendable)
+    UNINTERESTING_ATTR(NonSendable)
 
     UNINTERESTING_ATTR(AtRethrows)
     UNINTERESTING_ATTR(Marker)

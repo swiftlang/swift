@@ -796,6 +796,7 @@ func _taskCancel(_ task: Builtin.NativeObject)
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_isCancelled")
+@usableFromInline
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
 @available(SwiftStdlib 5.5, *)

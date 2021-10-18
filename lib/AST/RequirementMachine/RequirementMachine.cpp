@@ -502,7 +502,6 @@ void RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy)
 
     // Check invariants.
     System.verifyRewriteRules(policy);
-    System.verifyHomotopyGenerators();
 
     // Build the property map, which also performs concrete term
     // unification; if this added any new rules, run the completion

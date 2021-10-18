@@ -73,6 +73,15 @@ bool Rule::isProtocolRefinementRule() const {
           LHS[0] != LHS[1]);
 }
 
+/// Linear order on rules; compares LHS followed by RHS.
+int Rule::compare(const Rule &other, const ProtocolGraph &protos) const {
+  int compare = LHS.compare(other.LHS, protos);
+  if (compare != 0)
+    return compare;
+
+  return RHS.compare(other.RHS, protos);
+}
+
 void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
   if (Permanent)
@@ -333,7 +342,7 @@ void RewriteSystem::simplifyRewriteSystem() {
           continue;
 
         if (Debug.contains(DebugFlags::Completion)) {
-          const auto &otherRule = getRule(ruleID);
+          const auto &otherRule = getRule(*otherRuleID);
           llvm::dbgs() << "$ Deleting rule " << rule << " because "
                        << "its left hand side contains " << otherRule
                        << "\n";

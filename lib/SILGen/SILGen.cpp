@@ -1144,6 +1144,7 @@ static void emitOrDelayFunction(SILGenModule &SGM,
   auto linkage = constant.getLinkage(ForDefinition);
   bool mayDelay = !forceEmission &&
              (constant.isImplicit() &&
+              !constant.isDynamicallyReplaceable() &&
               !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule()));
 
   // Avoid emitting a delayable definition if it hasn't already been referenced.
@@ -2202,53 +2203,4 @@ swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
                           const SILOptions &options) {
   auto desc = ASTLoweringDescriptor::forFile(sf, tc, options);
   return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
-}
-
-static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
-                                               Decl *d) {
-  auto *vd = cast<AbstractFunctionDecl>(d);
-  for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
-    auto *SA = cast<SpecializeAttr>(A);
-    // Filter _spi.
-    auto spiGroups = SA->getSPIGroups();
-    auto hasSPIGroup = !spiGroups.empty();
-    if (hasSPIGroup) {
-      if (vd->getModuleContext() != M.getSwiftModule() &&
-          !M.getSwiftModule()->isImportedAsSPI(SA, vd)) {
-        continue;
-      }
-    }
-    if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
-      auto target = SILDeclRef(targetFunctionDecl);
-      auto targetSILFunction = SGM.getFunction(target, NotForDefinition);
-      auto kind = SA->getSpecializationKind() ==
-                          SpecializeAttr::SpecializationKind::Full
-                      ? SILSpecializeAttr::SpecializationKind::Full
-                      : SILSpecializeAttr::SpecializationKind::Partial;
-      Identifier spiGroupIdent;
-      if (hasSPIGroup) {
-        spiGroupIdent = spiGroups[0];
-      }
-      auto availability =
-        AvailabilityInference::annotatedAvailableRangeForAttr(SA,
-                                                              M.getSwiftModule()->getASTContext());
-      targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-          spiGroupIdent, vd->getModuleContext(), availability));
-    }
-  }
-}
-
-void SILGenModule::visitImportDecl(ImportDecl *import) {
-  auto *module = import->getModule();
-  if (module->isNonSwiftModule())
-    return;
-
-  SmallVector<Decl*, 16> prespecializations;
-  module->getExportedPrespecializations(prespecializations);
-  for (auto *p : prespecializations) {
-    if (auto *vd = dyn_cast<AbstractFunctionDecl>(p)) {
-      transferSpecializeAttributeTargets(*this, M, vd);
-    }
-  }
 }

@@ -52,6 +52,7 @@ static inline int _swift_stdlib_fcntlPtr(int fd, int cmd, void* ptr) {
 #endif
 
 // Environment
+#if SWIFT_STDLIB_HAS_ENVIRON
 #if defined(__FreeBSD__) || defined(__OpenBSD__)
 static inline char * _Nullable * _Null_unspecified _swift_stdlib_getEnviron() {
   extern char **environ;
@@ -63,6 +64,7 @@ static inline char * _Nullable *_swift_stdlib_getEnviron() {
   return *_NSGetEnviron();
 }
 #endif
+#endif  // SWIFT_STDLIB_HAS_ENVIRON
 
 // System error numbers <errno.h>
 static inline int _swift_stdlib_getErrno() {

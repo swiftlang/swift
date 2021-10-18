@@ -477,7 +477,7 @@ std::string LinkEntity::mangleAsString() const {
   }
   case Kind::DistributedThunkAsyncFunctionPointer: {
     std::string Result = getSILDeclRef().mangle();
-    Result.append("Td");
+    Result.append("TE");
     Result.append("Tu");
     return Result;
   }

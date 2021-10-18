@@ -34,6 +34,9 @@
 #define __has_cpp_attribute(attribute) 0
 #endif
 
+// TODO: These macro definitions are duplicated in BridgedSwiftObject.h. Move
+// them to a single file if we find a location that both Visibility.h and
+// BridgedSwiftObject.h can import.
 #if __has_feature(nullability)
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
@@ -219,7 +222,7 @@
 #define SWIFT_FALLTHROUGH
 #endif
 
-#if __cplusplus >= 201402l && __has_cpp_attribute(nodiscard)
+#if __cplusplus > 201402l && __has_cpp_attribute(nodiscard)
 #define SWIFT_NODISCARD [[nodiscard]]
 #elif __has_cpp_attribute(clang::warn_unused_result)
 #define SWIFT_NODISCARD [[clang::warn_unused_result]]

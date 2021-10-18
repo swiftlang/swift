@@ -8,8 +8,8 @@
 
 import _Distributed
 
-// CHECK: @"$s4test1AC13_remote_helloyyYaKFTd" = hidden global %swift.async_func_pointer
-// CHECK: @"$s4test1AC13_remote_helloyyYaKFTdTu" = hidden global %swift.async_func_pointer
+// CHECK: @"$s4test1AC13_remote_helloyyYaKFTE" = hidden global %swift.async_func_pointer
+// CHECK: @"$s4test1AC13_remote_helloyyYaKFTETu" = hidden global %swift.async_func_pointer
 distributed actor SomeDistributedActor {
   distributed func hello(name: String) -> String {
     "Hello, \(name)!"
@@ -21,6 +21,6 @@ distributed actor SomeDistributedActor {
 // function method descriptor
 // IR unmangledName = $s4test20SomeDistributedActorC5hello4nameS2S_tFTq
 // thunk, method reference
-// IR unmangledName = $s4test20SomeDistributedActorC5hello4nameS2S_tFTd
+// IR unmangledName = $s4test20SomeDistributedActorC5hello4nameS2S_tFTE
 // thunk, method reference + async function pointer
-// IR unmangledName = $s4test20SomeDistributedActorC5hello4nameS2S_tFTdTu
+// IR unmangledName = $s4test20SomeDistributedActorC5hello4nameS2S_tFTETu

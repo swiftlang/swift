@@ -62,6 +62,7 @@ import Swift
 ///   - the group will await any not yet complete tasks,
 ///   - once the `withTaskGroup` returns the group is guaranteed to be empty.
 @available(SwiftStdlib 5.5, *)
+@_silgen_name("_$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -141,6 +142,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// - if the body throws:
 ///   - all tasks remaining in the group will be automatically cancelled.
 @available(SwiftStdlib 5.5, *)
+@_silgen_name("_$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,

@@ -150,6 +150,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("collect-var-type", SourceKitRequest::CollectVariableType)
         .Case("global-config", SourceKitRequest::GlobalConfiguration)
         .Case("dependency-updated", SourceKitRequest::DependencyUpdated)
+        .Case("diags", SourceKitRequest::Diagnostics)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
 #include "swift/IDE/RefactoringKinds.def"
         .Default(SourceKitRequest::None);

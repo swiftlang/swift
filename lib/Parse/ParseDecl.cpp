@@ -1735,6 +1735,133 @@ void Parser::parseAllAvailabilityMacroArguments() {
   AvailabilityMacrosComputed = true;
 }
 
+/// Processes a parsed option name by attempting to match it to a list of
+/// alternative name/value pairs provided by a chain of \c when() calls, ending
+/// in either \c whenOmitted() if omitting the option is allowed, or
+/// \c diagnoseWhenOmitted() if the option is mandatory.
+template<typename T, typename R = T>
+class LLVM_NODISCARD AttrOptionSwitch {
+  // Inputs:
+  Optional<StringRef> parsedName;         // None: parse error, empty: omitted
+  Parser &P;
+  SourceLoc loc;
+  StringRef attrName;                     // empty: error already diagnosed
+  bool isDeclModifier;
+
+  // State:
+  StringRef exampleName;                  // empty: when() was never called
+  Optional<R> result;                     // None: no when() has matched
+
+public:
+  /// \param parsedName The name of the option parsed out of the source code. If
+  ///        \c None, there was some sort of parse error; this will normally be
+  ///        diagnosed as \c diag::attr_expected_option_such_as using the name
+  ///        from the first \c when() call as an example.
+  /// \param P The parser used to diagnose errors concerning this attribute
+  ///        option.
+  /// \param loc The source location to diagnose errors at.
+  /// \param attrName The name of the attribute, used in diagnostics. If empty,
+  ///        an error has already been diagnosed and the AttrOptionSwitch should
+  ///        just fall through.
+  /// \param isDeclModifier Are we parsing an attribute or a modifier?
+  AttrOptionSwitch(Optional<StringRef> parsedName, Parser &P, SourceLoc loc,
+                   StringRef attrName, bool isDeclModifier)
+    :  parsedName(parsedName), P(P), loc(loc), attrName(attrName),
+       isDeclModifier(isDeclModifier) { }
+
+  /// If the option has the identifier \p name, give it value \p value.
+  AttrOptionSwitch<R, T> &when(StringLiteral name, T value) {
+    // Save this to use in a future diagnostic, if needed.
+    if (exampleName.empty() && !name.empty())
+      exampleName = name;
+
+    // Does this string match?
+    if (parsedName && *parsedName == name) {
+      assert(!result && "overlapping AttrOptionSwitch::when()s?");
+      result = std::move(value);
+    }
+
+    return *this;
+  }
+
+  /// Diagnose if the option is missing or was not matched, returning either the
+  /// option's value or \c None if an error was diagnosed.
+  Optional<R> diagnoseWhenOmitted() {
+    assert(!exampleName.empty() && "No AttrOptionSwitch::when() calls");
+
+    if (attrName.empty())
+      // An error has already been diagnosed; nothing to do.
+      return None;
+
+    if (!result) {
+      if (!parsedName)
+        // We parsed a non-identifier; diagnose it with `exampleName`.
+        P.diagnose(loc, diag::attr_expected_option_such_as, attrName,
+                   exampleName);
+      else if (*parsedName == "")
+        // Option list was omitted; apparently this attr doesn't allow that.
+        P.diagnose(loc, diag::attr_expected_lparen, attrName, isDeclModifier);
+      else
+        // The identifier didn't match any of the when() calls.
+        P.diagnose(loc, diag::attr_unknown_option, *parsedName, attrName);
+    }
+
+    return result;
+  }
+
+  /// Diagnose if the option is missing or not matched, returning:
+  ///
+  /// \returns \c None if an error was diagnosed; \p value if the option was
+  /// omitted; the value the option was matched to otherwise.
+  Optional<R> whenOmitted(T value) {
+    return when("", value).diagnoseWhenOmitted();
+  }
+};
+
+/// Parses an attribute argument list that allows a single identifier with a
+/// known set of permitted options:
+///
+/// \verbatim
+///     '(' identifier ')'
+/// \endverbatim
+///
+/// Returns an object of type \c AttrOptionSwitch, a type loosely inspired by
+/// \c llvm::StringSwitch which can be used in a fluent style to map each
+/// permitted identifier to a value. Together, they will automatically
+/// diagnose \c diag::attr_expected_lparen,
+/// \c diag::attr_expected_option_such_as, \c diag::attr_unknown_option, and
+/// \c diag::attr_expected_rparen when needed.
+///
+/// \seealso AttrOptionSwitch
+template<typename R>
+static AttrOptionSwitch<R>
+parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
+                      StringRef AttrName, DeclAttrKind DK) {
+  bool isModifier = DeclAttribute::isDeclModifier(DK);
+  if (!P.consumeIf(tok::l_paren)) {
+    AttrRange = SourceRange(Loc);
+    // Create an AttrOptionSwitch with an empty value. The calls on it will
+    // decide whether or not that's valid.
+    return AttrOptionSwitch<R>(StringRef(), P, Loc, AttrName, isModifier);
+  }
+
+  StringRef parsedName = P.Tok.getText();
+  if (!P.consumeIf(tok::identifier)) {
+    // Once we have an example of a valid option, diagnose this with
+    // diag::attr_expected_option_such_as.
+    return AttrOptionSwitch<R>(None, P, Loc, AttrName, isModifier);
+  }
+
+  if (!P.consumeIf(tok::r_paren)) {
+    P.diagnose(Loc, diag::attr_expected_rparen, AttrName, isModifier);
+    // Pass through the switch without diagnosing anything.
+    return AttrOptionSwitch<R>(None, P, Loc, "", isModifier);
+  }
+
+  AttrRange = SourceRange(Loc, P.PreviousLoc);
+  return AttrOptionSwitch<R>(parsedName, P, Loc, AttrName, isModifier);
+}
+
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                    DeclAttrKind DK, bool isFromClangAttribute) {
   // Ok, it is a valid attribute, eat it, and then process it.
@@ -1814,114 +1941,49 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 #include "swift/AST/Attr.def"
 
   case DAK_Effects: {
-    if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));      return false;
-    }
-
-    if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::effects_attribute_expect_option, AttrName);
+    auto kind = parseSingleAttrOption<EffectsKind>
+                         (*this, Loc, AttrRange, AttrName, DK)
+                    .when("readonly", EffectsKind::ReadOnly)
+                    .when("readnone", EffectsKind::ReadNone)
+                    .when("readwrite", EffectsKind::ReadWrite)
+                    .when("releasenone", EffectsKind::ReleaseNone)
+                    .diagnoseWhenOmitted();
+    if (!kind)
       return false;
-    }
-
-    EffectsKind kind;
-    if (Tok.getText() == "readonly")
-      kind = EffectsKind::ReadOnly;
-    else if (Tok.getText() == "readnone")
-      kind = EffectsKind::ReadNone;
-    else if (Tok.getText() == "readwrite")
-      kind = EffectsKind::ReadWrite;
-    else if (Tok.getText() == "releasenone")
-      kind = EffectsKind::ReleaseNone;
-    else {
-      diagnose(Loc, diag::attr_unknown_option,
-               Tok.getText(), AttrName);
-      return false;
-    }
-    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-    consumeToken(tok::identifier);
-
-    if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) EffectsAttr(AtLoc, AttrRange, kind));
+      Attributes.add(new (Context) EffectsAttr(AtLoc, AttrRange, *kind));
+
     break;
   }
 
   case DAK_Inline: {
-    if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
+    auto kind = parseSingleAttrOption<InlineKind>
+                         (*this, Loc, AttrRange, AttrName, DK)
+                    .when("never", InlineKind::Never)
+                    .when("__always", InlineKind::Always)
+                    .diagnoseWhenOmitted();
+    if (!kind)
       return false;
-    }
-
-    if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::attr_expected_option_such_as, AttrName, "none");
-      return false;
-    }
-
-    InlineKind kind;
-    if (Tok.getText() == "never")
-      kind = InlineKind::Never;
-    else if (Tok.getText() == "__always")
-      kind = InlineKind::Always;
-    else {
-      diagnose(Loc, diag::attr_unknown_option, Tok.getText(), AttrName);
-      return false;
-    }
-    consumeToken(tok::identifier);
-    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-    
-    if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) InlineAttr(AtLoc, AttrRange, kind));
+      Attributes.add(new (Context) InlineAttr(AtLoc, AttrRange, *kind));
 
     break;
   }
 
   case DAK_Optimize: {
-    if (!consumeIf(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
+    auto optMode = parseSingleAttrOption<OptimizationMode>
+                            (*this, Loc, AttrRange, AttrName, DK)
+                       .when("speed", OptimizationMode::ForSpeed)
+                       .when("size", OptimizationMode::ForSize)
+                       .when("none", OptimizationMode::NoOptimization)
+                       .diagnoseWhenOmitted();
+    if (!optMode)
       return false;
-    }
-
-    if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::attr_expected_option_such_as, AttrName, "speed");
-      return false;
-    }
-
-    OptimizationMode optMode = OptimizationMode::NotSet;
-    if (Tok.getText() == "none")
-      optMode = OptimizationMode::NoOptimization;
-    else if (Tok.getText() == "speed")
-      optMode = OptimizationMode::ForSpeed;
-    else if (Tok.getText() == "size")
-      optMode = OptimizationMode::ForSize;
-    else {
-      diagnose(Loc, diag::attr_unknown_option, Tok.getText(), AttrName);
-      return false;
-    }
-    consumeToken(tok::identifier);
-    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-
-    if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) OptimizeAttr(AtLoc, AttrRange, optMode));
+      Attributes.add(new (Context) OptimizeAttr(AtLoc, AttrRange, *optMode));
 
     break;
   }
@@ -1930,30 +1992,39 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     // Handle weak/unowned/unowned(unsafe).
     auto Kind = AttrName == "weak" ? ReferenceOwnership::Weak
                                    : ReferenceOwnership::Unowned;
-    SourceLoc EndLoc = Loc;
 
-    if (Kind == ReferenceOwnership::Unowned && Tok.is(tok::l_paren)) {
+    if (Kind == ReferenceOwnership::Unowned) {
       // Parse an optional specifier after unowned.
-      SourceLoc lp = consumeToken(tok::l_paren);
-      if (Tok.is(tok::identifier) && Tok.getText() == "safe") {
-        consumeToken();
-      } else if (Tok.is(tok::identifier) && Tok.getText() == "unsafe") {
-        consumeToken();
-        Kind = ReferenceOwnership::Unmanaged;
-      } else {
-        diagnose(Tok, diag::attr_unowned_invalid_specifier);
-        consumeIf(tok::identifier);
-      }
-
-      SourceLoc rp;
-      parseMatchingToken(tok::r_paren, rp, diag::attr_unowned_expected_rparen,
-                         lp);
-      EndLoc = rp;
+      Kind = parseSingleAttrOption<ReferenceOwnership>
+                     (*this, Loc, AttrRange, AttrName, DK)
+                .when("unsafe", ReferenceOwnership::Unmanaged)
+                .when("safe", ReferenceOwnership::Unowned)
+                .whenOmitted(ReferenceOwnership::Unowned)
+            // Recover from errors by going back to Unowned.
+            .getValueOr(ReferenceOwnership::Unowned);
+    }
+    else {
+      AttrRange = SourceRange(Loc);
     }
 
     if (!DiscardAttribute)
       Attributes.add(
-          new (Context) ReferenceOwnershipAttr(SourceRange(Loc, EndLoc), Kind));
+          new (Context) ReferenceOwnershipAttr(AttrRange, Kind));
+
+    break;
+  }
+
+  case DAK_NonSendable: {
+    auto kind = parseSingleAttrOption<NonSendableKind>
+                         (*this, Loc, AttrRange, AttrName, DK)
+                    .when("_assumed", NonSendableKind::Assumed)
+                    .whenOmitted(NonSendableKind::Specific);
+    if (!kind)
+      return false;
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) NonSendableAttr(AtLoc, AttrRange, *kind));
+
     break;
   }
 

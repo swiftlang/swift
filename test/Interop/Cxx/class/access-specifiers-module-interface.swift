@@ -4,6 +4,9 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=AccessSpecifiers -I %S/Inputs -source-filename=x -enable-cxx-interop | %FileCheck %s
 
 // CHECK:      struct PublicPrivate {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   static var PublicStaticMemberVar: Int32
+// CHECK-NEXT:   mutating func publicMemberFunc()
 // CHECK-NEXT:   typealias PublicTypedef = Int32
 // CHECK-NEXT:   struct PublicStruct {
 // CHECK-NEXT:     init()
@@ -37,8 +40,5 @@
 // CHECK-NEXT:     typealias Element = PublicPrivate.PublicFlagEnum
 // CHECK-NEXT:     typealias ArrayLiteralElement = PublicPrivate.PublicFlagEnum
 // CHECK-NEXT:   }
-// CHECK-NEXT:   static var PublicStaticMemberVar: Int32
 // CHECK-NEXT:   var PublicMemberVar: Int32
-// CHECK-NEXT:   init()
-// CHECK-NEXT:   mutating func publicMemberFunc()
 // CHECK-NEXT: }

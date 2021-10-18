@@ -499,14 +499,6 @@ bool checkContextualRequirements(GenericTypeDecl *decl,
 /// struct, class or actor.
 void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
-/// Synthesize and add a '_remote' counterpart of the passed in `func` to `decl`.
-///
-/// \param decl the actor type to add the '_remote' definition to
-/// \param func the 'distributed func' that the '_remote' func should mirror
-/// \return the synthesized function
-AbstractFunctionDecl *addImplicitDistributedActorRemoteFunction(
-    ClassDecl* decl, AbstractFunctionDecl *func);
-
 /// Fold the given sequence expression into an (unchecked) expression
 /// tree.
 Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);

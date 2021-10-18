@@ -384,7 +384,7 @@ public:
 
   /// Apply CanonicalizeOSSALifetime to the extended lifetime of any copy
   /// introduced during SILCombine for an owned value.
-  void canonicalizeOSSALifetimes();
+  void canonicalizeOSSALifetimes(SILInstruction *currentInst);
 
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.

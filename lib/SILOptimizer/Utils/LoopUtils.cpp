@@ -127,8 +127,8 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   // the backedge block which correspond to any PHI nodes in the header block.
   SmallVector<SILValue, 6> BBArgs;
   for (auto *BBArg : Header->getArguments()) {
-    BBArgs.push_back(
-        BEBlock->createPhiArgument(BBArg->getType(), OwnershipKind::Owned));
+    BBArgs.push_back(BEBlock->createPhiArgument(BBArg->getType(),
+                                                BBArg->getOwnershipKind()));
   }
 
   // Arbitrarily pick one of the predecessor's branch locations.

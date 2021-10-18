@@ -2883,7 +2883,7 @@ void ClangImporter::lookupTypeDecl(
             !isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
           continue;
         }
-        auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
+        Decl *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
 
         // Namespaces are imported as extensions for enums.
         if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported)) {
@@ -3015,7 +3015,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
-      auto importedDecl = owner.importDecl(decl, owner.CurrentVersion);
+      Decl *importedDecl = owner.importDecl(decl, owner.CurrentVersion);
       if (!importedDecl) continue;
 
       // Find the enclosing extension, if there is one.
@@ -3381,9 +3381,7 @@ void ClangModuleUnit::lookupObjCMethods(
     if (objcMethod->isPropertyAccessor())
       (void)owner.importDecl(objcMethod->findPropertyDecl(true),
                              owner.CurrentVersion);
-
-    auto imported =
-        owner.importDecl(objcMethod, owner.CurrentVersion);
+    Decl *imported = owner.importDecl(objcMethod, owner.CurrentVersion);
     if (!imported) continue;
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(imported))
@@ -4053,7 +4051,8 @@ ClangImporter::Implementation::loadNamedMembers(
   auto table = findLookupTable(*CMO);
   assert(table && "clang module without lookup table");
 
-  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
+  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD) ||
+         isa<clang::RecordDecl>(CD));
 
   // Force the members of the entire inheritance hierarchy to be loaded and
   // deserialized before loading the named member of a class. This warms up
