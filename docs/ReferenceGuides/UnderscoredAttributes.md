@@ -251,7 +251,7 @@ even when `Self` is a reference type.
 ```swift
 class C {
   func f() {}
-  func g(_: @escaping () -> Void {
+  func g(_: @escaping () -> Void) {
     g({ f() }) // error: call to method 'f' in closure requires explicit use of 'self'
   }
   func h(@_implicitSelfCapture _: @escaping () -> Void) {
