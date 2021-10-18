@@ -124,6 +124,12 @@
   RPATH_INSTALL_NAME_DIRECTIVE(11,  4)
   RPATH_INSTALL_NAME_DIRECTIVE(11,  5)
   RPATH_INSTALL_NAME_DIRECTIVE(11,  6)
+
+ // Link against @rpath/libswift_Concurrency.dylib for macCatalyst < 15.0.
+SWIFT_RUNTIME_EXPORT const char ld_previous_macCatalyst
+__asm("$ld$previous$@rpath/libswift_Concurrency.dylib$$6$1.0$15.0$");
+
+const char ld_previous_macCatalyst = 0;
 #else
   #error Unknown target.
 #endif
