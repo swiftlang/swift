@@ -1729,6 +1729,7 @@ private:
     case TypeKind::SILToken:
     case TypeKind::BuiltinUnsafeValueBuffer:
     case TypeKind::BuiltinDefaultActorStorage:
+    case TypeKind::SILMoveOnly:
 
       LLVM_DEBUG(llvm::dbgs() << "Unhandled type: ";
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");

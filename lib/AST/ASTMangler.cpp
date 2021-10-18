@@ -1436,7 +1436,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       return;
     }
-
+    case TypeKind::SILMoveOnly:
+      // If we hit this, we just mangle the underlying name and move on.
+      llvm_unreachable("should never be mangled?");
     case TypeKind::SILBlockStorage:
       llvm_unreachable("should never be mangled");
   }

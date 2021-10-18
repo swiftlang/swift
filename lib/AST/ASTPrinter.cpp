@@ -6125,6 +6125,11 @@ public:
     }
   }
 
+  void visitSILMoveOnlyType(SILMoveOnlyType *T) {
+    Printer << "@moveOnly ";
+    printWithParensIfNotSimple(T->getInnerType());
+  }
+
   void visitArraySliceType(ArraySliceType *T) {
     Printer << "[";
     visit(T->getBaseType());
