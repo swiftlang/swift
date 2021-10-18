@@ -14,7 +14,7 @@
 // RUN: touch %t/lib/swift/clang/lib/darwin/libclang_rt.osx.a %t/lib/swift/clang/lib/darwin/libclang_rt.ios.a %t/lib/swift/clang/lib/darwin/libclang_rt.iossim.a %t/lib/swift/clang/lib/darwin/libclang_rt.tvos.a %t/lib/swift/clang/lib/darwin/libclang_rt.tvossim.a %t/lib/swift/clang/lib/darwin/libclang_rt.watchos.a %t/lib/swift/clang/lib/darwin/libclang_rt.watchossim.a
 
 // RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MACOS %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios13.0-macabi %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MACCATALYST %s
+// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios13.1-macabi %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MACCATALYST %s
 
 // RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-ios7-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
 // RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
