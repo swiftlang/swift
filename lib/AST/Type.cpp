@@ -189,6 +189,9 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::DynamicSelf:
     return isReferenceTypeImpl(cast<DynamicSelfType>(type).getSelfType(),
                                sig, functionsCount);
+  case TypeKind::SILMoveOnly:
+    return isReferenceTypeImpl(cast<SILMoveOnlyType>(type)->getInnerType(), sig,
+                               functionsCount);
 
   // Archetypes and existentials are only class references if class-bounded.
   case TypeKind::PrimaryArchetype:
@@ -1632,6 +1635,7 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
   case TypeKind::SILToken:
+  case TypeKind::SILMoveOnly:
     llvm_unreachable("SIL-only types are always canonical!");
 
   case TypeKind::ProtocolComposition: {
@@ -5086,6 +5090,18 @@ case TypeKind::Id:
     return storageTy;
   }
 
+  case TypeKind::SILMoveOnly: {
+    auto *storageTy = cast<SILMoveOnlyType>(base);
+    Type transCap = storageTy->getInnerType().transformWithPosition(
+        TypePosition::Invariant, fn);
+    if (!transCap)
+      return Type();
+    CanType canTransCap = transCap->getCanonicalType();
+    if (canTransCap != storageTy->getInnerType())
+      return SILMoveOnlyType::get(canTransCap);
+    return storageTy;
+  }
+
   case TypeKind::SILBox: {
     bool changed = false;
     auto boxTy = cast<SILBoxType>(base);
@@ -5996,6 +6012,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
         ->getReferenceCounting();
+  case TypeKind::SILMoveOnly:
+    return cast<SILMoveOnlyType>(type)->getInnerType()->getReferenceCounting();
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:

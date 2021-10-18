@@ -666,6 +666,14 @@ namespace {
           type, getReferenceRecursiveProperties(isSensitive));
     }
 
+    RetTy visitSILMoveOnlyType(CanSILMoveOnlyType type,
+                               AbstractionPattern origType,
+                               IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleReference(
+          type->getInnerType()->getCanonicalType(),
+          getReferenceRecursiveProperties(isSensitive));
+    }
+
     RetTy handleAggregateByProperties(CanType type, RecursiveProperties props) {
       if (props.isAddressOnly()) {
         return asImpl().handleAddressOnly(type, props);

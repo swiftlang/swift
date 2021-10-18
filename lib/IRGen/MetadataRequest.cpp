@@ -1941,7 +1941,10 @@ namespace {
                                           DynamicMetadataRequest request) {
       llvm_unreachable("should not be asking for metadata of a SILToken type");
     }
-
+    MetadataResponse visitSILMoveOnlyType(CanSILMoveOnlyType type,
+                                          DynamicMetadataRequest request) {
+      llvm_unreachable("should not be asking for metadata of a move only type");
+    }
     MetadataResponse visitArchetypeType(CanArchetypeType type,
                                         DynamicMetadataRequest request) {
       return emitArchetypeTypeMetadataRef(IGF, type, request);

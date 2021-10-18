@@ -2842,7 +2842,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
   // In SIL *only*, allow @moveOnly to specify a moveOnly type.
   if ((options & TypeResolutionFlags::SILType) && attrs.has(TAK_moveOnly)) {
-    //ty = ty->getCanonicalType()->getMoveOnlyType();
+    ty = SILMoveOnlyType::get(ty->getCanonicalType());
     attrs.clearAttribute(TAK_moveOnly);
   }
 
