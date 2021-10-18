@@ -2964,6 +2964,9 @@ ERROR(broken_encodable_requirement,none,
       "Encodable protocol is broken: unexpected requirement", ())
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
+ERROR(codable_synthesis_empty_enum_not_supported,none,
+      "cannot automatically synthesize %0 conformance for empty enum %1",
+      (Type, Identifier))
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
 WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,

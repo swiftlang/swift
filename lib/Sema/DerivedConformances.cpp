@@ -561,7 +561,7 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
     return true;
   }
 
-  // A non-final class can't have an protocol-witnesss initializer in an
+  // A non-final class can't have a protocol-witnesses initializer in an
   // extension.
   if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
     if (!CD->isSemanticallyFinal() && isa<ConstructorDecl>(synthesizing) &&
@@ -570,6 +570,16 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
           diag::cannot_synthesize_init_in_extension_of_nonfinal,
           getProtocolType(), synthesizing->getName());
       return true;
+    }
+  }
+
+  if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
+    if (ED->getAllCases().empty() &&
+        (Protocol->isSpecificProtocol(KnownProtocolKind::Encodable) ||
+         Protocol->isSpecificProtocol(KnownProtocolKind::Decodable))) {
+      ED->diagnose(diag::codable_synthesis_empty_enum_not_supported,
+                   getProtocolType(), Nominal->getBaseIdentifier());
+      return false;
     }
   }
 
