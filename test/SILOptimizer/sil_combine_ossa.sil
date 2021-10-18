@@ -2972,8 +2972,6 @@ bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
 // CHECK-LABEL: sil [ossa] @alloc_ref_dynamic_with_metatype :
 // CHECK: bb0
 // CHECK-NOT: alloc_ref_dynamic
-// CHECK-NEXT: alloc_ref $B
-// CHECK-NEXT: destroy_value
 // CHECK: return
 // CHECK: } // end sil function 'alloc_ref_dynamic_with_metatype'
 sil [ossa] @alloc_ref_dynamic_with_metatype : $() -> () {
@@ -3017,7 +3015,6 @@ sil [ossa] @alloc_ref_dynamic_with_upcast_metatype : $@convention(thin) () -> @o
 // CHECK: checked_cast_br
 // CHECK: bb1
 // CHECK-NOT: alloc_ref_dynamic
-// CHECK: alloc_ref $B
 // CHECK: } // end sil function 'alloc_ref_dynamic_after_successful_checked_cast_br'
 sil [ossa] @alloc_ref_dynamic_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
@@ -3041,8 +3038,6 @@ bb3 (%10: $Builtin.Int32):
 // CHECK: checked_cast_br
 // CHECK: bb1
 // CHECK-NOT: alloc_ref_dynamic
-// CHECK:      [[R:%[0-9]+]] = alloc_ref $E
-// CHECK-NEXT: destroy_value [[R]]
 // CHECK: } // end sil function 'alloc_ref_dynamic_upcast_after_successful_checked_cast_br'
 sil [ossa] @alloc_ref_dynamic_upcast_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
