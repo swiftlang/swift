@@ -79,6 +79,8 @@ public:
 
   void dump(llvm::raw_ostream &out) const;
 
+  int compare(Term other, const ProtocolGraph &protos) const;
+
   friend bool operator==(Term lhs, Term rhs) {
     return lhs.Ptr == rhs.Ptr;
   }

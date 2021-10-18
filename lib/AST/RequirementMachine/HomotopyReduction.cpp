@@ -218,7 +218,6 @@ RewritePath::findRulesAppearingOnceInEmptyContext() const {
       result.push_back(rule);
   }
 
-  std::sort(result.begin(), result.end());
   return result;
 }
 
@@ -574,6 +573,64 @@ void HomotopyGenerator::dump(llvm::raw_ostream &out,
     out << " [deleted]";
 }
 
+/// Check if a rewrite rule is a candidate for deletion in this pass of the
+/// minimization algorithm.
+bool RewriteSystem::
+isCandidateForDeletion(unsigned ruleID,
+                       bool firstPass,
+                       const llvm::DenseSet<unsigned> *redundantConformances) const {
+  const auto &rule = getRule(ruleID);
+
+  // We should not find a rule that has already been marked redundant
+  // here; it should have already been replaced with a rewrite path
+  // in all homotopy generators.
+  assert(!rule.isRedundant());
+
+  // Associated type introduction rules are 'permanent'. They're
+  // not worth eliminating since they are re-added every time; it
+  // is better to find other candidates to eliminate in the same
+  // 3-cell instead.
+  if (rule.isPermanent())
+    return false;
+
+  // Other rules involving unresolved name symbols are derived from an
+  // associated type introduction rule together with a conformance rule.
+  // They are eliminated in the first pass.
+  if (firstPass)
+    return rule.getLHS().containsUnresolvedSymbols();
+
+  // In the second and third pass we should not have any rules involving
+  // unresolved name symbols, except for permanent rules which were
+  // already skipped above.
+  //
+  // FIXME: This isn't true with invalid code.
+  assert(!rule.getLHS().containsUnresolvedSymbols());
+
+  // Protocol conformance rules are eliminated via a different
+  // algorithm which computes "generating conformances".
+  //
+  // The first and second passes skip protocol conformance rules.
+  //
+  // The third pass eliminates any protocol conformance rule which is
+  // redundant according to both homotopy reduction and the generating
+  // conformances algorithm.
+  //
+  // Later on, we verify that any conformance redundant via generating
+  // conformances was also redundant via homotopy reduction. This
+  // means that the set of generating conformances is always a superset
+  // (or equal to) of the set of minimal protocol conformance
+  // requirements that homotopy reduction alone would produce.
+  if (rule.isProtocolConformanceRule()) {
+    if (!redundantConformances)
+      return false;
+
+    if (!redundantConformances->count(ruleID))
+      return false;
+  }
+
+  return true;
+}
+
 /// Find a rule to delete by looking through all 3-cells for rewrite rules appearing
 /// once in empty context. Returns a redundant rule to delete if one was found,
 /// otherwise returns None.
@@ -604,63 +661,26 @@ findRuleToDelete(bool firstPass,
     SmallVector<unsigned> redundancyCandidates =
         loop.Path.findRulesAppearingOnceInEmptyContext();
 
-    auto found = std::find_if(
-        redundancyCandidates.begin(),
-        redundancyCandidates.end(),
-        [&](unsigned ruleID) -> bool {
-          const auto &rule = getRule(ruleID);
+    Optional<unsigned> found;
 
-          // We should not find a rule that has already been marked redundant
-          // here; it should have already been replaced with a rewrite path
-          // in all homotopy generators.
-          assert(!rule.isRedundant());
+    for (unsigned ruleID : redundancyCandidates) {
+      if (!isCandidateForDeletion(ruleID, firstPass, redundantConformances))
+        continue;
 
-          // Associated type introduction rules are 'permanent'. They're
-          // not worth eliminating since they are re-added every time; it
-          // is better to find other candidates to eliminate in the same
-          // 3-cell instead.
-          if (rule.isPermanent())
-            return false;
+      if (!found) {
+        found = ruleID;
+        continue;
+      }
 
-          // Other rules involving unresolved name symbols are derived from an
-          // associated type introduction rule together with a conformance rule.
-          // They are eliminated in the first pass.
-          if (firstPass)
-            return rule.getLHS().containsUnresolvedSymbols();
+      const auto &rule = getRule(ruleID);
+      const auto &otherRule = getRule(*found);
 
-          // In the second and third pass we should not have any rules involving
-          // unresolved name symbols, except for permanent rules which were
-          // already skipped above.
-          //
-          // FIXME: This isn't true with invalid code.
-          assert(!rule.getLHS().containsUnresolvedSymbols());
+      // Prefer to delete "less canonical" rules.
+      if (rule.compare(otherRule, Protos) > 0)
+        found = ruleID;
+    }
 
-          // Protocol conformance rules are eliminated via a different
-          // algorithm which computes "generating conformances".
-          //
-          // The first and second passes skip protocol conformance rules.
-          //
-          // The third pass eliminates any protocol conformance rule which is
-          // redundant according to both homotopy reduction and the generating
-          // conformances algorithm.
-          //
-          // Later on, we verify that any conformance redundant via generating
-          // conformances was also redundant via homotopy reduction. This
-          // means that the set of generating conformances is always a superset
-          // (or equal to) of the set of minimal protocol conformance
-          // requirements that homotopy reduction alone would produce.
-          if (rule.isProtocolConformanceRule()) {
-            if (!redundantConformances)
-              return false;
-
-            if (!redundantConformances->count(ruleID))
-              return false;
-          }
-
-          return true;
-        });
-
-    if (found == redundancyCandidates.end())
+    if (!found)
       continue;
 
     auto ruleID = *found;

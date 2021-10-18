@@ -558,6 +558,7 @@ private:
     case Node::Kind::ProtocolConformanceRefInTypeModule:
     case Node::Kind::ProtocolConformanceRefInProtocolModule:
     case Node::Kind::ProtocolConformanceRefInOtherModule:
+    case Node::Kind::DistributedThunk:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
@@ -1985,6 +1986,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
     Printer << "opaque type symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::DistributedThunk:
+    if (!Options.ShortenThunk) {
+      Printer << "distributed thunk for ";
+    }
     return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
     if (!Options.ShortenThunk) {

@@ -1610,6 +1610,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::VTableAttribute:
       case Node::Kind::DirectMethodReferenceAttribute:
       case Node::Kind::MergedFunction:
+      case Node::Kind::DistributedThunk:
       case Node::Kind::DynamicallyReplaceableFunctionKey:
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
@@ -2238,6 +2239,12 @@ ManglingError Remangler::manglePartialApplyObjCForwarder(Node *node,
 
 ManglingError Remangler::mangleMergedFunction(Node *node, unsigned depth) {
   Buffer << "Tm";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDistributedThunk(Node *node, unsigned depth) {
+  Buffer << "TE";
   return ManglingError::Success;
 }
 

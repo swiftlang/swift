@@ -652,3 +652,30 @@ bb4(%3 : @owned $Klass):
   return %res : $()
 }
 
+// CHECK-LABEL: sil [ossa] @looping_borrow : $@convention(thin) () -> () {
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'looping_borrow'
+sil [ossa] @looping_borrow : $@convention(thin) () -> () {
+entry:
+  %instance_1 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %lifetime_1 = begin_borrow [lexical] %instance_1 : $FakeOptional<Klass>
+  br loop_entry(%instance_1 : $FakeOptional<Klass>, %lifetime_1 : $FakeOptional<Klass>)
+
+loop_entry(%18 : @owned $FakeOptional<Klass>, %19 : @guaranteed $FakeOptional<Klass>):
+  br loop_body
+
+loop_body:
+  cond_br undef, loop_back, loop_exit
+
+loop_back:
+  br loop_entry(%18 : $FakeOptional<Klass>, %19 : $FakeOptional<Klass>)
+
+loop_exit:
+  end_borrow %19 : $FakeOptional<Klass>
+  destroy_value %18 : $FakeOptional<Klass>
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
