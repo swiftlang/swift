@@ -1,4 +1,4 @@
-//===--- DAGNodeWorklist.h --------------------------------------*- C++ -*-===//
+//===--- GraphNodeWorklist.h ------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_DAGNODEWORKLIST_H
-#define SWIFT_BASIC_DAGNODEWORKLIST_H
+#ifndef SWIFT_BASIC_GRAPHNODEWORKLIST_H
+#define SWIFT_BASIC_GRAPHNODEWORKLIST_H
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -25,23 +25,22 @@
 ///
 /// The primary API has two methods: intialize() and pop(). Others are provided
 /// for flexibility.
-///
-/// TODO: This also works well for cyclic graph traversal. Particularly CFG
-/// traversal. So we should probably just call it GraphNodeWorklist.
-template <typename T, unsigned SmallSize> struct DAGNodeWorklist {
+template <typename T, unsigned SmallSize>
+struct GraphNodeWorklist {
   llvm::SmallPtrSet<T, SmallSize> nodeVisited;
   llvm::SmallVector<T, SmallSize> nodeVector;
 
-  DAGNodeWorklist() = default;
+  GraphNodeWorklist() = default;
 
-  DAGNodeWorklist(const DAGNodeWorklist &) = delete;
+  GraphNodeWorklist(const GraphNodeWorklist &) = delete;
 
   void initialize(T t) {
     clear();
     insert(t);
   }
 
-  template <typename R> void initializeRange(R &&range) {
+  template <typename R>
+  void initializeRange(R &&range) {
     clear();
     nodeVisited.insert(range.begin(), range.end());
     nodeVector.append(range.begin(), range.end());
@@ -64,4 +63,4 @@ template <typename T, unsigned SmallSize> struct DAGNodeWorklist {
   }
 };
 
-#endif // SWIFT_BASIC_DAGNODEWORKLIST_H
+#endif // SWIFT_BASIC_GRAPHNODEWORKLIST_H

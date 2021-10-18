@@ -96,7 +96,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 
-#include "swift/Basic/DAGNodeWorklist.h"
+#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
@@ -271,10 +271,10 @@ private:
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
   /// Visited set for general def-use traversal that prevents revisiting values.
-  DAGNodeWorklist<SILValue, 8> defUseWorklist;
+  GraphNodeWorklist<SILValue, 8> defUseWorklist;
 
   /// Visited set general CFG traversal that prevents revisiting blocks.
-  DAGNodeWorklist<SILBasicBlock *, 8> blockWorklist;
+  GraphNodeWorklist<SILBasicBlock *, 8> blockWorklist;
 
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
