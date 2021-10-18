@@ -697,13 +697,17 @@ void IRGenModule::emitRuntimeRegistration() {
       llvm::ConstantInt::get(Int32Ty, 0),
     };
     auto begin = llvm::ConstantExpr::getGetElementPtr(
-        protocols->getType()->getPointerElementType(), protocols, beginIndices);
+        cast<llvm::PointerType>(protocols->getType()->getScalarType())
+            ->getElementType(),
+        protocols, beginIndices);
     llvm::Constant *endIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, SwiftProtocols.size()),
     };
     auto end = llvm::ConstantExpr::getGetElementPtr(
-        protocols->getType()->getPointerElementType() , protocols, endIndices);
+        cast<llvm::PointerType>(protocols->getType()->getScalarType())
+            ->getElementType(),
+        protocols, endIndices);
 
     RegIGF.Builder.CreateCall(getRegisterProtocolsFn(), {begin, end});
   }
@@ -716,14 +720,16 @@ void IRGenModule::emitRuntimeRegistration() {
       llvm::ConstantInt::get(Int32Ty, 0),
     };
     auto begin = llvm::ConstantExpr::getGetElementPtr(
-        conformances->getType()->getPointerElementType(),
+        cast<llvm::PointerType>(conformances->getType()->getScalarType())
+            ->getElementType(),
         conformances, beginIndices);
     llvm::Constant *endIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, ProtocolConformances.size()),
     };
     auto end = llvm::ConstantExpr::getGetElementPtr(
-        conformances->getType()->getPointerElementType(),
+        cast<llvm::PointerType>(conformances->getType()->getScalarType())
+            ->getElementType(),
         conformances, endIndices);
 
     RegIGF.Builder.CreateCall(getRegisterProtocolConformancesFn(), {begin, end});
@@ -738,13 +744,17 @@ void IRGenModule::emitRuntimeRegistration() {
       llvm::ConstantInt::get(Int32Ty, 0),
     };
     auto begin = llvm::ConstantExpr::getGetElementPtr(
-        records->getType()->getPointerElementType(), records, beginIndices);
+        cast<llvm::PointerType>(records->getType()->getScalarType())
+            ->getElementType(),
+        records, beginIndices);
     llvm::Constant *endIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, RuntimeResolvableTypes.size()),
     };
     auto end = llvm::ConstantExpr::getGetElementPtr(
-        records->getType()->getPointerElementType(), records, endIndices);
+        cast<llvm::PointerType>(records->getType()->getScalarType())
+            ->getElementType(),
+        records, endIndices);
 
     RegIGF.Builder.CreateCall(getRegisterTypeMetadataRecordsFn(), {begin, end});
   }
@@ -911,15 +921,6 @@ bool LinkInfo::isUsed(IRLinkage IRL) {
 ///
 /// This value must have a definition by the time the module is finalized.
 void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
-
-  // As of reviews.llvm.org/D97448 "ELF: Create unique SHF_GNU_RETAIN sections
-  // for llvm.used global objects" LLVM creates separate sections for globals in
-  // llvm.used on ELF.  Therefore we use llvm.compiler.used on ELF instead.
-  if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF) {
-    addCompilerUsedGlobal(global);
-    return;
-  }
-
   LLVMUsed.push_back(global);
 }
 
@@ -1666,7 +1667,9 @@ static llvm::GlobalVariable *getChainEntryForDynamicReplacement(
     llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, 0),
                                  llvm::ConstantInt::get(IGM.Int32Ty, 0)};
     auto *storageAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        linkEntry->getType()->getPointerElementType(), linkEntry, indices);
+        cast<llvm::PointerType>(linkEntry->getType()->getScalarType())
+            ->getElementType(),
+        linkEntry, indices);
     bool isAsyncFunction =
         entity.hasSILFunction() && entity.getSILFunction()->isAsync();
     auto &schema =
@@ -2533,7 +2536,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // Return the address of the initialized object itself (and not the address
     // to a reference to it).
     addr = llvm::ConstantExpr::getGetElementPtr(
-      gvar->getType()->getPointerElementType(), gvar, Indices);
+        cast<llvm::PointerType>(gvar->getType()->getScalarType())
+            ->getElementType(),
+        gvar, Indices);
   }
   addr = llvm::ConstantExpr::getBitCast(
       addr,
@@ -2666,9 +2671,10 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   llvm::Constant *indices[] = {llvm::ConstantInt::get(Int32Ty, 0),
                                llvm::ConstantInt::get(Int32Ty, 0)};
 
-  auto *fnPtrAddr =
-      llvm::ConstantExpr::getInBoundsGetElementPtr(
-        linkEntry->getType()->getPointerElementType(), linkEntry, indices);
+  auto *fnPtrAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      cast<llvm::PointerType>(linkEntry->getType()->getScalarType())
+          ->getElementType(),
+      linkEntry, indices);
 
   auto *ReplAddr =
     llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(fnPtrAddr,
@@ -2882,9 +2888,10 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
   llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, 0),
                                llvm::ConstantInt::get(IGM.Int32Ty, 0)};
 
-  auto *fnPtrAddr =
-      llvm::ConstantExpr::getInBoundsGetElementPtr(
-        linkEntry->getType()->getPointerElementType(), linkEntry, indices);
+  auto *fnPtrAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      cast<llvm::PointerType>(linkEntry->getType()->getScalarType())
+          ->getElementType(),
+      linkEntry, indices);
   auto *fnPtr = IGF.Builder.CreateLoad(fnPtrAddr, IGM.getPointerAlignment());
   auto *typeFnPtr = IGF.Builder.CreateBitOrPointerCast(fnPtr, implFn->getType());
 
@@ -3001,10 +3008,11 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   llvm::Constant *indices[] = {llvm::ConstantInt::get(Int32Ty, 0),
                                llvm::ConstantInt::get(Int32Ty, 0)};
 
-  auto *fnPtrAddr =
-    llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
+  auto *fnPtrAddr = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
       llvm::ConstantExpr::getInBoundsGetElementPtr(
-        linkEntry->getType()->getPointerElementType(), linkEntry, indices),
+          cast<llvm::PointerType>(linkEntry->getType()->getScalarType())
+              ->getElementType(),
+          linkEntry, indices),
       FunctionPtrTy->getPointerTo());
 
   auto *OrigFn =
@@ -3720,10 +3728,7 @@ static void appendLLVMUsedConditionalEntry(IRGenModule &IGM,
           llvm::Type::getInt32Ty(IGM.Module.getContext()), 0)),
       // (3) the "edge" that holds the target alive, if it's missing the target
       // is allowed to be removed
-      llvm::MDNode::get(IGM.Module.getContext(),
-                        {
-                            llvm::ConstantAsMetadata::get(dependsOn),
-                        }),
+      llvm::ConstantAsMetadata::get(dependsOn),
   };
   auto *usedConditional =
       IGM.Module.getOrInsertNamedMetadata("llvm.used.conditional");
@@ -4494,7 +4499,9 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, adjustmentIndex)};
   auto addr = llvm::ConstantExpr::getInBoundsGetElementPtr(
-    var->getType()->getPointerElementType(), var, indices);
+      cast<llvm::PointerType>(var->getType()->getScalarType())
+          ->getElementType(),
+      var, indices);
   addr = llvm::ConstantExpr::getBitCast(addr, TypeMetadataPtrTy);
 
   // For concrete metadata, declare the alias to its address point.
@@ -4613,10 +4620,11 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
       llvm::ConstantInt::get(Int32Ty, adjustmentIndex)
     };
     addr = ConstantReference(
-             llvm::ConstantExpr::getInBoundsGetElementPtr(
-               addr.getValue()->getType()->getPointerElementType(),
-                                    addr.getValue(), indices),
-                             addr.isIndirect());
+        llvm::ConstantExpr::getInBoundsGetElementPtr(
+            cast<llvm::PointerType>(addr.getValue()->getType()->getScalarType())
+                ->getElementType(),
+            addr.getValue(), indices),
+        addr.isIndirect());
   }
   
   return addr;

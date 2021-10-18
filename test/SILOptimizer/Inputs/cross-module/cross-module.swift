@@ -285,8 +285,3 @@ public func callCImplementationOnly<T>(_ t: T) -> Int {
 
 
 public let globalLet = 529387
-
-public struct StructWithClosure {
-  public static let c = { (x: Int) -> Int in return x }
-}
-

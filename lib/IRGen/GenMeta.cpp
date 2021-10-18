@@ -873,8 +873,9 @@ namespace {
         int offset = WitnessTableFirstRequirementOffset;
         auto firstReqAdjustment = llvm::ConstantInt::get(IGM.Int32Ty, -offset);
         address = llvm::ConstantExpr::getGetElementPtr(
-          address->getType()->getPointerElementType(), address,
-          firstReqAdjustment);
+            cast<llvm::PointerType>(address->getType()->getScalarType())
+                ->getElementType(),
+            address, firstReqAdjustment);
 
         IGM.defineProtocolRequirementsBaseDescriptor(Proto, address);
       }

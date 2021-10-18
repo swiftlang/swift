@@ -333,7 +333,7 @@ void RewriteSystem::simplifyRewriteSystem() {
           continue;
 
         if (Debug.contains(DebugFlags::Completion)) {
-          const auto &otherRule = getRule(*otherRuleID);
+          const auto &otherRule = getRule(ruleID);
           llvm::dbgs() << "$ Deleting rule " << rule << " because "
                        << "its left hand side contains " << otherRule
                        << "\n";

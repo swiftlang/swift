@@ -302,15 +302,6 @@ if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
-set(swift_core_incorporate_object_libraries)
-list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
-list(APPEND swift_core_incorporate_object_libraries swiftLLVMSupport)
-list(APPEND swift_core_incorporate_object_libraries swiftDemangling)
-list(APPEND swift_core_incorporate_object_libraries swiftStdlibStubs)
-if(SWIFT_STDLIB_HAS_COMMANDLINE)
-  list(APPEND swift_core_incorporate_object_libraries swiftCommandLineSupport)
-endif()
-
 set(swiftCore_common_options
                   IS_STDLIB IS_STDLIB_CORE
                     ${SWIFTLIB_SOURCES}
@@ -323,7 +314,7 @@ set(swiftCore_common_options
                   PRIVATE_LINK_LIBRARIES
                     ${swift_core_private_link_libraries}
                   INCORPORATE_OBJECT_LIBRARIES
-                    ${swift_core_incorporate_object_libraries}
+                    swiftRuntime swiftLLVMSupport swiftDemangling swiftStdlibStubs
                   FRAMEWORK_DEPENDS
                     ${swift_core_framework_depends})
 

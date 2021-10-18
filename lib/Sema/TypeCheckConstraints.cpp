@@ -1499,10 +1499,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case BridgingCoercion:
         return CheckedCastKind::BridgingCoercion;
       }
-
       assert(hasCoercion && "Not a coercion?");
-      (void)hasCoercion;
-
       return CheckedCastKind::Coercion;
     }
   }

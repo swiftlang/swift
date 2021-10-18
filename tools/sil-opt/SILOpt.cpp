@@ -424,6 +424,8 @@ int main(int argc, char **argv) {
     EnableExperimentalConcurrency;
   Invocation.getLangOptions().EnableExperimentalDistributed =
     EnableExperimentalDistributed;
+  Invocation.getLangOptions().EnableExperimentalLexicalLifetimes =
+      EnableExperimentalLexicalLifetimes;
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
@@ -511,8 +513,6 @@ int main(int argc, char **argv) {
   SILOpts.EnableOSSAModules = EnableOSSAModules;
   SILOpts.EnableCopyPropagation = EnableCopyPropagation;
   SILOpts.DisableCopyPropagation = DisableCopyPropagation;
-  SILOpts.EnableExperimentalLexicalLifetimes =
-      EnableExperimentalLexicalLifetimes;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -require-explicit-sendable -warn-concurrency
+// RUN: %target-typecheck-verify-swift -require-explicit-sendable
 
 public protocol P { }
 

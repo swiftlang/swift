@@ -39,8 +39,7 @@
 static char **_swift_stdlib_ProcessOverrideUnsafeArgv = nullptr;
 static int _swift_stdlib_ProcessOverrideUnsafeArgc = 0;
 
-// This needs to findable by dlopen() for JIT purposes (see Immediate.cpp).
-SWIFT_CC(swift) extern "C" SWIFT_ATTRIBUTE_FOR_EXPORTS
+SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_overrideUnsafeArgvArgc(char **argv, int argc) {
   _swift_stdlib_ProcessOverrideUnsafeArgv = argv;
   _swift_stdlib_ProcessOverrideUnsafeArgc = argc;
@@ -52,7 +51,7 @@ void _swift_stdlib_overrideUnsafeArgvArgc(char **argv, int argc) {
 extern "C" char ***_NSGetArgv(void);
 extern "C" int *_NSGetArgc(void);
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_API
 char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -65,7 +64,7 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   return *_NSGetArgv();
 }
 #elif defined(__linux__) || defined(__CYGWIN__)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_API
 char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -99,7 +98,7 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 #elif defined(_WIN32)
 #include <stdlib.h>
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_API
 char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -166,7 +165,7 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 #include <sys/types.h>
 #include <unistd.h>
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_API
 char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -217,7 +216,7 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 #include <wasi/api.h>
 #include <wasi/libc.h>
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_API
 char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -258,7 +257,7 @@ char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 #include <sys/sysctl.h>
 #include <sys/exec.h>
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_API
 char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
@@ -290,7 +289,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   return argv_copy;
 }
 #else // Add your favorite OS's command line arg grabber here.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_API
 char **_swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
     *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;

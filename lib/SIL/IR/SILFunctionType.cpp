@@ -362,8 +362,7 @@ getSemanticResults(SILFunctionType *functionType, IndexSubset *parameterIndices,
 }
 
 static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignature sig,
-                                                               CanType tanType,
-                                                               CanType origTypeOfAbstraction) {
+                                                               CanType tanType) {
   if (!sig)
     return sig;
 
@@ -389,20 +388,6 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
       reqs.push_back(Requirement(RequirementKind::Conformance, type,
                                  proto->getDeclaredInterfaceType()));
     }
-  }
-
-  if (origTypeOfAbstraction) {
-    (void) origTypeOfAbstraction.findIf([&](Type t) -> bool {
-      if (auto *at = t->getAs<ArchetypeType>()) {
-        types.insert(at->getInterfaceType()->getCanonicalType());
-        for (auto *proto : at->getConformsTo()) {
-          reqs.push_back(Requirement(RequirementKind::Conformance,
-                                     at->getInterfaceType(),
-                                     proto->getDeclaredInterfaceType()));
-        }
-      }
-      return false;
-    });
   }
 
   return evaluateOrDefault(
@@ -442,7 +427,6 @@ static CanType getAutoDiffTangentTypeForLinearMap(
 static CanSILFunctionType getAutoDiffDifferentialType(
     SILFunctionType *originalFnTy, IndexSubset *parameterIndices,
     IndexSubset *resultIndices, LookupConformanceFn lookupConformance,
-    CanType origTypeOfAbstraction,
     TypeConverter &TC) {
   // Given the tangent type and the corresponding original parameter's
   // convention, returns the tangent parameter's convention.
@@ -450,7 +434,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
       [&](CanType tanType,
           ParameterConvention origParamConv) -> ParameterConvention {
     auto sig = buildDifferentiableGenericSignature(
-      originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
+      originalFnTy->getSubstGenericSignature(), tanType);
 
     tanType = tanType->getCanonicalType(sig);
     AbstractionPattern pattern(sig, tanType);
@@ -478,7 +462,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
       [&](CanType tanType,
           ResultConvention origResConv) -> ResultConvention {
     auto sig = buildDifferentiableGenericSignature(
-      originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
+      originalFnTy->getSubstGenericSignature(), tanType);
 
     tanType = tanType->getCanonicalType(sig);
     AbstractionPattern pattern(sig, tanType);
@@ -581,7 +565,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
 static CanSILFunctionType getAutoDiffPullbackType(
     SILFunctionType *originalFnTy, IndexSubset *parameterIndices,
     IndexSubset *resultIndices, LookupConformanceFn lookupConformance,
-    CanType origTypeOfAbstraction, TypeConverter &TC) {
+    TypeConverter &TC) {
   auto &ctx = originalFnTy->getASTContext();
   SmallVector<GenericTypeParamType *, 4> substGenericParams;
   SmallVector<Requirement, 4> substRequirements;
@@ -598,7 +582,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
       [&](CanType tanType,
           ResultConvention origResConv) -> ParameterConvention {
     auto sig = buildDifferentiableGenericSignature(
-      originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
+      originalFnTy->getSubstGenericSignature(), tanType);
 
     tanType = tanType->getCanonicalType(sig);
     AbstractionPattern pattern(sig, tanType);
@@ -629,7 +613,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
       [&](CanType tanType,
           ParameterConvention origParamConv) -> ResultConvention {
     auto sig = buildDifferentiableGenericSignature(
-      originalFnTy->getSubstGenericSignature(), tanType, origTypeOfAbstraction);
+      originalFnTy->getSubstGenericSignature(), tanType);
 
     tanType = tanType->getCanonicalType(sig);
     AbstractionPattern pattern(sig, tanType);
@@ -796,8 +780,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
     LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnInvocationGenSig,
-    bool isReabstractionThunk,
-    CanType origTypeOfAbstraction) {
+    bool isReabstractionThunk) {
   assert(parameterIndices);
   assert(!parameterIndices->isEmpty() && "Parameter indices must not be empty");
   assert(resultIndices);
@@ -827,14 +810,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   case AutoDiffDerivativeFunctionKind::JVP:
     closureType =
         getAutoDiffDifferentialType(constrainedOriginalFnTy, parameterIndices,
-                                    resultIndices, lookupConformance,
-                                    origTypeOfAbstraction, TC);
+                                    resultIndices, lookupConformance, TC);
     break;
   case AutoDiffDerivativeFunctionKind::VJP:
     closureType =
         getAutoDiffPullbackType(constrainedOriginalFnTy, parameterIndices,
-                                resultIndices, lookupConformance,
-                                origTypeOfAbstraction, TC);
+                                resultIndices, lookupConformance, TC);
     break;
   }
   // Compute the derivative function parameters.

@@ -1058,12 +1058,6 @@ public:
   /// Returns true if this ends the lifetime of an owned operand.
   bool isConsuming() const;
 
-  bool endsLocalBorrowScope() const {
-    auto ownership = getOperandOwnership();
-    return ownership == OperandOwnership::EndBorrow
-           || ownership == OperandOwnership::Reborrow;
-  }
-
   SILBasicBlock *getParentBlock() const;
   SILFunction *getParentFunction() const;
 

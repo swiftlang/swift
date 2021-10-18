@@ -27,7 +27,6 @@
 #define SWIFT_C_SYNTAX_C_DATA_TYPES_H
 
 #include <stdbool.h>
-#include <stdint.h>
 
 /// Offset+length in UTF8 bytes.
 typedef struct {

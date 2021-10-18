@@ -536,7 +536,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   bool isLexical = ABI->getFunction()
                        ->getModule()
                        .getASTContext()
-                       .SILOpts.EnableExperimentalLexicalLifetimes;
+                       .LangOpts.EnableExperimentalLexicalLifetimes;
   auto *ASI = Builder.createAllocStack(
       ABI->getLoc(),
       getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),

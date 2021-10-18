@@ -45,8 +45,14 @@ extension Task {
   /// Returns `true` if the task is cancelled, and should stop executing.
   ///
   /// - SeeAlso: `checkCancellation()`
-  @_transparent public var isCancelled: Bool {
-    _taskIsCancelled(_task)
+  public var isCancelled: Bool {
+    withUnsafeCurrentTask { task in
+      guard let task = task else {
+        return false
+      }
+
+      return _taskIsCancelled(task._task)
+    }
   }
 }
 

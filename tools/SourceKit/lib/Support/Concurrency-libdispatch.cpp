@@ -14,6 +14,7 @@
 #include "SourceKit/Config/config.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Threading.h"
 #include "llvm/Support/thread.h"
 
 #include <dispatch/dispatch.h>
@@ -103,9 +104,8 @@ static void executeBlock(void *Data) {
 }
 
 static void executeOnLargeStackThread(void *Data) {
-  static const size_t ThreadStackSize = 8 << 20; // 8 MB.
-  llvm::thread Thread(llvm::Optional<unsigned>(ThreadStackSize),
-                      executeBlock, Data);
+  static const unsigned ThreadStackSize = 8 << 20; // 8 MB.
+  llvm::thread Thread(llvm::Optional<unsigned>(ThreadStackSize), executeBlock, Data);
   Thread.join();
 }
 

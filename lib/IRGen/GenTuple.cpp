@@ -83,9 +83,7 @@ namespace {
       IGF.IGM.getSize(Size(index)),               //     [index]
       llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)  //       .Offset
     };
-    auto slot = IGF.Builder.CreateInBoundsGEP(
-        asTuple->getType()->getScalarType()->getPointerElementType(), asTuple,
-        indices);
+    auto slot = IGF.Builder.CreateInBoundsGEP(asTuple, indices);
 
     return IGF.Builder.CreateLoad(slot, IGF.IGM.getPointerAlignment(),
                                   metadata->getName()

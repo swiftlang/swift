@@ -428,17 +428,40 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   entryArgs.reserve(AppliedArgs.size());
   SmallBitVector borrowedArgs(AppliedArgs.size());
   SmallBitVector copiedArgs(AppliedArgs.size());
+  auto enableLexicalLifetimes =
+      Apply.getFunction()
+          ->getModule()
+          .getASTContext()
+          .LangOpts.EnableExperimentalLexicalLifetimes;
 
   auto calleeConv = getCalleeFunction()->getConventions();
   for (auto p : llvm::enumerate(AppliedArgs)) {
     SILValue callArg = p.value();
     unsigned idx = p.index();
     if (idx >= calleeConv.getSILArgIndexOfFirstParam()) {
-      // Insert begin/end borrow for guaranteed arguments.
-      if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
-        if (SILValue newValue = borrowFunctionArgument(callArg, Apply)) {
-          callArg = newValue;
+      if (enableLexicalLifetimes) {
+        if (Apply.getFunction()->hasOwnership() &&
+            !callArg->getType().isTrivial(*Apply.getFunction()) &&
+            !callArg->getType().isAddress()) {
+          SILBuilderWithScope builder(Apply.getInstruction(), getBuilder());
+          if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
+            callArg = builder.createBeginBorrow(Apply.getLoc(), callArg,
+                                                /*isLexical*/ true);
+          } else { /*owned*/
+            auto *bbi = builder.createBeginBorrow(Apply.getLoc(), callArg,
+                                                  /*isLexical*/ true);
+            callArg = builder.createCopyValue(Apply.getLoc(), bbi);
+            copiedArgs[idx] = true;
+          }
           borrowedArgs[idx] = true;
+        }
+      } else {
+        // Insert begin/end borrow for guaranteed arguments.
+        if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
+          if (SILValue newValue = borrowFunctionArgument(callArg, Apply)) {
+            callArg = newValue;
+            borrowedArgs[idx] = true;
+          }
         }
       }
     }
@@ -495,7 +518,23 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
 
       for (auto *insertPt : endBorrowInsertPts) {
         SILBuilderWithScope returnBuilder(insertPt, getBuilder());
-        returnBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
+        SILValue original;
+        SILValue borrow;
+        if (copiedArgs.test(i)) {
+          auto *cvi =
+              cast<CopyValueInst>(entryArgs[i]->getDefiningInstruction());
+          auto *bbi = cast<BeginBorrowInst>(
+              cvi->getOperand()->getDefiningInstruction());
+          borrow = bbi;
+          original = bbi->getOperand();
+        } else {
+          original = SILValue();
+          borrow = entryArgs[i];
+        }
+        returnBuilder.createEndBorrow(Apply.getLoc(), borrow);
+        if (original) {
+          returnBuilder.createDestroyValue(Apply.getLoc(), original);
+        }
       }
     }
   }
@@ -597,28 +636,13 @@ void SILInlineCloner::postFixUp(SILFunction *calleeFunction) {
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
                                                  FullApplySite AI) {
-  auto enableLexicalLifetimes = Apply.getFunction()
-                                    ->getModule()
-                                    .getASTContext()
-                                    .SILOpts.EnableExperimentalLexicalLifetimes;
-  auto argOwnershipRequiresBorrow = [&]() {
-    auto kind = callArg.getOwnershipKind();
-    if (enableLexicalLifetimes) {
-      // At this point, we know that the function argument is @guaranteed.
-      // If the value passed as that parameter has ownership, always add a
-      // lexical borrow scope to ensure that the value stays alive for the
-      // duration of the inlined callee.
-      return kind != OwnershipKind::None;
-    }
-    return kind == OwnershipKind::Owned;
-  };
-  if (!AI.getFunction()->hasOwnership() || !argOwnershipRequiresBorrow()) {
+  if (!AI.getFunction()->hasOwnership() ||
+      callArg.getOwnershipKind() != OwnershipKind::Owned) {
     return SILValue();
   }
 
   SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
-  return beginBuilder.createBeginBorrow(AI.getLoc(), callArg,
-                                        /*isLexical=*/enableLexicalLifetimes);
+  return beginBuilder.createBeginBorrow(AI.getLoc(), callArg);
 }
 
 void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {

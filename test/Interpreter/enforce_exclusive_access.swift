@@ -6,8 +6,6 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: single_threaded_runtime
 
-// UNSUPPORTED: use_os_stdlib
-
 // Tests for traps at run time when enforcing exclusive access.
 
 import StdlibUnittest

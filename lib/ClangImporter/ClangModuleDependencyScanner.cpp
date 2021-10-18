@@ -80,6 +80,26 @@ llvm::ErrorOr<StringRef> ClangModuleDependenciesCacheImpl::getImportHackFile(Str
   return importHackFileCache[moduleName];
 }
 
+namespace {
+  class SingleCommandCompilationDatabase : public CompilationDatabase {
+  public:
+    SingleCommandCompilationDatabase(CompileCommand Cmd)
+        : Command(std::move(Cmd)) {}
+
+    virtual std::vector<CompileCommand>
+    getCompileCommands(StringRef FilePath) const override {
+      return {Command};
+    }
+
+    virtual std::vector<CompileCommand> getAllCompileCommands() const override {
+      return {Command};
+    }
+
+  private:
+    CompileCommand Command;
+  };
+}
+
 // Add search paths.
 // Note: This is handled differently for the Clang importer itself, which
 // adds search paths to Clang's data structures rather than to its
@@ -317,13 +337,17 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   }
 
   // Determine the command-line arguments for dependency scanning.
+
   std::vector<std::string> commandLineArgs =
     getClangDepScanningInvocationArguments(ctx, *importHackFile);
+
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+  CompileCommand command(workingDir, *importHackFile, commandLineArgs, "-");
+  SingleCommandCompilationDatabase database(command);
 
   auto clangDependencies = clangImpl->tool.getFullDependencies(
-      commandLineArgs, workingDir, clangImpl->alreadySeen);
+      database, workingDir, clangImpl->alreadySeen);
   if (!clangDependencies) {
     // FIXME: Route this to a normal diagnostic.
     llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());
@@ -371,11 +395,14 @@ bool ClangImporter::addBridgingHeaderDependencies(
   // Determine the command-line arguments for dependency scanning.
   std::vector<std::string> commandLineArgs =
     getClangDepScanningInvocationArguments(ctx, bridgingHeader);
+
   std::string workingDir =
       ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+  CompileCommand command(workingDir, bridgingHeader, commandLineArgs, "-");
+  SingleCommandCompilationDatabase database(command);
 
   auto clangDependencies = clangImpl->tool.getFullDependencies(
-      commandLineArgs, workingDir, clangImpl->alreadySeen);
+      database, workingDir, clangImpl->alreadySeen);
 
   if (!clangDependencies) {
     // FIXME: Route this to a normal diagnostic.

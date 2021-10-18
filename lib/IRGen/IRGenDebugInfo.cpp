@@ -781,12 +781,7 @@ private:
     if (Optional<ASTSourceDescriptor> ModuleDesc = getClangModule(*M))
       return getOrCreateModule(*ModuleDesc, ModuleDesc->getModuleOrNull());
     StringRef Path = getFilenameFromDC(M);
-    // Use the module 'real' name, which can be different from the name if module
-    // aliasing was used (swift modules only). For example, if a source file has
-    // 'import Foo', and '-module-alias Foo=Bar' was passed in, the real name of
-    // the module on disk is Bar (.swiftmodule or .swiftinterface), and is used
-    // for loading and mangling.
-    StringRef Name = M->getRealName().str();
+    StringRef Name = M->getName().str();
     return getOrCreateModule(M, TheCU, Name, Path);
   }
 

@@ -518,7 +518,9 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
     llvm::ConstantInt::get(IGM.Int32Ty, 2)
   };
   return llvm::ConstantExpr::getInBoundsGetElementPtr(
-      var->getType()->getPointerElementType(), var, indices);
+      cast<llvm::PointerType>(var->getType()->getScalarType())
+          ->getElementType(),
+      var, indices);
 }
 
 llvm::Constant *
@@ -1852,9 +1854,7 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
         structTy = dyn_cast<llvm::StructType>(eltTy);
       } while (structTy != nullptr);
 
-      slot = IGF.Builder.CreateInBoundsGEP(
-          object->getType()->getScalarType()->getPointerElementType(), object,
-          indexes);
+      slot = IGF.Builder.CreateInBoundsGEP(object, indexes);
 
       if (!suppressCast) {
         slot = IGF.Builder.CreateBitCast(slot,

@@ -867,10 +867,6 @@ void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint,
       if (d->isImplicit())
         return true;
 
-      // Imported decls won't have complete location info.
-      if (d->hasClangNode())
-        return true;
-
       return false;
     };
 

@@ -1481,6 +1481,13 @@ void AutolinkKind::writeEntries(llvm::SetVector<llvm::MDNode *, Vector, Set> Ent
     }
     auto EntriesConstant = llvm::ConstantDataArray::getString(
         IGM.getLLVMContext(), EntriesString, /*AddNull=*/false);
+    // Mark the swift1_autolink_entries section with the SHF_EXCLUDE attribute
+    // to get the linker to drop it in the final linked binary.
+    // LLVM doesn't provide an interface to specify section attributs in the
+    // IR so we pass the attribute with inline assembly.
+    if (IGM.TargetInfo.OutputObjectFormat == llvm::Triple::ELF)
+      IGM.Module.appendModuleInlineAsm(".section .swift1_autolink_entries,"
+                                       "\"0x80000000\"");
     auto var =
         new llvm::GlobalVariable(*IGM.getModule(), EntriesConstant->getType(),
                                  true, llvm::GlobalValue::PrivateLinkage,

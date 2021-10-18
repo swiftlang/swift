@@ -12,10 +12,12 @@
 
 print("Hi from Swift!")
 
+// ELF: module asm ".section .swift1_autolink_entries,\220x80000000\22"
+
 // Find the metadata entry for the denylisting of the metadata symbol
 // Ensure that it is in the ASAN metadata
 
-// ELF: !llvm.asan.globals = !{
+// ELF-DAG: !llvm.asan.globals = !{
 // ELF-SAME: [[MD:![0-9]+]]
 // ELF-SAME: }
 

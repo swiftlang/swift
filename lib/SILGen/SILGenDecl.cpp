@@ -255,7 +255,7 @@ public:
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
     SILValue val = SGF.VarLocs[Var].value;
-    if (SGF.getASTContext().SILOpts.EnableExperimentalLexicalLifetimes &&
+    if (SGF.getASTContext().LangOpts.EnableExperimentalLexicalLifetimes &&
         val->getOwnershipKind() != OwnershipKind::None)
       SGF.B.createEndBorrow(l, val);
     SGF.destroyLocalVariable(l, Var);
@@ -526,7 +526,7 @@ public:
       address = value;
     SILLocation PrologueLoc(vd);
 
-    if (SGF.getASTContext().SILOpts.EnableExperimentalLexicalLifetimes &&
+    if (SGF.getASTContext().LangOpts.EnableExperimentalLexicalLifetimes &&
         value->getOwnershipKind() != OwnershipKind::None)
       value = SILValue(
           SGF.B.createBeginBorrow(PrologueLoc, value, /*isLexical*/ true));
@@ -1717,7 +1717,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   SILValue Val = loc.value;
   if (!Val->getType().isAddress()) {
     SILValue valueToBeDestroyed;
-    if (getASTContext().SILOpts.EnableExperimentalLexicalLifetimes &&
+    if (getASTContext().LangOpts.EnableExperimentalLexicalLifetimes &&
         Val->getOwnershipKind() != OwnershipKind::None) {
       auto *inst = cast<BeginBorrowInst>(Val.getDefiningInstruction());
       valueToBeDestroyed = inst->getOperand();

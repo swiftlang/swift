@@ -29,7 +29,6 @@
 // CHECK: }
 
 // CHECK:       struct WrapperStruct {
-// CHECK-NEXT:    init()
 // TODO: where is "A" and "B"? They should be member variables.
 // CHECK-NEXT:    struct InnerBoolEnum : Equatable, RawRepresentable {
 // CHECK-NEXT:      init(_ rawValue: Bool)
@@ -37,4 +36,5 @@
 // CHECK-NEXT:      var rawValue: Bool
 // CHECK-NEXT:      typealias RawValue = Bool
 // CHECK-NEXT:    }
+// CHECK-NEXT:    init()
 // CHECK-NEXT:  }

@@ -62,6 +62,7 @@ extension AsyncSequence {
 /// elements of the base sequence that satisfy the given error-throwing
 /// predicate.
 @available(SwiftStdlib 5.5, *)
+@frozen
 public struct AsyncThrowingPrefixWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -69,7 +70,7 @@ public struct AsyncThrowingPrefixWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let predicate: (Base.Element) async throws -> Bool
 
-  @usableFromInline
+  @inlinable
   init(
     _ base: Base, 
     predicate: @escaping (Base.Element) async throws -> Bool
@@ -90,6 +91,7 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the prefix-while sequence.
+  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var predicateHasFailed = false
@@ -100,7 +102,7 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
     @usableFromInline
     let predicate: (Base.Element) async throws -> Bool
 
-    @usableFromInline
+    @inlinable
     init(
       _ baseIterator: Base.AsyncIterator, 
       predicate: @escaping (Base.Element) async throws -> Bool

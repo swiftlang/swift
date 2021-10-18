@@ -41,7 +41,7 @@ void error(const char *fmt, ...) {
   vsnprintf(buffer, sizeof(buffer), fmt, argp);
   va_end(argp);
 
-#if SWIFT_STDLIB_HAS_ASL
+#if defined(__APPLE__)
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", buffer);
 #elif defined(__ANDROID__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", buffer);

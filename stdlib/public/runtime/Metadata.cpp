@@ -5822,8 +5822,6 @@ void swift::checkMetadataDependencyCycle(const Metadata *startMetadata,
 /*** Allocator implementation **********************************************/
 /***************************************************************************/
 
-#if !SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
-
 namespace {
   struct alignas(sizeof(uintptr_t) * 2) PoolRange {
     static constexpr uintptr_t PageSize = 16 * 1024;
@@ -6060,8 +6058,6 @@ void MetadataAllocator::Deallocate(const void *allocation, size_t size,
                                                  std::memory_order_relaxed,
                                                  std::memory_order_relaxed);
 }
-
-#endif
 
 void *swift::allocateMetadata(size_t size, size_t alignment) {
   return MetadataAllocator(MetadataTag).Allocate(size, alignment);

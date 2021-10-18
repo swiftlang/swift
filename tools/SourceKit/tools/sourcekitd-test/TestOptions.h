@@ -67,7 +67,6 @@ enum class SourceKitRequest {
   CollectVariableType,
   GlobalConfiguration,
   DependencyUpdated,
-  Diagnostics,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };

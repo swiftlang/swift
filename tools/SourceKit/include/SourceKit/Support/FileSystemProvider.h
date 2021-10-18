@@ -13,7 +13,6 @@
 #ifndef LLVM_SOURCEKIT_SUPPORT_FILESYSTEMPROVIDER_H
 #define LLVM_SOURCEKIT_SUPPORT_FILESYSTEMPROVIDER_H
 
-#include "SourceKit/Core/LangSupport.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"

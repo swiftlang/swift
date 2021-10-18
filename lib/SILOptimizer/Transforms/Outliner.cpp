@@ -224,7 +224,7 @@ class BridgedProperty : public OutlinePattern {
   SILBasicBlock *StartBB;
   SwitchInfo switchInfo;
   ObjCMethodInst *ObjCMethod;
-  SILInstruction *Release;
+  StrongReleaseInst *Release;
   ApplyInst *PropApply;
 
 public:
@@ -505,18 +505,11 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
     return false;
 
   if (numSomeEnumUses == 2) {
-    // [release_value | destroy_value] %38 : $Optional<NSString>
+    // release_value %38 : $Optional<NSString>
     ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
-    bool hasOwnership = It->getFunction()->hasOwnership();
-    if (hasOwnership) {
-      auto *DVI = dyn_cast<DestroyValueInst>(It);
-      if (!DVI || DVI->getOperand() != SomeEnum)
-        return false;
-    } else {
-      auto *RVI = dyn_cast<ReleaseValueInst>(It);
-      if (!RVI || RVI->getOperand() != SomeEnum)
-        return false;
-    }
+    auto *RVI = dyn_cast<ReleaseValueInst>(It);
+    if (!RVI || RVI->getOperand() != SomeEnum)
+      return false;
   }
 
   // br bb10(%41 : $Optional<String>)
@@ -585,7 +578,7 @@ bool BridgedProperty::matchMethodCall(SILBasicBlock::iterator It) {
 bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
   // Matches:
   // [ optionally:
-  //    %31 = load %30 : $*UITextField or %31 = load [copy] %30 : $*UITextField
+  //    %31 = load %30 : $*UITextField
   //    strong_retain %31 : $UITextField
   // ]
   //    %33 = objc_method %31 : $UITextField, #UITextField.text!getter.foreign : (UITextField) -> () -> String?, $@convention(objc_method) (UITextField) -> @autoreleased Optional<NSString>
@@ -626,39 +619,25 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
   StartBB = FirstInst->getParent();
 
   if (Load) {
-    if (Load->getFunction()->hasOwnership()) {
-      if (Load->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
-        return false;
-    } else {
-      // strong_retain %31 : $UITextField
-      ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
-      auto *Retain = dyn_cast<StrongRetainInst>(It);
-      if (!Retain || Retain->getOperand() != Load)
-        return false;
-      ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
-    }
+    // strong_retain %31 : $UITextField
+    ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
+    auto *Retain = dyn_cast<StrongRetainInst>(It);
+    if (!Retain || Retain->getOperand() != Load)
+      return false;
+    ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
   }
 
   if (!matchMethodCall(It))
     return false;
 
   if (Load) {
-    // In OSSA, there will be a destroy_value matching the earlier load [copy].
-    // In non-ossa, there will be a release matching the earlier retain. The
-    // only user of the retained value is the unowned objective-c method
-    // consumer.
+    // There will be a release matching the earlier retain. The only user of the
+    // retained value is the unowned objective-c method consumer.
     unsigned NumUses = 0;
     Release = nullptr;
-    bool hasOwnership = Load->getFunction()->hasOwnership();
     for (auto *Use : Load->getUses()) {
       ++NumUses;
-      SILInstruction *R;
-      if (hasOwnership) {
-        R = dyn_cast<DestroyValueInst>(Use->getUser());
-      } else {
-        R = dyn_cast<StrongReleaseInst>(Use->getUser());
-      }
-      if (R) {
+      if (auto *R = dyn_cast<StrongReleaseInst>(Use->getUser())) {
         if (!Release) {
           Release = R;
         } else {
@@ -667,15 +646,8 @@ bool BridgedProperty::matchInstSequence(SILBasicBlock::iterator It) {
         }
       }
     }
-    if (!Release)
+    if (!Release || NumUses != 4)
       return false;
-    if (hasOwnership) {
-      if (NumUses != 3)
-        return false;
-    } else {
-      if (NumUses != 4)
-        return false;
-    }
   }
   return true;
 }
@@ -704,18 +676,16 @@ public:
   ApplyInst *BridgeCall;
   EnumInst *OptionalResult;
   SILValue BridgedValue;
-  SILInstruction *ReleaseAfterBridge;
-  SILInstruction *ReleaseArgAfterCall;
+  ReleaseValueInst *ReleaseAfterBridge;
+  ReleaseValueInst *ReleaseArgAfterCall;
   unsigned Idx = 0;
 
   // Matched bridged argument.
   BridgedArgument(unsigned Idx, FunctionRefInst *F, ApplyInst *A, EnumInst *E,
-                  SILInstruction *R0, SILInstruction *R1)
+                  ReleaseValueInst *R0, ReleaseValueInst *R1)
       : BridgeFun(F), BridgeCall(A), OptionalResult(E),
         BridgedValue(FullApplySite(A).getSelfArgument()),
-        ReleaseAfterBridge(R0), ReleaseArgAfterCall(R1), Idx(Idx) {
-    assert(!R0 || isa<ReleaseValueInst>(R0) || isa<DestroyValueInst>(R0));
-  }
+        ReleaseAfterBridge(R0), ReleaseArgAfterCall(R1), Idx(Idx) {}
 
   /// Invalid argument constructor.
   BridgedArgument()
@@ -756,7 +726,7 @@ void BridgedArgument::transferTo(SILValue BridgedValue,
   DestBB->moveTo(SILBasicBlock::iterator(BridgedCall), OptionalResult);
   if (ReleaseAfterBridge) {
     DestBB->moveTo(SILBasicBlock::iterator(BridgedCall), ReleaseAfterBridge);
-    ReleaseAfterBridge->setOperand(0, BridgedValue);
+    ReleaseAfterBridge->setOperand(BridgedValue);
   }
   auto AfterCall = std::next(SILBasicBlock::iterator(BridgedCall));
   DestBB->moveTo(SILBasicBlock::iterator(AfterCall), ReleaseArgAfterCall);
@@ -771,20 +741,13 @@ void BridgedArgument::eraseFromParent() {
   BridgeFun->eraseFromParent();
 }
 
-static SILInstruction *findReleaseOf(SILValue releasedValue,
-                                     SILBasicBlock::iterator from,
-                                     SILBasicBlock::iterator to) {
-  bool hasOwnership = releasedValue->getFunction()->hasOwnership();
+static ReleaseValueInst *findReleaseOf(SILValue releasedValue,
+                                       SILBasicBlock::iterator from,
+                                       SILBasicBlock::iterator to) {
   while (from != to) {
-    if (hasOwnership) {
-      auto destroy = dyn_cast<DestroyValueInst>(&*from);
-      if (destroy && destroy->getOperand() == releasedValue)
-        return destroy;
-    } else {
-      auto release = dyn_cast<ReleaseValueInst>(&*from);
-      if (release && release->getOperand() == releasedValue)
-        return release;
-    }
+    auto release = dyn_cast<ReleaseValueInst>(&*from);
+    if (release && release->getOperand() == releasedValue)
+      return release;
     ++from;
   }
   return nullptr;
@@ -794,13 +757,14 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
                                        ApplyInst *AI) {
   // Match
   // %15 = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
-  // %16 = apply %15(%14) : $@convention(method) (@guaranteed String) -> @owned NSString
+  // %16 = apply %15(%14) :
+  //         $@convention(method) (@guaranteed String) -> @owned NSString
   // %17 = enum $Optional<NSString>, #Optional.some!enumelt, %16 : $NSString
-  // [release_value | destroy_value] %14 : $String
+  // release_value %14 : $String
   // ...
-  // apply %objcMethod(%17, ...) : $@convention(objc_method) (Optional<NSString>...) ->
+  // apply %objcMethod(%17, ...) : $@convention(objc_method) (Optional<NSString> ...) ->
   // release_value ...
-  // [release_value | destroy_value] %17 : $Optional<NSString>
+  // release_value %17 : $Optional<NSString>
   //
   auto *Enum = dyn_cast<EnumInst>(Arg);
   if (!Enum || !Enum->hasOperand())
@@ -831,15 +795,10 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   // value.
   if (Enum->getParent() != AI->getParent())
     return BridgedArgument();
-
-  bool hasOwnership = AI->getFunction()->hasOwnership();
-  auto *BridgedValueRelease =
+  auto *BridgedValueRelease = dyn_cast_or_null<ReleaseValueInst>(
       findReleaseOf(BridgedValue, std::next(SILBasicBlock::iterator(Enum)),
-                    SILBasicBlock::iterator(AI));
-  assert(!BridgedValueRelease ||
-         (hasOwnership && isa<DestroyValueInst>(BridgedValueRelease)) ||
-         isa<ReleaseValueInst>(BridgedValueRelease));
-  if (BridgedValueRelease && BridgedValueRelease->getOperand(0) != BridgedValue)
+                    SILBasicBlock::iterator(AI)));
+  if (BridgedValueRelease && BridgedValueRelease->getOperand() != BridgedValue)
     return BridgedArgument();
 
   if (SILBasicBlock::iterator(BridgeCall) == BridgeCall->getParent()->begin())
@@ -849,7 +808,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   if (!FunRef || !FunRef->hasOneUse() || BridgeCall->getCallee() != FunRef)
     return BridgedArgument();
 
-  SILInstruction *ReleaseAfter = nullptr;
+  ReleaseValueInst *ReleaseAfter = nullptr;
   for (auto *Use : Enum->getUses()) {
     if (Use->getUser() == AI)
       continue;
@@ -858,11 +817,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
     if (ReleaseAfter)
       return BridgedArgument();
 
-    if (hasOwnership) {
-      ReleaseAfter = dyn_cast<DestroyValueInst>(Use->getUser());
-    } else {
-      ReleaseAfter = dyn_cast<ReleaseValueInst>(Use->getUser());
-    }
+    ReleaseAfter = dyn_cast<ReleaseValueInst>(Use->getUser());
     if (!ReleaseAfter)
       return BridgedArgument();
   }
@@ -883,7 +838,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
 }
 
 namespace {
-// Match the return value bridging pattern.
+// Match the return value briding pattern.
 //   switch_enum %20 : $Optional<NSString>, case #O.some: bb1, case #O.none: bb2
 //
 // bb1(%23 : $NSString):
@@ -1318,6 +1273,10 @@ public:
 
   void run() override {
     auto *Fun = getFunction();
+
+    // We do not support [ossa] now.
+    if (Fun->hasOwnership())
+      return;
 
     // Only outline if we optimize for size.
     if (!Fun->optimizeForSize())

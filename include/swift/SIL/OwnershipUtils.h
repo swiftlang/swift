@@ -77,9 +77,8 @@ inline bool isForwardingConsume(SILValue value) {
   return canOpcodeForwardOwnedValues(value);
 }
 
-/// Find leaf "use points" of \p guaranteedValue that determine its lifetime
-/// requirement. If \p usePoints is nullptr, then the simply returns true if no
-/// PointerEscape use was found.
+/// Find all "use points" of \p guaranteedValue that determine its lifetime
+/// requirement.
 ///
 /// Precondition: \p guaranteedValue is not a BorrowedValue.
 ///
@@ -100,10 +99,10 @@ inline bool isForwardingConsume(SILValue value) {
 /// When this is called on a value that does not introduce a new scope, none of
 /// the use points can be EndBorrows or Reborrows. Those uses are only allowed
 /// on borrow-introducing values.
-bool findInnerTransitiveGuaranteedUses(
-    SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints = nullptr);
+bool findInnerTransitiveGuaranteedUses(SILValue guaranteedValue,
+                                       SmallVectorImpl<Operand *> &usePoints);
 
-/// Find leaf "use points" of a guaranteed value within its enclosing borrow
+/// Find all "use points" of a guaranteed value within its enclosing borrow
 /// scope (without looking through reborrows). To find the use points of the
 /// extended borrow scope, after looking through reborrows, use
 /// findExtendedTransitiveGuaranteedUses() instead.
@@ -663,19 +662,12 @@ bool getAllBorrowIntroducingValues(SILValue value,
 /// introducer, then we return a .some(BorrowScopeIntroducingValue).
 BorrowedValue getSingleBorrowIntroducingValue(SILValue inputValue);
 
-enum class AddressUseKind { NonEscaping, PointerEscape, Unknown };
-
-inline AddressUseKind meet(AddressUseKind lhs, AddressUseKind rhs) {
-  return (lhs > rhs) ? lhs : rhs;
-}
-
 /// The algorithm that is used to determine what the verifier will consider to
 /// be transitive uses of the given address. Used to implement \see
 /// findTransitiveUses.
-AddressUseKind
-findTransitiveUsesForAddress(SILValue address,
-                             SmallVectorImpl<Operand *> *foundUses = nullptr,
-                             std::function<void(Operand *)> *onError = nullptr);
+bool findTransitiveUsesForAddress(
+    SILValue address, SmallVectorImpl<Operand *> &foundUses,
+    std::function<void(Operand *)> *onError = nullptr);
 
 class InteriorPointerOperandKind {
 public:
@@ -842,19 +834,15 @@ struct InteriorPointerOperand {
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  /// Transitively compute the list of leaf uses that this interior pointer
-  /// operand puts on its parent guaranted value.
-  ///
-  /// If \p foundUses is nullptr, this simply returns true if no PointerEscapes
-  /// were found.
+  /// Transitively compute the list of uses that this interior pointer operand
+  /// puts on its parent guaranted value.
   ///
   /// Example: Uses of a ref_element_addr can not occur outside of the lifetime
   /// of the instruction's operand. The uses of that address act as liveness
   /// requirements to ensure that the underlying class is alive at all use
   /// points.
-  AddressUseKind
-  findTransitiveUses(SmallVectorImpl<Operand *> *foundUses = nullptr,
-                     std::function<void(Operand *)> *onError = nullptr) {
+  bool findTransitiveUses(SmallVectorImpl<Operand *> &foundUses,
+                          std::function<void(Operand *)> *onError = nullptr) {
     return findTransitiveUsesForAddress(getProjectedAddress(), foundUses,
                                         onError);
   }
@@ -924,8 +912,8 @@ struct AddressOwnership {
   }
 
   /// Transitively compute uses of this base address.
-  AddressUseKind findTransitiveUses(SmallVectorImpl<Operand *> &foundUses) {
-    return findTransitiveUsesForAddress(base.getBaseAddress(), &foundUses);
+  bool findTransitiveUses(SmallVectorImpl<Operand *> &foundUses) {
+    return findTransitiveUsesForAddress(base.getBaseAddress(), foundUses);
   }
 
   /// Return true of all \p uses occur before the end of the address' lifetime

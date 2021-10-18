@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #
 # ==-- process-stats-dir - summarize one or more Swift -stats-output-dirs --==#
 #

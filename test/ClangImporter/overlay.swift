@@ -3,8 +3,6 @@
 
 // REQUIRES: objc_interop
 
-// REQUIRES: rdar83592270
-
 // Do not import Foundation! This tests indirect visibility.
 #if REVERSED
 import Redeclaration

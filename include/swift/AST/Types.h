@@ -4653,9 +4653,7 @@ public:
       AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr,
-      bool isReabstractionThunk = false,
-      CanType origTypeOfAbstraction = CanType());
-
+      bool isReabstractionThunk = false);
 
   /// Returns the type of the transpose function for the given parameter
   /// indices, transpose function generic signature (optional), and other

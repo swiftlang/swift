@@ -50,13 +50,12 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
   llvm::SmallDenseMap<TypeBase *, llvm::SmallVector<Type, 2>> sameTypeReqs;
 
   auto genericParams = proto->getGenericSignature().getGenericParams();
-  const auto &protos = System.getProtocols();
 
   // Convert a rewrite rule into a requirement.
   auto createRequirementFromRule = [&](const Rule &rule) {
     if (auto prop = rule.isPropertyRule()) {
       auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
-                                                protos);
+                                                System.getProtocols());
 
       switch (prop->getKind()) {
       case Symbol::Kind::Protocol:
@@ -66,29 +65,9 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
         return;
 
       case Symbol::Kind::Layout:
-        reqs.emplace_back(RequirementKind::Layout,
-                          subjectType,
-                          prop->getLayoutConstraint());
-        return;
-
-      case Symbol::Kind::Superclass:
-        reqs.emplace_back(RequirementKind::Superclass,
-                          subjectType,
-                          Context.getTypeFromSubstitutionSchema(
-                              prop->getSuperclass(),
-                              prop->getSubstitutions(),
-                              genericParams, MutableTerm(),
-                              protos));
-        return;
-
       case Symbol::Kind::ConcreteType:
-        reqs.emplace_back(RequirementKind::SameType,
-                          subjectType,
-                          Context.getTypeFromSubstitutionSchema(
-                              prop->getConcreteType(),
-                              prop->getSubstitutions(),
-                              genericParams, MutableTerm(),
-                              protos));
+      case Symbol::Kind::Superclass:
+        // FIXME
         return;
 
       case Symbol::Kind::Name:
@@ -100,9 +79,9 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
       llvm_unreachable("Invalid symbol kind");
     } else if (rule.getLHS().back().getKind() != Symbol::Kind::Protocol) {
       auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams,
-                                                   protos);
+                                                   System.getProtocols());
       auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
-                                                protos);
+                                                System.getProtocols());
 
       sameTypeReqs[subjectType.getPointer()].push_back(constraintType);
     }

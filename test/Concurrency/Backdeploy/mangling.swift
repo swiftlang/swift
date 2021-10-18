@@ -17,6 +17,8 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
 
+// REQUIRES: rdar83840279
+
 actor MyActor { }
 
 protocol MyProtocol {
@@ -78,8 +80,8 @@ assert(assocIsolated(MyStruct.self) == ActorIsolatedFn.self)
 // NEW-NOT: call swiftcc %swift.metadata_response @"$syyScMYccMa"
 // NEW: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$syyScMYccMD")
 
-// OLD: call swiftcc %swift.metadata_response @"$sSS4main7MyActorCYicMa"(i64 0)
+// OLD: call swiftcc %swift.metadata_response @"$sSS4main7MyActorCYicMa"(i64 0) #3
 // OLD-NOT: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$sSS4main7MyActorCYicMD")
 
-// NEW-NOT: call swiftcc %swift.metadata_response @"$sSS4main7MyActorCYicMa"(i64 0)
+// NEW-NOT: call swiftcc %swift.metadata_response @"$sSS4main7MyActorCYicMa"(i64 0) #3
 // NEW: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$sSS4main7MyActorCYicMD")

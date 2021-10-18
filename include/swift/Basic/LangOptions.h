@@ -303,6 +303,9 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
+    /// Enable experimental support for emitting defined borrow scopes.
+    bool EnableExperimentalLexicalLifetimes = false;
+
     /// Enable experimental support for named opaque result types, e.g.
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;
@@ -472,7 +475,7 @@ namespace swift {
 
     /// Maximum iteration count for requirement machine confluent completion
     /// algorithm.
-    unsigned RequirementMachineStepLimit = 4000;
+    unsigned RequirementMachineStepLimit = 2000;
 
     /// Maximum term length for requirement machine confluent completion
     /// algorithm.

@@ -193,9 +193,6 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
 
 static void reportCursorInfo(const RequestResult<CursorInfoData> &Result, ResponseReceiver Rec);
 
-static void reportDiagnostics(const RequestResult<DiagnosticsResult> &Result,
-                              ResponseReceiver Rec);
-
 static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> &Result,
                                      ResponseReceiver Rec);
 
@@ -1280,16 +1277,6 @@ static void handleSemanticRequest(
                              Args, CancellationToken, Rec);
   }
 
-  if (ReqUID == RequestDiagnostics) {
-    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-    Lang.getDiagnostics(*SourceFile, Args, std::move(vfsOptions),
-                        CancellationToken,
-                        [Rec](const RequestResult<DiagnosticsResult> &Result) {
-                          reportDiagnostics(Result, Rec);
-                        });
-    return;
-  }
-
   {
     llvm::raw_svector_ostream OSErr(ErrBuf);
     OSErr << "unknown request: " << UIdentFromSKDUID(ReqUID).getName();
@@ -1959,27 +1946,6 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
   }
 
   return Rec(RespBuilder.createResponse());
-}
-
-//===----------------------------------------------------------------------===//
-// ReportDiagnostics
-//===----------------------------------------------------------------------===//
-
-static void reportDiagnostics(const RequestResult<DiagnosticsResult> &Result,
-                              ResponseReceiver Rec) {
-  if (Result.isCancelled())
-    return Rec(createErrorRequestCancelled());
-  if (Result.isError())
-    return Rec(createErrorRequestFailed(Result.getError()));
-
-  auto &DiagResults = Result.value();
-
-  ResponseBuilder RespBuilder;
-  auto Dict = RespBuilder.getDictionary();
-  auto DiagArray = Dict.setArray(KeyDiagnostics);
-  for (const auto &DiagInfo : DiagResults)
-    fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);
-  Rec(RespBuilder.createResponse());
 }
 
 //===----------------------------------------------------------------------===//

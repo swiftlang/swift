@@ -343,8 +343,7 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
 
   // GEP to the appropriate index.
-  llvm::Value *slot = IGF.Builder.CreateInBoundsGEP(
-      table->getType()->getScalarType()->getPointerElementType(), table, index);
+  llvm::Value *slot = IGF.Builder.CreateInBoundsGEP(table, index);
 
   if (slotPtr) *slotPtr = slot;
 

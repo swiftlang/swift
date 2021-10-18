@@ -4,7 +4,6 @@
 // UNSUPPORTED: OS=wasi
 
 import StdlibUnittest
-import SwiftPrivateLibcExtras
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
