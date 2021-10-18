@@ -81,7 +81,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   /// and can remove it from its (weak) lookup tables.
   if (cd->isDistributedActor()) {
     SILBasicBlock *continueBB = createBasicBlock();
-    emitDistributedActor_resignAddress(dd, selfValue, continueBB);
+    emitDistributedActor_resignIdentity(dd, selfValue, continueBB);
     B.emitBlock(continueBB);
   }
 

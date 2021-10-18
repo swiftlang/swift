@@ -2023,7 +2023,7 @@ public:
       SILLocation loc, ConstructorDecl *ctor, ManagedValue actorSelf);
 
   /// Inject distributed actor and transport interaction code into the destructor.
-  void emitDistributedActor_resignAddress(
+  void emitDistributedActor_resignIdentity(
       DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
 
   void emitDistributedActorClassMemberDestruction(
