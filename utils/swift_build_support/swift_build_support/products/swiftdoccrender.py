@@ -13,7 +13,6 @@
 import os
 
 from . import product
-from . import swiftdocc
 from .. import shell
 
 
@@ -24,7 +23,7 @@ class SwiftDocCRender(product.Product):
 
         The name of the source code directory of this product.
         """
-        return "swift-docc-render"
+        return "swift-docc-render-artifact"
 
     @classmethod
     def is_build_script_impl_product(cls):
@@ -38,41 +37,32 @@ class SwiftDocCRender(product.Product):
     def is_swiftpm_unified_build_product(cls):
         return False
 
-    def run_build_script_helper(self, action, host_target, additional_params=[]):
-        script_path = os.path.join(
-            self.source_dir, 'build-script-helper.py')
-
-        helper_cmd = [
-            script_path,
-            action
-        ]
-        if self.args.verbose_build:
-            helper_cmd.append('--verbose')
-        helper_cmd.extend(additional_params)
-
-        shell.call(helper_cmd)
-
     def should_build(self, host_target):
-        return True
-
-    def build(self, host_target):
-        self.run_build_script_helper('build', host_target)
+        # Swift-DocC-Render is a pre-built, installable artifact.
+        return False
 
     def should_test(self, host_target):
-        return self.args.test_swiftdoccrender
-
-    def test(self, host_target):
-        self.run_build_script_helper('test', host_target)
+        # Swift-DocC-Render is a pre-built, installable artifact.
+        return False
 
     def should_install(self, host_target):
-        return self.args.install_swiftdoccrender
+        # Swift-DocC-Render should always be installed if Swift-DocC is being installed
+        return self.args.install_swiftdocc
 
     def install(self, host_target):
-        install_dir = swiftdocc.SwiftDocC.get_render_install_destdir(
-            self.install_toolchain_path(host_target))
-        additional_params = ['--install-dir', install_dir]
-        self.run_build_script_helper('install', host_target, additional_params)
+        # Swift-DocC-Render is installed at '/usr/share/docc/render' in the built
+        # toolchain.
+        install_toolchain_path = self.install_toolchain_path(host_target)
+        install_path = os.path.join(install_toolchain_path, 'share', 'docc', 'render')
 
-    @classmethod
-    def get_dependencies(cls):
-        return [swiftdocc.SwiftDocC]
+        # The pre-built version of Swift-DocC-Render is distributed in the 'dist'
+        # folder at the root of the swift-docc-render-artifact repository
+        artifact_dist_path = os.path.join(self.source_dir, 'dist')
+
+        # Add a trailing slash so that we copy the contents of the 'dist' directory
+        # instead of the 'dist' directory itself.
+        artifact_dist_path_with_trailing_slash = os.path.join(artifact_dist_path, '')
+
+        shell.call(["mkdir", "-p", install_path])
+        shell.call(
+            ["rsync", "-a", artifact_dist_path_with_trailing_slash, install_path])

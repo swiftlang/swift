@@ -99,54 +99,7 @@ class SwiftDocC(product.Product):
 
         additional_params = ['--install-dir', install_dir]
 
-        # PLEASE READ:
-        # The code below does something different than other build-script products do.
-        #
-        # Installing swift-docc without also building swift-docc-render will find the
-        # already built swift-docc-render template in the host toolchain and copy it
-        # over to the install toolchain.
-        # This allows developers with local swift-docc changes but no swift-docc-render
-        # changes to build and run their swift-docc changes without requiring 'node'
-        # which is required to build and install swift-docc-render from source.
-        # (Displaying the output from swift-docc  with built swift-docc-render template
-        # doesn't require 'node' or other tools.)
-        if not self.args.build_swiftdoccrender:
-            # swift-docc and swift-docc-render are expected to come in pairs.
-            # When building swift-docc without building swift-docc-render,
-            # attempt to copy the prebuilt swift-docc-render from the host toolchain.
-            docc_path = self.toolchain.find_tool("docc")
-            if docc_path is None:
-                warn_msg = 'Host toolchain could not locate an prebuilt'\
-                           'swift-docc-render to copy.'\
-                           '(Use `--swiftdoccrender` to build swift-docc-render)'
-                print('-- Warning: {}', warn_msg)
-            else:
-                additional_params.append('--copy-doccrender-from')
-                # Drop two path components from the docc path to get to the `/usr/` dir.
-                host_toolchain_path = os.path.dirname(os.path.dirname(docc_path))
-                # Get the location of the swift-docc-render in the host toolchain.
-                built_render_dir = self.get_render_install_destdir(
-                    host_toolchain_path)
-                additional_params.append(built_render_dir)
-
-                additional_params.append('--copy-doccrender-to')
-                # Get the install location of the swift-docc-render in the install
-                # toolchain.
-                render_install_dir = self.get_render_install_destdir(
-                    install_toolchain_path)
-                additional_params.append(render_install_dir)
-                note_msg = 'Copying already built swift-docc-render output '\
-                           'from %s to %s.' % (built_render_dir, render_install_dir)
-                print('-- Note: {}', note_msg)
-
         self.run_build_script_helper('install', host_target, additional_params)
-
-    # This is defined on swift-docc to avoid a circular import.
-    @classmethod
-    def get_render_install_destdir(cls, toolchain_install_dir):
-        # swift-docc-render is installed at '/usr/share/docc/render' in the built
-        # toolchain.
-        return os.path.join(toolchain_install_dir, 'share', 'docc', 'render')
 
     @classmethod
     def get_dependencies(cls):

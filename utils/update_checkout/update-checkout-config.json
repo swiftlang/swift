@@ -65,8 +65,8 @@
             "remote": { "id": "apple/swift-docc" } },
         "swift-lmdb": {
             "remote": { "id": "apple/swift-lmdb" } },
-        "swift-docc-render": {
-            "remote": { "id": "apple/swift-docc-render" } },
+        "swift-docc-render-artifact": {
+            "remote": { "id": "apple/swift-docc-render-artifact" } },
         "swift-docc-symbolkit": {
             "remote": { "id": "apple/swift-docc-symbolkit" } },
         "swift-markdown": {
@@ -115,7 +115,7 @@
                 "swift-installer-scripts": "main",
                 "swift-docc": "main",
                 "swift-lmdb": "main",
-                "swift-docc-render": "main",
+                "swift-docc-render-artifact": "main",
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
                 "swift-cmark-gfm": "gfm",
@@ -152,7 +152,7 @@
                 "swift-installer-scripts": "main",
                 "swift-docc": "main",
                 "swift-lmdb": "main",
-                "swift-docc-render": "main",
+                "swift-docc-render-artifact": "main",
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
                 "swift-cmark-gfm": "gfm",
@@ -189,7 +189,7 @@
                  "swift-installer-scripts": "main",
                  "swift-docc": "main",
                  "swift-lmdb": "main",
-                 "swift-docc-render": "main",
+                 "swift-docc-render-artifact": "main",
                  "swift-docc-symbolkit": "main",
                  "swift-markdown": "main",
                  "swift-cmark-gfm": "gfm",

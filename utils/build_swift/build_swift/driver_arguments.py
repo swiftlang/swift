@@ -194,7 +194,6 @@ def _apply_default_arguments(args):
         args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
         args.test_swiftdocc = False
-        args.test_swiftdoccrender = False
 
     # --test implies --test-early-swift-driver
     # (unless explicitly skipped with `--skip-test-early-swift-driver`)
@@ -636,8 +635,6 @@ def create_argument_parser():
            help='build swift-driver')
     option(['--swiftdocc'], toggle_true('build_swiftdocc'),
            help='build Swift DocC')
-    option(['--swiftdoccrender'], toggle_true('build_swiftdoccrender'),
-           help='build Swift DocC Render')
 
     option(['--skip-early-swift-driver'], toggle_false('build_early_swift_driver'),
            help='skip building the early swift-driver')
@@ -668,8 +665,6 @@ def create_argument_parser():
            help='install SwiftEvolve')
     option(['--install-swiftdocc'], toggle_true('install_swiftdocc'),
            help='install Swift DocC')
-    option(['--install-swiftdoccrender'], toggle_true('install_swiftdoccrender'),
-           help='install Swift DocC Render')
     option(['--toolchain-benchmarks'],
            toggle_true('build_toolchainbenchmarks'),
            help='build Swift Benchmarks using swiftpm against the just built '
@@ -1131,8 +1126,6 @@ def create_argument_parser():
            help='skip testing swift_inspect')
     option('--skip-test-swiftdocc', toggle_false('test_swiftdocc'),
            help='skip testing swift-docc')
-    option('--skip-test-swiftdoccrender', toggle_false('test_swiftdoccrender'),
-           help='skip testing swift-docc-render')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
