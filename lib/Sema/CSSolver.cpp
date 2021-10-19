@@ -259,8 +259,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register the defaulted type variables.
-  DefaultedConstraints.insert(DefaultedConstraints.end(),
-                              solution.DefaultedConstraints.begin(),
+  DefaultedConstraints.insert(solution.DefaultedConstraints.begin(),
                               solution.DefaultedConstraints.end());
 
   // Add the node types back.
@@ -406,6 +405,12 @@ void truncate(llvm::SmallMapVector<K, V, N> &map, unsigned newSize) {
     map.pop_back();
 }
 
+template <typename V>
+void truncate(llvm::SetVector<V> &vector, unsigned newSize) {
+  while (vector.size() > newSize)
+    vector.pop_back();
+}
+
 } // end anonymous namespace
 
 ConstraintSystem::SolverState::SolverState(
@@ -542,8 +547,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
     return;
 
   // Erase the end of various lists.
-  while (cs.TypeVariables.size() > numTypeVariables)
-    cs.TypeVariables.pop_back();
+  truncate(cs.TypeVariables, numTypeVariables);
 
   truncate(cs.ResolvedOverloads, numResolvedOverloads);
 

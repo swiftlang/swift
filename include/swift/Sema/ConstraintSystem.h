@@ -2450,7 +2450,7 @@ public:
   llvm::SmallMapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>, 4> appliedPropertyWrappers;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
-  std::vector<ConstraintLocator *> DefaultedConstraints;
+  llvm::SetVector<ConstraintLocator *> DefaultedConstraints;
 
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
