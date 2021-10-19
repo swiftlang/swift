@@ -266,7 +266,7 @@ static constexpr size_t globalQueueCacheCount =
     static_cast<size_t>(JobPriority::UserInteractive) + 1;
 static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
 
-#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || defined(__linux__)
+#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__APPLE__)
 extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 #endif
 
@@ -286,7 +286,7 @@ static dispatch_queue_t getGlobalQueue(JobPriority priority) {
   if (SWIFT_LIKELY(queue))
     return queue;
 
-#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || defined(__linux__)
+#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__APPLE__)
   const int DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS = -3;
 
   // Create a new cooperative concurrent queue and swap it in.
