@@ -2157,6 +2157,7 @@ UncheckedRefCastInst *
 UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                              SILType Ty, SILFunction &F,
                              ValueOwnershipKind forwardingOwnershipKind) {
+  assert(Operand->getType().getCategory() == SILValueCategory::Object);
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, Ty.getASTType());
