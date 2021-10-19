@@ -3580,7 +3580,8 @@ StringRef ClangModuleUnit::getExportedModuleName() const {
   if (clangModule && !clangModule->ExportAsModule.empty())
     return clangModule->ExportAsModule;
 
-  return getParentModule()->getName().str();
+  // Return module real name (see FileUnit::getExportedModuleName)
+  return getParentModule()->getRealName().str();
 }
 
 ModuleDecl *ClangModuleUnit::getOverlayModule() const {

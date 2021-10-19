@@ -176,6 +176,9 @@ public:
   ///
   /// For a Swift module, this will only ever have one component, but an
   /// imported Clang module might actually be a submodule.
+  ///
+  /// *Note: see `StringRef operator*()` for details on the returned name for printing
+  /// for a Swift module.
   class ReverseFullNameIterator {
   public:
     // Make this look like a valid STL iterator.
@@ -194,6 +197,9 @@ public:
       current = clangModule;
     }
 
+    /// Returns the name of the current module.
+    /// Note that for a Swift module, it returns the current module's real (binary) name,
+    /// which can be different from the name if module aliasing was used (see `-module-alias`).
     StringRef operator*() const;
     ReverseFullNameIterator &operator++();
 
@@ -208,6 +214,9 @@ public:
 
     /// This is a convenience function that writes the entire name, in forward
     /// order, to \p out.
+    ///
+    /// It calls `StringRef operator*()` under the hood (see for more detail on the
+    /// returned name for a Swift module).
     void printForward(raw_ostream &out, StringRef delim = ".") const;
   };
 
@@ -802,6 +811,9 @@ public:
   ///
   /// For a Swift module, this will only ever have one component, but an
   /// imported Clang module might actually be a submodule.
+  ///
+  /// *Note: see `StringRef operator*()` for details on the returned name for printing
+  /// for a Swift module.
   ReverseFullNameIterator getReverseFullModuleName() const {
     return ReverseFullNameIterator(this);
   }

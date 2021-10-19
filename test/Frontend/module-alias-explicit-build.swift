@@ -44,4 +44,3 @@
 
 // RUN: %FileCheck %s -input-file %t/outputs/load-result.output -check-prefix CHECK
 // CHECK: remark: loaded module at {{.*}}Bar.swiftmodule
-
