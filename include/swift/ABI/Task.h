@@ -482,25 +482,23 @@ public:
 
     /// Retrieve a pointer to the storage of result.
     OpaqueValue *getStoragePtr() {
+      auto *startAddr = reinterpret_cast<char *>(this) + sizeof(FutureFragment);
+      uintptr_t startAddrVal = (uintptr_t)startAddr;
+      uintptr_t alignment = resultType->vw_alignment();
+      startAddrVal = (startAddrVal + alignment -1) & ~(alignment -1);
       return reinterpret_cast<OpaqueValue *>(
-          reinterpret_cast<char *>(this) + storageOffset(resultType));
+          reinterpret_cast<char *>(startAddrVal));
     }
 
     /// Retrieve the error.
     SwiftError *&getError() { return error; }
 
-    /// Compute the offset of the storage from the base of the future
-    /// fragment.
-    static size_t storageOffset(const Metadata *resultType)  {
-      size_t offset = sizeof(FutureFragment);
-      size_t alignment = resultType->vw_alignment();
-      return (offset + alignment - 1) & ~(alignment - 1);
-    }
-
     /// Determine the size of the future fragment given a particular future
     /// result type.
-    static size_t fragmentSize(const Metadata *resultType) {
-      return storageOffset(resultType) + resultType->vw_size();
+    static size_t fragmentSize(size_t initialOffset, const Metadata *resultType) {
+      size_t alignment = resultType->vw_alignment();
+      size_t padding = alignment - ((sizeof(FutureFragment) + initialOffset) % alignment);
+      return sizeof(FutureFragment) + padding + resultType->vw_size();
     }
   };
 
