@@ -1499,9 +1499,11 @@ ModuleDecl::ReverseFullNameIterator::ReverseFullNameIterator(
 
 StringRef ModuleDecl::ReverseFullNameIterator::operator*() const {
   assert(current && "all name components exhausted");
-
+  // Return the module's real (binary) name, which can be different from
+  // the name if module aliasing was used (-module-alias flag). The real
+  // name is used for serialization and loading.
   if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>())
-    return swiftModule->getName().str();
+    return swiftModule->getRealName().str();
 
   auto *clangModule =
       static_cast<const clang::Module *>(current.get<const void *>());

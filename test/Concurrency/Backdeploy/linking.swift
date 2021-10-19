@@ -7,6 +7,12 @@
 // RUN: otool -L %t/linking_rpath | %FileCheck -check-prefix CHECK-RPATH %s
 // RUN: otool -L %t/linking_rpath_old | %FileCheck -check-prefix CHECK-RPATH %s
 
+// RUN: %target-build-swift -disable-autolinking-runtime-compatibility-concurrency -target x86_64-apple-ios15.0-macabi %s -o %t/linking_direct
+// RUN: %target-build-swift -disable-autolinking-runtime-compatibility-concurrency -target x86_64-apple-ios14.0-macabi %s -o %t/linking_rpath
+
+// RUN: otool -L %t/linking_direct | %FileCheck -check-prefix CHECK-DIRECT %s
+// RUN: otool -L %t/linking_rpath | %FileCheck -check-prefix CHECK-RPATH %s
+
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
 

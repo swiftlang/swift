@@ -1,16 +1,15 @@
 /// Test the -module-alias flag.
 
 // RUN: %empty-directory(%t)
+// RUN: %{python} %utils/split_file.py -o %t %s
 
 /// Create a module Bar
-// RUN: echo 'public func bar() {}' > %t/FileBar.swift
 // RUN: %target-swift-frontend -module-name Bar %t/FileBar.swift -emit-module -emit-module-path %t/Bar.swiftmodule
 
 /// Check Bar.swiftmodule is created
 // RUN: test -f %t/Bar.swiftmodule
 
 /// Create a module Foo that imports Cat with -module-alias Cat=Bar with a serialized modue loader
-// RUN: echo 'import Cat' > %t/FileFoo.swift
 // RUN: %target-swift-frontend -module-name Foo %t/FileFoo.swift -module-alias Cat=Bar -I %t -emit-module -emit-module-path %t/Foo.swiftmodule -Rmodule-loading 2> %t/load-result-foo.output
 
 /// Check Foo.swiftmodule is created and Bar.swiftmodule is loaded
@@ -32,3 +31,8 @@
 // CHECK-ZOO: remark: loaded module at {{.*}}Bar.swiftmodule
 
 
+// BEGIN FileBar.swift
+public func bar() {}
+
+// BEGIN FileFoo.swift
+import Cat

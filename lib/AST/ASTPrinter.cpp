@@ -2338,13 +2338,16 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
   llvm::interleave(decl->getImportPath(),
                    [&](const ImportPath::Element &Elem) {
                      if (!Mods.empty()) {
-                       Identifier Name = Elem.Item;
+                       // Should print the module real name in case module
+                       // aliasing is used (see -module-alias), since that's
+                       // the actual binary name.
+                       Identifier Name = decl->getASTContext().getRealModuleName(Elem.Item);
                        if (Options.MapCrossImportOverlaysToDeclaringModule) {
                          if (auto *MD = Mods.front().getAsSwiftModule()) {
                            ModuleDecl *Declaring = const_cast<ModuleDecl*>(MD)
                              ->getDeclaringModuleIfCrossImportOverlay();
                            if (Declaring)
-                             Name = Declaring->getName();
+                             Name = Declaring->getRealName();
                          }
                        }
                        Printer.printModuleRef(Mods.front(), Name);
@@ -4322,7 +4325,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
         Mod = Declaring;
     }
 
-    Identifier Name = Mod->getName();
+    // Should use the module real (binary) name here and everywhere else the
+    // module is printed in case module aliasing is used (see -module-alias)
+    Identifier Name = Mod->getRealName();
     if (Options.UseExportedModuleNames && !ExportedModuleName.empty()) {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
@@ -4343,7 +4348,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   bool isLLDBExpressionModule(ModuleDecl *M) {
     if (!M)
       return false;
-    return M->getName().str().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
+    return M->getRealName().str().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
   }
 
   bool shouldPrintFullyQualified(TypeBase *T) {
@@ -4374,7 +4379,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
     // Don't print qualifiers for types from the standard library.
     if (M->isStdlibModule() ||
-        M->getName() == M->getASTContext().Id_ObjectiveC ||
+        M->getRealName() == M->getASTContext().Id_ObjectiveC ||
         M->isSystemModule() ||
         isLLDBExpressionModule(M))
       return false;
@@ -4637,7 +4642,9 @@ public:
 
   void visitModuleType(ModuleType *T) {
     Printer << "module<";
-    Printer.printModuleRef(T->getModule(), T->getModule()->getName());
+    // Should print the module real name in case module aliasing is
+    // used (see -module-alias), since that's the actual binary name.
+    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName());
     Printer << ">";
   }
 
@@ -5697,13 +5704,13 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(this);
     os << normal->getProtocol()->getName()
-       << " module " << normal->getDeclContext()->getParentModule()->getName();
+       << " module " << normal->getDeclContext()->getParentModule()->getRealName();
     break;
   }
   case ProtocolConformanceKind::Self: {
     auto self = cast<SelfProtocolConformance>(this);
     os << self->getProtocol()->getName()
-       << " module " << self->getDeclContext()->getParentModule()->getName();
+       << " module " << self->getDeclContext()->getParentModule()->getRealName();
     break;
   }
   case ProtocolConformanceKind::Specialized: {
