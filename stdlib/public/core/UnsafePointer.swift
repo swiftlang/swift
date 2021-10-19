@@ -786,6 +786,20 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     }
   }
   
+  /// Update this pointer's initialized memory.
+  ///
+  /// The range of memory starting at this pointer and covering one instance
+  /// of `Pointee` must be initialized, or `Pointee` must be a trivial type.
+  /// This method is equivalent to:
+  ///
+  ///     self.pointee = value
+  ///
+  /// - Parameters:
+  ///   - value: The value used to update this pointer's memory.
+  public func assign(_ value: Pointee) {
+    pointee = value
+  }
+
   /// Replaces this pointer's initialized memory with the specified number of
   /// instances from the given pointer's memory.
   ///
