@@ -3291,9 +3291,9 @@ void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
                AttrName);
       return;
     }
-    if (IntroVer.getValue() >= Attr->MovedVersion) {
+    if (IntroVer.getValue() > Attr->MovedVersion) {
       diagnose(AtLoc,
-               diag::originally_definedin_must_after_available_version,
+               diag::originally_definedin_must_not_before_available_version,
                AttrName);
       return;
     }

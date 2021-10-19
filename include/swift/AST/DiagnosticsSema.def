@@ -1600,8 +1600,8 @@ ERROR(originally_definedin_topleve_decl,none,
 ERROR(originally_definedin_need_available,none,
       "need @available attribute for @%0", (StringRef))
 
-ERROR(originally_definedin_must_after_available_version,none,
-      "moved version from @%0 must after introduced OS version", (StringRef))
+ERROR(originally_definedin_must_not_before_available_version,none,
+      "symbols are moved to the current module before they were available in the OSs", (StringRef))
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
