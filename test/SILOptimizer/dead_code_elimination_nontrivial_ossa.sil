@@ -679,3 +679,44 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: sil hidden [ossa] @add_end_borrow_after_destroy_value : {{.*}} {
+// CHECK:       bb0({{%[^,]+}} : $Builtin.Int1, [[INSTANCE_1:%[^,]+]] : @owned $Klass, {{%[^,]+}} : @owned $Klass):
+// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [[INSTANCE_1]]
+// CHECK:         copy_value [[LIFETIME_1]]
+// CHECK:         cond_br {{%[^,]+}}, [[BASIC_BLOCK1:bb[0-9]+]], [[BASIC_BLOCK2:bb[0-9]+]]
+// CHECK:       [[BASIC_BLOCK1]]:
+// CHECK:         end_borrow [[LIFETIME_1]]
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:       [[BASIC_BLOCK2]]:
+// CHECK:         end_borrow [[LIFETIME_1]]
+// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK-LABEL: } // end sil function 'add_end_borrow_after_destroy_value'
+sil hidden [ossa] @add_end_borrow_after_destroy_value : $@convention(thin) (Builtin.Int1, @owned Klass, @owned Klass) -> () {
+bb0(%condition : $Builtin.Int1, %instance_1 : @owned $Klass, %instance_2 : @owned $Klass):
+  %lifetime_1 = begin_borrow %instance_1 : $Klass
+  
+  %copy_1 = copy_value %lifetime_1 : $Klass
+  %stack_addr = alloc_stack $Klass
+  store %copy_1 to [init] %stack_addr : $*Klass
+  destroy_addr %stack_addr : $*Klass
+  dealloc_stack %stack_addr : $*Klass
+
+  cond_br %condition, bb1, bb2
+
+bb1:
+  end_borrow %lifetime_1 : $Klass
+  destroy_value %instance_1 : $Klass
+  %lifetime_2 = begin_borrow %instance_2 : $Klass
+  br bb3(%instance_2 : $Klass, %lifetime_2 : $Klass)
+
+bb2:
+  destroy_value %instance_2 : $Klass
+  br bb3(%instance_1 : $Klass, %lifetime_1 : $Klass)
+
+bb3(%original : @owned $Klass, %lifetime : @guaranteed $Klass):
+  end_borrow %lifetime : $Klass
+  destroy_value %original : $Klass
+  %result = tuple ()
+  return %result : $()
+}
