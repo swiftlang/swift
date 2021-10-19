@@ -8893,13 +8893,10 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   if (builderType->hasTypeParameter()) {
     // Find the opened type for this callee and substitute in the type
     // parametes.
-    // FIXME: We should consider changing OpenedTypes to a MapVector.
-    for (const auto &opened : cs.getOpenedTypes()) {
-      if (opened.first == calleeLocator) {
-        OpenedTypeMap replacements(opened.second.begin(), opened.second.end());
-        builderType = cs.openType(builderType, replacements);
-        break;
-      }
+    auto substitutions = cs.getOpenedTypes(calleeLocator);
+    if (!substitutions.empty()) {
+      OpenedTypeMap replacements(substitutions.begin(), substitutions.end());
+      builderType = cs.openType(builderType, replacements);
     }
     assert(!builderType->hasTypeParameter());
   }

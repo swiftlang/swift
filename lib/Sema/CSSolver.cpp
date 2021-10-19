@@ -250,12 +250,12 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register the solution's opened types.
   for (const auto &opened : solution.OpenedTypes) {
-    OpenedTypes.push_back(opened);
+    OpenedTypes.insert(opened);
   }
 
   // Register the solution's opened existential types.
   for (const auto &openedExistential : solution.OpenedExistentialTypes) {
-    OpenedExistentialTypes.push_back(openedExistential);
+    OpenedExistentialTypes.insert(openedExistential);
   }
 
   // Register the defaulted type variables.
@@ -297,7 +297,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (const auto &transformed : solution.resultBuilderTransformed) {
-    resultBuilderTransformed.push_back(transformed);
+    resultBuilderTransformed.insert(transformed);
   }
 
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {

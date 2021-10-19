@@ -2415,8 +2415,8 @@ private:
 
   /// A mapping from constraint locators to the set of opened types associated
   /// with that locator.
-  SmallVector<std::pair<ConstraintLocator *, ArrayRef<OpenedType>>, 4>
-    OpenedTypes;
+  llvm::SmallMapVector<ConstraintLocator *, ArrayRef<OpenedType>, 4>
+      OpenedTypes;
 
   /// The list of all generic requirements fixed along the current
   /// solver path.
@@ -2430,11 +2430,11 @@ private:
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
-  SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
-    OpenedExistentialTypes;
+  llvm::SmallMapVector<ConstraintLocator *, OpenedArchetypeType *, 4>
+      OpenedExistentialTypes;
 
   /// The set of functions that have been transformed by a result builder.
-  std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
+  llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
 
   /// Cache of the effects any closures visited.
@@ -4172,10 +4172,12 @@ public:
                           OpenedTypeMap *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
-  /// with a type variable) along the current path.
-  ArrayRef<std::pair<ConstraintLocator *, ArrayRef<OpenedType>>>
-  getOpenedTypes() const {
-    return OpenedTypes;
+  /// with a type variable) at the given location.
+  ArrayRef<OpenedType> getOpenedTypes(ConstraintLocator *locator) const {
+    auto substitutions = OpenedTypes.find(locator);
+    if (substitutions == OpenedTypes.end())
+      return {};
+    return substitutions->second;
   }
 
 private:
