@@ -433,7 +433,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   ExecutorRef executor = ExecutorRef::generic();
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
-  void *asyncLetBuffer = nullptr;
   bool hasAsyncLetResultBuffer = false;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
@@ -461,7 +460,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       // context, so that we can emplace the eventual result there instead
       // of in a FutureFragment.
       hasAsyncLetResultBuffer = true;
-      asyncLetBuffer = aletRecord->getResultBuffer();
       assert(asyncLet && "Missing async let storage");
         
       jobFlags.task_setIsAsyncLetTask(true);
