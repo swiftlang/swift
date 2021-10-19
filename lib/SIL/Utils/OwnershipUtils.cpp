@@ -11,9 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/Basic/DAGNodeWorklist.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/DAGNodeWorklist.h"
+#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
@@ -179,7 +178,7 @@ bool swift::findInnerTransitiveGuaranteedUses(
   // grow exponentially without the membership check. It's fine to do this
   // membership check locally in this function (within a borrow scope) because
   // it isn't needed for the immediate uses, only the transitive uses.
-  DAGNodeWorklist<Operand *, 8> worklist;
+  GraphNodeWorklist<Operand *, 8> worklist;
   for (Operand *use : guaranteedValue->getUses()) {
     if (use->getOperandOwnership() != OperandOwnership::NonUse)
       worklist.insert(use);
@@ -1438,7 +1437,7 @@ void swift::findTransitiveReborrowBaseValuePairs(
 void swift::visitTransitiveEndBorrows(
     BorrowedValue beginBorrow,
     function_ref<void(EndBorrowInst *)> visitEndBorrow) {
-  DAGNodeWorklist<SILValue, 4> worklist;
+  GraphNodeWorklist<SILValue, 4> worklist;
   worklist.insert(beginBorrow.value);
 
   while (!worklist.empty()) {
