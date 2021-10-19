@@ -626,14 +626,14 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
     Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
-  /// Accesses the instance referenced by this pointer.
+  /// Reads or updates the instance referenced by this pointer.
   ///
   /// When reading from the `pointee` property, the instance referenced by this
   /// pointer must already be initialized. When `pointee` is used as the left
-  /// side of an assignment, the instance must be initialized or this
-  /// pointer's `Pointee` type must be a trivial type.
+  /// side of an assignment, the instance is updated. The instance must
+  /// be initialized or this pointer's `Pointee` type must be a trivial type.
   ///
-  /// Do not assign an instance of a nontrivial type through `pointee` to
+  /// Do not update an instance of a nontrivial type through `pointee` to
   /// uninitialized memory. Instead, use an initializing method, such as
   /// `initialize(repeating:count:)`.
   @inlinable // unsafe-performance
@@ -705,33 +705,55 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
     return Builtin.take(_rawValue)
   }
 
-  /// Replaces this pointer's memory with the specified number of
+  /// Update this pointer's initialized memory with the specified number of
   /// consecutive copies of the given value.
   ///
   /// The region of memory starting at this pointer and covering `count`
   /// instances of the pointer's `Pointee` type must be initialized or
   /// `Pointee` must be a trivial type. After calling
-  /// `assign(repeating:count:)`, the region is initialized.
+  /// `update(repeating:count:)`, the region is initialized.
   ///
   /// - Parameters:
-  ///   - repeatedValue: The instance to assign this pointer's memory to.
-  ///   - count: The number of consecutive copies of `newValue` to assign.
-  ///     `count` must not be negative. 
+  ///   - repeatedValue: The value used when updating this pointer's memory.
+  ///   - count: The number of consecutive elements to update.
+  ///     `count` must not be negative.
   @inlinable
-  public func assign(repeating repeatedValue: Pointee, count: Int) {
+  @_silgen_name("$sSp6assign9repeating5countyx_SitF")
+  public func update(repeating repeatedValue: Pointee, count: Int) {
     _debugPrecondition(count >= 0, "UnsafeMutablePointer.assign(repeating:count:) with negative count")
     for i in 0..<count {
       self[i] = repeatedValue
     }
   }
   
-  /// Replaces this pointer's initialized memory with the specified number of
-  /// instances from the given pointer's memory.
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "update(repeating:count:)")
+  @_silgen_name("_deprecated_assign_repeating_count")
+  public func assign(repeating repeatedValue: Pointee, count: Int) {
+    update(repeating: repeatedValue, count: count)
+  }
+
+  /// Update this pointer's initialized memory.
+  ///
+  /// The range of memory starting at this pointer and covering one instance
+  /// of `Pointee` must be initialized, or `Pointee` must be a trivial type.
+  /// This method is equivalent to:
+  ///
+  ///     self.pointee = value
+  ///
+  /// - Parameters:
+  ///   - value: The value used to update this pointer's memory.
+  public func update(_ value: Pointee) {
+    pointee = value
+  }
+
+  /// Update this pointer's initialized memory with the specified number of
+  /// instances, copied from the given pointer's memory.
   ///
   /// The region of memory starting at this pointer and covering `count`
   /// instances of the pointer's `Pointee` type must be initialized or
   /// `Pointee` must be a trivial type. After calling
-  /// `assign(from:count:)`, the region is initialized.
+  /// `update(from:count:)`, the region is initialized.
   ///
   /// - Note: Returns without performing work if `self` and `source` are equal.
   ///
@@ -742,9 +764,10 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
   ///   - count: The number of instances to copy from the memory referenced by
   ///     `source` to this pointer's memory. `count` must not be negative.
   @inlinable
-  public func assign(from source: UnsafePointer<Pointee>, count: Int) {
+  @_silgen_name("$sSp6assign4from5countySPyxG_SitF")
+  public func update(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.assign with negative count")
+      count >= 0, "UnsafeMutablePointer.update with negative count")
     if UnsafePointer(self) < source || UnsafePointer(self) >= source + count {
       // assign forward from a disjoint or following overlapping range.
       Builtin.assignCopyArrayFrontToBack(
@@ -765,6 +788,13 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
       //   i -= 1
       // }
     }
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "update(from:count:)")
+  @_silgen_name("_deprecated_assign_from_count")
+  public func assign(from source: UnsafePointer<Pointee>, count: Int) {
+    update(from: source, count: count)
   }
 
   /// Moves instances from initialized source memory into the uninitialized
@@ -819,6 +849,8 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
   /// `Pointee` must be a trivial type. After calling
   /// `initialize(from:count:)`, the region is initialized.
   ///
+  /// - Note: The source and destination memory regions must not overlap.
+  ///
   /// - Parameters:
   ///   - source: A pointer to the values to copy. The memory region
   ///     `source..<(source + count)` must be initialized. The memory regions
@@ -841,30 +873,34 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
     // }
   }
 
-  /// Replaces the memory referenced by this pointer with the values
-  /// starting at the given pointer, leaving the source memory uninitialized.
+  /// Update this pointer's initialized memory by moving the specified number
+  /// of instances the source pointer's memory, leaving the source memory
+  /// uninitialized.
   ///
   /// The region of memory starting at this pointer and covering `count`
   /// instances of the pointer's `Pointee` type must be initialized or
   /// `Pointee` must be a trivial type. After calling
-  /// `moveAssign(from:count:)`, the region is initialized and the memory
+  /// `moveUpdate(from:count:)`, the region is initialized and the memory
   /// region `source..<(source + count)` is uninitialized.
   ///
+  /// - Note: The source and destination memory regions must not overlap.
+  ///
   /// - Parameters:
-  ///   - source: A pointer to the values to copy. The memory region
+  ///   - source: A pointer to the values to be moved. The memory region
   ///     `source..<(source + count)` must be initialized. The memory regions
   ///     referenced by `source` and this pointer must not overlap.
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveAssign(
+  @_silgen_name("$sSp10moveAssign4from5countySpyxG_SitF")
+  public func moveUpdate(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
   ) {
     _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.moveAssign(from:) with negative count")
+      count >= 0, "UnsafeMutablePointer.moveUpdate(from:) with negative count")
     _debugPrecondition(
       self + count <= source || source + count <= self,
-      "moveAssign overlapping range")
+      "moveUpdate overlapping range")
     Builtin.assignTakeArray(
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // These builtins are equivalent to:
@@ -872,7 +908,16 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
     //   self[i] = (source + i).move()
     // }
   }
-  
+
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "moveUpdate(from:count:)")
+  @_silgen_name("_deprecated_moveAssign_from_count")
+  public func moveAssign(
+    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
+  ) {
+    moveUpdate(from: source, count: count)
+  }
+
   /// Deinitializes the specified number of values starting at this pointer.
   ///
   /// The region of memory starting at this pointer and covering `count`
@@ -952,14 +997,14 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
     return try body(UnsafeMutablePointer<T>(_rawValue))
   }
 
-  /// Accesses the pointee at the specified offset from this pointer.
+  /// Reads or updates the pointee at the specified offset from this pointer.
   ///
   /// For a pointer `p`, the memory at `p + i` must be initialized when reading
   /// the value by using the subscript. When the subscript is used as the left
-  /// side of an assignment, the memory at `p + i` must be initialized or
-  /// the pointer's `Pointee` type must be a trivial type.
+  /// side of an assignment, the memory at `p + i` is updated. The memory must
+  /// be initialized or the pointer's `Pointee` type must be a trivial type.
   ///
-  /// Do not assign an instance of a nontrivial type through the subscript to
+  /// Do not update an instance of a nontrivial type through the subscript to
   /// uninitialized memory. Instead, use an initializing method, such as
   /// `initialize(repeating:count:)`.
   ///
