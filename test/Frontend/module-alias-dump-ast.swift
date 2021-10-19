@@ -9,13 +9,12 @@
 // RUN: %target-swift-frontend -module-name AppleLogging -module-alias XLogging=AppleLogging %t/FileLogging.swift -emit-module -emit-module-path %t/AppleLogging.swiftmodule
 // RUN: test -f %t/AppleLogging.swiftmodule
 
-/// Verify AST contains XLogging, not AppleLogging
+/// Verify AST contains AppleLogging as module name
 // RUN: %target-swift-frontend -dump-ast %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t > %t/result-ast.output
 
 // RUN: %FileCheck %s -input-file %t/result-ast.output -check-prefix CHECK-AST
 // CHECK-AST: XLogging
-// RUN: not %FileCheck %s -input-file %t/result-ast.output -check-prefix CHECK-NOT-AST
-// CHECK-NOT-AST: AppleLogging
+// CHECK-AST: module<AppleLogging>
 
 
 // BEGIN FileLogging.swift
