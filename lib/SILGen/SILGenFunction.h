@@ -2021,10 +2021,31 @@ public:
   /// and is ready to receive messages.
   void emitDistributedActorReady(
       SILLocation loc, ConstructorDecl *ctor, ManagedValue actorSelf);
-
-  /// Inject distributed actor and transport interaction code into the destructor.
-  void emitDistributedActor_resignIdentity(
-      DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
+  
+  /// For a distributed actor, emits code to invoke the transport's
+  /// resignIdentity function.
+  ///
+  /// Specifically, this code emits SIL that performs the call
+  ///
+  /// \verbatim
+  ///   self.transport.resignIdentity(self.id)
+  /// \endverbatim
+  ///
+  /// using the current builder's state as the injection point.
+  ///
+  /// \param actorDecl the declaration corresponding to the actor
+  /// \param actorSelf the SIL value representing the distributed actor instance
+  void emitResignIdentityCall(SILLocation loc,
+                              ClassDecl *actorDecl, ManagedValue actorSelf);
+  
+  /// Emit code that tests whether the distributed actor is local, and if so,
+  /// resigns the distributed actor's identity.
+  /// \param continueBB the target block where execution will continue after
+  ///                   the conditional call, whether actor is local or remote.
+  void emitConditionalResignIdentityCall(SILLocation loc,
+                                         ClassDecl *actorDecl,
+                                         ManagedValue actorSelf,
+                                         SILBasicBlock *continueBB);
 
   void emitDistributedActorClassMemberDestruction(
       SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
