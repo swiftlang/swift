@@ -8679,9 +8679,11 @@ AbstractGenericSignatureRequest::evaluate(
 
 GenericSignature
 InferredGenericSignatureRequest::evaluate(
-        Evaluator &evaluator, ModuleDecl *parentModule,
+        Evaluator &evaluator,
+        ModuleDecl *parentModule,
         const GenericSignatureImpl *parentSig,
-        GenericParamSource paramSource,
+        GenericParamList *genericParams,
+        WhereClauseOwner whereClause,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,
         bool allowConcreteGenericParams) const {
@@ -8729,12 +8731,6 @@ InferredGenericSignatureRequest::evaluate(
     return false;
   };
 
-  GenericParamList *genericParams = nullptr;
-  if (auto params = paramSource.dyn_cast<GenericParamList *>())
-      genericParams = params;
-  else
-      genericParams = paramSource.get<GenericContext *>()->getGenericParams();
-
   if (genericParams) {
     // Extensions never have a parent signature.
     if (genericParams->getOuterParameters())
@@ -8777,15 +8773,10 @@ InferredGenericSignatureRequest::evaluate(
     }
   }
 
-  if (auto *ctx = paramSource.dyn_cast<GenericContext *>()) {
-    // The declaration might have a trailing where clause.
-    if (auto *where = ctx->getTrailingWhereClause()) {
-      // Determine where and how to perform name lookup.
-      lookupDC = ctx;
-
-      WhereClauseOwner(lookupDC, where).visitRequirements(
+  if (whereClause) {
+    lookupDC = whereClause.dc;
+    std::move(whereClause).visitRequirements(
         TypeResolutionStage::Structural, visitRequirement);
-    }
   }
       
   /// Perform any remaining requirement inference.

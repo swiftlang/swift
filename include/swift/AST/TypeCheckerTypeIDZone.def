@@ -131,10 +131,12 @@ SWIFT_REQUEST(TypeChecker, HasImplementationOnlyImportsRequest,
 SWIFT_REQUEST(TypeChecker, ModuleLibraryLevelRequest,
               LibraryLevel(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
-              GenericSignature (ModuleDecl *, const GenericSignatureImpl *,
-                                 GenericParamSource,
-                                 SmallVector<Requirement, 2>,
-                                 SmallVector<TypeLoc, 2>, bool),
+              GenericSignature (ModuleDecl *,
+                                const GenericSignatureImpl *,
+                                GenericParamList *,
+                                WhereClauseOwner,
+                                SmallVector<Requirement, 2>,
+                                SmallVector<TypeLoc, 2>, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DistributedModuleIsAvailableRequest,
               bool(ModuleDecl *), Cached, NoLocationInfo)
