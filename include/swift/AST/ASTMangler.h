@@ -297,8 +297,7 @@ public:
   getClangDeclForMangling(const ValueDecl *decl);
 
   void appendExistentialLayout(
-      const ExistentialLayout &layout, GenericSignature sig,
-      const ValueDecl *forDecl);
+      const ExistentialLayout &layout, const ValueDecl *forDecl);
 
 protected:
 

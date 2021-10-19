@@ -1015,8 +1015,7 @@ void ASTMangler::appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl) {
 }
 
 void ASTMangler::appendExistentialLayout(
-    const ExistentialLayout &layout, GenericSignature sig,
-    const ValueDecl *forDecl) {
+    const ExistentialLayout &layout, const ValueDecl *forDecl) {
   bool First = true;
   bool DroppedRequiresClass = false;
   bool SawRequiresClass = false;
@@ -1040,7 +1039,7 @@ void ASTMangler::appendExistentialLayout(
     appendOperator("y");
 
   if (auto superclass = layout.explicitSuperclass) {
-    appendType(superclass, sig, forDecl);
+    appendType(superclass, forDecl);
     return appendOperator("Xc");
   } else if (layout.hasExplicitAnyObject ||
              (DroppedRequiresClass && !SawRequiresClass)) {
@@ -1219,14 +1218,14 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
 
     case TypeKind::Protocol: {
       return appendExistentialLayout(
-          ExistentialLayout(cast<ProtocolType>(tybase)), sig, forDecl);
+          ExistentialLayout(cast<ProtocolType>(tybase)), forDecl);
     }
 
     case TypeKind::ProtocolComposition: {
       // We mangle ProtocolType and ProtocolCompositionType using the
       // same production:
       auto layout = type->getExistentialLayout();
-      return appendExistentialLayout(layout, sig, forDecl);
+      return appendExistentialLayout(layout, forDecl);
     }
 
     case TypeKind::UnboundGeneric:
