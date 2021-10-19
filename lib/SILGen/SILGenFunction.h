@@ -2006,8 +2006,9 @@ public:
   // Distributed Actors
   //===---------------------------------------------------------------------===//
 
-  /// Initialize the distributed actors transport and id.
-  void initializeDistributedActorImplicitStorageInit(
+  /// Initializes the implicit stored properties of a distributed actor that correspond to
+  /// its transport and identity.
+  void emitDistActorImplicitPropertyInits(
       ConstructorDecl *ctor, ManagedValue selfArg);
 
   /// Given a function representing a distributed actor factory, emits the

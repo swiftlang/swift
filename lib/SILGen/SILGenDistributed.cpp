@@ -28,11 +28,12 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/SILOptimizer/Utils/DistributedActor.h"
 
 using namespace swift;
 using namespace Lowering;
 
-// MARK: Local utility functions
+// MARK: utility functions
 
 /// Obtain a nominal type's member by name, as a VarDecl.
 /// \returns nullptr if the name lookup doesn't resolve to exactly one member,
@@ -42,6 +43,21 @@ static VarDecl* lookupProperty(NominalTypeDecl *ty, DeclName name) {
   if (refs.size() != 1)
     return nullptr;
   return dyn_cast<VarDecl>(refs.front());
+}
+
+/// Perform an initializing store to the given property using the value
+/// \param actorSelf the value representing `self` for the actor instance.
+/// \param prop the property to be initialized.
+/// \param value the value to use when initializing the property.
+static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
+                               SILValue actorSelf,
+                               VarDecl* prop, SILValue value) {
+  auto fieldAddr = SGF.B.createRefElementAddr(loc, actorSelf, prop,
+                                  SGF.getLoweredType(prop->getInterfaceType()));
+  SGF.B.createCopyAddr(loc,
+                   /*src*/value,
+                   /*dest*/fieldAddr,
+                   IsNotTake, IsInitialization);
 }
 
 /******************************************************************************/
@@ -82,20 +98,15 @@ static void emitDistributedIfRemoteBranch(SILGenFunction &SGF,
   B.createCondBranch(Loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
 }
 
-/******************************************************************************/
-/****************** DISTRIBUTED ACTOR STORAGE INITIALIZATION ******************/
-/******************************************************************************/
+// MARK: local instance initialization
 
-/// Get the `ActorTransport` parameter of the constructor.
-/// Sema should have guaranteed that there is exactly one of them for any
-/// designated initializer of a distributed actor.
-static SILArgument*
-getActorTransportArgument(ASTContext& C, SILFunction& F, ConstructorDecl *ctor) {
-  auto *DC = cast<DeclContext>(ctor);
-  auto module = DC->getParentModule();
+/// Finds the first `ActorTransport`-compatible parameter of the given function.
+/// Crashes if the given function does not have such a parameter.
+static SILArgument *findFirstActorTransportArg(SILFunction &F) {
+  auto *module = F.getModule().getSwiftModule();
+  auto &C = F.getASTContext();
 
-  auto *transportProto =
-      C.getProtocol(KnownProtocolKind::ActorTransport);
+  auto *transportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
   Type transportTy = transportProto->getDeclaredInterfaceType();
 
   for (auto arg : F.getArguments()) {
@@ -103,8 +114,8 @@ getActorTransportArgument(ASTContext& C, SILFunction& F, ConstructorDecl *ctor) 
     Type argTy = arg->getType().getASTType();
     auto argDecl = arg->getDecl();
 
-    auto conformsToTransport = module->lookupConformance(
-        argDecl->getInterfaceType(), transportProto);
+    auto conformsToTransport =
+        module->lookupConformance(argDecl->getInterfaceType(), transportProto);
 
     // Is it a protocol that conforms to ActorTransport?
     if (argTy->isEqual(transportTy) || conformsToTransport) {
@@ -122,42 +133,21 @@ getActorTransportArgument(ASTContext& C, SILFunction& F, ConstructorDecl *ctor) 
   llvm_unreachable("Missing required ActorTransport argument!");
 }
 
-/// Perform an initializing store to the given property using the value
-/// \param actorSelf the value representing `self` for the actor instance.
-/// \param prop the property to be initialized.
-/// \param value the value to use when initializing the property.
-static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
-                               SILValue actorSelf,
-                               VarDecl* prop, SILArgument *value) {
-  auto fieldAddr = SGF.B.createRefElementAddr(loc, actorSelf, prop,
-                                  SGF.getLoweredType(prop->getInterfaceType()));
-  SGF.B.createCopyAddr(loc,
-                   /*src*/value,
-                   /*dest*/fieldAddr,
-                   IsNotTake, IsInitialization);
-}
-
-// TODO(distributed): remove this store impl and reuse Store_transport
-static void
-emitDistributedActor_init_transportStore(
-    SILGenFunction &SGF,
-    ManagedValue borrowedSelfArg, VarDecl *selfDecl,
-    ConstructorDecl *ctor, VarDecl *var) {
-  auto &C = selfDecl->getASTContext();
-  auto &B = SGF.B;
-  auto &F = SGF.F;
-  
+/// For the initialization of a local distributed actor instance, emits code to initialize the instance's
+/// stored property corresponding to the transport.
+static void emitTransportInit(SILGenFunction &SGF,
+                                        ConstructorDecl *ctor,
+                                        SILLocation loc,
+                                        ManagedValue actorSelf) {
   auto *dc = ctor->getDeclContext();
+  auto classDecl = dc->getSelfClassDecl();
+  auto &C = ctor->getASTContext();
 
-  auto loc = SILLocation(ctor);
-  loc.markAutoGenerated();
-
-  // ==== Prepare assignment: get the self.transport address
-  SILValue transportArg = getActorTransportArgument(C, F, ctor);
-
-  auto fieldAddr = B.createRefElementAddr(
-      loc, borrowedSelfArg.getValue(), var,
-      SGF.getLoweredType(var->getInterfaceType()));
+  // Sema has already guaranteed that there is exactly one ActorTransport
+  // argument to the constructor, so we grab the first one from the params.
+  SILValue transportArg = findFirstActorTransportArg(SGF.F);
+  VarDecl *var = lookupProperty(classDecl, C.Id_actorTransport);
+  assert(var);
       
   // If the argument is not existential, it will be a concrete type
   // that can be erased to that existential.
@@ -185,46 +175,36 @@ emitDistributedActor_init_transportStore(
                  });
     transportValue = mv.getValue();
   }
-
-  // ==== Store the transport
-  B.createCopyAddr(loc,
-                   /*src*/transportValue,
-                   /*dest*/fieldAddr,
-                   IsNotTake, IsInitialization);
+  
+  initializeProperty(SGF, loc, actorSelf.getValue(), var, transportValue);
 }
 
-/// Synthesize the distributed actor's identity (`id`) initialization:
+/// Emits the distributed actor's identity (`id`) initialization.
 ///
+/// Specifically, it performs:
 /// \verbatim
 ///     self.id = transport.assignIdentity(Self.self)
 /// \endverbatim
-static void emitDistributedActorStore_init_assignIdentity(
-    SILGenFunction &SGF,
-    ManagedValue borrowedSelfArg, VarDecl *selfVarDecl,
-    ConstructorDecl *ctor, VarDecl *var) {
-  auto &C = selfVarDecl->getASTContext();
+static void emitIdentityInit(SILGenFunction &SGF, ConstructorDecl *ctor,
+                             SILLocation loc, ManagedValue borrowedSelfArg) {
+  auto &C = ctor->getASTContext();
   auto &B = SGF.B;
   auto &F = SGF.F;
-  auto &SGM = SGF.SGM;
-  SILGenFunctionBuilder builder(SGM);
+  
+  auto *dc = ctor->getDeclContext();
+  auto classDecl = dc->getSelfClassDecl();
 
-  auto loc = SILLocation(ctor);
-  loc.markAutoGenerated();
-
-  // ==== prepare the transport.assignIdentity(_:) function
   ProtocolDecl *transportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
-
-  // --- Prepare the arguments
-  SILValue transportArgValue = getActorTransportArgument(C, F, ctor);
-
   ProtocolDecl *distributedActorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
 
   assert(distributedActorProto);
   assert(transportProto);
 
+  SILValue transportValue =
+      loadActorTransport(B, loc, classDecl, borrowedSelfArg.getValue());
+
   // --- Open the transport existential, if needed.
-  SILValue transportValue = transportArgValue;
-  auto transportASTType = transportArgValue->getType().getASTType();
+  auto transportASTType = transportValue->getType().getASTType();
   if (transportASTType->isAnyExistentialType()) {
     OpenedArchetypeType *Opened;
     transportASTType =
@@ -282,6 +262,8 @@ static void emitDistributedActorStore_init_assignIdentity(
                            {transportASTType, selfTy},
                            {transportConfRef, distributedActorConfRef});
 
+  VarDecl *var = lookupProperty(classDecl, C.Id_id);
+
   // --- create a temporary storage for the result of the call
   // it will be deallocated automatically as we exit this scope
   auto resultTy = SGF.getLoweredType(var->getInterfaceType());
@@ -292,133 +274,40 @@ static void emitDistributedActorStore_init_assignIdentity(
       loc, assignWitnessMethod, subs,
       { temp, selfMetatypeValue, transportValue});
 
-  // ==== Assign the identity to stored property
-  // TODO(distributed): reuse emitDistributedActorStore_id here, pass the SILValue
-  // --- Prepare address of self.id
-  auto idFieldAddr = B.createRefElementAddr(
-      loc, borrowedSelfArg.getValue(), var,
-      SGF.getLoweredType(var->getInterfaceType()));
-
-  // --- assign to the property
-  B.createCopyAddr(loc, /*src*/temp, /*dest*/idFieldAddr,
-                   IsTake, IsInitialization);
+  initializeProperty(SGF, loc, borrowedSelfArg.getValue(), var, temp);
 }
 
-/******************************************************************************/
-/******************* DISTRIBUTED ACTOR LOCAL INIT *****************************/
-/******************************************************************************/
-
-void SILGenFunction::initializeDistributedActorImplicitStorageInit(
+void SILGenFunction::emitDistActorImplicitPropertyInits(
     ConstructorDecl *ctor, ManagedValue selfArg) {
-  VarDecl *selfVarDecl = ctor->getImplicitSelfDecl();
-  auto *dc = ctor->getDeclContext();
-  auto classDecl = dc->getSelfClassDecl();
-  auto &C = classDecl->getASTContext();
+  // Only designated initializers should perform this initialization.
+  assert(ctor->isDesignatedInit());
 
-  // Only designated initializers get the lifecycle handling injected
-  if (!ctor->isDesignatedInit())
-    return;
+  auto loc = SILLocation(ctor);
+  loc.markAutoGenerated();
 
-  SILLocation prologueLoc = RegularLocation(ctor);
-  prologueLoc.markAsPrologue(); // TODO: no idea if this is necessary or makes sense
-
-  // ==== Initialize Properties.
-  auto borrowedSelfArg = selfArg.borrow(*this, prologueLoc);
-  
-  VarDecl *transportVar = lookupProperty(classDecl, C.Id_actorTransport);
-  emitDistributedActor_init_transportStore(*this, borrowedSelfArg, selfVarDecl,
-                                           ctor, transportVar);
-  
-  VarDecl *identityVar = lookupProperty(classDecl, C.Id_id);
-  emitDistributedActorStore_init_assignIdentity(*this, borrowedSelfArg,
-                                                selfVarDecl,
-                                                ctor, identityVar);
+  selfArg = selfArg.borrow(*this, loc);
+  emitTransportInit(*this, ctor, loc, selfArg);
+  emitIdentityInit(*this, ctor, loc, selfArg);
 }
 
 void SILGenFunction::emitDistributedActorReady(
     SILLocation loc, ConstructorDecl *ctor, ManagedValue actorSelf) {
 
-  auto *dc = ctor->getDeclContext();
-  auto classDecl = dc->getSelfClassDecl();
-  auto &C = classDecl->getASTContext();
-
   // Only designated initializers get the lifecycle handling injected
   assert(ctor->isDesignatedInit());
-  
-  // setup scope for clean-ups
+
+  auto *dc = ctor->getDeclContext();
+  auto classDecl = dc->getSelfClassDecl();
+
+  SILValue transport = findFirstActorTransportArg(F);
+
   FullExpr scope(Cleanups, CleanupLocation(loc));
+  auto borrowedSelf = actorSelf.borrow(*this, loc);
 
-  // === Prepare the arguments
-  SILValue transportArgValue = getActorTransportArgument(C, F, ctor);
-  actorSelf = actorSelf.borrow(*this, loc);
-
-  ProtocolDecl *distributedActorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
-  ProtocolDecl *transportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
-  assert(distributedActorProto);
-  assert(transportProto);
-
-  // --- Open the transport existential
-  SILValue transportValue = transportArgValue;
-  auto transportASTType = transportValue->getType().getASTType();
-  if (transportASTType->isAnyExistentialType()) {
-    OpenedArchetypeType *Opened;
-    transportASTType =
-        transportASTType->openAnyExistentialType(Opened)->getCanonicalType();
-    transportValue = B.createOpenExistentialAddr(
-        loc, transportValue, F.getLoweredType(transportASTType),
-        OpenedExistentialAccess::Immutable);
-  }
-
-  // === Make the transport.actorReady call
-  // --- prepare the witness_method
-  // Note: it does not matter on what module we perform the lookup,
-  // it is currently ignored. So the Stdlib module is good enough.
-  auto *module = getModule().getSwiftModule();
-
-  // the conformance here is just an abstract thing so we can simplify
-  auto transportConfRef = ProtocolConformanceRef(transportProto);
-  assert(!transportConfRef.isInvalid() && "Missing conformance to `ActorTransport`");
-
-  auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
-  auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType()); // TODO: thats just self var devl getType
-
-  auto distributedActorConfRef = module->lookupConformance(
-      selfTy,
-      distributedActorProto);
-  assert(!distributedActorConfRef.isInvalid() && "Missing conformance to `DistributedActor`");
-
-  // === Prepare the actorReady function
-  auto actorReadyMethod =
-      cast<FuncDecl>(transportProto->getSingleRequirement(C.Id_actorReady));
-  auto actorReadyRef = SILDeclRef(actorReadyMethod, SILDeclRef::Kind::Func);
-  auto actorReadySILTy =
-      getConstantInfo(getTypeExpansionContext(), actorReadyRef)
-      .getSILType();
-
-  auto readyWitnessMethod = B.createWitnessMethod(
-      loc,
-      /*lookupTy*/transportASTType,
-      /*Conformance*/transportConfRef,
-      /*member*/actorReadyRef,
-      /*methodTy*/actorReadySILTy);
-
-  // --- prepare conformance subs
-  auto genericSig = actorReadyMethod->getGenericSignature();
-
-  SubstitutionMap subs =
-      SubstitutionMap::get(genericSig,
-                           {transportASTType, selfTy},
-                           {transportConfRef, distributedActorConfRef});
-
-  // ---- actually call transport.actorReady(self)
-  B.createApply(
-      loc, readyWitnessMethod, subs,
-      { actorSelf.getValue(), transportValue});
+  emitActorReadyCall(B, loc, classDecl, borrowedSelf.getValue(), transport);
 }
 
-/******************************************************************************/
-/******************* DISTRIBUTED ACTOR RESOLVE FUNCTION ***********************/
-/******************************************************************************/
+// MARK: remote instance initialization
 
 /// Synthesize the distributed actor's identity (`id`) initialization:
 ///

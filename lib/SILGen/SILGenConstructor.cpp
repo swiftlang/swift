@@ -785,7 +785,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Distributed actor initializers implicitly initialize their transport and id
   if (isDesignatedDistActorInit) {
-    initializeDistributedActorImplicitStorageInit(ctor, selfArg);
+    emitDistActorImplicitPropertyInits(ctor, selfArg);
   }
 
   // Prepare the end of initializer location.
