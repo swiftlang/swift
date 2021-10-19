@@ -20,27 +20,54 @@ set(swiftDarwin_target_sdks ALL_APPLE_PLATFORMS)
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple")
   set(swiftDarwin_target_sdks ALL_APPLE_PLATFORMS FREESTANDING)
 endif()
-add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-    ${swift_platform_sources}
-    POSIXError.swift
-    MachError.swift
 
-    "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+set(swiftDarwin_common_options
+      IS_SDK_OVERLAY
+      ${swift_platform_sources}
+      POSIXError.swift
+      MachError.swift
 
-    GYB_SOURCES
-      ${swift_platform_gyb_sources}
-      Darwin.swift.gyb
+      "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
-    SWIFT_COMPILE_FLAGS
-      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
-      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-      -Xfrontend -disable-objc-attr-requires-foundation-module
-      ${swift_platform_compile_flags}
-    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+      GYB_SOURCES
+        ${swift_platform_gyb_sources}
+        Darwin.swift.gyb
+
+      SWIFT_COMPILE_FLAGS
+        ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+        ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+        -Xfrontend -disable-objc-attr-requires-foundation-module
+        ${swift_platform_compile_flags}
+      LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+      DEPENDS ${darwin_depends})
+
+
+if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
+
+  set(swiftDarwin_common_bootstrapping_options
+      ${swiftDarwin_common_options}
+      SHARED
+      IS_STDLIB
+      SDK ${SWIFT_HOST_VARIANT_SDK}
+      ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
+      INSTALL_IN_COMPONENT "never_install")
+
+  add_swift_target_library_single(swiftDarwin-bootstrapping0 swiftDarwin
+      ${swiftDarwin_common_bootstrapping_options}
+      BOOTSTRAPPING 0)
+
+  add_swift_target_library_single(swiftDarwin-bootstrapping1 swiftDarwin
+      ${swiftDarwin_common_bootstrapping_options}
+      BOOTSTRAPPING 1)
+
+  add_dependencies(bootstrapping1-all swiftDarwin-bootstrapping1)
+  add_dependencies(bootstrapping0-all swiftDarwin-bootstrapping0)
+endif()
+
+add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
+    ${swiftDarwin_common_options}
     TARGET_SDKS "${swiftDarwin_target_sdks}"
-    INSTALL_IN_COMPONENT sdk-overlay
-
-    DEPENDS ${darwin_depends})
+    INSTALL_IN_COMPONENT sdk-overlay)
 
 set(swiftGlibc_target_sdks ANDROID CYGWIN FREEBSD OPENBSD LINUX HAIKU)
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "linux")

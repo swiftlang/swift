@@ -910,7 +910,7 @@ function(add_swift_host_tool executable)
 
         # At build time link against the built swift libraries from the
         # previous bootstrapping stage.
-        get_bootstrapping_swift_lib_dir(bs_lib_dir "${bootstrapping}")
+        get_bootstrapping_swift_lib_dir(bs_lib_dir "${ASHT_BOOTSTRAPPING}")
         target_link_directories(${executable} PRIVATE ${bs_lib_dir})
 
         # At runtime link against the built swift libraries from the current
@@ -979,7 +979,7 @@ function(add_swift_host_tool executable)
     elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
       # At build time link against the built swift libraries from the
       # previous bootstrapping stage.
-      get_bootstrapping_swift_lib_dir(bs_lib_dir "${bootstrapping}")
+      get_bootstrapping_swift_lib_dir(bs_lib_dir "${ASHT_BOOTSTRAPPING}")
       target_link_directories(${executable} PRIVATE ${bs_lib_dir})
 
       # At runtime link against the built swift libraries from the current
