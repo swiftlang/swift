@@ -127,13 +127,6 @@ Solution ConstraintSystem::finalize() {
 
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
-    // We shouldn't ever register disjunction choices multiple times,
-    // but saving and re-applying solutions can cause us to get
-    // multiple entries.  We should use an optimized PartialSolution
-    // structure for that use case, which would optimize a lot of
-    // stuff here.
-    assert(!solution.DisjunctionChoices.count(choice.first) ||
-           solution.DisjunctionChoices[choice.first] == choice.second);
     solution.DisjunctionChoices.insert(choice);
   }
 
@@ -240,7 +233,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
-    DisjunctionChoices.push_back(choice);
+    DisjunctionChoices.insert(choice);
   }
 
   // Remember all of the argument/parameter matching choices we made.

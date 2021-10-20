@@ -2384,8 +2384,7 @@ private:
 
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
-  std::vector<std::pair<ConstraintLocator*, unsigned>>
-      DisjunctionChoices;
+  llvm::MapVector<ConstraintLocator *, unsigned> DisjunctionChoices;
 
   /// A map from applied disjunction constraints to the corresponding
   /// argument function type.
@@ -4903,7 +4902,10 @@ private:
   /// Record a particular disjunction choice of
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
                                unsigned index) {
-    DisjunctionChoices.push_back({disjunctionLocator, index});
+    // We shouldn't ever register disjunction choices multiple times.
+    assert(!DisjunctionChoices.count(disjunctionLocator) ||
+           DisjunctionChoices[disjunctionLocator] == index);
+    DisjunctionChoices.insert({disjunctionLocator, index});
   }
 
   /// Filter the set of disjunction terms, keeping only those where the
