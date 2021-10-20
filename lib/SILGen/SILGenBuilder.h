@@ -385,6 +385,21 @@ public:
   using SILBuilder::createMarkDependence;
   ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
                                     ManagedValue base);
+
+  using SILBuilder::createBeginBorrow;
+  ManagedValue createBeginBorrow(SILLocation loc, ManagedValue value,
+                                 bool isLexical = false);
+
+  using SILBuilder::createMoveValue;
+  ManagedValue createMoveValue(SILLocation loc, ManagedValue value);
+
+  using SILBuilder::createOwnedMoveOnlyToCopyableValue;
+  ManagedValue createOwnedMoveOnlyToCopyableValue(SILLocation loc,
+                                                  ManagedValue value);
+
+  using SILBuilder::createGuaranteedMoveOnlyToCopyableValue;
+  ManagedValue createGuaranteedMoveOnlyToCopyableValue(SILLocation loc,
+                                                       ManagedValue value);
 };
 
 } // namespace Lowering
