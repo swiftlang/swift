@@ -1,5 +1,7 @@
 /// Round trip test for SIL with module aliasing
 
+// REQUIRES: rdar84436250
+
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
