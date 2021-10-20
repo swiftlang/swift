@@ -648,8 +648,8 @@ extension Unsafe${Mutable}BufferPointer {
 
     dstBase.initialize(repeating: repeatedValue, count: count)
   }
-  
-  /// Assigns every element in this buffer's memory to a copy of the given value.
+
+  /// Copies the given value to every element in this buffer's memory.
   ///
   /// The buffer’s memory must be initialized or the buffer's `Element`
   /// must be a trivial type. 
