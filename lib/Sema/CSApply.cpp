@@ -5825,16 +5825,14 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // for things like trailing closures and args to property wrapper params.
     arg.setLabel(param.getLabel());
 
-    // Determine whether the parameter is unsafe Sendable or MainActor, and
-    // record it as such.
-    bool isUnsafeSendable = paramInfo.isUnsafeSendable(paramIdx);
-    bool isMainActor = paramInfo.isUnsafeMainActor(paramIdx) ||
-        (isUnsafeSendable && apply && isMainDispatchQueue(apply->getFn()));
+    // Determine whether the closure argument should be treated as being on
+    // the main actor, having implicit self capture, or inheriting actor
+    // context.
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
     applyContextualClosureFlags(
-        argExpr, isUnsafeSendable && contextUsesConcurrencyFeatures(dc),
-        isMainActor, isImplicitSelfCapture, inheritsActorContext);
+        argExpr, false,
+        false, isImplicitSelfCapture, inheritsActorContext);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();

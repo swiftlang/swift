@@ -1324,7 +1324,8 @@ void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
 /// references to its function type from the given declaration context,
 /// update the given function type to include the global actor.
 AnyFunctionType *applyGlobalActorType(
-    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc);
+    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue);
 
 /// If \p attr was added by an access note, wraps the error in
 /// \c diag::wrap_invalid_attr_added_by_access_note and limits it as an access
