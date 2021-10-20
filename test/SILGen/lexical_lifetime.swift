@@ -11,6 +11,9 @@ final class C {
   init?(failably: ()) {}
 }
 
+@_silgen_name("getC")
+func getC() -> C { fatalError() }
+
 struct S {
   let c: C
 }
@@ -25,6 +28,8 @@ enum E {
 
 @_silgen_name("use_generic")
 func use_generic<T>(_ t: T) {}
+
+func rethrower(_ fn: () throws -> ()) rethrows { try fn() }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Declarations                                                               }}
@@ -127,6 +132,47 @@ func lexical_borrow_arg_class_addr(_ c: inout C) {
 @_silgen_name("lexical_borrow_arg_trivial")
 func lexical_borrow_arg_trivial(_ trivial: Trivial) {
   use_generic(trivial)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @lexical_borrow_around_nonthrowing_rethrow : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         try_apply {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+// CHECK:       [[NORMAL]]{{.*}}:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         return [[COPY]]
+// CHECK:       [[ERROR]]{{.*}}:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'lexical_borrow_around_nonthrowing_rethrow'
+@_silgen_name("lexical_borrow_around_nonthrowing_rethrow")
+func lexical_borrow_around_nonthrowing_rethrow() -> C {
+  let c = getC()
+  rethrower {}
+  return c
+}
+
+// CHECK-LABEL: sil hidden [ossa] @arg_lexical_borrow_around_nonthrowing_rethrow : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         try_apply {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+// CHECK:       [[NORMAL]]{{.*}}:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         return [[COPY]]
+// CHECK:       [[ERROR]]{{.*}}:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'arg_lexical_borrow_around_nonthrowing_rethrow'
+@_silgen_name("arg_lexical_borrow_around_nonthrowing_rethrow")
+func arg_lexical_borrow_around_nonthrowing_rethrow(_ c: __owned C) -> C {
+  rethrower {}
+  return c
 }
 
 ////////////////////////////////////////////////////////////////////////////////

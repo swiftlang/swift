@@ -1108,7 +1108,7 @@ void SILGenFunction::ForceTryEmission::finish() {
               },
               SGFContext());
     }
-    SGF.B.createUnreachable(Loc);
+    SGF.emitCleanupsAndCreateUnreachable(Loc);
   }
 
   // Prevent double-finishing and make the destructor a no-op.
@@ -5076,7 +5076,7 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
         auto boolTy = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
         auto trueV = failureBuilder.createIntegerLiteral(loc, boolTy, 1);
         failureBuilder.createCondFail(loc, trueV, "force unwrapped a nil value");
-        failureBuilder.createUnreachable(loc);
+        SGF.emitCleanupsAndCreateUnreachable(loc, &failureBuilder);
       }
     }
 

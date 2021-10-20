@@ -2159,6 +2159,12 @@ public:
   // Enter a cleanup to cancel and destroy an AsyncLet as it leaves the scope.
   CleanupHandle enterAsyncLetCleanup(SILValue alet, SILValue resultBuf);
 
+  /// Create an unreachable instruction, after first emitting all outstanding
+  /// cleanups.
+  void
+  emitCleanupsAndCreateUnreachable(SILLocation loc,
+                                   SILGenBuilder *builderSpecified = nullptr);
+
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, SGFAccessKind accessKind,
                     LValueOptions options = LValueOptions());

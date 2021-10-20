@@ -995,7 +995,7 @@ chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
 void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
                                         const FailureHandler &outerFailure) {
   if (clauses.rows() == 0) {
-    SGF.B.createUnreachable(SILLocation(PatternMatchStmt));
+    SGF.emitCleanupsAndCreateUnreachable(PatternMatchStmt);
     return;
   }
 
@@ -2777,7 +2777,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   // Emit an unreachable in place of the switch statement.
   if (subjectTy->isStructurallyUninhabited()) {
     emitIgnoredExpr(S->getSubjectExpr());
-    B.createUnreachable(S);
+    emitCleanupsAndCreateUnreachable(S);
     return;
   }
 
@@ -2897,7 +2897,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     // over an @objc enum, which may contain any value of its underlying type,
     // or a switch over a non-frozen Swift enum when the user hasn't written a
     // catch-all case.
-    SWIFT_DEFER { B.createUnreachable(location); };
+    SWIFT_DEFER { emitCleanupsAndCreateUnreachable(location); };
 
     // Special case: if it's a single @objc enum, we can print the raw value.
     if (unexpectedEnumCaseInfo.isSingleObjCEnum()) {
@@ -3146,7 +3146,7 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
     // logic is emitting an unreachable block but didn't prune the failure BB.
     // Mark it as such.
     if (!ThrowDest.isValid()) {
-      B.createUnreachable(S);
+      emitCleanupsAndCreateUnreachable(S);
       return;
     }
 

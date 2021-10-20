@@ -86,7 +86,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
   // return, then we
   // are not allowed to fall off the end of the function and can't reach here.
   if (SGF.NeedsReturn && SGF.B.hasValidInsertionPoint())
-    SGF.B.createUnreachable(implicitReturnFromTopLevel);
+    SGF.emitCleanupsAndCreateUnreachable(implicitReturnFromTopLevel);
 
   if (epilogBB->pred_empty()) {
     // If the epilog was not branched to at all, kill the BB and

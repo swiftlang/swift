@@ -787,7 +787,7 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
     // isn't valid to fall off into the normal flow.  To model this, we emit
     // an unreachable instruction and then have SIL diagnostic check this.
     if (SGF.B.hasValidInsertionPoint())
-      SGF.B.createUnreachable(S);
+      SGF.emitCleanupsAndCreateUnreachable(S);
   }
 
   // Emit the condition bindings, branching to the bodyBB if they fail.
@@ -1535,7 +1535,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.
   if (suppressErrorPath) {
-    B.createUnreachable(loc);
+    emitCleanupsAndCreateUnreachable(loc);
     return destBB;
   }
 

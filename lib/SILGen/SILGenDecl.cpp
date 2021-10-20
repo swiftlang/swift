@@ -1566,6 +1566,14 @@ CleanupHandle SILGenFunction::enterAsyncLetCleanup(SILValue alet,
   return Cleanups.getTopCleanup();
 }
 
+void SILGenFunction::emitCleanupsAndCreateUnreachable(
+    SILLocation loc, SILGenBuilder *builderSpecified) {
+  SILGenBuilder *builder = builderSpecified ? builderSpecified : &B;
+  if (getASTContext().SILOpts.EnableExperimentalLexicalLifetimes)
+    Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
+  builder->createUnreachable(loc);
+}
+
 /// Create a LocalVariableInitialization for the uninitialized var.
 InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(
     VarDecl *vd, Optional<MarkUninitializedInst::Kind> kind, unsigned ArgNo) {

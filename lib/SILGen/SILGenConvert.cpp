@@ -238,7 +238,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                                 SGFContext());
   }
 
-  B.createUnreachable(ArtificialUnreachableLocation());
+  emitCleanupsAndCreateUnreachable(ArtificialUnreachableLocation());
   B.clearInsertionPoint();
   B.emitBlock(contBB);
 
