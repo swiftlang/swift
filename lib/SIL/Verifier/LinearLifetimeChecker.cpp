@@ -161,12 +161,12 @@ struct State {
   /// Once we have setup all of our consuming/non-consuming blocks and have
   /// validated that all intra-block dataflow is safe, perform the inter-block
   /// dataflow.
-  void performDataflow(DeadEndBlocks &deBlocks);
+  void performDataflow(DeadEndBlocks *deBlocks);
 
   /// After we have performed the dataflow, check the end state of our dataflow
   /// for validity. If this is a linear typed value, return true. Return false
   /// otherwise.
-  void checkDataflowEndState(DeadEndBlocks &deBlocks);
+  void checkDataflowEndState(DeadEndBlocks *deBlocks);
 
   void dumpConsumingUsers() const {
     llvm::errs() << "Consuming Users:\n";
@@ -409,7 +409,7 @@ void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
 //                                  Dataflow
 //===----------------------------------------------------------------------===//
 
-void State::performDataflow(DeadEndBlocks &deBlocks) {
+void State::performDataflow(DeadEndBlocks *deBlocks) {
   LLVM_DEBUG(llvm::dbgs() << "    Beginning to check dataflow constraints\n");
   // Until the worklist is empty...
   while (!worklist.empty()) {
@@ -445,7 +445,7 @@ void State::performDataflow(DeadEndBlocks &deBlocks) {
 
       // Then check if the successor is a transitively unreachable block. In
       // such a case, we ignore it since we are going to leak along that path.
-      if (deBlocks.isDeadEnd(succBlock))
+      if (deBlocks && deBlocks->isDeadEnd(succBlock))
         continue;
 
       // Otherwise, add the successor to our SuccessorBlocksThatMustBeVisited
@@ -482,7 +482,7 @@ void State::performDataflow(DeadEndBlocks &deBlocks) {
   }
 }
 
-void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
+void State::checkDataflowEndState(DeadEndBlocks *deBlocks) {
   if (!successorBlocksThatMustBeVisited.empty()) {
     // If we are asked to store any leaking blocks, put them in the leaking
     // blocks array.
@@ -517,7 +517,7 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
   // be a use-before-def or a use-after-free.
   for (auto pair : blocksWithNonConsumingUses.getRange()) {
     auto *block = pair.first;
-    if (deBlocks.isDeadEnd(block)) {
+    if (deBlocks && deBlocks->isDeadEnd(block)) {
       continue;
     }
 
@@ -600,7 +600,7 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     for (auto *use : nonConsumingUses) {
       auto *useParent = use->getUser()->getParent();
       if (useParent == value->getParentBlock() ||
-          deadEndBlocks.isDeadEnd(useParent)) {
+          (deadEndBlocks && deadEndBlocks->isDeadEnd(useParent))) {
         continue;
       }
 
