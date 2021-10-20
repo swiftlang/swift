@@ -4056,6 +4056,39 @@ static Type applyUnsafeConcurrencyToParameterType(
                                .withGlobalActor(globalActor));
 }
 
+/// Determine whether the given name is that of a DispatchQueue operation that
+/// takes a closure to be executed on the queue.
+bool swift::isDispatchQueueOperationName(StringRef name) {
+  return llvm::StringSwitch<bool>(name)
+    .Case("sync", true)
+    .Case("async", true)
+    .Case("asyncAndWait", true)
+    .Case("asyncAfter", true)
+    .Case("concurrentPerform", true)
+    .Default(false);
+}
+
+/// Determine whether this function is implicitly known to have its
+/// parameters of function type be @_unsafeSendable.
+///
+/// This hard-codes knowledge of a number of functions that will
+/// eventually have @_unsafeSendable and, eventually, @Sendable,
+/// on their parameters of function type.
+static bool hasKnownUnsafeSendableFunctionParams(AbstractFunctionDecl *func) {
+  auto nominal = func->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  // DispatchQueue operations.
+  auto nominalName = nominal->getName().str();
+  if (nominalName == "DispatchQueue") {
+    auto name = func->getBaseName().userFacingName();
+    return isDispatchQueueOperationName(name);
+  }
+
+  return false;
+}
+
 /// Apply @_unsafeSendable and @_unsafeMainActor to the parameters of the
 /// given function.
 static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
@@ -4079,6 +4112,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   auto typeParams = fnType->getParams();
   auto paramDecls = func->getParameters();
   assert(typeParams.size() == paramDecls->size());
+  bool knownUnsafeParams = hasKnownUnsafeSendableFunctionParams(func);
   for (unsigned index : indices(typeParams)) {
     auto param = typeParams[index];
     auto paramDecl = (*paramDecls)[index];
@@ -4089,12 +4123,11 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     // application.
     bool isSendable =
         (paramDecl->getAttrs().hasAttribute<UnsafeSendableAttr>() ||
-         func->hasKnownUnsafeSendableFunctionParams()) &&
+         knownUnsafeParams) &&
         inConcurrencyContext;
     bool isMainActor =
         (paramDecl->getAttrs().hasAttribute<UnsafeMainActorAttr>() ||
-         (isMainDispatchQueue &&
-          func->hasKnownUnsafeSendableFunctionParams())) &&
+         (isMainDispatchQueue && knownUnsafeParams)) &&
         (inConcurrencyContext || numApplies >= 1);
 
     if (!isSendable && !isMainActor) {
@@ -4109,7 +4142,6 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     if (newTypeParams.empty()) {
       newTypeParams.append(typeParams.begin(), typeParams.begin() + index);
     }
-
 
     // Transform the parameter type.
     Type newParamType = applyUnsafeConcurrencyToParameterType(
@@ -4140,7 +4172,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
       outerFnType->getParams(), Type(fnType), outerFnType->getExtInfo());
 }
 
-AnyFunctionType *swift::applyGlobalActorType(
+AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc,
     unsigned numApplies, bool isMainDispatchQueue) {
   // Apply unsafe concurrency features to the given function type.

@@ -18,6 +18,7 @@
 #include "CSDiagnostics.h"
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1356,7 +1357,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         ->castTo<AnyFunctionType>();
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(value, false, functionRefKind);
-      funcType = applyGlobalActorType(funcType, func, useDC, numApplies, false);
+      funcType = adjustFunctionTypeForConcurrency(funcType, func, useDC, numApplies, false);
     }
     auto openedType = openFunctionType(
         funcType, locator, replacements, func->getDeclContext());
@@ -1389,7 +1390,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(
           funcDecl, false, functionRefKind);
-      funcType = applyGlobalActorType(
+      funcType = adjustFunctionTypeForConcurrency(
           funcType, funcDecl, useDC, numApplies, false);
     }
 
@@ -1658,18 +1659,6 @@ Type constraints::getDynamicSelfReplacementType(
       ->getMetatypeInstanceType();
 }
 
-/// Determine whether the given name is that of a DispatchQueue operation that
-/// takes a closure to be executed on the queue.
-static bool isDispatchQueueOperationName(StringRef name) {
-  return llvm::StringSwitch<bool>(name)
-    .Case("sync", true)
-    .Case("async", true)
-    .Case("asyncAndWait", true)
-    .Case("asyncAfter", true)
-    .Case("concurrentPerform", true)
-    .Default(false);
-}
-
 /// Determine whether this locator refers to a member of "DispatchQueue.main",
 /// which is a special dispatch queue that executes its work on the main actor.
 static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
@@ -1804,7 +1793,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(
           value, hasAppliedSelf, functionRefKind);
-      funcType = applyGlobalActorType(
+      funcType = adjustFunctionTypeForConcurrency(
           funcType, value, useDC, numApplies,
           isMainDispatchQueueMember(locator));
     }
