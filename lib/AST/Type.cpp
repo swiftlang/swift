@@ -928,36 +928,12 @@ static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
   return paramType->is<AnyFunctionType>();
 }
 
-/// Determine whether the parameter is contextually Sendable.
-static bool isParamUnsafeSendable(const ParamDecl *param) {
-  // Check for @_unsafeSendable.
-  if (param->getAttrs().hasAttribute<UnsafeSendableAttr>())
-    return true;
-
-  // Check that the parameter is of function type.
-  Type paramType = param->isVariadic() ? param->getVarargBaseTy()
-                                       : param->getInterfaceType();
-  paramType = paramType->getRValueType()->lookThroughAllOptionalTypes();
-  if (!paramType->is<FunctionType>())
-    return false;
-
-  // Check whether this function is known to have @_unsafeSendable function
-  // parameters.
-  auto func = dyn_cast<AbstractFunctionDecl>(param->getDeclContext());
-  if (!func)
-    return false;
-
-  return func->hasKnownUnsafeSendableFunctionParams();
-}
-
 ParameterListInfo::ParameterListInfo(
     ArrayRef<AnyFunctionType::Param> params,
     const ValueDecl *paramOwner,
     bool skipCurriedSelf) {
   defaultArguments.resize(params.size());
   propertyWrappers.resize(params.size());
-  unsafeSendable.resize(params.size());
-  unsafeMainActor.resize(params.size());
   implicitSelfCapture.resize(params.size());
   inheritActorContext.resize(params.size());
 
@@ -1012,14 +988,6 @@ ParameterListInfo::ParameterListInfo(
       propertyWrappers.set(i);
     }
 
-    if (isParamUnsafeSendable(param)) {
-      unsafeSendable.set(i);
-    }
-
-    if (param->getAttrs().hasAttribute<UnsafeMainActorAttr>()) {
-      unsafeMainActor.set(i);
-    }
-
     if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>()) {
       implicitSelfCapture.set(i);
     }
@@ -1045,18 +1013,6 @@ bool ParameterListInfo::hasExternalPropertyWrapper(unsigned paramIdx) const {
   return paramIdx < propertyWrappers.size() ? propertyWrappers[paramIdx] : false;
 }
 
-bool ParameterListInfo::isUnsafeSendable(unsigned paramIdx) const {
-  return paramIdx < unsafeSendable.size()
-      ? unsafeSendable[paramIdx]
-      : false;
-}
-
-bool ParameterListInfo::isUnsafeMainActor(unsigned paramIdx) const {
-  return paramIdx < unsafeMainActor.size()
-      ? unsafeMainActor[paramIdx]
-      : false;
-}
-
 bool ParameterListInfo::isImplicitSelfCapture(unsigned paramIdx) const {
   return paramIdx < implicitSelfCapture.size()
       ? implicitSelfCapture[paramIdx]
@@ -1070,8 +1026,7 @@ bool ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
 }
 
 bool ParameterListInfo::anyContextualInfo() const {
-  return unsafeSendable.any() || unsafeMainActor.any() ||
-      implicitSelfCapture.any() || inheritActorContext.any();
+  return implicitSelfCapture.any() || inheritActorContext.any();
 }
 
 /// Turn a param list into a symbolic and printable representation that does not

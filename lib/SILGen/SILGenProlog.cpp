@@ -583,10 +583,7 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
       break;
     }
   } else if (auto *closureExpr = dyn_cast<AbstractClosureExpr>(FunctionDC)) {
-    bool wantExecutor = F.isAsync() ||
-      (wantDataRaceChecks &&
-       !(isa<ClosureExpr>(closureExpr) &&
-         cast<ClosureExpr>(closureExpr)->isUnsafeMainActor()));
+    bool wantExecutor = F.isAsync() || wantDataRaceChecks;
     auto actorIsolation = closureExpr->getActorIsolation();
     switch (actorIsolation.getKind()) {
     case ClosureActorIsolation::Independent:

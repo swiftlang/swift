@@ -32,8 +32,8 @@ public actor MyActor {
     }
   }
 
-  // CHECK-RAW-LABEL: sil private [ossa] @$s4test7MyActorC0A10UnsafeMainyyFSiycfU_
-  // CHECK-RAW-NOT: _checkExpectedExecutor
+  // CHECK-RAW-LABEL: sil private [ossa] @$s4test7MyActorC0A10UnsafeMainyyFSiyScMYccfU_
+  // CHECK-RAW: _checkExpectedExecutor
   // CHECK-RAW: onMainActor
   // CHECK-RAW: return
   public func testUnsafeMain() {
