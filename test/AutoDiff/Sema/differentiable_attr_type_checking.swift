@@ -191,6 +191,7 @@ func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
   return x
 }
 
+// expected-error @+1 {{'@differentiable' attribute does not yet support layout requirements}}
 @differentiable(reverse where T: AnyObject)
 func invalidAnyObjectRequirement<T: Differentiable>(x: T) -> T {
   return x
