@@ -136,6 +136,9 @@ ERROR(error_mode_cannot_emit_module_semantic_info,none,
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "the -experimental-skip-*-function-bodies* flags do not support "
       "emitting IR", ())
+ERROR(cannot_emit_ir_checking_api_availability_only,none,
+      "the flag -check-api-availability-only does not support "
+      "emitting IR", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
         "ignoring -emit-reference-dependencies (requires -primary-file)", ())
