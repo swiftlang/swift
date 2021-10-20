@@ -36,6 +36,14 @@ namespace swift {
 
 /// Abstract base class. Implements all canonicalization transforms. Extended by
 /// passes to be notified of each SIL modification.
+///
+/// TODO: Instead of InstModCallbacks, let the client pass in an
+/// InstructionDeleter. The only callback that is needed is
+/// onDelete. notifyNewInstruction and notifyHasNewUsers are called directly
+/// below. Instead if calling kill instruction, call
+/// deleter.forceDelete(). Clients can install a deletion callback in the
+/// deleter if they really need to. Clients can choose to call
+/// deleter.cleanupDeadInstructions() whenever they want.
 struct CanonicalizeInstruction {
   // May be overriden by passes.
   static constexpr const char *defaultDebugType = "sil-canonicalize";
@@ -91,6 +99,9 @@ struct CanonicalizeInstruction {
   ///
   /// Warning: If the \p inst argument is killed and the client immediately
   /// erases \p inst, then it may be an invalid pointer upon return.
+  ///
+  /// TODO: remove the iterator return value. The client can use an updating
+  /// iterator instead.
   SILBasicBlock::iterator canonicalize(SILInstruction *inst);
 
   /// Record a newly generated instruction.
