@@ -104,23 +104,22 @@ public:
   static ReachingBlockMatrix allocateMatrix(unsigned numBlocks) {
     ReachingBlockMatrix m;
     m.numBitWords = numBitWordsForNumBlocks(numBlocks);
-    m.bits = new uint64_t[numBlocks * m.numBitWords];
-    memset(m.bits, 0, numBlocks * m.numBitWords * sizeof(uint64_t));
+    m.bits = static_cast<uint64_t *>(calloc(numBlocks * m.numBitWords, sizeof(uint64_t)));
     return m;
   }
   static void deallocateMatrix(ReachingBlockMatrix &m) {
-    delete[] m.bits;
+    free(m.bits);
     m.bits = nullptr;
     m.numBitWords = 0;
   }
   static ReachingBlockSet allocateSet(unsigned numBlocks) {
     ReachingBlockSet s;
     s.numBitWords = numBitWordsForNumBlocks(numBlocks);
-    s.bits = new uint64_t[s.numBitWords];
+    s.bits = static_cast<uint64_t *>(calloc(s.numBitWords, sizeof(uint64_t)));
     return s;
   }
   static void deallocateSet(ReachingBlockSet &s) {
-    delete[] s.bits;
+    free(s.bits);
     s.bits = nullptr;
     s.numBitWords = 0;
   }

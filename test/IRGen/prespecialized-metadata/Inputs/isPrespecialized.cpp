@@ -49,9 +49,9 @@ bool isStaticallySpecializedGenericMetadata(void *ptr) {
 void allocateDirtyAndFreeChunk(void) {
   uintptr_t ChunkSize = 16 * 1024;
 
-  char *allocation = new char[ChunkSize];
+  char *allocation = static_cast<char *>(malloc(ChunkSize));
 
-  memset(allocation, 255, ChunkSize);
+  memset(allocation, 0xff, ChunkSize);
 
-  delete[] allocation;
+  free(allocation);
 }

@@ -2933,16 +2933,17 @@ initGenericObjCClass(ClassMetadata *self, size_t numFields,
   const unsigned NumInlineGlobalIvarOffsets = 8;
   size_t *_inlineGlobalIvarOffsets[NumInlineGlobalIvarOffsets];
   size_t **_globalIvarOffsets = nullptr;
-  auto getGlobalIvarOffsets = [&]() -> size_t** {
+  auto getGlobalIvarOffsets = [&]() -> size_t ** {
     if (!_globalIvarOffsets) {
-      if (numFields <= NumInlineGlobalIvarOffsets) {
-        _globalIvarOffsets = _inlineGlobalIvarOffsets;
+      if (numFields > NumInlineGlobalIvarOffsets) {
+        // Make sure all the entries start out null.
+        _globalIvarOffsets =
+            static_cast<size_t **>(calloc(numFields, sizeof(size_t *)));
       } else {
-        _globalIvarOffsets = new size_t*[numFields];
+        _globalIvarOffsets = _inlineGlobalIvarOffsets;
+        // Make sure all the entries start out null.
+        memset(_globalIvarOffsets, 0, sizeof(size_t *) * numFields);
       }
-
-      // Make sure all the entries start out null.
-      memset(_globalIvarOffsets, 0, sizeof(size_t*) * numFields);
     }
     return _globalIvarOffsets;
   };
@@ -3002,7 +3003,7 @@ initGenericObjCClass(ClassMetadata *self, size_t numFields,
 
     // Free the out-of-line if we allocated one.
     if (_globalIvarOffsets != _inlineGlobalIvarOffsets) {
-      delete [] _globalIvarOffsets;
+      free(_globalIvarOffsets);
     }
   }
 
