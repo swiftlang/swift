@@ -35,6 +35,12 @@ inline bool requiresOSSACleanup(SILValue v) {
     && v.getOwnershipKind() != OwnershipKind::Unowned;
 }
 
+/// Insert a lifetime-ending instruction on every path to complete the OSSA
+/// lifetime of \p value.
+///
+/// Returns true if any new instructions were created to complete the lifetime.
+bool completeOSSALifetime(SILValue value);
+
 /// Rewrite the lifetime of \p ownedValue to match \p lifetimeBoundary. This may
 /// insert copies at forwarding consumes, including phis.
 ///
