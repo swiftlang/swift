@@ -521,9 +521,6 @@ static bool isSendableClosure(
     if (forActorIsolation && explicitClosure->inheritsActorContext()) {
       return false;
     }
-
-    if (explicitClosure->isUnsafeSendable())
-      return true;
   }
 
   if (auto type = closure->getType()) {
@@ -2578,12 +2575,6 @@ namespace {
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
         if (Type globalActorType = resolveGlobalActorType(explicitClosure))
           return ClosureActorIsolation::forGlobalActor(globalActorType);
-
-        if (explicitClosure->isUnsafeMainActor()) {
-          ASTContext &ctx = closure->getASTContext();
-          if (Type mainActor = ctx.getMainActorType())
-            return ClosureActorIsolation::forGlobalActor(mainActor);
-        }
       }
 
       // Sendable closures are actor-independent unless the closure has
@@ -4035,8 +4026,151 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
   return formConformance(nullptr);
 }
 
-AnyFunctionType *swift::applyGlobalActorType(
-    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc) {
+/// Apply @Sendable and/or @MainActor to the given parameter type.
+static Type applyUnsafeConcurrencyToParameterType(
+    Type type, bool sendable, bool mainActor) {
+  if (Type objectType = type->getOptionalObjectType()) {
+    return OptionalType::get(
+        applyUnsafeConcurrencyToParameterType(objectType, sendable, mainActor));
+  }
+
+  auto fnType = type->getAs<FunctionType>();
+  if (!fnType)
+    return type;
+
+  Type globalActor;
+  if (mainActor)
+    globalActor = type->getASTContext().getMainActorType();
+
+  return fnType->withExtInfo(fnType->getExtInfo()
+                               .withConcurrent(sendable)
+                               .withGlobalActor(globalActor));
+}
+
+/// Determine whether the given name is that of a DispatchQueue operation that
+/// takes a closure to be executed on the queue.
+bool swift::isDispatchQueueOperationName(StringRef name) {
+  return llvm::StringSwitch<bool>(name)
+    .Case("sync", true)
+    .Case("async", true)
+    .Case("asyncAndWait", true)
+    .Case("asyncAfter", true)
+    .Case("concurrentPerform", true)
+    .Default(false);
+}
+
+/// Determine whether this function is implicitly known to have its
+/// parameters of function type be @_unsafeSendable.
+///
+/// This hard-codes knowledge of a number of functions that will
+/// eventually have @_unsafeSendable and, eventually, @Sendable,
+/// on their parameters of function type.
+static bool hasKnownUnsafeSendableFunctionParams(AbstractFunctionDecl *func) {
+  auto nominal = func->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  // DispatchQueue operations.
+  auto nominalName = nominal->getName().str();
+  if (nominalName == "DispatchQueue") {
+    auto name = func->getBaseName().userFacingName();
+    return isDispatchQueueOperationName(name);
+  }
+
+  return false;
+}
+
+/// Apply @_unsafeSendable and @_unsafeMainActor to the parameters of the
+/// given function.
+static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
+    AnyFunctionType *fnType, ValueDecl *funcOrEnum,
+    bool inConcurrencyContext, unsigned numApplies, bool isMainDispatchQueue) {
+  // Only functions can have @_unsafeSendable/@_unsafeMainActor parameters.
+  auto func = dyn_cast<AbstractFunctionDecl>(funcOrEnum);
+  if (!func)
+    return fnType;
+
+  AnyFunctionType *outerFnType = nullptr;
+  if (func->hasImplicitSelfDecl()) {
+    outerFnType = fnType;
+    fnType = outerFnType->getResult()->castTo<AnyFunctionType>();
+
+    if (numApplies > 0)
+      --numApplies;
+  }
+
+  SmallVector<AnyFunctionType::Param, 4> newTypeParams;
+  auto typeParams = fnType->getParams();
+  auto paramDecls = func->getParameters();
+  assert(typeParams.size() == paramDecls->size());
+  bool knownUnsafeParams = hasKnownUnsafeSendableFunctionParams(func);
+  for (unsigned index : indices(typeParams)) {
+    auto param = typeParams[index];
+    auto paramDecl = (*paramDecls)[index];
+
+    // Determine whether the resulting parameter should be @Sendable or
+    // @MainActor. @Sendable occurs only in concurrency contents, while
+    // @MainActor occurs in concurrency contexts or those where we have an
+    // application.
+    bool isSendable =
+        (paramDecl->getAttrs().hasAttribute<UnsafeSendableAttr>() ||
+         knownUnsafeParams) &&
+        inConcurrencyContext;
+    bool isMainActor =
+        (paramDecl->getAttrs().hasAttribute<UnsafeMainActorAttr>() ||
+         (isMainDispatchQueue && knownUnsafeParams)) &&
+        (inConcurrencyContext || numApplies >= 1);
+
+    if (!isSendable && !isMainActor) {
+      // If any prior parameter has changed, record this one.
+      if (!newTypeParams.empty())
+        newTypeParams.push_back(param);
+      continue;
+    }
+
+    // If this is the first parameter to have changed, copy all of the others
+    // over.
+    if (newTypeParams.empty()) {
+      newTypeParams.append(typeParams.begin(), typeParams.begin() + index);
+    }
+
+    // Transform the parameter type.
+    Type newParamType = applyUnsafeConcurrencyToParameterType(
+        param.getPlainType(), isSendable, isMainActor);
+    newTypeParams.push_back(param.withType(newParamType));
+  }
+
+  // If we didn't change any parameters, we're done.
+  if (newTypeParams.empty()) {
+    return outerFnType ? outerFnType : fnType;
+  }
+
+  // Rebuild the (inner) function type.
+  fnType = FunctionType::get(
+      newTypeParams, fnType->getResult(), fnType->getExtInfo());
+
+  if (!outerFnType)
+    return fnType;
+
+  // Rebuild the outer function type.
+  if (auto genericFnType = dyn_cast<GenericFunctionType>(outerFnType)) {
+    return GenericFunctionType::get(
+        genericFnType->getGenericSignature(), outerFnType->getParams(),
+        Type(fnType), outerFnType->getExtInfo());
+  }
+
+  return FunctionType::get(
+      outerFnType->getParams(), Type(fnType), outerFnType->getExtInfo());
+}
+
+AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
+    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue) {
+  // Apply unsafe concurrency features to the given function type.
+  fnType = applyUnsafeConcurrencyToFunctionType(
+      fnType, funcOrEnum, contextUsesConcurrencyFeatures(dc), numApplies,
+      isMainDispatchQueue);
+
   Type globalActorType;
   switch (auto isolation = getActorIsolation(funcOrEnum)) {
   case ActorIsolation::ActorInstance:

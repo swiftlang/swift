@@ -18,6 +18,7 @@
 #include "CSDiagnostics.h"
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1255,6 +1256,24 @@ static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
   llvm_unreachable("Unhandled FunctionRefKind in switch.");
 }
 
+/// Determine the number of applications
+static unsigned getNumApplications(
+    ValueDecl *decl, bool hasAppliedSelf, FunctionRefKind functionRefKind) {
+  switch (functionRefKind) {
+  case FunctionRefKind::Unapplied:
+  case FunctionRefKind::Compound:
+    return 0 + hasAppliedSelf;
+
+  case FunctionRefKind::SingleApply:
+    return 1 + hasAppliedSelf;
+
+  case FunctionRefKind::DoubleApply:
+    return 2;
+  }
+
+  llvm_unreachable("Unhandled FunctionRefKind in switch.");
+}
+
 /// Replaces property wrapper types in the parameter list of the given function type
 /// with the wrapped-value or projected-value types (depending on argument label).
 static FunctionType *
@@ -1336,8 +1355,10 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     AnyFunctionType *funcType = func->getInterfaceType()
         ->castTo<AnyFunctionType>();
-    if (!isRequirementOrWitness(locator))
-      funcType = applyGlobalActorType(funcType, func, useDC);
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(value, false, functionRefKind);
+      funcType = adjustFunctionTypeForConcurrency(funcType, func, useDC, numApplies, false);
+    }
     auto openedType = openFunctionType(
         funcType, locator, replacements, func->getDeclContext());
 
@@ -1366,8 +1387,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
-    if (!isRequirementOrWitness(locator))
-      funcType = applyGlobalActorType(funcType, funcDecl, useDC);
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(
+          funcDecl, false, functionRefKind);
+      funcType = adjustFunctionTypeForConcurrency(
+          funcType, funcDecl, useDC, numApplies, false);
+    }
 
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
@@ -1634,6 +1659,60 @@ Type constraints::getDynamicSelfReplacementType(
       ->getMetatypeInstanceType();
 }
 
+/// Determine whether this locator refers to a member of "DispatchQueue.main",
+/// which is a special dispatch queue that executes its work on the main actor.
+static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
+  if (!locator)
+    return false;
+
+  if (locator->getPath().size() != 1 ||
+      !locator->isLastElement<LocatorPathElt::Member>())
+    return false;
+
+  auto expr = locator->getAnchor().dyn_cast<Expr *>();
+  if (!expr)
+    return false;
+
+  auto outerUnresolvedDot = dyn_cast<UnresolvedDotExpr>(expr);
+  if (!outerUnresolvedDot)
+    return false;
+
+
+  if (!isDispatchQueueOperationName(
+          outerUnresolvedDot->getName().getBaseName().userFacingName()))
+    return false;
+
+  auto innerUnresolvedDot = dyn_cast<UnresolvedDotExpr>(
+      outerUnresolvedDot->getBase());
+  if (!innerUnresolvedDot)
+    return false;
+
+  if (innerUnresolvedDot->getName().getBaseName().userFacingName() != "main")
+    return false;
+
+  auto typeExpr = dyn_cast<TypeExpr>(innerUnresolvedDot->getBase());
+  if (!typeExpr)
+    return false;
+
+  auto typeRepr = typeExpr->getTypeRepr();
+  if (!typeRepr)
+    return false;
+
+  auto identTypeRepr = dyn_cast<IdentTypeRepr>(typeRepr);
+  if (!identTypeRepr)
+    return false;
+
+  auto components = identTypeRepr->getComponentRange();
+  if (components.empty())
+    return false;
+
+  if (components.back()->getNameRef().getBaseName().userFacingName() !=
+        "DispatchQueue")
+    return false;
+
+  return true;
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
@@ -1711,8 +1790,13 @@ ConstraintSystem::getTypeOfMemberReference(
     // This is the easy case.
     funcType = value->getInterfaceType()->castTo<AnyFunctionType>();
 
-    if (!isRequirementOrWitness(locator))
-      funcType = applyGlobalActorType(funcType, value, useDC);
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(
+          value, hasAppliedSelf, functionRefKind);
+      funcType = adjustFunctionTypeForConcurrency(
+          funcType, value, useDC, numApplies,
+          isMainDispatchQueueMember(locator));
+    }
   } else {
     // For a property, build a type (Self) -> PropType.
     // For a subscript, build a type (Self) -> (Indices...) -> ElementType.
