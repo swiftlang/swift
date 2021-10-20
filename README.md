@@ -122,7 +122,7 @@ On macOS if one wants to install such a toolchain into Xcode:
 ```
 
 The script also generates an archive containing debug symbols which
-can be installed over the main archive allowing symbolication of any
+can be installed over the main archive allowing symbolization of any
 compiler crashes.
 
 ```
