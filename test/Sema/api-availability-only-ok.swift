@@ -12,6 +12,9 @@
 public protocol NewProto {}
 
 @available(macOS 11.0, *)
+public struct NewStruct {}
+
+@available(macOS 11.0, *)
 public func newFunc() {}
 
 @available(macOS 11.0, *)
@@ -57,6 +60,10 @@ public struct Struct {
   internal var internalVar: NewProto
   private var privateVar: NewProto
   fileprivate var fileprivateVar: NewProto
+
+  internal var internalAssigned = NewStruct()
+  private var privateAssigned = NewStruct()
+  fileprivate var fileprivateAssigned = NewStruct()
 
   @available(macOS 11.0, *)
   public typealias PubTA = NewProto
