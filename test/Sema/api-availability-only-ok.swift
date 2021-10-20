@@ -3,7 +3,7 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %swiftc_driver -emit-module %s -target x86_64-apple-macosx10.15 -emit-module-interface -emit-module-interface-path %t/main.swiftinterface -enable-library-evolution -Xfrontend -check-api-availability-only -verify-emitted-module-interface
+// RUN: %swiftc_driver -emit-module %s -target %target-cpu-apple-macosx10.15 -emit-module-interface -emit-module-interface-path %t/main.swiftinterface -enable-library-evolution -Xfrontend -check-api-availability-only -verify-emitted-module-interface
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/main.swiftinterface
 
 // REQUIRES: OS=macosx
