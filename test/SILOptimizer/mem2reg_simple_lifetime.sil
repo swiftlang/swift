@@ -1,0 +1,451 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-experimental-lexical-lifetimes %s -mem2reg | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// func foo(v : Int) -> Int {
+//   var x : Int = 0
+//   if v == 3 { x = 3 } else {
+//     if (v == 2) { x = 2 }
+//   }
+//   var i : Int = 0
+//   while (i < 10) { i = i+1 }
+//   return x
+// }
+
+// CHECK: sil [ossa] @place_phi :
+// CHECK-NOT: alloc_stack
+sil [ossa] @place_phi : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack [lexical] $Int64, var, name "v"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_stack [lexical] $Int64, var, name "x"
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3 : $*Int64
+  %7 = integer_literal $Builtin.Int64, 3
+  %9 = struct_extract %0 : $Int64, #Int64._value
+  %10 = builtin "cmp_eq_Int64"(%9 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %10, bb1, bb2
+
+bb1:
+  %12 = struct $Int64 (%7 : $Builtin.Int64)
+  store %12 to [trivial] %3 : $*Int64
+  br bb6
+
+bb2:
+  %15 = integer_literal $Builtin.Int64, 2
+  %16 = builtin "cmp_eq_Int64"(%9 : $Builtin.Int64, %15 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %16, bb3, bb4
+
+bb3:
+  %18 = struct $Int64 (%15 : $Builtin.Int64)
+  store %18 to [trivial] %3 : $*Int64
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  br bb6
+
+// CHECK: bb6([[PHI:%[0-9]+]] : $Int64):
+// CHECK-NOT: alloc_stack
+bb6:
+  %22 = alloc_stack [lexical] $Int64, var, name "i"
+  store %5 to [trivial] %22 : $*Int64
+  br bb7
+
+// CHECK: bb7([[PHI2:%[0-9]+]] : $Int64):
+bb7:
+  // CHECK: struct_extract [[PHI2]]
+  %25 = struct_element_addr %22 : $*Int64, #Int64._value
+  %26 = load [trivial] %25 : $*Builtin.Int64
+  %27 = integer_literal $Builtin.Int64, 10
+  %29 = builtin "cmp_slt_Int64"(%26 : $Builtin.Int64, %27 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %29, bb8, bb9
+
+bb8:
+  // CHECK: struct_extract [[PHI2]]
+  %31 = struct_element_addr %22 : $*Int64, #Int64._value
+  %32 = load [trivial] %31 : $*Builtin.Int64
+  %33 = integer_literal $Builtin.Int64, 1
+  %35 = builtin "sadd_with_overflow_Int64"(%32 : $Builtin.Int64, %33 : $Builtin.Int64, %29 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %36 = tuple_extract %35 : $(Builtin.Int64, Builtin.Int1), 0
+  %37 = tuple_extract %35 : $(Builtin.Int64, Builtin.Int1), 1
+  %38 = struct $Int64 (%36 : $Builtin.Int64)
+  cond_fail %37 : $Builtin.Int1
+  store %38 to [trivial] %22 : $*Int64
+  br bb7
+
+bb9:
+  %42 = load [trivial] %3 : $*Int64
+  dealloc_stack %22 : $*Int64
+  dealloc_stack %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %42 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'place_phi'
+
+// func loop(c : Int) -> Int {
+//   var x : Int = 0
+//   while (x < c) { x = x + 1 }
+//   return x
+// }
+
+// CHECK: sil [ossa] @func_loop :
+// CHECK-NOT: alloc_stack
+sil [ossa] @func_loop: $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack [lexical] $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_stack [lexical] $Int64, var, name "x"
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3 : $*Int64
+  br bb1
+
+// CHECK: bb1([[VAR:%[0-9]+]] : $Int64):
+bb1:
+  %8 = load [trivial] %3 : $*Int64
+  %10 = struct_extract %8 : $Int64, #Int64._value
+  %11 = struct_extract %0 : $Int64, #Int64._value
+  %12 = builtin "cmp_slt_Int64"(%10 : $Builtin.Int64, %11 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %12, bb2, bb3
+
+bb2:
+  %14 = load [trivial] %3 : $*Int64
+  %15 = integer_literal $Builtin.Int64, 1
+  %16 = integer_literal $Builtin.Int1, -1
+  %18 = struct_extract %14 : $Int64, #Int64._value
+  %19 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %15 : $Builtin.Int64, %16 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %20 = tuple_extract %19 : $(Builtin.Int64, Builtin.Int1), 0
+  %21 = tuple_extract %19 : $(Builtin.Int64, Builtin.Int1), 1
+  %22 = struct $Int64 (%20 : $Builtin.Int64)
+  cond_fail %21 : $Builtin.Int1
+  store %22 to [trivial] %3 : $*Int64
+  br bb1
+
+bb3:
+  %26 = load [trivial] %3 : $*Int64
+  dealloc_stack %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+// CHECK-NOT: dealloc_stack
+  return %26 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'func_loop'
+
+// func nest(c : Int) -> Int {
+// var x : Int = 0
+//   if (c > 1) { if (c > 2) { if (c > 3) { if (c > 4) {
+//   if (c > 5) { if (c > 6) { if (c > 7) { if (c > 8) {
+//   if (c > 9) { if (c > 10) { if (c > 11) { if (c > 12) {
+//   if (c > 13) { if (c > 14) { if (c > 15) { if (c > 16) {
+//   if (c > 17) { x = 7 }}}}}}}}}}}}}}}}} return x
+// }
+
+// This test should kill exponential algorithms.
+// CHECK: sil [ossa] @high_nest :
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+// CHECK-LABEL: } // end sil function 'high_nest'
+sil [ossa] @high_nest : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack [lexical] $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_stack [lexical] $Int64, var, name "x"
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3 : $*Int64
+  %7 = integer_literal $Builtin.Int64, 1
+  %9 = struct_extract %0 : $Int64, #Int64._value
+  %10 = builtin "cmp_sgt_Int64"(%9 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %10, bb1, bb34
+
+bb1:
+  %12 = integer_literal $Builtin.Int64, 2
+  %14 = struct_extract %0 : $Int64, #Int64._value
+  %15 = builtin "cmp_sgt_Int64"(%14 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %15, bb2, bb33
+
+bb2:
+  %17 = integer_literal $Builtin.Int64, 3
+  %19 = struct_extract %0 : $Int64, #Int64._value
+  %20 = builtin "cmp_sgt_Int64"(%19 : $Builtin.Int64, %17 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %20, bb3, bb32
+
+bb3:
+  %22 = integer_literal $Builtin.Int64, 4
+  %24 = struct_extract %0 : $Int64, #Int64._value
+  %25 = builtin "cmp_sgt_Int64"(%24 : $Builtin.Int64, %22 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %25, bb4, bb31
+
+bb4:
+  %27 = integer_literal $Builtin.Int64, 5
+  %29 = struct_extract %0 : $Int64, #Int64._value
+  %30 = builtin "cmp_sgt_Int64"(%29 : $Builtin.Int64, %27 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %30, bb5, bb30
+
+bb5:
+  %32 = integer_literal $Builtin.Int64, 6
+  %34 = struct_extract %0 : $Int64, #Int64._value
+  %35 = builtin "cmp_sgt_Int64"(%34 : $Builtin.Int64, %32 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %35, bb6, bb29
+
+bb6:
+  %37 = integer_literal $Builtin.Int64, 7
+  %39 = struct_extract %0 : $Int64, #Int64._value
+  %40 = builtin "cmp_sgt_Int64"(%39 : $Builtin.Int64, %37 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %40, bb7, bb28
+
+bb7:
+  %42 = integer_literal $Builtin.Int64, 8
+  %44 = struct_extract %0 : $Int64, #Int64._value
+  %45 = builtin "cmp_sgt_Int64"(%44 : $Builtin.Int64, %42 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %45, bb8, bb27
+
+bb8:
+  %47 = integer_literal $Builtin.Int64, 9
+  %49 = struct_extract %0 : $Int64, #Int64._value
+  %50 = builtin "cmp_sgt_Int64"(%49 : $Builtin.Int64, %47 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %50, bb9, bb26
+
+bb9:
+  %52 = integer_literal $Builtin.Int64, 10
+  %54 = struct_extract %0 : $Int64, #Int64._value
+  %55 = builtin "cmp_sgt_Int64"(%54 : $Builtin.Int64, %52 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %55, bb10, bb25
+
+bb10:
+  %57 = integer_literal $Builtin.Int64, 11
+  %59 = struct_extract %0 : $Int64, #Int64._value
+  %60 = builtin "cmp_sgt_Int64"(%59 : $Builtin.Int64, %57 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %60, bb11, bb24
+
+bb11:
+  %62 = integer_literal $Builtin.Int64, 12
+  %64 = struct_extract %0 : $Int64, #Int64._value
+  %65 = builtin "cmp_sgt_Int64"(%64 : $Builtin.Int64, %62 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %65, bb12, bb23
+
+bb12:
+  %67 = integer_literal $Builtin.Int64, 13
+  %69 = struct_extract %0 : $Int64, #Int64._value
+  %70 = builtin "cmp_sgt_Int64"(%69 : $Builtin.Int64, %67 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %70, bb13, bb22
+
+
+bb13:
+  %72 = integer_literal $Builtin.Int64, 14
+  %74 = struct_extract %0 : $Int64, #Int64._value
+  %75 = builtin "cmp_sgt_Int64"(%74 : $Builtin.Int64, %72 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %75, bb14, bb21
+
+bb14:
+  %77 = integer_literal $Builtin.Int64, 15
+  %79 = struct_extract %0 : $Int64, #Int64._value
+  %80 = builtin "cmp_sgt_Int64"(%79 : $Builtin.Int64, %77 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %80, bb15, bb20
+
+bb15:
+  %82 = integer_literal $Builtin.Int64, 16
+  %84 = struct_extract %0 : $Int64, #Int64._value
+  %85 = builtin "cmp_sgt_Int64"(%84 : $Builtin.Int64, %82 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %85, bb16, bb19
+
+bb16:
+  %87 = integer_literal $Builtin.Int64, 17
+  %89 = struct_extract %0 : $Int64, #Int64._value
+  %90 = builtin "cmp_sgt_Int64"(%89 : $Builtin.Int64, %87 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %90, bb17, bb18
+
+bb17:
+  %92 = integer_literal $Builtin.Int64, 7
+  %93 = struct $Int64 (%92 : $Builtin.Int64)
+  store %93 to [trivial] %3 : $*Int64
+  br bb35
+
+bb18:
+  br bb35
+bb35:
+  br bb36
+
+bb19:
+  br bb36
+bb36:
+  br bb37
+
+bb20:
+  br bb37
+bb37:
+  br bb38
+
+bb21:
+  br bb38
+bb38:
+  br bb39
+
+bb22:
+  br bb39
+bb39:
+  br bb40
+
+bb23:
+  br bb40
+bb40:
+  br bb41
+
+bb24:
+  br bb41
+bb41:
+  br bb42
+
+bb25:
+  br bb42
+bb42:
+  br bb43
+
+bb26:
+  br bb43
+bb43:
+  br bb44
+
+bb27:
+  br bb44
+bb44:
+  br bb45
+
+bb28:
+  br bb45
+bb45:
+  br bb46
+
+bb29:
+  br bb46
+bb46:
+  br bb47
+
+bb30:
+  br bb47
+bb47:
+  br bb48
+
+bb31:
+  br bb48
+bb48:
+  br bb49
+
+bb32:
+  br bb49
+bb49:
+  br bb50
+
+bb33:
+  br bb50
+bb50:
+  br bb51
+
+bb34:
+  br bb51
+
+bb51:
+  %112 = load [trivial] %3 : $*Int64
+  dealloc_stack %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %112 : $Int64
+}
+
+// CHECK-LABEL: sil [ossa] @simple_if :
+// CHECK-NOT: alloc_stack
+sil [ossa] @simple_if : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack [lexical] $Int64, var, name "c"
+  store %0 to [trivial] %1 : $*Int64
+  %3 = alloc_stack [lexical] $Int64, var, name "x"
+  %4 = integer_literal $Builtin.Int64, 0
+// CHECK: [[INIT:%[0-9]+]] = struct $Int64
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to [trivial] %3 : $*Int64
+  %8 = struct_extract %0 : $Int64, #Int64._value
+  %9 = builtin "cmp_sgt_Int64"(%4 : $Builtin.Int64, %8 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %9, bb1, bb2
+
+bb1:
+  %11 = integer_literal $Builtin.Int64, 2
+// CHECK: [[INIT2:%[0-9]+]] = struct $Int64
+  %12 = struct $Int64 (%11 : $Builtin.Int64)
+  store %12 to [trivial] %3 : $*Int64
+// CHECK: br bb3([[INIT2]] : $Int64)
+  br bb3
+
+bb2:
+// CHECK: br bb3([[INIT]] : $Int64)
+  br bb3
+
+bb3:
+  %15 = load [trivial] %3 : $*Int64
+  dealloc_stack %3 : $*Int64
+  dealloc_stack %1 : $*Int64
+  return %15 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'simple_if'
+
+enum X {
+  case One
+  case Two
+  case Three
+}
+
+// CHECK-LABEL: sil [ossa] @test_switch :
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+sil [ossa] @test_switch: $@convention(thin) (Int64, X) -> Int64 {
+bb0(%0 : $Int64, %1 : $X):
+  %2 = alloc_stack [lexical] $Int64, var, name "xi"
+  %3 = alloc_stack [lexical] $X, var, name "c"
+  store %0 to [trivial] %2 : $*Int64
+  store %1 to [trivial] %3 : $*X
+  %6 = alloc_stack [lexical] $Int64, var, name "x"
+  store %0 to [trivial] %6 : $*Int64
+  %8 = tuple ()
+  switch_enum %1 : $X, case #X.One!enumelt: bb1, case #X.Two!enumelt: bb3, case #X.Three!enumelt: bb5
+
+bb1:
+  br bb2
+
+bb2:
+  %11 = integer_literal $Builtin.Int64, 3
+  %12 = struct $Int64 (%11 : $Builtin.Int64)
+  store %12 to [trivial] %6 : $*Int64
+  br bb7
+
+bb3:
+  br bb4
+
+bb4:
+  %16 = integer_literal $Builtin.Int64, 2
+  %17 = struct $Int64 (%16 : $Builtin.Int64)
+  store %17 to [trivial] %6 : $*Int64
+  br bb7
+
+bb5:
+  br bb6
+
+bb6:
+  %21 = integer_literal $Builtin.Int64, 1
+  %22 = struct $Int64 (%21 : $Builtin.Int64)
+  store %22 to [trivial] %6 : $*Int64
+  br bb7
+
+bb7:
+  %25 = load [trivial] %6 : $*Int64
+  dealloc_stack %6 : $*Int64
+  dealloc_stack %3 : $*X
+  dealloc_stack %2 : $*Int64
+  return %25 : $Int64
+}
+// CHECK-LABEL: } // end sil function 'test_switch'
+
+
