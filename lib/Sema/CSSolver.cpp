@@ -109,11 +109,13 @@ Solution ConstraintSystem::finalize() {
   // For each of the constraint restrictions, record it with simplified,
   // canonical types.
   if (solverState) {
-    for (auto &restriction : ConstraintRestrictions) {
-      using std::get;
-      CanType first = simplifyType(get<0>(restriction))->getCanonicalType();
-      CanType second = simplifyType(get<1>(restriction))->getCanonicalType();
-      solution.ConstraintRestrictions[{first, second}] = get<2>(restriction);
+    for (const auto &entry : ConstraintRestrictions) {
+      const auto &types = entry.first;
+      auto restriction = entry.second;
+
+      CanType first = simplifyType(types.first)->getCanonicalType();
+      CanType second = simplifyType(types.second)->getCanonicalType();
+      solution.ConstraintRestrictions[{first, second}] = restriction;
     }
   }
 
@@ -224,11 +226,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
-  for (auto restriction : solution.ConstraintRestrictions) {
-    auto &types = restriction.first;
-    ConstraintRestrictions.push_back(std::make_tuple(types.first.getPointer(),
-                                                     types.second.getPointer(),
-                                                     restriction.second));
+  for ( auto &restriction : solution.ConstraintRestrictions) {
+    auto *type1 = restriction.first.first.getPointer();
+    auto *type2 = restriction.first.second.getPointer();
+
+    ConstraintRestrictions.insert({{type1, type2}, restriction.second});
   }
 
   // Register the solution's disjunction choices.

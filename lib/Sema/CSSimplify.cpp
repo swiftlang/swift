@@ -3973,10 +3973,10 @@ bool ConstraintSystem::repairFailures(
       // we can instead suggest the conditional downcast as it is safer in
       // situations like conditional binding.
       auto useConditionalCast =
-          llvm::any_of(ConstraintRestrictions, [&](auto &restriction) {
-            ConversionRestrictionKind restrictionKind;
+          llvm::any_of(ConstraintRestrictions, [&](const auto &restriction) {
             Type type1, type2;
-            std::tie(type1, type2, restrictionKind) = restriction;
+            std::tie(type1, type2) = restriction.first;
+            auto restrictionKind = restriction.second;
 
             if (restrictionKind != ConversionRestrictionKind::ValueToOptional)
               return false;
@@ -6770,7 +6770,6 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
     ConstraintSystem &cs, Type origFromType, Type origToType, Type fromType,
     Type toType, SmallVector<Type, 4> fromOptionals,
     SmallVector<Type, 4> toOptionals,
-    const std::vector<ConversionRestriction> &constraintRestrictions,
     ConstraintSystem::TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
 
@@ -6797,10 +6796,8 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   // "from" expression could be a type variable with value-to-optional
   // restrictions that we have to account for optionality mismatch.
   const auto subExprType = cs.getType(castExpr->getSubExpr());
-  if (llvm::is_contained(
-          constraintRestrictions,
-          std::make_tuple(fromType.getPointer(), subExprType.getPointer(),
-                          ConversionRestrictionKind::ValueToOptional))) {
+  if (cs.hasConversionRestriction(fromType, subExprType,
+                                  ConversionRestrictionKind::ValueToOptional)) {
     extraOptionals++;
     origFromType = OptionalType::get(origFromType);
   }
@@ -6960,7 +6957,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     if (auto *fix = maybeWarnAboutExtraneousCast(
             *this, origFromType, origToType, fromType, toType, fromOptionals,
-            toOptionals, ConstraintRestrictions, flags, locator)) {
+            toOptionals, flags, locator)) {
       (void)recordFix(fix);
     }
   };
@@ -7028,7 +7025,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // succeed or fail.
     if (auto *fix = maybeWarnAboutExtraneousCast(
             *this, origFromType, origToType, fromType, toType, fromOptionals,
-            toOptionals, ConstraintRestrictions, flags, locator)) {
+            toOptionals, flags, locator)) {
       (void)recordFix(fix);
     }
 
@@ -11358,8 +11355,8 @@ ConstraintSystem::simplifyRestrictedConstraint(
       addFixConstraint(fix, matchKind, type1, type2, locator);
     }
 
-    ConstraintRestrictions.push_back(
-        std::make_tuple(type1.getPointer(), type2.getPointer(), restriction));
+    ConstraintRestrictions.insert({
+        std::make_pair(type1.getPointer(), type2.getPointer()), restriction});
     return SolutionKind::Solved;
   }
   case SolutionKind::Unsolved:

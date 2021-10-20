@@ -2184,10 +2184,6 @@ public:
 using RewriteTargetFn = std::function<
     Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>;
 
-/// Represents a conversion restriction between two types.
-using ConversionRestriction =
-    std::tuple<TypeBase *, TypeBase *, ConversionRestrictionKind>;
-
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
   Solving,
@@ -2377,7 +2373,8 @@ private:
   /// there are multiple ways in which one type could convert to another, e.g.,
   /// given class types A and B, the solver might choose either a superclass
   /// conversion or a user-defined conversion.
-  std::vector<ConversionRestriction> ConstraintRestrictions;
+  llvm::MapVector<std::pair<TypeBase *, TypeBase *>, ConversionRestrictionKind>
+      ConstraintRestrictions;
 
   /// The set of fixes applied to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
@@ -3470,6 +3467,16 @@ public:
           }
           return false;
         });
+  }
+
+  bool
+  hasConversionRestriction(Type type1, Type type2,
+                           ConversionRestrictionKind restrictionKind) const {
+    auto restriction =
+        ConstraintRestrictions.find({type1.getPointer(), type2.getPointer()});
+    return restriction == ConstraintRestrictions.end()
+               ? false
+               : restriction->second == restrictionKind;
   }
 
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
