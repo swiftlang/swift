@@ -34,7 +34,6 @@ namespace llvm {
 }
 
 namespace swift {
-  class GenericSignatureBuilder;
   class ArchetypeType;
   class CanType;
   class ClassDecl;
