@@ -521,9 +521,6 @@ static bool isSendableClosure(
     if (forActorIsolation && explicitClosure->inheritsActorContext()) {
       return false;
     }
-
-    if (explicitClosure->isUnsafeSendable())
-      return true;
   }
 
   if (auto type = closure->getType()) {
@@ -2578,12 +2575,6 @@ namespace {
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
         if (Type globalActorType = resolveGlobalActorType(explicitClosure))
           return ClosureActorIsolation::forGlobalActor(globalActorType);
-
-        if (explicitClosure->isUnsafeMainActor()) {
-          ASTContext &ctx = closure->getASTContext();
-          if (Type mainActor = ctx.getMainActorType())
-            return ClosureActorIsolation::forGlobalActor(mainActor);
-        }
       }
 
       // Sendable closures are actor-independent unless the closure has
