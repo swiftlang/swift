@@ -157,6 +157,7 @@ IDENTIFIER(withKeywordArguments)
 IDENTIFIER(wrapped)
 IDENTIFIER(wrappedValue)
 IDENTIFIER(wrapperValue)
+IDENTIFIER(Duration)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")

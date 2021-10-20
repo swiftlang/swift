@@ -1717,9 +1717,16 @@ bool TypeVarBindingProducer::computeNext() {
   if (TypeVar->getImpl().isClosureType())
     return false;
 
+  Optional<PotentialBinding> fallback;
+
   for (auto &binding : Bindings) {
     const auto type = binding.BindingType;
     assert(!type->hasError());
+
+    if (type->isTimeIntervalType()) {
+      auto &ctx = CS.getASTContext();
+      fallback = binding.withType(ctx.getDurationType());
+    }
 
     // If we have a protocol with a default type, look for alternative
     // types to the default.
@@ -1826,8 +1833,16 @@ bool TypeVarBindingProducer::computeNext() {
     }
   }
 
-  if (newBindings.empty())
+  if (newBindings.empty()) {
+    if (fallback) {
+      addNewBinding(fallback.getValue());
+      Index = 0;
+      ++NumTries;
+      Bindings = std::move(newBindings);
+      return true;
+    }
     return false;
+  }
 
   Index = 0;
   ++NumTries;

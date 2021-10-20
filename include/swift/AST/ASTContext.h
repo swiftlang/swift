@@ -515,6 +515,10 @@ public:
   /// Retrieve the type of Swift.Void.
   Type getVoidType() const;
 
+  StructDecl *getDurationDecl() const;
+
+  Type getDurationType() const;
+
   /// Retrieve the declaration of the "pointee" property of a pointer type.
   VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
 

@@ -225,6 +225,8 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Void.
   TypeAliasDecl *VoidDecl = nullptr;
 
+  StructDecl *DurationDecl = nullptr;
+
   /// The declaration of Swift.UnsafeMutableRawPointer.memory.
   VarDecl *UnsafeMutableRawPointerMemoryDecl = nullptr;
 
@@ -899,6 +901,30 @@ TypeAliasDecl *ASTContext::getVoidDecl() const {
 
 Type ASTContext::getVoidType() const {
   auto decl = getVoidDecl();
+  if (!decl)
+    return Type();
+  return decl->getDeclaredInterfaceType();
+}
+
+StructDecl *ASTContext::getDurationDecl() const {
+  if (getImpl().DurationDecl) {
+    return getImpl().DurationDecl;
+  }
+
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("Duration", results);
+  for (auto result : results) {
+    if (auto typealias = dyn_cast<StructDecl>(result)) {
+      getImpl().DurationDecl = typealias;
+      return typealias;
+    }
+  }
+
+  return nullptr;
+}
+
+Type ASTContext::getDurationType() const {
+  auto decl = getDurationDecl();
   if (!decl)
     return Type();
   return decl->getDeclaredInterfaceType();
