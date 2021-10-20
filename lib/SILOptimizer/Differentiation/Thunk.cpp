@@ -20,9 +20,9 @@
 #include "swift/SILOptimizer/Differentiation/Common.h"
 
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 
@@ -53,30 +53,26 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
   }
 
   auto &ctx = fn->getASTContext();
-  GenericSignatureBuilder builder(ctx);
 
   // Add the existing generic signature.
+  GenericSignature baseGenericSig;
   int depth = 0;
   if (inheritGenericSig) {
-    if (auto genericSig =
-            fn->getLoweredFunctionType()->getSubstGenericSignature()) {
-      builder.addGenericSignature(genericSig);
-      depth = genericSig.getGenericParams().back()->getDepth() + 1;
-    }
+    baseGenericSig = fn->getLoweredFunctionType()->getSubstGenericSignature();
+    if (baseGenericSig)
+      depth = baseGenericSig.getGenericParams().back()->getDepth() + 1;
   }
 
   // Add a new generic parameter to replace the opened existential.
   auto *newGenericParam = GenericTypeParamType::get(depth, 0, ctx);
-
-  builder.addGenericParameter(newGenericParam);
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
                              openedExistential->getOpenedExistentialType());
-  auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  builder.addRequirement(newRequirement, source, nullptr);
 
-  auto genericSig = std::move(builder).computeGenericSignature(
-      /*allowConcreteGenericParams=*/true);
+  auto genericSig = evaluateOrDefault(
+      ctx.evaluator,
+      AbstractGenericSignatureRequest{
+        baseGenericSig.getPointer(), { newGenericParam }, { newRequirement }},
+      GenericSignature());
   genericEnv = genericSig.getGenericEnvironment();
 
   newArchetype =
