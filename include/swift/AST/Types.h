@@ -804,6 +804,9 @@ public:
   /// on macOS or Foundation on Linux.
   bool isCGFloatType();
 
+  bool isTimeIntervalType();
+  bool isDurationType();
+
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
   bool isKnownStdlibCollectionType();

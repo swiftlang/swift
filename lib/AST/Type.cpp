@@ -830,6 +830,43 @@ bool TypeBase::isCGFloatType() {
          NTD->getName().is("CGFloat");
 }
 
+bool TypeBase::isTimeIntervalType() {
+  if (auto alias = dyn_cast<TypeAliasType>(this)) {
+    auto *decl = alias->getDecl();
+    auto *module = decl->getModuleContext();
+    return module->getName().is("Foundation") &&
+           decl->getName().is("TimeInterval");
+  }
+  auto *NTD = getAnyNominal();
+  if (!NTD)
+    return false;
+
+  auto *DC = NTD->getDeclContext();
+  if (!DC->isModuleScopeContext())
+    return false;
+
+  auto *module = DC->getParentModule();
+
+  return module->getName().is("Foundation") &&
+         NTD->getName().is("TimeInterval");
+}
+
+bool TypeBase::isDurationType() {
+  auto *NTD = getAnyNominal();
+  if (!NTD)
+    return false;
+
+  auto *DC = NTD->getDeclContext();
+  if (!DC->isModuleScopeContext())
+    return false;
+
+  auto *module = DC->getParentModule();
+  
+  return module->getName().is("Swift") &&
+         NTD->getName().is("Duration");
+}
+
+
 bool TypeBase::isKnownStdlibCollectionType() {
   if (isArray() || isDictionary() || isSet()) {
     return true;

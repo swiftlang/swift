@@ -385,6 +385,8 @@ namespace {
     // Don't favor narrowing conversions.
     if (argTy->isDouble() && paramTy->isCGFloatType())
       return false;
+    if (argTy->isDurationType() && paramTy->isTimeIntervalType())
+      return false;
 
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
     if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
@@ -420,7 +422,8 @@ namespace {
         // it is the same as the parameter type.
         // Check whether there is a default type to compare against.
         if (paramTy->isEqual(defaultType) ||
-            (defaultType->isDouble() && paramTy->isCGFloatType()))
+            (defaultType->isDouble() && paramTy->isCGFloatType()) ||
+            (defaultType->isDurationType() && paramTy->isTimeIntervalType()))
           return true;
       }
     }
@@ -561,6 +564,8 @@ namespace {
       // which would result in conversion from CGFloat to Double; otherwise
       // it would lead to ambiguities.
       if (argTy->isCGFloatType() && paramTy->isDouble())
+        return false;
+      if (argTy->isTimeIntervalType() && paramTy->isDurationType())
         return false;
 
       return isFavoredParamAndArg(CS, paramTy, argTy) &&
@@ -721,8 +726,12 @@ namespace {
       {
         if (firstArgTy->isDouble() && firstParamTy->isCGFloatType())
           return false;
+        if (firstArgTy->isDurationType() && firstParamTy->isTimeIntervalType())
+          return false;
 
         if (secondArgTy->isDouble() && secondParamTy->isCGFloatType())
+          return false;
+        if (secondArgTy->isDurationType() && secondParamTy->isTimeIntervalType())
           return false;
       }
 

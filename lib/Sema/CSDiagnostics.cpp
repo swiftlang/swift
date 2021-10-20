@@ -3564,7 +3564,6 @@ bool MissingMemberFailure::diagnoseAsError() {
 
   auto emitBasicError = [&](Type baseType) {
     auto diagnostic = diag::could_not_find_value_member;
-
     if (auto *metatype = baseType->getAs<MetatypeType>()) {
       baseType = metatype->getInstanceType();
       diagnostic = diag::could_not_find_type_member;
@@ -6724,6 +6723,8 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
   case ConversionRestrictionKind::CGFloatToDouble:
   case ConversionRestrictionKind::DoubleToCGFloat:
+  case ConversionRestrictionKind::DurationToTimeInterval:
+  case ConversionRestrictionKind::TimeIntervalToDuration:
     llvm_unreachable("Expected an ephemeral conversion!");
   }
 }

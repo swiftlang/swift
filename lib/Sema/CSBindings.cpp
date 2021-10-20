@@ -553,6 +553,11 @@ void BindingSet::addBinding(PotentialBinding binding) {
           return binding.BindingType->isDouble();
         }))
       return;
+    if (type->isTimeIntervalType() &&
+        llvm::any_of(Bindings, [](const PotentialBinding &binding) {
+          return binding.BindingType->isDurationType();
+        }))
+      return;
 
     if (type->isDouble()) {
       auto inferredCGFloat =
@@ -563,6 +568,18 @@ void BindingSet::addBinding(PotentialBinding binding) {
       if (inferredCGFloat != Bindings.end()) {
         Bindings.erase(inferredCGFloat);
         Bindings.insert(inferredCGFloat->withType(type));
+        return;
+      }
+    }
+    if (type->isDurationType()) {
+      auto inferredTimeInterval =
+          llvm::find_if(Bindings, [](const PotentialBinding &binding) {
+            return binding.BindingType->isTimeIntervalType();
+          });
+
+      if (inferredTimeInterval != Bindings.end()) {
+        Bindings.erase(inferredTimeInterval);
+        Bindings.insert(inferredTimeInterval->withType(type));
         return;
       }
     }

@@ -5553,6 +5553,67 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
 
+      if (kind >= ConstraintKind::Subtype &&
+          nominal1->getDecl() != nominal2->getDecl() &&
+          ((nominal1->isTimeIntervalType() || nominal2->isTimeIntervalType() ||
+            type1->isTimeIntervalType() || type2->isTimeIntervalType()) &&
+           (nominal1->isDurationType() || nominal2->isDurationType()))) {
+        ConstraintLocatorBuilder location{locator};
+
+        if (auto last = location.last()) {
+          // T -> Optional<T>
+          if (last->is<LocatorPathElt::OptionalPayload>()) {
+            SmallVector<LocatorPathElt, 4> path;
+            auto anchor = location.getLocatorParts(path);
+
+            path.erase(llvm::remove_if(
+                           path,
+                           [](const LocatorPathElt &elt) {
+                             return elt.is<LocatorPathElt::OptionalPayload>();
+                           }),
+                       path.end());
+
+            location = getConstraintLocator(anchor, path);
+          }
+        }
+
+        if (!location.trySimplifyToExpr()) {
+          return getTypeMatchFailure(locator);
+        }
+
+        SmallVector<LocatorPathElt, 4> path;
+        auto anchor = location.getLocatorParts(path);
+
+        auto isCoercionOrCast = [](ASTNode anchor,
+                                   ArrayRef<LocatorPathElt> path) {
+          // E.g. contextual conversion from coercion/cast
+          // to some other type.
+          if (!path.empty())
+            return false;
+
+          return isExpr<CoerceExpr>(anchor) || isExpr<IsExpr>(anchor) ||
+                 isExpr<ConditionalCheckedCastExpr>(anchor) ||
+                 isExpr<ForcedCheckedCastExpr>(anchor);
+        };
+
+        if (!isCoercionOrCast(anchor, path) &&
+            llvm::none_of(path, [&](const LocatorPathElt &rawElt) {
+              if (auto elt =
+                      rawElt.getAs<LocatorPathElt::ImplicitConversion>()) {
+                auto convKind = elt->getConversionKind();
+                return convKind == ConversionRestrictionKind::DurationToTimeInterval ||
+                       convKind == ConversionRestrictionKind::TimeIntervalToDuration;
+              }
+              return false;
+            })) {
+          conversionsOrFixes.push_back(
+              desugar1->isTimeIntervalType()
+                  ? ConversionRestrictionKind::TimeIntervalToDuration
+                  : ConversionRestrictionKind::DurationToTimeInterval);
+        }
+      }
+
+
       break;
     }
 
@@ -11307,6 +11368,62 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         applicationLoc, LocatorPathElt::ConstructorMemberType());
 
     auto *memberTy = createTypeVariable(memberTypeLoc, TVO_CanBindToNoEscape);
+
+    addValueMemberConstraint(MetatypeType::get(type2, getASTContext()),
+                             DeclNameRef(DeclBaseName::createConstructor()),
+                             memberTy, DC, FunctionRefKind::DoubleApply,
+                             /*outerAlternatives=*/{}, memberLoc);
+
+    addConstraint(ConstraintKind::ApplicableFunction,
+                  FunctionType::get({FunctionType::Param(type1)}, type2),
+                  memberTy, applicationLoc);
+
+    ImplicitValueConversions.push_back(
+        {getConstraintLocator(locator), restriction});
+    return SolutionKind::Solved;
+  }
+  case ConversionRestrictionKind::DurationToTimeInterval:
+  case ConversionRestrictionKind::TimeIntervalToDuration: {
+    // Prefer TimeInterval -> Duration over other way araund.
+    auto impact =
+        restriction == ConversionRestrictionKind::TimeIntervalToDuration ? 1 : 10;
+
+    if (restriction == ConversionRestrictionKind::DurationToTimeInterval) {
+      if (auto *anchor = locator.trySimplifyToExpr()) {
+        if (auto depth = getExprDepth(anchor))
+          impact = (*depth + 1) * impact;
+      }
+    }
+
+    increaseScore(SK_ImplicitValueConversion, impact);
+
+    if (worseThanBestSolution())
+      return SolutionKind::Error;
+
+    auto *conversionLoc = getConstraintLocator(
+        /*anchor=*/ASTNode(), LocatorPathElt::ImplicitConversion(restriction));
+
+    auto *applicationLoc =
+        getConstraintLocator(conversionLoc, ConstraintLocator::ApplyFunction);
+
+    auto *memberLoc = getConstraintLocator(
+        applicationLoc, ConstraintLocator::ConstructorMember);
+
+    // Conversion has been already attempted for this direction
+    // and constructor choice has been recorded.
+    if (findSelectedOverloadFor(memberLoc))
+      return SolutionKind::Solved;
+
+    // Allocate a single argument info to cover all possible
+    // Double <-> CGFloat conversion locations.
+    if (!ArgumentLists.count(memberLoc)) {
+      auto *argList = ArgumentList::createImplicit(
+          getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
+          AllocationArena::ConstraintSolver);
+      ArgumentLists.insert({memberLoc, argList});
+    }
+
+    auto *memberTy = createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
 
     addValueMemberConstraint(MetatypeType::get(type2, getASTContext()),
                              DeclNameRef(DeclBaseName::createConstructor()),

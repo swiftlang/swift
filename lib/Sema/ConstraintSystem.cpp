@@ -453,7 +453,9 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   if (auto conversion =
           locator->findLast<LocatorPathElt::ImplicitConversion>()) {
     if (conversion->is(ConversionRestrictionKind::DoubleToCGFloat) ||
-        conversion->is(ConversionRestrictionKind::CGFloatToDouble)) {
+        conversion->is(ConversionRestrictionKind::CGFloatToDouble) ||
+        conversion->is(ConversionRestrictionKind::DurationToTimeInterval) ||
+        conversion->is(ConversionRestrictionKind::TimeIntervalToDuration)) {
       return getConstraintLocator(
           ASTNode(), {*conversion, ConstraintLocator::ApplyFunction,
                       ConstraintLocator::ConstructorMember});
@@ -5269,6 +5271,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
   case ConversionRestrictionKind::CGFloatToDouble:
   case ConversionRestrictionKind::DoubleToCGFloat:
+  case ConversionRestrictionKind::DurationToTimeInterval:
+  case ConversionRestrictionKind::TimeIntervalToDuration:
     // @_nonEphemeral has no effect on these conversions, so treat them as all
     // being non-ephemeral in order to allow their passing to an @_nonEphemeral
     // parameter.

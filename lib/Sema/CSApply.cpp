@@ -6641,7 +6641,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::CGFloatToDouble:
-    case ConversionRestrictionKind::DoubleToCGFloat: {
+    case ConversionRestrictionKind::DoubleToCGFloat:
+    case ConversionRestrictionKind::DurationToTimeInterval:
+    case ConversionRestrictionKind::TimeIntervalToDuration: {
       auto conversionKind = knownRestriction->second;
 
       auto *argExpr = locator.trySimplifyToExpr();
