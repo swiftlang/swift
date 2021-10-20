@@ -484,7 +484,9 @@ public:
 
   bool empty() const {
     assert(!liveBlocks.empty() || users.empty());
-    return liveBlocks.empty();
+    // There may be a liveBlock created by initializeDefBlock with no users. The
+    // true test of emptiness is whether there are any users.
+    return users.empty();
   }
 
   void clear() {
