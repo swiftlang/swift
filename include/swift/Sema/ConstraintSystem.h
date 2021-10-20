@@ -2394,7 +2394,7 @@ private:
 
   /// For locators associated with call expressions, the trailing closure
   /// matching rule and parameter bindings that were applied.
-  std::vector<std::pair<ConstraintLocator *, MatchCallArgumentResult>>
+  llvm::MapVector<ConstraintLocator *, MatchCallArgumentResult>
       argumentMatchingChoices;
 
   /// The set of implicit value conversions performed by the solver on

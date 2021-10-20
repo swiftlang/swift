@@ -245,7 +245,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Remember all of the argument/parameter matching choices we made.
   for (auto &argumentMatch : solution.argumentMatchingChoices) {
-    argumentMatchingChoices.push_back(argumentMatch);
+    argumentMatchingChoices.insert(argumentMatch);
   }
 
   // Register the solution's opened types.

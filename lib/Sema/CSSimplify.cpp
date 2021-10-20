@@ -11566,7 +11566,7 @@ void ConstraintSystem::recordAnyTypeVarAsPotentialHole(Type type) {
 void ConstraintSystem::recordMatchCallArgumentResult(
     ConstraintLocator *locator, MatchCallArgumentResult result) {
   assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
-  argumentMatchingChoices.push_back({locator, result});
+  argumentMatchingChoices.insert({locator, result});
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
