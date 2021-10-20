@@ -2399,7 +2399,7 @@ private:
 
   /// The set of implicit value conversions performed by the solver on
   /// a current path to reach a solution.
-  SmallVector<std::pair<ConstraintLocator *, ConversionRestrictionKind>, 2>
+  llvm::SmallMapVector<ConstraintLocator *, ConversionRestrictionKind, 2>
       ImplicitValueConversions;
 
   /// The worklist of "active" constraints that should be revisited

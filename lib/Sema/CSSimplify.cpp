@@ -11322,7 +11322,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                   FunctionType::get({FunctionType::Param(type1)}, type2),
                   memberTy, applicationLoc);
 
-    ImplicitValueConversions.push_back(
+    ImplicitValueConversions.insert(
         {getConstraintLocator(locator), restriction});
     return SolutionKind::Solved;
   }

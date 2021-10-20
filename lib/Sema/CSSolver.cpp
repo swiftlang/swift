@@ -305,7 +305,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (auto &valueConversion : solution.ImplicitValueConversions) {
-    ImplicitValueConversions.push_back(valueConversion);
+    ImplicitValueConversions.insert(valueConversion);
   }
 
   // Register the argument lists.
