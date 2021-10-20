@@ -3409,6 +3409,48 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::CopyableToMoveOnlyValueInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    auto *MVI = B.createCopyableToMoveOnlyValue(InstLoc, Val);
+    ResultVal = MVI;
+    break;
+  }
+
+  case SILInstructionKind::MoveOnlyToCopyableValueInst: {
+    StringRef AttrName;
+    if (!parseSILOptional(AttrName, *this)) {
+      auto diag = diag::sil_moveonlytocopyable_requires_attribute;
+      P.diagnose(InstLoc.getSourceLoc(), diag);
+      return true;
+    }
+
+    OwnershipKind OwnershipKind =
+        llvm::StringSwitch<ValueOwnershipKind>(AttrName)
+            .Case("owned", OwnershipKind::Owned)
+            .Case("guaranteed", OwnershipKind::Guaranteed)
+            .Default(OwnershipKind::None);
+
+    if (OwnershipKind == OwnershipKind::None) {
+      auto diag = diag::sil_moveonlytocopyable_invalid_attribute;
+      P.diagnose(InstLoc.getSourceLoc(), diag, AttrName);
+      return true;
+    }
+
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    if (OwnershipKind == OwnershipKind::Owned)
+      ResultVal = B.createOwnedMoveOnlyToCopyableValue(InstLoc, Val);
+    else
+      ResultVal = B.createGuaranteedMoveOnlyToCopyableValue(InstLoc, Val);
+    break;
+  }
+
   case SILInstructionKind::LoadInst: {
     Optional<LoadOwnershipQualifier> Qualifier;
     SourceLoc AddrLoc;

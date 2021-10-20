@@ -1,0 +1,18 @@
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all=true %s | %target-sil-opt -enable-objc-interop -enable-sil-verify-all=true | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+class Klass {}
+
+// CHECK-LABEL: sil [ossa] @foo : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK: copyable_to_moveonly %0 : $Klass
+// CHECK: moveonly_to_copyable [owned] %1 : $@moveOnly Klass
+// CHECK: } // end sil function 'foo'
+sil [ossa] @foo : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = copyable_to_moveonly %0 : $Klass
+  %2 = moveonly_to_copyable [owned] %1 : $@moveOnly Klass
+  return %2 : $Klass
+}

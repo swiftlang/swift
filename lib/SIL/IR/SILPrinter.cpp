@@ -23,8 +23,8 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/QuotedString.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/CFG.h"
@@ -32,6 +32,7 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILVTable.h"
@@ -1903,6 +1904,26 @@ public:
       llvm_unreachable("Invalid?!");
     case CheckKind::NoImplicitCopy:
       *this << "[no_implicit_copy] ";
+      break;
+    }
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitCopyableToMoveOnlyValueInst(CopyableToMoveOnlyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMoveOnlyToCopyableValueInst(MoveOnlyToCopyableValueInst *I) {
+    switch (I->getForwardingOwnershipKind()) {
+    case OwnershipKind::None:
+    case OwnershipKind::Any:
+    case OwnershipKind::Unowned:
+      llvm_unreachable("Move only values are always non-trivial");
+    case OwnershipKind::Owned:
+      *this << "[owned] ";
+      break;
+    case OwnershipKind::Guaranteed:
+      *this << "[guaranteed] ";
       break;
     }
     *this << getIDAndType(I->getOperand());

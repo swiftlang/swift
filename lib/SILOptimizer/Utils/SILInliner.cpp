@@ -756,6 +756,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::RebindMemoryInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::CopyableToMoveOnlyValueInst:
+  case SILInstructionKind::MoveOnlyToCopyableValueInst:
     return InlineCost::Free;
 
   // Typed GEPs are free.

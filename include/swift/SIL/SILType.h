@@ -613,7 +613,35 @@ public:
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getASTType()->isAnyObject(); }
-  
+
+  /// Returns true if this SILType is a move only wrapper type.
+  bool isMoveOnly() const { return getASTType()->is<SILMoveOnlyType>(); }
+
+  /// Wrap the current type within a move only type wrapper.
+  SILType asMoveOnly() const {
+    if (isMoveOnly())
+      return *this;
+    auto newType = SILMoveOnlyType::get(getASTType());
+    return SILType::getPrimitiveType(newType, getCategory());
+  }
+
+  SILType withoutMoveOnly() const {
+    if (!isMoveOnly())
+      return *this;
+    auto moveOnly = getASTType()->castTo<SILMoveOnlyType>();
+    return SILType::getPrimitiveType(moveOnly->getInnerType(), getCategory());
+  }
+
+  /// If \p otherType is move only, return this type that is move only as
+  /// well. Otherwise, returns self. Useful for propagating "move only"-ness
+  /// from a parent type to a subtype.
+  SILType copyMoveOnly(SILType otherType) const {
+    if (otherType.isMoveOnly()) {
+      return asMoveOnly();
+    }
+    return *this;
+  }
+
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;
 

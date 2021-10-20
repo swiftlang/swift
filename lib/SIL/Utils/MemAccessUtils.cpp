@@ -892,8 +892,13 @@ void swift::findGuaranteedReferenceRoots(SILValue value,
         if (addAllOperandsToWorklist(result)) {
           continue;
         }
+      } else if (auto *mvi = dyn_cast<MoveOnlyToCopyableValueInst>(inst)) {
+        if (addAllOperandsToWorklist(mvi)) {
+          continue;
+        }
       }
     }
+
     if (value.getOwnershipKind() == OwnershipKind::Guaranteed)
       roots.push_back(value);
   }
