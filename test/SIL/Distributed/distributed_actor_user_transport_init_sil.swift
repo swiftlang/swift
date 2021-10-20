@@ -73,3 +73,11 @@ distributed actor SimpleUserDefinedInitDistributedActor {
 // While in AST the return was "return null" after SILGen we properly return the self
 // CHECK:  return %2 : $SimpleUserDefinedInitDistributedActor // id: %18
 // CHECK: } // end sil function '$s41distributed_actor_user_transport_init_sil37SimpleUserDefinedInitDistributedActorC5other12theTransportACSi_01_K00lO0_ptcfc'
+
+@available(SwiftStdlib 5.5, *)
+distributed actor GenericUserDefinedInitDistributedActor {
+  // CHECK-LABEL: sil shared @$s41distributed_actor_user_transport_init_sil38GenericUserDefinedInitDistributedActorC0D0ACx_tc01_K00L9TransportRzlufcTf4gn_n : $@convention(method) <T where T : ActorTransport> (@in_guaranteed T, @owned GenericUserDefinedInitDistributedActor) -> @owned GenericUserDefinedInitDistributedActor
+  // CHECK: metatype $@thick GenericUserDefinedInitDistributedActor.Type
+  // CHECK: witness_method $T, #ActorTransport.assignIdentity
+  init<T: ActorTransport>(transport: T) { }
+}

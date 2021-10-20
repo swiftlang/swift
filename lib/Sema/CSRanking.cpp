@@ -1368,8 +1368,14 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
 
   // Find a potential best.
   SmallVector<bool, 16> losers(viable.size(), false);
+  Score bestScore = viable.front().getFixedScore();
   unsigned bestIdx = 0;
   for (unsigned i = 1, n = viable.size(); i != n; ++i) {
+    auto currScore = viable[i].getFixedScore();
+
+    if (currScore < bestScore)
+      bestScore = currScore;
+
     switch (compareSolutions(*this, viable, diff, i, bestIdx)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
@@ -1424,52 +1430,14 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     return bestIdx;
   }
 
-  // If there is not a single "better" than others
-  // solution, which probably means that solutions
-  // were incomparable, let's just keep the original
-  // list instead of removing everything, even if we
-  // are asked to "minimize" the result.
-  if (losers.size() == viable.size())
+  if (!minimize)
     return None;
-
-  // The comparison was ambiguous. Identify any solutions that are worse than
-  // any other solution.
-  for (unsigned i = 0, n = viable.size(); i != n; ++i) {
-    // If the first solution has already lost once, don't bother looking
-    // further.
-    if (losers[i])
-      continue;
-
-    for (unsigned j = i + 1; j != n; ++j) {
-      // If the second solution has already lost once, don't bother looking
-      // further.
-      if (losers[j])
-        continue;
-
-      switch (compareSolutions(*this, viable, diff, i, j)) {
-      case SolutionCompareResult::Identical:
-        // FIXME: Dub one of these the loser arbitrarily?
-        break;
-
-      case SolutionCompareResult::Better:
-        losers[j] = true;
-        break;
-
-      case SolutionCompareResult::Worse:
-        losers[i] = true;
-        break;
-
-      case SolutionCompareResult::Incomparable:
-        break;
-      }
-    }
-  }
 
   // Remove any solution that is worse than some other solution.
   unsigned outIndex = 0;
   for (unsigned i = 0, n = viable.size(); i != n; ++i) {
     // Skip over the losing solutions.
-    if (losers[i])
+    if (viable[i].getFixedScore() > bestScore)
       continue;
 
     // If we have skipped any solutions, move this solution into the next
@@ -1479,6 +1447,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
 
     ++outIndex;
   }
+
   viable.erase(viable.begin() + outIndex, viable.end());
   NumDiscardedSolutions += viable.size() - outIndex;
 

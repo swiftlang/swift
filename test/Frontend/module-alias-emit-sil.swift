@@ -2,6 +2,8 @@
 ///
 /// Module 'Lib' imports module 'XLogging', and 'XLogging' is aliased 'AppleLogging'.
 
+// REQUIRES: rdar84436250
+
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 

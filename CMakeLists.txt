@@ -610,6 +610,13 @@ elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING" OR LIBSWIFT_BUILD_MODE STREQ
   set(SWIFT_EXEC_FOR_LIBSWIFT "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
 endif()
 
+if(LIBSWIFT_BUILD_MODE STREQUAL "HOSTTOOLS" OR LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+  if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
+    message(STATUS "array COW checks disabled when building libswift with host libraries")
+    set(SWIFT_ENABLE_ARRAY_COW_CHECKS FALSE)
+  endif()
+endif()
+
 # This setting causes all CMakeLists.txt to automatically have
 # ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CURRENT_SOURCE_DIR} as an
 # include_directories path. This is done for developer
