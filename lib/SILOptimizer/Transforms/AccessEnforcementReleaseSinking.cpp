@@ -148,6 +148,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
     case BuiltinValueKind::DestroyTaskGroup:
+    case BuiltinValueKind::StackAlloc:
+    case BuiltinValueKind::StackDealloc:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime

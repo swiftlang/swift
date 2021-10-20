@@ -5410,6 +5410,7 @@ public:
                   "stack dealloc with empty stack");
           if (op != state.Stack.back()) {
             llvm::errs() << "Recent stack alloc: " << *state.Stack.back();
+            llvm::errs() << "Matching stack alloc: " << *op;
             require(op == state.Stack.back(),
                     "stack dealloc does not match most recent stack alloc");
           }

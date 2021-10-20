@@ -603,6 +603,29 @@ BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", "", Special)
 /// was allocated.
 BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 
+/// StackAlloc has type (Int, Int, Int) -> Builtin.RawPointer
+///
+/// Parameters: capacity, stride, alignment
+///
+/// The resulting pointer comes from the stack (as in the non-standard C
+/// extension `alloca()`.) It is at least as aligned as specified and is valid
+/// until the end of the calling scope.
+///
+/// The count and stride are multiplied together to get the byte count to use
+/// for the allocation.
+///
+/// The passed alignment must be a positive power of two. If the alignment value
+/// is not known at compile time, MaximumAlignment is assumed.
+BUILTIN_MISC_OPERATION(StackAlloc, "stackAlloc", "", Special)
+
+/// StackDealloc has type (Builtin.RawPointer) -> ()
+///
+/// Parameters: address.
+///
+/// The range starting at `address`, previously allocated with
+/// Builtin.stackAlloc(), is deallocated from the stack.
+BUILTIN_MISC_OPERATION(StackDealloc, "stackDealloc", "", Special)
+
 /// Fence has type () -> ().
 BUILTIN_MISC_OPERATION(Fence, "fence", "", None)
 
