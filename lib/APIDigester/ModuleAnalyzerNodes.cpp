@@ -1,6 +1,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/AST/ASTMangler.h"
 #include <swift/APIDigester/ModuleAnalyzerNodes.h>
 #include <algorithm>
 
@@ -98,7 +99,8 @@ SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root)
   JsonFormatVer(Info.JsonFormatVer.hasValue() ? *Info.JsonFormatVer : DIGESTER_JSON_DEFAULT_VERSION) {}
 
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
-      : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr), Loc(Info.Loc),
+      : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
+        MangledName(Info.MangledName), Loc(Info.Loc),
         Location(Info.Location), ModuleName(Info.ModuleName),
         DeclAttributes(Info.DeclAttrs), IsImplicit(Info.IsImplicit),
         IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
@@ -120,7 +122,8 @@ SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   ParamValueOwnership(Info.ParamValueOwnership) {}
 
 SDKNodeTypeNominal::SDKNodeTypeNominal(SDKNodeInitInfo Info):
-  SDKNodeType(Info, SDKNodeKind::TypeNominal), USR(Info.Usr) {}
+  SDKNodeType(Info, SDKNodeKind::TypeNominal), USR(Info.Usr),
+  MangledName(Info.MangledName) {}
 
 SDKNodeTypeFunc::SDKNodeTypeFunc(SDKNodeInitInfo Info):
   SDKNodeType(Info, SDKNodeKind::TypeFunc) {}
@@ -139,7 +142,8 @@ SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::Conformance),
-  Usr(Info.Usr), IsABIPlaceholder(Info.IsABIPlaceholder) {}
+  Usr(Info.Usr), MangledName(Info.MangledName),
+  IsABIPlaceholder(Info.IsABIPlaceholder) {}
 
 SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::TypeWitness) {}
@@ -1036,6 +1040,18 @@ static StringRef calculateUsr(SDKContext &Ctx, ValueDecl *VD) {
   return StringRef();
 }
 
+static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
+  if (isFromClang(VD)) {
+    // Don't mangle clang symbols.
+    return StringRef();
+  }
+  if (auto *attr = VD->getAttrs().getAttribute<SILGenNameAttr>()) {
+    return Ctx.buffer(attr->Name);
+  }
+  Mangle::ASTMangler NewMangler;
+  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true));
+}
+
 static StringRef calculateLocation(SDKContext &SDKCtx, Decl *D) {
   if (SDKCtx.getOpts().AvoidLocation)
     return StringRef();
@@ -1298,6 +1314,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
   // If this is a nominal type, get its Usr.
   if (auto *ND = Ty->getAnyNominal()) {
     Usr = calculateUsr(Ctx, ND);
+    MangledName = calculateMangledName(Ctx, ND);
   }
 }
 
@@ -1415,6 +1432,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   Name = getSimpleName(VD);
   PrintedName = getPrintedName(Ctx, VD);
   Usr = calculateUsr(Ctx, VD);
+  MangledName = calculateMangledName(Ctx, VD);
   IsThrowing = isFuncThrowing(VD);
   IsStatic = VD->isStatic();
   IsOverriding = VD->getOverriddenDecl();
@@ -1969,6 +1987,7 @@ void SDKNodeRoot::jsonize(json::Output &out) {
 void SDKNodeConformance::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
   output(out, KeyKind::KK_usr, Usr);
+  output(out, KeyKind::KK_mangledName, MangledName);
   output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
 }
 
@@ -1976,6 +1995,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
   out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declKind).data(), DKind);
   output(out, KeyKind::KK_usr, Usr);
+  output(out, KeyKind::KK_mangledName, MangledName);
   output(out, KeyKind::KK_location, Location);
   output(out, KeyKind::KK_moduleName, ModuleName);
   output(out, KeyKind::KK_genericSig, GenericSig);
