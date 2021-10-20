@@ -422,34 +422,6 @@ void checkProtocolSelfRequirements(ValueDecl *decl);
 /// declaration's type, otherwise we have no way to infer them.
 void checkReferencedGenericParams(GenericContext *dc);
 
-/// Construct a new generic environment for the given declaration context.
-///
-/// \param paramSource The source of generic info: either a generic parameter
-/// list or a generic context with a \c where clause dependent on outer
-/// generic parameters.
-///
-/// \param dc The declaration context in which to perform the validation.
-///
-/// \param outerSignature The generic signature of the outer
-/// context, if not available as part of the \c dc argument (used
-/// for SIL parsing).
-///
-/// \param allowConcreteGenericParams Whether or not to allow
-/// same-type constraints between generic parameters and concrete types.
-///
-/// \param additionalRequirements Additional requirements to add
-/// directly to the GSB.
-///
-/// \param inferenceSources Additional types to infer requirements from.
-///
-/// \returns the resulting generic signature.
-GenericSignature
-checkGenericSignature(GenericParamSource paramSource, DeclContext *dc,
-                      GenericSignature outerSignature,
-                      bool allowConcreteGenericParams,
-                      SmallVector<Requirement, 2> additionalRequirements = {},
-                      SmallVector<TypeLoc, 2> inferenceSources = {});
-
 /// Create a text string that describes the bindings of generic parameters
 /// that are relevant to the given set of types, e.g.,
 /// "[with T = Bar, U = Wibble]".

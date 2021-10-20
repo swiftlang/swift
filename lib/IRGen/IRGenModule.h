@@ -85,7 +85,6 @@ namespace clang {
 
 namespace swift {
   class GenericSignature;
-  class GenericSignatureBuilder;
   class AssociatedConformance;
   class AssociatedType;
   class ASTContext;

@@ -513,7 +513,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     headerSize += sizeof(AsyncTask::GroupChildFragment);
   }
   if (futureResultType) {
-    headerSize += FutureFragment::fragmentSize(futureResultType);
+    headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
     // Add the future async context prefix.
     headerSize += sizeof(FutureAsyncContextPrefix);
   } else {
