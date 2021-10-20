@@ -51,7 +51,7 @@ void allocateDirtyAndFreeChunk(void) {
 
   char *allocation = new char[ChunkSize];
 
-  memset(allocation, 255, ChunkSize);
+  memset(allocation, 0xff, ChunkSize);
 
   delete[] allocation;
 }
