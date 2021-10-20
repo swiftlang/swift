@@ -48,18 +48,12 @@ struct CanonicalizeInstruction {
   // May be overriden by passes.
   static constexpr const char *defaultDebugType = "sil-canonicalize";
   const char *debugType = defaultDebugType;
-  DeadEndBlocks &deadEndBlocks;
+  SILFunction *function;
   InstModCallbacks callbacks;
   bool preserveDebugInfo;
 
-  CanonicalizeInstruction(const char *passDebugType,
-                          DeadEndBlocks &deadEndBlocks)
-      : deadEndBlocks(deadEndBlocks),
-        callbacks() {
-
-    preserveDebugInfo = getFunction()->getEffectiveOptimizationMode()
-      <= OptimizationMode::NoOptimization;
-
+  CanonicalizeInstruction(SILFunction *f, const char *passDebugType)
+    : function(f), callbacks() {
 #ifndef NDEBUG
     if (llvm::DebugFlag && !llvm::isCurrentDebugType(debugType))
       debugType = passDebugType;
@@ -79,7 +73,7 @@ struct CanonicalizeInstruction {
 
   virtual ~CanonicalizeInstruction();
 
-  const SILFunction *getFunction() const { return deadEndBlocks.getFunction(); }
+  const SILFunction *getFunction() const { return function; }
 
   // TODO: callbacks should come from the current InstructionDeleter.
   InstModCallbacks &getCallbacks() { return callbacks; }

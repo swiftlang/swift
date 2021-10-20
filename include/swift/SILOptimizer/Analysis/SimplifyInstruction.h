@@ -35,8 +35,7 @@ struct InstModCallbacks;
 /// insert compensating instructions.
 SILBasicBlock::iterator
 replaceAllSimplifiedUsesAndErase(SILInstruction *I, SILValue result,
-                                 InstModCallbacks &callbacks,
-                                 DeadEndBlocks *deadEndBlocks = nullptr);
+                                 InstModCallbacks &callbacks);
 
 /// Attempt to map \p inst to a simplified result. Upon success, replace \p inst
 /// with this simplified result and erase \p inst. If the instruction initiates
@@ -48,8 +47,7 @@ replaceAllSimplifiedUsesAndErase(SILInstruction *I, SILValue result,
 /// NOTE: When \p I is in an OSSA function, this fails to optimize if \p
 /// deadEndBlocks is null.
 SILBasicBlock::iterator simplifyAndReplaceAllSimplifiedUsesAndErase(
-    SILInstruction *I, InstModCallbacks &callbacks,
-    DeadEndBlocks *deadEndBlocks = nullptr);
+    SILInstruction *I, InstModCallbacks &callbacks);
 
 // Simplify invocations of builtin operations that may overflow.
 /// All such operations return a tuple (result, overflow_flag).

@@ -742,13 +742,12 @@ case BuiltinValueKind::id:
 /// Return an iterator to the next (nondeleted) instruction.
 SILBasicBlock::iterator
 swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
-                                        InstModCallbacks &callbacks,
-                                        DeadEndBlocks *deadEndBlocks) {
+                                        InstModCallbacks &callbacks) {
   auto *svi = cast<SingleValueInstruction>(i);
   assert(svi != result && "Cannot RAUW a value with itself");
 
   if (svi->getFunction()->hasOwnership()) {
-    OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
+    OwnershipFixupContext ctx{callbacks};
     OwnershipRAUWHelper helper(ctx, svi, result);
     return helper.perform();
   }
@@ -779,8 +778,7 @@ static SILValue simplifyInstruction(SILInstruction *i) {
 }
 
 SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
-    SILInstruction *i, InstModCallbacks &callbacks,
-    DeadEndBlocks *deadEndBlocks) {
+    SILInstruction *i, InstModCallbacks &callbacks) {
   auto next = std::next(i->getIterator());
   auto *svi = dyn_cast<SingleValueInstruction>(i);
   if (!svi)
@@ -795,12 +793,7 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
   if (!svi->getFunction()->hasOwnership())
     return replaceAllUsesAndErase(svi, result, callbacks);
 
-  // If we weren't passed a dead end blocks, we can't optimize without ownership
-  // enabled.
-  if (!deadEndBlocks)
-    return next;
-
-  OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
+  OwnershipFixupContext ctx{callbacks};
   OwnershipRAUWHelper helper(ctx, svi, result);
 
   // If our RAUW helper is invalid, we do not support RAUWing this case, so

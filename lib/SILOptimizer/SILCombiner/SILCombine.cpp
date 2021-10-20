@@ -126,9 +126,9 @@ class SILCombineCanonicalize final : CanonicalizeInstruction {
   bool changed = false;
 
 public:
-  SILCombineCanonicalize(SmallSILInstructionWorklist<256> &Worklist,
-                         DeadEndBlocks &deadEndBlocks)
-      : CanonicalizeInstruction(DEBUG_TYPE, deadEndBlocks), Worklist(Worklist) {
+  SILCombineCanonicalize(SILFunction *f,
+                         SmallSILInstructionWorklist<256> &Worklist)
+    : CanonicalizeInstruction(f, DEBUG_TYPE), Worklist(Worklist) {
   }
 
   void notifyNewInstruction(SILInstruction *inst) override {
@@ -393,7 +393,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   // Add reachable instructions to our worklist.
   addReachableCodeToWorklist(&*F.begin());
 
-  SILCombineCanonicalize scCanonicalize(Worklist, deadEndBlocks);
+  SILCombineCanonicalize scCanonicalize(&F, Worklist);
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {

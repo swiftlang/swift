@@ -72,8 +72,8 @@ private:
   bool changed = false;
 
 public:
-  MandatoryCombineCanonicalize(Worklist &worklist, DeadEndBlocks &deadEndBlocks)
-      : CanonicalizeInstruction(DEBUG_TYPE, deadEndBlocks), worklist(worklist) {
+  MandatoryCombineCanonicalize(SILFunction *f, Worklist &worklist)
+    : CanonicalizeInstruction(f, DEBUG_TYPE), worklist(worklist) {
   }
 
   void notifyNewInstruction(SILInstruction *inst) override {
@@ -135,17 +135,14 @@ class MandatoryCombiner final
   InstModCallbacks instModCallbacks;
   SmallVectorImpl<SILInstruction *> &createdInstructions;
   SmallVector<SILInstruction *, 16> instructionsPendingDeletion;
-  DeadEndBlocks &deadEndBlocks;
 
 public:
   MandatoryCombiner(bool optimized,
-                    SmallVectorImpl<SILInstruction *> &createdInstructions,
-                    DeadEndBlocks &deadEndBlocks)
+                    SmallVectorImpl<SILInstruction *> &createdInstructions)
       : compilingWithOptimization(optimized), worklist("MC"), madeChange(false),
         iteration(0),
         instModCallbacks(),
-        createdInstructions(createdInstructions),
-        deadEndBlocks(deadEndBlocks) {
+        createdInstructions(createdInstructions) {
     instModCallbacks = InstModCallbacks()
       .onDelete([&](SILInstruction *instruction) {
         worklist.erase(instruction);
@@ -244,7 +241,7 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
   madeChange = false;
 
   addReachableCodeToWorklist(function);
-  MandatoryCombineCanonicalize mcCanonicialize(worklist, deadEndBlocks);
+  MandatoryCombineCanonicalize mcCanonicialize(&function, worklist);
 
   while (!worklist.isEmpty()) {
     auto *instruction = worklist.pop_back_val();
@@ -395,8 +392,7 @@ public:
       return;
     }
 
-    DeadEndBlocks deadEndBlocks(function);
-    MandatoryCombiner combiner(optimized, createdInstructions, deadEndBlocks);
+    MandatoryCombiner combiner(optimized, createdInstructions);
     bool madeChange = combiner.runOnFunction(*function);
 
     if (madeChange) {
