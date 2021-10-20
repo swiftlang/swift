@@ -2551,11 +2551,11 @@ public:
     bool success = useKind == AddressUseKind::NonEscaping;
 
     require(!success || checkScopedAddressUses(
-                            scopedAddress, &scopedAddressLiveness, &DEBlocks),
+              scopedAddress, &scopedAddressLiveness, DEBlocks.get()),
             "Ill formed store_borrow scope");
 
     require(!success || !hasOtherStoreBorrowsInLifetime(
-                            SI, &scopedAddressLiveness, &DEBlocks),
+              SI, &scopedAddressLiveness, DEBlocks.get()),
             "A store_borrow cannot be nested within another "
             "store_borrow to its destination");
 
