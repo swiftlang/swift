@@ -339,6 +339,7 @@ struct PlatformIntroVersion {
 class SDKNodeDecl: public SDKNode {
   DeclKind DKind;
   StringRef Usr;
+  StringRef MangledName;
   SourceLoc Loc;
   StringRef Location;
   StringRef ModuleName;
@@ -463,6 +464,7 @@ public:
 
 class SDKNodeTypeNominal : public SDKNodeType {
   StringRef USR;
+  StringRef MangledName;
 public:
   SDKNodeTypeNominal(SDKNodeInitInfo Info);
   // Get the usr of the corresponding nominal type decl.
@@ -583,6 +585,7 @@ public:
 /// in the conformance, thus getName() will give us the name of the protocol.
 class SDKNodeConformance: public SDKNode {
   StringRef Usr;
+  StringRef MangledName;
   SDKNodeDeclType *TypeDecl;
   friend class SDKNodeDeclType;
   bool IsABIPlaceholder;

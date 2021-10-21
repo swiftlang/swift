@@ -18,7 +18,7 @@
 // CHECK: func constLvalueReference<T>(_: UnsafePointer<T>)
 // CHECK: func forwardingReference<T>(_: UnsafeMutablePointer<T>)
 
-// CHECK: extension Orbiters {
+// CHECK: enum Orbiters {
 // CHECK:   static func galileo<T>(_: T)
 // CHECK:   static func cassini<T, U>(_: T, _: U)
 // CHECK:   static func magellan<T>(_: UnsafeMutablePointer<T>)

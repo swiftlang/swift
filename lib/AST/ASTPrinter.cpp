@@ -30,6 +30,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -44,6 +45,7 @@
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
@@ -2158,10 +2160,54 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   indent();
 }
 
+// This provides logic for looking up all members of a namespace. This is
+// intentionally implemented only in the printer and should *only* be used for
+// debugging, testing, generating module dumps, etc. (In other words, if you're
+// trying to get all the members of a namespace in another part of the compiler,
+// you're probably doing somethign wrong. This is a very expensive operation,
+// so we want to do it only when absolutely nessisary.)
+static void addNamespaceMembers(Decl *decl,
+                                llvm::SmallVector<Decl *, 16> &members) {
+  auto &ctx = decl->getASTContext();
+  auto namespaceDecl = cast<clang::NamespaceDecl>(decl->getClangDecl());
+
+  // This is only to keep track of the members we've already seen.
+  llvm::SmallPtrSet<Decl *, 16> addedMembers;
+  for (auto redecl : namespaceDecl->redecls()) {
+    for (auto member : redecl->decls()) {
+      if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
+        // Hack in the class template specializations that live here.
+        for (auto spec : classTemplate->specializations()) {
+          if (auto import =
+                  ctx.getClangModuleLoader()->importDeclDirectly(spec))
+            if (addedMembers.insert(import).second)
+              members.push_back(import);
+        }
+      }
+
+      auto namedDecl = dyn_cast<clang::NamedDecl>(member);
+      if (!namedDecl)
+        continue;
+
+      auto name = ctx.getClangModuleLoader()->importName(namedDecl);
+      if (!name)
+        continue;
+
+      // If we're building libSyntaxParser, #if out the clang importer request
+      // because libSyntaxParser doesn't know about the clang importer.
+      CXXNamespaceMemberLookup lookupRequest({cast<EnumDecl>(decl), name});
+      for (auto found : evaluateOrDefault(ctx.evaluator, lookupRequest, {})) {
+        if (addedMembers.insert(found).second)
+          members.push_back(found);
+      }
+    }
+  }
+}
+
 void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
                                   bool openBracket,
                                   bool closeBracket) {
-  llvm::SmallVector<Decl *, 3> Members;
+  llvm::SmallVector<Decl *, 16> Members;
   auto AddMembers = [&](IterableDeclContext *idc) {
     if (Options.PrintCurrentMembersOnly) {
       for (auto RD : idc->getMembers())
@@ -2188,6 +2234,8 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
         }
       }
     }
+    if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl()))
+      addNamespaceMembers(D, Members);
   }
   printMembers(Members, needComma, openBracket, closeBracket);
 }
