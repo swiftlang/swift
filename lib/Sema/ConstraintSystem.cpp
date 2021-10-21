@@ -3000,7 +3000,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
 
     if (isa<AbstractFunctionDecl>(decl) || isa<TypeDecl>(decl)) {
-      if (choice.getFunctionRefKind() == FunctionRefKind::Unapplied) {
+      auto anchor = locator->getAnchor();
+      // TODO: Instead of not increasing the score for arguments to #selector,
+      // a better fix for this is to port over the #selector diagnostics from
+      // CSApply to constraint fixes, and not attempt invalid disjunction
+      // choices based on the selector kind on the valid code path.
+      if (choice.getFunctionRefKind() == FunctionRefKind::Unapplied &&
+          !UnevaluatedRootExprs.contains(getAsExpr(anchor))) {
         increaseScore(SK_UnappliedFunction);
       }
     }
