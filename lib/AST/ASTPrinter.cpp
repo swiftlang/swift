@@ -5906,6 +5906,7 @@ swift::getInheritedForPrinting(
   // Collect synthesized conformances.
   auto &ctx = decl->getASTContext();
   llvm::SetVector<ProtocolDecl *> protocols;
+  llvm::TinyPtrVector<ProtocolDecl *> uncheckedProtocols;
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     if (auto *proto = ctx.getProtocol(attr->getProtocolKind())) {
       // The SerialExecutor conformance is only synthesized on the root
@@ -5918,11 +5919,14 @@ swift::getInheritedForPrinting(
           cast<EnumDecl>(decl)->hasRawType())
         continue;
       protocols.insert(proto);
+      if (attr->isUnchecked())
+        uncheckedProtocols.push_back(proto);
     }
   }
 
   for (size_t i = 0; i < protocols.size(); i++) {
     auto proto = protocols[i];
+    bool isUnchecked = llvm::is_contained(uncheckedProtocols, proto);
 
     if (!options.shouldPrint(proto)) {
       // If private stdlib protocols are skipped and this is a private stdlib
@@ -5933,12 +5937,14 @@ swift::getInheritedForPrinting(
           proto->isPrivateStdlibDecl(!options.SkipUnderscoredStdlibProtocols)) {
         auto inheritedProtocols = proto->getInheritedProtocols();
         protocols.insert(inheritedProtocols.begin(), inheritedProtocols.end());
+        if (isUnchecked)
+          copy(inheritedProtocols, std::back_inserter(uncheckedProtocols));
       }
       continue;
     }
 
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                       /*isUnchecked=*/false});
+                       isUnchecked});
   }
 }
 

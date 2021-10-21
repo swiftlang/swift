@@ -168,8 +168,9 @@ protected:
     );
 
     SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute,
-                          NumKnownProtocolKindBits,
-      kind : NumKnownProtocolKindBits
+                          NumKnownProtocolKindBits+1,
+      kind : NumKnownProtocolKindBits,
+      isUnchecked : 1
     );
   } Bits;
 
@@ -1276,17 +1277,23 @@ class SynthesizedProtocolAttr : public DeclAttribute {
 
 public:
   SynthesizedProtocolAttr(KnownProtocolKind protocolKind,
-                          LazyConformanceLoader *Loader)
+                          LazyConformanceLoader *Loader,
+                          bool isUnchecked)
     : DeclAttribute(DAK_SynthesizedProtocol, SourceLoc(), SourceRange(),
                     /*Implicit=*/true), Loader(Loader)
   {
     Bits.SynthesizedProtocolAttr.kind = unsigned(protocolKind);
+    Bits.SynthesizedProtocolAttr.isUnchecked = unsigned(isUnchecked);
   }
 
   /// Retrieve the known protocol kind naming the protocol to be
   /// synthesized.
   KnownProtocolKind getProtocolKind() const {
     return KnownProtocolKind(Bits.SynthesizedProtocolAttr.kind);
+  }
+
+  bool isUnchecked() const {
+    return bool(Bits.SynthesizedProtocolAttr.isUnchecked);
   }
 
   /// Retrieve the lazy loader that will be used to populate the
