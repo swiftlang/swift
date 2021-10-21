@@ -306,9 +306,22 @@ enum class SendableCheck {
 Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 checkGlobalActorAttributes(
     SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
-/// Get the explicit global actor specified for a closure.
 
+/// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);
+
+/// Adjust the given function type to account for concurrency-specific
+/// attributes whose affect on the type might differ based on context.
+/// This includes adjustments for unsafe parameter attributes like
+/// `@_unsafeSendable` and `@_unsafeMainActor` as well as a global actor
+/// on the declaration itself.
+AnyFunctionType *adjustFunctionTypeForConcurrency(
+    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue);
+
+/// Determine whether the given name is that of a DispatchQueue operation that
+/// takes a closure to be executed on the queue.
+bool isDispatchQueueOperationName(StringRef name);
 
 /// Check the correctness of the given Sendable conformance.
 ///

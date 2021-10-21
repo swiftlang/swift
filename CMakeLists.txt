@@ -405,6 +405,18 @@ option(SWIFT_REPORT_STATISTICS
     "Create json files which contain internal compilation statistics"
     FALSE)
 
+# Only Darwin platforms enable ObjC interop by default.
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
+  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP_default TRUE)
+else()
+  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP_default FALSE)
+endif()
+
+# Used by stdlib/toolchain as well, so this cannot be in stdlib/CMakeLists.txt
+option(SWIFT_STDLIB_ENABLE_OBJC_INTEROP
+       "Should stdlib be built with Obj-C interop."
+       "${SWIFT_STDLIB_ENABLE_OBJC_INTEROP_default}")
+
 # FIXME(wasm) Reflection tests are temporalily disabled due to lack of linker features
 option(SWIFTWASM_DISABLE_REFLECTION_TEST
     "Disable building swift-reflection-test for WebAssembly build"

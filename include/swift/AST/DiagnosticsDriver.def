@@ -166,6 +166,14 @@ ERROR(error_darwin_only_supports_libcxx, none,
       "The only C++ standard library supported on Apple platforms is libc++",
       ())
 
+ERROR(error_hermetic_seal_cannot_have_library_evolution, none,
+      "Cannot use -experimental-hermetic-seal-at-link with -enable-library-evolution",
+      ())
+
+ERROR(error_hermetic_seal_requires_lto, none,
+      "-experimental-hermetic-seal-at-link requires -lto=llvm-full or -lto=llvm-thin",
+      ())
+
 WARNING(warn_drv_darwin_sdk_invalid_settings, none,
     "SDK settings were ignored because 'SDKSettings.json' could not be parsed",
     ())

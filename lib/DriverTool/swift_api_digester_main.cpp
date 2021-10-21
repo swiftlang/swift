@@ -553,7 +553,10 @@ static void diagnoseRemovedDecl(const SDKNodeDecl *D) {
     if (D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient))
       return;
   }
-  D->emitDiag(SourceLoc(), diag::removed_decl, D->isDeprecated());
+  // Don't diagnose removal of deprecated APIs.
+  if (!D->isDeprecated()) {
+    D->emitDiag(SourceLoc(), diag::removed_decl, false);
+  }
 }
 
 // This is first pass on two given SDKNode trees. This pass removes the common part

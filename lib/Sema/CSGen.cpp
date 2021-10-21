@@ -3464,7 +3464,8 @@ namespace {
       // Note that the subexpression of a #selector expression is
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
-        CG.getConstraintSystem().UnevaluatedRootExprs.insert(sel->getSubExpr());
+        auto *subExpr = sel->getSubExpr()->getSemanticsProvidingExpr();
+        CG.getConstraintSystem().UnevaluatedRootExprs.insert(subExpr);
       }
 
       // Check an objc key-path expression, which fills in its semantic

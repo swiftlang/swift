@@ -85,7 +85,6 @@ namespace clang {
 
 namespace swift {
   class GenericSignature;
-  class GenericSignatureBuilder;
   class AssociatedConformance;
   class AssociatedType;
   class ASTContext;
@@ -1462,6 +1461,11 @@ public:
       SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
+
+  void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
+                                      llvm::Constant *dependsOn);
+  void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
+                                      const ProtocolConformance *conformance);
 
   llvm::Constant *
   getAddrOfTypeMetadata(CanType concreteType,

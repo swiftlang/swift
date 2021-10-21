@@ -116,7 +116,6 @@ Struct TaskGroup has generic signature change from <ChildTaskResult> to <ChildTa
 Struct TaskGroup.Iterator has generic signature change from <ChildTaskResult> to <ChildTaskResult where ChildTaskResult : Swift.Sendable>
 Struct ThrowingTaskGroup has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
 Struct ThrowingTaskGroup.Iterator has generic signature change from <ChildTaskResult, Failure where Failure : Swift.Error> to <ChildTaskResult, Failure where ChildTaskResult : Swift.Sendable, Failure : Swift.Error>
-Struct YieldingContinuation has been removed (deprecated)
 Subscript TaskLocal.subscript(_enclosingInstance:wrapped:storage:) has been removed
 Var UnownedJob.context has mangled name changing from 'Swift.UnownedJob.(context in #UNSTABLE ID#) : Builtin.Job' to 'Swift.UnownedJob.(context in #UNSTABLE ID#) : Builtin.Job'
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

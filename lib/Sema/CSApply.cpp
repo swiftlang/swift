@@ -5631,10 +5631,8 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 
 /// Apply the contextually Sendable flag to the given expression,
 static void applyContextualClosureFlags(
-      Expr *expr, bool sendable, bool forMainActor, bool implicitSelfCapture,
-      bool inheritActorContext) {
+      Expr *expr, bool implicitSelfCapture, bool inheritActorContext) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-    closure->setUnsafeConcurrent(sendable, forMainActor);
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     closure->setInheritsActorContext(inheritActorContext);
     return;
@@ -5642,46 +5640,14 @@ static void applyContextualClosureFlags(
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
     applyContextualClosureFlags(
-        captureList->getClosureBody(), sendable, forMainActor,
-        implicitSelfCapture, inheritActorContext);
+        captureList->getClosureBody(), implicitSelfCapture,
+        inheritActorContext);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
     applyContextualClosureFlags(
-        identity->getSubExpr(), sendable, forMainActor,
-        implicitSelfCapture, inheritActorContext);
+        identity->getSubExpr(), implicitSelfCapture, inheritActorContext);
   }
-}
-
-/// Whether this is a reference to a method on the main dispatch queue.
-static bool isMainDispatchQueue(Expr *arg) {
-  auto call = dyn_cast<DotSyntaxCallExpr>(arg);
-  if (!call)
-    return false;
-
-  auto memberRef = dyn_cast<MemberRefExpr>(
-      call->getBase()->getValueProvidingExpr());
-  if (!memberRef)
-    return false;
-
-  auto member = memberRef->getMember();
-  if (member.getDecl()->getName().getBaseName().userFacingName() != "main")
-    return false;
-
-  auto typeExpr = dyn_cast<TypeExpr>(
-      memberRef->getBase()->getValueProvidingExpr());
-  if (!typeExpr)
-    return false;
-
-  Type baseType = typeExpr->getInstanceType();
-  if (!baseType)
-    return false;
-
-  auto baseNominal = baseType->getAnyNominal();
-  if (!baseNominal)
-    return false;
-
-  return baseNominal->getName().str() == "DispatchQueue";
 }
 
 ArgumentList *ExprRewriter::coerceCallArguments(
@@ -5825,16 +5791,12 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     // for things like trailing closures and args to property wrapper params.
     arg.setLabel(param.getLabel());
 
-    // Determine whether the parameter is unsafe Sendable or MainActor, and
-    // record it as such.
-    bool isUnsafeSendable = paramInfo.isUnsafeSendable(paramIdx);
-    bool isMainActor = paramInfo.isUnsafeMainActor(paramIdx) ||
-        (isUnsafeSendable && apply && isMainDispatchQueue(apply->getFn()));
+    // Determine whether the closure argument should be treated as having
+    // implicit self capture or inheriting actor context.
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
     bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
     applyContextualClosureFlags(
-        argExpr, isUnsafeSendable && contextUsesConcurrencyFeatures(dc),
-        isMainActor, isImplicitSelfCapture, inheritsActorContext);
+        argExpr, isImplicitSelfCapture, inheritsActorContext);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
