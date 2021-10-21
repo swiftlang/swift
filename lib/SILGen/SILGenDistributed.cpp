@@ -100,39 +100,6 @@ static void emitDistributedIfRemoteBranch(SILGenFunction &SGF,
 
 // MARK: local instance initialization
 
-/// Finds the first `ActorTransport`-compatible parameter of the given function.
-/// Crashes if the given function does not have such a parameter.
-static SILArgument *findFirstActorTransportArg(SILFunction &F) {
-  auto *module = F.getModule().getSwiftModule();
-  auto &C = F.getASTContext();
-
-  auto *transportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
-  Type transportTy = transportProto->getDeclaredInterfaceType();
-
-  for (auto arg : F.getArguments()) {
-    // TODO(distributed): also be able to locate a generic transport
-    Type argTy = arg->getType().getASTType();
-    auto argDecl = arg->getDecl();
-
-    auto conformsToTransport =
-        module->lookupConformance(argDecl->getInterfaceType(), transportProto);
-
-    // Is it a protocol that conforms to ActorTransport?
-    if (argTy->isEqual(transportTy) || conformsToTransport) {
-      return arg;
-    }
-
-    // Is it some specific ActorTransport?
-    auto result = module->lookupConformance(argTy, transportProto);
-    if (!result.isInvalid()) {
-      return arg;
-    }
-  }
-
-  // did not find argument of ActorTransport type!
-  llvm_unreachable("Missing required ActorTransport argument!");
-}
-
 /// For the initialization of a local distributed actor instance, emits code to initialize the instance's
 /// stored property corresponding to the transport.
 static void emitTransportInit(SILGenFunction &SGF,
@@ -200,8 +167,7 @@ static void emitIdentityInit(SILGenFunction &SGF, ConstructorDecl *ctor,
   assert(distributedActorProto);
   assert(transportProto);
 
-  SILValue transportValue =
-      loadActorTransport(B, loc, classDecl, borrowedSelfArg.getValue());
+  SILValue transportValue = findFirstActorTransportArg(F);
 
   // --- Open the transport existential, if needed.
   auto transportASTType = transportValue->getType().getASTType();
@@ -296,15 +262,12 @@ void SILGenFunction::emitDistributedActorReady(
   // Only designated initializers get the lifecycle handling injected
   assert(ctor->isDesignatedInit());
 
-  auto *dc = ctor->getDeclContext();
-  auto classDecl = dc->getSelfClassDecl();
-
   SILValue transport = findFirstActorTransportArg(F);
 
   FullExpr scope(Cleanups, CleanupLocation(loc));
   auto borrowedSelf = actorSelf.borrow(*this, loc);
 
-  emitActorReadyCall(B, loc, classDecl, borrowedSelf.getValue(), transport);
+  emitActorReadyCall(B, loc, borrowedSelf.getValue(), transport);
 }
 
 // MARK: remote instance initialization

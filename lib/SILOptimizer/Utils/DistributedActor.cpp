@@ -18,33 +18,46 @@
 
 namespace swift {
 
-// MARK: utilities
+SILArgument *findFirstActorTransportArg(SILFunction &F) {
+  auto *module = F.getModule().getSwiftModule();
+  auto &C = F.getASTContext();
 
-SILValue loadActorTransport(SILBuilder &B, SILLocation loc,
-                            ClassDecl *actorDecl, SILValue actorSelf) {
-  assert(actorDecl->isDistributedActor());
+  auto *transportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
+  Type transportTy = transportProto->getDeclaredInterfaceType();
 
-  // get the VarDecl corresponding to the transport
-  auto &C = actorDecl->getASTContext();
-  auto refs = actorDecl->lookupDirect(C.Id_actorTransport);
-  assert(refs.size() == 1);
-  VarDecl *prop = dyn_cast<VarDecl>(refs.front());
+  for (auto arg : F.getArguments()) {
+    // TODO(distributed): also be able to locate a generic transport
+    Type argTy = arg->getType().getASTType();
+    auto argDecl = arg->getDecl();
 
-  // form a reference and load it
-  auto &F = B.getFunction();
-  auto fieldAddr = B.createRefElementAddr(
-      loc, actorSelf, prop, F.getLoweredType(prop->getInterfaceType()));
-  return B.createLoad(loc, fieldAddr, LoadOwnershipQualifier::Copy);
+    auto conformsToTransport =
+        module->lookupConformance(argDecl->getInterfaceType(), transportProto);
+
+    // Is it a protocol that conforms to ActorTransport?
+    if (argTy->isEqual(transportTy) || conformsToTransport) {
+      return arg;
+    }
+
+    // Is it some specific ActorTransport?
+    auto result = module->lookupConformance(argTy, transportProto);
+    if (!result.isInvalid()) {
+      return arg;
+    }
+  }
+
+#ifndef NDEBUG
+  llvm_unreachable("Missing required ActorTransport argument!");
+#endif
+
+  return nullptr;
 }
 
-// MARK: exposed interface
-
-void emitActorReadyCall(SILBuilder &B, SILLocation loc, ClassDecl *actorDecl,
-                        SILValue actor, SILValue transport) {
+void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
+                        SILValue transport) {
 
   auto &F = B.getFunction();
   auto &M = B.getModule();
-  auto &C = actorDecl->getASTContext();
+  auto &C = F.getASTContext();
 
   ProtocolDecl *actorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
   ProtocolDecl *transProto = C.getProtocol(KnownProtocolKind::ActorTransport);
@@ -69,10 +82,7 @@ void emitActorReadyCall(SILBuilder &B, SILLocation loc, ClassDecl *actorDecl,
   assert(!transportConfRef.isInvalid() &&
          "Missing conformance to `ActorTransport`");
 
-  auto *selfTyDecl = actorDecl->getSelfNominalTypeDecl();
-  auto selfTy = F.mapTypeIntoContext(
-      selfTyDecl->getDeclaredInterfaceType()); // TODO: thats just self var devl
-                                               // getType
+  Type selfTy = F.mapTypeIntoContext(actor->getType().getASTType());
 
   // Note: it does not matter on what module we perform the lookup,
   // it is currently ignored. So the Stdlib module is good enough.
