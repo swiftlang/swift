@@ -29,7 +29,7 @@ using namespace swift;
 
 llvm::cl::opt<bool> EnableCompleteOSSALifetimes(
     "complete-ossa-lifetimes",
-    llvm::cl::init(false),
+    llvm::cl::init(true),
     llvm::cl::desc("Automatically complete OSSA lifetimes after SILGen"),
     llvm::cl::Hidden);
 
