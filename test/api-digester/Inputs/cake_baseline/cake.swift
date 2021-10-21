@@ -232,3 +232,6 @@ open class AddingNewDesignatedInit {
     print(foo)
   }
 }
+
+@_silgen_name("sil_name_before")
+public func silGenNameGiven() {}
