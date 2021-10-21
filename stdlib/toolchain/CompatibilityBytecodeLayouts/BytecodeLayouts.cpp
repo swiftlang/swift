@@ -521,8 +521,8 @@ BitVector AlignedGroup::spareBits() const {
   size_t offsetOfBest = 0;
   BitVector maskOfBest;
 
-  for (auto field : fields) {
-    BitVector fieldSpareBits = ::spareBits(field.fieldPtr, metadata);
+  for (size_t fieldIdx = 0; fieldIdx < fields.size(); fieldIdx++) {
+    BitVector fieldSpareBits = ::spareBits(fields[fieldIdx].fieldPtr, metadata);
     // We're supposed to pick the first field (see
     // RecordTypeInfoImpl::getFixedExtraInhabitantProvidingField), but what
     // "first" seems to be gets reversed somewhere? So we pick the last field
@@ -531,9 +531,47 @@ BitVector AlignedGroup::spareBits() const {
       offsetOfBest = offset;
       maskOfBest = fieldSpareBits;
     }
-    uint64_t shiftValue = uint64_t(1) << (field.alignment - '0');
-    uint64_t alignMask = shiftValue - 1;
 
+    uint64_t alignMask = 0;
+    uint64_t size = 0;
+    if (fields[fieldIdx].alignment == '?') {
+      // This must be an archetype or resilient type.
+      switch ((LayoutType)fields[fieldIdx].fieldPtr[0]) {
+      case LayoutType::ArcheType: {
+        // Grab the index from the
+        // archetype and consult the metadata
+        size_t fieldOffset = 1;
+        // 'A' <index: UINT32>
+        uint32_t archetypeIndex =
+            readBytes<uint32_t>(fields[fieldIdx].fieldPtr, fieldOffset);
+        const Metadata *archetypeMetadata =
+            getGenericArgs((Metadata *)metadata)[archetypeIndex];
+        alignMask = archetypeMetadata->getValueWitnesses()->getAlignmentMask();
+        offset = ((uint64_t)offset + alignMask) & (~alignMask);
+        size = archetypeMetadata->getValueWitnesses()->getSize();
+        break;
+      }
+      case LayoutType::ResilientType: {
+        // 'R' <nameLength: uint32_t> <mangledName...>
+        size_t fieldOffset = 1;
+        const uint8_t *fieldLayout = fields[fieldIdx].fieldPtr;
+        uint32_t mangledNameLength = readBytes<uint32_t>(fieldLayout, fieldOffset);
+        const Metadata *resilientMetadata = swift_getTypeByMangledNameInContext(
+            (const char *)(fieldLayout + offset), mangledNameLength, nullptr,
+            (const void *const *)getGenericArgs(metadata));
+        alignMask = resilientMetadata->getValueWitnesses()->getAlignmentMask();
+        size += resilientMetadata->getValueWitnesses()->getSize();
+        break;
+      }
+      default:
+        assert(false &&
+               "Only Archetypes and Resilient types should have '?' alignment");
+      }
+    } else {
+      uint64_t shiftValue = uint64_t(1) << (fields[fieldIdx].alignment - '0');
+      alignMask = shiftValue - 1;
+      size = computeSize(fields[fieldIdx].fieldPtr, metadata);
+    }
     // When we align, all the bits are spare and are considered a field we can
     // put spare bits into
     size_t oldOffset = offset;
@@ -544,8 +582,7 @@ BitVector AlignedGroup::spareBits() const {
       offsetOfBest = oldOffset;
       maskOfBest = alignmentSpareBits;
     }
-
-    offset += computeSize(field.fieldPtr, metadata);
+    offset += size;
   }
 
   return BitVector(offsetOfBest * 8) + maskOfBest +
@@ -699,9 +736,6 @@ uint32_t getEnumTagSinglePayload(void *addr, const uint8_t *layoutString,
       return payloadIndex - e.numEmptyPayloads;
     return payloadIndex;
   }
-  case LayoutType::MultiPayloadEnum:
-    assert(false && "nyi");
-    return UINT32_MAX;
   case LayoutType::ArcheType: {
     // Read 'A'
     // Kind is a pointer sized int at offset 0 of metadata pointer
@@ -713,7 +747,9 @@ uint32_t getEnumTagSinglePayload(void *addr, const uint8_t *layoutString,
         ->getEnumTagSinglePayload((const OpaqueValue *)addr, numEmptyPayloads,
                                   getGenericArgs(metadata)[index]);
   }
+  case LayoutType::MultiPayloadEnum:
   case LayoutType::ResilientType:
+    // We don't store extra inhabitants in these types
     return UINT32_MAX;
   }
 }
@@ -827,14 +863,50 @@ swift_generic_destroy(void *address, void *metadata,
   switch ((LayoutType)typeLayout[0]) {
   case LayoutType::AlignedGroup: {
     AlignedGroup group = readAlignedGroup(typeLayout, typedMetadata);
-    StructMetadata *structMetadata = (StructMetadata *)typedMetadata;
     auto fields = group.fields;
     for (unsigned fieldIdx = 0; fieldIdx < fields.size(); fieldIdx++) {
       if (fields[fieldIdx].alignment == '?') {
-        unsigned fieldOffset = structMetadata->getFieldOffsets()[fieldIdx];
-        addr = (uint8_t *)address + fieldOffset;
-        swift_generic_destroy(addr, metadata, fields[fieldIdx].fieldPtr);
-        addr += computeSize(fields[fieldIdx].fieldPtr, typedMetadata);
+        switch ((LayoutType)fields[fieldIdx].fieldPtr[0]) {
+        case LayoutType::ArcheType: {
+          // Grab the index from the
+          // archetype and consult the metadata
+          size_t offset = 1;
+          // 'A' <index: UINT32>
+          uint32_t archetypeIndex =
+              readBytes<uint32_t>(fields[fieldIdx].fieldPtr, offset);
+          const Metadata *archetypeMetadata =
+              getGenericArgs((Metadata *)metadata)[archetypeIndex];
+          uint64_t alignMask =
+              archetypeMetadata->getValueWitnesses()->getAlignmentMask();
+          addr = (uint8_t *)((((uint64_t)addr) + alignMask) & (~alignMask));
+          archetypeMetadata->getValueWitnesses()->destroy((OpaqueValue *)addr,
+                                                          archetypeMetadata);
+          addr += archetypeMetadata->getValueWitnesses()->getSize();
+          break;
+        }
+        case LayoutType::ResilientType: {
+          // 'R' <nameLength: uint32_t> <mangledName...>
+          size_t offset = 1;
+          const uint8_t *fieldLayout = fields[fieldIdx].fieldPtr;
+          uint32_t mangledNameLength = readBytes<uint32_t>(fieldLayout, offset);
+          const Metadata *resilientMetadata =
+              swift_getTypeByMangledNameInContext(
+                  (const char *)(fieldLayout + offset), mangledNameLength,
+                  nullptr,
+                  (const void *const *)getGenericArgs((Metadata *)metadata));
+          uint64_t alignMask =
+              resilientMetadata->getValueWitnesses()->getAlignmentMask();
+          addr = (uint8_t *)((((uint64_t)addr) + alignMask) & (~alignMask));
+          resilientMetadata->getValueWitnesses()->destroy((OpaqueValue *)addr,
+                                                          resilientMetadata);
+          addr += resilientMetadata->getValueWitnesses()->getSize();
+          break;
+        }
+        default:
+          assert(
+              false &&
+              "Only Archetypes and Resilient types should have '?' alignment");
+        }
       } else {
         uint64_t shiftValue = uint64_t(1) << (fields[fieldIdx].alignment - '0');
         uint64_t alignMask = shiftValue - 1;
@@ -910,10 +982,9 @@ swift_generic_destroy(void *address, void *metadata,
     return;
   }
   case LayoutType::ArcheType: {
-    // Read 'A'
+    // Read 'A' <index: uint32_t>
     // Kind is a pointer sized int at offset 0 of metadata pointer
-    size_t offset = 0;
-    readBytes<uint8_t>(typeLayout, offset);
+    size_t offset = 1;
     uint32_t index = readBytes<uint32_t>(typeLayout, offset);
     getGenericArgs(typedMetadata)[index]->getValueWitnesses()->destroy(
         (OpaqueValue *)addr, getGenericArgs(typedMetadata)[index]);
@@ -946,18 +1017,74 @@ swift_generic_initialize(void *dest, void *src, void *metadata,
   switch ((LayoutType)typeLayout[offset]) {
   case LayoutType::AlignedGroup: {
     AlignedGroup group = readAlignedGroup(typeLayout, typedMetadata);
-    StructMetadata *structMetadata = (StructMetadata *)typedMetadata;
     auto fields = group.fields;
     for (unsigned fieldIdx = 0; fieldIdx < fields.size(); fieldIdx++) {
       if (fields[fieldIdx].alignment == '?') {
-        unsigned fieldOffset = structMetadata->getFieldOffsets()[fieldIdx];
-        srcAddr = (uint8_t *)src + fieldOffset;
-        destAddr = (uint8_t *)dest + fieldOffset;
-        swift_generic_initialize(destAddr, srcAddr, metadata,
-                                 fields[fieldIdx].fieldPtr, isTake);
-        unsigned size = computeSize(fields[fieldIdx].fieldPtr, typedMetadata);
-        srcAddr += size;
-        destAddr += size;
+        switch ((LayoutType)fields[fieldIdx].fieldPtr[0]) {
+        case LayoutType::ArcheType: {
+          // Grab the index from the
+          // archetype and consult the metadata
+          // 'A' <index: UINT32>
+          size_t offset = 1;
+          uint32_t archetypeIndex =
+              readBytes<uint32_t>(fields[fieldIdx].fieldPtr, offset);
+          const Metadata *archetypeMetadata =
+              getGenericArgs((Metadata *)metadata)[archetypeIndex];
+          uint64_t alignMask =
+              archetypeMetadata->getValueWitnesses()->getAlignmentMask();
+          destAddr =
+              (uint8_t *)((((uint64_t)destAddr) + alignMask) & (~alignMask));
+          srcAddr =
+              (uint8_t *)((((uint64_t)srcAddr) + alignMask) & (~alignMask));
+          if (isTake) {
+            archetypeMetadata->getValueWitnesses()->initializeWithTake(
+                (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr,
+                archetypeMetadata);
+          } else {
+            archetypeMetadata->getValueWitnesses()->initializeWithCopy(
+                (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr,
+                archetypeMetadata);
+          }
+          uint32_t size = archetypeMetadata->getValueWitnesses()->getSize();
+          srcAddr += size;
+          destAddr += size;
+          break;
+        }
+        case LayoutType::ResilientType: {
+          // 'R' <nameLength: uint32_t> <mangledName...>
+          size_t offset = 1;
+          const uint8_t *fieldLayout = fields[fieldIdx].fieldPtr;
+          uint32_t mangledNameLength = readBytes<uint32_t>(fieldLayout, offset);
+          const Metadata *resilientMetadata =
+              swift_getTypeByMangledNameInContext(
+                  (const char *)(fieldLayout + offset), mangledNameLength,
+                  nullptr,
+                  (const void *const *)getGenericArgs((Metadata *)metadata));
+          uint64_t alignMask =
+              resilientMetadata->getValueWitnesses()->getAlignmentMask();
+          destAddr =
+              (uint8_t *)((((uint64_t)destAddr) + alignMask) & (~alignMask));
+          srcAddr =
+              (uint8_t *)((((uint64_t)srcAddr) + alignMask) & (~alignMask));
+          if (isTake) {
+            resilientMetadata->getValueWitnesses()->initializeWithTake(
+                (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr,
+                resilientMetadata);
+          } else {
+            resilientMetadata->getValueWitnesses()->initializeWithCopy(
+                (OpaqueValue *)destAddr, (OpaqueValue *)srcAddr,
+                resilientMetadata);
+          }
+          uint32_t size = resilientMetadata->getValueWitnesses()->getSize();
+          srcAddr += size;
+          destAddr += size;
+          break;
+        }
+        default:
+          assert(
+              false &&
+              "Only Archetypes and Resilient types should have '?' alignment");
+        }
       } else {
         uint64_t shiftValue = uint64_t(1) << (fields[fieldIdx].alignment - '0');
         uint64_t alignMask = shiftValue - 1;
