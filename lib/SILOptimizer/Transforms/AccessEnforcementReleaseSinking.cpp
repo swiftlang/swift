@@ -155,6 +155,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AllocRaw:
     case BuiltinValueKind::DeallocRaw:
     case BuiltinValueKind::Fence:
+    case BuiltinValueKind::Ifdef:
     case BuiltinValueKind::AtomicLoad:
     case BuiltinValueKind::AtomicStore:
     case BuiltinValueKind::AtomicRMW:
