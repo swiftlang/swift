@@ -181,7 +181,7 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
     }
     let destinationAddress = destination.baseAddress._unsafelyUnwrappedUnchecked
     let d = UnsafeMutableRawPointer(destinationAddress)
-    let n = Swift.min(destination.count, self.count)
+    let n = Swift.min(destination.count, s.distance(to: e))
     d.copyMemory(from: s, byteCount: n)
     return (Iterator(_position: s.advanced(by: n), _end: e), n)
   }
