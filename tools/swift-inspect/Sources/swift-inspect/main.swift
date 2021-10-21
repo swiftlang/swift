@@ -56,7 +56,7 @@ func dumpGenericMetadata(
   let metadatas = allocations.findGenericMetadata(in: context)
   let backtraces = backtraceStyle != nil ? context.allocationBacktraces : [:]
 
-  print("Address","Allocation","Size","Offset","Name", separator: "\t")
+  print("Address","Allocation","Size","Offset","isArrayOfClass", "Name", separator: "\t")
   for metadata in metadatas {
     print("\(hex: metadata.ptr)", terminator: "\t")
 
@@ -66,6 +66,7 @@ func dumpGenericMetadata(
     } else {
       print("???\t???\t???", terminator: "\t")
     }
+    print(metadata.isArrayOfClass, terminator: "\t")
     print(metadata.name)
     if let allocation = metadata.allocation {
       printBacktrace(style: backtraceStyle, for: allocation.ptr, in: backtraces, inspector: inspector)
