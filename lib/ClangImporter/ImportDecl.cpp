@@ -1468,10 +1468,12 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 static void addSynthesizedProtocolAttrs(
     ClangImporter::Implementation &Impl,
     NominalTypeDecl *nominal,
-    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs) {
+    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
+    bool isUnchecked = false) {
   for (auto kind : synthesizedProtocolAttrs) {
     nominal->getAttrs().add(new (Impl.SwiftContext)
-                                 SynthesizedProtocolAttr(kind, &Impl));
+                                 SynthesizedProtocolAttr(kind, &Impl,
+                                                         isUnchecked));
   }
 }
 
