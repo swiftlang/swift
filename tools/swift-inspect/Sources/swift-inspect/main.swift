@@ -126,6 +126,8 @@ func makeReflectionContext(
     argFail("Failed to create reflection context")
   }
 
+  inspector.addReflectionInfoFromLoadedImages(context: reflectionContext)
+
   return (inspector, reflectionContext)
 }
 
