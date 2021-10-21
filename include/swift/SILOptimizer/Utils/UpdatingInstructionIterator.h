@@ -108,7 +108,7 @@ public:
   /// This returns nullptr for deleted instructions.
   value_type operator*() const { return isDeleted ? nullptr : &*base; }
 
-  SILInstruction *operator->() const { return operator*(); }
+  value_type operator->() const { return operator*(); }
 
   Self &operator++() {
     advance();
