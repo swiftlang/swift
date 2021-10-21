@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// REQUIRES: concurrency
 
 func unsafelySendableClosure(@_unsafeSendable _ closure: () -> Void) { }
 
