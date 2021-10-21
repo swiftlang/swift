@@ -1269,6 +1269,11 @@ def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
 
+def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-access-level">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Include symbols with this access level or more when emitting a symbol graph">,
+  MetaVarName<"<level>">;
+
 def pretty_print: Flag<["-"], "pretty-print">,
   Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Pretty-print the output JSON">;

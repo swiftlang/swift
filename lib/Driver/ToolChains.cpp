@@ -590,6 +590,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
   }
   context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
+  context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
 
   return II;
 }
@@ -1081,6 +1082,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
   context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
+  context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
