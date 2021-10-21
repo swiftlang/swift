@@ -1155,7 +1155,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   Opts.DisableModulesValidateSystemDependencies |=
       Args.hasArg(OPT_disable_modules_validate_system_headers);
 
-  if (const Arg *A = Args.getLastArg(OPT_explict_swift_module_map))
+  if (const Arg *A = Args.getLastArg(OPT_explicit_swift_module_map))
     Opts.ExplicitSwiftModuleMap = A->getValue();
   for (auto A: Args.filtered(OPT_candidate_module_file)) {
     Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));

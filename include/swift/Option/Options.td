@@ -704,7 +704,7 @@ def save_optimization_record_path :
 def save_optimization_record_passes :
   Separate<["-"], "save-optimization-record-passes">,
   Flags<[FrontendOption]>,
-  HelpText<"Only include passes which match a specified regular expression in"
+  HelpText<"Only include passes which match a specified regular expression in "
            "the generated optimization record "
            "(by default, include all passes)">, MetaVarName<"<regex>">;
 
