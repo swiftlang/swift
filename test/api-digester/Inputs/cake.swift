@@ -142,6 +142,3 @@ extension SwiftObjcClass {
 
 @_alwaysEmitIntoClient
 public func emitIntoClientFunc() {}
-
-@_silgen_name("silgenName")
-public func silgenNamedFunc() {}

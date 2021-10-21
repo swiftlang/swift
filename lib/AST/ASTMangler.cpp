@@ -756,14 +756,16 @@ std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
   return finalize();
 }
 
-std::string ASTMangler::mangleAnyDecl(const ValueDecl *Decl, bool prefix) {
+std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
+                                        StringRef USRPrefix) {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return std::string(); // not needed for the parser library.
+#endif
+
   DWARFMangling = true;
-  if (prefix) {
-    beginMangling();
-  } else {
-    beginManglingWithoutPrefix();
-  }
+  beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
+  Buffer << USRPrefix;
 
   if (auto Ctor = dyn_cast<ConstructorDecl>(Decl)) {
     appendConstructorEntity(Ctor, /*isAllocating=*/false);
@@ -782,16 +784,8 @@ std::string ASTMangler::mangleAnyDecl(const ValueDecl *Decl, bool prefix) {
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
   if (!Decl->isInvalid())
-    verify(Storage.str());
+    verify(Storage.str().drop_front(USRPrefix.size()));
   return finalize();
-}
-
-std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
-                                        StringRef USRPrefix) {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return std::string(); // not needed for the parser library.
-#endif
-  return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, false)).str();
 }
 
 std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
