@@ -2220,25 +2220,21 @@ private:
       return false;
     };
 
-    bool isTypeContext = false;
     switch (auto contextKind = descriptor->getKind()) {
     case ContextDescriptorKind::Class:
       if (!getContextName())
         return nullptr;
       nodeKind = Demangle::Node::Kind::Class;
-      isTypeContext = true;
       break;
     case ContextDescriptorKind::Struct:
       if (!getContextName())
         return nullptr;
       nodeKind = Demangle::Node::Kind::Structure;
-      isTypeContext = true;
       break;
     case ContextDescriptorKind::Enum:
       if (!getContextName())
         return nullptr;
       nodeKind = Demangle::Node::Kind::Enum;
-      isTypeContext = true;
       break;
     case ContextDescriptorKind::Protocol: {
       if (!getContextName())
