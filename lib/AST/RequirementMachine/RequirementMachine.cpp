@@ -235,13 +235,13 @@ void RewriteSystemBuilder::processProtocolDependencies() {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
     }
 
-    const auto &info = Protocols.getProtocolInfo(proto);
-
-    for (auto *assocType : info.AssociatedTypes)
+    for (auto *assocType : proto->getAssociatedTypeMembers())
       addAssociatedType(assocType, proto);
 
-    for (auto *assocType : info.InheritedAssociatedTypes)
-      addAssociatedType(assocType, proto);
+    for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+      for (auto *assocType : inheritedProto->getAssociatedTypeMembers())
+        addAssociatedType(assocType, proto);
+    }
 
     // If this protocol is part of the initial connected component, we're
     // building requirement signatures for all protocols in this component,
@@ -250,7 +250,7 @@ void RewriteSystemBuilder::processProtocolDependencies() {
     // Otherwise, we should either already have a requirement signature, or
     // we can trigger the computation of the requirement signatures of the
     // next component recursively.
-    if (info.InitialComponent) {
+    if (Protocols.getProtocolInfo(proto).InitialComponent) {
       for (auto req : proto->getStructuralRequirements())
         addRequirement(req.req.getCanonical(), proto);
     } else {
@@ -411,8 +411,7 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   // providing the protocol graph to use for the linear order on terms.
   System.initialize(/*recordHomotopyGenerators=*/false,
                     std::move(builder.AssociatedTypeRules),
-                    std::move(builder.RequirementRules),
-                    std::move(builder.Protocols));
+                    std::move(builder.RequirementRules));
 
   computeCompletion(RewriteSystem::DisallowInvalidRequirements);
 
@@ -453,8 +452,7 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
   // providing the protocol graph to use for the linear order on terms.
   System.initialize(/*recordHomotopyGenerators=*/true,
                     std::move(builder.AssociatedTypeRules),
-                    std::move(builder.RequirementRules),
-                    std::move(builder.Protocols));
+                    std::move(builder.RequirementRules));
 
   // FIXME: Only if the protocols were written in source, though.
   computeCompletion(RewriteSystem::AllowInvalidRequirements);

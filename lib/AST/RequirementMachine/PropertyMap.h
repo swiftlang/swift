@@ -26,7 +26,6 @@
 #include <vector>
 
 #include "Debug.h"
-#include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
 
@@ -102,7 +101,6 @@ public:
   Type getSuperclassBound(
       TypeArrayView<GenericTypeParamType> genericParams,
       const MutableTerm &lookupTerm,
-      const ProtocolGraph &protos,
       RewriteContext &ctx) const;
 
   bool isConcreteType() const {
@@ -116,7 +114,6 @@ public:
   Type getConcreteType(
       TypeArrayView<GenericTypeParamType> genericParams,
       const MutableTerm &lookupTerm,
-      const ProtocolGraph &protos,
       RewriteContext &ctx) const;
 
   LayoutConstraint getLayoutConstraint() const {
@@ -146,7 +143,6 @@ class PropertyMap {
   using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
   llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
 
-  const ProtocolGraph &Protos;
   DebugOptions Debug;
 
   PropertyBag *getOrCreateProperties(Term key);
@@ -159,8 +155,7 @@ class PropertyMap {
 public:
   explicit PropertyMap(RewriteSystem &system)
       : Context(system.getRewriteContext()),
-        System(system),
-        Protos(system.getProtocols()) {
+        System(system) {
     Debug = Context.getDebugOptions();
   }
 

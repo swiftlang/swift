@@ -676,7 +676,7 @@ findRuleToDelete(bool firstPass,
       const auto &otherRule = getRule(*found);
 
       // Prefer to delete "less canonical" rules.
-      if (rule.compare(otherRule, Protos) > 0)
+      if (rule.compare(otherRule, Context) > 0)
         found = ruleID;
     }
 

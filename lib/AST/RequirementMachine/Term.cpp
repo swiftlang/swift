@@ -16,7 +16,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <vector>
-#include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -134,7 +133,7 @@ namespace {
 template<typename Iter>
 int shortlexCompare(Iter lhsBegin, Iter lhsEnd,
                     Iter rhsBegin, Iter rhsEnd,
-                    const ProtocolGraph &protos) {
+                    RewriteContext &ctx) {
   unsigned lhsSize = (lhsEnd - lhsBegin);
   unsigned rhsSize = (rhsEnd - rhsBegin);
   if (lhsSize != rhsSize)
@@ -147,7 +146,7 @@ int shortlexCompare(Iter lhsBegin, Iter lhsEnd,
     ++lhsBegin;
     ++rhsBegin;
 
-    int result = lhs.compare(rhs, protos);
+    int result = lhs.compare(rhs, ctx);
     if (result != 0) {
       assert(lhs != rhs);
       return result;
@@ -162,15 +161,13 @@ int shortlexCompare(Iter lhsBegin, Iter lhsEnd,
 }
 
 /// Shortlex order on terms.
-int Term::compare(Term other,
-                  const ProtocolGraph &protos) const {
-  return shortlexCompare(begin(), end(), other.begin(), other.end(), protos);
+int Term::compare(Term other, RewriteContext &ctx) const {
+  return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 
 /// Shortlex order on mutable terms.
-int MutableTerm::compare(const MutableTerm &other,
-                         const ProtocolGraph &protos) const {
-  return shortlexCompare(begin(), end(), other.begin(), other.end(), protos);
+int MutableTerm::compare(const MutableTerm &other, RewriteContext &ctx) const {
+  return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 
 /// Replace the subterm in the range [from,to) with \p rhs.

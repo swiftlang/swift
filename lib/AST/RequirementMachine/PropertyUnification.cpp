@@ -501,7 +501,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     // PropertyBag::getConformsToExcludingSuperclassConformances().
     conformances.push_back(concrete);
 
-    auto assocTypes = Protos.getProtocolInfo(proto).AssociatedTypes;
+    auto assocTypes = proto->getAssociatedTypeMembers();
     if (assocTypes.empty())
       continue;
 
@@ -543,7 +543,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
           auto term = Context.getRelativeTermForType(t->getCanonicalType(),
                                                      substitutions);
           System.simplify(term);
-          return Context.getTypeForTerm(term, { }, Protos);
+          return Context.getTypeForTerm(term, { });
         }));
       };
 

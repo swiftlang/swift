@@ -16,7 +16,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <vector>
-#include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -491,7 +490,7 @@ ArrayRef<const ProtocolDecl *> Symbol::getRootProtocols() const {
 ///   is used to break ties; based on the protocol name and parent module.
 ///
 /// * For layout symbols, we use LayoutConstraint::compare().
-int Symbol::compare(Symbol other, const ProtocolGraph &graph) const {
+int Symbol::compare(Symbol other, RewriteContext &ctx) const {
   // Exit early if the symbols are equal.
   if (Ptr == other.Ptr)
     return 0;
@@ -510,7 +509,7 @@ int Symbol::compare(Symbol other, const ProtocolGraph &graph) const {
     break;
 
   case Kind::Protocol:
-    result = graph.compareProtocols(getProtocol(), other.getProtocol());
+    result = ctx.compareProtocols(getProtocol(), other.getProtocol());
     break;
 
   case Kind::AssociatedType: {
@@ -522,8 +521,8 @@ int Symbol::compare(Symbol other, const ProtocolGraph &graph) const {
 
     // Symbols with larger support are *smaller* than those with
     // smaller support.
-    unsigned support = graph.getProtocolSupport(protos);
-    unsigned otherSupport = graph.getProtocolSupport(otherProtos);
+    unsigned support = ctx.getProtocolSupport(protos);
+    unsigned otherSupport = ctx.getProtocolSupport(otherProtos);
     if (support != otherSupport)
       return support > otherSupport ? -1 : 1;
 
@@ -532,7 +531,7 @@ int Symbol::compare(Symbol other, const ProtocolGraph &graph) const {
       return protos.size() < otherProtos.size() ? -1 : 1;
 
     for (unsigned i : indices(protos)) {
-      int result = graph.compareProtocols(protos[i], otherProtos[i]);
+      int result = ctx.compareProtocols(protos[i], otherProtos[i]);
       if (result)
         return result;
     }

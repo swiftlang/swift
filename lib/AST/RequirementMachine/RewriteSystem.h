@@ -16,7 +16,6 @@
 #include "llvm/ADT/DenseSet.h"
 
 #include "Debug.h"
-#include "ProtocolGraph.h"
 #include "Symbol.h"
 #include "Term.h"
 #include "Trie.h"
@@ -122,7 +121,7 @@ public:
     return LHS.size();
   }
 
-  int compare(const Rule &other, const ProtocolGraph &protos) const;
+  int compare(const Rule &other, RewriteContext &ctx) const;
 
   void dump(llvm::raw_ostream &out) const;
 
@@ -326,10 +325,6 @@ class RewriteSystem final {
   /// type is an index into the Rules array defined above.
   Trie<unsigned, MatchKind::Shortest> Trie;
 
-  /// The graph of all protocols transitively referenced via our set of
-  /// rewrite rules, used for the linear order on symbols.
-  ProtocolGraph Protos;
-
   /// Constructed from a rule of the form X.[P2:T] => X.[P1:T] by
   /// checkMergedAssociatedType().
   struct MergedAssociatedType {
@@ -396,13 +391,9 @@ public:
   /// Return the rewrite context used for allocating memory.
   RewriteContext &getRewriteContext() const { return Context; }
 
-  /// Return the object recording information about known protocols.
-  const ProtocolGraph &getProtocols() const { return Protos; }
-
   void initialize(bool recordHomotopyGenerators,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&assocaitedTypeRules,
-                  std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
-                  ProtocolGraph &&protos);
+                  std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   unsigned getRuleID(const Rule &rule) const {
     assert((unsigned)(&rule - &*Rules.begin()) < Rules.size());
