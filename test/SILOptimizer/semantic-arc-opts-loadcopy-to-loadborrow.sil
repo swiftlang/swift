@@ -1448,9 +1448,11 @@ bb0(%0 : $Builtin.RawPointer):
   cond_br undef, bb1, bb2
 
 bb1:
+  end_borrow %2 : $Klass
   unreachable
 
 bb2:
+  end_borrow %2 : $Klass
   unreachable
 }
 
