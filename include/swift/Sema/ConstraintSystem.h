@@ -1200,6 +1200,9 @@ public:
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
       caseLabelItems;
 
+  /// The set of parameters that have been inferred to be 'isolated'.
+  llvm::SmallVector<ParamDecl *, 2> isolatedParams;
+
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
@@ -2360,6 +2363,9 @@ private:
   llvm::SmallMapVector<const CaseLabelItem *, CaseLabelItemInfo, 4>
       caseLabelItems;
 
+  /// The set of parameters that have been inferred to be 'isolated'.
+  llvm::SmallSetVector<ParamDecl *, 2> isolatedParams;
+
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
     OpenedParameterTypes;
@@ -2923,6 +2929,9 @@ public:
 
     /// The length of \c caseLabelItems.
     unsigned numCaseLabelItems;
+
+    /// The length of \c isolatedParams.
+    unsigned numIsolatedParams;
 
     /// The length of \c ImplicitValueConversions.
     unsigned numImplicitValueConversions;

@@ -111,3 +111,23 @@ func testTuplingIsolated(_ a: isolated A, _ b: isolated A) {
   // expected-error@-1 {{generic parameter 'Ts' could not be inferred}}
   // expected-error@-2 {{cannot convert value of type '(isolated A, isolated A) -> ()' to expected argument type '(Ts) -> Void'}}
 }
+
+// Inference of "isolated" on closure parameters.
+@available(SwiftStdlib 5.5, *)
+func testIsolatedClosureInference(a: A) {
+  let _: (isolated A) -> Void = {
+    $0.f()
+  }
+
+  let _: (isolated A) -> Void = {
+    $0.f()
+  }
+
+  let _: (isolated A) -> Void = { a2 in
+    a2.f()
+  }
+
+  let _: (isolated A) -> Void = { (a2: isolated A) in
+    a2.f()
+  }
+}

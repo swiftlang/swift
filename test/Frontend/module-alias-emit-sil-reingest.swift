@@ -1,7 +1,5 @@
 /// Round trip test for SIL with module aliasing
 
-// REQUIRES: rdar84436250
-
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
@@ -16,7 +14,7 @@
 
 /// Reingest the SIL file and verify it contains the same result
 // RUN: %target-sil-opt -enable-sil-verify-all %t/Bar-output1.sil -I %t -o %t/Bar-output2.sil
-// RUN: %FileCheck %s -input-file %t/Bar-output2.sil -check-prefix CHECK
+// RUN: %FileCheck %s -input-file %t/Bar-output2.sil
 
 // CHECK: sil_stage canonical
 
@@ -27,14 +25,6 @@
 // CHECK: import Tea
 
 // CHECK: public func drink() -> Mild?
-
-// CHECK: // main
-// CHECK: sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-// CHECK: bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
-// CHECK:   %2 = integer_literal $Builtin.Int32, 0          // user: %3
-// CHECK:   %3 = struct $Int32 (%2 : $Builtin.Int32)        // user: %4
-// CHECK:   return %3 : $Int32                              // id: %4
-// CHECK: } // end sil function 'main'
 
 // CHECK: // drink()
 // CHECK: sil @$s4main5drink3Tea4MildVSgyF : $@convention(thin) () -> Optional<Mild> {

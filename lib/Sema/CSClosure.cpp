@@ -1370,6 +1370,12 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
     auto *params = closure->getParameters();
     TypeChecker::coerceParameterListToType(params, closureFnType);
 
+    // Find any isolated parameters in this closure and mark them as isolated.
+    for (auto param : solution.isolatedParams) {
+      if (param->getDeclContext() == closure)
+        param->setIsolated(true);
+    }
+
     // Coerce the result type, if it was written explicitly.
     if (closure->hasExplicitResultType()) {
       closure->setExplicitResultType(closureFnType->getResult());
