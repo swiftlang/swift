@@ -186,6 +186,7 @@ Solution ConstraintSystem::finalize() {
 
   solution.solutionApplicationTargets = solutionApplicationTargets;
   solution.caseLabelItems = caseLabelItems;
+  solution.isolatedParams.append(isolatedParams.begin(), isolatedParams.end());
 
   for (const auto &transformed : resultBuilderTransformed) {
     solution.resultBuilderTransformed.insert(transformed);
@@ -290,6 +291,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (const auto &info : solution.caseLabelItems) {
     if (!getCaseLabelItemInfo(info.first))
       setCaseLabelItemInfo(info.first, info.second);
+  }
+
+  for (auto param : solution.isolatedParams) {
+    isolatedParams.insert(param);
   }
 
   for (const auto &transformed : solution.resultBuilderTransformed) {
@@ -521,6 +526,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numContextualTypes = cs.contextualTypes.size();
   numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
+  numIsolatedParams = cs.isolatedParams.size();
   numImplicitValueConversions = cs.ImplicitValueConversions.size();
   numArgumentLists = cs.ArgumentLists.size();
 
@@ -628,6 +634,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any case label item infos.
   truncate(cs.caseLabelItems, numCaseLabelItems);
+
+  // Remove any isolated parameters.
+  truncate(cs.isolatedParams, numIsolatedParams);
 
   // Remove any implicit value conversions.
   truncate(cs.ImplicitValueConversions, numImplicitValueConversions);
