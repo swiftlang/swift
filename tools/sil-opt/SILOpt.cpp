@@ -31,6 +31,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "llvm/ADT/Statistic.h"
@@ -633,7 +634,9 @@ int main(int argc, char **argv) {
     serializationOpts.SerializeAllSIL = EmitSIB;
     serializationOpts.IsSIB = EmitSIB;
 
-    serialize(CI.getMainModule(), serializationOpts, SILMod.get());
+    symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
+
+    serialize(CI.getMainModule(), serializationOpts, symbolGraphOptions, SILMod.get());
   } else {
     const StringRef OutputFile = OutputFilename.size() ?
                                    StringRef(OutputFilename) : "-";
