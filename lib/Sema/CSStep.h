@@ -907,9 +907,12 @@ public:
     // Restore conjunction constraint.
     restore(AfterConjunction, Conjunction);
 
-    // Restore best score.
-    CS.solverState->BestScore = BestScore;
-    CS.CurrentScore = CurrentScore;
+    // Restore best score only if conjunction fails because
+    // successful outcome should keep a score set by `restoreOuterState`.
+    if (HadFailure) {
+      CS.solverState->BestScore = BestScore;
+      CS.CurrentScore = CurrentScore;
+    }
   }
 
   StepResult resume(bool prevFailed) override;
