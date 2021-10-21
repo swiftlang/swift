@@ -725,6 +725,7 @@ public:
     registerParseRequestFunctions(Parser->getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(
         Parser->getParser().Context.evaluator);
+    registerClangImporterRequestFunctions(Parser->getParser().Context.evaluator);
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
 
     IncrementalParsingEnabled =

@@ -75,7 +75,7 @@
 // CHECK:   }
 // CHECK: }
 
-// CHECK: extension NestedDeclIsAFirstForwardDeclaration {
+// CHECK: enum NestedDeclIsAFirstForwardDeclaration {
 // CHECK:   struct ForwardDeclaresFriend {
 // CHECK:     init()
 // CHECK:   }
