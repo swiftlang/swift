@@ -2871,6 +2871,13 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     default: break;
   }
 
+  PerformanceConstraints perf = getPerfConstraints();
+  switch (perf) {
+    case PerformanceConstraints::None:         break;
+    case PerformanceConstraints::NoLocks:      OS << "[no_locks] "; break;
+    case PerformanceConstraints::NoAllocation: OS << "[no_allocation] "; break;
+  }
+
   if (getEffectsKind() == EffectsKind::ReadOnly)
     OS << "[readonly] ";
   else if (getEffectsKind() == EffectsKind::ReadNone)
