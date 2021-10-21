@@ -942,7 +942,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   SGF.B.createReturn(loc, r);
 
   // Finally, verify the thunk for SIL invariants.
-  SGF.F.verify();
+  SGF.F.verifyIncompleteOSSA();
 }
 
 /// Bridge a native function to a block with a thunk.
