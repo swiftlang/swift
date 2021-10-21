@@ -16,7 +16,7 @@ private var _LF: UInt8 { return 0x0a }
 
 internal func _hasGraphemeBreakBetween(
   _ lhs: Unicode.Scalar, _ rhs: Unicode.Scalar
-) -> Bool? {
+) -> Bool {
 
   // CR-LF is a special case: no break between these
   if lhs == Unicode.Scalar(_CR) && rhs == Unicode.Scalar(_LF) {
@@ -78,54 +78,126 @@ internal func _hasGraphemeBreakBetween(
     default: return false
     }
   }
-  return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs) ? true : nil
+  return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
 }
 
 extension _StringGuts {
-  @usableFromInline
-  @inline(never)
+  @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func isOnGraphemeClusterBoundary(_ i: String.Index) -> Bool {
-    guard i.transcodedOffset == 0 else {
-      return false
-    }
+    guard i.transcodedOffset == 0 else { return false }
 
     let offset = i._encodedOffset
-    if offset == 0 || offset == self.count {
-      return true
-    }
+    if offset == 0 || offset == self.count { return true }
 
-    guard isOnUnicodeScalarBoundary(i) else {
-      return false
-    }
+    guard isOnUnicodeScalarBoundary(i) else { return false }
 
     let str = String(self)
     return i == str.index(before: str.index(after: i))
   }
 
-  @usableFromInline
-  @inline(never)
+  @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
-    let idx = String.Index(_encodedOffset: i)
-    let scalars = String.UnicodeScalarView(self)
+    if _slowPath(isForeign) {
+      return _foreignOpaqueCharacterStride(startingAt: i)
+    }
 
-    let iter = Unicode._GraphemeWalker(scalars)
-    let nextIdx = iter.nextBoundary(startingAt: idx)
+    return self.withFastUTF8 { utf8 in
+      let (sc1, len) = _decodeScalar(utf8, startingAt: i)
+      if i &+ len == utf8.endIndex {
+        // Last scalar is last grapheme
+        return len
+      }
+      let (sc2, _) = _decodeScalar(utf8, startingAt: i &+ len)
+      if _fastPath(_hasGraphemeBreakBetween(sc1, sc2)) {
+        return len
+      }
 
-    return nextIdx._encodedOffset &- i
+      let idx = String.Index(_encodedOffset: i)
+      let walker = Unicode._GraphemeWalker(String(self).unicodeScalars)
+      let nextIdx = walker.nextBoundary(startingAt: idx)
+      return nextIdx._encodedOffset &- i
+    }
   }
 
-  @usableFromInline
   @inline(never)
   @_effects(releasenone)
+  private func _foreignOpaqueCharacterStride(startingAt i: Int) -> Int {
+#if _runtime(_ObjC)
+    _internalInvariant(isForeign)
+
+    // TODO(String performance): Faster to do it from a pointer directly
+    let count = _object.largeCount
+
+    let startIdx = String.Index(_encodedOffset: i)
+    let (sc1, len) = foreignErrorCorrectedScalar(startingAt: startIdx)
+    if i &+ len == count {
+      // Last scalar is last grapheme
+      return len
+    }
+    let (sc2, _) = foreignErrorCorrectedScalar(
+      startingAt: startIdx.encoded(offsetBy: len))
+    if _fastPath(_hasGraphemeBreakBetween(sc1, sc2)) {
+      return len
+    }
+
+    let walker = Unicode._GraphemeWalker(String(self).unicodeScalars)
+    let nextIdx = walker.nextBoundary(startingAt: startIdx)
+    return nextIdx._encodedOffset &- i
+#else
+  fatalError("No foreign strings on Linux in this version of Swift")
+#endif
+  }
+
+  @usableFromInline @inline(never)
+  @_effects(releasenone)
   internal func _opaqueCharacterStride(endingAt i: Int) -> Int {
-    let idx = String.Index(_encodedOffset: i)
-    let scalars = String.UnicodeScalarView(self)
+    if _slowPath(isForeign) {
+      return _foreignOpaqueCharacterStride(endingAt: i)
+    }
 
-    let iter = Unicode._GraphemeWalker(scalars)
-    let previousIdx = iter.previousBoundary(endingAt: idx)
+    return self.withFastUTF8 { utf8 in
+      let (sc2, len) = _decodeScalar(utf8, endingAt: i)
+      if i &- len == utf8.startIndex {
+        // First scalar is first grapheme
+        return len
+      }
+      let (sc1, _) = _decodeScalar(utf8, endingAt: i &- len)
+      if _fastPath(_hasGraphemeBreakBetween(sc1, sc2)) {
+        return len
+      }
 
+      let idx = String.Index(_encodedOffset: i)
+      let walker = Unicode._GraphemeWalker(String(self).unicodeScalars)
+      let previousIdx = walker.previousBoundary(endingAt: idx)
+      return i &- previousIdx._encodedOffset
+    }
+  }
+
+  @inline(never)
+  @_effects(releasenone)
+  private func _foreignOpaqueCharacterStride(endingAt i: Int) -> Int {
+#if _runtime(_ObjC)
+    _internalInvariant(isForeign)
+
+    let endIdx = String.Index(_encodedOffset: i)
+    let (sc2, len) = foreignErrorCorrectedScalar(endingAt: endIdx)
+    if i &- len == 0 {
+      // First scalar is first grapheme
+      return len
+    }
+    let (sc1, _) = foreignErrorCorrectedScalar(
+      endingAt: endIdx.encoded(offsetBy: -len))
+    if _fastPath(_hasGraphemeBreakBetween(sc1, sc2)) {
+      return len
+    }
+
+    let walker = Unicode._GraphemeWalker(String(self).unicodeScalars)
+    let previousIdx = walker.previousBoundary(endingAt: endIdx)
     return i &- previousIdx._encodedOffset
+#else
+  fatalError("No foreign strings on Linux in this version of Swift")
+#endif
   }
 }

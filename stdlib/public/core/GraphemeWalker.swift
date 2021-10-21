@@ -132,32 +132,21 @@ extension Unicode._GraphemeWalker {
 }
 
 extension Unicode._GraphemeWalker {
-  func shouldBreak(
-    _ scalar1: Unicode.Scalar,
-    between scalar2: Unicode.Scalar,
-    _ state: inout State
-  ) -> Bool {
-    // Go through our fast path first when determining if we should break
-    // between these two scalars.
-    //
-    // This also emcompasses the GB3 rule.
-    if let fastCheck = _hasGraphemeBreakBetween(scalar1, scalar2) {
-      return fastCheck
-    }
-
-    return shouldBreakSlow(scalar1, between: scalar2, &state)
-  }
-
   // The "algorithm" that determines whether or not we should break between
   // certain grapheme break properties.
   //
   // This is based off of the Unicode Annex #29 for [Grapheme Cluster Boundary
   // Rules](https://unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules).
-  func shouldBreakSlow(
+  func shouldBreak(
     _ scalar1: Unicode.Scalar,
     between scalar2: Unicode.Scalar,
     _ state: inout State
   ) -> Bool {
+    // GB3
+    if scalar1.value == 0xD, scalar2.value == 0xA {
+      return false
+    }
+
     let x = Unicode._GraphemeBreakProperty(from: scalar1)
     let y = Unicode._GraphemeBreakProperty(from: scalar2)
 
