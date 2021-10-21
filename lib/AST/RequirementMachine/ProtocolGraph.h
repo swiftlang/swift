@@ -27,57 +27,15 @@ namespace rewriting {
 
 /// Stores cached information about a protocol.
 struct ProtocolInfo {
-  /// All immediately-inherited protocols.
-  ArrayRef<ProtocolDecl *> Inherited;
-
-  /// Transitive closure of inherited protocols; does not include the protocol
-  /// itself. Computed by ProtocolGraph::computeInheritedProtocols().
-  llvm::TinyPtrVector<const ProtocolDecl *> AllInherited;
-
-  /// Associated types defined in the protocol itself.
-  ArrayRef<AssociatedTypeDecl *> AssociatedTypes;
-
-  /// Associated types from all inherited protocols, not including duplicates or
-  /// those defined in the protocol itself. Computed by
-  /// ProtocolGraph::computeInheritedAssociatedTypes().
-  llvm::TinyPtrVector<AssociatedTypeDecl *> InheritedAssociatedTypes;
-
-  /// The protocol's dependencies.
-  ArrayRef<ProtocolDecl *> Dependencies;
-
-  /// Used by ProtocolGraph::computeProtocolDepth() to detect circularity.
-  unsigned Mark : 1;
-
-  /// Longest chain of protocol refinements, including this one. Greater than
-  /// zero on valid code, might be zero if there's a cycle. Computed by
-  /// ProtocolGraph::computeLinearOrder().
-  unsigned Depth : 31;
-
-  /// Index of the protocol in the linear order. Computed by
-  /// ProtocolGraph::computeLinearOrder().
-  unsigned Index : 31;
-
   /// When building a protocol requirement signature, the initial set of
   /// protocols are marked with this bit.
   unsigned InitialComponent : 1;
 
   ProtocolInfo() {
-    Mark = 0;
-    Depth = 0;
-    Index = 0;
     InitialComponent = 0;
   }
 
-  ProtocolInfo(ArrayRef<ProtocolDecl *> inherited,
-               ArrayRef<AssociatedTypeDecl *> &&types,
-               ArrayRef<ProtocolDecl *> deps,
-               bool initialComponent)
-    : Inherited(inherited),
-      AssociatedTypes(types),
-      Dependencies(deps) {
-    Mark = 0;
-    Depth = 0;
-    Index = 0;
+  ProtocolInfo(bool initialComponent) {
     InitialComponent = initialComponent;
   }
 };
@@ -88,15 +46,12 @@ struct ProtocolInfo {
 /// Out-of-line methods are documented in ProtocolGraph.cpp.
 class ProtocolGraph {
   llvm::DenseMap<const ProtocolDecl *, ProtocolInfo> Info;
-  llvm::DenseMap<ArrayRef<const ProtocolDecl *>, unsigned> Support;
   std::vector<const ProtocolDecl *> Protocols;
   bool Debug = false;
 
 public:
   void visitProtocols(ArrayRef<const ProtocolDecl *> protos);
   void visitRequirements(ArrayRef<Requirement> reqs);
-
-  bool isKnownProtocol(const ProtocolDecl *proto) const;
 
   /// Returns the sorted list of protocols, with the property
   /// that (P refines Q) => P < Q. See compareProtocols()
@@ -108,31 +63,13 @@ public:
   const ProtocolInfo &getProtocolInfo(
       const ProtocolDecl *proto) const;
 
-  unsigned getProtocolSupport(
-      const ProtocolDecl *proto) const;
-
-  unsigned getProtocolSupport(
-      ArrayRef<const ProtocolDecl *> protos) const;
-
 private:
   void addProtocol(const ProtocolDecl *proto,
                    bool initialComponent);
   void computeTransitiveClosure();
-  void computeLinearOrder();
-  void computeInheritedAssociatedTypes();
-  void computeInheritedProtocols();
 
 public:
   void compute();
-
-  int compareProtocols(const ProtocolDecl *lhs,
-                       const ProtocolDecl *rhs) const;
-
-  bool inheritsFrom(const ProtocolDecl *thisProto,
-                    const ProtocolDecl *otherProto) const;
-
-private:
-  unsigned computeProtocolDepth(const ProtocolDecl *proto);
 };
 
 } // end namespace rewriting

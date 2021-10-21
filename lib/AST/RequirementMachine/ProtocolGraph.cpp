@@ -36,11 +36,6 @@ void ProtocolGraph::visitProtocols(ArrayRef<const ProtocolDecl *> protos) {
   }
 }
 
-/// Return true if we know about this protocol.
-bool ProtocolGraph::isKnownProtocol(const ProtocolDecl *proto) const {
-  return Info.count(proto) > 0;
-}
-
 /// Look up information about a known protocol.
 const ProtocolInfo &ProtocolGraph::getProtocolInfo(
     const ProtocolDecl *proto) const {
@@ -49,223 +44,23 @@ const ProtocolInfo &ProtocolGraph::getProtocolInfo(
   return found->second;
 }
 
-/// The "support" of a protocol P is the size of the transitive closure of
-/// the singleton set {P} under protocol inheritance.
-unsigned ProtocolGraph::getProtocolSupport(
-    const ProtocolDecl *proto) const {
-  return getProtocolInfo(proto).AllInherited.size() + 1;
-}
-
-/// The "support" of a set S of protocols is the size of the transitive
-/// closure of S under protocol inheritance. For example, if you start
-/// with
-///
-///   protocol P1 : P3 {}
-///   protocol P2 : P3 {}
-///   protocol P3 {}
-///
-/// Then the "support" of P1 & P2 is 3 because |P1 & P2 & P3| = 3.
-///
-/// The \p protos array must be sorted in canonical order and
-/// permanently-allocated; one safe choice is to use the return value of
-/// Symbol::getProtocols().
-unsigned ProtocolGraph::getProtocolSupport(
-    ArrayRef<const ProtocolDecl *> protos) const {
-  auto found = Support.find(protos);
-  if (found != Support.end())
-    return found->second;
-
-  unsigned result;
-  if (protos.size() == 1) {
-    result = getProtocolSupport(protos[0]);
-  } else {
-    llvm::DenseSet<const ProtocolDecl *> visited;
-    for (const auto *proto : protos) {
-      visited.insert(proto);
-      for (const auto *inheritedProto : getProtocolInfo(proto).AllInherited)
-        visited.insert(inheritedProto);
-    }
-
-    result = visited.size();
-  }
-
-  const_cast<ProtocolGraph *>(this)->Support[protos] = result;
-  return result;
-}
-
 /// Record information about a protocol if we have no seen it yet.
 void ProtocolGraph::addProtocol(const ProtocolDecl *proto,
                                 bool initialComponent) {
   if (Info.count(proto) > 0)
     return;
 
-  Info[proto] = {proto->getInheritedProtocols(),
-                 proto->getAssociatedTypeMembers(),
-                 proto->getProtocolDependencies(),
-                 initialComponent};
+  Info[proto] = {initialComponent};
   Protocols.push_back(proto);
-}
-
-/// Record information about all protocols transtively referenced
-/// from protocol requirement signatures.
-void ProtocolGraph::computeTransitiveClosure() {
-  unsigned i = 0;
-  while (i < Protocols.size()) {
-    auto *proto = Protocols[i++];
-    for (auto *proto : getProtocolInfo(proto).Dependencies) {
-      addProtocol(proto, /*initialComponent=*/false);
-    }
-  }
-}
-
-/// See ProtocolGraph::compareProtocols() for the definition of this linear
-/// order.
-void ProtocolGraph::computeLinearOrder() {
-  for (const auto *proto : Protocols) {
-    (void) computeProtocolDepth(proto);
-  }
-
-  std::sort(
-      Protocols.begin(), Protocols.end(),
-      [&](const ProtocolDecl *lhs,
-          const ProtocolDecl *rhs) -> bool {
-        const auto &lhsInfo = getProtocolInfo(lhs);
-        const auto &rhsInfo = getProtocolInfo(rhs);
-
-        // protocol Base {} // depth 1
-        // protocol Derived : Base {} // depth 2
-        //
-        // Derived < Base in the linear order.
-        if (lhsInfo.Depth != rhsInfo.Depth)
-          return lhsInfo.Depth > rhsInfo.Depth;
-
-        return TypeDecl::compare(lhs, rhs) < 0;
-      });
-
-  for (unsigned i : indices(Protocols)) {
-    Info[Protocols[i]].Index = i;
-  }
-
-  if (Debug) {
-    for (const auto *proto : Protocols) {
-      const auto &info = getProtocolInfo(proto);
-      llvm::dbgs() << "@ Protocol " << proto->getName()
-                   << " Depth=" << info.Depth
-                   << " Index=" << info.Index << "\n";
-    }
-  }
-}
-
-/// Update each ProtocolInfo's AssociatedTypes vector to add all associated
-/// types from all transitively inherited protocols.
-void ProtocolGraph::computeInheritedAssociatedTypes() {
-  // Visit protocols in reverse order, so that if P inherits from Q and
-  // Q inherits from R, we first visit R, then Q, then P, ensuring that
-  // R's associated types are added to P's list, etc.
-  for (const auto *proto : llvm::reverse(Protocols)) {
-    auto &info = Info[proto];
-
-    for (const auto *inherited : info.AllInherited) {
-      for (auto *inheritedType : getProtocolInfo(inherited).AssociatedTypes) {
-        info.InheritedAssociatedTypes.push_back(inheritedType);
-      }
-    }
-  }
-}
-
-// Update each protocol's AllInherited vector to add all transitively
-// inherited protocols.
-void ProtocolGraph::computeInheritedProtocols() {
-  // Visit protocols in reverse order, so that if P inherits from Q and
-  // Q inherits from R, we first visit R, then Q, then P, ensuring that
-  // R's inherited protocols are added to P's list, etc.
-  for (const auto *proto : llvm::reverse(Protocols)) {
-    auto &info = Info[proto];
-
-    // We might inherit the same protocol multiple times due to diamond
-    // inheritance, so make sure we only add each protocol once.
-    llvm::SmallDenseSet<const ProtocolDecl *, 4> visited;
-    visited.insert(proto);
-
-    for (const auto *inherited : info.Inherited) {
-      // Add directly-inherited protocols.
-      if (!visited.insert(inherited).second)
-        continue;
-      info.AllInherited.push_back(inherited);
-
-      // Add indirectly-inherited protocols.
-      for (auto *inheritedType : getProtocolInfo(inherited).AllInherited) {
-        if (!visited.insert(inheritedType).second)
-          continue;
-
-        info.AllInherited.push_back(inheritedType);
-      }
-    }
-  }
-}
-
-/// Recursively compute the 'depth' of a protocol, which is inductively defined
-/// as one greater than the depth of all inherited protocols, with a protocol
-/// that does not inherit any other protocol having a depth of one.
-unsigned ProtocolGraph::computeProtocolDepth(const ProtocolDecl *proto) {
-  auto &info = Info[proto];
-
-  if (info.Mark) {
-    // Already computed, or we have a cycle. Cycles are diagnosed
-    // elsewhere in the type checker, so we don't have to do
-    // anything here.
-    return info.Depth;
-  }
-
-  info.Mark = true;
-  unsigned depth = 0;
-
-  for (auto *inherited : info.Inherited) {
-    unsigned inheritedDepth = computeProtocolDepth(inherited);
-    depth = std::max(inheritedDepth, depth);
-  }
-
-  depth++;
-
-  info.Depth = depth;
-  return depth;
 }
 
 /// Compute everything in the right order.
 void ProtocolGraph::compute() {
-  computeTransitiveClosure();
-  computeLinearOrder();
-  computeInheritedProtocols();
-  computeInheritedAssociatedTypes();
-}
-
-/// Defines a linear order with the property that if a protocol P inherits
-/// from another protocol Q, then P < Q. (The converse cannot be true, since
-/// this is a linear order.)
-///
-/// We first compare the 'support' of a protocol, which is defined in
-/// ProtocolGraph::getProtocolSupport() above.
-///
-/// If two protocols have the same support, the tie is broken by the standard
-/// TypeDecl::compare().
-int ProtocolGraph::compareProtocols(const ProtocolDecl *lhs,
-                                    const ProtocolDecl *rhs) const {
-  unsigned lhsSupport = getProtocolSupport(lhs);
-  unsigned rhsSupport = getProtocolSupport(rhs);
-
-  if (lhsSupport != rhsSupport)
-    return rhsSupport - lhsSupport;
-
-  return TypeDecl::compare(lhs, rhs);
-}
-
-/// Returns if \p thisProto transitively inherits from \p otherProto.
-///
-/// The result is false if the two protocols are equal.
-bool ProtocolGraph::inheritsFrom(const ProtocolDecl *thisProto,
-                                 const ProtocolDecl *otherProto) const {
-  const auto &info = getProtocolInfo(thisProto);
-  return std::find(info.AllInherited.begin(),
-                   info.AllInherited.end(),
-                   otherProto) != info.AllInherited.end();
+  unsigned i = 0;
+  while (i < Protocols.size()) {
+    auto *proto = Protocols[i++];
+    for (auto *depProto : proto->getProtocolDependencies()) {
+      addProtocol(depProto, /*initialComponent=*/false);
+    }
+  }
 }
