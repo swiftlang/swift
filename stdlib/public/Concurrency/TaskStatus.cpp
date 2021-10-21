@@ -184,6 +184,7 @@ static bool withStatusRecordLock(AsyncTask *task,
       if (task->_private().Status.compare_exchange_weak(status, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ loadOrdering)) {
+        newStatus.traceStatusChanged(task);
         status = newStatus;
         return false;
       }
@@ -203,6 +204,7 @@ static bool withStatusRecordLock(AsyncTask *task,
     if (task->_private().Status.compare_exchange_weak(status, newStatus,
            /*success*/ std::memory_order_release,
            /*failure*/ loadOrdering)) {
+      newStatus.traceStatusChanged(task);
 
       // Update `status` for the purposes of the callback function.
       // Note that we don't include the record lock, but do need to
@@ -230,6 +232,7 @@ static bool withStatusRecordLock(AsyncTask *task,
   // atomic objects in the task status records.  Because of this, we can
   // actually unpublish the lock with a relaxed store.
   assert(!status.isLocked());
+  status.traceStatusChanged(task);
   task->_private().Status.store(status,
                                 /*success*/ std::memory_order_relaxed);
 
@@ -606,6 +609,7 @@ void AsyncTask::flagAsRunning_slow() {
     if (status.isStoredPriorityEscalated()) {
       status = status.withoutStoredPriorityEscalation();
       Flags.setPriority(status.getStoredPriority());
+      concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
     }
   });
 }
@@ -619,6 +623,7 @@ void AsyncTask::flagAsSuspended_slow() {
     if (status.isStoredPriorityEscalated()) {
       status = status.withoutStoredPriorityEscalation();
       Flags.setPriority(status.getStoredPriority());
+      concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
     }
   });
 }

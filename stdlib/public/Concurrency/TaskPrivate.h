@@ -18,6 +18,7 @@
 #define SWIFT_CONCURRENCY_TASKPRIVATE_H
 
 #include "Error.h"
+#include "Tracing.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
 #include "swift/Runtime/Atomic.h"
@@ -266,6 +267,10 @@ public:
   llvm::iterator_range<record_iterator> records() const {
     return record_iterator::rangeBeginning(getInnermostRecord());
   }
+
+  void traceStatusChanged(AsyncTask *task) {
+    concurrency::trace::task_status_changed(task, Flags);
+  }
 };
 
 /// The size of an allocator slab.
@@ -373,11 +378,13 @@ inline void AsyncTask::flagAsRunning() {
     if (newStatus.isStoredPriorityEscalated()) {
       newStatus = newStatus.withoutStoredPriorityEscalation();
       Flags.setPriority(oldStatus.getStoredPriority());
+      concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
     }
 
     if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
                                                 std::memory_order_relaxed,
                                                 std::memory_order_relaxed)) {
+      newStatus.traceStatusChanged(this);
       adoptTaskVoucher(this);
       swift_task_enterThreadLocalContext(
           (char *)&_private().ExclusivityAccessSet[0]);
@@ -403,11 +410,13 @@ inline void AsyncTask::flagAsSuspended() {
     if (newStatus.isStoredPriorityEscalated()) {
       newStatus = newStatus.withoutStoredPriorityEscalation();
       Flags.setPriority(oldStatus.getStoredPriority());
+      concurrency::trace::task_flags_changed(this, Flags.getOpaqueValue());
     }
 
     if (_private().Status.compare_exchange_weak(oldStatus, newStatus,
                                                 std::memory_order_relaxed,
                                                 std::memory_order_relaxed)) {
+      newStatus.traceStatusChanged(this);
       swift_task_exitThreadLocalContext(
           (char *)&_private().ExclusivityAccessSet[0]);
       restoreTaskVoucher(this);

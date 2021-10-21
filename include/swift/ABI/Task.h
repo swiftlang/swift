@@ -272,6 +272,14 @@ public:
 
   /// Set the task's ID field to the next task ID.
   void setTaskId();
+  uint64_t getTaskId();
+
+  /// Get the task's resume function, for logging purposes only. This will
+  /// attempt to see through the various adapters that are sometimes used, and
+  /// failing that will return ResumeTask. The returned function pointer may
+  /// have a different signature than ResumeTask, and it's only for identifying
+  /// code associated with the task.
+  const void *getResumeFunctionForLogging();
 
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
