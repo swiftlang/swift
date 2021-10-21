@@ -20,10 +20,6 @@
 #include <condition_variable>
 #include <thread>
 
-#ifndef SWIFT_DEBUG_RUNTIME
-#define SWIFT_DEBUG_RUNTIME 0
-#endif
-
 namespace swift {
 
 #if !SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
