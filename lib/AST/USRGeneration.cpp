@@ -256,16 +256,23 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
   return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
 }
 
-std::string ide::demangleUSR(StringRef mangled) {
-  if (mangled.startswith(getUSRSpacePrefix())) {
-    mangled = mangled.substr(getUSRSpacePrefix().size());
+std::string ide::getMangledNameFromUSR(StringRef usr) {
+  if (usr.startswith(getUSRSpacePrefix())) {
+    usr = usr.substr(getUSRSpacePrefix().size());
   }
   SmallString<128> buffer;
   buffer += "$s";
-  buffer += mangled;
-  mangled = buffer.str();
+  buffer += usr;
+  return buffer.str().str();
+}
+
+std::string ide::demangleMangledName(StringRef mangled) {
   Demangler Dem;
-  return nodeToString(Dem.demangleSymbol(mangled));
+  std::string result = nodeToString(Dem.demangleSymbol(mangled));
+  if (result.empty()) {
+    return mangled.str();
+  }
+  return result;
 }
 
 std::string

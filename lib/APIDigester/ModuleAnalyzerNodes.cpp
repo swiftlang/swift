@@ -817,6 +817,19 @@ static bool hasSameParameterFlags(const SDKNodeType *Left, const SDKNodeType *Ri
   return true;
 }
 
+StringRef SDKNodeDecl::getDemangledName() const {
+  if (demangledName.hasValue()) {
+    return *demangledName;
+  }
+  std::string mangled = MangledName.str();
+  if (mangled.empty()) {
+    mangled = getMangledNameFromUSR(Usr);
+  }
+  demangledName = Ctx.buffer(demangleMangledName(mangled));
+  assert(demangledName.hasValue());
+  return *demangledName;
+}
+
 static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) {
   auto *LeftAlias = dyn_cast<SDKNodeTypeAlias>(&L);
   auto *RightAlias = dyn_cast<SDKNodeTypeAlias>(&R);
@@ -948,7 +961,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         if (Left->getFixedBinaryOrder() != Right->getFixedBinaryOrder())
           return false;
       }
-      if (Left->getUsr() != Right->getUsr())
+      if (Left->getDemangledName() != Right->getDemangledName())
         return false;
       LLVM_FALLTHROUGH;
     }
@@ -1049,7 +1062,7 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(attr->Name);
   }
   Mangle::ASTMangler NewMangler;
-  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, false));
+  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true));
 }
 
 static StringRef calculateLocation(SDKContext &SDKCtx, Decl *D) {
@@ -2582,9 +2595,10 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
       emitDiag(Loc, diag::decl_reorder, getFixedBinaryOrder(),
                RD->getFixedBinaryOrder());
     }
-    if (getUsr() != RD->getUsr()) {
-      auto left = demangleUSR(getUsr());
-      auto right = demangleUSR(RD->getUsr());
+    {
+      // diagnose mangled name change.
+      auto left = getDemangledName();
+      auto right = RD->getDemangledName();
       if (left != right) {
         emitDiag(Loc, diag::demangled_name_changed, left, right);
       }
