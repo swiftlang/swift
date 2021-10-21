@@ -16,8 +16,6 @@
 ///
 //===----------------------------------------------------------------------===//
 
-// CanonicalizeInstruction defines a default DEBUG_TYPE: "sil-canonicalize"
-
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -33,6 +31,19 @@
 
 using namespace swift;
 
+// FIXME: Add these statistics and debug output back. They were unceremoniously
+// removed, but they play an important role. Without this it's extremely
+// confusing for example when -debug-only=sil-combine does not trace any of the
+// simplifications.
+//
+// Put this code back!
+// STATISTIC(NumSimplified, "Number of instructions simplified");
+//  ...
+//  ++NumSimplified;
+//  LLVM_DEBUG(llvm::dbgs() << "Simplify Old = " << *inst
+//                          << "    New = " << *result << '\n');
+
+// CanonicalizeInstruction defines a default DEBUG_TYPE: "sil-canonicalize"
 // Tracing within the implementation can also be activiated by the pass.
 #define DEBUG_TYPE pass.debugType
 
