@@ -58,7 +58,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake2P1PAAE1poiyAaB_pAaB_p_AaB_ptFZ",
-          "mangledName": "4cake2P1PAAE1poiyAaB_pAaB_p_AaB_ptFZ",
+          "mangledName": "$s4cake2P1PAAE1poiyAaB_pAaB_p_AaB_ptFZ",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.P1>",
           "static": true,
@@ -67,7 +67,7 @@
       ],
       "declKind": "Protocol",
       "usr": "s:4cake2P1P",
-      "mangledName": "4cake2P1P",
+      "mangledName": "$s4cake2P1P",
       "moduleName": "cake"
     },
     {
@@ -76,7 +76,7 @@
       "printedName": "P2",
       "declKind": "Protocol",
       "usr": "s:4cake2P2P",
-      "mangledName": "4cake2P2P",
+      "mangledName": "$s4cake2P2P",
       "moduleName": "cake"
     },
     {
@@ -85,7 +85,7 @@
       "printedName": "P3",
       "declKind": "Protocol",
       "usr": "s:4cake2P3P",
-      "mangledName": "4cake2P3P",
+      "mangledName": "$s4cake2P3P",
       "moduleName": "cake",
       "genericSig": "<Self : cake.P1, Self : cake.P2>",
       "conformances": [
@@ -94,14 +94,14 @@
           "name": "P2",
           "printedName": "P2",
           "usr": "s:4cake2P2P",
-          "mangledName": "4cake2P2P"
+          "mangledName": "$s4cake2P2P"
         },
         {
           "kind": "Conformance",
           "name": "P1",
           "printedName": "P1",
           "usr": "s:4cake2P1P",
-          "mangledName": "4cake2P1P"
+          "mangledName": "$s4cake2P1P"
         }
       ]
     },
@@ -123,7 +123,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake2S1V4foo1yyFZ",
-          "mangledName": "4cake2S1V4foo1yyFZ",
+          "mangledName": "$s4cake2S1V4foo1yyFZ",
           "moduleName": "cake",
           "static": true,
           "funcSelfKind": "NonMutating"
@@ -141,7 +141,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake2S1V4foo2yyF",
-          "mangledName": "4cake2S1V4foo2yyF",
+          "mangledName": "$s4cake2S1V4foo2yyF",
           "moduleName": "cake",
           "funcSelfKind": "Mutating"
         },
@@ -165,14 +165,14 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake2S1V4foo6yyF",
-          "mangledName": "4cake2S1V4foo6yyF",
+          "mangledName": "$s4cake2S1V4foo6yyF",
           "moduleName": "cake",
           "funcSelfKind": "NonMutating"
         }
       ],
       "declKind": "Struct",
       "usr": "s:4cake2S1V",
-      "mangledName": "4cake2S1V",
+      "mangledName": "$s4cake2S1V",
       "moduleName": "cake",
       "declAttributes": [
         "Frozen"
@@ -183,21 +183,21 @@
           "name": "P1",
           "printedName": "P1",
           "usr": "s:4cake2P1P",
-          "mangledName": "4cake2P1P"
+          "mangledName": "$s4cake2P1P"
         },
         {
           "kind": "Conformance",
           "name": "Sendable",
           "printedName": "Sendable",
           "usr": "s:s8SendableP",
-          "mangledName": "s8SendableP"
+          "mangledName": "$ss8SendableP"
         },
         {
           "kind": "Conformance",
           "name": "P2",
           "printedName": "P2",
           "usr": "s:4cake2P2P",
-          "mangledName": "4cake2P2P"
+          "mangledName": "$s4cake2P2P"
         }
       ]
     },
@@ -219,7 +219,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake2C0CA2A2S1VRszAERs_AERs0_rlE17conditionalFooExtyyF",
-          "mangledName": "4cake2C0CA2A2S1VRszAERs_AERs0_rlE17conditionalFooExtyyF",
+          "mangledName": "$s4cake2C0CA2A2S1VRszAERs_AERs0_rlE17conditionalFooExtyyF",
           "moduleName": "cake",
           "genericSig": "<T1, T2, T3 where T1 == cake.S1, T2 == cake.S1, T3 == cake.S1>",
           "funcSelfKind": "NonMutating"
@@ -237,7 +237,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake2C0C19unconditionalFooExtyyF",
-          "mangledName": "4cake2C0C19unconditionalFooExtyyF",
+          "mangledName": "$s4cake2C0C19unconditionalFooExtyyF",
           "moduleName": "cake",
           "genericSig": "<T1, T2, T3>",
           "funcSelfKind": "NonMutating"
@@ -245,7 +245,7 @@
       ],
       "declKind": "Class",
       "usr": "s:4cake2C0C",
-      "mangledName": "4cake2C0C",
+      "mangledName": "$s4cake2C0C",
       "moduleName": "cake",
       "genericSig": "<T1, T2, T3>",
       "hasMissingDesignatedInitializers": true
@@ -284,7 +284,7 @@
       ],
       "declKind": "TypeAlias",
       "usr": "s:4cake7C0Aliasa",
-      "mangledName": "4cake7C0Aliasa",
+      "mangledName": "$s4cake7C0Aliasa",
       "moduleName": "cake"
     },
     {
@@ -305,7 +305,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake2C1C4foo1yyFZ",
-          "mangledName": "4cake2C1C4foo1yyFZ",
+          "mangledName": "$s4cake2C1C4foo1yyFZ",
           "moduleName": "cake",
           "static": true,
           "isOpen": true,
@@ -324,7 +324,7 @@
           ],
           "declKind": "Var",
           "usr": "s:4cake2C1C3InsACSgvp",
-          "mangledName": "4cake2C1C3InsACSgvp",
+          "mangledName": "$s4cake2C1C3InsACSgvp",
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
@@ -356,7 +356,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake2C1C3InsACSgvg",
-              "mangledName": "4cake2C1C3InsACSgvg",
+              "mangledName": "$s4cake2C1C3InsACSgvg",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -391,7 +391,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake2C1C3InsACSgvs",
-              "mangledName": "4cake2C1C3InsACSgvs",
+              "mangledName": "$s4cake2C1C3InsACSgvs",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -414,7 +414,7 @@
           ],
           "declKind": "Var",
           "usr": "s:4cake2C1C4Ins2ACvp",
-          "mangledName": "4cake2C1C4Ins2ACvp",
+          "mangledName": "$s4cake2C1C4Ins2ACvp",
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
@@ -438,7 +438,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake2C1C4Ins2ACvg",
-              "mangledName": "4cake2C1C4Ins2ACvg",
+              "mangledName": "$s4cake2C1C4Ins2ACvg",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -465,7 +465,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake2C1C4Ins2ACvs",
-              "mangledName": "4cake2C1C4Ins2ACvs",
+              "mangledName": "$s4cake2C1C4Ins2ACvs",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -478,7 +478,7 @@
       ],
       "declKind": "Class",
       "usr": "s:4cake2C1C",
-      "mangledName": "4cake2C1C",
+      "mangledName": "$s4cake2C1C",
       "moduleName": "cake",
       "superclassUsr": "s:4cake2C0C",
       "hasMissingDesignatedInitializers": true,
@@ -513,7 +513,7 @@
       ],
       "declKind": "Func",
       "usr": "s:4cake4foo1_1bySi_AA2S1VtF",
-      "mangledName": "4cake4foo1_1bySi_AA2S1VtF",
+      "mangledName": "$s4cake4foo1_1bySi_AA2S1VtF",
       "moduleName": "cake",
       "funcSelfKind": "NonMutating"
     },
@@ -543,7 +543,7 @@
       ],
       "declKind": "Func",
       "usr": "s:4cake4foo2_1bySi_AA2S1VtF",
-      "mangledName": "4cake4foo2_1bySi_AA2S1VtF",
+      "mangledName": "$s4cake4foo2_1bySi_AA2S1VtF",
       "moduleName": "cake",
       "funcSelfKind": "NonMutating"
     },
@@ -593,7 +593,7 @@
           ],
           "declKind": "EnumElement",
           "usr": "s:4cake6NumberO3oneyA2CmF",
-          "mangledName": "4cake6NumberO3oneyA2CmF",
+          "mangledName": "$s4cake6NumberO3oneyA2CmF",
           "moduleName": "cake"
         },
         {
@@ -622,7 +622,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake6NumberO21__derived_enum_equalsySbAC_ACtFZ",
-          "mangledName": "4cake6NumberO21__derived_enum_equalsySbAC_ACtFZ",
+          "mangledName": "$s4cake6NumberO21__derived_enum_equalsySbAC_ACtFZ",
           "moduleName": "cake",
           "static": true,
           "implicit": true,
@@ -656,7 +656,7 @@
           ],
           "declKind": "Constructor",
           "usr": "s:4cake6NumberO8rawValueACSgSi_tcfc",
-          "mangledName": "4cake6NumberO8rawValueACSgSi_tcfc",
+          "mangledName": "$s4cake6NumberO8rawValueACSgSi_tcfc",
           "moduleName": "cake",
           "implicit": true,
           "declAttributes": [
@@ -678,7 +678,7 @@
           ],
           "declKind": "TypeAlias",
           "usr": "s:4cake6NumberO8RawValuea",
-          "mangledName": "4cake6NumberO8RawValuea",
+          "mangledName": "$s4cake6NumberO8RawValuea",
           "moduleName": "cake",
           "implicit": true
         },
@@ -696,7 +696,7 @@
           ],
           "declKind": "Var",
           "usr": "s:4cake6NumberO8rawValueSivp",
-          "mangledName": "4cake6NumberO8rawValueSivp",
+          "mangledName": "$s4cake6NumberO8rawValueSivp",
           "moduleName": "cake",
           "implicit": true,
           "accessors": [
@@ -714,7 +714,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake6NumberO8rawValueSivg",
-              "mangledName": "4cake6NumberO8rawValueSivg",
+              "mangledName": "$s4cake6NumberO8rawValueSivg",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -727,7 +727,7 @@
       ],
       "declKind": "Enum",
       "usr": "s:4cake6NumberO",
-      "mangledName": "4cake6NumberO",
+      "mangledName": "$s4cake6NumberO",
       "moduleName": "cake",
       "enumRawTypeName": "Int",
       "isEnumExhaustive": true,
@@ -737,14 +737,14 @@
           "name": "Equatable",
           "printedName": "Equatable",
           "usr": "s:SQ",
-          "mangledName": "SQ"
+          "mangledName": "$sSQ"
         },
         {
           "kind": "Conformance",
           "name": "Hashable",
           "printedName": "Hashable",
           "usr": "s:SH",
-          "mangledName": "SH"
+          "mangledName": "$sSH"
         },
         {
           "kind": "Conformance",
@@ -766,7 +766,7 @@
             }
           ],
           "usr": "s:SY",
-          "mangledName": "SY"
+          "mangledName": "$sSY"
         }
       ]
     },
@@ -803,7 +803,7 @@
       ],
       "declKind": "Func",
       "usr": "s:4cake4foo3yySDySiSSGF",
-      "mangledName": "4cake4foo3yySDySiSSGF",
+      "mangledName": "$s4cake4foo3yySDySiSSGF",
       "moduleName": "cake",
       "funcSelfKind": "NonMutating"
     },
@@ -826,7 +826,7 @@
           ],
           "declKind": "Var",
           "usr": "s:4cake17fixedLayoutStructV1aSivp",
-          "mangledName": "4cake17fixedLayoutStructV1aSivp",
+          "mangledName": "$s4cake17fixedLayoutStructV1aSivp",
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
@@ -848,7 +848,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake17fixedLayoutStructV1aSivg",
-              "mangledName": "4cake17fixedLayoutStructV1aSivg",
+              "mangledName": "$s4cake17fixedLayoutStructV1aSivg",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -875,7 +875,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake17fixedLayoutStructV1aSivs",
-              "mangledName": "4cake17fixedLayoutStructV1aSivs",
+              "mangledName": "$s4cake17fixedLayoutStructV1aSivs",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -888,7 +888,7 @@
       ],
       "declKind": "Struct",
       "usr": "s:4cake17fixedLayoutStructV",
-      "mangledName": "4cake17fixedLayoutStructV",
+      "mangledName": "$s4cake17fixedLayoutStructV",
       "moduleName": "cake",
       "declAttributes": [
         "Frozen"
@@ -899,7 +899,7 @@
           "name": "Sendable",
           "printedName": "Sendable",
           "usr": "s:s8SendableP",
-          "mangledName": "s8SendableP"
+          "mangledName": "$ss8SendableP"
         }
       ]
     },
@@ -914,7 +914,7 @@
           "printedName": "A",
           "declKind": "AssociatedType",
           "usr": "s:4cake21ProWithAssociatedTypeP1AQa",
-          "mangledName": "4cake21ProWithAssociatedTypeP1AQa",
+          "mangledName": "$s4cake21ProWithAssociatedTypeP1AQa",
           "moduleName": "cake",
           "protocolReq": true
         },
@@ -932,7 +932,7 @@
           ],
           "declKind": "AssociatedType",
           "usr": "s:4cake21ProWithAssociatedTypeP1BQa",
-          "mangledName": "4cake21ProWithAssociatedTypeP1BQa",
+          "mangledName": "$s4cake21ProWithAssociatedTypeP1BQa",
           "moduleName": "cake",
           "protocolReq": true
         },
@@ -949,7 +949,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake21ProWithAssociatedTypePAAE10NonReqFuncyyF",
-          "mangledName": "4cake21ProWithAssociatedTypePAAE10NonReqFuncyyF",
+          "mangledName": "$s4cake21ProWithAssociatedTypePAAE10NonReqFuncyyF",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.ProWithAssociatedType>",
           "funcSelfKind": "NonMutating"
@@ -968,7 +968,7 @@
           ],
           "declKind": "Var",
           "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
-          "mangledName": "4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
+          "mangledName": "$s4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
           "moduleName": "cake",
           "accessors": [
             {
@@ -985,7 +985,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivg",
-              "mangledName": "4cake21ProWithAssociatedTypePAAE9NonReqVarSivg",
+              "mangledName": "$s4cake21ProWithAssociatedTypePAAE9NonReqVarSivg",
               "moduleName": "cake",
               "genericSig": "<Self where Self : cake.ProWithAssociatedType>",
               "accessorKind": "get"
@@ -1006,14 +1006,14 @@
           ],
           "declKind": "TypeAlias",
           "usr": "s:4cake21ProWithAssociatedTypePAAE11NonReqAliasa",
-          "mangledName": "4cake21ProWithAssociatedTypePAAE11NonReqAliasa",
+          "mangledName": "$s4cake21ProWithAssociatedTypePAAE11NonReqAliasa",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.ProWithAssociatedType>"
         }
       ],
       "declKind": "Protocol",
       "usr": "s:4cake21ProWithAssociatedTypeP",
-      "mangledName": "4cake21ProWithAssociatedTypeP",
+      "mangledName": "$s4cake21ProWithAssociatedTypeP",
       "moduleName": "cake"
     },
     {
@@ -1041,7 +1041,7 @@
           ],
           "declKind": "Subscript",
           "usr": "s:4cake13SubsContainerP6getterS2i_tcip",
-          "mangledName": "4cake13SubsContainerP6getterS2i_tcip",
+          "mangledName": "$s4cake13SubsContainerP6getterS2i_tcip",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.SubsContainer>",
           "protocolReq": true,
@@ -1066,7 +1066,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake13SubsContainerP6getterS2i_tcig",
-              "mangledName": "4cake13SubsContainerP6getterS2i_tcig",
+              "mangledName": "$s4cake13SubsContainerP6getterS2i_tcig",
               "moduleName": "cake",
               "genericSig": "<Self where Self : cake.SubsContainer>",
               "protocolReq": true,
@@ -1095,7 +1095,7 @@
           ],
           "declKind": "Subscript",
           "usr": "s:4cake13SubsContainerP6setterS2i_tcip",
-          "mangledName": "4cake13SubsContainerP6setterS2i_tcip",
+          "mangledName": "$s4cake13SubsContainerP6setterS2i_tcip",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.SubsContainer>",
           "protocolReq": true,
@@ -1120,7 +1120,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake13SubsContainerP6setterS2i_tcig",
-              "mangledName": "4cake13SubsContainerP6setterS2i_tcig",
+              "mangledName": "$s4cake13SubsContainerP6setterS2i_tcig",
               "moduleName": "cake",
               "genericSig": "<Self where Self : cake.SubsContainer>",
               "protocolReq": true,
@@ -1152,7 +1152,7 @@
               ],
               "declKind": "Accessor",
               "usr": "s:4cake13SubsContainerP6setterS2i_tcis",
-              "mangledName": "4cake13SubsContainerP6setterS2i_tcis",
+              "mangledName": "$s4cake13SubsContainerP6setterS2i_tcis",
               "moduleName": "cake",
               "genericSig": "<Self where Self : cake.SubsContainer>",
               "protocolReq": true,
@@ -1164,7 +1164,7 @@
       ],
       "declKind": "Protocol",
       "usr": "s:4cake13SubsContainerP",
-      "mangledName": "4cake13SubsContainerP",
+      "mangledName": "$s4cake13SubsContainerP",
       "moduleName": "cake"
     },
     {
@@ -1178,7 +1178,7 @@
           "printedName": "T",
           "declKind": "AssociatedType",
           "usr": "s:4cake6PSuperP1TQa",
-          "mangledName": "4cake6PSuperP1TQa",
+          "mangledName": "$s4cake6PSuperP1TQa",
           "moduleName": "cake",
           "protocolReq": true
         },
@@ -1195,7 +1195,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake6PSuperP3fooyyF",
-          "mangledName": "4cake6PSuperP3fooyyF",
+          "mangledName": "$s4cake6PSuperP3fooyyF",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.PSuper>",
           "protocolReq": true,
@@ -1215,7 +1215,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake6PSuperPAAE9futureFooyyF",
-          "mangledName": "4cake6PSuperPAAE9futureFooyyF",
+          "mangledName": "$s4cake6PSuperPAAE9futureFooyyF",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.PSuper>",
           "funcSelfKind": "NonMutating"
@@ -1223,7 +1223,7 @@
       ],
       "declKind": "Protocol",
       "usr": "s:4cake6PSuperP",
-      "mangledName": "4cake6PSuperP",
+      "mangledName": "$s4cake6PSuperP",
       "moduleName": "cake"
     },
     {
@@ -1237,7 +1237,7 @@
           "printedName": "T",
           "declKind": "AssociatedType",
           "usr": "s:4cake4PSubP1TQa",
-          "mangledName": "4cake4PSubP1TQa",
+          "mangledName": "$s4cake4PSubP1TQa",
           "moduleName": "cake",
           "protocolReq": true,
           "overriding": true
@@ -1255,7 +1255,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake4PSubP3fooyyF",
-          "mangledName": "4cake4PSubP3fooyyF",
+          "mangledName": "$s4cake4PSubP3fooyyF",
           "moduleName": "cake",
           "genericSig": "<Self where Self : cake.PSub>",
           "protocolReq": true,
@@ -1268,7 +1268,7 @@
       ],
       "declKind": "Protocol",
       "usr": "s:4cake4PSubP",
-      "mangledName": "4cake4PSubP",
+      "mangledName": "$s4cake4PSubP",
       "moduleName": "cake",
       "genericSig": "<Self : cake.PSuper>",
       "conformances": [
@@ -1277,7 +1277,7 @@
           "name": "PSuper",
           "printedName": "PSuper",
           "usr": "s:4cake6PSuperP",
-          "mangledName": "4cake6PSuperP"
+          "mangledName": "$s4cake6PSuperP"
         }
       ]
     },
@@ -1295,7 +1295,7 @@
       ],
       "declKind": "Var",
       "usr": "s:4cake9GlobalVarSivp",
-      "mangledName": "4cake9GlobalVarSivp",
+      "mangledName": "$s4cake9GlobalVarSivp",
       "moduleName": "cake",
       "declAttributes": [
         "HasInitialValue",
@@ -1332,7 +1332,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake15FutureContainerC9futureFooyyF",
-          "mangledName": "4cake15FutureContainerC9futureFooyyF",
+          "mangledName": "$s4cake15FutureContainerC9futureFooyyF",
           "moduleName": "cake",
           "intro_Macosx": "10.15",
           "intro_iOS": "13",
@@ -1359,7 +1359,7 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake15FutureContainerC12NotfutureFooyyF",
-          "mangledName": "4cake15FutureContainerC12NotfutureFooyyF",
+          "mangledName": "$s4cake15FutureContainerC12NotfutureFooyyF",
           "moduleName": "cake",
           "intro_Macosx": "10.15",
           "declAttributes": [
@@ -1370,7 +1370,7 @@
       ],
       "declKind": "Class",
       "usr": "s:4cake15FutureContainerC",
-      "mangledName": "4cake15FutureContainerC",
+      "mangledName": "$s4cake15FutureContainerC",
       "moduleName": "cake",
       "hasMissingDesignatedInitializers": true,
       "conformances": [
@@ -1379,14 +1379,14 @@
           "name": "P1",
           "printedName": "P1",
           "usr": "s:4cake2P1P",
-          "mangledName": "4cake2P1P"
+          "mangledName": "$s4cake2P1P"
         },
         {
           "kind": "Conformance",
           "name": "P2",
           "printedName": "P2",
           "usr": "s:4cake2P2P",
-          "mangledName": "4cake2P2P"
+          "mangledName": "$s4cake2P2P"
         }
       ]
     },
@@ -1396,7 +1396,7 @@
       "printedName": "PlatformIntroClass",
       "declKind": "Class",
       "usr": "s:4cake18PlatformIntroClassC",
-      "mangledName": "4cake18PlatformIntroClassC",
+      "mangledName": "$s4cake18PlatformIntroClassC",
       "moduleName": "cake",
       "intro_Macosx": "10.1",
       "intro_iOS": "10.2",
@@ -1416,7 +1416,7 @@
       "printedName": "SwiftIntroClass",
       "declKind": "Class",
       "usr": "s:4cake15SwiftIntroClassC",
-      "mangledName": "4cake15SwiftIntroClassC",
+      "mangledName": "$s4cake15SwiftIntroClassC",
       "moduleName": "cake",
       "intro_swift": "5",
       "declAttributes": [
@@ -1460,7 +1460,7 @@
           ],
           "declKind": "Func",
           "usr": "c:@M@cake@objc(cs)NewObjCClass(im)ObjCFool:ObjCA:ObjCB:",
-          "mangledName": "4cake14SwiftObjcClassC3foo1a1b1cySi_S2itF",
+          "mangledName": "$s4cake14SwiftObjcClassC3foo1a1b1cySi_S2itF",
           "moduleName": "cake",
           "objc_name": "ObjCFool:ObjCA:ObjCB:",
           "declAttributes": [
@@ -1471,7 +1471,7 @@
       ],
       "declKind": "Class",
       "usr": "c:@M@cake@objc(cs)NewObjCClass",
-      "mangledName": "4cake14SwiftObjcClassC",
+      "mangledName": "$s4cake14SwiftObjcClassC",
       "moduleName": "cake",
       "objc_name": "NewObjCClass",
       "declAttributes": [
@@ -1492,7 +1492,7 @@
       ],
       "declKind": "Func",
       "usr": "s:4cake18emitIntoClientFuncyyF",
-      "mangledName": "4cake18emitIntoClientFuncyyF",
+      "mangledName": "$s4cake18emitIntoClientFuncyyF",
       "moduleName": "cake",
       "declAttributes": [
         "AlwaysEmitIntoClient"
@@ -1537,7 +1537,7 @@
           ],
           "declKind": "Func",
           "usr": "s:Si4cakeE3fooyyF",
-          "mangledName": "Si4cakeE3fooyyF",
+          "mangledName": "$sSi4cakeE3fooyyF",
           "moduleName": "cake",
           "funcSelfKind": "NonMutating"
         },
@@ -1554,14 +1554,14 @@
           ],
           "declKind": "Func",
           "usr": "s:Si4cakeE3baryyF",
-          "mangledName": "Si4cakeE3baryyF",
+          "mangledName": "$sSi4cakeE3baryyF",
           "moduleName": "cake",
           "funcSelfKind": "NonMutating"
         }
       ],
       "declKind": "Struct",
       "usr": "s:Si",
-      "mangledName": "Si",
+      "mangledName": "$sSi",
       "moduleName": "Swift",
       "declAttributes": [
         "Frozen"
@@ -1573,14 +1573,14 @@
           "name": "FixedWidthInteger",
           "printedName": "FixedWidthInteger",
           "usr": "s:s17FixedWidthIntegerP",
-          "mangledName": "s17FixedWidthIntegerP"
+          "mangledName": "$ss17FixedWidthIntegerP"
         },
         {
           "kind": "Conformance",
           "name": "SignedInteger",
           "printedName": "SignedInteger",
           "usr": "s:SZ",
-          "mangledName": "SZ"
+          "mangledName": "$sSZ"
         },
         {
           "kind": "Conformance",
@@ -1602,21 +1602,21 @@
             }
           ],
           "usr": "s:Sz",
-          "mangledName": "Sz"
+          "mangledName": "$sSz"
         },
         {
           "kind": "Conformance",
           "name": "LosslessStringConvertible",
           "printedName": "LosslessStringConvertible",
           "usr": "s:s25LosslessStringConvertibleP",
-          "mangledName": "s25LosslessStringConvertibleP"
+          "mangledName": "$ss25LosslessStringConvertibleP"
         },
         {
           "kind": "Conformance",
           "name": "SignedNumeric",
           "printedName": "SignedNumeric",
           "usr": "s:s13SignedNumericP",
-          "mangledName": "s13SignedNumericP"
+          "mangledName": "$ss13SignedNumericP"
         },
         {
           "kind": "Conformance",
@@ -1645,14 +1645,14 @@
             }
           ],
           "usr": "s:Sj",
-          "mangledName": "Sj"
+          "mangledName": "$sSj"
         },
         {
           "kind": "Conformance",
           "name": "CustomStringConvertible",
           "printedName": "CustomStringConvertible",
           "usr": "s:s23CustomStringConvertibleP",
-          "mangledName": "s23CustomStringConvertibleP"
+          "mangledName": "$ss23CustomStringConvertibleP"
         },
         {
           "kind": "Conformance",
@@ -1674,14 +1674,14 @@
             }
           ],
           "usr": "s:Sx",
-          "mangledName": "Sx"
+          "mangledName": "$sSx"
         },
         {
           "kind": "Conformance",
           "name": "AdditiveArithmetic",
           "printedName": "AdditiveArithmetic",
           "usr": "s:s18AdditiveArithmeticP",
-          "mangledName": "s18AdditiveArithmeticP"
+          "mangledName": "$ss18AdditiveArithmeticP"
         },
         {
           "kind": "Conformance",
@@ -1710,77 +1710,77 @@
             }
           ],
           "usr": "s:s27ExpressibleByIntegerLiteralP",
-          "mangledName": "s27ExpressibleByIntegerLiteralP"
+          "mangledName": "$ss27ExpressibleByIntegerLiteralP"
         },
         {
           "kind": "Conformance",
           "name": "Comparable",
           "printedName": "Comparable",
           "usr": "s:SL",
-          "mangledName": "SL"
+          "mangledName": "$sSL"
         },
         {
           "kind": "Conformance",
           "name": "P1",
           "printedName": "P1",
           "usr": "s:4cake2P1P",
-          "mangledName": "4cake2P1P"
+          "mangledName": "$s4cake2P1P"
         },
         {
           "kind": "Conformance",
           "name": "Encodable",
           "printedName": "Encodable",
           "usr": "s:SE",
-          "mangledName": "SE"
+          "mangledName": "$sSE"
         },
         {
           "kind": "Conformance",
           "name": "Decodable",
           "printedName": "Decodable",
           "usr": "s:Se",
-          "mangledName": "Se"
+          "mangledName": "$sSe"
         },
         {
           "kind": "Conformance",
           "name": "CustomReflectable",
           "printedName": "CustomReflectable",
           "usr": "s:s17CustomReflectableP",
-          "mangledName": "s17CustomReflectableP"
+          "mangledName": "$ss17CustomReflectableP"
         },
         {
           "kind": "Conformance",
           "name": "MirrorPath",
           "printedName": "MirrorPath",
           "usr": "s:s10MirrorPathP",
-          "mangledName": "s10MirrorPathP"
+          "mangledName": "$ss10MirrorPathP"
         },
         {
           "kind": "Conformance",
           "name": "CVarArg",
           "printedName": "CVarArg",
           "usr": "s:s7CVarArgP",
-          "mangledName": "s7CVarArgP"
+          "mangledName": "$ss7CVarArgP"
         },
         {
           "kind": "Conformance",
           "name": "Hashable",
           "printedName": "Hashable",
           "usr": "s:SH",
-          "mangledName": "SH"
+          "mangledName": "$sSH"
         },
         {
           "kind": "Conformance",
           "name": "Equatable",
           "printedName": "Equatable",
           "usr": "s:SQ",
-          "mangledName": "SQ"
+          "mangledName": "$sSQ"
         },
         {
           "kind": "Conformance",
           "name": "Sendable",
           "printedName": "Sendable",
           "usr": "s:s8SendableP",
-          "mangledName": "s8SendableP"
+          "mangledName": "$ss8SendableP"
         },
         {
           "kind": "Conformance",
@@ -1887,7 +1887,7 @@
             }
           ],
           "usr": "s:s10SIMDScalarP",
-          "mangledName": "s10SIMDScalarP"
+          "mangledName": "$ss10SIMDScalarP"
         }
       ]
     }

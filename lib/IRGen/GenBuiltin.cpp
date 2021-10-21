@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/ASTContext.h"
 
@@ -121,10 +122,12 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
 
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
-                            Identifier FnId, SILType resultType,
-                            ArrayRef<SILType> argTypes,
-                            Explosion &args, Explosion &out,
-                            SubstitutionMap substitutions) {
+                            BuiltinInst *Inst, ArrayRef<SILType> argTypes,
+                            Explosion &args, Explosion &out) {
+  Identifier FnId = Inst->getName();
+  SILType resultType = Inst->getType();
+  SubstitutionMap substitutions = Inst->getSubstitutions();
+
   if (Builtin.ID == BuiltinValueKind::COWBufferForReading) {
     // Just forward the incoming argument.
     assert(args.size() == 1 && "Expecting one incoming argument");
@@ -711,7 +714,15 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
-  
+  if (Builtin.ID == BuiltinValueKind::Ifdef) {
+    // Ifdef not constant folded, which means it was not @_alwaysEmitIntoClient
+    IGF.IGM.error(
+        Inst->getLoc().getSourceLoc(),
+        "Builtin.ifdef can only be used in @_alwaysEmitIntoClient functions");
+    out.add(IGF.Builder.getInt32(0));
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::CmpXChg) {
     SmallVector<Type, 4> Types;
     StringRef BuiltinName =

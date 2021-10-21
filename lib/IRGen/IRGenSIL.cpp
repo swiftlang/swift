@@ -2976,8 +2976,7 @@ void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
   }
   
   Explosion result;
-  emitBuiltinCall(*this, builtin, i->getName(), i->getType(),
-                  argTypes, args, result, i->getSubstitutions());
+  emitBuiltinCall(*this, builtin, i, argTypes, args, result);
   
   setLoweredExplosion(i, result);
 }

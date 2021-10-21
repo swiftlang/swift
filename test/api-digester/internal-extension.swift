@@ -32,7 +32,7 @@ internal extension S1 {
 // CHECK-NEXT:     "name": "PublicProto",
 // CHECK-NEXT:     "printedName": "PublicProto",
 // CHECK-NEXT:     "usr": "s:4main11PublicProtoP",
-// CHECK-NEXT:     "mangledName": "4main11PublicProtoP"
+// CHECK-NEXT:     "mangledName": "$s4main11PublicProtoP"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
 extension C0: InternalProto {
