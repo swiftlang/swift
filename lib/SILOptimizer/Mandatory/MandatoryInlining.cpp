@@ -111,7 +111,7 @@ static  bool fixupReferenceCounts(
       auto *stackLoc = builder.createAllocStack(loc, v->getType().getObjectType());
       builder.createCopyAddr(loc, v, stackLoc, IsNotTake, IsInitialization);
 
-      LinearLifetimeChecker checker(deadEndBlocks);
+      LinearLifetimeChecker checker(&deadEndBlocks);
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -154,7 +154,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(deadEndBlocks);
+      LinearLifetimeChecker checker;
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -201,7 +201,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(deadEndBlocks);
+      LinearLifetimeChecker checker;
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -238,7 +238,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(deadEndBlocks);
+      LinearLifetimeChecker checker;
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
