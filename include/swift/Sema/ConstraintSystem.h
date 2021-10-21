@@ -2364,7 +2364,7 @@ private:
       caseLabelItems;
 
   /// The set of parameters that have been inferred to be 'isolated'.
-  llvm::SmallVector<ParamDecl *, 2> isolatedParams;
+  llvm::SmallSetVector<ParamDecl *, 2> isolatedParams;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>

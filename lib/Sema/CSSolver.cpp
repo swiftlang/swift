@@ -186,7 +186,8 @@ Solution ConstraintSystem::finalize() {
 
   solution.solutionApplicationTargets = solutionApplicationTargets;
   solution.caseLabelItems = caseLabelItems;
-  solution.isolatedParams = isolatedParams;
+  solution.isolatedParams.clear();
+  solution.isolatedParams.append(isolatedParams.begin(), isolatedParams.end());
 
   for (const auto &transformed : resultBuilderTransformed) {
     solution.resultBuilderTransformed.insert(transformed);
@@ -294,7 +295,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (auto param : solution.isolatedParams) {
-    isolatedParams.push_back(param);
+    isolatedParams.insert(param);
   }
 
   for (const auto &transformed : solution.resultBuilderTransformed) {

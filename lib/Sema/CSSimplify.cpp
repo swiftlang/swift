@@ -8999,7 +8999,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
         // Note when a parameter is inferred to be isolated.
         if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
-          isolatedParams.push_back(paramDecl);
+          isolatedParams.insert(paramDecl);
 
         param =
             param.withFlags(flags.withInOut(contextualParam->isInOut())
