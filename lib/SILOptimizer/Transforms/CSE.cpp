@@ -1399,7 +1399,7 @@ class SILCSE : public SILFunctionTransform {
     auto *Fn = getFunction();
     DeadEndBlocks DeadEndBBs(Fn);
     InstModCallbacks callbacks;
-    OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs};
+    OwnershipFixupContext FixupCtx{callbacks};
     CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, FixupCtx);
     bool Changed = false;
 
