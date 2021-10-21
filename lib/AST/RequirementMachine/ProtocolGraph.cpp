@@ -49,6 +49,50 @@ const ProtocolInfo &ProtocolGraph::getProtocolInfo(
   return found->second;
 }
 
+/// The "support" of a protocol P is the size of the transitive closure of
+/// the singleton set {P} under protocol inheritance.
+unsigned ProtocolGraph::getProtocolSupport(
+    const ProtocolDecl *proto) const {
+  return getProtocolInfo(proto).AllInherited.size() + 1;
+}
+
+/// The "support" of a set S of protocols is the size of the transitive
+/// closure of S under protocol inheritance. For example, if you start
+/// with
+///
+///   protocol P1 : P3 {}
+///   protocol P2 : P3 {}
+///   protocol P3 {}
+///
+/// Then the "support" of P1 & P2 is 3 because |P1 & P2 & P3| = 3.
+///
+/// The \p protos array must be sorted in canonical order and
+/// permanently-allocated; one safe choice is to use the return value of
+/// Symbol::getProtocols().
+unsigned ProtocolGraph::getProtocolSupport(
+    ArrayRef<const ProtocolDecl *> protos) const {
+  auto found = Support.find(protos);
+  if (found != Support.end())
+    return found->second;
+
+  unsigned result;
+  if (protos.size() == 1) {
+    result = getProtocolSupport(protos[0]);
+  } else {
+    llvm::DenseSet<const ProtocolDecl *> visited;
+    for (const auto *proto : protos) {
+      visited.insert(proto);
+      for (const auto *inheritedProto : getProtocolInfo(proto).AllInherited)
+        visited.insert(inheritedProto);
+    }
+
+    result = visited.size();
+  }
+
+  const_cast<ProtocolGraph *>(this)->Support[protos] = result;
+  return result;
+}
+
 /// Record information about a protocol if we have no seen it yet.
 void ProtocolGraph::addProtocol(const ProtocolDecl *proto,
                                 bool initialComponent) {
@@ -199,17 +243,20 @@ void ProtocolGraph::compute() {
 /// from another protocol Q, then P < Q. (The converse cannot be true, since
 /// this is a linear order.)
 ///
-/// We first compare the 'depth' of a protocol, which is defined in
-/// ProtocolGraph::computeProtocolDepth() above.
+/// We first compare the 'support' of a protocol, which is defined in
+/// ProtocolGraph::getProtocolSupport() above.
 ///
-/// If two protocols have the same depth, the tie is broken by the standard
+/// If two protocols have the same support, the tie is broken by the standard
 /// TypeDecl::compare().
 int ProtocolGraph::compareProtocols(const ProtocolDecl *lhs,
                                     const ProtocolDecl *rhs) const {
-  const auto &infoLHS = getProtocolInfo(lhs);
-  const auto &infoRHS = getProtocolInfo(rhs);
+  unsigned lhsSupport = getProtocolSupport(lhs);
+  unsigned rhsSupport = getProtocolSupport(rhs);
 
-  return infoLHS.Index - infoRHS.Index;
+  if (lhsSupport != rhsSupport)
+    return rhsSupport - lhsSupport;
+
+  return TypeDecl::compare(lhs, rhs);
 }
 
 /// Returns if \p thisProto transitively inherits from \p otherProto.

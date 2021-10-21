@@ -95,7 +95,7 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
   auto otherProtos = rhs.getProtocols();
 
   // This must follow from lhs > rhs.
-  assert(protos.size() <= otherProtos.size());
+  assert(graph.getProtocolSupport(protos) <= graph.getProtocolSupport(otherProtos));
 
   // Compute sorted and merged list of protocols, with duplicates.
   llvm::TinyPtrVector<const ProtocolDecl *> newProtos;

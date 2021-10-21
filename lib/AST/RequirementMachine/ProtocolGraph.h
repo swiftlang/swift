@@ -88,6 +88,7 @@ struct ProtocolInfo {
 /// Out-of-line methods are documented in ProtocolGraph.cpp.
 class ProtocolGraph {
   llvm::DenseMap<const ProtocolDecl *, ProtocolInfo> Info;
+  llvm::DenseMap<ArrayRef<const ProtocolDecl *>, unsigned> Support;
   std::vector<const ProtocolDecl *> Protocols;
   bool Debug = false;
 
@@ -106,6 +107,12 @@ public:
 
   const ProtocolInfo &getProtocolInfo(
       const ProtocolDecl *proto) const;
+
+  unsigned getProtocolSupport(
+      const ProtocolDecl *proto) const;
+
+  unsigned getProtocolSupport(
+      ArrayRef<const ProtocolDecl *> protos) const;
 
 private:
   void addProtocol(const ProtocolDecl *proto,
