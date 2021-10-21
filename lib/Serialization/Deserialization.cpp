@@ -3145,12 +3145,14 @@ public:
     bool isIUO;
     bool isVariadic;
     bool isAutoClosure;
+    bool isIsolated;
     uint8_t rawDefaultArg;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isIUO, isVariadic,
-                                         isAutoClosure, rawDefaultArg);
+                                         isAutoClosure, isIsolated,
+                                         rawDefaultArg);
 
     auto argName = MF.getIdentifier(argNameID);
     auto paramName = MF.getIdentifier(paramNameID);
@@ -3184,6 +3186,7 @@ public:
     param->setImplicitlyUnwrappedOptional(isIUO);
     param->setVariadic(isVariadic);
     param->setAutoClosure(isAutoClosure);
+    param->setIsolated(isIsolated);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.

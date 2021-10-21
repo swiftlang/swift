@@ -437,10 +437,14 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->walk(walker);
   }
 
-  return TypeChecker::checkGenericSignature(nestedList.back(), DC,
-                                         /*parentSig=*/nullptr,
-                                         /*allowConcreteGenericParams=*/true)
-    .getGenericEnvironment();
+  auto request = InferredGenericSignatureRequest{
+      DC->getParentModule(), /*parentSig=*/nullptr,
+      nestedList.back(), WhereClauseOwner(),
+      {}, {}, /*allowConcreteGenericParams=*/true};
+  auto sig = evaluateOrDefault(DC->getASTContext().evaluator,
+                               request, GenericSignature());
+
+  return sig.getGenericEnvironment();
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,

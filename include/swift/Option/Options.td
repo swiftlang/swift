@@ -620,6 +620,11 @@ def requirement_machine_protocol_signatures_EQ : Joined<["-"], "requirement-mach
   Flags<[FrontendOption]>,
   HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', or 'verify'">;
 
+def experimental_hermetic_seal_at_link:
+  Flag<["-"], "experimental-hermetic-seal-at-link">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Library code can assume that all clients are visible at linktime, and aggressively strip unused code">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,

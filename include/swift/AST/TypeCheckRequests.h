@@ -459,6 +459,8 @@ struct WhereClauseOwner {
                      SpecializeAttr *, DifferentiableAttr *>
       source;
 
+  WhereClauseOwner() : dc(nullptr) {}
+
   WhereClauseOwner(GenericContext *genCtx);
   WhereClauseOwner(AssociatedTypeDecl *atd);
 
@@ -478,6 +480,10 @@ struct WhereClauseOwner {
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
     return llvm::hash_value(owner.source.getOpaqueValue());
+  }
+
+  operator bool() const {
+    return dc != nullptr;
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,
@@ -1437,11 +1443,12 @@ public:
 class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
                          GenericSignature (ModuleDecl *,
-                                            const GenericSignatureImpl *,
-                                            GenericParamSource,
-                                            SmallVector<Requirement, 2>,
-                                            SmallVector<TypeLoc, 2>,
-                                            bool),
+                                           const GenericSignatureImpl *,
+                                           GenericParamList *,
+                                           WhereClauseOwner,
+                                           SmallVector<Requirement, 2>,
+                                           SmallVector<TypeLoc, 2>,
+                                           bool),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1452,9 +1459,10 @@ private:
   // Evaluation.
   GenericSignature
   evaluate(Evaluator &evaluator,
-           ModuleDecl *module,
+           ModuleDecl *parentModule,
            const GenericSignatureImpl *baseSignature,
-           GenericParamSource paramSource,
+           GenericParamList *genericParams,
+           WhereClauseOwner whereClause,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
            bool allowConcreteGenericParams) const;
