@@ -145,8 +145,12 @@ if(NOT SWIFT_INCLUDE_TOOLS)
   else()
     list(APPEND SWIFT_LIT_ARGS
       "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
+      "--param" "swift_native_llvm_tools_path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
       "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
-      "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
+      "--param" "swift_native_clang_tools_path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
+      "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
+      "--param" "swift_native_swift_tools_path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
+      )
   endif()
   if(SWIFT_BUILD_STDLIB)
     list(APPEND SWIFT_LIT_ARGS
