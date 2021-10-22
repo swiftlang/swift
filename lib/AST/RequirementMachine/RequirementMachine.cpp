@@ -32,7 +32,23 @@ struct RewriteSystemBuilder {
   RewriteContext &Context;
   bool Dump;
 
-  ProtocolGraph Protocols;
+  /// The keys are the unique protocols we've added so far. The value indicates
+  /// whether the protocol's SCC is an initial component for the rewrite system.
+  ///
+  /// A rewrite system built from a generic signature does not have any initial
+  /// protocols.
+  ///
+  /// A rewrite system built from a protocol SCC has the protocols of the SCC
+  /// itself as initial protocols.
+  ///
+  /// If a protocol is an initial protocol, we use its structural requirements
+  /// instead of its requirement signature as the basis of its rewrite rules.
+  ///
+  /// This is what breaks the cycle in requirement signature computation for a
+  /// group of interdependent protocols.
+  llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
+  std::vector<const ProtocolDecl *> Protocols;
+
   std::vector<std::pair<MutableTerm, MutableTerm>> AssociatedTypeRules;
   std::vector<std::pair<MutableTerm, MutableTerm>> RequirementRules;
 
@@ -44,6 +60,8 @@ struct RewriteSystemBuilder {
     : Context(ctx), Dump(dump) {}
   void addGenericSignature(CanGenericSignature sig);
   void addProtocols(ArrayRef<const ProtocolDecl *> proto);
+  void addProtocol(const ProtocolDecl *proto,
+                   bool initialComponent);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
@@ -84,8 +102,11 @@ RewriteSystemBuilder::getConcreteSubstitutionSchema(CanType concreteType,
 void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
   // Collect all protocols transitively referenced from the generic signature's
   // requirements.
-  Protocols.visitRequirements(sig.getRequirements());
-  Protocols.compute();
+  for (auto req : sig.getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      addProtocol(req.getProtocolDecl(), /*initialComponent=*/false);
+    }
+  }
 
   processProtocolDependencies();
 
@@ -97,8 +118,9 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
 void RewriteSystemBuilder::addProtocols(ArrayRef<const ProtocolDecl *> protos) {
   // Collect all protocols transitively referenced from this connected component
   // of the protocol dependency graph.
-  Protocols.visitProtocols(protos);
-  Protocols.compute();
+  for (auto proto : protos) {
+    addProtocol(proto, /*initialComponent=*/true);
+  }
 
   processProtocolDependencies();
 }
@@ -228,20 +250,38 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   RequirementRules.emplace_back(subjectTerm, constraintTerm);
 }
 
+/// Record information about a protocol if we have no seen it yet.
+void RewriteSystemBuilder::addProtocol(const ProtocolDecl *proto,
+                                       bool initialComponent) {
+  if (ProtocolMap.count(proto) > 0)
+    return;
+
+  ProtocolMap[proto] = initialComponent;
+  Protocols.push_back(proto);
+}
+
 void RewriteSystemBuilder::processProtocolDependencies() {
+  unsigned i = 0;
+  while (i < Protocols.size()) {
+    auto *proto = Protocols[i++];
+    for (auto *depProto : proto->getProtocolDependencies()) {
+      addProtocol(depProto, /*initialComponent=*/false);
+    }
+  }
+
   // Add rewrite rules for each protocol.
-  for (auto *proto : Protocols.getProtocols()) {
+  for (auto *proto : Protocols) {
     if (Dump) {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
     }
 
-    const auto &info = Protocols.getProtocolInfo(proto);
-
-    for (auto *assocType : info.AssociatedTypes)
+    for (auto *assocType : proto->getAssociatedTypeMembers())
       addAssociatedType(assocType, proto);
 
-    for (auto *assocType : info.InheritedAssociatedTypes)
-      addAssociatedType(assocType, proto);
+    for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+      for (auto *assocType : inheritedProto->getAssociatedTypeMembers())
+        addAssociatedType(assocType, proto);
+    }
 
     // If this protocol is part of the initial connected component, we're
     // building requirement signatures for all protocols in this component,
@@ -250,7 +290,7 @@ void RewriteSystemBuilder::processProtocolDependencies() {
     // Otherwise, we should either already have a requirement signature, or
     // we can trigger the computation of the requirement signatures of the
     // next component recursively.
-    if (info.InitialComponent) {
+    if (ProtocolMap[proto]) {
       for (auto req : proto->getStructuralRequirements())
         addRequirement(req.req.getCanonical(), proto);
     } else {
@@ -411,8 +451,7 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   // providing the protocol graph to use for the linear order on terms.
   System.initialize(/*recordHomotopyGenerators=*/false,
                     std::move(builder.AssociatedTypeRules),
-                    std::move(builder.RequirementRules),
-                    std::move(builder.Protocols));
+                    std::move(builder.RequirementRules));
 
   computeCompletion(RewriteSystem::DisallowInvalidRequirements);
 
@@ -453,8 +492,7 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
   // providing the protocol graph to use for the linear order on terms.
   System.initialize(/*recordHomotopyGenerators=*/true,
                     std::move(builder.AssociatedTypeRules),
-                    std::move(builder.RequirementRules),
-                    std::move(builder.Protocols));
+                    std::move(builder.RequirementRules));
 
   // FIXME: Only if the protocols were written in source, though.
   computeCompletion(RewriteSystem::AllowInvalidRequirements);

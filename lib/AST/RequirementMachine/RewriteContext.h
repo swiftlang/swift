@@ -48,6 +48,14 @@ class RewriteContext final {
   /// Folding set for uniquing terms.
   llvm::FoldingSet<Term::Storage> Terms;
 
+  /// Cache for transitive closure of inherited protocols.
+  llvm::DenseMap<const ProtocolDecl *,
+                 llvm::TinyPtrVector<const ProtocolDecl *>> AllInherited;
+
+  /// Cached support of sets of protocols, which is the number of elements in
+  /// the transitive closure of the set under protocol inheritance.
+  llvm::DenseMap<ArrayRef<const ProtocolDecl *>, unsigned> Support;
+
   /// Cache for associated type declarations.
   llvm::DenseMap<Symbol, AssociatedTypeDecl *> AssocTypes;
 
@@ -127,6 +135,16 @@ public:
 
   DebugOptions getDebugOptions() const { return Debug; }
 
+  const llvm::TinyPtrVector<const ProtocolDecl *> &
+  getInheritedProtocols(const ProtocolDecl *proto);
+
+  unsigned getProtocolSupport(const ProtocolDecl *proto);
+
+  unsigned getProtocolSupport(ArrayRef<const ProtocolDecl *> protos);
+
+  int compareProtocols(const ProtocolDecl *lhs,
+                       const ProtocolDecl *rhs);
+
   Term getTermForType(CanType paramType, const ProtocolDecl *proto);
 
   MutableTerm getMutableTermForType(CanType paramType,
@@ -135,16 +153,13 @@ public:
   ASTContext &getASTContext() const { return Context; }
 
   Type getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const ProtocolGraph &protos) const;
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
 
   Type getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams,
-                      const ProtocolGraph &protos) const;
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
 
   Type getRelativeTypeForTerm(
-                      const MutableTerm &term, const MutableTerm &prefix,
-                      const ProtocolGraph &protos) const;
+                      const MutableTerm &term, const MutableTerm &prefix) const;
 
   MutableTerm getRelativeTermForType(CanType typeWitness,
                                      ArrayRef<Term> substitutions);
@@ -153,14 +168,11 @@ public:
                       Type schema,
                       ArrayRef<Term> substitutions,
                       TypeArrayView<GenericTypeParamType> genericParams,
-                      const MutableTerm &prefix,
-                      const ProtocolGraph &protos) const;
+                      const MutableTerm &prefix) const;
 
-  AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol,
-                                                 const ProtocolGraph &protos);
+  AssociatedTypeDecl *getAssociatedTypeForSymbol(Symbol symbol);
 
-  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs,
-                              const ProtocolGraph &protos);
+  Symbol mergeAssociatedTypes(Symbol lhs, Symbol rhs);
 
   RequirementMachine *getRequirementMachine(CanGenericSignature sig);
   bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);
