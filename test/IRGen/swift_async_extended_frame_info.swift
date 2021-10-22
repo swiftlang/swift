@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=ALWAYS %s
+// RUN: %target-swift-frontend -disable-availability-checking -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=AUTO %s
 // RUN: %target-swift-frontend -disable-availability-checking -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=ALWAYS %s
 // RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=auto -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=AUTO %s
 // RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=auto -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=ALWAYS %s
