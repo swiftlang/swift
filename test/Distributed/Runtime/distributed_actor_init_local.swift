@@ -25,6 +25,17 @@ distributed actor LocalWorker {
   init(transport: ActorTransport) {}
 }
 
+@available(SwiftStdlib 5.5, *)
+distributed actor Bug_CallsReadyTwice {
+  var x: Int
+  init(transport: ActorTransport, wantBug: Bool) async {
+    if wantBug {
+      self.x = 1
+    }
+    self.x = 2
+  }
+}
+
 // ==== Fake Transport ---------------------------------------------------------
 
 @available(SwiftStdlib 5.5, *)
@@ -81,6 +92,17 @@ func test() async {
   _ = await PickATransport2(other: 1, theTransport: transport)
   // CHECK: assign type:PickATransport2, id:ActorAddress(address: "[[ID:.*]]")
   // CHECK: ready actor:main.PickATransport2, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  _ = await Bug_CallsReadyTwice(transport: transport, wantBug: true)
+  // CHECK: assign type:Bug_CallsReadyTwice, id:ActorAddress(address: "[[ID:.*]]")
+  // CHECK:      ready actor:main.Bug_CallsReadyTwice, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+  // CHECK-NEXT: ready actor:main.Bug_CallsReadyTwice, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  // TODO: it's not obvious why the resigns happen later for the async ones.
+  // might need to find a way to force the deallocation at a specific point,
+  // or just use check-dag or something.
+
+  // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
   // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
 }
 
