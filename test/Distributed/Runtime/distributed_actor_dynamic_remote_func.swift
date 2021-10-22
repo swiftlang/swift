@@ -13,9 +13,7 @@
 import _Distributed
 
 distributed actor LocalWorker {
-  init(transport: ActorTransport) {
-    defer { transport.actorReady(self) } // FIXME(distributed): rdar://81783599 this should be injected automatically
-  }
+  init(transport: ActorTransport) {}
 
   distributed func function() async throws -> String {
     "local:"
