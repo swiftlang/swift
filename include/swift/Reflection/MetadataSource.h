@@ -27,6 +27,7 @@
 
 using llvm::cast;
 
+#include <cerrno>
 #include <climits>
 #include <string>
 
