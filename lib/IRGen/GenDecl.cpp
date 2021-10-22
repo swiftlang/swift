@@ -547,8 +547,9 @@ static void collectGlobalList(IRGenModule &IGM,
 static llvm::GlobalVariable *
 emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
                StringRef name, StringRef section,
-               llvm::GlobalValue::LinkageTypes linkage, llvm::Type *eltTy,
-               bool isConstant, bool asContiguousArray) {
+               llvm::GlobalValue::LinkageTypes linkage,
+               llvm::Type *eltTy,
+               bool isConstant) {
   // Do nothing if the list is empty.
   if (handles.empty()) return nullptr;
 
@@ -556,31 +557,6 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
   // ones like @llvm.used), it's important to set an explicit alignment
   // so that the linker doesn't accidentally put padding in the list.
   Alignment alignment = IGM.getPointerAlignment();
-
-  if (!asContiguousArray) {
-    // Emit as individual globals, which is required for conditional runtime
-    // records to work.
-    for (auto &handle : handles) {
-      llvm::Constant *elt = cast<llvm::Constant>(&*handle);
-      auto eltName = name + "_" + elt->getName();
-      if (elt->getType() != eltTy)
-        elt = llvm::ConstantExpr::getBitCast(elt, eltTy);
-      auto var = new llvm::GlobalVariable(IGM.Module, eltTy, isConstant,
-                                          linkage, elt, eltName);
-      var->setSection(section);
-      var->setAlignment(llvm::MaybeAlign(alignment.getValue()));
-      disableAddressSanitizer(IGM, var);
-      if (llvm::GlobalValue::isLocalLinkage(linkage))
-        IGM.addUsedGlobal(var);
-
-      if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
-        // Allow dead-stripping `var` (the runtime record from the global list)
-        // when `handle` / `elt` (the underlaying entity) is not referenced.
-        IGM.appendLLVMUsedConditionalEntry(var, elt->stripPointerCasts());
-      }
-    }
-    return nullptr;
-  }
 
   // We have an array of value handles, but we need an array of constants.
   SmallVector<llvm::Constant*, 8> elts;
@@ -1061,41 +1037,36 @@ void IRGenModule::emitGlobalLists() {
   if (ObjCInterop) {
     // Objective-C class references go in a variable with a meaningless
     // name but a magic section.
-    emitGlobalList(
-        *this, ObjCClasses, "objc_classes",
-        GetObjCSectionName("__objc_classlist", "regular,no_dead_strip"),
-        llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
-        /*asContiguousArray*/ false);
+    emitGlobalList(*this, ObjCClasses, "objc_classes",
+                   GetObjCSectionName("__objc_classlist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
 
     // So do resilient class stubs.
-    emitGlobalList(
-        *this, ObjCClassStubs, "objc_class_stubs",
-        GetObjCSectionName("__objc_stublist", "regular,no_dead_strip"),
-        llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
-        /*asContiguousArray*/ true);
+    emitGlobalList(*this, ObjCClassStubs, "objc_class_stubs",
+                   GetObjCSectionName("__objc_stublist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
 
     // So do categories.
-    emitGlobalList(
-        *this, ObjCCategories, "objc_categories",
-        GetObjCSectionName("__objc_catlist", "regular,no_dead_strip"),
-        llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
-        /*asContiguousArray*/ true);
+    emitGlobalList(*this, ObjCCategories, "objc_categories",
+                   GetObjCSectionName("__objc_catlist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
 
     // And categories on class stubs.
-    emitGlobalList(
-        *this, ObjCCategoriesOnStubs, "objc_categories_stubs",
-        GetObjCSectionName("__objc_catlist2", "regular,no_dead_strip"),
-        llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
-        /*asContiguousArray*/ true);
+    emitGlobalList(*this, ObjCCategoriesOnStubs, "objc_categories_stubs",
+                   GetObjCSectionName("__objc_catlist2",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
 
-    // Emit nonlazily realized class references in a second magic section to
-    // make sure they are realized by the Objective-C runtime before any
-    // instances are allocated.
-    emitGlobalList(
-        *this, ObjCNonLazyClasses, "objc_non_lazy_classes",
-        GetObjCSectionName("__objc_nlclslist", "regular,no_dead_strip"),
-        llvm::GlobalValue::InternalLinkage, Int8PtrTy, /*isConstant*/ false,
-        /*asContiguousArray*/ true);
+    // Emit nonlazily realized class references in a second magic section to make
+    // sure they are realized by the Objective-C runtime before any instances
+    // are allocated.
+    emitGlobalList(*this, ObjCNonLazyClasses, "objc_non_lazy_classes",
+                   GetObjCSectionName("__objc_nlclslist",
+                                      "regular,no_dead_strip"),
+                   llvm::GlobalValue::InternalLinkage, Int8PtrTy, false);
   }
 
   // @llvm.used
@@ -1105,7 +1076,7 @@ void IRGenModule::emitGlobalLists() {
   emitGlobalList(*this, LLVMUsed, "llvm.used", "llvm.metadata",
                  llvm::GlobalValue::AppendingLinkage,
                  Int8PtrTy,
-                 /*isConstant*/false, /*asContiguousArray*/true);
+                 false);
 
   // Collect llvm.compiler.used globals already in the module (coming
   // from ClangCodeGen).
@@ -1113,7 +1084,7 @@ void IRGenModule::emitGlobalLists() {
   emitGlobalList(*this, LLVMCompilerUsed, "llvm.compiler.used", "llvm.metadata",
                  llvm::GlobalValue::AppendingLinkage,
                  Int8PtrTy,
-                 /*isConstant*/false, /*asContiguousArray*/true);
+                 false);
 }
 
 static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
@@ -3738,34 +3709,39 @@ IRGenModule::emitDirectRelativeReference(llvm::Constant *target,
 
 /// Expresses that `var` is removable (dead-strippable) when `dependsOn` is not
 /// referenced.
-void IRGenModule::appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
-                                                 llvm::Constant *dependsOn) {
+static void appendLLVMUsedConditionalEntry(IRGenModule &IGM,
+                                           llvm::GlobalVariable *var,
+                                           llvm::Constant *dependsOn) {
   llvm::Metadata *metadata[] = {
       // (1) which variable is being conditionalized, "target"
       llvm::ConstantAsMetadata::get(var),
       // (2) type, not relevant for a single-edge condition
       llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
-          llvm::Type::getInt32Ty(Module.getContext()), 0)),
+          llvm::Type::getInt32Ty(IGM.Module.getContext()), 0)),
       // (3) the "edge" that holds the target alive, if it's missing the target
       // is allowed to be removed
-      llvm::MDNode::get(Module.getContext(),
+      llvm::MDNode::get(IGM.Module.getContext(),
                         {
                             llvm::ConstantAsMetadata::get(dependsOn),
                         }),
   };
   auto *usedConditional =
-      Module.getOrInsertNamedMetadata("llvm.used.conditional");
-  usedConditional->addOperand(llvm::MDNode::get(Module.getContext(), metadata));
+      IGM.Module.getOrInsertNamedMetadata("llvm.used.conditional");
+  usedConditional->addOperand(
+      llvm::MDNode::get(IGM.Module.getContext(), metadata));
 }
 
 /// Expresses that `var` is removable (dead-strippable) when either the protocol
 /// from `record` is not referenced or the type from `record` is not referenced.
-void IRGenModule::appendLLVMUsedConditionalEntry(
-    llvm::GlobalVariable *var, const ProtocolConformance *conformance) {
-  auto *protocol = getAddrOfProtocolDescriptor(conformance->getProtocol())
-                       ->stripPointerCasts();
-  auto *type = getAddrOfTypeContextDescriptor(
-                   conformance->getType()->getAnyNominal(), DontRequireMetadata)
+static void
+appendLLVMUsedConditionalEntry(IRGenModule &IGM, llvm::GlobalVariable *var,
+                               const ConformanceDescription &record) {
+  auto *protocol =
+      IGM.getAddrOfProtocolDescriptor(record.conformance->getProtocol())
+          ->stripPointerCasts();
+  auto *type = IGM.getAddrOfTypeContextDescriptor(
+                      record.conformance->getType()->getAnyNominal(),
+                      DontRequireMetadata)
                    ->stripPointerCasts();
 
   llvm::Metadata *metadata[] = {
@@ -3774,17 +3750,18 @@ void IRGenModule::appendLLVMUsedConditionalEntry(
       // (2) type, "1" = if either edge is missing, the target is allowed to be
       // removed.
       llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
-          llvm::Type::getInt32Ty(Module.getContext()), 1)),
+          llvm::Type::getInt32Ty(IGM.Module.getContext()), 1)),
       // (3) list of edges
-      llvm::MDNode::get(Module.getContext(),
+      llvm::MDNode::get(IGM.Module.getContext(),
                         {
                             llvm::ConstantAsMetadata::get(protocol),
                             llvm::ConstantAsMetadata::get(type),
                         }),
   };
   auto *usedConditional =
-      Module.getOrInsertNamedMetadata("llvm.used.conditional");
-  usedConditional->addOperand(llvm::MDNode::get(Module.getContext(), metadata));
+      IGM.Module.getOrInsertNamedMetadata("llvm.used.conditional");
+  usedConditional->addOperand(
+      llvm::MDNode::get(IGM.Module.getContext(), metadata));
 }
 
 /// Emit the protocol descriptors list and return it (if asContiguousArray is
@@ -3866,7 +3843,7 @@ llvm::Constant *IRGenModule::emitSwiftProtocols(bool asContiguousArray) {
     if (IRGen.Opts.ConditionalRuntimeRecords) {
       // Allow dead-stripping `var` (the protocol record) when the protocol
       // (descriptorRef) is not referenced.
-      appendLLVMUsedConditionalEntry(var, descriptorRef.getValue());
+      appendLLVMUsedConditionalEntry(*this, var, descriptorRef.getValue());
     }
   }
 
@@ -3960,7 +3937,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
     if (IRGen.Opts.ConditionalRuntimeRecords) {
       // Allow dead-stripping `var` (the conformance record) when the protocol
       // or type (from the conformance) is not referenced.
-      appendLLVMUsedConditionalEntry(var, record.conformance);
+      appendLLVMUsedConditionalEntry(*this, var, record);
     }
   }
 
@@ -4075,7 +4052,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
     if (IRGen.Opts.ConditionalRuntimeRecords) {
       // Allow dead-stripping `var` (the type record) when the type (`ref`) is
       // not referenced.
-      appendLLVMUsedConditionalEntry(var, ref.getValue());
+      appendLLVMUsedConditionalEntry(*this, var, ref.getValue());
     }
   }
 
