@@ -59,6 +59,7 @@ extension MainActor {
   }
 
   /// Execute the given body closure on the main actor.
+  @_silgen_name("$sScM12runAndReturn10resultType4bodyxxm_xyYbKScMYcXEtYaKlFZ")
   @_alwaysEmitIntoClient
   public static func run<T>(
     resultType: T.Type = T.self,
