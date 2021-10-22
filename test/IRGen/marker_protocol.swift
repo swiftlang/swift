@@ -13,7 +13,11 @@
 extension Int: P { }
 extension Array: P where Element: P { }
 
-// CHECK: @"$s15marker_protocol1QMp" = {{(dllexport |protected )?}}constant
+// No mention of the marker protocol for runtime type instantiation.
+// CHECK-LABEL: @"$sSS_15marker_protocol1P_ptMD" =
+// CHECK-SAME: @"symbolic SS_ypt"
+
+// CHECK-LABEL: @"$s15marker_protocol1QMp" = {{(dllexport |protected )?}}constant
 // CHECK-SAME: i32 trunc{{.*}}s15marker_protocolMXM{{.*}}s15marker_protocol1QMp
 // CHECK-SAME: i32 0, i32 5, i32 0
 public protocol Q: P {
@@ -22,6 +26,31 @@ public protocol Q: P {
   func h()
   func i()
   func j()
+}
+
+protocol R { }
+
+@_marker protocol S: AnyObject { }
+
+// Note: no mention of marker protocols here.
+// CHECK-LABEL: @"$s15marker_protocol10HasMarkersVMF" =
+// CHECK-SAME: @"symbolic yp"
+// CHECK-SAME: @"symbolic ______p 15marker_protocol1QP"
+// CHECK-SAME: @"symbolic ______p 15marker_protocol1RP"
+// CHECK-SAME: @"symbolic yXl"
+struct HasMarkers {
+  var field1: P
+  var field2: P & Q
+  var field3: P & R
+  var field4: S
+}
+
+// Note: no mention of marker protocols when forming a dictionary.
+// CHECK-LABEL: define{{.*}}@"$s15marker_protocol0A12InDictionaryypyF"
+// CHECK: call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSS_15marker_protocol1P_ptMD")
+public func markerInDictionary() -> Any {
+  let dict: [String: P] = ["answer" : 42]
+  return dict
 }
 
 // Note: no witness tables

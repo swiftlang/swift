@@ -17,6 +17,10 @@ protocol P4 { } // expected-note{{'P4' declared here}}
 
 @_marker protocol P5: P4 { } // expected-error{{marker protocol 'P5' cannot inherit non-marker protocol 'P4'}}
 
+class C { }
+@_marker protocol P5a: AnyObject { }  // okay
+@_marker protocol P5b: C { }   // expected-error{{marker protocol 'P5b' cannot inherit class 'C'}}
+
 // Legitimate uses of marker protocols.
 extension P3 {
   func f() { }
