@@ -107,13 +107,11 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
   llvm::SmallDenseMap<TypeBase *, ConnectedComponent> sameTypeReqs;
 
   auto genericParams = proto->getGenericSignature().getGenericParams();
-  const auto &protos = System.getProtocols();
 
   // Convert a rewrite rule into a requirement.
   auto createRequirementFromRule = [&](const Rule &rule) {
     if (auto prop = rule.isPropertyRule()) {
-      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
-                                                protos);
+      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams);
 
       switch (prop->getKind()) {
       case Symbol::Kind::Protocol:
@@ -134,16 +132,14 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
                           Context.getTypeFromSubstitutionSchema(
                               prop->getSuperclass(),
                               prop->getSubstitutions(),
-                              genericParams, MutableTerm(),
-                              protos));
+                              genericParams, MutableTerm()));
         return;
 
       case Symbol::Kind::ConcreteType: {
         auto concreteType = Context.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
-                                genericParams, MutableTerm(),
-                                protos);
+                                genericParams, MutableTerm());
 
         auto &component = sameTypeReqs[subjectType.getPointer()];
         assert(!component.ConcreteType);
@@ -159,10 +155,8 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
 
       llvm_unreachable("Invalid symbol kind");
     } else if (rule.getLHS().back().getKind() != Symbol::Kind::Protocol) {
-      auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams,
-                                                   protos);
-      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
-                                                protos);
+      auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams);
+      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams);
 
       sameTypeReqs[subjectType.getPointer()].Members.push_back(constraintType);
     }

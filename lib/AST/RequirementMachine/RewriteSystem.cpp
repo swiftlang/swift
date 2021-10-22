@@ -16,7 +16,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <vector>
-#include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
 
@@ -74,12 +73,12 @@ bool Rule::isProtocolRefinementRule() const {
 }
 
 /// Linear order on rules; compares LHS followed by RHS.
-int Rule::compare(const Rule &other, const ProtocolGraph &protos) const {
-  int compare = LHS.compare(other.LHS, protos);
+int Rule::compare(const Rule &other, RewriteContext &ctx) const {
+  int compare = LHS.compare(other.LHS, ctx);
   if (compare != 0)
     return compare;
 
-  return RHS.compare(other.RHS, protos);
+  return RHS.compare(other.RHS, ctx);
 }
 
 void Rule::dump(llvm::raw_ostream &out) const {
@@ -108,13 +107,11 @@ RewriteSystem::~RewriteSystem() {
 void RewriteSystem::initialize(
     bool recordHomotopyGenerators,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&associatedTypeRules,
-    std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules,
-    ProtocolGraph &&graph) {
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
   RecordHomotopyGenerators = recordHomotopyGenerators;
-  Protos = graph;
 
   for (const auto &rule : associatedTypeRules) {
     bool added = addRule(rule.first, rule.second);
@@ -175,7 +172,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // If the left hand side and right hand side are already equivalent, we're
   // done.
-  int result = lhs.compare(rhs, Protos);
+  int result = lhs.compare(rhs, Context);
   if (result == 0) {
     // If this rule is a consequence of existing rules, add a homotopy
     // generator.
@@ -201,7 +198,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
     loop.invert();
   }
 
-  assert(lhs.compare(rhs, Protos) > 0);
+  assert(lhs.compare(rhs, Context) > 0);
 
   if (Debug.contains(DebugFlags::Add)) {
     llvm::dbgs() << "## Simplified and oriented rule " << lhs << " => " << rhs << "\n\n";

@@ -16,7 +16,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <vector>
-#include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "Symbol.h"
 #include "Term.h"
@@ -460,27 +459,38 @@ ArrayRef<const ProtocolDecl *> Symbol::getRootProtocols() const {
 ///
 /// Then we break ties when both symbols have the same kind as follows:
 ///
-/// * For associated type symbols, we first order the number of protocols,
-///   with symbols containing more protocols coming first. This ensures
-///   that the following holds:
+/// * For associated type symbols, symbols with larger support are smaller
+///   than those with smaller support.
+///
+///   This ensures that if P inherits from Q, then [P:T] < [Q:T].
+///
+///   Furthermore, if P1...Pm and Q1...Qn are two minimal sets of protocols,
+///   this ensures that the following holds, where merge() is the
+///   RewriteContext::mergeAssociatedTypes() operation:
+///
+///     [merge(P1&...&Pm, Q1&...&Qn):T] < [P1&...&Pm:T]
+///     [merge(P1&...&Pm, Q1&...&Qn):T] < [Q1&...&Qn:T]
+///
+///   For example, if P1 and P2 are unrelated protocols, and P3 inherits
+///   both P1 and P2, then
 ///
 ///     [P1&P2:T] < [P1:T]
 ///     [P1&P2:T] < [P2:T]
+///     [P3:T] < [P1&P2:T]
 ///
-///   If both symbols have the same number of protocols, we perform a
-///   lexicographic comparison on the protocols pair-wise, using the
-///   protocol order defined by \p graph (see
-///   ProtocolGraph::compareProtocols()).
+///   If two different lists of protocols have the same support, the tie is
+///   broken by a lexshort comparison on the lists.
 ///
 /// * For generic parameter symbols, we first order by depth, then index.
 ///
 /// * For unbound name symbols, we compare identifiers lexicographically.
 ///
-/// * For protocol symbols, we compare the protocols using the protocol
-///   linear order on \p graph.
+/// * For protocol symbols, protocols with larger support are ordered before
+///   those with smaller support. The type order defined in TypeDecl::compare()
+///   is used to break ties; based on the protocol name and parent module.
 ///
 /// * For layout symbols, we use LayoutConstraint::compare().
-int Symbol::compare(Symbol other, const ProtocolGraph &graph) const {
+int Symbol::compare(Symbol other, RewriteContext &ctx) const {
   // Exit early if the symbols are equal.
   if (Ptr == other.Ptr)
     return 0;
@@ -499,7 +509,7 @@ int Symbol::compare(Symbol other, const ProtocolGraph &graph) const {
     break;
 
   case Kind::Protocol:
-    result = graph.compareProtocols(getProtocol(), other.getProtocol());
+    result = ctx.compareProtocols(getProtocol(), other.getProtocol());
     break;
 
   case Kind::AssociatedType: {
@@ -509,12 +519,19 @@ int Symbol::compare(Symbol other, const ProtocolGraph &graph) const {
     if (getName() != other.getName())
       return getName().compare(other.getName());
 
-    // Symbols with more protocols are 'smaller' than those with fewer.
+    // Symbols with larger support are *smaller* than those with
+    // smaller support.
+    unsigned support = ctx.getProtocolSupport(protos);
+    unsigned otherSupport = ctx.getProtocolSupport(otherProtos);
+    if (support != otherSupport)
+      return support > otherSupport ? -1 : 1;
+
+    // Otherwise, perform a shortlex comparison in the protocols.
     if (protos.size() != otherProtos.size())
-      return protos.size() > otherProtos.size() ? -1 : 1;
+      return protos.size() < otherProtos.size() ? -1 : 1;
 
     for (unsigned i : indices(protos)) {
-      int result = graph.compareProtocols(protos[i], otherProtos[i]);
+      int result = ctx.compareProtocols(protos[i], otherProtos[i]);
       if (result)
         return result;
     }

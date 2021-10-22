@@ -18,7 +18,6 @@
 #include <vector>
 
 #include "PropertyMap.h"
-#include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
 

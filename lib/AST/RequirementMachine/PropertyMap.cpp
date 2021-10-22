@@ -152,13 +152,11 @@ PropertyBag::getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const {
 Type PropertyBag::getSuperclassBound(
     TypeArrayView<GenericTypeParamType> genericParams,
     const MutableTerm &lookupTerm,
-    const ProtocolGraph &protos,
     RewriteContext &ctx) const {
   MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
   return ctx.getTypeFromSubstitutionSchema(Superclass->getSuperclass(),
                                            Superclass->getSubstitutions(),
-                                           genericParams, prefix,
-                                           protos);
+                                           genericParams, prefix);
 }
 
 /// Get the concrete type of the term represented by this property bag.
@@ -173,13 +171,11 @@ Type PropertyBag::getSuperclassBound(
 Type PropertyBag::getConcreteType(
     TypeArrayView<GenericTypeParamType> genericParams,
     const MutableTerm &lookupTerm,
-    const ProtocolGraph &protos,
     RewriteContext &ctx) const {
   MutableTerm prefix = getPrefixAfterStrippingKey(lookupTerm);
   return ctx.getTypeFromSubstitutionSchema(ConcreteType->getConcreteType(),
                                            ConcreteType->getSubstitutions(),
-                                           genericParams, prefix,
-                                           protos);
+                                           genericParams, prefix);
 }
 
 void PropertyBag::copyPropertiesFrom(const PropertyBag *next,

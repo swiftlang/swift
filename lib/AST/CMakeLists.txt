@@ -79,7 +79,6 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/GenericSignatureQueries.cpp
   RequirementMachine/PropertyMap.cpp
   RequirementMachine/PropertyUnification.cpp
-  RequirementMachine/ProtocolGraph.cpp
   RequirementMachine/RequirementMachine.cpp
   RequirementMachine/RequirementMachineRequests.cpp
   RequirementMachine/RewriteContext.cpp

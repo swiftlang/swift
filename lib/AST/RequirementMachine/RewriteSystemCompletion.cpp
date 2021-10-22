@@ -73,12 +73,7 @@ Symbol Symbol::prependPrefixToConcreteSubstitutions(
 /// - If P inherits from Q, this is just [P:T].
 /// - If Q inherits from P, this is just [Q:T].
 /// - If P and Q are unrelated, this is [P&Q:T].
-///
-/// Note that the protocol graph is not part of the caching key; each
-/// protocol graph is a subgraph of the global inheritance graph, so
-/// the specific choice of subgraph does not change the result.
-Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
-                                            const ProtocolGraph &graph) {
+Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs) {
   auto key = std::make_pair(lhs, rhs);
 
   auto found = MergedAssocTypes.find(key);
@@ -89,13 +84,13 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
   assert(lhs.getKind() == Symbol::Kind::AssociatedType);
   assert(rhs.getKind() == Symbol::Kind::AssociatedType);
   assert(lhs.getName() == rhs.getName());
-  assert(lhs.compare(rhs, graph) > 0);
+  assert(lhs.compare(rhs, *this) > 0);
 
   auto protos = lhs.getProtocols();
   auto otherProtos = rhs.getProtocols();
 
   // This must follow from lhs > rhs.
-  assert(protos.size() <= otherProtos.size());
+  assert(getProtocolSupport(protos) <= getProtocolSupport(otherProtos));
 
   // Compute sorted and merged list of protocols, with duplicates.
   llvm::TinyPtrVector<const ProtocolDecl *> newProtos;
@@ -104,7 +99,7 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
              std::back_inserter(newProtos),
              [&](const ProtocolDecl *lhs,
                  const ProtocolDecl *rhs) -> int {
-               return graph.compareProtocols(lhs, rhs) < 0;
+               return compareProtocols(lhs, rhs) < 0;
              });
 
   // Prune duplicates and protocols that are inherited by other
@@ -112,8 +107,13 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
   llvm::TinyPtrVector<const ProtocolDecl *> minimalProtos;
   for (const auto *newProto : newProtos) {
     auto inheritsFrom = [&](const ProtocolDecl *thisProto) {
-      return (thisProto == newProto ||
-              graph.inheritsFrom(thisProto, newProto));
+      if (thisProto == newProto)
+        return true;
+
+      const auto &inherited = getInheritedProtocols(thisProto);
+      return std::find(inherited.begin(),
+                       inherited.end(),
+                       newProto) != inherited.end();
     };
 
     if (std::find_if(minimalProtos.begin(), minimalProtos.end(),
@@ -305,8 +305,7 @@ void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
       llvm::dbgs() << lhs << " => " << rhs << "\n\n";
     }
 
-    auto mergedSymbol = Context.mergeAssociatedTypes(lhs.back(), rhs.back(),
-                                                     Protos);
+    auto mergedSymbol = Context.mergeAssociatedTypes(lhs.back(), rhs.back());
     if (Debug.contains(DebugFlags::Merge)) {
       llvm::dbgs() << "### Merged symbol " << mergedSymbol << "\n";
     }
@@ -314,8 +313,8 @@ void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
     // We must have mergedSymbol <= rhs < lhs, therefore mergedSymbol != lhs.
     assert(lhs.back() != mergedSymbol &&
            "Left hand side should not already end with merged symbol?");
-    assert(mergedSymbol.compare(rhs.back(), Protos) <= 0);
-    assert(rhs.back().compare(lhs.back(), Protos) < 0);
+    assert(mergedSymbol.compare(rhs.back(), Context) <= 0);
+    assert(rhs.back().compare(lhs.back(), Context) < 0);
 
     // If the merge didn't actually produce a new symbol, there is nothing else
     // to do.
