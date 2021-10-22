@@ -967,6 +967,45 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// initialized to a trivial type, and must be properly aligned for
   /// accessing `T`.
   ///
+  /// The following example allocates raw memory for one instance of `UInt`,
+  /// and then uses the `initializeMemory(as:to:)` method
+  /// to initialize the allocated memory.
+  ///
+  ///     let bytePointer = UnsafeMutableRawPointer.allocate(
+  ///             byteCount: MemoryLayout<UInt>.stride,
+  ///             alignment: MemoryLayout<UInt>.alignment)
+  ///     let int8Pointer = bytePointer.initializeMemory(as: UInt.self, to: 0)
+  ///
+  ///     // After using 'int8Pointer':
+  ///     int8Pointer.deallocate()
+  ///
+  /// After calling this method on a raw pointer `p`, the region starting at
+  /// `self` and continuing up to `p + MemoryLayout<T>.stride` is bound
+  /// to type `T` and initialized. If `T` is a nontrivial type, you must
+  /// eventually deinitialize the memory in this region to avoid memory leaks.
+  ///
+  /// - Parameters:
+  ///   - type: The type to which this memory will be bound.
+  ///   - value: The value used to initialize this memory.
+  /// - Returns: A typed pointer to the memory referenced by this raw pointer.
+  @inlinable
+  @discardableResult
+  public func initializeMemory<T>(
+    as type: T.Type, to value: T
+  ) -> UnsafeMutablePointer<T> {
+    Builtin.bindMemory(_rawValue, (1)._builtinWordValue, type)
+    Builtin.initialize(value, _rawValue)
+    return UnsafeMutablePointer(_rawValue)
+  }
+
+  /// Initializes the memory referenced by this pointer with the given value,
+  /// binds the memory to the value's type, and returns a typed pointer to the
+  /// initialized memory.
+  ///
+  /// The memory referenced by this pointer must be uninitialized or
+  /// initialized to a trivial type, and must be properly aligned for
+  /// accessing `T`.
+  ///
   /// The following example allocates enough raw memory to hold four instances
   /// of `Int8`, and then uses the `initializeMemory(as:repeating:count:)` method
   /// to initialize the allocated memory.
