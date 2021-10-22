@@ -2377,7 +2377,7 @@ private:
       ConstraintRestrictions;
 
   /// The set of fixes applied to make the solution work.
-  llvm::SmallVector<ConstraintFix *, 4> Fixes;
+  llvm::SmallSetVector<ConstraintFix *, 4> Fixes;
 
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -3420,7 +3420,7 @@ public:
     return !solverState || solverState->recordFixes;
   }
 
-  ArrayRef<ConstraintFix *> getFixes() const { return Fixes; }
+  ArrayRef<ConstraintFix *> getFixes() const { return Fixes.getArrayRef(); }
 
   bool shouldSuppressDiagnostics() const {
     return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);

@@ -309,7 +309,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register any fixes produced along this path.
-  Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
+  Fixes.insert(solution.Fixes.begin(), solution.Fixes.end());
 }
 
 /// Restore the type variable bindings to what they were before
