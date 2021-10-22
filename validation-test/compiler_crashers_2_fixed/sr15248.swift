@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir %s
 // REQUIRES: concurrency
+
 private struct TransformResult<T> {
     var index: Int
     var transformedElement: T
@@ -11,7 +12,7 @@ private struct TransformResult<T> {
 }
 
 public extension Collection {
-    @available(macOS 12.0.0, *)
+    @available(SwiftStdlib 5.5, *)
     private func f<T>(_ transform: @escaping (Element) async throws -> T) async throws -> [T] {
         return try await withThrowingTaskGroup(of: TransformResult<T>.self) { group in
           return []
