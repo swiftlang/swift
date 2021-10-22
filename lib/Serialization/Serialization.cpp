@@ -3614,6 +3614,7 @@ public:
         param->isImplicitlyUnwrappedOptional(),
         param->isVariadic(),
         param->isAutoClosure(),
+        param->isIsolated(),
         getRawStableDefaultArgumentKind(argKind),
         defaultArgumentText);
 
