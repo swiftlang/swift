@@ -193,10 +193,10 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
   }
 
   // Finally, sort the requirements in canonical order.
-  std::sort(reqs.begin(), reqs.end(),
-            [](const Requirement &lhs, const Requirement &rhs) -> bool {
-              return lhs.compare(rhs) < 0;
-            });
+  llvm::array_pod_sort(reqs.begin(), reqs.end(),
+                       [](const Requirement *lhs, const Requirement *rhs) -> int {
+                         return lhs->compare(*rhs);
+                       });
 
   return reqs;
 }
