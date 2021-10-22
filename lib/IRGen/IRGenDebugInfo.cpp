@@ -884,7 +884,9 @@ private:
     Mangle::ASTMangler Mangler;
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
-    if (!Opts.DisableRoundTripDebugTypes) {
+    // TODO(SR-15377): We currently cannot round trip some C++ types.
+    if (!Opts.DisableRoundTripDebugTypes &&
+        !Ty->getASTContext().LangOpts.EnableCXXInterop) {
       // Make sure we can reconstruct mangled types for the debugger.
 #ifndef NDEBUG
       auto &Ctx = Ty->getASTContext();
