@@ -21,7 +21,7 @@ distributed actor MyDistActor {
 // destroy only the correct stored properties whether remote or local, and also
 // destroy the executor.
 
-// CHECK-LABEL: sil hidden {{.*}} @$s14default_deinit11MyDistActorCfd : $@convention(method) (@guaranteed MyDistActor) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil hidden{{.*}} @$s14default_deinit11MyDistActorCfd : $@convention(method) (@guaranteed MyDistActor) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[SELF:%[0-9]+]] : $MyDistActor):
 // CHECK:   [[EXI_SELF:%[0-9]+]] = init_existential_ref [[SELF]] : $MyDistActor
 // CHECK:   [[IS_REMOTE_FN:%[0-9]+]] = function_ref @swift_distributed_actor_is_remote
@@ -105,7 +105,7 @@ actor SimpleActor {
 // additionally, we add basic coverage for a non-distributed actor's deinit
 
 
-// CHECK-LABEL: sil hidden {{.*}} @$s14default_deinit11SimpleActorCfd : $@convention(method) (@guaranteed SimpleActor) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil hidden{{.*}} @$s14default_deinit11SimpleActorCfd : $@convention(method) (@guaranteed SimpleActor) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[SELF:%[0-9]+]] : $SimpleActor):
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $SimpleActor, #SimpleActor.someField
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
