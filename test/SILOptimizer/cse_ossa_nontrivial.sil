@@ -2,6 +2,7 @@
 sil_stage canonical
 
 import Builtin
+import Swift
 
 ///////////////
 // CSE Tests //
@@ -14,20 +15,13 @@ struct NonTrivialStruct {
   var val:Klass
 }
 
-struct UInt8 {
-  var _value: Builtin.Int8
-}
-struct UInt64 {
-  var _value: Builtin.Int64
-}
-
 public enum FakeOptional {
   case none
   case some(Klass)
 }
 
 public enum FakeOptional2 {
-  case some1(UInt64)
+  case some1(UInt)
   case some2(Klass)
 }
 
@@ -44,44 +38,10 @@ struct StructWithEnum2 {
   var val:FakeOptional2
 }
 
-struct BridgeStruct {
-  @_hasStorage var obj: Builtin.BridgeObject { get set }
-  init(obj: Builtin.BridgeObject)
-}
-
-class FakeStorageBase {}
-
-struct FakeBuffer<Element> {
-  var _storage: FakeStorageBase
-}
-
-struct UMP<Element> {
-  let _rawValue: Builtin.RawPointer
-}
-
-typealias AnyObject = Builtin.AnyObject
-
-struct FakeSliceBuffer<Element> {
-  var o: AnyObject
-  var p: UMP<Element>
-  var i: Builtin.Int64
-  var c: Builtin.Int64
-  init(_: AnyObject, _: UMP<Element>, _: Builtin.Int64, _: Builtin.Int64)
-}
-
-class FakeBitSet {
-  internal struct Word {
-    internal var value: Builtin.Int64
-  }
-}
-
-class FakeSetStorage {}
-
 sil @use_nontrivialstruct1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
 sil @use_nontrivialstruct2 : $@convention(thin) (@owned NonTrivialStruct) -> ()
 sil @use_nontrivialstruct3 : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
 sil @use_superklass1 : $@convention(thin) (@owned SuperKlass) -> ()
-sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 
 // CHECK-LABEL: sil [ossa] @structliteral1 :
 // CHECK: struct $NonTrivialStruct
@@ -627,14 +587,14 @@ bb4:
   %copy2 = copy_value %2 : $FakeOptional2
   switch_enum %2 : $FakeOptional2, case #FakeOptional2.some1!enumelt:bb5, case #FakeOptional2.some2!enumelt:bb6
 
-bb5(%arg4 : $UInt64):
-  br bb7(%arg4 : $UInt64)
+bb5(%arg4 : $UInt):
+  br bb7(%arg4 : $UInt)
 
 bb6(%arg5 : @guaranteed $Klass):
-  %4 = unchecked_trivial_bit_cast %arg5 : $Klass to $UInt64
-  br bb7(%4 : $UInt64)
+  %4 = unchecked_trivial_bit_cast %arg5 : $Klass to $UInt
+  br bb7(%4 : $UInt)
 
-bb7(%arg6 : $UInt64):
+bb7(%arg6 : $UInt):
   destroy_value %copy2 : $FakeOptional2
   br bb8
 
@@ -678,42 +638,38 @@ bb3(%borrow : @guaranteed $Klass):
   return %copy : $NonTrivialStruct
 }
 
-// Test to make sure we clear the context if we fail while checking if
-// ownership rauw is possible
-//
+// Test to make sure we clear the context if we fail while checking if ownership rauw is possible
 // CHECK-LABEL: sil [ossa] @test_rauwfailsandthensucceeds :
 // CHECK: bb0
 // CHECK: struct_extract
 // CHECK: struct_extract
-// CHECK: struct $FakeSliceBuffer
-// CHECK-NOT: struct $FakeSliceBuffer
+// CHECK: struct $_SliceBuffer
+// CHECK-NOT: struct $_SliceBuffer
 // CHECK-LABEL: } // end sil function 'test_rauwfailsandthensucceeds'
-sil [ossa] @test_rauwfailsandthensucceeds : $@convention(method) <Element> (UMP<Element>, @guaranteed FakeBuffer<Element>, Builtin.Int64, Builtin.Int64) -> @owned FakeSliceBuffer<Element> {
-bb0(%0 : $UMP<Element>, %1 : @guaranteed $FakeBuffer<Element>, %2 : $Builtin.Int64, %3 : $Builtin.Int64):
-  %borrow = begin_borrow %1 : $FakeBuffer<Element>
-  %4 = struct_extract %borrow : $FakeBuffer<Element>, #FakeBuffer._storage
-  %5 = copy_value %4 : $FakeStorageBase
-  %6 = init_existential_ref %5 : $FakeStorageBase : $FakeStorageBase, $AnyObject
-  %7 = struct_extract %borrow : $FakeBuffer<Element>, #FakeBuffer._storage
-  %8 = ref_tail_addr %7 : $FakeStorageBase, $Element
+sil [ossa] @test_rauwfailsandthensucceeds : $@convention(method) <Element> (UnsafeMutablePointer<Element>, @guaranteed _ContiguousArrayBuffer<Element>, Int, UInt) -> @owned _SliceBuffer<Element> {
+bb0(%0 : $UnsafeMutablePointer<Element>, %1 : @guaranteed $_ContiguousArrayBuffer<Element>, %2 : $Int, %3 : $UInt):
+  %4 = struct_extract %1 : $_ContiguousArrayBuffer<Element>, #_ContiguousArrayBuffer._storage
+  %5 = copy_value %4 : $__ContiguousArrayStorageBase
+  %6 = init_existential_ref %5 : $__ContiguousArrayStorageBase : $__ContiguousArrayStorageBase, $AnyObject
+  %7 = struct_extract %1 : $_ContiguousArrayBuffer<Element>, #_ContiguousArrayBuffer._storage
+  %8 = ref_tail_addr %7 : $__ContiguousArrayStorageBase, $Element
   %9 = address_to_pointer %8 : $*Element to $Builtin.RawPointer
-  %10 = struct $UMP<Element> (%9 : $Builtin.RawPointer)
-  end_borrow %borrow : $FakeBuffer<Element>
+  %10 = struct $UnsafeMutablePointer<Element> (%9 : $Builtin.RawPointer)
   %11 = begin_borrow %6 : $AnyObject
-  %12 = struct $FakeSliceBuffer<Element> (%11 : $AnyObject, %0 : $UMP<Element>, %2 : $Builtin.Int64, %3 : $Builtin.Int64)
-  %13 = copy_value %12 : $FakeSliceBuffer<Element>
+  %12 = struct $_SliceBuffer<Element> (%11 : $AnyObject, %0 : $UnsafeMutablePointer<Element>, %2 : $Int, %3 : $UInt)
+  %13 = copy_value %12 : $_SliceBuffer<Element>
   end_borrow %11 : $AnyObject
-  destroy_value %13 : $FakeSliceBuffer<Element>
+  destroy_value %13 : $_SliceBuffer<Element>
   %14 = begin_borrow %6 : $AnyObject
-  %15 = struct $FakeSliceBuffer<Element> (%14 : $AnyObject, %0 : $UMP<Element>, %2 : $Builtin.Int64, %3 : $Builtin.Int64)
-  %16 = copy_value %15 : $FakeSliceBuffer<Element>
+  %15 = struct $_SliceBuffer<Element> (%14 : $AnyObject, %0 : $UnsafeMutablePointer<Element>, %2 : $Int, %3 : $UInt)
+  %16 = copy_value %15 : $_SliceBuffer<Element>
   end_borrow %14 : $AnyObject
-  %17 = struct $FakeSliceBuffer<Element> (%6 : $AnyObject, %0 : $UMP<Element>, %2 : $Builtin.Int64, %3 : $Builtin.Int64)
-  destroy_value %17 : $FakeSliceBuffer<Element>
-  return %16 : $FakeSliceBuffer<Element>
+  %17 = struct $_SliceBuffer<Element> (%6 : $AnyObject, %0 : $UnsafeMutablePointer<Element>, %2 : $Int, %3 : $UInt)
+  destroy_value %17 : $_SliceBuffer<Element>
+  return %16 : $_SliceBuffer<Element>
 }
 
-sil [ossa] @use_word1 : $@convention(thin) (@inout FakeBitSet.Word) -> ()
+sil [ossa] @use_word1 : $@convention(thin) (@inout _UnsafeBitset.Word) -> ()
 
 // TODO: Disable the TODO check when rauw address users correctly replaces all uses of the old ref_tail_addr with the new ref_tail_addr.
 // CHECK-LABEL: sil [ossa] @test_reftailaddr :
@@ -721,22 +677,22 @@ sil [ossa] @use_word1 : $@convention(thin) (@inout FakeBitSet.Word) -> ()
 // CHECK: ref_tail_addr
 // TODO-CHECK-NOT: ref_tail_addr
 // CHECK-LABEL: } // end sil function 'test_reftailaddr'
-sil [ossa] @test_reftailaddr : $@convention(thin) (@owned FakeSetStorage) -> () {
-bb0(%0 : @owned $FakeSetStorage):
-  %func  = function_ref @use_word1 : $@convention(thin) (@inout FakeBitSet.Word) -> ()
-  %1 = copy_value %0 : $FakeSetStorage
-  %2 = begin_borrow %1 : $FakeSetStorage
-  %3 = ref_tail_addr %2 : $FakeSetStorage, $FakeBitSet.Word
-  apply %func(%3) : $@convention(thin) (@inout FakeBitSet.Word) -> ()
-  end_borrow %2 : $FakeSetStorage
-  %4 = copy_value %0 : $FakeSetStorage
-  %5 = begin_borrow %4 : $FakeSetStorage
-  %6 = ref_tail_addr %5 : $FakeSetStorage, $FakeBitSet.Word
-  apply %func(%6) : $@convention(thin) (@inout FakeBitSet.Word) -> ()
-  end_borrow %5 : $FakeSetStorage
-  destroy_value %1 : $FakeSetStorage
-  destroy_value %4 : $FakeSetStorage
-  destroy_value %0 : $FakeSetStorage
+sil [ossa] @test_reftailaddr : $@convention(thin) (@owned __RawSetStorage) -> () {
+bb0(%0 : @owned $__RawSetStorage):
+  %func  = function_ref @use_word1 : $@convention(thin) (@inout _UnsafeBitset.Word) -> ()
+  %1 = copy_value %0 : $__RawSetStorage
+  %2 = begin_borrow %1 : $__RawSetStorage
+  %3 = ref_tail_addr %2 : $__RawSetStorage, $_UnsafeBitset.Word
+  apply %func(%3) : $@convention(thin) (@inout _UnsafeBitset.Word) -> ()
+  end_borrow %2 : $__RawSetStorage
+  %4 = copy_value %0 : $__RawSetStorage
+  %5 = begin_borrow %4 : $__RawSetStorage
+  %6 = ref_tail_addr %5 : $__RawSetStorage, $_UnsafeBitset.Word
+  apply %func(%6) : $@convention(thin) (@inout _UnsafeBitset.Word) -> ()
+  end_borrow %5 : $__RawSetStorage
+  destroy_value %1 : $__RawSetStorage
+  destroy_value %4 : $__RawSetStorage
+  destroy_value %0 : $__RawSetStorage
   %res  = tuple ()
   return %res : $()
 }
@@ -769,28 +725,35 @@ bb0(%0 : @guaranteed $WrapperKlass):
 
 sil [ossa] @use_word2 : $@convention(thin) (@inout Builtin.Word) -> ()
 
-// CHECK-LABEL: sil [ossa] @test_uncheckedaddrcast :
-// CHECK: bb0
-// CHECK: unchecked_addr_cast
-// CHECK-NOT: unchecked_addr_cast
-// CHECK-LABEL: } // end sil function 'test_uncheckedaddrcast'
-sil [ossa] @test_uncheckedaddrcast : $@convention(thin) (@owned FakeSetStorage) -> () {
-bb0(%0 : @owned $FakeSetStorage):
+/*
+// TODO: Enable this test after the verifier correctly handles the case a ref_tail_addr's result is used in an unchecked_addr_cast
+// TODOCHECK-LABEL: sil [ossa] @test_uncheckedaddrcast :
+// TODOCHECK: bb0
+// TODOCHECK: unchecked_addr_cast
+// TODO-CHECK-NOT: unchecked_addr_cast
+// TODOCHECK-LABEL: } // end sil function 'test_uncheckedaddrcast'
+sil [ossa] @test_reftailaddr : $@convention(thin) (@owned __RawSetStorage) -> () {
+bb0(%0 : @owned $__RawSetStorage):
   %func = function_ref @use_word2 : $@convention(thin) (@inout Builtin.Word) -> ()
-  %1 = copy_value %0 : $FakeSetStorage
-  %2 = begin_borrow %1 : $FakeSetStorage
-  %3 = ref_tail_addr %2 : $FakeSetStorage, $FakeBitSet.Word
-  %cast1 = unchecked_addr_cast %3 : $*FakeBitSet.Word to $*Builtin.Word
+  %1 = copy_value %0 : $__RawSetStorage
+  %2 = begin_borrow %1 : $__RawSetStorage
+  %3 = ref_tail_addr %2 : $__RawSetStorage, $_UnsafeBitset.Word
+  %cast1 = unchecked_addr_cast %3 : $*_UnsafeBitset.Word to $*Builtin.Word
   apply %func(%cast1) : $@convention(thin) (@inout Builtin.Word) -> ()
-  %6 = ref_tail_addr %2 : $FakeSetStorage, $FakeBitSet.Word
-  %cast2 = unchecked_addr_cast %6 : $*FakeBitSet.Word to $*Builtin.Word
+  end_borrow %2 : $__RawSetStorage
+  %4 = copy_value %0 : $__RawSetStorage
+  %5 = begin_borrow %4 : $__RawSetStorage
+  %6 = ref_tail_addr %5 : $__RawSetStorage, $_UnsafeBitset.Word
+  %cast2 = unchecked_addr_cast %6 : $*_UnsafeBitset.Word to $*Builtin.Word
   apply %func(%cast2) : $@convention(thin) (@inout Builtin.Word) -> ()
-  end_borrow %2 : $FakeSetStorage
-  destroy_value %1 : $FakeSetStorage
-  destroy_value %0 : $FakeSetStorage
+  end_borrow %5 : $__RawSetStorage
+  destroy_value %1 : $__RawSetStorage
+  destroy_value %4 : $__RawSetStorage
+  destroy_value %0 : $__RawSetStorage
   %res  = tuple ()
   return %res : $()
 }
+*/
 
 sil [ossa] @use_bridgeobject : $@convention(thin) (Builtin.BridgeObject) -> ()
 
@@ -877,6 +840,8 @@ class TestKlass {
   var testStruct: NonTrivialStruct
 }
 
+sil [ossa] @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
 // An interior pointer, struct_element_addr, can be reused during an
 // OSSA/RAUW because its new uses are within the borrowed value
 // (function argument %0).
@@ -932,15 +897,13 @@ bb0(%0 : @guaranteed $TestKlass):
 }
 
 struct X {
-  var i: UInt64
+  var i: Int64
 }
 
 sil_global hidden @globalX : $X
 
 sil [ossa] @use_address : $@convention(thin) (@in_guaranteed X) -> ()
 
-// Test multiple RAUW calls where one is invalid. Ensure context cleanup.
-//
 // CHECK-LABEL: sil [ossa] @cse_ossa_validrauwfollowinvalidrauw :
 // CHECK: global_addr
 // CHECK-NOT: global_addr
@@ -968,6 +931,7 @@ bb0(%0 : @guaranteed $TestKlass):
   return %18 : $()
 }
 
+
 struct WrapperStruct {
   var val: TestKlass
 }
@@ -978,198 +942,24 @@ struct WrapperStruct {
 // CHECK-LABEL: } // end sil function 'cse_ossa_utilstest'
 sil [ossa] @cse_ossa_utilstest : $@convention(thin) (@guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct):
-  %f = function_ref @use_nontrivialstruct3 : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
-  %none = enum $FakeOptional3, #FakeOptional3.none
-  switch_enum %none : $FakeOptional3, case #FakeOptional3.some!enumelt:bb1, case #FakeOptional3.none!enumelt:bb2, forwarding: @guaranteed
+%f = function_ref @use_nontrivialstruct3 : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+%none = enum $FakeOptional3, #FakeOptional3.none
+switch_enum %none : $FakeOptional3, case #FakeOptional3.some!enumelt:bb1, case #FakeOptional3.none!enumelt:bb2, forwarding: @guaranteed
 
 bb1(%arg : @guaranteed $WrapperStruct):
-  %ex = struct_extract %arg : $WrapperStruct, #WrapperStruct.val
-  %1 = ref_element_addr %ex : $TestKlass, #TestKlass.testStruct
-  apply %f (%1) : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
-  %2 = ref_element_addr %ex : $TestKlass, #TestKlass.testStruct
-  apply %f (%2) : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
-  br bb3
+%ex = struct_extract %arg : $WrapperStruct, #WrapperStruct.val
+%1 = ref_element_addr %ex : $TestKlass, #TestKlass.testStruct
+apply %f (%1) : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+%2 = ref_element_addr %ex : $TestKlass, #TestKlass.testStruct
+apply %f (%2) : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
+br bb3
 
 bb2:
-  br bb3
+br bb3
 
 bb3:
-  %res = tuple ()
-  return %res : $()
+%res = tuple ()
+return %res : $()
 }
 
-// Test RAUW of guaranteed non-address values.
-// RAUW creates a copy-borrow.
-//
-// TODO:
-// When the %10 struct is CSE'd, its dead %9 borrow scope should be deleted.
-// A new copy_value and borrow scope are also created.
-// When the %11 unchecked_trivial_bit_cast is CSE'd, that new copy_value and
-// borrow scope will also be dead and should be immediately removed.
-// 
-// CHECK-LABEL: sil hidden [ossa] @testExtendGuaranteedVal : $@convention(thin) (@owned BridgeStruct) -> Builtin.Int64 {
-// CHECK: bb1([[ARG1:%.*]] : @owned $BridgeStruct):
-// CHECK:   begin_borrow
-// CHECK:   [[EXTROBJ:%.*]] = struct_extract %{{.*}} : $BridgeStruct, #BridgeStruct.obj
-// CHECK:   [[CP:%.*]] = copy_value [[EXTROBJ]] : $Builtin.BridgeObject
-// CHECK:   [[CAST:%.*]] = unchecked_trivial_bit_cast [[EXTROBJ]] : $Builtin.BridgeObject to $UInt64
-// CHECK:   [[EXTRVAL:%.*]] = struct_extract [[CAST]] : $UInt64, #UInt64._value
-// CHECK: bb2:
-// CHECK:   end_borrow %{{.*}} : $BridgeStruct
-// CHECK:   begin_borrow [[ARG1]] : $BridgeStruct
-// CHECK:   begin_borrow [[CP]] : $Builtin.BridgeObject
-// CHECK:   end_borrow
-// CHECK:   destroy_value [[CP]] : $Builtin.BridgeObject
-// CHECK:   end_borrow
-// CHECK:   destroy_value [[ARG1]] : $BridgeStruct
-// CHECK:   builtin "and_Int64"([[EXTRVAL]] : $Builtin.Int64, [[EXTRVAL]] : $Builtin.Int64) : $Builtin.Int64
-// CHECK-LABEL: } // end sil function 'testExtendGuaranteedVal'
-sil hidden [ossa] @testExtendGuaranteedVal : $@convention(thin) (@owned BridgeStruct) -> Builtin.Int64 {
-bb0(%0 : @owned $BridgeStruct):
-  br bb1(%0 : $BridgeStruct)
 
-bb1(%2 : @owned $BridgeStruct):
-  %3 = begin_borrow %2 : $BridgeStruct
-  %4 = struct_extract %3 : $BridgeStruct, #BridgeStruct.obj
-  %5 = unchecked_trivial_bit_cast %4 : $Builtin.BridgeObject to $UInt64
-  %6 = struct_extract %5 : $UInt64, #UInt64._value
-  br bb2
-
-bb2:
-  end_borrow %3 : $BridgeStruct
-  %9 = begin_borrow %2 : $BridgeStruct
-  %10 = struct_extract %9 : $BridgeStruct, #BridgeStruct.obj
-  %11 = unchecked_trivial_bit_cast %10 : $Builtin.BridgeObject to $UInt64
-  %12 = struct_extract %11 : $UInt64, #UInt64._value
-  end_borrow %9 : $BridgeStruct
-  destroy_value %2 : $BridgeStruct
-  %15 = builtin "and_Int64"(%6 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int64
-  return %15 : $Builtin.Int64
-}
-
-// Test RAUW of struct_extract where all the uses to be replaced are
-// inside a loop, but the guaranteed value is copied outside the loop.
-//
-// CHECK-LABEL: sil [ossa] @testRAUWLoopBorrow : $@convention(thin) (@owned NonTrivialStruct) -> () {
-// CHECK:      bb0(%0 : @owned $NonTrivialStruct):
-// CHECK:        [[B0:%.*]] = begin_borrow %0 : $NonTrivialStruct
-// CHECK:        [[K0:%.*]] = struct_extract [[B0]] : $NonTrivialStruct, #NonTrivialStruct.val
-// CHECK:        [[COPY:%.*]] = copy_value [[K0]] : $Klass
-// CHECK:      bb2:
-// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow [[COPY]] : $Klass
-// CHECK-NEXT:   apply {{.*}}([[BORROW]])
-// CHECK-NEXT:   end_borrow [[BORROW]] : $Klass
-// CHECK-NEXT:   cond_br undef, bb3, bb4
-// CHECK: bb3:
-// CHECK-NEXT:   br bb2
-// CHECK:      bb4:
-// CHECK-NEXT:   destroy_value [[COPY]] : $Klass
-// CHECK-NEXT:   br bb6
-// CHECK:      bb5:
-// CHECK-NEXT:   destroy_value [[COPY]] : $Klass
-// CHECK-NEXT:   br bb6
-// CHECK-LABEL: } // end sil function 'testRAUWLoopBorrow'
-sil [ossa] @testRAUWLoopBorrow : $@convention(thin) (@owned NonTrivialStruct) -> () {
-bb0(%0 : @owned $NonTrivialStruct):
-  %borrow = begin_borrow %0 : $NonTrivialStruct
-  %k0 = struct_extract %borrow : $NonTrivialStruct, #NonTrivialStruct.val
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f (%k0) : $@convention(thin) (@guaranteed Klass) -> ()
-  cond_br undef, bb1, bb5
-
-bb1:
-  br bb2
-
-bb2:
-  %k1 = struct_extract %borrow : $NonTrivialStruct, #NonTrivialStruct.val
-  apply %f (%k1) : $@convention(thin) (@guaranteed Klass) -> ()
-  cond_br undef, bb3, bb4
-
-bb3:
-  br bb2
-
-bb4:
-  br bb6
-
-bb5:
-  br bb6
-
-bb6:
-  end_borrow %borrow : $NonTrivialStruct
-  destroy_value %0 : $NonTrivialStruct
-  return undef : $()
-}
-
-// CSE the struct extracts even though the store_borrow is a
-// PointerEscape because the first struct_extract is rooted in a
-// function argument.
-//
-// CHECK-LABEL: sil [ossa] @testDeadStoreBorrow1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
-// CHECK: [[E:%.*]] = struct_extract %0 : $NonTrivialStruct, #NonTrivialStruct.val
-// CHECK: apply %{{.*}}([[E]]) : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK: apply %{{.*}}([[E]]) : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK: store_borrow [[E]] to %{{.*}} : $*Klass
-// CHECK-LABEL: } // end sil function 'testDeadStoreBorrow1'
-sil [ossa] @testDeadStoreBorrow1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
-bb0(%0 : @guaranteed $NonTrivialStruct):
-  %k0 = struct_extract %0 : $NonTrivialStruct, #NonTrivialStruct.val
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f (%k0) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb1
-
-bb1:
-  %k1 = struct_extract %0 : $NonTrivialStruct, #NonTrivialStruct.val
-  apply %f (%k1) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb2
-
-bb2:
-  %adr = alloc_stack $Klass
-  %sb = store_borrow %k1 to %adr : $*Klass
-  %ld = load_borrow %adr : $*Klass
-  fix_lifetime %ld : $Klass
-  end_borrow %ld : $Klass
-  dealloc_stack %adr : $*Klass
-  br bb3
-
-bb3:
-  return undef : $()
-}
-
-// Cannot CSE the struct extracts because store_borrow appears to be a
-// PointerEscape.
-//
-// CHECK-LABEL: sil [ossa] @testDeadStoreBorrow2 : $@convention(thin) (@owned NonTrivialStruct) -> () {
-// CHECK: [[B0:%.*]] = begin_borrow %0 : $NonTrivialStruct
-// CHECK: struct_extract [[B0]] : $NonTrivialStruct, #NonTrivialStruct.val
-// CHECK: [[B1:%.*]] = begin_borrow %0 : $NonTrivialStruct
-// CHECK: struct_extract [[B1]] : $NonTrivialStruct, #NonTrivialStruct.val
-// CHECK-LABEL: } // end sil function 'testDeadStoreBorrow2'
-sil [ossa] @testDeadStoreBorrow2 : $@convention(thin) (@owned NonTrivialStruct) -> () {
-bb0(%0 : @owned $NonTrivialStruct):
-  %b0 = begin_borrow %0 : $NonTrivialStruct
-  %k0 = struct_extract %b0 : $NonTrivialStruct, #NonTrivialStruct.val
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f (%k0) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %b0 : $NonTrivialStruct
-  br bb1
-
-bb1:
-  %b1 = begin_borrow %0 : $NonTrivialStruct
-  %k1 = struct_extract %b1 : $NonTrivialStruct, #NonTrivialStruct.val
-  apply %f (%k1) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb2
-
-bb2:
-  %adr = alloc_stack $Klass
-  %sb = store_borrow %k1 to %adr : $*Klass
-  %ld = load_borrow %adr : $*Klass
-  fix_lifetime %ld : $Klass
-  end_borrow %ld : $Klass
-  end_borrow %b1 : $NonTrivialStruct
-  dealloc_stack %adr : $*Klass
-  br bb3
-
-bb3:
-  destroy_value %0 : $NonTrivialStruct
-  return undef : $()
-}
