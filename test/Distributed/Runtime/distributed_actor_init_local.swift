@@ -11,10 +11,18 @@
 import _Distributed
 
 @available(SwiftStdlib 5.5, *)
+distributed actor PickATransport1 {
+  init(kappa transport: ActorTransport, other: Int) {}
+}
+
+@available(SwiftStdlib 5.5, *)
+distributed actor PickATransport2 {
+  init(other: Int, theTransport: ActorTransport) async {}
+}
+
+@available(SwiftStdlib 5.5, *)
 distributed actor LocalWorker {
-  init(transport: ActorTransport) {
-    defer { transport.actorReady(self) } // FIXME(distributed): rdar://81783599 this should be injected automatically
-  }
+  init(transport: ActorTransport) {}
 }
 
 // ==== Fake Transport ---------------------------------------------------------
@@ -57,18 +65,28 @@ struct FakeTransport: ActorTransport {
 // ==== Execute ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.5, *)
-func test() {
+func test() async {
   let transport = FakeTransport()
 
   _ = LocalWorker(transport: transport)
   // CHECK: assign type:LocalWorker, id:ActorAddress(address: "[[ID:.*]]")
   // CHECK: ready actor:main.LocalWorker, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
   // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  _ = PickATransport1(kappa: transport, other: 0)
+  // CHECK: assign type:PickATransport1, id:ActorAddress(address: "[[ID:.*]]")
+  // CHECK: ready actor:main.PickATransport1, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+  // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  _ = await PickATransport2(other: 1, theTransport: transport)
+  // CHECK: assign type:PickATransport2, id:ActorAddress(address: "[[ID:.*]]")
+  // CHECK: ready actor:main.PickATransport2, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+  // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
 }
 
 @available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
-    test()
+    await test()
   }
 }
