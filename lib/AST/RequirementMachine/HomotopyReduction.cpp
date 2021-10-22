@@ -913,15 +913,10 @@ void RewriteSystem::verifyMinimizedRules() const {
     if (rule.isRedundant())
       continue;
 
-    // Simplified rules should be redundant.
-    if (rule.isSimplified()) {
-      llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
-      dump(llvm::errs());
-      abort();
-    }
-
     // Rules with unresolved name symbols (other than permanent rules for
     // associated type introduction) should be redundant.
+    //
+    // FIXME: What about invalid code?
     if (rule.getLHS().containsUnresolvedSymbols() ||
         rule.getRHS().containsUnresolvedSymbols()) {
       llvm::errs() << "Unresolved rule is not redundant: " << rule << "\n\n";
