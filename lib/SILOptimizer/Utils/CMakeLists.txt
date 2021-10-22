@@ -10,6 +10,7 @@ target_sources(swiftSILOptimizer PRIVATE
   ConstExpr.cpp
   Devirtualize.cpp
   DifferentiationMangler.cpp
+  DistributedActor.cpp
   Existential.cpp
   GenericCloner.cpp
   Generics.cpp
