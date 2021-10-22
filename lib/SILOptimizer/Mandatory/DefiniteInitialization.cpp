@@ -2397,18 +2397,6 @@ static void emitDefaultActorDestroy(SILBuilder &B, SILLocation loc,
   B.createEndBorrow(loc, self);
 }
 
-static void emitDistributedActorDestroy(SILBuilder &B, SILLocation loc,
-                                        SILValue self) {
-  auto builtinName = B.getASTContext().getIdentifier(
-    getBuiltinName(BuiltinValueKind::DestroyDistributedActor));
-  auto resultTy = B.getModule().Types.getEmptyTupleType();
-
-  self = B.createBeginBorrow(loc, self);
-  B.createBuiltin(loc, builtinName, resultTy, /*subs*/{},
-                  { self });
-  B.createEndBorrow(loc, self);
-}
-
 void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
                                                   bool consumed,
                                              SILBasicBlock::iterator InsertPt) {
@@ -2465,9 +2453,6 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     if (!TheMemory.isDelegatingInit()) {
       auto classDecl = TheMemory.getASTType().getClassOrBoundGenericClass();
       if (classDecl && classDecl->isRootDefaultActor()) {
-        if (classDecl->isDistributedActor())
-          emitDistributedActorDestroy(B, Loc, Pointer); // FIXME(distributed): this will be different only for if it is 'remote'
-        else
           emitDefaultActorDestroy(B, Loc, Pointer);
       }
     }
