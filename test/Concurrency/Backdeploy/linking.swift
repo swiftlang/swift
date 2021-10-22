@@ -15,6 +15,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
+// REQUIRES: maccatalyst_support
 
 // CHECK-DIRECT: /usr/lib/swift/libswift_Concurrency.dylib
 // CHECK-RPATH: @rpath/libswift_Concurrency.dylib
