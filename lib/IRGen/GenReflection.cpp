@@ -676,20 +676,11 @@ public:
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getAssociatedTypeMetadataSectionName();
-    llvm::GlobalVariable *var = ReflectionMetadataBuilder::emit(
-        [&](IRGenModule &IGM, ConstantInit init) -> llvm::Constant * {
-          return IGM.getAddrOfReflectionAssociatedTypeDescriptor(Conformance,
-                                                                 init);
-        },
-        section);
-
-    if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
-      // Allow dead-stripping `var` (the reflection record) when the protocol
-      // or type (from the conformance) is not referenced.
-      IGM.appendLLVMUsedConditionalEntry(var, Conformance);
-    }
-
-    return var;
+    return ReflectionMetadataBuilder::emit(
+      [&](IRGenModule &IGM, ConstantInit init) -> llvm::Constant* {
+       return IGM.getAddrOfReflectionAssociatedTypeDescriptor(Conformance,init);
+      },
+      section);
   }
 };
 
@@ -865,21 +856,12 @@ public:
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getFieldTypeMetadataSectionName();
-    llvm::GlobalVariable *var = ReflectionMetadataBuilder::emit(
-        [&](IRGenModule &IGM, ConstantInit definition) -> llvm::Constant * {
-          return IGM.getAddrOfReflectionFieldDescriptor(
-              NTD->getDeclaredType()->getCanonicalType(), definition);
-        },
-        section);
-
-    if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
-      // Allow dead-stripping `var` (the reflection record) when the type
-      // (NTD) is not referenced.
-      auto ref = IGM.getTypeEntityReference(const_cast<NominalTypeDecl *>(NTD));
-      IGM.appendLLVMUsedConditionalEntry(var, ref.getValue());
-    }
-
-    return var;
+    return ReflectionMetadataBuilder::emit(
+      [&](IRGenModule &IGM, ConstantInit definition) -> llvm::Constant* {
+        return IGM.getAddrOfReflectionFieldDescriptor(
+          NTD->getDeclaredType()->getCanonicalType(), definition);
+      },
+      section);
   }
 };
 
