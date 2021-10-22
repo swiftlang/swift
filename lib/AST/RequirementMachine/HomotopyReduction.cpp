@@ -849,46 +849,51 @@ findRuleToDelete(bool firstPass,
                  RewritePath &replacementPath) {
   assert(!firstPass || redundantConformances == nullptr);
 
-  for (auto &loop : HomotopyGenerators) {
+  SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
+  for (unsigned loopID : indices(HomotopyGenerators)) {
+    const auto &loop = HomotopyGenerators[loopID];
     if (loop.isDeleted())
       continue;
 
-    SmallVector<unsigned> redundancyCandidates =
-        loop.findRulesAppearingOnceInEmptyContext(*this);
-
-    Optional<unsigned> found;
-
-    for (unsigned ruleID : redundancyCandidates) {
-      if (!isCandidateForDeletion(ruleID, firstPass, redundantConformances))
-        continue;
-
-      if (!found) {
-        found = ruleID;
-        continue;
-      }
-
-      const auto &rule = getRule(ruleID);
-      const auto &otherRule = getRule(*found);
-
-      // Prefer to delete "less canonical" rules.
-      if (rule.compare(otherRule, Context) > 0)
-        found = ruleID;
+    for (unsigned ruleID : loop.findRulesAppearingOnceInEmptyContext(*this)) {
+      redundancyCandidates.emplace_back(loopID, ruleID);
     }
-
-    if (!found)
-      continue;
-
-    auto ruleID = *found;
-    assert(replacementPath.empty());
-    replacementPath = loop.Path.splitCycleAtRule(ruleID);
-
-    loop.markDeleted();
-    getRule(ruleID).markRedundant();
-
-    return ruleID;
   }
 
-  return None;
+  Optional<std::pair<unsigned, unsigned>> found;
+
+  for (const auto &pair : redundancyCandidates) {
+    unsigned ruleID = pair.second;
+    if (!isCandidateForDeletion(ruleID, firstPass, redundantConformances))
+      continue;
+
+    if (!found) {
+      found = pair;
+      continue;
+    }
+
+    const auto &rule = getRule(ruleID);
+    const auto &otherRule = getRule(found->second);
+
+    // Prefer to delete "less canonical" rules.
+    if (rule.compare(otherRule, Context) > 0)
+      found = pair;
+  }
+
+  if (!found)
+    return None;
+
+  unsigned loopID = found->first;
+  unsigned ruleID = found->second;
+  assert(replacementPath.empty());
+
+  auto &loop = HomotopyGenerators[loopID];
+  replacementPath = loop.Path.splitCycleAtRule(ruleID);
+
+  loop.markDeleted();
+  getRule(ruleID).markRedundant();
+
+  return ruleID;
 }
 
 /// Delete a rewrite rule that is known to be redundant, replacing all
@@ -1123,6 +1128,8 @@ void RewriteSystem::verifyMinimizedRules() const {
 
     // Rules with unresolved name symbols (other than permanent rules for
     // associated type introduction) should be redundant.
+    //
+    // FIXME: What about invalid code?
     if (rule.getLHS().containsUnresolvedSymbols() ||
         rule.getRHS().containsUnresolvedSymbols()) {
       llvm::errs() << "Unresolved rule is not redundant: " << rule << "\n\n";
