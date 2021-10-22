@@ -727,10 +727,6 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
 swift_distributedActor_remote_initialize(const Metadata *actorType);
 
-/// Destroy the runtime storage for a default actor.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_distributedActor_destroy(DefaultActor *actor);
-
 /// Enqueue a job on the default actor implementation.
 ///
 /// The job must be ready to run.  Notably, if it's a task, that

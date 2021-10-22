@@ -397,12 +397,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::DestroyDistributedActor) {
-    auto actor = args.claimNext();
-    emitDistributedActorDestroy(IGF, actor);
-    return;
-  }
-
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;

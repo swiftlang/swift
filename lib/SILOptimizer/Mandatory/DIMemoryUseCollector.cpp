@@ -438,7 +438,7 @@ ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
     if (auto decl =
         dyn_cast_or_null<ClassDecl>(getASTType()->getAnyNominal()))
       // is it for an actor?
-      if (decl->isActor() && !decl->isDistributedActor()) // FIXME(78484431) skip distributed actors for now, until their initializers are fixed!
+      if (decl->isAnyActor())
         if (auto *silFn = MemoryInst->getFunction())
           // is it a designated initializer?
           if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(

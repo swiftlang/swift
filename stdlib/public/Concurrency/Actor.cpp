@@ -1981,11 +1981,6 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
   return reinterpret_cast<OpaqueValue*>(actor);
 }
 
-void swift::swift_distributedActor_destroy(DefaultActor *_actor) {
-  // FIXME(distributed): if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
-  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
-}
-
 bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
   return asImpl(_actor)->isDistributedRemote();
 }

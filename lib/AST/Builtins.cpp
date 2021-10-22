@@ -1480,13 +1480,6 @@ static ValueDecl *getDistributedActorInitializeRemote(ASTContext &ctx,
                             _rawPointer);
 }
 
-static ValueDecl *getDistributedActorDestroy(ASTContext &ctx,
-                                                 Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin,
-                            _parameters(_nativeObject),
-                            _void);
-}
-
 static ValueDecl *getResumeContinuationReturning(ASTContext &ctx,
                                                  Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
@@ -2841,9 +2834,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::InitializeDistributedRemoteActor:
     return getDistributedActorInitializeRemote(Context, Id);
-
-  case BuiltinValueKind::DestroyDistributedActor:
-    return getDistributedActorDestroy(Context, Id);
 
   case BuiltinValueKind::StartAsyncLet:
   case BuiltinValueKind::StartAsyncLetWithLocalBuffer:

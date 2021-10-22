@@ -182,7 +182,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::DestroyDefaultActor:
     case BuiltinValueKind::InitializeDistributedRemoteActor:
-    case BuiltinValueKind::DestroyDistributedActor:
     case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     case BuiltinValueKind::BuildDefaultActorExecutorRef:
     case BuiltinValueKind::BuildMainActorExecutorRef:
