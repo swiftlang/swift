@@ -54,11 +54,7 @@ extension MainActor {
     resultType: T.Type = T.self,
     body: @MainActor @Sendable () throws -> T
   ) async rethrows -> T {
-    @MainActor func runOnMain(body: @MainActor @Sendable () throws -> T) rethrows -> T {
-      return try body()
-    }
-
-    return try await runOnMain(body: body)
+    return try await body()
   }
 
   /// Execute the given body closure on the main actor.
