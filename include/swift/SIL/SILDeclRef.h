@@ -263,7 +263,7 @@ struct SILDeclRef {
   /// Retrieves the ASTContext from the underlying AST node being stored.
   ASTContext &getASTContext() const;
 
-  llvm::Optional<AnyFunctionRef> getAnyFunctionRef() const;
+  std::unique_ptr<AnyFunctionRef> getAnyFunctionRef() const;
   
   SILLocation getAsRegularLocation() const;
 

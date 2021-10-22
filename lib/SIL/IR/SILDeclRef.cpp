@@ -175,16 +175,16 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   pointer = prespecializedSig.getPointer();
 }
 
-Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
+std::unique_ptr<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
   switch (getLocKind()) {
   case LocKind::Decl:
     if (auto *afd = getAbstractFunctionDecl())
-      return AnyFunctionRef(afd);
-    return None;
+      return std::make_unique<AnyFunctionRef>(afd);
+    return nullptr;
   case LocKind::Closure:
-    return AnyFunctionRef(getAbstractClosureExpr());
+    return std::make_unique<AnyFunctionRef>(getAbstractClosureExpr());
   case LocKind::File:
-    return None;
+    return nullptr;
   }
   llvm_unreachable("Unhandled case in switch");
 }
