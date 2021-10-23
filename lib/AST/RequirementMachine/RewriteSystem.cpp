@@ -72,6 +72,19 @@ bool Rule::isProtocolRefinementRule() const {
           LHS[0] != LHS[1]);
 }
 
+/// Returns the length of the left hand side.
+unsigned Rule::getDepth() const {
+  auto result = LHS.size();
+
+  if (LHS.back().isSuperclassOrConcreteType()) {
+    for (auto substitution : LHS.back().getSubstitutions()) {
+      result = std::max(result, substitution.size());
+    }
+  }
+
+  return result;
+}
+
 /// Linear order on rules; compares LHS followed by RHS.
 int Rule::compare(const Rule &other, RewriteContext &ctx) const {
   int compare = LHS.compare(other.LHS, ctx);

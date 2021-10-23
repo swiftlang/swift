@@ -116,10 +116,7 @@ public:
     Redundant = true;
   }
 
-  /// Returns the length of the left hand side.
-  unsigned getDepth() const {
-    return LHS.size();
-  }
+  unsigned getDepth() const;
 
   int compare(const Rule &other, RewriteContext &ctx) const;
 
