@@ -45,15 +45,24 @@ import Swift
 @available(SwiftStdlib 5.5, *)
 extension MainActor {
   /// Execute the given body closure on the main actor.
-  @_silgen_name("$sScM3run10resultType4bodyxxm_xyYbKScMYcXEtYaKlFZ")
+  ///
+  /// Historical ABI entry point, superceded by the Sendable version that is
+  /// also inlined to back-deploy a semantic fix where this operation would
+  /// not hop back at the end.
+  @usableFromInline
+  static func run<T>(
+    resultType: T.Type = T.self,
+    body: @MainActor @Sendable () throws -> T
+  ) async rethrows -> T {
+    return try await body()
+  }
+
+  /// Execute the given body closure on the main actor.
+  @_alwaysEmitIntoClient
   public static func run<T: Sendable>(
     resultType: T.Type = T.self,
     body: @MainActor @Sendable () throws -> T
   ) async rethrows -> T {
-    @MainActor func runOnMain(body: @MainActor @Sendable () throws -> T) async rethrows -> T {
-      return try body()
-    }
-
-    return try await runOnMain(body: body)
+    return try await body()
   }
 }

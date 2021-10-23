@@ -81,6 +81,10 @@ actor A {
 // CHECK-NOT: ERROR
 // CHECK: finished with return counter = 4
 
+// CHECK: detached task not on main queue
+// CHECK: on main queue again
+// CHECK: detached task hopped back
+
 @main struct RunIt {
   static func main() async {
     print("starting")
@@ -91,5 +95,25 @@ actor A {
     }
     let result = await someFunc()
     print("finished with return counter = \(result)")
+
+    // Check actor hopping with MainActor.run.
+    let task = Task.detached {
+      if checkIfMainQueue(expectedAnswer: false) {
+        print("detached task not on main queue")
+      } else {
+        print("ERROR: detached task is on the main queue?")
+      }
+
+      _ = await MainActor.run {
+        checkAnotherFn(1)
+      }
+
+      if checkIfMainQueue(expectedAnswer: false) {
+        print("detached task hopped back")
+      } else {
+        print("ERROR: detached task is on the main queue?")
+      }
+    }
+    _ = await task.value
   }
 }
