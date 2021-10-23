@@ -50,5 +50,5 @@
 // UNSUPPORTED: swift_evolve
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
-
+Func MainActor.run(resultType:body:) has generic signature change from <T where T : Swift.Sendable> to <T>
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

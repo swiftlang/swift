@@ -642,7 +642,7 @@ SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
     actorType->getTypeOfMember(SGM.SwiftModule, sharedInstanceDecl);
 
   auto metaRepr =
-    nominal->isResilient(SGM.SwiftModule, ResilienceExpansion::Maximal)
+    nominal->isResilient(SGM.SwiftModule, F.getResilienceExpansion())
     ? MetatypeRepresentation::Thick
     : MetatypeRepresentation::Thin;
 
