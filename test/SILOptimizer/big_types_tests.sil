@@ -1,9 +1,10 @@
-// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir -sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -I %S/Inputs/abi %s -loadable-address -sil-verify-all | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
 
 sil_stage lowered
+
 import Builtin
 import Swift
 
@@ -20,10 +21,9 @@ public struct BigStruct {
   var i9 : Builtin.NativeObject
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testDestroyValue(%T15big_types_tests9BigStructV* noalias nocapture dereferenceable({{.*}}) #0 {
-// CHECK-NEXT: entry
-// CHECK-NEXT: call %T15big_types_tests9BigStructV* @"$s15big_types_tests9BigStructVWOs"(%T15big_types_tests9BigStructV* %0)
-// CHECK-NEXT: ret void
+// CHECK-LABEL: sil @testDestroyValue : $@convention(thin) (@in_constant BigStruct) -> () {
+// CHECK: release_value_addr %0
+// CHECK: } // end sil function 'testDestroyValue'
 sil @testDestroyValue : $@convention(thin) (@owned BigStruct) -> ()  {
 entry(%x : $BigStruct):
   release_value %x : $BigStruct
@@ -45,6 +45,9 @@ entry(%x : $BigStruct, %i : $Builtin.Int1):
 }
 
 // Make sure that we can handle this example and not choke.
+// CHECK-LABEL: sil @test_move_value : $@convention(thin) (@in_constant BigStruct, Builtin.Int1) -> () {
+// CHECK-NOT: move_value
+// CHECK: } // end sil function 'test_move_value'
 sil @test_move_value : $@convention(thin) (@owned BigStruct, Builtin.Int1) -> () {
 entry(%x : $BigStruct, %i : $Builtin.Int1):
   %x1 = move_value %x : $BigStruct
