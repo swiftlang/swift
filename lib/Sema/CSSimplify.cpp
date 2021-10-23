@@ -1854,7 +1854,8 @@ static bool isSingleTupleParam(ASTContext &ctx,
     return false;
 
   const auto &param = params.front();
-  if (param.isVariadic() || param.isInOut() || param.hasLabel())
+  if (param.isVariadic() || param.isInOut() || param.hasLabel() ||
+      param.isIsolated())
     return false;
 
   auto paramType = param.getPlainType();
@@ -8988,15 +8989,22 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     auto param = inferredClosureType->getParams()[i];
     auto *paramDecl = paramList->get(i);
 
-    // In case of anonymous or name-only parameters, let's infer inout/variadic
-    // flags from context, that helps to propagate type information into the
-    // internal type of the parameter and reduces inference solver has to make.
+    // In case of anonymous or name-only parameters, let's infer
+    // inout/variadic/isolated flags from context, that helps to propagate
+    // type information into the internal type of the parameter and reduces
+    // inference solver has to make.
     if (!paramDecl->getTypeRepr()) {
       if (auto contextualParam = getContextualParamAt(i)) {
         auto flags = param.getParameterFlags();
+
+        // Note when a parameter is inferred to be isolated.
+        if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
+          isolatedParams.insert(paramDecl);
+
         param =
             param.withFlags(flags.withInOut(contextualParam->isInOut())
-                                 .withVariadic(contextualParam->isVariadic()));
+                                 .withVariadic(contextualParam->isVariadic())
+                                 .withIsolated(contextualParam->isIsolated()));
       }
     }
 

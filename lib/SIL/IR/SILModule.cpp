@@ -415,6 +415,8 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
   // Builtins.def, so handle those first.
   if (OperationName.startswith("fence_"))
     Info.ID = BuiltinValueKind::Fence;
+  else if (OperationName.startswith("ifdef_"))
+    Info.ID = BuiltinValueKind::Ifdef;
   else if (OperationName.startswith("cmpxchg_"))
     Info.ID = BuiltinValueKind::CmpXChg;
   else if (OperationName.startswith("atomicrmw_"))

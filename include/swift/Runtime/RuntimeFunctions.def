@@ -1725,14 +1725,6 @@ FUNCTION(DistributedActorInitializeRemote,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_distributedActor_destroy(DefaultActor *actor);
-FUNCTION(DistributedActorDestroy,
-         swift_distributedActor_destroy, SwiftCC,
-         ConcurrencyAvailability, // TODO(distributed): Introduce DistributedAvailability once shipping somewhere
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
-
 /// void swift_asyncLet_start(
 ///     AsyncLet *alet,
 ///     TaskOptionRecord *options,

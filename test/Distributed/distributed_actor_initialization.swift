@@ -101,7 +101,6 @@ struct FakeTransport: ActorTransport {
 distributed actor OKSpecificTransportType {
 
   init(y: Int, transport fake: FakeTransport) { // ok
-    defer { fake.actorReady(self) }
     // nothing
   }
 

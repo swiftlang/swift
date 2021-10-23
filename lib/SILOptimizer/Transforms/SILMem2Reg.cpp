@@ -1028,15 +1028,20 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSetVector &phiBlocks,
     }
     // Go over all proactively added phis, and delete those that were not marked
     // live above.
+    auto eraseLastPhiFromBlock = [](SILBasicBlock *block) {
+      auto *phi = cast<SILPhiArgument>(
+          block->getArgument(block->getNumArguments() - 1));
+      phi->replaceAllUsesWithUndef();
+      erasePhiArgument(block, block->getNumArguments() - 1);
+    };
     for (auto *block : phiBlocks) {
       auto *proactivePhi = cast<SILPhiArgument>(
           block->getArgument(block->getNumArguments() - 1));
       if (!livePhis.contains(proactivePhi)) {
-        proactivePhi->replaceAllUsesWithUndef();
-        erasePhiArgument(block, block->getNumArguments() - 1);
+        eraseLastPhiFromBlock(block);
         if (shouldAddLexicalLifetime(asi)) {
-          erasePhiArgument(block, block->getNumArguments() - 1);
-          erasePhiArgument(block, block->getNumArguments() - 1);
+          eraseLastPhiFromBlock(block);
+          eraseLastPhiFromBlock(block);
         }
       } else {
         phiBlocksOut.insert(block);

@@ -31,7 +31,8 @@ internal extension S1 {
 // CHECK-NEXT:     "kind": "Conformance",
 // CHECK-NEXT:     "name": "PublicProto",
 // CHECK-NEXT:     "printedName": "PublicProto",
-// CHECK-NEXT:     "usr": "s:4main11PublicProtoP"
+// CHECK-NEXT:     "usr": "s:4main11PublicProtoP",
+// CHECK-NEXT:     "mangledName": "$s4main11PublicProtoP"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
 extension C0: InternalProto {

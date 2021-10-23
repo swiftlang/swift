@@ -642,6 +642,9 @@ BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 /// Returns the selected assertion configuration.
 BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
 
+/// Ifdef has type () -> Bool.
+BUILTIN_MISC_OPERATION(Ifdef, "ifdef", "n", Special)
+
 /// StringObjectOr has type (T,T) -> T.
 /// Sets bits in a string object. The first operand is bit-cast string literal
 /// pointer to an integer. The second operand is the bit mask to be or'd into
@@ -733,10 +736,6 @@ BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 /// Allocate a "proxy" for a distributed remote actor.  TODO(distributed) change the name of this to create throughout.
 BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
                        "initializeDistributedRemoteActor", "", Special)
-
-/// Destroy the distributed-actor instance in a "proxy" actor object.
-BUILTIN_MISC_OPERATION(DestroyDistributedActor,
-                       "destroyDistributedActor", "", Special)
 
 /// Resume a non-throwing continuation normally with the given result.
 BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,

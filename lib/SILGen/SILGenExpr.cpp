@@ -30,6 +30,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1031,6 +1032,16 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
   Optional<SILDebugVariable> DbgVar;
   if (auto *VD = loc.getAsASTNode<VarDecl>())
     DbgVar = SILDebugVariable(VD->isLet(), 0);
+  // Recognize "catch let errorvar" bindings.
+  if (auto *DRE = loc.getAsASTNode<DeclRefExpr>())
+    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
+      if (!isa<ParamDecl>(VD) && VD->isImplicit() &&
+          (VD->getType()->is<ProtocolType>() ||
+           VD->getType()->is<ProtocolCompositionType>()) &&
+          VD->getType()->getExistentialLayout().isErrorExistential()) {
+        DbgVar = SILDebugVariable(VD->isLet(), 0);
+        loc = SILLocation(VD);
+      }
   auto alloc = B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime);
   enterDeallocStackCleanup(alloc);
   return alloc;

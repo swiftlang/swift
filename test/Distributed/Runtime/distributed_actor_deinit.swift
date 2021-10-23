@@ -17,25 +17,19 @@ actor A {}
 
 @available(SwiftStdlib 5.5, *)
 distributed actor DA {
-  init(transport: ActorTransport) {
-    defer { transport.actorReady(self) } // FIXME(distributed): rdar://81783599 this should be injected automatically
-  }
+  init(transport: ActorTransport) {}
 }
 
 @available(SwiftStdlib 5.5, *)
 distributed actor DA_userDefined {
-  init(transport: ActorTransport) {
-    defer { transport.actorReady(self) } // FIXME(distributed): rdar://81783599 this should be injected automatically
-  }
+  init(transport: ActorTransport) {}
 
   deinit {}
 }
 
 @available(SwiftStdlib 5.5, *)
 distributed actor DA_userDefined2 {
-  init(transport: ActorTransport) {
-    defer { transport.actorReady(self) } // FIXME(distributed): rdar://81783599 this should be injected automatically
-  }
+  init(transport: ActorTransport) {}
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -48,9 +42,7 @@ distributed actor DA_state {
   var name = "Hello"
   var age = 42
 
-  init(transport: ActorTransport) {
-    defer { transport.actorReady(self) } // FIXME(distributed): rdar://81783599 this should be injected automatically
-  }
+  init(transport: ActorTransport) {}
 
   deinit {
     print("Deinitializing \(self.id)")

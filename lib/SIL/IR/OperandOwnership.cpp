@@ -693,6 +693,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFRem)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FSub)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFSub)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Fence)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Ifdef)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetObjCTypeEncoding)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ICMP_EQ)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ICMP_NE)
@@ -845,7 +846,6 @@ BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedRemoteActor)
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDistributedActor)
 
 // FIXME: Why do these reqiuire a borrowed value at all?
 BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffAllocateSubcontext)

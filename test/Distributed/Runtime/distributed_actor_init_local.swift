@@ -10,10 +10,53 @@
 
 import _Distributed
 
+enum MyError: Error {
+  case test
+}
+
+@available(SwiftStdlib 5.5, *)
+distributed actor PickATransport1 {
+  init(kappa transport: ActorTransport, other: Int) {}
+}
+
+@available(SwiftStdlib 5.5, *)
+distributed actor PickATransport2 {
+  init(other: Int, theTransport: ActorTransport) async {}
+}
+
 @available(SwiftStdlib 5.5, *)
 distributed actor LocalWorker {
-  init(transport: ActorTransport) {
-    defer { transport.actorReady(self) } // FIXME(distributed): rdar://81783599 this should be injected automatically
+  init(transport: ActorTransport) {}
+}
+
+@available(SwiftStdlib 5.5, *)
+distributed actor Bug_CallsReadyTwice {
+  var x: Int
+  init(transport: ActorTransport, wantBug: Bool) async {
+    if wantBug {
+      self.x = 1
+    }
+    self.x = 2
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+distributed actor Throwy {
+  init(transport: ActorTransport, doThrow: Bool) throws {
+    if doThrow {
+      throw MyError.test
+    }
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+distributed actor ThrowBeforeFullyInit {
+  var x: Int
+  init(transport: ActorTransport, doThrow: Bool) throws {
+    if doThrow {
+      throw MyError.test
+    }
+    self.x = 0
   }
 }
 
@@ -57,18 +100,56 @@ struct FakeTransport: ActorTransport {
 // ==== Execute ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.5, *)
-func test() {
+func test() async {
   let transport = FakeTransport()
 
   _ = LocalWorker(transport: transport)
   // CHECK: assign type:LocalWorker, id:ActorAddress(address: "[[ID:.*]]")
   // CHECK: ready actor:main.LocalWorker, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
   // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  _ = PickATransport1(kappa: transport, other: 0)
+  // CHECK: assign type:PickATransport1, id:ActorAddress(address: "[[ID:.*]]")
+  // CHECK: ready actor:main.PickATransport1, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+  // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  _ = try? Throwy(transport: transport, doThrow: false)
+  // CHECK: assign type:Throwy, id:ActorAddress(address: "[[ID:.*]]")
+  // CHECK: ready actor:main.Throwy, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+  // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  _ = try? Throwy(transport: transport, doThrow: true)
+  // CHECK: assign type:Throwy, id:ActorAddress(address: "[[ID:.*]]")
+  // CHECK-NOT: ready
+  // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  _ = try? ThrowBeforeFullyInit(transport: transport, doThrow: true)
+  // CHECK: assign type:ThrowBeforeFullyInit, id:ActorAddress(address: "[[ID:.*]]")
+  // FIXME: The two checks below should work, but do not currently, so they're disabled (rdar://84533820).
+  // MISSING-CHECK-NOT: ready actor:main.ThrowBeforeFullyInit
+  // MISSING-CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  _ = await PickATransport2(other: 1, theTransport: transport)
+  // CHECK: assign type:PickATransport2, id:ActorAddress(address: "[[ID:.*]]")
+  // CHECK: ready actor:main.PickATransport2, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  // FIXME: The checks for this initializer should NOT pass, but currently do. (rdar://84533820)
+  _ = await Bug_CallsReadyTwice(transport: transport, wantBug: true)
+  // CHECK: assign type:Bug_CallsReadyTwice, id:ActorAddress(address: "[[ID:.*]]")
+  // CHECK:      ready actor:main.Bug_CallsReadyTwice, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+  // CHECK-NEXT: ready actor:main.Bug_CallsReadyTwice, id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+
+  // TODO: it's not obvious why the resigns happen later for the async ones.
+  // might need to find a way to force the deallocation at a specific point,
+  // or just use check-dag or something.
+
+  // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
+  // CHECK: resign id:AnyActorIdentity(ActorAddress(address: "[[ID]]"))
 }
 
 @available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
-    test()
+    await test()
   }
 }
