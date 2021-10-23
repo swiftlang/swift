@@ -157,6 +157,7 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
          "Canonical conformance term should simplify in one step");
 
   const auto &step = *steps.begin();
+  assert(getRule(step.RuleID).isProtocolConformanceRule());
   assert(step.Kind == RewriteStep::ApplyRewriteRule);
   assert(step.EndOffset == 0);
   assert(!step.Inverse);
