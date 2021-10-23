@@ -2,6 +2,8 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+// REQUIRES: OS=macosx
+
 import _Distributed
 
 class SomeClass {}
