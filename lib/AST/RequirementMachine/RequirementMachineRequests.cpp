@@ -154,12 +154,13 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
       }
 
       llvm_unreachable("Invalid symbol kind");
-    } else if (rule.getLHS().back().getKind() != Symbol::Kind::Protocol) {
-      auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams);
-      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams);
-
-      sameTypeReqs[subjectType.getPointer()].Members.push_back(constraintType);
     }
+
+    assert(rule.getLHS().back().getKind() != Symbol::Kind::Protocol);
+    auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams);
+    auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams);
+
+    sameTypeReqs[subjectType.getPointer()].Members.push_back(constraintType);
   };
 
   if (getDebugOptions().contains(DebugFlags::Minimization)) {
