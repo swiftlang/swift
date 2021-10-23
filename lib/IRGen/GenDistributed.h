@@ -47,6 +47,12 @@ llvm::Value *emitDistributedActorInitializeRemote(
     llvm::Value *actorMetatype,
     Explosion &out);
 
+/// Destroy the distributed actor.
+/// E.g. a remote actor has to be destroyed differently from a local one.
+void emitDistributedActorDestroy(
+    IRGenFunction &IGF,
+    llvm::Value *actor);
+
 } // end namespace irgen
 } // end namespace swift
 

@@ -737,6 +737,10 @@ BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
                        "initializeDistributedRemoteActor", "", Special)
 
+/// Destroy the distributed-actor instance in a "proxy" actor object.
+BUILTIN_MISC_OPERATION(DestroyDistributedActor,
+                       "destroyDistributedActor", "", Special)
+
 /// Resume a non-throwing continuation normally with the given result.
 BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,
                        "resumeNonThrowingContinuationReturning", "", Special)

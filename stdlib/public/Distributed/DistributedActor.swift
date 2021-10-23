@@ -243,3 +243,10 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 @_silgen_name("swift_distributedActor_remote_initialize")
 func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
+
+/// Called to destroy the default actor instance in an actor.
+/// The implementation will call this within the actor's deinit.
+///
+/// This will call `actorTransport.resignIdentity(self.id)`.
+@_silgen_name("swift_distributedActor_destroy")
+func _distributedActorDestroy(_ actor: AnyObject)
