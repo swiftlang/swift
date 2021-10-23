@@ -79,6 +79,8 @@ public:
 
   const ProtocolDecl *isProtocolConformanceRule() const;
 
+  bool isIdentityConformanceRule() const;
+
   bool isProtocolRefinementRule() const;
 
   /// See above for an explanation.

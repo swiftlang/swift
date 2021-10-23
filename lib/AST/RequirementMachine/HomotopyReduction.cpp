@@ -1087,6 +1087,10 @@ void RewriteSystem::verifyRedundantConformances(
     llvm::DenseSet<unsigned> redundantConformances) const {
   for (unsigned ruleID : redundantConformances) {
     const auto &rule = getRule(ruleID);
+    assert(!rule.isPermanent() &&
+           "Permanent rule cannot be redundant");
+    assert(!rule.isIdentityConformanceRule() &&
+           "Identity conformance cannot be redundant");
     assert(rule.isProtocolConformanceRule() &&
            "Redundant conformance is not a conformance rule?");
 

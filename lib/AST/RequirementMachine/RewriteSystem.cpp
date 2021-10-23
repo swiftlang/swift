@@ -40,13 +40,6 @@ Optional<Symbol> Rule::isPropertyRule() const {
   if (!std::equal(RHS.begin(), RHS.end(), LHS.begin()))
     return None;
 
-  // A same-type requirement of the form 'Self.Foo == Self' can induce a
-  // conformance rule [P].[P] => [P]. Don't consider this a property-like
-  // rule, since it messes up the generating conformances algorithm and
-  // doesn't mean anything useful anyway.
-  if (RHS.size() == 1 && RHS[0] == LHS[1])
-    return None;
-
   return property;
 }
 
@@ -59,6 +52,16 @@ const ProtocolDecl *Rule::isProtocolConformanceRule() const {
   }
 
   return nullptr;
+}
+
+/// If this is a rule of the form [P].[P] => [P] where [P] is a protocol
+/// symbol, return true, otherwise return false.
+bool Rule::isIdentityConformanceRule() const {
+  return (LHS.size() == 2 &&
+          RHS.size() == 1 &&
+          LHS[0] == RHS[0] &&
+          LHS[0] == LHS[1] &&
+          LHS[0].getKind() == Symbol::Kind::Protocol);
 }
 
 /// If this is a rule of the form [P].[Q] => [P] where [P] and [Q] are

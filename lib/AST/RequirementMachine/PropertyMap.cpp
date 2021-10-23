@@ -334,6 +334,9 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
     if (rule.isSimplified())
       continue;
 
+    if (rule.isPermanent())
+      continue;
+
     // Collect all rules of the form T.[p] => T where T is canonical.
     auto property = rule.isPropertyRule();
     if (!property)

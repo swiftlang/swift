@@ -89,6 +89,10 @@ void HomotopyGenerator::findProtocolConformanceRules(
   bool foundAny = false;
   for (unsigned ruleID : redundantRules) {
     const auto &rule = system.getRule(ruleID);
+
+    if (rule.isIdentityConformanceRule())
+      continue;
+
     if (auto *proto = rule.isProtocolConformanceRule()) {
       result[proto].first.push_back(ruleID);
       foundAny = true;
@@ -107,6 +111,10 @@ void HomotopyGenerator::findProtocolConformanceRules(
       switch (step.Kind) {
       case RewriteStep::ApplyRewriteRule: {
         const auto &rule = system.getRule(step.RuleID);
+
+        if (rule.isIdentityConformanceRule())
+          break;
+
         if (auto *proto = rule.isProtocolConformanceRule()) {
           if (step.StartOffset > 0 &&
               step.EndOffset == 0) {
@@ -157,7 +165,13 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
          "Canonical conformance term should simplify in one step");
 
   const auto &step = *steps.begin();
-  assert(getRule(step.RuleID).isProtocolConformanceRule());
+
+#ifndef NDEBUG
+  const auto &rule = getRule(step.RuleID);
+  assert(rule.isProtocolConformanceRule());
+  assert(!rule.isIdentityConformanceRule());
+#endif
+
   assert(step.Kind == RewriteStep::ApplyRewriteRule);
   assert(step.EndOffset == 0);
   assert(!step.Inverse);
@@ -183,6 +197,7 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
     SmallVectorImpl<unsigned> &result) const {
   const auto &rule = getRule(ruleID);
   assert(rule.isProtocolConformanceRule());
+  assert(!rule.isIdentityConformanceRule());
 
   // Compute domain(V).
   const auto &lhs = rule.getLHS();
@@ -596,6 +611,9 @@ void RewriteSystem::computeGeneratingConformances(
   // can be expressed as itself.
   for (unsigned ruleID : indices(Rules)) {
     const auto &rule = getRule(ruleID);
+    if (rule.isPermanent())
+      continue;
+
     if (rule.isRedundant())
       continue;
 
