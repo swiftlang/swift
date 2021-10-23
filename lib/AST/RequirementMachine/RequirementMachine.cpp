@@ -275,6 +275,15 @@ void RewriteSystemBuilder::processProtocolDependencies() {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
     }
 
+    MutableTerm lhs;
+    lhs.add(Symbol::forProtocol(proto, Context));
+    lhs.add(Symbol::forProtocol(proto, Context));
+
+    MutableTerm rhs;
+    rhs.add(Symbol::forProtocol(proto, Context));
+
+    AssociatedTypeRules.emplace_back(lhs, rhs);
+
     for (auto *assocType : proto->getAssociatedTypeMembers())
       addAssociatedType(assocType, proto);
 

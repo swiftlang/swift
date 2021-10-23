@@ -15,6 +15,7 @@ extension P where Self : Derived {
 
 // CHECK-LABEL: Requirement machine for <τ_0_0 where τ_0_0 : Derived, τ_0_0 : P>
 // CHECK-NEXT: Rewrite system: {
+// CHECK-NEXT: - [P].[P] => [P] [permanent]
 // CHECK-NEXT: - [P].[superclass: Base] => [P]
 // CHECK-NEXT: - [P].[layout: _NativeClass] => [P]
 // CHECK-NEXT: - τ_0_0.[superclass: Derived] => τ_0_0
