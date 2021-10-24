@@ -8,6 +8,12 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// FIXME(distributed): we need to revisit what's going on on windows with distributed actors rdar://84574311
+// UNSUPPORTED: OS=windows-msvc
+
+// Disabled temporarily until we figure out why the test is flaky.
+// REQUIRES: rdar84586299
+
 import _Distributed
 
 enum MyError: Error {
