@@ -265,7 +265,8 @@ def default_stdlib_deployment_targets(args):
     # OS X build machines configure all Darwin platforms by default.
     # Put iOS native targets last so that we test them last
     # (it takes a long time).
-    if host_target == StdlibDeploymentTarget.OSX.x86_64:
+    if host_target == StdlibDeploymentTarget.OSX.x86_64 or \
+            host_target == StdlibDeploymentTarget.OSX.arm64:
         targets = [host_target]
         if args.build_ios and args.build_ios_simulator:
             targets.extend(StdlibDeploymentTarget.iOSSimulator.targets)
