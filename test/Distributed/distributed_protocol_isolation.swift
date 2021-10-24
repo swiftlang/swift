@@ -117,6 +117,13 @@ distributed actor OK_StrictlyLocal: StrictlyLocal {
   nonisolated func localThrows() throws {}
 }
 
+protocol Server {
+  func send<Message: Codable>(message: Message) async throws -> String
+}
+actor MyServer : Server {
+  func send<Message: Codable>(message: Message) throws -> String { "" }  // okay, asynchronously accessed from clients of the protocol
+}
+
 protocol AsyncThrowsAll {
   func maybe(param: String, int: Int) async throws -> Int
 }

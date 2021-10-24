@@ -890,6 +890,17 @@ func testCrossActorProtocol<T: P>(t: T) async {
   ASPD.sd()
 }
 
+@available(SwiftStdlib 5.5, *)
+protocol Server {
+  func send<Message: Codable>(message: Message) async throws -> String
+}
+
+@available(SwiftStdlib 5.5, *)
+actor MyServer : Server {
+  // okay, asynchronously accessed from clients of the protocol
+  func send<Message: Codable>(message: Message) throws -> String { "" }
+}
+
 // ----------------------------------------------------------------------
 // @_inheritActorContext
 // ----------------------------------------------------------------------
