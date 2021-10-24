@@ -5,9 +5,12 @@
 import _Distributed
 
 // ==== -----------------------------------------------------------------------
-// MARK: Good cases
+// MARK: Distributed actor protocols
 
-@available(SwiftStdlib 5.6, *)
+protocol WrongDistFuncs {
+    distributed func notDistActor() // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+}
+
 protocol DistProtocol: DistributedActor {
   // FIXME(distributed): avoid issuing these warnings, these originate from the call on the DistProtocol where we marked this func as dist isolated,
   func local() -> String
@@ -24,7 +27,6 @@ protocol DistProtocol: DistributedActor {
   distributed func distAsyncThrows() async throws -> String
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor SpecificDist: DistProtocol {
 
   nonisolated func local() -> String { "hi" }
@@ -47,7 +49,6 @@ distributed actor SpecificDist: DistProtocol {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 func outside_good(dp: SpecificDist) async throws {
   _ = dp.local()
 
@@ -58,14 +59,13 @@ func outside_good(dp: SpecificDist) async throws {
   _ = try await dp.distAsyncThrows() // ok
 }
 
-@available(SwiftStdlib 5.6, *)
 func outside_good_generic<DP: DistProtocol>(dp: DP) async throws {
-  _ = dp.local() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
-  _ = await dp.local() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  _ = dp.local() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
+  _ = await dp.local() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
   // the below warning is expected because we don't apply the "implicitly async" to the not-callable func
   // expected-warning@-2{{no 'async' operations occur within 'await' expression}}
 
-  _ = try dp.local() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  _ = try dp.local() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
   // the below warning is expected because we don't apply the "implicitly throwing" to the not-callable func
   // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
 
@@ -76,7 +76,6 @@ func outside_good_generic<DP: DistProtocol>(dp: DP) async throws {
   _ = try await dp.distAsyncThrows() // ok
 }
 
-@available(SwiftStdlib 5.6, *)
 func outside_good_ext<DP: DistProtocol>(dp: DP) async throws {
   _ = try await dp.dist() // implicit async throws
   _ = try await dp.dist(string: "") // implicit async throws
@@ -85,10 +84,78 @@ func outside_good_ext<DP: DistProtocol>(dp: DP) async throws {
   _ = try await dp.distAsyncThrows() // ok
 }
 
-// ==== -----------------------------------------------------------------------
+// ==== ------------------------------------------------------------------------
+// MARK: General protocols implemented by distributed actors
+
+/// A distributed actor could only conform to this by making everything 'nonisolated':
+protocol StrictlyLocal {
+  func local()
+  // expected-note@-1{{mark the protocol requirement 'local()' 'async throws' in order witness it with 'distributed' function declared in distributed actor 'Nope2_StrictlyLocal'}}
+  func localThrows() throws
+  // expected-note@-1{{mark the protocol requirement 'localThrows()' 'async' in order witness it with 'distributed' function declared in distributed actor 'Nope2_StrictlyLocal'}}
+  // TODO: localAsync
+}
+
+distributed actor Nope1_StrictlyLocal: StrictlyLocal {
+  func local() {}
+  // expected-error@-1{{actor-isolated instance method 'local()' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'local()' to make this instance method not isolated to the actor}}
+  func localThrows() throws {}
+  // expected-error@-1{{actor-isolated instance method 'localThrows()' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this instance method not isolated to the actor}}
+}
+distributed actor Nope2_StrictlyLocal: StrictlyLocal {
+  distributed func local() {}
+  // expected-error@-1{{actor-isolated instance method 'local()' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'local()' to make this instance method not isolated to the actor}}
+  distributed func localThrows() throws {}
+  // expected-error@-1{{actor-isolated instance method 'localThrows()' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this instance method not isolated to the actor}}
+}
+distributed actor OK_StrictlyLocal: StrictlyLocal {
+  nonisolated func local() {}
+  nonisolated func localThrows() throws {}
+}
+
+protocol AsyncThrowsAll {
+  func maybe(param: String, int: Int) async throws -> Int
+}
+
+actor LocalOK_AsyncThrowsAll: AsyncThrowsAll {
+  func maybe(param: String, int: Int) async throws -> Int { 1111 }
+}
+
+actor LocalOK_Implicitly_AsyncThrowsAll: AsyncThrowsAll {
+  func maybe(param: String, int: Int) throws -> Int { 1111 }
+}
+
+distributed actor Nope1_AsyncThrowsAll: AsyncThrowsAll {
+  func maybe(param: String, int: Int) async throws -> Int { 111 }
+  // expected-error@-1{{distributed actor-isolated instance method 'maybe(param:int:)' cannot be used to satisfy a protocol requirement}}
+}
+
+distributed actor OK_AsyncThrowsAll: AsyncThrowsAll {
+  distributed func maybe(param: String, int: Int) async throws -> Int { 222 }
+}
+distributed actor OK_Implicitly_AsyncThrowsAll: AsyncThrowsAll {
+  distributed func maybe(param: String, int: Int) -> Int { 333 }
+}
+
+func testAsyncThrowsAll(p: AsyncThrowsAll,
+                        dap: OK_AsyncThrowsAll,
+                        dapi: OK_Implicitly_AsyncThrowsAll) async throws {
+  _ = try await p.maybe(param: "", int: 0)
+  _ = try await dap.maybe(param: "", int: 0)
+  _ = try await dapi.maybe(param: "", int: 0)
+
+  // Such conversion is sound:
+  let pp: AsyncThrowsAll = dapi
+  _ = try await pp.maybe(param: "", int: 0)
+}
+
+// ==== ------------------------------------------------------------------------
 // MARK: Error cases
 
-@available(SwiftStdlib 5.6, *)
 protocol ErrorCases: DistributedActor {
   distributed func unexpectedAsyncThrows() -> String
   // expected-note@-1{{protocol requires function 'unexpectedAsyncThrows()' with type '() -> String'; do you want to add a stub?}}

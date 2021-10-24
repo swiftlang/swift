@@ -2827,24 +2827,89 @@ bool ConformanceChecker::checkActorIsolation(
   case ActorIsolationRestriction::ActorSelf: {
     auto requirementIsolation = getActorIsolation(requirement);
 
-    // An actor-isolated witness can only conform to an actor-isolated
-    // requirement.
-    if (requirementIsolation == ActorIsolation::ActorInstance)
-      return false;
-
     auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness);
     auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
+    auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
+
+    // An actor-isolated witness can only conform to an actor-isolated
+    // requirement.
+    if (requirementIsolation == ActorIsolation::ActorInstance) {
+      return false;
+    }
 
     /// Distributed actors can witness protocol requirements either with
     /// nonisolated or distributed members.
-    auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
     if (witnessClass && witnessClass->isDistributedActor()) {
-      // Maybe we're dealing with a 'distributed func' which is witness to
-      // a distributed function requirement, this is ok.
-      if (requirementFunc && requirementFunc->isDistributed() &&
-          witnessFunc && witnessFunc->isDistributed()) {
+      // A distributed actor may conform to an 'async throws' function
+      // requirement with a distributed function, because those are always
+      // cross-actor.
+      //
+      // If the distributed function is well-formed (passed checks) then it can
+      // witness this requirement. I.e. since checks to the distributed function
+      // passed, it can be called through this protocol.
+      if (witnessFunc && witnessFunc->isDistributed()) {
+        // If the requirement was also a 'distributed func' we most definitely
+        // can witness it with our 'distributed func' witness.
+        if (requirementFunc && requirementFunc->isDistributed()) {
           return false;
+        }
+        if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
+          return false;
+        }
+
+        if (requirementFunc) {
+          // The witness was distributed, but the requirement func was not
+          // 'async throws', so we can suggest adding those to the protocol
+          int suggestAddingModifiers = 0;
+          if (!requirementFunc->hasAsync()) suggestAddingModifiers += 1;
+          if (!requirementFunc->hasThrows()) suggestAddingModifiers += 2;
+          requirementFunc->diagnose(diag::note_add_async_and_throws_to_decl,
+                                    witness->getName(),
+                                    suggestAddingModifiers,
+                                    witnessClass->getName());
+          // TODO(distributed): fixit inserts for the async/throws
+        }
       }
+
+      // The witness definitely is distributed actor isolated,
+      // so diagnose this as an error; next we'll provide helpful notes
+      witness->diagnose(diag::distributed_actor_isolated_witness,
+                        witness->getDescriptiveKind(), witness->getName())
+          .fixItInsert(witness->getAttributeInsertionLoc(true),
+                       "distributed ");
+
+      // witness is not 'distributed', if the requirement was though,
+      // then we definitely must mark the witness distributed as well.
+      if (requirementFunc->isDistributed()) {
+        witness->diagnose(diag::note_add_distributed_to_decl,
+                          witness->getName(),
+                          witness->getDescriptiveKind())
+            .fixItInsert(witness->getAttributeInsertionLoc(true),
+                         "distributed ");
+        requirement->diagnose(diag::note_distributed_requirement_defined_here,
+                              requirement->getName());
+      } else if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
+        assert(!requirementFunc->isDistributed());
+        // If the requirement is 'async throws' we can add 'distributed' to the
+        // distributed actor function to witness the requirement.
+        witness->diagnose(diag::note_add_distributed_to_decl,
+                          witness->getName(), witness->getDescriptiveKind())
+            .fixItInsert(witness->getAttributeInsertionLoc(true),
+                         "distributed ");
+      }
+
+      if (!requirementFunc->hasAsync() && !requirementFunc->isDistributed()) {
+        /// The requirement is synchronous, so we can only conform to it using
+        /// 'nonisolated'...
+        witness->diagnose(diag::note_add_nonisolated_to_decl,
+                          witness->getName(), witness->getDescriptiveKind())
+            .fixItInsert(witness->getAttributeInsertionLoc(true),
+                         "nonisolated ");
+
+        /// ... or by suggesting to make it 'async'
+      }
+
+      return true;
     }
 
     witness->diagnose(diag::actor_isolated_witness,
@@ -2856,9 +2921,8 @@ bool ConformanceChecker::checkActorIsolation(
         if (requirementFunc && requirementFunc->isDistributed()) {
           // a distributed protocol requirement can be witnessed with a
           // distributed function:
-          witness
-              ->diagnose(diag::note_add_distributed_to_decl,
-                         witness->getName(), witness->getDescriptiveKind())
+          witness->diagnose(diag::note_add_distributed_to_decl,
+                            witness->getName(), witness->getDescriptiveKind())
               .fixItInsert(witness->getAttributeInsertionLoc(true),
                            "distributed ");
           requirement
@@ -2878,10 +2942,61 @@ bool ConformanceChecker::checkActorIsolation(
     return true;
   }
 
-  case ActorIsolationRestriction::CrossActorSelf:
-    return diagnoseNonSendableTypesInReference(
+  case ActorIsolationRestriction::CrossActorSelf: {
+    if (diagnoseNonSendableTypesInReference(
         witness, DC->getParentModule(), witness->getLoc(),
-        ConcurrentReferenceKind::CrossActor);
+        ConcurrentReferenceKind::CrossActor)) {
+      return true;
+    }
+
+    auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness);
+    auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
+    auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
+
+    if (witnessClass && witnessClass->isDistributedActor()) {
+      // A distributed actor may conform to an 'async throws' function
+      // requirement with a distributed function, because those are always
+      // cross-actor.
+      //
+      // If the distributed function is well-formed (passed checks) then it can
+      // witness this requirement. I.e. since checks to the distributed function
+      // passed, it can be called through this protocol.
+      if (witnessFunc && witnessFunc->isDistributed()) {
+        // If the requirement was also a 'distributed func' we most definitely
+        // can witness it with our 'distributed func' witness.
+        if (requirementFunc && requirementFunc->isDistributed()) {
+          return false;
+        }
+        if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
+          return false;
+        }
+
+        if (requirementFunc) {
+          // The witness was distributed, but the requirement func was not
+          // 'async throws', so we can suggest adding those to the protocol
+          int suggestAddingModifiers = 0;
+          if (!requirementFunc->hasAsync()) suggestAddingModifiers += 1;
+          if (!requirementFunc->hasThrows()) suggestAddingModifiers += 2;
+          requirementFunc->diagnose(diag::note_add_async_and_throws_to_decl,
+                                    witness->getName(), suggestAddingModifiers,
+                                    witnessClass->getName());
+          // TODO(distributed): fixit inserts for the async/throws
+        } // TODO(distributed): handle computed properties as well?
+      }
+
+      if (witnessFunc) {
+        witness
+            ->diagnose(diag::distributed_actor_isolated_witness,
+                       witness->getDescriptiveKind(), witness->getName())
+            .fixItInsert(witness->getAttributeInsertionLoc(true),
+                         "distributed ");
+      }
+
+      return true;
+    }
+
+    return false;
+  }
 
   case ActorIsolationRestriction::GlobalActorUnsafe:
     witnessIsUnsafe = true;

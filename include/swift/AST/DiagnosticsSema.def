@@ -4351,6 +4351,10 @@ NOTE(note_add_async_to_function,none,
 NOTE(note_add_nonisolated_to_decl,none,
      "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
+NOTE(note_add_async_and_throws_to_decl,none,
+     "mark the protocol requirement %0 '%select{|async|throws|async throws}1' "
+     "in order witness it with 'distributed' function declared in distributed actor %2",
+     (DeclName, unsigned, DeclName))
 NOTE(note_add_distributed_to_decl,none,
      "add 'distributed' to %0 to make this %1 witness the protocol requirement",
      (DeclName, DescriptiveDeclKind))
@@ -4484,11 +4488,11 @@ NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
-NOTE(distributed_actor_isolated_method_note,none,
-     "only 'distributed' functions can be called from outside the distributed actor", // TODO(distributed): improve error message
-     ())
+NOTE(note_distributed_actor_isolated_method,none,
+     "distributed actor-isolated %0 %1 declared here",
+     (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_isolated_method,none,
-      "only 'distributed' functions can be called from outside the distributed actor", // TODO(distributed): improve error message to be more like 'non-distributed' ... defined here
+      "only 'distributed' functions can be called on a potentially remote distributed actor",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "distributed function parameter '%0' of type %1 does not conform to 'Codable'",
@@ -4497,7 +4501,7 @@ ERROR(distributed_actor_func_result_not_codable,none,
       "distributed function result type %0 does not conform to 'Codable'",
       (Type))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
-      "Distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
+      "distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
@@ -4522,6 +4526,9 @@ WARNING(shared_mutable_state_access,none,
         "shared mutable state", (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_witness,none,
      "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
+     (DescriptiveDeclKind, DeclName))
+ERROR(distributed_actor_isolated_witness,none,
+     "distributed actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
      (DescriptiveDeclKind, DeclName))
 ERROR(global_actor_isolated_requirement,none,
       "%0 %1 must be isolated to the global actor %2 to satisfy corresponding "
