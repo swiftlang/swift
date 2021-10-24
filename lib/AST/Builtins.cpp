@@ -856,8 +856,7 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getMoveOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
-                            _parameters(_owned(_typeparam(0))),
-                            _moveOnly(_typeparam(0)));
+                            _parameters(_owned(_typeparam(0))), _typeparam(0));
 }
 
 static ValueDecl *getTransferArrayOperation(ASTContext &ctx, Identifier id) {

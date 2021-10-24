@@ -2135,6 +2135,12 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       visitor(&builtin->getAllOperands()[2]);
       return;
 
+    // This consumes its second parameter (the arg) and takes/places that value
+    // into the first parameter (the result).
+    case BuiltinValueKind::Move:
+      visitor(&builtin->getAllOperands()[1]);
+      return;
+
     // These consume values out of their second operand.
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:

@@ -20,10 +20,12 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -32,7 +34,6 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -1983,6 +1984,22 @@ public:
       requireObjectType(BuiltinExecutorType, BI,
                         "result of build*ExecutorRef");
       return;
+    }
+
+    if (builtinKind == BuiltinValueKind::Move) {
+      // We expect that this builtin will be specialized during transparent
+      // inlining into move_value if we inline into a non-generic context. If
+      // the builtin still remains and is not in the specific move semantic
+      // function (which is the only function marked with
+      // semantics::LIFETIMEMANAGEMENT_MOVE), then we know that we did
+      // transparent inlining into a function that did not result in the Builtin
+      // being specialized out which is user error.
+      //
+      // NOTE: Once we have opaque values, this restriction will go away. This
+      // is just so we can call Builtin.move outside of the stdlib.
+      auto semanticName = semantics::LIFETIMEMANAGEMENT_MOVE;
+      require(BI->getFunction()->hasSemanticsAttr(semanticName),
+              "_move used within a generic context");
     }
   }
   
