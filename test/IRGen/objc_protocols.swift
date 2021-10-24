@@ -28,7 +28,7 @@ class Foo : NSRuncing, NSFunging, Ansible {
 // CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Foo = internal constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
-// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC:@[0-9]+]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
+// CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC:@.str.[0-9]+]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(funge)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC5fungeyyFTo{{(\.ptrauth)?}}" to i8*) },
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC3fooyyFTo{{(\.ptrauth)?}}" to i8*)
 // CHECK:   }]
