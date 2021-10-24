@@ -5,6 +5,8 @@
 // RUN: %target-build-swift -Xfrontend -disable-objc-interop -Xfrontend -enable-llvm-vfe -parse-as-library %s -DLIBRARY -module-name Library -emit-module -o %t/Library.swiftmodule
 // RUN: %target-build-swift -Xfrontend -disable-objc-interop -Xfrontend -enable-llvm-vfe -parse-as-library %s -DCLIENT -module-name Main -I%t -emit-ir -o - | %FileCheck %s
 
+// UNSUPPORTED: OS=windows-msvc
+
 #if LIBRARY
 
 public class MyLibraryClass {
