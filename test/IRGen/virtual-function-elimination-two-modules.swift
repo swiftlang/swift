@@ -31,8 +31,8 @@
 
 // REQUIRES: executable_test
 
-// Test disabled until LLVM GlobalDCE supports Swift vtables.
-// REQUIRES: rdar81868930
+// FIXME(mracek): More work needed to get this to work on non-Apple platforms.
+// REQUIRES: VENDOR=apple
 
 #if LIBRARY
 
