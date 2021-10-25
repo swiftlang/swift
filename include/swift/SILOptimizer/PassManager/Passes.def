@@ -325,6 +325,8 @@ PASS(PerfInliner, "inline",
      "Performance Function Inlining")
 PASS(PerformanceConstantPropagation, "performance-constant-propagation",
      "Constant Propagation for Performance without Diagnostics")
+PASS(PerformanceDiagnostics, "performance-diagnostics",
+     "Constant Propagation for Performance without Diagnostics")
 PASS(PredictableMemoryAccessOptimizations, "predictable-memaccess-opts",
      "Predictable Memory Access Optimizations for Diagnostics")
 PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
