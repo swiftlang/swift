@@ -1199,7 +1199,23 @@ AssociatedTypeDecl *AssociatedTypeInference::completeSolution(
         // If the substitution produced an error, we're done.
         if (type->hasError())
           return witness.getAssocType();
+
+        // FIXME: If we still have a type parameter and it isn't a generic
+        // parameter of the conforming nominal, it's either a cycle or a
+        // solution that is beyond the current algorithm, i.e.
+        //
+        // protocol P {
+        //   associatedtype A = B
+        //   associatedtype B = C
+        //   associatedtype C = Int
+        // }
+        // struct Conformer: P {}
+        if (type->hasTypeParameter() &&
+            !adoptee->getAnyNominal()->isGeneric()) {
+          return witness.getAssocType();
+        }
       }
+
       type = dc->mapTypeIntoContext(type);
     }
 
