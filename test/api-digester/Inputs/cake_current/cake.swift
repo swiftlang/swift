@@ -252,6 +252,3 @@ public extension Float {
 }
 
 infix operator <==> : AssignmentPrecedence
-
-@_silgen_name("sil_name_after")
-public func silGenNameGiven() {}
