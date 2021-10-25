@@ -8,7 +8,6 @@
     "CString.swift",
     "Character.swift",
     "CharacterProperties.swift",
-    "GraphemeWalker.swift",
     "ICU.swift",
     "NFC.swift",
     "NFD.swift",
