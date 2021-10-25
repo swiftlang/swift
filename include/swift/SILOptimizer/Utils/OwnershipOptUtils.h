@@ -224,7 +224,8 @@ public:
   /// Return an instance of this class if we can perform the specific RAUW
   /// operation ignoring if the types line up. Returns None otherwise.
   ///
-  /// \p oldValue may be either a SingleValueInstruction or a terminator result.
+  /// \p oldValue may be a SingleValueInstruction, MultiValueInstruction result,
+  /// or terminator result.
   ///
   /// Precondition: If \p oldValue is a BorrowedValue that introduces a local
   /// borrow scope, then \p newValue must either be defined in the same block as
@@ -264,6 +265,10 @@ public:
   SILValue prepareReplacement(SILValue rewrittenNewValue = SILValue());
 
   /// Perform the actual RAUW--replace all uses if \p oldValue.
+  ///
+  /// Precondition: oldValue is a single-value instruction. To transform
+  /// multi-value instructions, the caller must first call prepareReplacement()
+  /// for each, then manually RAUW and erase.
   ///
   /// Precondition: \p replacementValue is either invalid or has the same type
   /// as \p oldValue and is a valid OSSA replacement.
