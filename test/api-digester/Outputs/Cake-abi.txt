@@ -10,7 +10,6 @@ cake: Func S1.foo5(x:y:) has mangled name changing from 'cake.S1.foo5(x: Swift.I
 cake: Func Somestruct2.foo1(_:) has mangled name changing from 'static cake.Somestruct2.foo1(cake.C3) -> ()' to 'static cake.NSSomestruct2.foo1(cake.C1) -> ()'
 cake: Func ownershipChange(_:_:) has mangled name changing from 'cake.ownershipChange(inout Swift.Int, __shared Swift.Int) -> ()' to 'cake.ownershipChange(Swift.Int, __owned Swift.Int) -> ()'
 cake: Func returnFunctionTypeOwnershipChange() has mangled name changing from 'cake.returnFunctionTypeOwnershipChange() -> (cake.C1) -> ()' to 'cake.returnFunctionTypeOwnershipChange() -> (__owned cake.C1) -> ()'
-cake: Func silGenNameGiven() has mangled name changing from 'sil_name_before' to 'sil_name_after'
 cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake.P2> to <Self : cake.P1, Self : cake.P4>
 cake: Struct Somestruct2 has mangled name changing from 'cake.Somestruct2' to 'cake.NSSomestruct2'
 

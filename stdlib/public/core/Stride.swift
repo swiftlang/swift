@@ -379,8 +379,10 @@ extension StrideTo: Sequence {
   public func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
-    if element < _start || _end <= element {
-      return false
+    if _stride < 0 {
+      if element <= _end || _start < element { return false }
+    } else {
+      if element < _start || _end <= element { return false }
     }
     return nil
   }
@@ -592,8 +594,10 @@ extension StrideThrough: Sequence {
   public func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
-    if element < _start || _end < element {
-      return false
+    if _stride < 0 {
+      if element < _end || _start < element { return false }
+    } else {
+      if element < _start || _end < element { return false }
     }
     return nil
   }

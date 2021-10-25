@@ -817,19 +817,6 @@ static bool hasSameParameterFlags(const SDKNodeType *Left, const SDKNodeType *Ri
   return true;
 }
 
-StringRef SDKNodeDecl::getDemangledName() const {
-  if (demangledName.hasValue()) {
-    return *demangledName;
-  }
-  std::string mangled = MangledName.str();
-  if (mangled.empty()) {
-    mangled = getMangledNameFromUSR(Usr);
-  }
-  demangledName = Ctx.buffer(demangleMangledName(mangled));
-  assert(demangledName.hasValue());
-  return *demangledName;
-}
-
 static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) {
   auto *LeftAlias = dyn_cast<SDKNodeTypeAlias>(&L);
   auto *RightAlias = dyn_cast<SDKNodeTypeAlias>(&R);
@@ -961,7 +948,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         if (Left->getFixedBinaryOrder() != Right->getFixedBinaryOrder())
           return false;
       }
-      if (Left->getDemangledName() != Right->getDemangledName())
+      if (Left->getUsr() != Right->getUsr())
         return false;
       LLVM_FALLTHROUGH;
     }
@@ -2595,10 +2582,9 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
       emitDiag(Loc, diag::decl_reorder, getFixedBinaryOrder(),
                RD->getFixedBinaryOrder());
     }
-    {
-      // diagnose mangled name change.
-      auto left = getDemangledName();
-      auto right = RD->getDemangledName();
+    if (getUsr() != RD->getUsr()) {
+      auto left = demangleUSR(getUsr());
+      auto right = demangleUSR(RD->getUsr());
       if (left != right) {
         emitDiag(Loc, diag::demangled_name_changed, left, right);
       }
