@@ -2184,10 +2184,6 @@ public:
 using RewriteTargetFn = std::function<
     Optional<SolutionApplicationTarget> (SolutionApplicationTarget)>;
 
-/// Represents a conversion restriction between two types.
-using ConversionRestriction =
-    std::tuple<TypeBase *, TypeBase *, ConversionRestrictionKind>;
-
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
   Solving,
@@ -2377,15 +2373,15 @@ private:
   /// there are multiple ways in which one type could convert to another, e.g.,
   /// given class types A and B, the solver might choose either a superclass
   /// conversion or a user-defined conversion.
-  std::vector<ConversionRestriction> ConstraintRestrictions;
+  llvm::MapVector<std::pair<TypeBase *, TypeBase *>, ConversionRestrictionKind>
+      ConstraintRestrictions;
 
   /// The set of fixes applied to make the solution work.
-  llvm::SmallVector<ConstraintFix *, 4> Fixes;
+  llvm::SmallSetVector<ConstraintFix *, 4> Fixes;
 
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
-  std::vector<std::pair<ConstraintLocator*, unsigned>>
-      DisjunctionChoices;
+  llvm::MapVector<ConstraintLocator *, unsigned> DisjunctionChoices;
 
   /// A map from applied disjunction constraints to the corresponding
   /// argument function type.
@@ -2394,12 +2390,12 @@ private:
 
   /// For locators associated with call expressions, the trailing closure
   /// matching rule and parameter bindings that were applied.
-  std::vector<std::pair<ConstraintLocator *, MatchCallArgumentResult>>
+  llvm::MapVector<ConstraintLocator *, MatchCallArgumentResult>
       argumentMatchingChoices;
 
   /// The set of implicit value conversions performed by the solver on
   /// a current path to reach a solution.
-  SmallVector<std::pair<ConstraintLocator *, ConversionRestrictionKind>, 2>
+  llvm::SmallMapVector<ConstraintLocator *, ConversionRestrictionKind, 2>
       ImplicitValueConversions;
 
   /// The worklist of "active" constraints that should be revisited
@@ -2415,8 +2411,8 @@ private:
 
   /// A mapping from constraint locators to the set of opened types associated
   /// with that locator.
-  SmallVector<std::pair<ConstraintLocator *, ArrayRef<OpenedType>>, 4>
-    OpenedTypes;
+  llvm::SmallMapVector<ConstraintLocator *, ArrayRef<OpenedType>, 4>
+      OpenedTypes;
 
   /// The list of all generic requirements fixed along the current
   /// solver path.
@@ -2430,11 +2426,11 @@ private:
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
-  SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
-    OpenedExistentialTypes;
+  llvm::SmallMapVector<ConstraintLocator *, OpenedArchetypeType *, 4>
+      OpenedExistentialTypes;
 
   /// The set of functions that have been transformed by a result builder.
-  std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
+  llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
 
   /// Cache of the effects any closures visited.
@@ -2450,7 +2446,7 @@ public:
   llvm::SmallMapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>, 4> appliedPropertyWrappers;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
-  std::vector<ConstraintLocator *> DefaultedConstraints;
+  llvm::SetVector<ConstraintLocator *> DefaultedConstraints;
 
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
@@ -3424,7 +3420,7 @@ public:
     return !solverState || solverState->recordFixes;
   }
 
-  ArrayRef<ConstraintFix *> getFixes() const { return Fixes; }
+  ArrayRef<ConstraintFix *> getFixes() const { return Fixes.getArrayRef(); }
 
   bool shouldSuppressDiagnostics() const {
     return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);
@@ -3471,6 +3467,16 @@ public:
           }
           return false;
         });
+  }
+
+  bool
+  hasConversionRestriction(Type type1, Type type2,
+                           ConversionRestrictionKind restrictionKind) const {
+    auto restriction =
+        ConstraintRestrictions.find({type1.getPointer(), type2.getPointer()});
+    return restriction == ConstraintRestrictions.end()
+               ? false
+               : restriction->second == restrictionKind;
   }
 
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
@@ -4172,10 +4178,12 @@ public:
                           OpenedTypeMap *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
-  /// with a type variable) along the current path.
-  ArrayRef<std::pair<ConstraintLocator *, ArrayRef<OpenedType>>>
-  getOpenedTypes() const {
-    return OpenedTypes;
+  /// with a type variable) at the given location.
+  ArrayRef<OpenedType> getOpenedTypes(ConstraintLocator *locator) const {
+    auto substitutions = OpenedTypes.find(locator);
+    if (substitutions == OpenedTypes.end())
+      return {};
+    return substitutions->second;
   }
 
 private:
@@ -4901,7 +4909,10 @@ private:
   /// Record a particular disjunction choice of
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
                                unsigned index) {
-    DisjunctionChoices.push_back({disjunctionLocator, index});
+    // We shouldn't ever register disjunction choices multiple times.
+    assert(!DisjunctionChoices.count(disjunctionLocator) ||
+           DisjunctionChoices[disjunctionLocator] == index);
+    DisjunctionChoices.insert({disjunctionLocator, index});
   }
 
   /// Filter the set of disjunction terms, keeping only those where the

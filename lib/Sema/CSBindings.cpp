@@ -1983,7 +1983,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
-    cs.DefaultedConstraints.push_back(srcLocator);
+    cs.DefaultedConstraints.insert(srcLocator);
 
     if (type->isPlaceholder() && reportHole())
       return true;
