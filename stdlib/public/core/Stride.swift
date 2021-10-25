@@ -384,6 +384,8 @@ extension StrideTo: Sequence {
     } else {
       if element < _start || _end <= element { return false }
     }
+    // TODO: Additional implementation work will avoid always falling back to the
+    // predicate version of `contains` when the sequence *does* contain `element`.
     return nil
   }
 }
@@ -599,6 +601,8 @@ extension StrideThrough: Sequence {
     } else {
       if element < _start || _end < element { return false }
     }
+    // TODO: Additional implementation work will avoid always falling back to the
+    // predicate version of `contains` when the sequence *does* contain `element`.
     return nil
   }
 }
