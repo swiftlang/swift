@@ -255,5 +255,25 @@ StrideTestSuite.test("StrideToIterator/past end/backward") {
   strideIteratorTest(stride(from: 3, to: 0, by: -1), nonNilResults: 3)
 }
 
+StrideTestSuite.test("Contains") {
+  expectTrue(stride(from: 1, through: 5, by: 1).contains(3))
+  expectTrue(stride(from: 1, to: 5, by: 1).contains(3))
+  expectTrue(stride(from: 1, through: 5, by: 1).contains(5))
+  expectFalse(stride(from: 1, to: 5, by: 1).contains(5))
+  expectFalse(stride(from: 1, through: 5, by: -1).contains(3))
+  expectFalse(stride(from: 1, to: 5, by: -1).contains(3))
+  expectFalse(stride(from: 1, through: 5, by: -1).contains(1))
+  expectFalse(stride(from: 1, to: 5, by: -1).contains(1))
+
+  expectTrue(stride(from: 5, through: 1, by: -1).contains(3))
+  expectTrue(stride(from: 5, to: 1, by: -1).contains(3))
+  expectTrue(stride(from: 5, through: 1, by: -1).contains(1))
+  expectFalse(stride(from: 5, to: 1, by: -1).contains(1))
+  expectFalse(stride(from: 5, through: 1, by: 1).contains(3))
+  expectFalse(stride(from: 5, to: 1, by: 1).contains(3))
+  expectFalse(stride(from: 5, through: 1, by: 1).contains(5))
+  expectFalse(stride(from: 5, to: 1, by: 1).contains(5))
+}
+
 runAllTests()
 
