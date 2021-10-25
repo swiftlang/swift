@@ -237,6 +237,8 @@ PASS(RedundantLoadElimination, "redundant-load-elim",
      "Redundant Load Elimination")
 PASS(DeadStoreElimination, "dead-store-elim",
      "Dead Store Elimination")
+PASS(MandatoryGenericSpecializer, "mandatory-generic-specializer",
+     "Mandatory Generic Function Specialization on Static Types")
 PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
 PASS(ExistentialSpecializer, "existential-specializer",
