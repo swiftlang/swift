@@ -136,6 +136,77 @@ void RewriteSystem::initialize(
     addRule(rule.first, rule.second);
 }
 
+/// Simplify terms appearing in the substitutions of the last symbol of \p term,
+/// which must be a superclass or concrete type symbol.
+void RewriteSystem::simplifySubstitutions(MutableTerm &term,
+                                          RewritePath &path) const {
+  auto symbol = term.back();
+  assert(symbol.isSuperclassOrConcreteType());
+
+  auto substitutions = symbol.getSubstitutions();
+  if (substitutions.empty())
+    return;
+
+  // Save the original rewrite path length so that we can reset if if we don't
+  // find anything to simplify.
+  unsigned oldSize = path.size();
+
+  // The term is on the A stack. Push all substitutions onto the A stack.
+  path.add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/false));
+
+  // Move all substitutions but the first one to the B stack.
+  for (unsigned i = 1; i < substitutions.size(); ++i)
+    path.add(RewriteStep::forShift(/*inverse=*/false));
+
+  // Simplify and collect substitutions.
+  SmallVector<Term, 2> newSubstitutions;
+  newSubstitutions.reserve(substitutions.size());
+
+  bool first = true;
+  bool anyChanged = false;
+  for (auto substitution : substitutions) {
+    // Move the next substitution from the B stack to the A stack.
+    if (!first)
+      path.add(RewriteStep::forShift(/*inverse=*/true));
+    first = false;
+
+    // The current substitution is at the top of the A stack; simplify it.
+    MutableTerm mutTerm(substitution);
+    anyChanged |= simplify(mutTerm, &path);
+
+    // Record the new substitution.
+    newSubstitutions.push_back(Term::get(mutTerm, Context));
+  }
+
+  // All simplified substitutions are now on the A stack. Collect them to
+  // produce the new term.
+  path.add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/true));
+
+  // If nothing changed, we don't have to rebuild the symbol.
+  if (!anyChanged) {
+    // The rewrite path should consist of a Decompose, followed by a number
+    // of Shifts, followed by a Compose.
+#ifndef NDEBUG
+    for (auto iter = path.begin() + oldSize; iter < path.end(); ++iter) {
+      assert(iter->Kind == RewriteStep::Shift ||
+             iter->Kind == RewriteStep::Decompose);
+    }
+#endif
+
+    path.resize(oldSize);
+    return;
+  }
+
+  // Build the new symbol with simplified substitutions.
+  auto newSymbol = (symbol.getKind() == Symbol::Kind::Superclass
+                    ? Symbol::forSuperclass(symbol.getSuperclass(),
+                                            newSubstitutions, Context)
+                    : Symbol::forConcreteType(symbol.getConcreteType(),
+                                              newSubstitutions, Context));
+
+  term.back() = newSymbol;
+}
+
 /// Adds a rewrite rule, returning true if the new rule was non-trivial.
 ///
 /// If both sides simplify to the same term, the rule is trivial and discarded,
@@ -162,6 +233,12 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
   // This avoids unnecessary work in the completion algorithm.
   RewritePath lhsPath;
   RewritePath rhsPath;
+
+  if (lhs.back().isSuperclassOrConcreteType())
+    simplifySubstitutions(lhs, lhsPath);
+
+  if (rhs.back().isSuperclassOrConcreteType())
+    simplifySubstitutions(rhs, rhsPath);
 
   simplify(lhs, &lhsPath);
   simplify(rhs, &rhsPath);

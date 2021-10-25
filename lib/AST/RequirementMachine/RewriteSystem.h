@@ -323,6 +323,11 @@ public:
     Steps.append(other.begin(), other.end());
   }
 
+  void resize(unsigned newSize) {
+    assert(newSize <= size());
+    Steps.erase(Steps.begin() + newSize, Steps.end());
+  }
+
   decltype(Steps)::const_iterator begin() const {
     return Steps.begin();
   }
@@ -494,6 +499,8 @@ public:
                const RewritePath *path=nullptr);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
+
+  void simplifySubstitutions(MutableTerm &term, RewritePath &path) const;
 
   //////////////////////////////////////////////////////////////////////////////
   ///
