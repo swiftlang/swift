@@ -78,7 +78,10 @@ public:
 
   /// Controls whether cross module optimization is enabled.
   bool CrossModuleOptimization = false;
-  
+
+  /// Enables experimental performance annotations.
+  bool EnablePerformanceAnnotations = false;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
