@@ -592,6 +592,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
   @inlinable
   public static func allocate(capacity count: Int)
     -> UnsafeMutablePointer<Pointee> {
+    _staticAssertIfConstant(count >= 0, "Allocation capacity must be greater than or equal to zero")
     let size = MemoryLayout<Pointee>.stride * count
     // For any alignment <= _minAllocationAlignment, force alignment = 0.
     // This forces the runtime's "aligned" allocation path so that

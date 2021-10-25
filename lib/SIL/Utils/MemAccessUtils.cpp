@@ -2151,6 +2151,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::UnexpectedError:
     case BuiltinValueKind::ErrorInMain:
     case BuiltinValueKind::IsOptionalType:
+    case BuiltinValueKind::StaticAssert:
     case BuiltinValueKind::CondFailMessage:
     case BuiltinValueKind::AllocRaw:
     case BuiltinValueKind::DeallocRaw:

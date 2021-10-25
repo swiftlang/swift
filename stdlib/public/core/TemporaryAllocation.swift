@@ -37,14 +37,12 @@ internal func _byteCountForTemporaryAllocation<T>(
   // inputs. If it makes them for constant inputs, it prevents the compiler from
   // emitting equivalent compile-time diagnostics because the call to
   // Builtin.stackAlloc() becomes unreachable.
-  if _isComputed(capacity) {
-    _precondition(capacity > 0, "Allocation capacity must be greater than or equal to zero")
-  }
+  _precondition(capacity >= 0, "Allocation capacity must be greater than or equal to zero",
+                tryCheckingDuringCompilation: true)
   let stride = MemoryLayout<T>.stride
   let (byteCount, overflow) = capacity.multipliedReportingOverflow(by: stride)
-  if _isComputed(capacity) {
-    _precondition(!overflow, "Allocation byte count too large")
-  }
+  _precondition(!overflow, "Allocation byte count too large",
+                tryCheckingDuringCompilation: true)
   return byteCount
 }
 
@@ -62,10 +60,10 @@ internal func _byteCountForTemporaryAllocation<T>(
 internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
   // PRECONDITIONS: Non-positive alignments are nonsensical, as are
   // non-power-of-two alignments.
-  if _isComputed(alignment) {
-    _precondition(alignment > 0, "Alignment value must be greater than zero")
-    _precondition(_isPowerOf2(alignment), "Alignment value must be a power of two")
-  }
+  _precondition(alignment > 0, "Alignment value must be greater than zero",
+                tryCheckingDuringCompilation: true)
+  _precondition(_isPowerOf2(alignment), "Alignment value must be a power of two",
+                tryCheckingDuringCompilation: true)
 
   // If the alignment is larger than MaximumAlignment, the allocation is always
   // performed on the heap. There are two reasons why:

@@ -6,4 +6,4 @@ func blackHole(_ value: UnsafeMutableRawPointer?) -> Void
 withUnsafeTemporaryAllocation(byteCount: 1, alignment: 3) { buffer in
     blackHole(buffer.baseAddress)
 }
-// CHECK: error: alignment value must be a power of two
+// CHECK: error: Alignment value must be a power of two

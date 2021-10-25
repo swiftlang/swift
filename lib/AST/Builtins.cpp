@@ -1012,6 +1012,12 @@ static ValueDecl *getIsSameMetatypeOperation(ASTContext &ctx, Identifier id) {
                             _int(1));
 }
 
+static ValueDecl *getStaticAssertOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_int(1), _rawPointer),
+                            _void);
+}
+
 static ValueDecl *getAllocOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_word, _word),
@@ -2646,6 +2652,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::IsSameMetatype:
     return getIsSameMetatypeOperation(Context, Id);
+
+  case BuiltinValueKind::StaticAssert:
+    return getStaticAssertOperation(Context, Id);
 
   case BuiltinValueKind::AllocRaw:
     return getAllocOperation(Context, Id);

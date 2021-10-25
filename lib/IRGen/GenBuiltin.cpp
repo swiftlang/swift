@@ -20,6 +20,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILInstruction.h"
@@ -118,6 +119,23 @@ static std::pair<SILType, const TypeInfo &>
 getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
   auto lowered = IGM.getLoweredType(unloweredType);
   return {lowered, IGM.getTypeInfo(lowered)};
+}
+
+static Optional<StringRef>
+getStaticStringValue(IRGenFunction &IGF, llvm::Value *value) {
+  if (auto valueConst = dyn_cast<llvm::Constant>(value)) {
+    if (auto valueGlobal = dyn_cast<llvm::GlobalVariable>(valueConst->stripPointerCasts())) {
+      if (auto valueArray = dyn_cast<llvm::ConstantDataArray>(valueGlobal->getInitializer())) {
+        if (valueArray->isCString()) {
+          return valueArray->getAsCString();
+        } else {
+          return valueArray->getAsString();
+        }
+      }
+    }
+  }
+
+  return Optional<StringRef>();
 }
 
 /// emitBuiltinCall - Emit a call to a builtin function.
@@ -422,19 +440,17 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
     // Extract the PGO function name.
     auto *NameGEP = cast<llvm::User>(args.claimNext());
-    auto *NameGV = dyn_cast<llvm::GlobalVariable>(NameGEP->stripPointerCasts());
+    auto NameOpt = getStaticStringValue(IGF, NameGEP);
 
     // TODO: The SIL optimizer may rewrite the name argument in a way that
     // makes it impossible to lower. Until that issue is fixed, defensively
     // refuse to lower ill-formed intrinsics (rdar://39146527).
-    if (!NameGV) {
+    if (!NameOpt) {
       (void)args.claimAll();
       return;
     }
 
-    auto *NameC = NameGV->getInitializer();
-    StringRef Name = cast<llvm::ConstantDataArray>(NameC)->getRawDataValues();
-    StringRef PGOFuncName = Name.rtrim(StringRef("\0", 1));
+    StringRef PGOFuncName = *NameOpt;
 
     // Point the increment call to the right function name variable.
     std::string PGOFuncNameVar = llvm::getPGOFuncNameVarName(
@@ -1283,6 +1299,36 @@ if (Builtin.ID == BuiltinValueKind::id) { \
         IGF.Builder.CreateBitCast(metatypeRHS, IGF.IGM.Int8PtrTy);
 
     out.add(IGF.Builder.CreateICmpEQ(metatypeLHSCasted, metatypeRHSCasted));
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::StaticAssert) {
+    auto condition = args.claimNext();
+    auto message = args.claimNext();
+
+    if (auto conditionConst = dyn_cast<llvm::Constant>(condition)) {
+      if (conditionConst->isZeroValue()) {
+        condition->dump();
+        auto sourceLoc = Inst->getLoc().getSourceLoc();
+
+        // If the function has been inlined, its source location may not be
+        // available, but its caller should be available via the debug scope.
+        // Look upwards for a function with a valid source location to which the
+        // assertion failure can be attributed.
+        auto debugScope = Inst->getDebugScope();
+        while (debugScope && sourceLoc.isInvalid()) {
+          sourceLoc = debugScope->getLoc().getSourceLoc();
+          debugScope = debugScope->InlinedCallSite;
+        }
+
+        auto emittedMessage = getStaticStringValue(IGF, message)
+          .getValueOr("Assertion failure");
+        IGF.IGM.error(sourceLoc, emittedMessage);
+      }
+    } else {
+      // Not a compile-time constant at the LLVM layer. The caller is
+      // responsible for emitting a runtime check instead.
+    }
     return;
   }
 

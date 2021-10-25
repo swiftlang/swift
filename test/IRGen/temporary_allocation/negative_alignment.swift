@@ -6,4 +6,4 @@ func blackHole(_ value: UnsafeMutableRawPointer?) -> Void
 withUnsafeTemporaryAllocation(byteCount: 1, alignment: -1) { buffer in
     blackHole(buffer.baseAddress)
 }
-// CHECK: error: alignment value must be greater than zero
+// CHECK: error: Alignment value must be greater than zero

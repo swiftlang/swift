@@ -195,6 +195,24 @@ public func fatalError(
     flags: _fatalErrorFlags())
 }
 
+/// Performs a compile-time assertion if `condition` is known at compile time.
+///
+/// - Parameters:
+///   - condition: The condition to test.
+///   - message: A string to print as a compiler diagnostic if `condition` is
+///     evaluated to `false`. The default is an empty string.
+///
+/// If `condition` is a compile-time constant or can be fully evaluated at
+/// compile time, and its value is equal to `false`, a compiler diagnostic is
+/// emitted and compilation terminates. Otherwise, this function has no effect.
+@usableFromInline @_transparent
+internal func _staticAssertIfConstant(
+  _ condition: Bool,
+  _ message: StaticString = StaticString()
+) {
+  Builtin.staticAssert(condition._value, message.unsafeRawPointer)
+}
+
 /// Library precondition checks.
 ///
 /// Library precondition checks are enabled in debug mode and release mode. When
@@ -204,16 +222,28 @@ public func fatalError(
 @usableFromInline @_transparent
 internal func _precondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  tryCheckingDuringCompilation: Bool = false,
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
+  guard tryCheckingDuringCompilation
+          || _isDebugAssertConfiguration()
+          || _isReleaseAssertConfiguration() else {
+    return
+  }
+
+  let condition = condition()
+  if tryCheckingDuringCompilation {
+    _staticAssertIfConstant(condition, message)
+  }
+
   if _isDebugAssertConfiguration() {
-    if !_fastPath(condition()) {
+    if !_fastPath(condition) {
       _assertionFailure("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
-    let error = !condition()
+    let error = !condition
     Builtin.condfail_message(error._value, message.unsafeRawPointer)
   }
 }
@@ -233,9 +263,15 @@ internal func _preconditionFailure(
 @_transparent
 public func _overflowChecked<T>(
   _ args: (T, Bool),
+  tryCheckingDuringCompilation: Bool = false,
   file: StaticString = #file, line: UInt = #line
 ) -> T {
   let (result, error) = args
+
+  if tryCheckingDuringCompilation {
+    _staticAssertIfConstant(!error, "Overflow/underflow")
+  }
+
   if _isDebugAssertConfiguration() {
     if _slowPath(error) {
       _fatalErrorMessage("Fatal error", "Overflow/underflow",
@@ -259,11 +295,21 @@ public func _overflowChecked<T>(
 @usableFromInline @_transparent
 internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  tryCheckingDuringCompilation: Bool = false,
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug mode.
+  guard tryCheckingDuringCompilation || _isDebugAssertConfiguration() else {
+    return
+  }
+
+  let condition = condition()
+  if tryCheckingDuringCompilation {
+    _staticAssertIfConstant(condition, message)
+  }
+
   if _slowPath(_isDebugAssertConfiguration()) {
-    if !_fastPath(condition()) {
+    if !_fastPath(condition) {
       _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
@@ -290,10 +336,16 @@ internal func _debugPreconditionFailure(
 @usableFromInline @_transparent
 internal func _internalInvariant(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  tryCheckingDuringCompilation: Bool = false,
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
-  if !_fastPath(condition()) {
+  let condition = condition()
+  if tryCheckingDuringCompilation {
+    _staticAssertIfConstant(condition, message)
+  }
+
+  if !_fastPath(condition) {
     _fatalErrorMessage("Fatal error", message, file: file, line: line,
       flags: _fatalErrorFlags())
   }

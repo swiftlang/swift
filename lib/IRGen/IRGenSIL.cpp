@@ -2969,49 +2969,17 @@ static std::unique_ptr<CallEmission> getCallEmissionForLoweredValue(
 }
 
 /// Get the size passed to stackAlloc().
+///
+/// The Swift caller is responsible for validating inputs.
 static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
                                            SILValue vCapacity,
                                            SILValue vStride,
                                            SourceLoc loc) {
-  auto &Diags = IGF.IGM.Context.Diags;
-
-  // Check for a negative capacity, which is invalid.
   auto capacity = IGF.getLoweredSingletonExplosion(vCapacity);
-  Optional<int64_t> capacityValue;
-  if (auto capacityConst = dyn_cast<llvm::ConstantInt>(capacity)) {
-    capacityValue = capacityConst->getSExtValue();
-    if (*capacityValue < 0) {
-      Diags.diagnose(loc, diag::temporary_allocation_size_negative);
-    }
-  }
-
-  // Check for a negative stride, which should never occur because the caller
-  // should always be using MemoryLayout<T>.stride to produce this value.
   auto stride = IGF.getLoweredSingletonExplosion(vStride);
-  Optional<int64_t> strideValue;
-  if (auto strideConst = dyn_cast<llvm::ConstantInt>(stride)) {
-    strideValue = strideConst->getSExtValue();
-    if (*strideValue < 0) {
-      llvm_unreachable("Builtin.stackAlloc() caller passed an invalid stride");
-    }
-  }
 
-  // Get the byte count (the product of capacity and stride.)
-  llvm::Value *result = nullptr;
-  if (capacityValue && strideValue) {
-    int64_t byteCount = 0;
-    auto overflow = llvm::MulOverflow(*capacityValue, *strideValue, byteCount);
-    if (overflow) {
-      Diags.diagnose(loc, diag::temporary_allocation_size_overflow);
-    }
-    result = llvm::ConstantInt::get(IGF.IGM.SizeTy, byteCount);
-
-  } else {
-    // If either value is not known at compile-time, preconditions must be
-    // tested at runtime by Builtin.stackAlloc()'s caller. See
-    // _byteCountForTemporaryAllocation(of:capacity:).
-    result = IGF.Builder.CreateMul(capacity, stride);
-  }
+  // size = capacity * stride
+  auto result = IGF.Builder.CreateMul(capacity, stride);
 
   // If the caller requests a zero-byte allocation, allocate one byte instead
   // to ensure that the resulting pointer is valid and unique on the stack.
@@ -3022,28 +2990,16 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
 /// Get the alignment passed to stackAlloc() as a compile-time constant.
 ///
 /// If the specified alignment is not known at compile time or is not valid,
-/// the default maximum alignment is substituted.
+/// the default maximum alignment is substituted. The Swift caller is
+/// responsible for validating inputs.
 static Alignment getStackAllocationAlignment(IRGenSILFunction &IGF,
                                              SILValue v,
                                              SourceLoc loc) {
-  auto &Diags = IGF.IGM.Context.Diags;
 
-  // Check for a non-positive alignment, which is invalid.
   auto align = IGF.getLoweredSingletonExplosion(v);
   if (auto alignConst = dyn_cast<llvm::ConstantInt>(align)) {
-    auto alignValue = alignConst->getSExtValue();
-    if (alignValue <= 0) {
-      Diags.diagnose(loc, diag::temporary_allocation_alignment_not_positive);
-    } else if (!llvm::isPowerOf2_64(alignValue)) {
-      Diags.diagnose(loc, diag::temporary_allocation_alignment_not_power_of_2);
-    } else {
-      return Alignment(alignValue);
-    }
+    return Alignment(alignConst->getSExtValue());
   }
-
-  // If the alignment is not known at compile-time, preconditions must be tested
-  // at runtime by Builtin.stackAlloc()'s caller. See
-  // _isStackAllocationSafe(byteCount:alignment:).
   return Alignment(MaximumAlignment);
 }
 
