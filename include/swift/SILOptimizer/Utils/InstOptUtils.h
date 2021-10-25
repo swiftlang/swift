@@ -715,6 +715,10 @@ void endLifetimeAtLeakingBlocks(SILValue value,
 bool tryEliminateOnlyOwnershipUsedForwardingInst(
     SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks);
 
+/// Constant-fold the Builtin.canBeClass if the type is known.
+IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
+                                                  SILBuilder &builder);
+
 } // end namespace swift
 
 #endif
