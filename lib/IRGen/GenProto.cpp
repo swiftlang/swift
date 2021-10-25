@@ -2167,6 +2167,9 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
                                   llvm::GlobalVariable *global,
                                   SILWitnessTable *wt) {
   auto conf = wt->getConformance();
+
+  uint64_t minOffset = UINT64_MAX;
+  uint64_t maxOffset = 0;
   for (auto entry : wt->getEntries()) {
     if (entry.getKind() != SILWitnessTable::WitnessKind::Method)
       continue;
@@ -2178,30 +2181,36 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
     auto index = fnProtoInfo.getFunctionIndex(member).forProtocolWitnessTable();
     auto offset = index.getValue() * IGM.getPointerSize().getValue();
     global->addTypeMetadata(offset, typeIdForMethod(IGM, member));
+
+    minOffset = std::min(minOffset, offset);
+    maxOffset = std::max(maxOffset, offset);
   }
 
+  if (minOffset == UINT64_MAX)
+    return;
+
+  using VCallVisibility = llvm::GlobalObject::VCallVisibility;
+  VCallVisibility vis = VCallVisibility::VCallVisibilityPublic;
   auto linkage = stripExternalFromLinkage(wt->getLinkage());
   switch (linkage) {
   case SILLinkage::Private:
-    global->setVCallVisibilityMetadata(
-        llvm::GlobalObject::VCallVisibility::VCallVisibilityTranslationUnit);
+    vis = VCallVisibility::VCallVisibilityTranslationUnit;
     break;
   case SILLinkage::Hidden:
   case SILLinkage::Shared:
-    global->setVCallVisibilityMetadata(
-        llvm::GlobalObject::VCallVisibility::VCallVisibilityLinkageUnit);
+    vis = VCallVisibility::VCallVisibilityLinkageUnit;
     break;
   case SILLinkage::Public:
   default:
     if (IGM.getOptions().InternalizeAtLink) {
-      global->setVCallVisibilityMetadata(
-          llvm::GlobalObject::VCallVisibility::VCallVisibilityLinkageUnit);
-    } else {
-      global->setVCallVisibilityMetadata(
-          llvm::GlobalObject::VCallVisibility::VCallVisibilityPublic);
+      vis = VCallVisibility::VCallVisibilityLinkageUnit;
     }
     break;
   }
+
+  auto relptrSize = IGM.DataLayout.getTypeAllocSize(IGM.Int32Ty).getValue();
+  IGM.setVCallVisibility(global, vis,
+                         std::make_pair(minOffset, maxOffset + relptrSize));
 }
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
