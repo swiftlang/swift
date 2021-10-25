@@ -2387,7 +2387,30 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       if (isa<TermInst>(&I))
         emitDebugVariableRangeExtension(BB);
     }
+    
+#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
+    IGM.effectOfRuntimeFuncs = RuntimeEffect::NoEffect;
+    IGM.emittedRuntimeFuncs.clear();
+#endif
+
     visit(&I);
+
+#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
+    if (!isa<DebugValueInst>(&I)) {
+      SILType impactType;
+      RuntimeEffect silImpact = getRuntimeEffect(&I, impactType);
+      if ((unsigned)IGM.effectOfRuntimeFuncs & ~(unsigned)silImpact) {
+        llvm::errs() << "Missing runtime impact " << (unsigned)silImpact
+                     << ", expected: " << (unsigned)IGM.effectOfRuntimeFuncs
+                     << "\n in " << I
+                     << "emitted runtime functions:\n";
+        for (const char *funcName : IGM.emittedRuntimeFuncs) {
+          llvm::errs() << "  " << funcName << "()\n";
+        }
+        llvm_unreachable("wrong runtime impact definition");
+      }
+    }
+#endif
   }
 
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
