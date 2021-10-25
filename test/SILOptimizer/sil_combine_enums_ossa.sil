@@ -18,6 +18,20 @@ enum Numerals {
   case Four
 }
 
+enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
+struct PointerStorage {
+  var ptr: FakeOptional<Builtin.NativeObject>
+}
+
+struct PointerStorage2 {
+  var ptr1: FakeOptional<Builtin.NativeObject>
+  var ptr2: FakeOptional<Builtin.NativeObject>
+}
+
 sil [ossa] @external_func: $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil [ossa] @eliminate_sw_enum_addr : $@convention(thin) () -> Int {
@@ -653,3 +667,93 @@ bb0(%0 : $S):
   return %11 : $()
 }
 
+
+// CanonicalizeInstruction simplifies 'enum->struct->struct_extract'
+// to 'enum'. Verify that the subsequent OSSA replacement works. This
+// exercises findOwnershipReferenceAggregate for
+// FirstArgOwnershipForwardingSingleValueInst with no operand.
+//
+// CHECK-LABEL: sil [ossa] @testEnumExtract : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject> {
+// CHECK: bb0:
+// CHECK:   %0 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.none!enumelt // user: %1
+// CHECK-NEXT:   return %0 : $FakeOptional<Builtin.NativeObject> // id: %1
+// CHECK-LABEL: } // end sil function 'testEnumExtract'
+sil [ossa] @testEnumExtract : $@convention(thin) () -> @owned FakeOptional<Builtin.NativeObject> {
+bb0:
+  %enum = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.none!enumelt
+  %struct = struct $PointerStorage(%enum : $FakeOptional<Builtin.NativeObject>)
+  %extract = struct_extract %struct : $PointerStorage, #PointerStorage.ptr, forwarding: @guaranteed // user: %60
+  %copy = copy_value %extract : $FakeOptional<Builtin.NativeObject>
+  return %copy : $FakeOptional<Builtin.NativeObject>
+}
+
+// CanonicalizeInstruction simplifies
+// 'destructure_struct->struct->struct_extract' to
+// 'destructure_struct'. Verify that the subsequent OSSA replacement
+// works. This exercises findOwnershipReferenceAggregate for
+// OwnershipForwardingMultipleValueInstruction.
+//
+// CHECK-LABEL: sil [ossa] @testDestructureExtract : $@convention(thin) (@guaranteed PointerStorage2) -> @owned FakeOptional<Builtin.NativeObject> {
+// CHECK: bb0(%0 : @guaranteed $PointerStorage2):
+// CHECK:   (%1, %2) = destructure_struct %0 : $PointerStorage2
+// CHECK-NEXT:   %3 = copy_value %2 : $FakeOptional<Builtin.NativeObject>
+// CHECK-NEXT:   return %3 : $FakeOptional<Builtin.NativeObject>
+// CHECK-LABEL: } // end sil function 'testDestructureExtract'
+sil [ossa] @testDestructureExtract : $@convention(thin) (@guaranteed PointerStorage2) -> @owned FakeOptional<Builtin.NativeObject> {
+bb0(%0 : @guaranteed $PointerStorage2):
+  (%ptr1, %ptr2) = destructure_struct %0 : $PointerStorage2
+  %struct = struct $PointerStorage(%ptr2 : $FakeOptional<Builtin.NativeObject>)
+  %extract = struct_extract %struct : $PointerStorage, #PointerStorage.ptr, forwarding: @guaranteed // user: %60
+  %copy = copy_value %extract : $FakeOptional<Builtin.NativeObject>
+  return %copy : $FakeOptional<Builtin.NativeObject>
+}
+
+// CanonicalizeInstruction simplifies 'enum->struct->destructure_struct'
+// to 'enum'. Verify that the subsequent OSSA replacement works. This
+// exercises:
+//
+// - findOwnershipReferenceAggregate for
+// FirstArgOwnershipForwardingSingleValueInst with one operand.
+// OwnershipForwardingMultipleValueInstruction.
+//
+// - MultiValueInstSimplifier for destructure_struct
+//
+// CHECK-LABEL: sil [ossa] @testEnumDestructureStruct : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned FakeOptional<Builtin.NativeObject> {
+// CHECK: bb0(%0 : @guaranteed $Builtin.NativeObject):
+// CHECK:   %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %0 : $Builtin.NativeObject
+// CHECK-NEXT:   %2 = copy_value %1 : $FakeOptional<Builtin.NativeObject>
+// CHECK-NEXT:   return %2 : $FakeOptional<Builtin.NativeObject>
+// CHECK-LABEL: } // end sil function 'testEnumDestructureStruct'
+sil [ossa] @testEnumDestructureStruct : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned FakeOptional<Builtin.NativeObject> {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %enum = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %0 : $Builtin.NativeObject
+  %struct = struct $PointerStorage2(%enum : $FakeOptional<Builtin.NativeObject>, %enum : $FakeOptional<Builtin.NativeObject>)
+  (%v0, %v1) = destructure_struct %struct : $PointerStorage2
+  %copy = copy_value %v1 : $FakeOptional<Builtin.NativeObject>
+  return %copy : $FakeOptional<Builtin.NativeObject>
+}
+
+// CanonicalizeInstruction simplifies 'enum->struct->destructure_struct'
+// to 'enum'. Verify that the subsequent OSSA replacement works. This
+// exercises:
+//
+// - findOwnershipReferenceAggregate for
+// FirstArgOwnershipForwardingSingleValueInst with one operand.
+// OwnershipForwardingMultipleValueInstruction.
+//
+// - MultiValueInstSimplifier for destructure_tuple
+//
+// CHECK-LABEL: sil [ossa] @testEnumDestructureTuple : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned FakeOptional<Builtin.NativeObject> {
+// CHECK: bb0(%0 : @guaranteed $Builtin.NativeObject):
+// CHECK:   %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %0 : $Builtin.NativeObject // user: %2
+// CHECK-NEXT:   %2 = copy_value %1 : $FakeOptional<Builtin.NativeObject> // user: %3
+// CHECK-NEXT:   return %2 : $FakeOptional<Builtin.NativeObject> // id: %3
+// CHECK-LABEL: } // end sil function 'testEnumDestructureTuple'
+sil [ossa] @testEnumDestructureTuple : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned FakeOptional<Builtin.NativeObject> {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %enum = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %0 : $Builtin.NativeObject
+  %tuple = tuple (%enum : $FakeOptional<Builtin.NativeObject>, %enum : $FakeOptional<Builtin.NativeObject>)
+  (%v0, %v1) = destructure_tuple %tuple : $(FakeOptional<Builtin.NativeObject>, FakeOptional<Builtin.NativeObject>)
+  %copy = copy_value %v1 : $FakeOptional<Builtin.NativeObject>
+  return %copy : $FakeOptional<Builtin.NativeObject>
+}
