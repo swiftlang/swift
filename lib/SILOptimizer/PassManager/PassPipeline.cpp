@@ -437,9 +437,9 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     // Early RLE does not touch loads from Arrays. This is important because
     // later array optimizations, like ABCOpt, get confused if an array load in
     // a loop is converted to a pattern with a phi argument.
-    P.addEarlyRedundantLoadElimination();
+//    P.addEarlyRedundantLoadElimination();
   } else {
-    P.addRedundantLoadElimination();
+//    P.addRedundantLoadElimination();
   }
   // Optimize copies created during RLE.
   P.addSemanticARCOpts();
@@ -634,7 +634,7 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionAndGlobalElimination();
-  P.addDeadStoreElimination();
+//  P.addDeadStoreElimination();
   P.addDeadObjectElimination();
 
   // These few passes are needed to cleanup between loop unrolling and GlobalOpt.
@@ -688,7 +688,7 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
 
   P.addDeadObjectElimination();
   P.addObjectOutliner();
-  P.addDeadStoreElimination();
+//  P.addDeadStoreElimination();
 
   // We've done a lot of optimizations on this function, attempt to FSO.
   P.addFunctionSignatureOpts();
