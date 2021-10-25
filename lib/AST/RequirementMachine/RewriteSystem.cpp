@@ -398,12 +398,13 @@ void RewriteSystem::simplifyRewriteSystem() {
     loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
                                          newRuleID, /*inverse=*/true));
 
-    recordHomotopyGenerator(MutableTerm(lhs), loop);
-
     if (Debug.contains(DebugFlags::Completion)) {
-      llvm::dbgs() << "$ Right hand side simplification recorded a loop: ";
-      HomotopyGenerators.back().dump(llvm::dbgs(), *this);
+      llvm::dbgs() << "$ Right hand side simplification recorded a loop at ";
+      llvm::dbgs() << lhs << ": ";
+      loop.dump(llvm::dbgs(), MutableTerm(lhs), *this);
     }
+
+    recordHomotopyGenerator(MutableTerm(lhs), loop);
   }
 }
 
