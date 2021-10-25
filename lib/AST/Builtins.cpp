@@ -1024,6 +1024,18 @@ static ValueDecl *getDeallocOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
+static ValueDecl *getStackAllocOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_word, _word, _word),
+                            _rawPointer);
+}
+
+static ValueDecl *getStackDeallocOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
+                            _void);
+}
+
 static ValueDecl *getFenceOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
 }
@@ -2640,6 +2652,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DeallocRaw:
     return getDeallocOperation(Context, Id);
+
+  case BuiltinValueKind::StackAlloc:
+    return getStackAllocOperation(Context, Id);
+  case BuiltinValueKind::StackDealloc:
+    return getStackDeallocOperation(Context, Id);
 
   case BuiltinValueKind::CastToNativeObject:
   case BuiltinValueKind::UnsafeCastToNativeObject:
