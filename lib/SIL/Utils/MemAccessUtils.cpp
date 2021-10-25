@@ -867,12 +867,11 @@ SILValue swift::findOwnershipReferenceAggregate(SILValue ref) {
     root = findOwnershipReferenceRoot(root);
     if (!root)
       return root;
-    if (isa<FirstArgOwnershipForwardingSingleValueInst>(root)
-        || isa<OwnershipForwardingConversionInst>(root)
-        || isa<OwnershipForwardingSelectEnumInstBase>(root)
-        || isa<OwnershipForwardingMultipleValueInstruction>(root)) {
-      root = root->getDefiningInstruction()->getOperand(0);
-      continue;
+    if (auto *inst = root->getDefiningInstruction()) {
+      if (Operand *op = OwnershipForwardingMixin::getForwardedOperand(inst)) {
+        root = op->get();
+        continue;
+      }
     }
     if (auto *arg = dyn_cast<SILArgument>(root)) {
       if (auto *term = arg->getSingleTerminator()) {
