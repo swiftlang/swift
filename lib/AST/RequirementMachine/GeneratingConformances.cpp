@@ -84,7 +84,7 @@ void HomotopyGenerator::findProtocolConformanceRules(
                         &result,
     const RewriteSystem &system) const {
 
-  auto redundantRules = Path.findRulesAppearingOnceInEmptyContext();
+  auto redundantRules = findRulesAppearingOnceInEmptyContext(system);
 
   bool foundAny = false;
   for (unsigned ruleID : redundantRules) {
@@ -98,34 +98,39 @@ void HomotopyGenerator::findProtocolConformanceRules(
   if (!foundAny)
     return;
 
-  MutableTerm term = Basepoint;
+  RewritePathEvaluator evaluator(Basepoint);
 
   // Now look for rewrite steps with conformance rules in empty right context,
   // that is something like X.(Y.[P] => Z) (or it's inverse, X.(Z => Y.[P])).
   for (const auto &step : Path) {
-    switch (step.Kind) {
-    case RewriteStep::ApplyRewriteRule: {
-      const auto &rule = system.getRule(step.RuleID);
-      if (auto *proto = rule.isProtocolConformanceRule()) {
-        if (step.StartOffset > 0 &&
-            step.EndOffset == 0) {
-          // Record the prefix term that is left unchanged by this rewrite step.
-          //
-          // In the above example where the rewrite step is X.(Y.[P] => Z),
-          // the prefix term is 'X'.
-          MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
-          result[proto].second.emplace_back(prefix, step.RuleID);
+    if (!evaluator.isInContext()) {
+      switch (step.Kind) {
+      case RewriteStep::ApplyRewriteRule: {
+        const auto &rule = system.getRule(step.RuleID);
+        if (auto *proto = rule.isProtocolConformanceRule()) {
+          if (step.StartOffset > 0 &&
+              step.EndOffset == 0) {
+            // Record the prefix term that is left unchanged by this rewrite step.
+            //
+            // In the above example where the rewrite step is X.(Y.[P] => Z),
+            // the prefix term is 'X'.
+            const auto &term = evaluator.getCurrentTerm();
+            MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
+            result[proto].second.emplace_back(prefix, step.RuleID);
+          }
         }
+
+        break;
       }
 
-      break;
+      case RewriteStep::AdjustConcreteType:
+      case RewriteStep::Shift:
+      case RewriteStep::Decompose:
+        break;
+      }
     }
 
-    case RewriteStep::AdjustConcreteType:
-      break;
-    }
-
-    step.apply(term, system);
+    step.apply(evaluator, system);
   }
 }
 

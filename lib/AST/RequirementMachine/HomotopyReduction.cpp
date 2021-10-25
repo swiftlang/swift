@@ -50,6 +50,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Type.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -61,6 +62,38 @@
 using namespace swift;
 using namespace rewriting;
 
+void RewritePathEvaluator::dump(llvm::raw_ostream &out) const {
+  out << "A stack:\n";
+  for (const auto &term : A) {
+    out << term << "\n";
+  }
+  out << "\nB stack:\n";
+  for (const auto &term : B) {
+    out << term << "\n";
+  }
+}
+
+void RewritePathEvaluator::checkA() const {
+  if (A.empty()) {
+    llvm::errs() << "Empty A stack\n";
+    dump(llvm::errs());
+    abort();
+  }
+}
+
+void RewritePathEvaluator::checkB() const {
+  if (B.empty()) {
+    llvm::errs() << "Empty B stack\n";
+    dump(llvm::errs());
+    abort();
+  }
+}
+
+MutableTerm &RewritePathEvaluator::getCurrentTerm() {
+  checkA();
+  return A.back();
+}
+
 /// Invert a 2-cell.
 void RewritePath::invert() {
   std::reverse(Steps.begin(), Steps.end());
@@ -70,8 +103,10 @@ void RewritePath::invert() {
 }
 
 AppliedRewriteStep
-RewriteStep::applyRewriteRule(MutableTerm &term,
+RewriteStep::applyRewriteRule(RewritePathEvaluator &evaluator,
                               const RewriteSystem &system) const {
+  auto &term = evaluator.getCurrentTerm();
+
   assert(Kind == ApplyRewriteRule);
 
   const auto &rule = system.getRule(RuleID);
@@ -108,8 +143,10 @@ RewriteStep::applyRewriteRule(MutableTerm &term,
   return {lhs, rhs, prefix, suffix};
 }
 
-MutableTerm RewriteStep::applyAdjustment(MutableTerm &term,
+MutableTerm RewriteStep::applyAdjustment(RewritePathEvaluator &evaluator,
                                          const RewriteSystem &system) const {
+  auto &term = evaluator.getCurrentTerm();
+
   assert(Kind == AdjustConcreteType);
   assert(EndOffset == 0);
   assert(RuleID == 0);
@@ -143,14 +180,126 @@ MutableTerm RewriteStep::applyAdjustment(MutableTerm &term,
   return prefix;
 }
 
-void RewriteStep::apply(MutableTerm &term, const RewriteSystem &system) const {
+void RewriteStep::applyShift(RewritePathEvaluator &evaluator,
+                             const RewriteSystem &system) const {
+  assert(Kind == Shift);
+  assert(StartOffset == 0);
+  assert(EndOffset == 0);
+  assert(RuleID == 0);
+
+  if (!Inverse) {
+    // Move top of A stack to B stack.
+    evaluator.checkA();
+    evaluator.B.push_back(evaluator.A.back());
+    evaluator.A.pop_back();
+  } else {
+    // Move top of B stack to A stack.
+    evaluator.checkB();
+    evaluator.A.push_back(evaluator.B.back());
+    evaluator.B.pop_back();
+  }
+}
+
+void RewriteStep::applyDecompose(RewritePathEvaluator &evaluator,
+                                 const RewriteSystem &system) const {
+  assert(Kind == Decompose);
+  assert(StartOffset == 0);
+  assert(EndOffset == 0);
+
+  auto &ctx = system.getRewriteContext();
+  unsigned numSubstitutions = RuleID;
+
+  if (!Inverse) {
+    // The top of the A stack must be a term ending with a superclass or
+    // concrete type symbol.
+    const auto &term = evaluator.getCurrentTerm();
+    auto symbol = term.back();
+    if (!symbol.isSuperclassOrConcreteType()) {
+      llvm::errs() << "Expected term with superclass or concrete type symbol"
+                   << " on A stack\n";
+      evaluator.dump(llvm::errs());
+      abort();
+    }
+
+    // The symbol must have the expected number of substitutions.
+    if (symbol.getSubstitutions().size() != numSubstitutions) {
+      llvm::errs() << "Expected " << numSubstitutions << " substitutions\n";
+      evaluator.dump(llvm::errs());
+      abort();
+    }
+
+    // Push each substitution on the A stack.
+    for (auto substitution : symbol.getSubstitutions()) {
+      evaluator.A.push_back(MutableTerm(substitution));
+    }
+  } else {
+    // The A stack must store the number of substitutions, together with a
+    // term ending with a superclass or concrete type symbol.
+    if (evaluator.A.size() < numSubstitutions + 1) {
+      llvm::errs() << "Not enough terms on A stack\n";
+      evaluator.dump(llvm::errs());
+      abort();
+    }
+
+    // The term immediately underneath the substitutions is the one we're
+    // updating with new substitutions.
+    auto &term = *(evaluator.A.end() - numSubstitutions - 1);
+    auto symbol = term.back();
+    if (!symbol.isSuperclassOrConcreteType()) {
+      llvm::errs() << "Expected term with superclass or concrete type symbol"
+                   << " on A stack\n";
+      evaluator.dump(llvm::errs());
+      abort();
+    }
+
+    // The symbol at the end of this term must have the expected number of
+    // substitutions.
+    if (symbol.getSubstitutions().size() != numSubstitutions) {
+      llvm::errs() << "Expected " << numSubstitutions << " substitutions\n";
+      evaluator.dump(llvm::errs());
+      abort();
+    }
+
+    // Collect the substitutions from the A stack.
+    SmallVector<Term, 2> substitutions;
+    substitutions.reserve(numSubstitutions);
+    for (unsigned i = 0; i < numSubstitutions; ++i) {
+      const auto &substitution = *(evaluator.A.end() - numSubstitutions + i);
+      substitutions.push_back(Term::get(substitution, ctx));
+    }
+
+    // Build the new symbol with the new substitutions.
+    auto newSymbol = (symbol.getKind() == Symbol::Kind::Superclass
+                      ? Symbol::forSuperclass(symbol.getSuperclass(),
+                                              substitutions, ctx)
+                      : Symbol::forConcreteType(symbol.getConcreteType(),
+                                                substitutions, ctx));
+
+    // Update the term with the new symbol.
+    term.back() = newSymbol;
+
+    // Pop the substitutions from the A stack.
+    evaluator.A.resize(evaluator.A.size() - numSubstitutions);
+  }
+}
+
+void RewriteStep::apply(RewritePathEvaluator &evaluator,
+                        const RewriteSystem &system) const {
   switch (Kind) {
   case ApplyRewriteRule:
-    (void) applyRewriteRule(term, system);
+    (void) applyRewriteRule(evaluator, system);
     break;
 
   case AdjustConcreteType:
-    (void) applyAdjustment(term, system);
+    (void) applyAdjustment(evaluator, system);
+    break;
+
+  case Shift:
+    applyShift(evaluator, system);
+    break;
+
+  case Decompose:
+    applyDecompose(evaluator, system);
     break;
   }
 }
@@ -158,11 +307,11 @@ void RewriteStep::apply(MutableTerm &term, const RewriteSystem &system) const {
 /// Dumps the rewrite step that was applied to \p term. Mutates \p term to
 /// reflect the application of the rule.
 void RewriteStep::dump(llvm::raw_ostream &out,
-                       MutableTerm &term,
+                       RewritePathEvaluator &evaluator,
                        const RewriteSystem &system) const {
   switch (Kind) {
   case ApplyRewriteRule: {
-    auto result = applyRewriteRule(term, system);
+    auto result = applyRewriteRule(evaluator, system);
 
     if (!result.prefix.empty()) {
       out << result.prefix;
@@ -177,12 +326,25 @@ void RewriteStep::dump(llvm::raw_ostream &out,
     break;
   }
   case AdjustConcreteType: {
-    auto result = applyAdjustment(term, system);
+    auto result = applyAdjustment(evaluator, system);
 
     out << "(σ";
     out << (Inverse ? " - " : " + ");
     out << result << ")";
 
+    break;
+  }
+  case Shift: {
+    applyShift(evaluator, system);
+
+    out << (Inverse ? "B>A" : "A>B");
+    break;
+  }
+  case Decompose: {
+    applyDecompose(evaluator, system);
+
+    out << (Inverse ? "Compose(" : "Decompose(");
+    out << RuleID << ")";
     break;
   }
   }
@@ -191,22 +353,30 @@ void RewriteStep::dump(llvm::raw_ostream &out,
 /// A rewrite rule is redundant if it appears exactly once in a 3-cell
 /// without context.
 llvm::SmallVector<unsigned, 1>
-RewritePath::findRulesAppearingOnceInEmptyContext() const {
+HomotopyGenerator::findRulesAppearingOnceInEmptyContext(
+    const RewriteSystem &system) const {
   llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
   llvm::SmallDenseMap<unsigned, unsigned, 2> ruleMultiplicity;
 
-  for (auto step : Steps) {
+  RewritePathEvaluator evaluator(Basepoint);
+
+  for (auto step : Path) {
     switch (step.Kind) {
     case RewriteStep::ApplyRewriteRule: {
-      if (!step.isInContext())
+      if (!step.isInContext() && !evaluator.isInContext())
         rulesInEmptyContext.insert(step.RuleID);
 
       ++ruleMultiplicity[step.RuleID];
       break;
     }
+
     case RewriteStep::AdjustConcreteType:
+    case RewriteStep::Shift:
+    case RewriteStep::Decompose:
       break;
     }
+
+    step.apply(evaluator, system);
   }
 
   SmallVector<unsigned, 1> result;
@@ -262,6 +432,8 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
       continue;
     }
     case RewriteStep::AdjustConcreteType:
+    case RewriteStep::Shift:
+    case RewriteStep::Decompose:
       break;
     }
 
@@ -339,6 +511,8 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
       break;
     }
     case RewriteStep::AdjustConcreteType:
+    case RewriteStep::Shift:
+    case RewriteStep::Decompose:
       newSteps.push_back(step);
       break;
     }
@@ -360,9 +534,19 @@ bool RewriteStep::isInverseOf(const RewriteStep &other) const {
   if (Inverse != !other.Inverse)
     return false;
 
-  if (Kind == RewriteStep::ApplyRewriteRule &&
-      RuleID != other.RuleID)
-    return false;
+  switch (Kind) {
+  case RewriteStep::ApplyRewriteRule:
+    return RuleID == other.RuleID;
+
+  case RewriteStep::AdjustConcreteType:
+    return true;
+
+  case RewriteStep::Shift:
+    return true;
+
+  case RewriteStep::Decompose:
+    return RuleID == other.RuleID;
+  }
 
   assert(EndOffset == other.EndOffset && "Bad whiskering?");
   return true;
@@ -478,6 +662,7 @@ bool RewritePath::computeFreelyReducedPath() {
 /// basepoint 'Y.A'.
 bool RewritePath::computeCyclicallyReducedLoop(MutableTerm &basepoint,
                                                const RewriteSystem &system) {
+  RewritePathEvaluator evaluator(basepoint);
   unsigned count = 0;
 
   while (2 * count + 1 < size()) {
@@ -487,7 +672,7 @@ bool RewritePath::computeCyclicallyReducedLoop(MutableTerm &basepoint,
       break;
 
     // Update the basepoint by applying the first step in the path.
-    left.apply(basepoint, system);
+    left.apply(evaluator, system);
 
     ++count;
   }
@@ -495,6 +680,7 @@ bool RewritePath::computeCyclicallyReducedLoop(MutableTerm &basepoint,
   std::rotate(Steps.begin(), Steps.begin() + count, Steps.end() - count);
   Steps.erase(Steps.end() - 2 * count, Steps.end());
 
+  basepoint = evaluator.getCurrentTerm();
   return count > 0;
 }
 
@@ -517,6 +703,7 @@ bool RewritePath::computeLeftCanonicalForm(const RewriteSystem &system) {
 void RewritePath::dump(llvm::raw_ostream &out,
                        MutableTerm term,
                        const RewriteSystem &system) const {
+  RewritePathEvaluator evaluator(term);
   bool first = true;
 
   for (const auto &step : Steps) {
@@ -526,7 +713,7 @@ void RewritePath::dump(llvm::raw_ostream &out,
       first = false;
     }
 
-    step.dump(out, term, system);
+    step.dump(out, evaluator, system);
   }
 }
 
@@ -543,23 +730,31 @@ void HomotopyGenerator::normalize(const RewriteSystem &system) {
 }
 
 /// A 3-cell is "in context" if every rewrite step has a left or right whisker.
-bool HomotopyGenerator::isInContext() const {
+bool HomotopyGenerator::isInContext(const RewriteSystem &system) const {
+  RewritePathEvaluator evaluator(Basepoint);
+
   unsigned minStartOffset = (unsigned) -1;
   unsigned minEndOffset = (unsigned) -1;
 
   for (const auto &step : Path) {
-    switch (step.Kind) {
-    case RewriteStep::ApplyRewriteRule:
-      minStartOffset = std::min(minStartOffset, step.StartOffset);
-      minEndOffset = std::min(minEndOffset, step.EndOffset);
-      break;
+    if (!evaluator.isInContext()) {
+      switch (step.Kind) {
+      case RewriteStep::ApplyRewriteRule:
+        minStartOffset = std::min(minStartOffset, step.StartOffset);
+        minEndOffset = std::min(minEndOffset, step.EndOffset);
+        break;
 
-    case RewriteStep::AdjustConcreteType:
-      break;
+      case RewriteStep::AdjustConcreteType:
+      case RewriteStep::Shift:
+      case RewriteStep::Decompose:
+        break;
+      }
+
+      if (minStartOffset == 0 && minEndOffset == 0)
+        break;
     }
 
-    if (minStartOffset == 0 && minEndOffset == 0)
-      break;
+    step.apply(evaluator, system);
   }
 
   return (minStartOffset > 0 || minEndOffset > 0);
@@ -659,7 +854,7 @@ findRuleToDelete(bool firstPass,
       continue;
 
     SmallVector<unsigned> redundancyCandidates =
-        loop.Path.findRulesAppearingOnceInEmptyContext();
+        loop.findRulesAppearingOnceInEmptyContext(*this);
 
     Optional<unsigned> found;
 
@@ -743,7 +938,7 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     }
 
     // FIXME: Is this correct?
-    if (loop.isInContext()) {
+    if (loop.isInContext(*this)) {
       if (Debug.contains(DebugFlags::HomotopyReduction)) {
         llvm::dbgs() << "** Deleting 3-cell in context: ";
         loop.dump(llvm::dbgs(), *this);
@@ -859,16 +1054,22 @@ RewriteSystem::getMinimizedRules(ArrayRef<const ProtocolDecl *> protos) {
 void RewriteSystem::verifyHomotopyGenerators() const {
 #ifndef NDEBUG
   for (const auto &loop : HomotopyGenerators) {
-    auto term = loop.Basepoint;
+    RewritePathEvaluator evaluator(loop.Basepoint);
 
     for (const auto &step : loop.Path) {
-      step.apply(term, *this);
+      step.apply(evaluator, *this);
     }
 
-    if (term != loop.Basepoint) {
+    if (evaluator.getCurrentTerm() != loop.Basepoint) {
       llvm::errs() << "Not a loop: ";
       loop.dump(llvm::errs(), *this);
       llvm::errs() << "\n";
+      abort();
+    }
+
+    if (evaluator.isInContext()) {
+      llvm::errs() << "Leftover terms on evaluator stack\n";
+      evaluator.dump(llvm::errs());
       abort();
     }
   }

@@ -128,7 +128,41 @@ public:
     return out;
   }
 };
+/// A rewrite path is a list of instructions for a two-stack interpreter.
+///
+/// - ApplyRewriteRule and AdjustConcreteType manipulate the term at the top of
+///   the A stack.
+///
+/// - Shift moves a term from A to B (if not inverted) or B to A (if inverted).
+///
+/// - Decompose splits off the substitutions from a superclass or concrete type
+///   symbol at the top of the A stack (if not inverted) or assembles a new
+///   superclass or concrete type symbol at the top of the A stack
+///   (if inverted).
+struct RewritePathEvaluator {
+  SmallVector<MutableTerm, 2> A;
+  SmallVector<MutableTerm, 2> B;
 
+  explicit RewritePathEvaluator(const MutableTerm &term) {
+    A.push_back(term);
+  }
+
+  void checkA() const;
+  void checkB() const;
+
+  MutableTerm &getCurrentTerm();
+
+  /// We're "in context" if we're in the middle of rewriting concrete
+  /// substitutions.
+  bool isInContext() const {
+    assert(A.size() > 0);
+    return (A.size() > 1 || B.size() > 0);
+  }
+
+  void dump(llvm::raw_ostream &out) const;
+};
+
+/// Return value of RewriteStep::applyRewriteRule();
 struct AppliedRewriteStep {
   Term lhs;
   Term rhs;
@@ -136,36 +170,65 @@ struct AppliedRewriteStep {
   MutableTerm suffix;
 };
 
-/// Records the application of a rewrite rule to a term.
-///
-/// Formally, this is a whiskered, oriented rewrite rule. For example, given a
-/// rule (X => Y) and the term A.X.B, the application at offset 1 yields A.Y.B.
-///
-/// This can be represented as A.(X => Y).B.
-///
-/// Similarly, going in the other direction, if we start from A.Y.B and apply
-/// the inverse rule, we get A.(Y => X).B.
+/// Records an evaluation step in a rewrite path.
 struct RewriteStep {
   enum StepKind {
-    /// Apply a rewrite rule at the stored offset.
+    /// Apply a rewrite rule to the term at the top of the A stack.
+    ///
+    /// Formally, this is a whiskered, oriented rewrite rule. For example,
+    /// given a rule (X => Y) and the term A.X.B, the application at
+    /// offset 1 yields A.Y.B.
+    ///
+    /// This can be represented as A.(X => Y).B.
+    ///
+    /// Similarly, going in the other direction, if we start from A.Y.B
+    /// and apply the inverse rule, we get A.(Y => X).B.
+    ///
+    /// The StartOffset field encodes the offset where to apply the rule.
+    ///
+    /// The RuleID field encodes the rule to apply.
     ApplyRewriteRule,
 
-    /// Prepend the prefix to each concrete substitution.
-    AdjustConcreteType
+    /// The term at the top of the A stack must be a term ending with a
+    /// superclass or concrete type symbol.
+    ///
+    /// If not inverted: prepend the prefix to each substitution.
+    ///
+    /// If inverted: strip the prefix from each substitution.
+    ///
+    /// The StartOffset field encodes the length of the prefix.
+    AdjustConcreteType,
+
+    /// Move a term from the A stack to the B stack (if not inverted) or
+    /// B stack to A stack (if inverted).
+    Shift,
+
+    /// If not inverted: the top of the A stack must be a term ending with a
+    /// superclass or concrete type symbol. Each concrete substitution in the
+    /// term is pushed onto the A stack.
+    ///
+    /// If inverted: pop concrete substitutions from the A stack, which must
+    /// follow a term ending with a superclass or concrete type symbol. The
+    /// new substitutions replace the substitutions in that symbol.
+    ///
+    /// The RuleID field encodes the number of substitutions.
+    Decompose
   };
 
   /// The rewrite step kind.
-  unsigned Kind : 1;
+  StepKind Kind : 2;
 
   /// The size of the left whisker, which is the position within the term where
   /// the rule is being applied. In A.(X => Y).B, this is |A|=1.
-  unsigned StartOffset : 7;
+  unsigned StartOffset : 15;
 
   /// The size of the right whisker, which is the length of the remaining suffix
   /// after the rule is applied. In A.(X => Y).B, this is |B|=1.
-  unsigned EndOffset : 7;
+  unsigned EndOffset : 15;
 
-  /// The index of the rule in the rewrite system.
+  /// If Kind is ApplyRewriteRule, the index of the rule in the rewrite system.
+  ///
+  /// If Kind is Concrete, the number of substitutions to push or pop.
   unsigned RuleID : 15;
 
   /// If false, the step replaces an occurrence of the rule's left hand side
@@ -174,7 +237,7 @@ struct RewriteStep {
 
   RewriteStep(StepKind kind, unsigned startOffset, unsigned endOffset,
               unsigned ruleID, bool inverse) {
-    Kind = unsigned(kind);
+    Kind = kind;
 
     StartOffset = startOffset;
     assert(StartOffset == startOffset && "Overflow");
@@ -195,6 +258,16 @@ struct RewriteStep {
                        /*ruleID=*/0, inverse);
   }
 
+  static RewriteStep forShift(bool inverse) {
+    return RewriteStep(Shift, /*startOffset=*/0, /*endOffset=*/0,
+                       /*ruleID=*/0, inverse);
+  }
+
+  static RewriteStep forDecompose(unsigned numSubstitutions, bool inverse) {
+    return RewriteStep(Decompose, /*startOffset=*/0, /*endOffset=*/0,
+                       /*ruleID=*/numSubstitutions, inverse);
+  }
+
   bool isInContext() const {
     return StartOffset > 0 || EndOffset > 0;
   }
@@ -203,13 +276,20 @@ struct RewriteStep {
     Inverse = !Inverse;
   }
 
-  AppliedRewriteStep applyRewriteRule(MutableTerm &term,
+  AppliedRewriteStep applyRewriteRule(RewritePathEvaluator &evaluator,
                                       const RewriteSystem &system) const;
 
-  MutableTerm applyAdjustment(MutableTerm &term,
+  MutableTerm applyAdjustment(RewritePathEvaluator &evaluator,
                               const RewriteSystem &system) const;
 
-  void apply(MutableTerm &term, const RewriteSystem &system) const;
+  void applyShift(RewritePathEvaluator &evaluator,
+                  const RewriteSystem &system) const;
+
+  void applyDecompose(RewritePathEvaluator &evaluator,
+                      const RewriteSystem &system) const;
+
+  void apply(RewritePathEvaluator &evaluator,
+             const RewriteSystem &system) const;
 
   bool isInverseOf(const RewriteStep &other) const;
 
@@ -217,7 +297,7 @@ struct RewriteStep {
                              const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out,
-            MutableTerm &term,
+            RewritePathEvaluator &evaluator,
             const RewriteSystem &system) const;
 };
 
@@ -250,8 +330,6 @@ public:
   decltype(Steps)::const_iterator end() const {
     return Steps.end();
   }
-
-  llvm::SmallVector<unsigned, 1> findRulesAppearingOnceInEmptyContext() const;
 
   RewritePath splitCycleAtRule(unsigned ruleID) const;
 
@@ -295,7 +373,10 @@ public:
 
   void normalize(const RewriteSystem &system);
 
-  bool isInContext() const;
+  bool isInContext(const RewriteSystem &system) const;
+
+  llvm::SmallVector<unsigned, 1>
+  findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
 
   void findProtocolConformanceRules(
       llvm::SmallDenseMap<const ProtocolDecl *,
