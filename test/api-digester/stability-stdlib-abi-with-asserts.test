@@ -64,31 +64,4 @@ Func _COWChecksEnabled() is a new API without @available attribute
 Func _swift_isImmutableCOWBuffer(_:) is a new API without @available attribute
 Func _swift_setImmutableCOWBuffer(_:_:) is a new API without @available attribute
 
-// *** these are false positives due to the baseline doesn't record @_silgen_name ***
-Func _NSStringFromUTF8(_:_:) has mangled name changing from 'Swift._NSStringFromUTF8(Swift.UnsafePointer<Swift.UInt8>, Swift.Int) -> Swift.AnyObject' to 'swift_stdlib_NSStringFromUTF8'
-Func _bridgeErrorToNSError(_:) has mangled name changing from 'Swift._bridgeErrorToNSError(__owned Swift.Error) -> Swift.AnyObject' to '_swift_stdlib_bridgeErrorToNSError'
-Func _errorInMain(_:) has mangled name changing from 'Swift._errorInMain(Swift.Error) -> ()' to 'swift_errorInMain'
-Func _getAtAnyKeyPath(root:keyPath:) has mangled name changing from 'Swift._getAtAnyKeyPath<A>(root: A, keyPath: Swift.AnyKeyPath) -> Swift.Optional<Any>' to 'swift_getAtAnyKeyPath'
-Func _getAtKeyPath(root:keyPath:) has mangled name changing from 'Swift._getAtKeyPath<A, B>(root: A, keyPath: Swift.KeyPath<A, B>) -> B' to 'swift_getAtKeyPath'
-Func _getAtPartialKeyPath(root:keyPath:) has mangled name changing from 'Swift._getAtPartialKeyPath<A>(root: A, keyPath: Swift.PartialKeyPath<A>) -> Any' to 'swift_getAtPartialKeyPath'
-Func _getDefaultErrorCode(_:) has mangled name changing from 'Swift._getDefaultErrorCode<A where A: Swift.Error>(A) -> Swift.Int' to '_swift_stdlib_getDefaultErrorCode'
-Func _getDescription(_:) has mangled name changing from 'Swift._getDescription<A>(A) -> Swift.AnyObject' to 'swift_stdlib_getDescription'
-Func _getRetainCount(_:) has mangled name changing from 'Swift._getRetainCount(Swift.AnyObject) -> Swift.UInt' to 'swift_retainCount'
-Func _getTypeByMangledNameInContext(_:_:genericContext:genericArguments:) has mangled name changing from 'Swift._getTypeByMangledNameInContext(_: Swift.UnsafePointer<Swift.UInt8>, _: Swift.UInt, genericContext: Swift.Optional<Swift.UnsafeRawPointer>, genericArguments: Swift.Optional<Swift.UnsafeRawPointer>) -> Swift.Optional<Any.Type>' to 'swift_getTypeByMangledNameInContext'
-Func _getTypeByMangledNameInEnvironment(_:_:genericEnvironment:genericArguments:) has mangled name changing from 'Swift._getTypeByMangledNameInEnvironment(_: Swift.UnsafePointer<Swift.UInt8>, _: Swift.UInt, genericEnvironment: Swift.Optional<Swift.UnsafeRawPointer>, genericArguments: Swift.Optional<Swift.UnsafeRawPointer>) -> Swift.Optional<Any.Type>' to 'swift_getTypeByMangledNameInEnvironment'
-Func _getTypeName(_:qualified:) has mangled name changing from 'Swift._getTypeName(_: Any.Type, qualified: Swift.Bool) -> (Swift.UnsafePointer<Swift.UInt8>, Swift.Int)' to 'swift_getTypeName'
-Func _getUnownedRetainCount(_:) has mangled name changing from 'Swift._getUnownedRetainCount(Swift.AnyObject) -> Swift.UInt' to 'swift_unownedRetainCount'
-Func _getWeakRetainCount(_:) has mangled name changing from 'Swift._getWeakRetainCount(Swift.AnyObject) -> Swift.UInt' to 'swift_weakRetainCount'
-Func _modifyAtReferenceWritableKeyPath_impl(root:keyPath:) has mangled name changing from 'Swift._modifyAtReferenceWritableKeyPath_impl<A, B>(root: A, keyPath: Swift.ReferenceWritableKeyPath<A, B>) -> (Swift.UnsafeMutablePointer<B>, Swift.Optional<Swift.AnyObject>)' to '_swift_modifyAtReferenceWritableKeyPath_impl'
-Func _modifyAtWritableKeyPath_impl(root:keyPath:) has mangled name changing from 'Swift._modifyAtWritableKeyPath_impl<A, B>(root: inout A, keyPath: Swift.WritableKeyPath<A, B>) -> (Swift.UnsafeMutablePointer<B>, Swift.Optional<Swift.AnyObject>)' to '_swift_modifyAtWritableKeyPath_impl'
-Func _setAtReferenceWritableKeyPath(root:keyPath:value:) has mangled name changing from 'Swift._setAtReferenceWritableKeyPath<A, B>(root: A, keyPath: Swift.ReferenceWritableKeyPath<A, B>, value: __owned B) -> ()' to 'swift_setAtReferenceWritableKeyPath'
-Func _setAtWritableKeyPath(root:keyPath:value:) has mangled name changing from 'Swift._setAtWritableKeyPath<A, B>(root: inout A, keyPath: Swift.WritableKeyPath<A, B>, value: __owned B) -> ()' to 'swift_setAtWritableKeyPath'
-Func _swift_bufferAllocate(bufferType:size:alignmentMask:) has mangled name changing from 'Swift._swift_bufferAllocate(bufferType: Swift.AnyObject.Type, size: Swift.Int, alignmentMask: Swift.Int) -> Swift.AnyObject' to 'swift_bufferAllocate'
-Func _swift_isClassOrObjCExistentialType(_:) has mangled name changing from 'Swift._swift_isClassOrObjCExistentialType<A>(A.Type) -> Swift.Bool' to '_swift_isClassOrObjCExistentialType'
-Func _unexpectedError(_:filenameStart:filenameLength:filenameIsASCII:line:) has mangled name changing from 'Swift._unexpectedError(_: __owned Swift.Error, filenameStart: Builtin.RawPointer, filenameLength: Builtin.Word, filenameIsASCII: Builtin.Int1, line: Builtin.Word) -> ()' to 'swift_unexpectedError'
-Func _usesNativeSwiftReferenceCounting(_:) has mangled name changing from 'Swift._usesNativeSwiftReferenceCounting(Swift.AnyObject.Type) -> Swift.Bool' to '_swift_objcClassUsesNativeSwiftReferenceCounting'
-Func getObjCClassInstanceExtents(_:) has mangled name changing from 'Swift.getObjCClassInstanceExtents(Swift.AnyObject.Type) -> (negative: Swift.UInt, positive: Swift.UInt)' to '_swift_getObjCClassInstanceExtents'
-Func getSwiftClassInstanceExtents(_:) has mangled name changing from 'Swift.getSwiftClassInstanceExtents(Swift.AnyObject.Type) -> (negative: Swift.UInt, positive: Swift.UInt)' to '_swift_getSwiftClassInstanceExtents'
-// *** these are false positives due to the baseline doesn't record @_silgen_name ***
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
