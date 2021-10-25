@@ -51,4 +51,5 @@
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 Func MainActor.run(resultType:body:) has generic signature change from <T where T : Swift.Sendable> to <T>
+Func MainActor.run(resultType:body:) has mangled name changing from 'static Swift.MainActor.run<A where A: Swift.Sendable>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A' to 'static Swift.MainActor.run<A>(resultType: A.Type, body: @Swift.MainActor @Sendable () throws -> A) async throws -> A'
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
