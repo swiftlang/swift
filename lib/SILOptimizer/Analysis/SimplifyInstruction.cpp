@@ -38,42 +38,78 @@ namespace swift {
 } // end namespace swift
 
 namespace {
-  class InstSimplifier : public SILInstructionVisitor<InstSimplifier, SILValue>{
-  public:
-    SILValue visitSILInstruction(SILInstruction *I) { return SILValue(); }
+/// Try to simplify the specified instruction, performing local
+/// analysis of the operands of the instruction, without looking at its uses
+/// (e.g. constant folding).  If a simpler result can be found, it is
+/// returned, otherwise a null SILValue is returned.
+///
+/// NOTE: We assume that the insertion point associated with the SILValue must
+/// dominate \p i.
+class InstSimplifier : public SILInstructionVisitor<InstSimplifier, SILValue> {
+public:
+  SILValue visitSILInstruction(SILInstruction *I) { return SILValue(); }
 
-    SILValue visitTupleExtractInst(TupleExtractInst *TEI);
-    SILValue visitStructExtractInst(StructExtractInst *SEI);
-    SILValue visitEnumInst(EnumInst *EI);
-    SILValue visitSelectEnumInst(SelectEnumInst *SEI);
-    SILValue visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
-    SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
-    SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
-    SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
-    SILValue
-    visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
-    SILValue visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI);
-    SILValue visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI);
-    SILValue visitStructInst(StructInst *SI);
-    SILValue visitTupleInst(TupleInst *SI);
-    SILValue visitBuiltinInst(BuiltinInst *AI);
-    SILValue visitUpcastInst(UpcastInst *UI);
-#define LOADABLE_REF_STORAGE(Name, ...) \
-    SILValue visitRefTo##Name##Inst(RefTo##Name##Inst *I); \
-    SILValue visit##Name##ToRefInst(Name##ToRefInst *I);
+  SILValue visitTupleExtractInst(TupleExtractInst *TEI);
+  SILValue visitStructExtractInst(StructExtractInst *SEI);
+  SILValue visitEnumInst(EnumInst *EI);
+  SILValue visitSelectEnumInst(SelectEnumInst *SEI);
+  SILValue visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
+  SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
+  SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
+  SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
+  SILValue
+  visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
+  SILValue visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI);
+  SILValue visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI);
+  SILValue visitStructInst(StructInst *SI);
+  SILValue visitTupleInst(TupleInst *SI);
+  SILValue visitBuiltinInst(BuiltinInst *AI);
+  SILValue visitUpcastInst(UpcastInst *UI);
+#define LOADABLE_REF_STORAGE(Name, ...)                                        \
+  SILValue visitRefTo##Name##Inst(RefTo##Name##Inst *I);                       \
+  SILValue visit##Name##ToRefInst(Name##ToRefInst *I);
 #include "swift/AST/ReferenceStorage.def"
-    SILValue visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
-    SILValue
-    visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
-    SILValue visitEndCOWMutationInst(EndCOWMutationInst *ECM);
-    SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
-    SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
-    SILValue visitBeginAccessInst(BeginAccessInst *BAI);
-    SILValue visitMetatypeInst(MetatypeInst *MTI);
-    SILValue visitConvertFunctionInst(ConvertFunctionInst *cfi);
+  SILValue visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
+  SILValue visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
+  SILValue visitEndCOWMutationInst(EndCOWMutationInst *ECM);
+  SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
+  SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
+  SILValue visitBeginAccessInst(BeginAccessInst *BAI);
+  SILValue visitMetatypeInst(MetatypeInst *MTI);
+  SILValue visitConvertFunctionInst(ConvertFunctionInst *cfi);
 
-    SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
-  };
+  SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
+};
+} // end anonymous namespace
+
+namespace {
+/// Try to simplify the specified instruction, performing local
+/// analysis of the operands of the instruction, without looking at its uses
+/// (e.g. constant folding).  If a simpler result can be found, it is
+/// returned, otherwise an empty set is returned.
+///
+/// NOTE: We assume that the insertion point associated with the SILValue must
+/// dominate \p i.
+///
+/// The returned ArrayRef of SILValues is valid until the subsequent call to
+/// visit() or the destruction of this MultiValueInstSimplifier.
+class MultiValueInstSimplifier
+    : public SILInstructionVisitor<MultiValueInstSimplifier,
+                                   ArrayRef<SILValue>> {
+
+  SmallVector<SILValue> resultReplacements;
+
+public:
+  void beforeVisit(SILInstruction *inst) { resultReplacements.clear(); }
+
+  ArrayRef<SILValue> visitSILInstruction(SILInstruction *I) { return {}; }
+
+  ArrayRef<SILValue>
+  visitDestructureStructInst(DestructureStructInst *destructure);
+
+  ArrayRef<SILValue>
+  visitDestructureTupleInst(DestructureTupleInst *destructure);
+};
 } // end anonymous namespace
 
 SILValue InstSimplifier::visitStructInst(StructInst *SI) {
@@ -746,6 +782,32 @@ case BuiltinValueKind::id:
   return SILValue();
 }
 
+ArrayRef<SILValue> MultiValueInstSimplifier::visitDestructureStructInst(
+    DestructureStructInst *destructure) {
+  auto op = lookThroughOwnershipInsts(destructure->getOperand());
+
+  // destructure_struct(struct(x, y)) -> x, y
+  if (auto *si = dyn_cast<StructInst>(op)) {
+    auto elements = si->getElements();
+    resultReplacements.append(elements.begin(), elements.end());
+    return resultReplacements;
+  }
+  return {};
+}
+
+ArrayRef<SILValue> MultiValueInstSimplifier::visitDestructureTupleInst(
+    DestructureTupleInst *destructure) {
+  auto op = lookThroughOwnershipInsts(destructure->getOperand());
+
+  // destructure_tuple(tuple(x, y)) -> x, y
+  if (auto *ti = dyn_cast<TupleInst>(op)) {
+    auto elements = ti->getElements();
+    resultReplacements.append(elements.begin(), elements.end());
+    return resultReplacements;
+  }
+  return {};
+}
+
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
@@ -787,45 +849,90 @@ SILValue swift::simplifyOverflowBuiltinInstruction(BuiltinInst *BI) {
   return InstSimplifier().simplifyOverflowBuiltin(BI);
 }
 
-/// Try to simplify the specified instruction, performing local
-/// analysis of the operands of the instruction, without looking at its uses
-/// (e.g. constant folding).  If a simpler result can be found, it is
-/// returned, otherwise a null SILValue is returned.
-///
-/// NOTE: We assume that the insertion point associated with the SILValue must
-/// dominate \p i.
-static SILValue simplifyInstruction(SILInstruction *i) {
-  return InstSimplifier().visit(i);
+static SILBasicBlock::iterator
+replaceSingleOSSAValueAndErase(SingleValueInstruction *svi, SILValue newValue,
+                               InstModCallbacks &callbacks,
+                               DeadEndBlocks *deadEndBlocks) {
+  SILBasicBlock::iterator nextII = std::next(svi->getIterator());
+
+  // If we weren't passed a dead end blocks, we can't optimize without ownership
+  // enabled.
+  if (!deadEndBlocks)
+    return nextII;
+
+  OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
+  OwnershipRAUWHelper helper(ctx, svi, newValue);
+
+  // If our RAUW helper is invalid, we do not support RAUWing this case, so
+  // just return next.
+  if (!helper.isValid())
+    return nextII;
+  return helper.perform();
+}
+
+static SILBasicBlock::iterator replaceMultipleOSSAValuesAndErase(
+    MultipleValueInstruction *mvi, ArrayRef<SILValue> newValues,
+    InstModCallbacks &callbacks, DeadEndBlocks *deadEndBlocks) {
+
+  SILBasicBlock::iterator nextII = std::next(mvi->getIterator());
+
+  // If we weren't passed a dead end blocks, we can't optimize without ownership
+  // enabled.
+  if (!deadEndBlocks)
+    return nextII;
+
+  assert(mvi->getNumResults() == newValues.size());
+
+  // TODO: allocating vectors of contexts and "helpers" is silly. Redesign the
+  // RAUW interface to allow multiple values.
+  std::vector<OwnershipFixupContext> rauwContexts(newValues.size(),
+                                                  {callbacks, *deadEndBlocks});
+
+  SmallVector<OwnershipRAUWHelper> helpers;
+  for (unsigned idx = 0, end = newValues.size(); idx < end; ++idx) {
+    helpers.emplace_back(rauwContexts[idx], mvi->getResult(idx),
+                         newValues[idx]);
+    if (!helpers.back().isValid())
+      return nextII;
+  }
+  SmallVector<SILValue> replacements;
+  for (auto &helper : helpers) {
+    replacements.push_back(helper.prepareReplacement());
+  }
+  return replaceAllUsesAndErase(mvi, replacements, callbacks);
 }
 
 SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
     SILInstruction *i, InstModCallbacks &callbacks,
     DeadEndBlocks *deadEndBlocks) {
-  auto next = std::next(i->getIterator());
-  auto *svi = dyn_cast<SingleValueInstruction>(i);
-  if (!svi)
-    return next;
-  SILValue result = simplifyInstruction(i);
 
-  // If we fail to simplify or the simplified value returned is our passed in
-  // value, just return std::next since we can't simplify.
-  if (!result || svi == result)
-    return next;
+  auto nextII = std::next(i->getIterator());
+  // Block terminators cannot be simplified because they cannot be erased
+  // without replacement.
+  if (auto *svi = dyn_cast<SingleValueInstruction>(i)) {
+    SILValue result = InstSimplifier().visit(i);
 
-  if (!svi->getFunction()->hasOwnership())
-    return replaceAllUsesAndErase(svi, result, callbacks);
+    // If we fail to simplify or the simplified value returned is our passed in
+    // value, just return std::next since we can't simplify.
+    if (!result || svi == result)
+      return nextII;
 
-  // If we weren't passed a dead end blocks, we can't optimize without ownership
-  // enabled.
-  if (!deadEndBlocks)
-    return next;
+    if (!i->getFunction()->hasOwnership())
+      return replaceAllUsesAndErase(svi, result, callbacks);
 
-  OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
-  OwnershipRAUWHelper helper(ctx, svi, result);
+    return replaceSingleOSSAValueAndErase(svi, result, callbacks,
+                                          deadEndBlocks);
+  } else if (auto *mvi = dyn_cast<MultipleValueInstruction>(i)) {
+    MultiValueInstSimplifier simplifier;
+    auto newValues = simplifier.visit(mvi);
+    if (newValues.empty())
+      return nextII;
 
-  // If our RAUW helper is invalid, we do not support RAUWing this case, so
-  // just return next.
-  if (!helper.isValid())
-    return next;
-  return helper.perform();
+    if (!mvi->getFunction()->hasOwnership())
+      return replaceAllUsesAndErase(mvi, newValues, callbacks);
+
+    return replaceMultipleOSSAValuesAndErase(mvi, newValues, callbacks,
+                                             deadEndBlocks);
+  }
+  return nextII;
 }
