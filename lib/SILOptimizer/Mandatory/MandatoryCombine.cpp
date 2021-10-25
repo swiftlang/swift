@@ -377,6 +377,59 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   return nullptr;
 }
 
+template<class Fn>
+static bool tryRemoveDeadStore(StoreInst *store, Fn deleter) {
+  DominanceInfo dominanceInfo(store->getFunction());
+  // Keep track of weather we've skipped any users of store->getDest(). If we
+  // have, we can't remove the dest and it's users.
+  bool skippedAnyDestUsers = false;
+  SmallVector<SILInstruction*, 4> instsToDelete;
+  for (auto *use : store->getDest()->getUses()) {
+    auto user = use->getUser();
+    if (user == store)
+      continue;
+
+    // Destroys, deallocs, etc. are fine.
+    if (isa<DestroyAddrInst>(user) || isa<DeallocStackInst>(user) ||
+        isa<EndAccessInst>(user)) {
+      instsToDelete.push_back(user);
+    } else {
+      // Other uses are only OK if they come before the store. But, if we find
+      // any it means we can't remove the dest and its users.
+      if (dominanceInfo.dominates(user, store))
+        skippedAnyDestUsers = true;
+      // If it comes after the store, bail.
+      else
+        return false;
+    }
+  }
+
+  // We could remove this but it would mean tracking down and removing the
+  // destroy addr which is expensive. Also, the pattern is rare:
+  //   store x to [init] addr
+  //   destroy_addr addr
+  //   store y to [init] addr
+  // So, just bail.
+  if (store->getOwnershipQualifier() == StoreOwnershipQualifier::Init &&
+      skippedAnyDestUsers)
+    return false;
+
+  // Make sure we consume the value if needed.
+  if (store->getOwnershipQualifier() == StoreOwnershipQualifier::Assign ||
+      store->getOwnershipQualifier() == StoreOwnershipQualifier::Init)
+    SILBuilderWithScope(store)
+      .emitDestroyValueAndFold(store->getLoc(), store->getSrc());
+
+  // Either way, remove the store.
+  deleter(store);
+  // If there are any uses we skipped, don't remove the dest.
+  if (!skippedAnyDestUsers) {
+    llvm::for_each(instsToDelete, deleter);
+    deleter(store->getDest().getDefiningInstruction());
+  }
+  return true;
+}
+
 StoreInst *MandatoryCombiner::tryPromoteLoadsOf(StoreInst *store) {
   // Avoid destinations such as global_addrs.
   if (store->getOwnershipQualifier() != StoreOwnershipQualifier::Trivial &&
@@ -488,7 +541,10 @@ StoreInst *MandatoryCombiner::tryPromoteLoadsOf(StoreInst *store) {
 SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
   if (auto newStore = tryPromoteLoadsOf(store))
     return newStore;
-
+  
+  if (tryRemoveDeadStore(store, instModCallbacks.deleteInst))
+    return nullptr;
+  
   return nullptr;
 }
 
