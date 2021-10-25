@@ -118,3 +118,10 @@ public func _getTypeByMangledNameInContext(
   genericContext: UnsafeRawPointer?,
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
+
+/// Prevents performance diagnostics in the passed closure.
+@_alwaysEmitIntoClient
+@_semantics("no_performance_analysis")
+public func _unsafePerformance<T>(_ c: () -> T) -> T {
+  return c()
+}
