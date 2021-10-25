@@ -290,6 +290,7 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
     }
 
     for (SILInstruction *instruction : instructionsPendingDeletion) {
+      if (!instruction) continue;
       worklist.eraseInstFromFunction(*instruction);
       madeChange = true;
     }
@@ -377,8 +378,11 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   return nullptr;
 }
 
-template<class Fn>
-static bool tryRemoveDeadStore(StoreInst *store, Fn deleter) {
+static bool tryRemoveDeadStore(StoreInst *store,
+                               InstModCallbacks &instModCallbacks) {
+  if (!isa<AllocStackInst>(store->getDest()))
+    return false;
+  
   DominanceInfo dominanceInfo(store->getFunction());
   // Keep track of weather we've skipped any users of store->getDest(). If we
   // have, we can't remove the dest and it's users.
@@ -421,11 +425,13 @@ static bool tryRemoveDeadStore(StoreInst *store, Fn deleter) {
       .emitDestroyValueAndFold(store->getLoc(), store->getSrc());
 
   // Either way, remove the store.
-  deleter(store);
+  instModCallbacks.deleteInst(store);
   // If there are any uses we skipped, don't remove the dest.
   if (!skippedAnyDestUsers) {
-    llvm::for_each(instsToDelete, deleter);
-    deleter(store->getDest().getDefiningInstruction());
+    llvm::for_each(instsToDelete, [&instModCallbacks](auto i) {
+      instModCallbacks.deleteInst(i);
+    });
+    instModCallbacks.deleteInst(store->getDest().getDefiningInstruction());
   }
   return true;
 }
@@ -485,7 +491,7 @@ StoreInst *MandatoryCombiner::tryPromoteLoadsOf(StoreInst *store) {
           load->use_begin(), load->use_end(),
           [&store, &dominanceInfo](Operand *use) {
             return dominanceInfo.dominates(store->getSrc()->getParentBlock(),
-                                           use->getUser()->getParentBlock());
+                                           use->getUser()->getParent());
           });
     }
 
@@ -542,7 +548,7 @@ SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
   if (auto newStore = tryPromoteLoadsOf(store))
     return newStore;
   
-  if (tryRemoveDeadStore(store, instModCallbacks.deleteInst))
+  if (tryRemoveDeadStore(store, instModCallbacks))
     return nullptr;
   
   return nullptr;
