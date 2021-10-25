@@ -264,12 +264,12 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
   bool changed = false;
 
   MutableTerm original;
-  RewritePath forDebug;
-  if (Debug.contains(DebugFlags::Simplify)) {
+  RewritePath subpath;
 
+  bool debug = false;
+  if (Debug.contains(DebugFlags::Simplify)) {
     original = term;
-    if (!path)
-      path = &forDebug;
+    debug = true;
   }
 
   while (true) {
@@ -290,9 +290,9 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
 
           term.rewriteSubTerm(from, to, rule.getRHS());
 
-          if (path) {
-            path->add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
-                                                  /*inverse=*/false));
+          if (path || debug) {
+            subpath.add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
+                                                    /*inverse=*/false));
           }
 
           changed = true;
@@ -308,17 +308,21 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
       break;
   }
 
-  if (Debug.contains(DebugFlags::Simplify)) {
+  if (debug) {
     if (changed) {
       llvm::dbgs() << "= Simplified " << original << " to " << term << " via ";
-      (path == nullptr ? &forDebug : path)->dump(llvm::dbgs(), original, *this);
+      subpath.dump(llvm::dbgs(), original, *this);
       llvm::dbgs() << "\n";
     } else {
       llvm::dbgs() << "= Irreducible term: " << term << "\n";
     }
   }
 
-  assert(path == nullptr || changed != path->empty());
+  if (path != nullptr) {
+    assert(changed != subpath.empty());
+    path->append(subpath);
+  }
+
   return changed;
 }
 
