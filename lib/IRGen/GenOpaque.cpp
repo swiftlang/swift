@@ -533,15 +533,16 @@ irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
 StackAddress IRGenFunction::emitDynamicAlloca(SILType T,
                                               const llvm::Twine &name) {
   llvm::Value *size = emitLoadOfSize(*this, T);
-  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), name);
+  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), true, name);
 }
 
 StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
                                               llvm::Value *arraySize,
                                               Alignment align,
+                                              bool allowTaskAlloc,
                                               const llvm::Twine &name) {
   // Async functions call task alloc.
-  if (isAsync()) {
+  if (allowTaskAlloc && isAsync()) {
     llvm::Value *byteCount;
     auto eltSize = IGM.DataLayout.getTypeAllocSize(eltTy);
     if (eltSize == 1) {
@@ -556,6 +557,8 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     return {address, address.getAddress()};
   // In coroutines, call llvm.coro.alloca.alloc.
   } else if (isCoroutine()) {
+    // NOTE: llvm does not support dynamic allocas in coroutines.
+
     // Compute the number of bytes to allocate.
     llvm::Value *byteCount;
     auto eltSize = IGM.DataLayout.getTypeAllocSize(eltTy);
@@ -606,9 +609,10 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 
 /// Deallocate dynamic alloca's memory if requested by restoring the stack
 /// location before the dynamic alloca's call.
-void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
+void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
+                                                bool allowTaskDealloc) {
   // Async function use taskDealloc.
-  if (isAsync() && address.getAddress().isValid()) {
+  if (allowTaskDealloc && isAsync() && address.getAddress().isValid()) {
     emitTaskDealloc(Address(address.getExtraInfo(), address.getAlignment()));
     return;
   }
@@ -617,6 +621,8 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
   // for a partial_apply [stack] that did not need a context object on the
   // stack.
   else if (isCoroutine() && address.getAddress().isValid()) {
+    // NOTE: llvm does not support dynamic allocas in coroutines.
+
     auto allocToken = address.getExtraInfo();
     assert(allocToken && "dynamic alloca in coroutine without alloc token?");
     auto freeFn = llvm::Intrinsic::getDeclaration(

@@ -180,6 +180,7 @@
   ],
   "Pointer": [
     "Pointer.swift",
+    "TemporaryAllocation.swift",
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift",

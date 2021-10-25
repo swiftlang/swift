@@ -18,6 +18,7 @@
 #define DEBUG_TYPE "irgensil"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -57,6 +58,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Transforms/Utils/Local.h"
 
@@ -436,6 +438,11 @@ public:
   /// Calculates EstimatedStackSize.
   void estimateStackSize();
 
+  inline bool isAddress(SILValue v) const {
+    SILType type = v->getType();
+    return type.isAddress() || type.getASTType() == IGM.Context.TheRawPointerType;
+  }
+
   void setLoweredValue(SILValue v, LoweredValue &&lv) {
     auto inserted = LoweredValues.insert({v, std::move(lv)});
     assert(inserted.second && "already had lowered value for sil value?!");
@@ -444,31 +451,31 @@ public:
   
   /// Create a new Address corresponding to the given SIL address value.
   void setLoweredAddress(SILValue v, const Address &address) {
-    assert(v->getType().isAddress() && "address for non-address value?!");
+    assert(isAddress(v) && "address for non-address value?!");
     setLoweredValue(v, address);
   }
 
   void setLoweredStackAddress(SILValue v, const StackAddress &address) {
-    assert(v->getType().isAddress() && "address for non-address value?!");
+    assert(isAddress(v) && "address for non-address value?!");
     setLoweredValue(v, address);
   }
 
   void setLoweredDynamicallyEnforcedAddress(SILValue v,
                                             const Address &address,
                                             llvm::Value *scratch) {
-    assert(v->getType().isAddress() && "address for non-address value?!");
+    assert(isAddress(v) && "address for non-address value?!");
     setLoweredValue(v, DynamicallyEnforcedAddress{address, scratch});
   }
   
   void setContainerOfUnallocatedAddress(SILValue v,
                                         const Address &buffer) {
-    assert(v->getType().isAddress() && "address for non-address value?!");
+    assert(isAddress(v) && "address for non-address value?!");
     setLoweredValue(v,
       LoweredValue(buffer, LoweredValue::ContainerForUnallocatedAddress));
   }
   
   void overwriteAllocatedAddress(SILValue v, const Address &address) {
-    assert(v->getType().isAddress() && "address for non-address value?!");
+    assert(isAddress(v) && "address for non-address value?!");
     auto it = LoweredValues.find(v);
     assert(it != LoweredValues.end() && "no existing entry for overwrite?");
     assert(it->second.isUnallocatedAddressInBuffer() &&
@@ -1623,6 +1630,9 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, SILType type,
                                 Explosion &ex) const {
   switch (kind) {
   case Kind::StackAddress:
+    ex.add(Storage.get<StackAddress>(kind).getAddressPointer());
+    return;
+
   case Kind::ContainedAddress:
   case Kind::DynamicallyEnforcedAddress:
   case Kind::CoroutineState:
@@ -2958,8 +2968,126 @@ static std::unique_ptr<CallEmission> getCallEmissionForLoweredValue(
   return callEmission;
 }
 
+/// Get the size passed to stackAlloc().
+static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
+                                           SILValue vCapacity,
+                                           SILValue vStride,
+                                           SourceLoc loc) {
+  auto &Diags = IGF.IGM.Context.Diags;
+
+  // Check for a negative capacity, which is invalid.
+  auto capacity = IGF.getLoweredSingletonExplosion(vCapacity);
+  Optional<int64_t> capacityValue;
+  if (auto capacityConst = dyn_cast<llvm::ConstantInt>(capacity)) {
+    capacityValue = capacityConst->getSExtValue();
+    if (*capacityValue < 0) {
+      Diags.diagnose(loc, diag::temporary_allocation_size_negative);
+    }
+  }
+
+  // Check for a negative stride, which should never occur because the caller
+  // should always be using MemoryLayout<T>.stride to produce this value.
+  auto stride = IGF.getLoweredSingletonExplosion(vStride);
+  Optional<int64_t> strideValue;
+  if (auto strideConst = dyn_cast<llvm::ConstantInt>(stride)) {
+    strideValue = strideConst->getSExtValue();
+    if (*strideValue < 0) {
+      llvm_unreachable("Builtin.stackAlloc() caller passed an invalid stride");
+    }
+  }
+
+  // Get the byte count (the product of capacity and stride.)
+  llvm::Value *result = nullptr;
+  if (capacityValue && strideValue) {
+    int64_t byteCount = 0;
+    auto overflow = llvm::MulOverflow(*capacityValue, *strideValue, byteCount);
+    if (overflow) {
+      Diags.diagnose(loc, diag::temporary_allocation_size_overflow);
+    }
+    result = llvm::ConstantInt::get(IGF.IGM.SizeTy, byteCount);
+
+  } else {
+    // If either value is not known at compile-time, preconditions must be
+    // tested at runtime by Builtin.stackAlloc()'s caller. See
+    // _byteCountForTemporaryAllocation(of:capacity:).
+    result = IGF.Builder.CreateMul(capacity, stride);
+  }
+
+  // If the caller requests a zero-byte allocation, allocate one byte instead
+  // to ensure that the resulting pointer is valid and unique on the stack.
+  return IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::umax,
+    {IGF.IGM.SizeTy}, {llvm::ConstantInt::get(IGF.IGM.SizeTy, 1), result});
+}
+
+/// Get the alignment passed to stackAlloc() as a compile-time constant.
+///
+/// If the specified alignment is not known at compile time or is not valid,
+/// the default maximum alignment is substituted.
+static Alignment getStackAllocationAlignment(IRGenSILFunction &IGF,
+                                             SILValue v,
+                                             SourceLoc loc) {
+  auto &Diags = IGF.IGM.Context.Diags;
+
+  // Check for a non-positive alignment, which is invalid.
+  auto align = IGF.getLoweredSingletonExplosion(v);
+  if (auto alignConst = dyn_cast<llvm::ConstantInt>(align)) {
+    auto alignValue = alignConst->getSExtValue();
+    if (alignValue <= 0) {
+      Diags.diagnose(loc, diag::temporary_allocation_alignment_not_positive);
+    } else if (!llvm::isPowerOf2_64(alignValue)) {
+      Diags.diagnose(loc, diag::temporary_allocation_alignment_not_power_of_2);
+    } else {
+      return Alignment(alignValue);
+    }
+  }
+
+  // If the alignment is not known at compile-time, preconditions must be tested
+  // at runtime by Builtin.stackAlloc()'s caller. See
+  // _isStackAllocationSafe(byteCount:alignment:).
+  return Alignment(MaximumAlignment);
+}
+
+/// Emit a call to a stack allocation builtin (stackAlloc() or stackDealloc().)
+///
+/// Returns whether or not `i` was such a builtin (true if so, false if it was
+/// some other builtin.)
+static bool emitStackAllocBuiltinCall(IRGenSILFunction &IGF,
+                                      swift::BuiltinInst *i) {
+  if (i->getBuiltinKind() == BuiltinValueKind::StackAlloc) {
+    // Stack-allocate a buffer with the specified size/alignment.
+    auto loc = i->getLoc().getSourceLoc();
+    auto size = getStackAllocationSize(
+      IGF, i->getOperand(0), i->getOperand(1), loc);
+    auto align = getStackAllocationAlignment(IGF, i->getOperand(2), loc);
+
+    auto stackAddress = IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, align,
+                                              false, "temp_alloc");
+    IGF.setLoweredStackAddress(i, stackAddress);
+
+    return true;
+
+  } else if (i->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
+    // Deallocate a stack address previously allocated with the StackAlloc
+    // builtin above.
+    auto address = i->getOperand(0);
+    auto stackAddress = IGF.getLoweredStackAddress(address);
+
+    if (stackAddress.getAddress().isValid()) {
+      IGF.emitDeallocateDynamicAlloca(stackAddress, false);
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
   const BuiltinInfo &builtin = getSILModule().getBuiltinInfo(i->getName());
+
+  if (emitStackAllocBuiltinCall(*this, i)) {
+    return;
+  }
 
   auto argValues = i->getArguments();
   Explosion args;

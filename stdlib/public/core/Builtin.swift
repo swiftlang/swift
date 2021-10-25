@@ -736,6 +736,20 @@ func _isOptional<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.isOptional(type))
 }
 
+/// Test whether a value is computed (i.e. it is not a compile-time constant.)
+///
+/// - Parameters:
+///   - value: The value to test.
+///
+/// - Returns: Whether or not `value` is computed (not known at compile-time.)
+///
+/// Optimizations performed at various stages during compilation may affect the
+/// result of this function.
+@_alwaysEmitIntoClient @inline(__always)
+internal func _isComputed(_ value: Int) -> Bool {
+  return !Bool(Builtin.int_is_constant_Word(value._builtinWordValue))
+}
+
 /// Extract an object reference from an Any known to contain an object.
 @inlinable
 internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
