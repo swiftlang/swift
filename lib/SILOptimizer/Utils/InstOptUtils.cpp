@@ -1963,16 +1963,32 @@ swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
 }
 
 SILBasicBlock::iterator
+swift::replaceAllUsesAndErase(MultipleValueInstruction *mvi,
+                              ArrayRef<SILValue> newValues,
+                              InstModCallbacks &callbacks) {
+  SILBasicBlock::iterator nextii = std::next(mvi->getIterator());
+  for (unsigned idx = 0, end = newValues.size(); idx < end; ++idx) {
+    nextii =
+        replaceAllUses(mvi->getResult(idx), newValues[idx], nextii, callbacks);
+  }
+  callbacks.deleteInst(mvi);
+
+  return nextii;
+}
+
+SILBasicBlock::iterator
 swift::replaceAllUsesAndErase(SILValue oldValue, SILValue newValue,
                               InstModCallbacks &callbacks) {
-  auto *blockArg = dyn_cast<SILPhiArgument>(oldValue);
-  if (!blockArg) {
-    // SingleValueInstruction SSA replacement.
+  if (auto *svi = dyn_cast<SingleValueInstruction>(oldValue)) {
     return replaceAllUsesAndErase(cast<SingleValueInstruction>(oldValue),
+                                  newValue, callbacks);
+  } else if (auto *mvi = dyn_cast<MultipleValueInstruction>(oldValue)) {
+    return replaceAllUsesAndErase(cast<MultipleValueInstruction>(oldValue),
                                   newValue, callbacks);
   }
   llvm_unreachable("Untested");
 #if 0 // FIXME: to be enabled in a following commit
+  auto *blockArg = cast<SILPhiArgument>(oldValue);
   TermInst *oldTerm = blockArg->getTerminatorForResult();
   assert(oldTerm && "can only replace and erase terminators, not phis");
 

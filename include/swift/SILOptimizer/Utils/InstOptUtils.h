@@ -653,11 +653,18 @@ SILBasicBlock::iterator replaceAllUses(SILValue oldValue, SILValue newValue,
                                        SILBasicBlock::iterator nextii,
                                        InstModCallbacks &callbacks);
 
-/// This is a low level routine that makes all uses of \p svi uses of \p
+/// This is a low level routine that makes all uses of \p svi use of \p
 /// newValue (ignoring end scope markers) and then deletes \p svi and all end
 /// scope markers. Then returns the next inst to process.
 SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
                                                SILValue newValue,
+                                               InstModCallbacks &callbacks);
+
+/// This is a low level routine that makes all uses of \p mvi use of \p
+/// newValues (ignoring end scope markers) and then deletes \p mvi and all end
+/// scope markers. Then returns the next inst to process.
+SILBasicBlock::iterator replaceAllUsesAndErase(MultipleValueInstruction *mvi,
+                                               ArrayRef<SILValue> newValues,
                                                InstModCallbacks &callbacks);
 
 /// Replace all uses of \p oldValue with \p newValue, delete the instruction
