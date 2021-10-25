@@ -894,7 +894,6 @@ bb0:
   return %13 : $MyInt
 } // end sil function 'mixed_nocapture_mixedargs_ossa'
 
-
 // CHECK-LABEL: sil [ossa] @dont_remove_polymorphic_builtin
 // CHECK: builtin "generic_add"
 // CHECK-LABEL: end sil function 'dont_remove_polymorphic_builtin'
@@ -923,4 +922,241 @@ bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass, %2 : @guaranteed $Klass):
 
   %9999 = tuple ()
   return %9999 : $()
+}
+
+////////////////////
+// Load Promotion //
+////////////////////
+
+// CHECK-LABEL: sil [ossa] @multi_block_no_load_promotion
+// CHECK: store
+// CHECK: load
+// CHECK: store
+// CHECK: } // end sil function 'multi_block_no_load_promotion'
+sil [ossa] @multi_block_no_load_promotion : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_stack $MyInt
+  cond_br undef, bb1, bb2
+  
+bb1:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  store %1 to [trivial] %3 : $*MyInt
+  cond_br undef, bb2, bb3
+
+bb2:
+  %4 = load [trivial] %3 : $*MyInt
+  store %4 to [trivial] undef : $*MyInt
+  br bb3
+
+bb3:
+  destroy_addr %3 : $*MyInt
+  dealloc_stack %3 : $*MyInt
+  
+  %7 = tuple ()
+  return %7 : $()
+} // end sil function 'multi_block_no_load_promotion'
+
+// CHECK-LABEL: sil [ossa] @multi_block_load_promotion
+// CHECK-NOT: load
+// CHECK: [[STRUCT:%.*]] = struct
+// CHECK: store [[STRUCT]]
+// CHECK: store [[STRUCT]]
+// CHECK: } // end sil function 'multi_block_load_promotion'
+sil [ossa] @multi_block_load_promotion : $@convention(thin) () -> () {
+bb0:
+  %3 = alloc_stack $MyInt
+  br bb1
+  
+bb1:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  store %1 to [trivial] %3 : $*MyInt
+  cond_br undef, bb2, bb3
+
+bb2:
+  %4 = load [trivial] %3 : $*MyInt
+  store %4 to [trivial] undef : $*MyInt
+  br bb3
+
+bb3:
+  destroy_addr %3 : $*MyInt
+  dealloc_stack %3 : $*MyInt
+  
+  %7 = tuple ()
+  return %7 : $()
+} // end sil function 'multi_block_load_promotion'
+
+sil private [transparent] [ossa] @closure0 : $@convention(thin) (@owned { var Builtin.Int32 }) -> Builtin.Int32 {
+bb0(%0 : @owned ${ var Builtin.Int32 }):
+  %1 = project_box %0 : ${ var Builtin.Int32 }, 0
+  %2 = tuple ()
+  %3 = load [trivial] %1 : $*Builtin.Int32
+  destroy_value %0 : ${ var Builtin.Int32 }
+  return %3 : $Builtin.Int32
+}
+
+ sil @get_logic_value : $@convention(method) (@inout Builtin.Int32) -> Builtin.Int1
+
+ sil @true_getter : $@convention(thin) () -> Builtin.Int32
+
+// CHECK-LABEL: sil [ossa] @promote_load_box
+// CHECK: [[ABOX:%.*]] = alloc_box
+// CHECK: [[PBOX:%.*]] = project_box
+// CHECK: store %0 to [trivial] [[PBOX]]
+// CHECK-NOT: [[PBOX]]
+// CHECK: store %0
+// CHECK: bb3(%{{.*}} : $Builtin.Int32):
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'promote_load_box'
+sil [ossa] @promote_load_box : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %2 = alloc_box ${ var Builtin.Int32 }
+  %3 = project_box %2 : ${ var Builtin.Int32 }, 0
+
+  store %0 to [trivial] %3 : $*Builtin.Int32
+  %8 = load [trivial] %3 : $*Builtin.Int32
+  
+  
+  %14 = alloc_box ${ var Builtin.Int32 }
+  %15 = project_box %14 : ${ var Builtin.Int32 }, 0
+  store %8 to [trivial] %15 : $*Builtin.Int32
+
+  cond_br undef, bb1, bb2
+
+ bb1:
+  %24 = function_ref @true_getter : $@convention(thin) () -> Builtin.Int32
+  %25 = apply %24() : $@convention(thin) () -> Builtin.Int32
+  br bb3(%25 : $Builtin.Int32)
+
+ bb2:
+  %27 = function_ref @true_getter : $@convention(thin) () -> Builtin.Int32
+  %28 = apply %27() : $@convention(thin) () -> Builtin.Int32
+  br bb3(%28 : $Builtin.Int32)
+
+ bb3(%36 : $Builtin.Int32):
+  destroy_value %14 : ${ var Builtin.Int32 }
+  destroy_value %2 : ${ var Builtin.Int32 }
+  return %36 : $Builtin.Int32
+}
+
+sil_global @foo : $Builtin.BridgeObject
+sil_global @bar : $Builtin.Int32
+
+// CHECK-LABEL: sil [ossa] @skip_global_addr
+// CHECK: load [copy]
+// CHECK: } // end sil function 'skip_global_addr'
+sil [ossa] @skip_global_addr : $@convention(thin) (@owned Builtin.BridgeObject) -> () {
+bb0(%0 : @owned $Builtin.BridgeObject):
+  %1 = global_addr @foo : $*Builtin.BridgeObject
+  store %0 to [init] %1 : $*Builtin.BridgeObject
+  %3 = load [copy] %1 : $*Builtin.BridgeObject
+  destroy_value %3 : $Builtin.BridgeObject
+  %7 = tuple ()
+  return %7 : $()
+} // end sil function 'mixed_nocapture_mixedargs_ossa'
+
+// CHECK-LABEL: sil [ossa] @opt_trivial_global_addr
+// CHECK: store %0
+// CHECK-NOT: load
+// CHECK: store %0 to [trivial] undef
+// CHECK: } // end sil function 'opt_trivial_global_addr'
+sil [ossa] @opt_trivial_global_addr : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = global_addr @bar : $*Builtin.Int32
+  store %0 to [trivial] %1 : $*Builtin.Int32
+  %3 = load [trivial] %1 : $*Builtin.Int32
+  store %3 to [trivial] undef : $*Builtin.Int32
+  %7 = tuple ()
+  return %7 : $()
+} // end sil function 'mixed_nocapture_mixedargs_ossa'
+
+// CHECK-LABEL: sil [ossa] @copy_load_promotion
+// CHECK-NOT: load
+// CHECK: [[AS:%.*]] = alloc_stack
+// CHECK-NEXT: [[COPY:%.*]] = copy_value %0
+// CHECK-NEXT: store [[COPY]] to [init] [[AS]]
+// CHECK-NEXT: [[COPY2:%.*]] = copy_value %0
+// CHECK-NEXT: destroy_value [[COPY2]]
+// CHECK-NEXT: destroy_value %0
+// CHECK-NEXT: destroy_addr [[AS]]
+// CHECK-NEXT: dealloc_stack [[AS]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'copy_load_promotion'
+sil [ossa] @copy_load_promotion : $@convention(thin) (@owned Builtin.BridgeObject) -> () {
+bb0(%0 : @owned $Builtin.BridgeObject):
+  %1 = alloc_stack $Builtin.BridgeObject
+  store %0 to [init] %1 : $*Builtin.BridgeObject
+  %3 = load [copy] %1 : $*Builtin.BridgeObject
+  destroy_value %3 : $Builtin.BridgeObject
+  destroy_addr %1 : $*Builtin.BridgeObject
+  dealloc_stack %1 : $*Builtin.BridgeObject
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @take_load_promotion
+// CHECK-NOT: load
+// CHECK: [[AS:%.*]] = alloc_stack
+// CHECK-NEXT: [[COPY:%.*]] = copy_value %0
+// CHECK-NEXT: store [[COPY]] to [init] [[AS]]
+// CHECK-NEXT: [[COPY2:%.*]] = copy_value %0
+// CHECK-NEXT: destroy_value %0
+// CHECK-NEXT: destroy_addr [[AS]]
+// CHECK-NEXT: destroy_value [[COPY2]]
+// CHECK-NEXT: dealloc_stack [[AS]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'take_load_promotion'
+sil [ossa] @take_load_promotion : $@convention(thin) (@owned Builtin.BridgeObject) -> () {
+bb0(%0 : @owned $Builtin.BridgeObject):
+  %1 = alloc_stack $Builtin.BridgeObject
+  store %0 to [init] %1 : $*Builtin.BridgeObject
+  %3 = load [take] %1 : $*Builtin.BridgeObject
+  destroy_value %3 : $Builtin.BridgeObject
+  dealloc_stack %1 : $*Builtin.BridgeObject
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_before
+// CHECK: load
+// CHECK: store
+// CHECK: load
+// CHECK: } // end sil function 'load_before'
+sil [ossa] @load_before : $@convention(thin) (@owned Builtin.BridgeObject, @in_guaranteed Builtin.BridgeObject) -> () {
+bb0(%0 : @owned $Builtin.BridgeObject, %dummy : $*Builtin.BridgeObject):
+  %1 = alloc_stack $Builtin.BridgeObject
+  copy_addr %dummy to [initialization] %1 : $*Builtin.BridgeObject
+  %3 = load [copy] %1 : $*Builtin.BridgeObject
+  destroy_value %3 : $Builtin.BridgeObject
+  store %0 to [assign] %1 : $*Builtin.BridgeObject
+  %5 = load [copy] %1 : $*Builtin.BridgeObject
+  destroy_value %5 : $Builtin.BridgeObject
+  destroy_addr %1 : $*Builtin.BridgeObject
+  dealloc_stack %1 : $*Builtin.BridgeObject
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @two_loads_after
+// CHECK: store
+// CHECK: load
+// CHECK: load
+// CHECK: } // end sil function 'two_loads_after'
+sil [ossa] @two_loads_after : $@convention(thin) (@owned Builtin.BridgeObject) -> () {
+bb0(%0 : @owned $Builtin.BridgeObject):
+  %1 = alloc_stack $Builtin.BridgeObject
+  store %0 to [init] %1 : $*Builtin.BridgeObject
+  %3 = load [copy] %1 : $*Builtin.BridgeObject
+  %4 = load [copy] %1 : $*Builtin.BridgeObject
+  destroy_value %3 : $Builtin.BridgeObject
+  destroy_value %4 : $Builtin.BridgeObject
+  destroy_addr %1 : $*Builtin.BridgeObject
+  dealloc_stack %1 : $*Builtin.BridgeObject
+  %7 = tuple ()
+  return %7 : $()
 }

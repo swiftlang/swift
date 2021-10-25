@@ -715,6 +715,8 @@ void endLifetimeAtLeakingBlocks(SILValue value,
 bool tryEliminateOnlyOwnershipUsedForwardingInst(
     SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks);
 
+bool dominatesAllUses(SILInstruction *a, SILValue b);
+
 } // end namespace swift
 
 #endif

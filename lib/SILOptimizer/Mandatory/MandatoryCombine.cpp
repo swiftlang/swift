@@ -29,6 +29,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
@@ -190,10 +191,13 @@ public:
 
     return changed;
   }
+      
+  StoreInst *tryPromoteLoadsOf(StoreInst *store);
 
   /// Base visitor that does not do anything.
   SILInstruction *visitSILInstruction(SILInstruction *) { return nullptr; }
   SILInstruction *visitApplyInst(ApplyInst *instruction);
+  SILInstruction *visitStoreInst(StoreInst *instruction);
 };
 
 } // end anonymous namespace
@@ -370,6 +374,121 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   if (tryDeleteDeadClosure(partialApply, instModCallbacks)) {
     invalidatedStackNesting = true;
   }
+  return nullptr;
+}
+
+StoreInst *MandatoryCombiner::tryPromoteLoadsOf(StoreInst *store) {
+  // Avoid destinations such as global_addrs.
+  if (store->getOwnershipQualifier() != StoreOwnershipQualifier::Trivial &&
+      store->getOwnershipQualifier() != StoreOwnershipQualifier::Unqualified &&
+      !isa<AllocStackInst>(store->getDest()) &&
+      !isa<PartialApplyInst>(store->getDest()))
+    return nullptr;
+
+  // Try to promote store src to loads.
+  DominanceInfo dominanceInfo(store->getFunction());
+  LoadInst *load = nullptr;
+  for (auto *use : getNonDebugUses(store->getDest())) {
+    auto user = use->getUser();
+    if (user == store)
+      continue;
+
+    if (isa<DeallocStackInst>(user) || isa<DestroyAddrInst>(user))
+      continue;
+
+    if (auto loadUse = dyn_cast<LoadInst>(user)) {
+      // If the load comes before the store, we don't want update it but, it
+      // also can't effect our optimization (unlike two loads after the store
+      // could).
+      if (dominanceInfo.dominates(loadUse, store))
+        continue;
+      if (load) {
+        load = nullptr;
+        break;
+      }
+      load = loadUse;
+    } else {
+      // Otherwise, bail.
+      load = nullptr;
+      break;
+    }
+  }
+
+  // If we can promote the load, do so.
+  if (load &&
+      // Make sure we haven't already tried to delete this instruction.
+      std::find(instructionsPendingDeletion.begin(),
+                instructionsPendingDeletion.end(),
+                load) == instructionsPendingDeletion.end()) {
+    // Check that all uses of the load are dominated by the store src.
+    // Otherwise, we can't optimize this load.
+    bool loadDominatesAllUses;
+    if (auto srcInst = store->getSrc().getDefiningInstruction()) {
+      loadDominatesAllUses = dominatesAllUses(srcInst, load);
+    } else {
+      // Otherwise it's an argument so, check all uses are in blocks that
+      // dominate that argument.
+      loadDominatesAllUses = std::all_of(
+          load->use_begin(), load->use_end(),
+          [&store, &dominanceInfo](Operand *use) {
+            return dominanceInfo.dominates(store->getSrc()->getParentBlock(),
+                                           use->getUser()->getParentBlock());
+          });
+    }
+
+    if (!loadDominatesAllUses)
+      return nullptr;
+
+    if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+      // load [copy] is just adding a copy.
+      auto copy = SILBuilderWithScope(load).createCopyValue(load->getLoc(),
+                                                            store->getSrc());
+      load->replaceAllUsesWith(copy);
+    } else if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+      // load [take] is both a copy and a destroy. It's important that the copy
+      // comes before the destroy even though they are unrelated because the
+      // destroy_addr will be used below to figure out where we need to insert a
+      // destroy_value.
+      SILBuilderWithScope loadBuilder(load);
+      auto copy = loadBuilder.createCopyValue(load->getLoc(), store->getSrc());
+      loadBuilder.createDestroyAddr(load->getLoc(), load->getOperand());
+      load->replaceAllUsesWith(copy);
+    } else
+      load->replaceAllUsesWith(store->getSrc());
+    instModCallbacks.deleteInst(load);
+
+    // Finally, for copy/takes we need to make sure the store doesn't consume
+    // the new value that we've just used. We can't move the copy above the
+    // store because the two instructions may not be in the same block so, we
+    // copy the value, replace the store, and destroy the value.
+    //
+    // To destroy the value we look for the destroy_addrs for the destination of
+    // the store and insert a destroy value next to those. Above we ensure that
+    // the only uses of the dest are either replaced or destroy_addrs so, we can
+    // safely add a destroy_value everywhere we see a destroy_addr.
+    if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Take ||
+        load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+      for (auto *use : store->getDest()->getUses()) {
+        if (isa<DestroyAddrInst>(use->getUser()))
+          SILBuilderWithScope(use->getUser())
+              .createDestroyValue(use->getUser()->getLoc(), store->getSrc());
+      }
+
+      SILBuilderWithScope storeBuilder(store);
+      auto copy =
+          storeBuilder.createCopyValue(store->getLoc(), store->getSrc());
+      return storeBuilder.createStore(store->getLoc(), copy, store->getDest(),
+                                      store->getOwnershipQualifier());
+    }
+  }
+  
+  return nullptr;
+}
+
+SILInstruction *MandatoryCombiner::visitStoreInst(StoreInst *store) {
+  if (auto newStore = tryPromoteLoadsOf(store))
+    return newStore;
+
   return nullptr;
 }
 

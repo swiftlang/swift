@@ -832,9 +832,9 @@ class FailableDerivedClass : FailableBaseClass {
 // CHECK:       bb0(%0 : $FailableDerivedClass):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableDerivedClass
 // CHECK:         store %0 to [[SELF_BOX]]
-// CHECK-NEXT:    [[RELOAD_FROM_SELF_BOX:%.*]] = load [[SELF_BOX]]
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thick FailableDerivedClass.Type
-// CHECK-NEXT:    dealloc_partial_ref [[RELOAD_FROM_SELF_BOX]] : $FailableDerivedClass, [[METATYPE]] : $@thick FailableDerivedClass.Type
+// CHECK-NEXT:    dealloc_partial_ref %0 : $FailableDerivedClass, [[METATYPE]] : $@thick FailableDerivedClass.Type
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    [[RESULT:%.*]] = enum $Optional<FailableDerivedClass>, #Optional.none!enumelt
 // CHECK-NEXT:    return [[RESULT]]

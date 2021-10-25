@@ -2249,3 +2249,15 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       }
   }
 }
+
+/// Checks that "a" dominates all uses of "b".
+/// \param a the instruction who's expected to dominate.
+/// \param b the instruction who's uses are expected to be dominated.
+/// \returns true if all uses of "b" are dominated by "a". Otherwise, false.
+bool swift::dominatesAllUses(SILInstruction *a, SILValue b) {
+  DominanceInfo dominanceInfo(a->getFunction());
+  return std::all_of(b->use_begin(), b->use_end(),
+                     [&a, &dominanceInfo](Operand *use) {
+                       return dominanceInfo.dominates(a, use->getUser());
+                     });
+}
