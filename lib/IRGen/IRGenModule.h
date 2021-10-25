@@ -1462,6 +1462,11 @@ public:
 
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
+  void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
+                                      llvm::Constant *dependsOn);
+  void appendLLVMUsedConditionalEntry(llvm::GlobalVariable *var,
+                                      const ProtocolConformance *conformance);
+
   llvm::Constant *
   getAddrOfTypeMetadata(CanType concreteType,
                         TypeMetadataCanonicality canonicality =
