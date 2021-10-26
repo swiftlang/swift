@@ -30,7 +30,7 @@
 // they are added by completion, or they are redundant rules written by the
 // user.
 //
-// Using the 3-cells that generate the homotopy relation on rewrite paths,
+// Using the rewrite loops that generate the homotopy relation on rewrite paths,
 // decompositions can be found for all "derived" conformance rules, producing
 // a minimal set of generating conformances.
 //
@@ -69,9 +69,9 @@
 using namespace swift;
 using namespace rewriting;
 
-/// Finds all protocol conformance rules appearing in a 3-cell, both without
-/// context, and with a non-empty left context. Applications of rules with a
-/// non-empty right context are ignored.
+/// Finds all protocol conformance rules appearing in a rewrite loop, both
+/// in empty context, and with a non-empty left context. Applications of rules
+/// with a non-empty right context are ignored.
 ///
 /// The rules are organized by protocol. For each protocol, the first element
 /// of the pair stores conformance rules that appear without context. The
@@ -79,9 +79,7 @@ using namespace rewriting;
 /// context. For each such rule, the left prefix is also stored alongside.
 void HomotopyGenerator::findProtocolConformanceRules(
     llvm::SmallDenseMap<const ProtocolDecl *,
-                        std::pair<SmallVector<unsigned, 2>,
-                                  SmallVector<std::pair<MutableTerm, unsigned>, 2>>>
-                        &result,
+                        ProtocolConformanceRules, 2> &result,
     const RewriteSystem &system) const {
 
   auto redundantRules = findRulesAppearingOnceInEmptyContext(system);
@@ -90,11 +88,13 @@ void HomotopyGenerator::findProtocolConformanceRules(
   for (unsigned ruleID : redundantRules) {
     const auto &rule = system.getRule(ruleID);
 
-    if (rule.isIdentityConformanceRule())
-      continue;
-
     if (auto *proto = rule.isProtocolConformanceRule()) {
-      result[proto].first.push_back(ruleID);
+      if (rule.isIdentityConformanceRule()) {
+        result[proto].SawIdentityConformance = true;
+        continue;
+      }
+
+      result[proto].RulesInEmptyContext.push_back(ruleID);
       foundAny = true;
     }
   }
@@ -105,7 +105,7 @@ void HomotopyGenerator::findProtocolConformanceRules(
   RewritePathEvaluator evaluator(Basepoint);
 
   // Now look for rewrite steps with conformance rules in empty right context,
-  // that is something like X.(Y.[P] => Z) (or it's inverse, X.(Z => Y.[P])).
+  // that is something like X.(Y.[P] => Y) (or it's inverse, X.(Y => Y.[P])).
   for (const auto &step : Path) {
     if (!evaluator.isInContext()) {
       switch (step.Kind) {
@@ -124,7 +124,7 @@ void HomotopyGenerator::findProtocolConformanceRules(
             // the prefix term is 'X'.
             const auto &term = evaluator.getCurrentTerm();
             MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
-            result[proto].second.emplace_back(prefix, step.RuleID);
+            result[proto].RulesInContext.emplace_back(prefix, step.RuleID);
           }
         }
 
@@ -279,9 +279,7 @@ void RewriteSystem::computeCandidateConformancePaths(
       continue;
 
     llvm::SmallDenseMap<const ProtocolDecl *,
-                        std::pair<SmallVector<unsigned, 2>,
-                                  SmallVector<std::pair<MutableTerm, unsigned>, 2>>>
-        result;
+                        ProtocolConformanceRules, 2> result;
 
     loop.findProtocolConformanceRules(result, *this);
 
@@ -296,21 +294,18 @@ void RewriteSystem::computeCandidateConformancePaths(
 
     for (const auto &pair : result) {
       const auto *proto = pair.first;
-      const auto &notInContext = pair.second.first;
-      const auto &inContext = pair.second.second;
+      const auto &inEmptyContext = pair.second.RulesInEmptyContext;
+      const auto &inContext = pair.second.RulesInContext;
+      bool sawIdentityConformance = pair.second.SawIdentityConformance;
 
       // No rules appear without context.
-      if (notInContext.empty())
-        continue;
-
-      // No replacement rules.
-      if (notInContext.size() == 1 && inContext.empty())
+      if (inEmptyContext.empty())
         continue;
 
       if (Debug.contains(DebugFlags::GeneratingConformances)) {
         llvm::dbgs() << "* Protocol " << proto->getName() << ":\n";
         llvm::dbgs() << "** Conformance rules not in context:\n";
-        for (unsigned ruleID : notInContext) {
+        for (unsigned ruleID : inEmptyContext) {
           llvm::dbgs() << "-- (#" << ruleID << ") " << getRule(ruleID) << "\n";
         }
 
@@ -319,6 +314,10 @@ void RewriteSystem::computeCandidateConformancePaths(
           llvm::dbgs() << "-- " << pair.first;
           unsigned ruleID = pair.second;
           llvm::dbgs() << " (#" << ruleID << ") " << getRule(ruleID) << "\n";
+        }
+
+        if (sawIdentityConformance) {
+          llvm::dbgs() << "** Equivalent to identity conformance\n";
         }
 
         llvm::dbgs() << "\n";
@@ -331,8 +330,8 @@ void RewriteSystem::computeCandidateConformancePaths(
       //
       //   (T.[P] => T) := (T'.[P])
       //   (T'.[P] => T') := (T.[P])
-      for (unsigned candidateRuleID : notInContext) {
-        for (unsigned otherRuleID : notInContext) {
+      for (unsigned candidateRuleID : inEmptyContext) {
+        for (unsigned otherRuleID : inEmptyContext) {
           if (otherRuleID == candidateRuleID)
             continue;
 
@@ -342,11 +341,22 @@ void RewriteSystem::computeCandidateConformancePaths(
         }
       }
 
-      // Suppose a 3-cell contains a conformance rule (T.[P] => T) in an empty
-      // context, and a conformance rule (V.[P] => V) with a non-empty left
+      // If a rewrite loop contains a conformance rule (T.[P] => T) together
+      // with the identity conformance ([P].[P] => [P]), both in empty context,
+      // the conformance rule (T.[P] => T) is equivalent to the *empty product*
+      // of conformance rules; that is, it is trivially redundant.
+      if (sawIdentityConformance) {
+        for (unsigned candidateRuleID : inEmptyContext) {
+          SmallVector<unsigned, 2> emptyPath;
+          conformancePaths[candidateRuleID].push_back(emptyPath);
+        }
+      }
+
+      // Suppose a rewrite loop contains a conformance rule (T.[P] => T) in
+      // empty context, and a conformance rule (V.[P] => V) in non-empty left
       // context U.
       //
-      // The 3-cell looks something like this:
+      // The rewrite loop looks something like this:
       //
       //     ... ⊗ (T.[P] => T) ⊗ ... ⊗ U.(V => V.[P]) ⊗ ...
       //    ^                                               ^
@@ -381,7 +391,7 @@ void RewriteSystem::computeCandidateConformancePaths(
 
         // This decomposition defines a conformance access path for each
         // conformance rule we saw in empty context.
-        for (unsigned otherRuleID : notInContext)
+        for (unsigned otherRuleID : inEmptyContext)
           conformancePaths[otherRuleID].push_back(conformancePath);
       }
     }
@@ -470,6 +480,11 @@ bool RewriteSystem::isValidRefinementPath(
 void RewriteSystem::dumpConformancePath(
     llvm::raw_ostream &out,
     const SmallVectorImpl<unsigned> &path) const {
+  if (path.empty()) {
+    out << "1";
+    return;
+  }
+
   for (unsigned ruleID : path)
     out << "(" << getRule(ruleID).getLHS() << ")";
 }
@@ -504,6 +519,9 @@ void RewriteSystem::verifyGeneratingConformanceEquations(
     (void) simplify(baseTerm);
 
     for (const auto &path : pair.second) {
+      if (path.empty())
+        continue;
+
       const auto &otherRule = getRule(path.back());
       auto *otherProto = otherRule.getLHS().back().getProtocol();
 

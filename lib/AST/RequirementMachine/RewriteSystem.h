@@ -356,6 +356,15 @@ public:
             const RewriteSystem &system) const;
 };
 
+/// Information about protocol conformance rules appearing in a rewrite loop.
+///
+/// This is the return value of HomotopyGenerator::findProtocolConformanceRules().
+struct ProtocolConformanceRules {
+  SmallVector<unsigned, 2> RulesInEmptyContext;
+  SmallVector<std::pair<MutableTerm, unsigned>, 2> RulesInContext;
+  bool SawIdentityConformance = false;
+};
+
 /// A loop (3-cell) that rewrites the basepoint back to the basepoint.
 class HomotopyGenerator {
 public:
@@ -387,9 +396,7 @@ public:
 
   void findProtocolConformanceRules(
       llvm::SmallDenseMap<const ProtocolDecl *,
-                          std::pair<SmallVector<unsigned, 2>,
-                                    SmallVector<std::pair<MutableTerm, unsigned>, 2>>>
-                          &result,
+                          ProtocolConformanceRules, 2> &result,
       const RewriteSystem &system) const;
 
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
