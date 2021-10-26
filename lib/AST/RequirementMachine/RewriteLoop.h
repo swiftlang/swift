@@ -245,13 +245,6 @@ public:
 
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
-  bool computeFreelyReducedPath();
-
-  bool computeCyclicallyReducedLoop(MutableTerm &basepoint,
-                                    const RewriteSystem &system);
-
-  bool computeLeftCanonicalForm(const RewriteSystem &system);
-
   void invert();
 
   void dump(llvm::raw_ostream &out,
@@ -289,8 +282,6 @@ public:
     assert(!Deleted);
     Deleted = true;
   }
-
-  void normalize(const RewriteSystem &system);
 
   bool isInContext(const RewriteSystem &system) const;
 
