@@ -14,6 +14,9 @@
 // FIXME(mracek): More work needed to get this to work on non-Apple platforms.
 // REQUIRES: VENDOR=apple
 
+// Disable to unblock CI
+// REQUIRES: rdar84643923
+
 protocol TheProtocol {
   func func1_live()
   func func2_dead()

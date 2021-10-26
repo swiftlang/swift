@@ -1837,7 +1837,8 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
           dyn_cast<clang::TemplateTypeParmType>(clangDecl->getReturnType())) {
     importedType = {findGenericTypeInGenericDecls(templateType, genericParams),
                     false};
-  } else if (!isa<clang::RecordType>(clangDecl->getReturnType()) ||
+  } else if (!(isa<clang::RecordType>(clangDecl->getReturnType()) ||
+               isa<clang::TemplateSpecializationType>(clangDecl->getReturnType())) ||
              // TODO: we currently don't lazily load operator return types, but
              // this should be trivial to add.
              clangDecl->isOverloadedOperator()) {

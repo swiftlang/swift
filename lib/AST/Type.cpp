@@ -4151,13 +4151,6 @@ Type Type::subst(TypeSubstitutionFn substitutions,
   return substType(*this, substitutions, conformances, options);
 }
 
-Type Type::substDependentTypesWithErrorTypes() const {
-  return substType(*this,
-                   [](SubstitutableType *t) -> Type { return Type(); },
-                   MakeAbstractConformanceForGenericType(),
-                   SubstFlags::AllowLoweredTypes);
-}
-
 const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
   if (!hasTypeParameter()) return nullptr;
 

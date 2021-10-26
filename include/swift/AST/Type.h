@@ -317,9 +317,6 @@ public:
              LookupConformanceFn conformances,
              SubstOptions options=None) const;
 
-  /// Replace references to substitutable types with error types.
-  Type substDependentTypesWithErrorTypes() const;
-  
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   SWIFT_DEBUG_DUMP;
