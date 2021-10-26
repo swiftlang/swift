@@ -474,7 +474,6 @@ bool RewriteLoop::isInContext(const RewriteSystem &system) const {
 /// minimization algorithm.
 bool RewriteSystem::
 isCandidateForDeletion(unsigned ruleID,
-                       bool firstPass,
                        const llvm::DenseSet<unsigned> *redundantConformances) const {
   const auto &rule = getRule(ruleID);
 
@@ -493,22 +492,15 @@ isCandidateForDeletion(unsigned ruleID,
   // Other rules involving unresolved name symbols are derived from an
   // associated type introduction rule together with a conformance rule.
   // They are eliminated in the first pass.
-  if (firstPass)
-    return rule.getLHS().containsUnresolvedSymbols();
-
-  // In the second and third pass we should not have any rules involving
-  // unresolved name symbols, except for permanent rules which were
-  // already skipped above.
-  //
-  // FIXME: This isn't true with invalid code.
-  assert(!rule.getLHS().containsUnresolvedSymbols());
+  if (rule.getLHS().containsUnresolvedSymbols())
+    return true;
 
   // Protocol conformance rules are eliminated via a different
   // algorithm which computes "generating conformances".
   //
-  // The first and second passes skip protocol conformance rules.
+  // The first pass skips protocol conformance rules.
   //
-  // The third pass eliminates any protocol conformance rule which is
+  // The second pass eliminates any protocol conformance rule which is
   // redundant according to both homotopy reduction and the generating
   // conformances algorithm.
   //
@@ -532,25 +524,19 @@ isCandidateForDeletion(unsigned ruleID,
 /// once in empty context. Returns a redundant rule to delete if one was found,
 /// otherwise returns None.
 ///
-/// Minimization performs three passes over the rewrite system, with the
-/// \p firstPass and \p redundantConformances parameters as follows:
+/// Minimization performs three passes over the rewrite system.
 ///
-/// 1) First, rules involving unresolved name symbols are deleted, with
-///    \p firstPass equal to true and \p redundantConformances equal to nullptr.
+/// 1) First, rules that are not conformance rules are deleted, with
+///    \p redundantConformances equal to nullptr.
 ///
-/// 2) Second, rules that are not conformance rules are deleted, with
-///    \p firstPass equal to false and \p redundantConformances equal to nullptr.
+/// 2) Second, generating conformances are computed.
 ///
-/// 3) Finally, conformance rules are deleted after computing a minimal set of
-///    generating conformances, with \p firstPass equal to false and
-///    \p redundantConformances equal to the set of conformance rules that are
+/// 3) Finally, redundant conformance rules are deleted, with
+/// \p redundantConformances equal to the set of conformance rules that are
 ///    not generating conformances.
 Optional<unsigned> RewriteSystem::
-findRuleToDelete(bool firstPass,
-                 const llvm::DenseSet<unsigned> *redundantConformances,
+findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
                  RewritePath &replacementPath) {
-  assert(!firstPass || redundantConformances == nullptr);
-
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
   for (unsigned loopID : indices(Loops)) {
     const auto &loop = Loops[loopID];
@@ -566,7 +552,7 @@ findRuleToDelete(bool firstPass,
 
   for (const auto &pair : redundancyCandidates) {
     unsigned ruleID = pair.second;
-    if (!isCandidateForDeletion(ruleID, firstPass, redundantConformances))
+    if (!isCandidateForDeletion(ruleID, redundantConformances))
       continue;
 
     if (!found) {
@@ -665,12 +651,10 @@ void RewriteSystem::deleteRule(unsigned ruleID,
 }
 
 void RewriteSystem::performHomotopyReduction(
-    bool firstPass,
     const llvm::DenseSet<unsigned> *redundantConformances) {
   while (true) {
     RewritePath replacementPath;
-    auto optRuleID = findRuleToDelete(firstPass,
-                                      redundantConformances,
+    auto optRuleID = findRuleToDelete(redundantConformances,
                                       replacementPath);
 
     // If no redundant rules remain which can be eliminated by this pass, stop.
@@ -703,13 +687,8 @@ void RewriteSystem::minimizeRewriteSystem() {
   // Check invariants before homotopy reduction.
   verifyRewriteLoops();
 
-  // First pass: Eliminate all redundant rules involving unresolved types.
-  performHomotopyReduction(/*firstPass=*/true,
-                           /*redundantConformances=*/nullptr);
-
-  // Second pass: Eliminate all redundant rules that are not conformance rules.
-  performHomotopyReduction(/*firstPass=*/false,
-                           /*redundantConformances=*/nullptr);
+  // First pass: Eliminate all redundant rules that are not conformance rules.
+  performHomotopyReduction(/*redundantConformances=*/nullptr);
 
   // Now find a minimal set of generating conformances.
   //
@@ -719,9 +698,8 @@ void RewriteSystem::minimizeRewriteSystem() {
   llvm::DenseSet<unsigned> redundantConformances;
   computeGeneratingConformances(redundantConformances);
 
-  // Third pass: Eliminate all redundant conformance rules.
-  performHomotopyReduction(/*firstPass=*/false,
-                           /*redundantConformances=*/&redundantConformances);
+  // Second pass: Eliminate all redundant conformance rules.
+  performHomotopyReduction(/*redundantConformances=*/&redundantConformances);
 
   // Check invariants after homotopy reduction.
   verifyRewriteLoops();

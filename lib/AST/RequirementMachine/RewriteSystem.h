@@ -324,18 +324,15 @@ public:
 
   bool
   isCandidateForDeletion(unsigned ruleID,
-                         bool firstPass,
                          const llvm::DenseSet<unsigned> *redundantConformances) const;
 
   Optional<unsigned>
-  findRuleToDelete(bool firstPass,
-                   const llvm::DenseSet<unsigned> *redundantConformances,
+  findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
                    RewritePath &replacementPath);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
 
   void performHomotopyReduction(
-      bool firstPass,
       const llvm::DenseSet<unsigned> *redundantConformances);
 
   void minimizeRewriteSystem();
