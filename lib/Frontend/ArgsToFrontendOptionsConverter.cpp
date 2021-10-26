@@ -229,13 +229,19 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (checkUnusedSupplementaryOutputPaths())
     return true;
 
-  if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction) &&
-      (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
-       Args.hasArg(OPT_experimental_skip_all_function_bodies) ||
-       Args.hasArg(
-         OPT_experimental_skip_non_inlinable_function_bodies_without_types))) {
-    Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
-    return true;
+  if (FrontendOptions::doesActionGenerateIR(Opts.RequestedAction)) {
+    if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies) ||
+        Args.hasArg(OPT_experimental_skip_all_function_bodies) ||
+        Args.hasArg(
+         OPT_experimental_skip_non_inlinable_function_bodies_without_types)) {
+      Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_skipping_function_bodies);
+      return true;
+    }
+
+    if (Args.hasArg(OPT_check_api_availability_only)) {
+      Diags.diagnose(SourceLoc(), diag::cannot_emit_ir_checking_api_availability_only);
+      return true;
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_module_abi_name))
