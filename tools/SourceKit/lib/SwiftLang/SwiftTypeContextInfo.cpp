@@ -30,8 +30,8 @@ static void translateTypeContextInfoOptions(OptionsDictionary &from,
   // TypeContextInfo doesn't receive any options at this point.
 }
 
-void deliverResults(SourceKit::TypeContextInfoConsumer &SKConsumer,
-                    CancellableResult<TypeContextInfoResult> Result) {
+static void deliverResults(SourceKit::TypeContextInfoConsumer &SKConsumer,
+                           CancellableResult<TypeContextInfoResult> Result) {
   switch (Result.getKind()) {
   case CancellableResultKind::Success: {
     SKConsumer.setReusingASTContext(Result->DidReuseAST);

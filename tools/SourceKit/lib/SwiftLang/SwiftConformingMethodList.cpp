@@ -32,8 +32,9 @@ translateConformingMethodListOptions(OptionsDictionary &from,
   // ConformingMethodList doesn't receive any options at this point.
 }
 
-void deliverResults(SourceKit::ConformingMethodListConsumer &SKConsumer,
-                    CancellableResult<ConformingMethodListResults> Result) {
+static void
+deliverResults(SourceKit::ConformingMethodListConsumer &SKConsumer,
+               CancellableResult<ConformingMethodListResults> Result) {
   switch (Result.getKind()) {
   case CancellableResultKind::Success: {
     SKConsumer.setReusingASTContext(Result->DidReuseAST);

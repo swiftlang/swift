@@ -92,19 +92,6 @@ static UIdent getUIDForCodeCompletionKindToReport(CompletionKind kind) {
   }
 }
 
-/// The result returned via the Callback of \c swiftCodeCompleteImpl.
-/// If \c HasResults is \c false, code completion did not fail, but did not
-/// produce any values either. All other fields of the struct should be ignored
-/// in that case.
-struct CodeCompleteImplResult {
-  bool HasResults;
-  swift::ASTContext *Context;
-  const swift::CompilerInvocation *Invocation;
-  swift::ide::CodeCompletionContext *CompletionContext;
-  ArrayRef<RequestedCachedModule> RequestedModules;
-  DeclContext *DC;
-};
-
 static void swiftCodeCompleteImpl(
     SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
     unsigned Offset, ArrayRef<const char *> Args,
@@ -141,9 +128,10 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
                                            unsigned &resultOffset,
                                            unsigned &maxResults);
 
-void deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
-                                const CodeCompletion::Options &CCOpts,
-                                CancellableResult<CodeCompleteResult> Result) {
+static void
+deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
+                           const CodeCompletion::Options &CCOpts,
+                           CancellableResult<CodeCompleteResult> Result) {
   switch (Result.getKind()) {
   case CancellableResultKind::Success: {
     auto kind = getUIDForCodeCompletionKindToReport(
