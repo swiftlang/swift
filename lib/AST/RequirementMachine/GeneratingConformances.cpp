@@ -607,6 +607,9 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
 /// conformance rules.
 void RewriteSystem::computeGeneratingConformances(
     llvm::DenseSet<unsigned> &redundantConformances) {
+  // All conformance rules, sorted by left hand side.
+  SmallVector<std::pair<unsigned, Term>, 4> conformanceRules;
+
   // Maps a conformance rule to a conformance path deriving the subject type's
   // base type. For example, consider the following conformance rule:
   //
@@ -625,8 +628,7 @@ void RewriteSystem::computeGeneratingConformances(
   // the form [P].[Q] => [P].
   llvm::DenseSet<unsigned> protocolRefinements;
 
-  // Prepare the initial set of equations: every non-redundant conformance rule
-  // can be expressed as itself.
+  // Prepare the initial set of equations.
   for (unsigned ruleID : indices(Rules)) {
     const auto &rule = getRule(ruleID);
     if (rule.isPermanent())
@@ -638,16 +640,20 @@ void RewriteSystem::computeGeneratingConformances(
     if (!rule.isProtocolConformanceRule())
       continue;
 
+    auto lhs = rule.getLHS();
+    conformanceRules.emplace_back(ruleID, lhs);
+
+    // Initially, every non-redundant conformance rule can be expressed
+    // as itself.
     SmallVector<unsigned, 2> path;
     path.push_back(ruleID);
     conformancePaths[ruleID].push_back(path);
 
+    // Save protocol refinement relations in a side table.
     if (rule.isProtocolRefinementRule()) {
       protocolRefinements.insert(ruleID);
       continue;
     }
-
-    auto lhs = rule.getLHS();
 
     // Record a parent path if the subject type itself requires a non-trivial
     // conformance path to derive.
@@ -687,22 +693,33 @@ void RewriteSystem::computeGeneratingConformances(
 
   verifyGeneratingConformanceEquations(conformancePaths);
 
-  // Find a minimal set of generating conformances.
-  for (const auto &pair : conformancePaths) {
-    bool isProtocolRefinement = protocolRefinements.count(pair.first) > 0;
+  // Sort the list of conformance rules in reverse order; we're going to try
+  // to minimize away less canonical rules first.
+  std::sort(conformanceRules.begin(), conformanceRules.end(),
+            [&](const std::pair<unsigned, Term> &lhs,
+                const std::pair<unsigned, Term> &rhs) -> bool {
+              return lhs.second.compare(rhs.second, Context) > 0;
+            });
 
-    for (const auto &path : pair.second) {
+  // Find a minimal set of generating conformances.
+  for (const auto &pair : conformanceRules) {
+    unsigned ruleID = pair.first;
+    const auto &paths = conformancePaths[ruleID];
+
+    bool isProtocolRefinement = protocolRefinements.count(ruleID) > 0;
+
+    for (const auto &path : paths) {
       // Only consider a protocol refinement rule to be redundant if it is
       // witnessed by a composition of other protocol refinement rules.
       if (isProtocolRefinement && !isValidRefinementPath(path))
         continue;
 
       llvm::SmallDenseSet<unsigned, 4> visited;
-      visited.insert(pair.first);
+      visited.insert(ruleID);
 
       if (isValidConformancePath(visited, redundantConformances, path,
                                  parentPaths, conformancePaths)) {
-        redundantConformances.insert(pair.first);
+        redundantConformances.insert(ruleID);
         break;
       }
     }
