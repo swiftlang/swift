@@ -425,3 +425,28 @@ actor Ahmad {
     // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
   }
 }
+
+@available(SwiftStdlib 5.5, *)
+actor Rain {
+  var x: Int = 0
+  func f() {}
+
+  init() {
+    defer { self.f() }  // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
+                        // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
+    defer { _ = self.x }  // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
+    defer { Task { await self.f() } } // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
+                                      // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+  }
+
+  init() async {
+    defer { self.f() }
+
+    defer { _ = self.x }
+
+    defer { Task { await self.f() } }
+  }
+}
