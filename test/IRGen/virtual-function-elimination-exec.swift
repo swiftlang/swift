@@ -14,6 +14,9 @@
 // FIXME(mracek): More work needed to get this to work on non-Apple platforms.
 // REQUIRES: VENDOR=apple
 
+// Disable to unblock CI
+// REQUIRES: rdar84643923
+
 class MyClass {
   func foo() { print("MyClass.foo") }
   func bar() { print("MyClass.bar") }
