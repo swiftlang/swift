@@ -295,7 +295,7 @@ void DCE::markLive() {
           continue;
         }
         // If not populate reborrowDependencies for this borrow
-        findReborrowDependencies(cast<BeginBorrowInst>(&I));
+        findReborrowDependencies(borrowInst);
         break;
       }
       default:
