@@ -658,7 +658,7 @@ bb4(%3 : @owned $Klass):
 sil [ossa] @looping_borrow : $@convention(thin) () -> () {
 entry:
   %instance_1 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
-  %lifetime_1 = begin_borrow [lexical] %instance_1 : $FakeOptional<Klass>
+  %lifetime_1 = begin_borrow %instance_1 : $FakeOptional<Klass>
   br loop_entry(%instance_1 : $FakeOptional<Klass>, %lifetime_1 : $FakeOptional<Klass>)
 
 loop_entry(%18 : @owned $FakeOptional<Klass>, %19 : @guaranteed $FakeOptional<Klass>):
