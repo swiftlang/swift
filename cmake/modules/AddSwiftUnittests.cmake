@@ -32,9 +32,6 @@ function(add_swift_unittest test_dirname)
       COMMAND "${SWIFT_SOURCE_DIR}/utils/swift-rpathize.py"
               "$<TARGET_FILE:${test_dirname}>")
   elseif("${SWIFT_HOST_VARIANT}" STREQUAL "android")
-    swift_android_libgcc_for_arch_cross_compile(${SWIFT_HOST_VARIANT_ARCH} android_system_libs)
-    set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_DIRECTORIES
-      "${android_system_libs}")
     set_property(TARGET "${test_dirname}" APPEND PROPERTY LINK_LIBRARIES "log")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")

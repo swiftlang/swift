@@ -85,6 +85,9 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
 }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
+  if (getTriple().isAndroid())
+    return "lld";
+
   switch (getTriple().getArch()) {
   case llvm::Triple::arm:
   case llvm::Triple::aarch64:
@@ -384,9 +387,12 @@ toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
 
   ArgStringList Arguments;
 
+  const char *AR;
   // Configure the toolchain.
-  const char *AR =
-      context.OI.LTOVariant != OutputInfo::LTOKind::None ? "llvm-ar" : "ar";
+  if (getTriple().isAndroid())
+    AR = "llvm-ar";
+  else
+    AR = context.OI.LTOVariant != OutputInfo::LTOKind::None ? "llvm-ar" : "ar";
   Arguments.push_back("crs");
 
   Arguments.push_back(
