@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -5453,9 +5454,10 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       return;
     } else if (auto protoDecl = dc->getSelfProtocolDecl()){
       if (!protoDecl->inheritsFromDistributedActor()) {
-        // TODO: could suggest adding `: DistributedActor` to the protocol as well
-        diagnoseAndRemoveAttr(
+        auto diag = diagnoseAndRemoveAttr(
             attr, diag::distributed_actor_func_not_in_distributed_actor);
+        diagnoseDistributedFunctionInNonDistributedActorProtocol(
+            protoDecl, diag);
         return;
       }
     } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {

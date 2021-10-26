@@ -8,16 +8,16 @@ import _Distributed
 // MARK: Distributed actor protocols
 
 protocol WrongDistFuncs {
-    distributed func notDistActor() // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+    distributed func notDistActor() // expected-error{{'distributed' function can only be declared within 'distributed actor'}}{{5-17=}} {{25-25=: DistributedActor}}
 }
 
 protocol DistProtocol: DistributedActor {
   // FIXME(distributed): avoid issuing these warnings, these originate from the call on the DistProtocol where we marked this func as dist isolated,
   func local() -> String
   // (the note appears a few times, because we misuse the call many times)
-  // expected-note@-2{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}} // FIXME: don't emit this note
-  // expected-note@-3{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}} // FIXME: don't emit this note
-  // expected-note@-4{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}} // FIXME: don't emit this note
+  // expected-note@-2{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-3{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-4{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}}
 
   distributed func dist() -> String
   distributed func dist(string: String) -> String
@@ -91,8 +91,10 @@ func outside_good_ext<DP: DistProtocol>(dp: DP) async throws {
 protocol StrictlyLocal {
   func local()
   // expected-note@-1{{mark the protocol requirement 'local()' 'async throws' in order witness it with 'distributed' function declared in distributed actor 'Nope2_StrictlyLocal'}}
+
   func localThrows() throws
   // expected-note@-1{{mark the protocol requirement 'localThrows()' 'async' in order witness it with 'distributed' function declared in distributed actor 'Nope2_StrictlyLocal'}}
+
   // TODO: localAsync
 }
 

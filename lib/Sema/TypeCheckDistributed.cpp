@@ -53,6 +53,24 @@ DistributedModuleIsAvailableRequest::evaluate(Evaluator &evaluator,
 
 // ==== ------------------------------------------------------------------------
 
+/// Add Fix-It text for the given protocol type to inherit DistributedActor.
+void swift::diagnoseDistributedFunctionInNonDistributedActorProtocol(
+    const ProtocolDecl *proto, InFlightDiagnostic &diag) {
+  if (proto->getInherited().empty()) {
+    SourceLoc fixItLoc = proto->getBraces().Start;
+    diag.fixItInsert(fixItLoc, ": DistributedActor");
+  } else {
+    // Similar to how Sendable FitIts do this, we insert at the end of
+    // the inherited types.
+    ASTContext &ctx = proto->getASTContext();
+    SourceLoc fixItLoc = proto->getInherited().back().getSourceRange().End;
+    fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
+    diag.fixItInsert(fixItLoc, ", DistributedActor");
+  }
+}
+
+// ==== ------------------------------------------------------------------------
+
 bool IsDistributedActorRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   // Protocols are actors if they inherit from `DistributedActor`.
@@ -63,7 +81,8 @@ bool IsDistributedActorRequest::evaluate(
             protocol->inheritsFrom(distributedActorProtocol));
   }
 
-  // Class declarations are 'distributed actors' if they are declared with 'distributed actor'
+  // Class declarations are 'distributed actors' if they are declared with
+  // 'distributed actor'
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if(!classDecl)
     return false;
