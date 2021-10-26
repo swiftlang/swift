@@ -177,3 +177,26 @@ distributed actor BadGreeter: ErrorCases {
   distributed func unexpectedAsyncThrows() async throws -> String { "" }
   // expected-note@-1{{candidate is 'async', but protocol requirement is not}}
 }
+
+// ==== ------------------------------------------------------------------------
+// MARK: Distributed Actor requiring protocol witnessing async throws requirements
+
+struct Salsa: Codable, Sendable {}
+
+protocol TacoPreparation {
+  func makeTacos(with salsa: Salsa) async throws
+}
+
+protocol DistributedTacoMaker: DistributedActor, TacoPreparation {
+}
+
+extension DistributedTacoMaker {
+    distributed func makeTacos(with: Salsa) {}
+}
+
+extension TacoPreparation {
+    distributed func makeSalsa() -> Salsa {}
+  // expected-error@-1{{'distributed' function can only be declared within 'distributed actor'}}
+}
+
+distributed actor TacoWorker: DistributedTacoMaker {} // implemented in extensions

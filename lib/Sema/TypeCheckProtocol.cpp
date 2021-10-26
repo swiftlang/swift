@@ -2827,19 +2827,27 @@ bool ConformanceChecker::checkActorIsolation(
   case ActorIsolationRestriction::ActorSelf: {
     auto requirementIsolation = getActorIsolation(requirement);
 
-    auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness);
-    auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
-    auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
-
     // An actor-isolated witness can only conform to an actor-isolated
     // requirement.
     if (requirementIsolation == ActorIsolation::ActorInstance) {
       return false;
     }
 
+    auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness);
+    auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
+    auto nominal = dyn_cast<NominalTypeDecl>(witness->getDeclContext());
+    auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
+    if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
+      // We can witness a distributed function in an extension, as long as
+      // that extension itself is on a DistributedActor type (including
+      // protocols that inherit from DistributedActor, even if the protocol
+      // requirement was not expressed in terms of distributed actors).
+      nominal = extension->getExtendedNominal();
+    }
+
     /// Distributed actors can witness protocol requirements either with
     /// nonisolated or distributed members.
-    if (witnessClass && witnessClass->isDistributedActor()) {
+    if (nominal && nominal->isDistributedActor()) {
       // A distributed actor may conform to an 'async throws' function
       // requirement with a distributed function, because those are always
       // cross-actor.
@@ -2866,7 +2874,8 @@ bool ConformanceChecker::checkActorIsolation(
           requirementFunc->diagnose(diag::note_add_async_and_throws_to_decl,
                                     witness->getName(),
                                     suggestAddingModifiers,
-                                    witnessClass->getName());
+                                    witnessClass ? witnessClass->getName() :
+                                                   nominal->getName());
           // TODO(distributed): fixit inserts for the async/throws
         }
       }
@@ -2961,9 +2970,18 @@ bool ConformanceChecker::checkActorIsolation(
 
     auto witnessFunc = dyn_cast<AbstractFunctionDecl>(witness);
     auto requirementFunc = dyn_cast<AbstractFunctionDecl>(requirement);
+    auto nominal = dyn_cast<NominalTypeDecl>(witness->getDeclContext());
     auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
+    if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
+      // We can witness a distributed function in an extension, as long as
+      // that extension itself is on a DistributedActor type (including
+      // protocols that inherit from DistributedActor, even if the protocol
+      // requirement was not expressed in terms of distributed actors).
+      nominal = extension->getExtendedNominal();
+      witnessClass = extension->getSelfClassDecl();
+    }
 
-    if (witnessClass && witnessClass->isDistributedActor()) {
+    if (nominal && nominal->isDistributedActor()) {
       // A distributed actor may conform to an 'async throws' function
       // requirement with a distributed function, because those are always
       // cross-actor.
@@ -2988,8 +3006,10 @@ bool ConformanceChecker::checkActorIsolation(
           if (!requirementFunc->hasAsync()) suggestAddingModifiers += 1;
           if (!requirementFunc->hasThrows()) suggestAddingModifiers += 2;
           requirementFunc->diagnose(diag::note_add_async_and_throws_to_decl,
-                                    witness->getName(), suggestAddingModifiers,
-                                    witnessClass->getName());
+                                    witness->getName(),
+                                    suggestAddingModifiers,
+                                    witnessClass ? witnessClass->getName() :
+                                                   nominal->getName());
           // TODO(distributed): fixit inserts for the async/throws
         } // TODO(distributed): handle computed properties as well?
       }
