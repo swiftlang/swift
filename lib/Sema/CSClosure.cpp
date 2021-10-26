@@ -162,8 +162,8 @@ static bool isViableElement(ASTNode element) {
   return true;
 }
 
-using ElementInfo =
-    std::tuple<ASTNode, ContextualTypeInfo, ConstraintLocator *>;
+using ElementInfo = std::tuple<ASTNode, ContextualTypeInfo,
+                               /*isDiscarded=*/bool, ConstraintLocator *>;
 
 static void createConjunction(ConstraintSystem &cs,
                               ArrayRef<ElementInfo> elements,
@@ -190,7 +190,8 @@ static void createConjunction(ConstraintSystem &cs,
   for (const auto &entry : elements) {
     ASTNode element = std::get<0>(entry);
     ContextualTypeInfo context = std::get<1>(entry);
-    ConstraintLocator *elementLoc = std::get<2>(entry);
+    bool isDiscarded = std::get<2>(entry);
+    ConstraintLocator *elementLoc = std::get<3>(entry);
 
     if (!isViableElement(element))
       continue;
@@ -201,8 +202,8 @@ static void createConjunction(ConstraintSystem &cs,
     if (isIsolated)
       element.walk(paramCollector);
 
-    constraints.push_back(
-        Constraint::createClosureBodyElement(cs, element, context, elementLoc));
+    constraints.push_back(Constraint::createClosureBodyElement(
+        cs, element, context, elementLoc, isDiscarded));
   }
 
   // It's possible that there are no viable elements in the body,
@@ -220,8 +221,9 @@ static void createConjunction(ConstraintSystem &cs,
 }
 
 ElementInfo makeElement(ASTNode node, ConstraintLocator *locator,
-                        ContextualTypeInfo context = ContextualTypeInfo()) {
-  return std::make_tuple(node, context, locator);
+                        ContextualTypeInfo context = ContextualTypeInfo(),
+                        bool isDiscarded = false) {
+  return std::make_tuple(node, context, isDiscarded, locator);
 }
 
 static ProtocolDecl *getSequenceProtocol(ASTContext &ctx, SourceLoc loc,
@@ -751,6 +753,8 @@ private:
 
   void visitBraceStmt(BraceStmt *braceStmt) {
     if (isSupportedMultiStatementClosure()) {
+      auto &ctx = cs.getASTContext();
+
       if (isChildOf(StmtKind::Case)) {
         auto *caseStmt = cast<CaseStmt>(
             locator->castLastElementTo<LocatorPathElt::ClosureBodyElement>()
@@ -765,10 +769,15 @@ private:
 
       SmallVector<ElementInfo, 4> elements;
       for (auto element : braceStmt->getElements()) {
+        bool isDiscarded =
+            element.is<Expr *>() &&
+            (!ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport);
+
         elements.push_back(makeElement(
             element,
             cs.getConstraintLocator(
-                locator, LocatorPathElt::ClosureBodyElement(element))));
+                locator, LocatorPathElt::ClosureBodyElement(element)),
+            /*contextualInfo=*/{}, isDiscarded));
       }
 
       createConjunction(cs, elements, locator);
@@ -925,28 +934,22 @@ bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyClosureBodyElementConstraint(
-    ASTNode element, ContextualTypeInfo context, TypeMatchOptions flags,
-    ConstraintLocatorBuilder locator) {
+    ASTNode element, ContextualTypeInfo context, bool isDiscarded,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   auto *closure = castToExpr<ClosureExpr>(locator.getAnchor());
 
   ClosureConstraintGenerator generator(*this, closure,
                                        getConstraintLocator(locator));
 
   if (auto *expr = element.dyn_cast<Expr *>()) {
-    if (context.purpose != CTP_Unused) {
-      SolutionApplicationTarget target(expr, closure, context.purpose,
-                                       context.getType(),
-                                       /*isDiscarded=*/false);
+    SolutionApplicationTarget target(expr, closure, context.purpose,
+                                     context.getType(), isDiscarded);
 
-      if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
-        return SolutionKind::Error;
-
-      setSolutionApplicationTarget(expr, target);
-      return SolutionKind::Solved;
-    }
-
-    if (!generateConstraints(expr, closure, /*isInputExpression=*/false))
+    if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
       return SolutionKind::Error;
+
+    setSolutionApplicationTarget(expr, target);
+    return SolutionKind::Solved;
   } else if (auto *stmt = element.dyn_cast<Stmt *>()) {
     generator.visit(stmt);
   } else if (auto *cond = element.dyn_cast<StmtCondition *>()) {
@@ -1241,13 +1244,20 @@ private:
   }
 
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
+    auto &cs = solution.getConstraintSystem();
+
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
         // Rewrite the expression.
-        if (auto rewrittenExpr = rewriteExpr(expr))
-          node = rewrittenExpr;
-        else
+        auto target = *cs.getSolutionApplicationTarget(expr);
+        if (auto rewrittenTarget = rewriteTarget(target)) {
+          node = rewrittenTarget->getAsExpr();
+
+          if (target.isDiscardedExpr())
+            TypeChecker::checkIgnoredExpr(castToExpr(node));
+        } else {
           hadError = true;
+        }
       } else if (auto stmt = node.dyn_cast<Stmt *>()) {
         node = visit(stmt);
       } else {

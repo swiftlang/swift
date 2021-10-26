@@ -12587,6 +12587,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::ClosureBodyElement:
     return simplifyClosureBodyElementConstraint(
         constraint.getClosureElement(), constraint.getElementContext(),
+        constraint.isDiscardedElement(),
         /*flags=*/None, constraint.getLocator());
   }
 

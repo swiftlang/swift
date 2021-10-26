@@ -4845,8 +4845,8 @@ private:
   /// Simplify a closure body element constraint by generating required
   /// constraints to represent the given element in constraint system.
   SolutionKind simplifyClosureBodyElementConstraint(
-      ASTNode element, ContextualTypeInfo context, TypeMatchOptions flags,
-      ConstraintLocatorBuilder locator);
+      ASTNode element, ContextualTypeInfo context, bool isDiscarded,
+      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
