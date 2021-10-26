@@ -5890,7 +5890,8 @@ bool hasExplicitResult(ClosureExpr *closure);
 /// Emit diagnostics for syntactic restrictions within a given solution
 /// application target.
 void performSyntacticDiagnosticsForTarget(
-    const SolutionApplicationTarget &target, bool isExprStmt);
+    const SolutionApplicationTarget &target,
+    bool isExprStmt,bool disableExprAvailabiltyChecking = false);
 
 /// Given a member of a protocol, check whether `Self` type of that
 /// protocol is contextually bound to some concrete type via same-type
