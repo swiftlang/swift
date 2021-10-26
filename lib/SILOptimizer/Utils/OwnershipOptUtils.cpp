@@ -246,6 +246,9 @@ void GuaranteedOwnershipExtension::transform(Status status) {
     PrunedLivenessBoundary ownedBoundary;
     ownedBoundary.compute(ownedLifetime, ownedConsumeBlocks);
     extendOwnedLifetime(beginBorrow->getOperand(), ownedBoundary, deleter);
+    PrunedLivenessBoundary guaranteedBoundary;
+    guaranteedBoundary.compute(guaranteedLiveness, ownedConsumeBlocks);
+    extendLocalBorrow(beginBorrow, guaranteedBoundary, deleter);
     break;
   }
   }
