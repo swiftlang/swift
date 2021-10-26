@@ -1,14 +1,11 @@
-// RUN: %target-swift-frontend -module-name test -primary-file %s -emit-sil -enable-experimental-distributed | %FileCheck %s --enable-var-scope --dump-input=fail --implicit-check-not=actorReady --implicit-check-not=resignIdentity --implicit-check-not=hop_to_executor
+// RUN: %target-swift-frontend -module-name test -primary-file %s -emit-sil -enable-experimental-distributed -disable-availability-checking | %FileCheck %s --enable-var-scope --dump-input=fail --implicit-check-not=actorReady --implicit-check-not=resignIdentity --implicit-check-not=hop_to_executor
 // REQUIRES: concurrency
 // REQUIRES: distributed
-
-// REQUIRES: OS=macosx
 
 import _Distributed
 
 class SomeClass {}
 
-@available(macOS 12, *)
 distributed actor MyDistActor {
   var localOnlyField: SomeClass
 
