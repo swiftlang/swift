@@ -11,6 +11,9 @@
 // FIXME(distributed): we need to revisit what's going on on windows with distributed actors rdar://83859906
 // UNSUPPORTED: OS=windows-msvc
 
+// Flaky CI test
+// REQUIRES: radar84649015
+
 import _Distributed
 
 enum MyError: Error {
