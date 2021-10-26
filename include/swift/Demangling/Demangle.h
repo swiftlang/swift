@@ -20,8 +20,8 @@
 #define SWIFT_DEMANGLING_DEMANGLE_H
 
 #include "swift/Demangling/NamespaceMacros.h"
-#include "swift/Runtime/Config.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Compiler.h"
 #include <cassert>
 #include <cstdint>
 #include <memory>
@@ -514,7 +514,7 @@ enum class OperatorKind {
 };
 
 /// A mangling error, which consists of an error code and a Node pointer
-struct SWIFT_NODISCARD ManglingError {
+struct LLVM_NODISCARD ManglingError {
   enum Code {
     Success = 0,
     AssertionFailed,
@@ -556,7 +556,7 @@ struct SWIFT_NODISCARD ManglingError {
 
 /// Used as a return type for mangling functions that may fail
 template <typename T>
-class SWIFT_NODISCARD ManglingErrorOr {
+class LLVM_NODISCARD ManglingErrorOr {
 private:
   ManglingError err_;
   T             value_;
