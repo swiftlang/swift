@@ -214,6 +214,7 @@ foreach(sdk ${SWIFT_SDKS})
         set(android_libraries -llog)
         set(libpthread)
       endif()
+      set(libBlocksRuntime -lBlocksRuntime)
 
       set(linkfile ${lowercase_sdk}/static-stdlib-args.lnk)
       file(WRITE "${SWIFTSTATICLIB_DIR}/${linkfile}" "
@@ -221,6 +222,7 @@ foreach(sdk ${SWIFT_SDKS})
 ${libpthread}
 ${android_libraries}
 -lswiftCore
+${libBlocksRuntime}
 -lstdc++
 -lm
 -Xlinker -export-dynamic

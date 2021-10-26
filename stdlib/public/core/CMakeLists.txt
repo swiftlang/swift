@@ -254,6 +254,15 @@ elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL WINDOWS)
   list(APPEND swift_core_private_link_libraries shell32;DbgHelp)
 endif()
 
+if(NOT SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+  # Non-Darwin platforms also need the blocks runtime
+  if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL WINDOWS)
+    list(APPEND swift_core_private_link_libraries BlocksRuntime)
+  else()
+    list(APPEND swift_core_private_link_libraries -lBlocksRuntime)
+  endif()
+endif()
+
 option(SWIFT_CHECK_ESSENTIAL_STDLIB
     "Check core standard library layering by linking its essential subset"
     FALSE)
