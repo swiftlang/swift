@@ -112,7 +112,7 @@ RewriteSystem::RewriteSystem(RewriteContext &ctx)
   Initialized = 0;
   Complete = 0;
   Minimized = 0;
-  RecordHomotopyGenerators = 0;
+  RecordLoops = 0;
 }
 
 RewriteSystem::~RewriteSystem() {
@@ -121,13 +121,13 @@ RewriteSystem::~RewriteSystem() {
 }
 
 void RewriteSystem::initialize(
-    bool recordHomotopyGenerators,
+    bool recordLoops,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&associatedTypeRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
-  RecordHomotopyGenerators = recordHomotopyGenerators;
+  RecordLoops = recordLoops;
 
   for (const auto &rule : associatedTypeRules) {
     bool added = addRule(rule.first, rule.second);
@@ -272,7 +272,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
     if (path) {
       // We already have a loop, since the simplified lhs is identical to the
       // simplified rhs.
-      recordHomotopyGenerator(lhs, loop);
+      recordRewriteLoop(lhs, loop);
 
       if (Debug.contains(DebugFlags::Add)) {
         llvm::dbgs() << "## Recorded trivial loop at " << lhs << ": ";
@@ -308,7 +308,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
     // add a rewrite step applying the new rule in reverse to close the loop.
     loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
                                          newRuleID, /*inverse=*/true));
-    recordHomotopyGenerator(lhs, loop);
+    recordRewriteLoop(lhs, loop);
 
     if (Debug.contains(DebugFlags::Add)) {
       llvm::dbgs() << "## Recorded non-trivial loop at " << lhs << ": ";
@@ -488,7 +488,7 @@ void RewriteSystem::simplifyRewriteSystem() {
       loop.dump(llvm::dbgs(), MutableTerm(lhs), *this);
     }
 
-    recordHomotopyGenerator(MutableTerm(lhs), loop);
+    recordRewriteLoop(MutableTerm(lhs), loop);
   }
 }
 
@@ -562,8 +562,8 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
     out << "- " << rule << "\n";
   }
   out << "}\n";
-  out << "Homotopy generators: {\n";
-  for (const auto &loop : HomotopyGenerators) {
+  out << "Rewrite loops: {\n";
+  for (const auto &loop : Loops) {
     if (loop.isDeleted())
       continue;
 

@@ -77,7 +77,7 @@ using namespace rewriting;
 /// of the pair stores conformance rules that appear without context. The
 /// second element of the pair stores rules that appear with non-empty left
 /// context. For each such rule, the left prefix is also stored alongside.
-void HomotopyGenerator::findProtocolConformanceRules(
+void RewriteLoop::findProtocolConformanceRules(
     llvm::SmallDenseMap<const ProtocolDecl *,
                         ProtocolConformanceRules, 2> &result,
     const RewriteSystem &system) const {
@@ -274,7 +274,7 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
 void RewriteSystem::computeCandidateConformancePaths(
     llvm::MapVector<unsigned,
                     std::vector<SmallVector<unsigned, 2>>> &conformancePaths) const {
-  for (const auto &loop : HomotopyGenerators) {
+  for (const auto &loop : Loops) {
     if (loop.isDeleted())
       continue;
 

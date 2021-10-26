@@ -458,7 +458,7 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 
   // Add the initial set of rewrite rules to the rewrite system, also
   // providing the protocol graph to use for the linear order on terms.
-  System.initialize(/*recordHomotopyGenerators=*/false,
+  System.initialize(/*recordLoops=*/false,
                     std::move(builder.AssociatedTypeRules),
                     std::move(builder.RequirementRules));
 
@@ -499,7 +499,7 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
 
   // Add the initial set of rewrite rules to the rewrite system, also
   // providing the protocol graph to use for the linear order on terms.
-  System.initialize(/*recordHomotopyGenerators=*/true,
+  System.initialize(/*recordLoops=*/true,
                     std::move(builder.AssociatedTypeRules),
                     std::move(builder.RequirementRules));
 

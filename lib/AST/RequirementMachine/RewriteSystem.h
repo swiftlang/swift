@@ -358,7 +358,7 @@ public:
 
 /// Information about protocol conformance rules appearing in a rewrite loop.
 ///
-/// This is the return value of HomotopyGenerator::findProtocolConformanceRules().
+/// This is the return value of RewriteLoop::findProtocolConformanceRules().
 struct ProtocolConformanceRules {
   SmallVector<unsigned, 2> RulesInEmptyContext;
   SmallVector<std::pair<MutableTerm, unsigned>, 2> RulesInContext;
@@ -366,7 +366,7 @@ struct ProtocolConformanceRules {
 };
 
 /// A loop (3-cell) that rewrites the basepoint back to the basepoint.
-class HomotopyGenerator {
+class RewriteLoop {
 public:
   MutableTerm Basepoint;
   RewritePath Path;
@@ -375,7 +375,7 @@ private:
   bool Deleted;
 
 public:
-  HomotopyGenerator(MutableTerm basepoint, RewritePath path)
+  RewriteLoop(MutableTerm basepoint, RewritePath path)
     : Basepoint(basepoint), Path(path), Deleted(false) {}
 
   bool isDeleted() const {
@@ -440,7 +440,7 @@ class RewriteSystem final {
   llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
 
   /// Homotopy generators for this rewrite system. These are the
-  /// cyclic rewrite paths which rewrite a term back to itself.
+  /// rewrite loops which rewrite a term back to itself.
   ///
   /// In the category theory interpretation, a rewrite rule is a generating
   /// 2-cell, and a rewrite path is a 2-cell made from a composition of
@@ -451,8 +451,9 @@ class RewriteSystem final {
   /// 2-cells; this is actually represented as a single 2-cell forming a
   /// loop around a base point.
   ///
-  /// This data informs the generic signature minimization algorithm.
-  std::vector<HomotopyGenerator> HomotopyGenerators;
+  /// This data is used by the homotopy reduction and generating conformances
+  /// algorithms.
+  std::vector<RewriteLoop> Loops;
 
   DebugOptions Debug;
 
@@ -468,8 +469,9 @@ class RewriteSystem final {
   /// Whether we've minimized the rewrite system.
   unsigned Minimized : 1;
 
-  /// If set, record homotopy generators in the completion procedure.
-  unsigned RecordHomotopyGenerators : 1;
+  /// If set, the completion procedure records rewrite loops describing the
+  /// identities among rewrite rules discovered while resolving critical pairs.
+  unsigned RecordLoops : 1;
 
 public:
   explicit RewriteSystem(RewriteContext &ctx);
@@ -483,7 +485,7 @@ public:
   /// Return the rewrite context used for allocating memory.
   RewriteContext &getRewriteContext() const { return Context; }
 
-  void initialize(bool recordHomotopyGenerators,
+  void initialize(bool recordLoops,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&assocaitedTypeRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
@@ -543,19 +545,19 @@ public:
   void verifyRewriteRules(ValidityPolicy policy) const;
 
 private:
-  void recordHomotopyGenerator(HomotopyGenerator loop) {
-    if (!RecordHomotopyGenerators)
+  void recordRewriteLoop(RewriteLoop loop) {
+    if (!RecordLoops)
       return;
 
-    HomotopyGenerators.push_back(loop);
+    Loops.push_back(loop);
   }
 
-  void recordHomotopyGenerator(MutableTerm basepoint,
-                               RewritePath path) {
-    if (!RecordHomotopyGenerators)
+  void recordRewriteLoop(MutableTerm basepoint,
+                         RewritePath path) {
+    if (!RecordLoops)
       return;
 
-    HomotopyGenerators.emplace_back(basepoint, path);
+    Loops.emplace_back(basepoint, path);
   }
 
   bool
@@ -564,7 +566,7 @@ private:
       const Rule &lhs, const Rule &rhs,
       std::vector<std::pair<MutableTerm, MutableTerm>> &pairs,
       std::vector<RewritePath> &paths,
-      std::vector<HomotopyGenerator> &loops) const;
+      std::vector<RewriteLoop> &loops) const;
 
   void processMergedAssociatedTypes();
 
@@ -599,7 +601,7 @@ public:
   llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
   getMinimizedRules(ArrayRef<const ProtocolDecl *> protos);
 
-  void verifyHomotopyGenerators() const;
+  void verifyRewriteLoops() const;
 
   void verifyRedundantConformances(
       llvm::DenseSet<unsigned> redundantConformances) const;

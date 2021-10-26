@@ -10,20 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A confluent rewrite system together with a set of 3-cells that generate the
-// homotopy relation on 2-cells (rewrite paths) is known as a 'coherent
-// presentation'.
+// A confluent rewrite system together with a set of rewrite loops that generate
+// the homotopy relation on rewrite paths is known as a 'coherent presentation'.
 //
-// If a rewrite rule appears exactly once in a 3-cell and without context, the
-// 3-cell witnesses a redundancy; the rewrite rule is equivalent to traveling
+// If a rewrite rule appears exactly once in a loop and without context, the
+// loop witnesses a redundancy; the rewrite rule is equivalent to traveling
 // around the loop "in the other direction". This rewrite rule and the
-// corresponding 3-cell can be deleted from the coherent presentation via a
+// corresponding loop can be deleted from the coherent presentation via a
 // Tietze transformation.
 //
-// Any occurrence of the rule in the remaining 3-cells is replaced with the
-// alternate definition obtained by splitting the 3-cell that witnessed the
-// redundancy. After substitution, every 3-cell is normalized to a cyclically
-// reduced left-canonical form. The 3-cell witnessing the redundancy normalizes
+// Any occurrence of the rule in the remaining loops is replaced with the
+// alternate definition obtained by splitting the loop that witnessed the
+// redundancy. After substitution, every loop is normalized to a cyclically
+// reduced left-canonical form. The loop witnessing the redundancy normalizes
 // to the empty loop and is deleted.
 //
 // Iterating this process eventually produces a minimal presentation.
@@ -32,7 +31,7 @@
 // Procedure with Applications to Coherence of Monoids",
 // https://hal.inria.fr/hal-00818253.
 //
-// The idea of computing a left-canonical form for 2-cells is from
+// The idea of computing a left-canonical form for rewrite loops is from
 // "Homotopy reduction systems for monoid presentations",
 // https://www.sciencedirect.com/science/article/pii/S0022404997000959
 //
@@ -43,7 +42,7 @@
 // rules to be deleted instead.
 //
 // Also, for a conformance rule (V.[P] => V) to be redundant, a stronger
-// condition is needed than appearing once in a 3-cell and without context;
+// condition is needed than appearing once in a loop and without context;
 // the rule must not be a _generating conformance_. The algorithm for computing
 // a minimal set of generating conformances is implemented in
 // GeneratingConformances.cpp.
@@ -94,7 +93,8 @@ MutableTerm &RewritePathEvaluator::getCurrentTerm() {
   return A.back();
 }
 
-/// Invert a 2-cell.
+/// Invert a rewrite path, producing a path that rewrites the original path's
+/// destination back to the original path's source.
 void RewritePath::invert() {
   std::reverse(Steps.begin(), Steps.end());
 
@@ -350,10 +350,10 @@ void RewriteStep::dump(llvm::raw_ostream &out,
   }
 }
 
-/// A rewrite rule is redundant if it appears exactly once in a 3-cell
+/// A rewrite rule is redundant if it appears exactly once in a loop
 /// without context.
 llvm::SmallVector<unsigned, 1>
-HomotopyGenerator::findRulesAppearingOnceInEmptyContext(
+RewriteLoop::findRulesAppearingOnceInEmptyContext(
     const RewriteSystem &system) const {
   llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
   llvm::SmallDenseMap<unsigned, unsigned, 2> ruleMultiplicity;
@@ -391,10 +391,10 @@ HomotopyGenerator::findRulesAppearingOnceInEmptyContext(
   return result;
 }
 
-/// Given a rewrite rule which appears exactly once in a 3-cell
+/// Given a rewrite rule which appears exactly once in a loop
 /// without context, return a new definition for this rewrite rule.
 /// The new definition is the path obtained by deleting the
-/// rewrite rule from the 3-cell.
+/// rewrite rule from the loop.
 RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
   // A cycle is a path from the basepoint to the basepoint.
   // Somewhere in this path, an application of \p ruleID
@@ -653,12 +653,12 @@ bool RewritePath::computeFreelyReducedPath() {
 /// pairs of terms from the ends that are inverses of each other, applying
 /// the corresponding translation to the basepoint.
 ///
-/// For example, consider this 3-cell, forming a loop with basepoint 'X':
+/// For example, consider this loop with basepoint 'X':
 ///
 ///   (X => Y.A) * (Y.A => Y.B) * Y.(B => A) * (Y.A => X)
 ///
 /// The first step is the inverse of the last step, so the cyclic
-/// reduction is the 3-cell (Y.A => Y.B) * Y.(B => A), with a new
+/// reduction is the loop (Y.A => Y.B) * Y.(B => A), with a new
 /// basepoint 'Y.A'.
 bool RewritePath::computeCyclicallyReducedLoop(MutableTerm &basepoint,
                                                const RewriteSystem &system) {
@@ -717,8 +717,8 @@ void RewritePath::dump(llvm::raw_ostream &out,
   }
 }
 
-/// Compute cyclically-reduced left-canonical normal form of a 3-cell.
-void HomotopyGenerator::normalize(const RewriteSystem &system) {
+/// Compute cyclically-reduced left-canonical normal form of a loop.
+void RewriteLoop::normalize(const RewriteSystem &system) {
   // FIXME: This can be more efficient.
   bool changed;
   do {
@@ -729,8 +729,8 @@ void HomotopyGenerator::normalize(const RewriteSystem &system) {
   } while (changed);
 }
 
-/// A 3-cell is "in context" if every rewrite step has a left or right whisker.
-bool HomotopyGenerator::isInContext(const RewriteSystem &system) const {
+/// A loop is "in context" if every rewrite step has a left or right whisker.
+bool RewriteLoop::isInContext(const RewriteSystem &system) const {
   RewritePathEvaluator evaluator(Basepoint);
 
   unsigned minStartOffset = (unsigned) -1;
@@ -760,8 +760,8 @@ bool HomotopyGenerator::isInContext(const RewriteSystem &system) const {
   return (minStartOffset > 0 || minEndOffset > 0);
 }
 
-void HomotopyGenerator::dump(llvm::raw_ostream &out,
-                             const RewriteSystem &system) const {
+void RewriteLoop::dump(llvm::raw_ostream &out,
+                       const RewriteSystem &system) const {
   out << Basepoint << ": ";
   Path.dump(out, Basepoint, system);
   if (isDeleted())
@@ -784,7 +784,7 @@ isCandidateForDeletion(unsigned ruleID,
   // Associated type introduction rules are 'permanent'. They're
   // not worth eliminating since they are re-added every time; it
   // is better to find other candidates to eliminate in the same
-  // 3-cell instead.
+  // loop instead.
   if (rule.isPermanent())
     return false;
 
@@ -826,7 +826,7 @@ isCandidateForDeletion(unsigned ruleID,
   return true;
 }
 
-/// Find a rule to delete by looking through all 3-cells for rewrite rules appearing
+/// Find a rule to delete by looking through all loops for rewrite rules appearing
 /// once in empty context. Returns a redundant rule to delete if one was found,
 /// otherwise returns None.
 ///
@@ -850,8 +850,8 @@ findRuleToDelete(bool firstPass,
   assert(!firstPass || redundantConformances == nullptr);
 
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
-  for (unsigned loopID : indices(HomotopyGenerators)) {
-    const auto &loop = HomotopyGenerators[loopID];
+  for (unsigned loopID : indices(Loops)) {
+    const auto &loop = Loops[loopID];
     if (loop.isDeleted())
       continue;
 
@@ -887,7 +887,7 @@ findRuleToDelete(bool firstPass,
   unsigned ruleID = found->second;
   assert(replacementPath.empty());
 
-  auto &loop = HomotopyGenerators[loopID];
+  auto &loop = Loops[loopID];
   replacementPath = loop.Path.splitCycleAtRule(ruleID);
 
   loop.markDeleted();
@@ -897,7 +897,7 @@ findRuleToDelete(bool firstPass,
 }
 
 /// Delete a rewrite rule that is known to be redundant, replacing all
-/// occurrences of the rule in all 3-cells with the replacement path.
+/// occurrences of the rule in all loops with the replacement path.
 void RewriteSystem::deleteRule(unsigned ruleID,
                                const RewritePath &replacementPath) {
   if (Debug.contains(DebugFlags::HomotopyReduction)) {
@@ -912,8 +912,8 @@ void RewriteSystem::deleteRule(unsigned ruleID,
   }
 
   // Replace all occurrences of the rule with the replacement path and
-  // normalize all 3-cells.
-  for (auto &loop : HomotopyGenerators) {
+  // normalize all loops.
+  for (auto &loop : Loops) {
     if (loop.isDeleted())
       continue;
 
@@ -927,14 +927,14 @@ void RewriteSystem::deleteRule(unsigned ruleID,
 
     if (Debug.contains(DebugFlags::HomotopyReduction)) {
       if (size != loop.Path.size()) {
-        llvm::dbgs() << "** Note: 3-cell normalization eliminated "
+        llvm::dbgs() << "** Note: loop normalization eliminated "
                      << (size - loop.Path.size()) << " steps\n";
       }
     }
 
     if (loop.Path.empty()) {
       if (Debug.contains(DebugFlags::HomotopyReduction)) {
-        llvm::dbgs() << "** Deleting trivial 3-cell at basepoint ";
+        llvm::dbgs() << "** Deleting trivial loop at basepoint ";
         llvm::dbgs() << loop.Basepoint << "\n";
       }
 
@@ -945,7 +945,7 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     // FIXME: Is this correct?
     if (loop.isInContext(*this)) {
       if (Debug.contains(DebugFlags::HomotopyReduction)) {
-        llvm::dbgs() << "** Deleting 3-cell in context: ";
+        llvm::dbgs() << "** Deleting loop in context: ";
         loop.dump(llvm::dbgs(), *this);
         llvm::dbgs() << "\n";
       }
@@ -955,7 +955,7 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     }
 
     if (Debug.contains(DebugFlags::HomotopyReduction)) {
-      llvm::dbgs() << "** Updated 3-cell: ";
+      llvm::dbgs() << "** Updated loop: ";
       loop.dump(llvm::dbgs(), *this);
       llvm::dbgs() << "\n";
     }
@@ -979,8 +979,8 @@ void RewriteSystem::performHomotopyReduction(
   }
 }
 
-/// Use the 3-cells to delete redundant rewrite rules via a series of Tietze
-/// transformations, updating and simplifying existing 3-cells as each rule
+/// Use the loops to delete redundant rewrite rules via a series of Tietze
+/// transformations, updating and simplifying existing loops as each rule
 /// is deleted.
 ///
 /// Redundant rules are mutated to set their isRedundant() bit.
@@ -989,9 +989,9 @@ void RewriteSystem::minimizeRewriteSystem() {
   assert(!Minimized);
   Minimized = 1;
 
-  /// Begin by normalizing all 3-cells to cyclically-reduced left-canonical
+  /// Begin by normalizing all loops to cyclically-reduced left-canonical
   /// form.
-  for (auto &loop : HomotopyGenerators) {
+  for (auto &loop : Loops) {
     if (loop.isDeleted())
       continue;
 
@@ -999,7 +999,7 @@ void RewriteSystem::minimizeRewriteSystem() {
   }
 
   // Check invariants before homotopy reduction.
-  verifyHomotopyGenerators();
+  verifyRewriteLoops();
 
   // First pass: Eliminate all redundant rules involving unresolved types.
   performHomotopyReduction(/*firstPass=*/true,
@@ -1022,7 +1022,7 @@ void RewriteSystem::minimizeRewriteSystem() {
                            /*redundantConformances=*/&redundantConformances);
 
   // Check invariants after homotopy reduction.
-  verifyHomotopyGenerators();
+  verifyRewriteLoops();
   verifyRedundantConformances(redundantConformances);
   verifyMinimizedRules();
 }
@@ -1055,10 +1055,10 @@ RewriteSystem::getMinimizedRules(ArrayRef<const ProtocolDecl *> protos) {
   return rules;
 }
 
-/// Verify that each 3-cell is a valid loop around its basepoint.
-void RewriteSystem::verifyHomotopyGenerators() const {
+/// Verify that each loop begins and ends at its basepoint.
+void RewriteSystem::verifyRewriteLoops() const {
 #ifndef NDEBUG
-  for (const auto &loop : HomotopyGenerators) {
+  for (const auto &loop : Loops) {
     RewritePathEvaluator evaluator(loop.Basepoint);
 
     for (const auto &step : loop.Path) {

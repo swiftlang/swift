@@ -35,7 +35,7 @@ public func test<T : P>(_ t: T) where T == T.A {
 // CHECK-NEXT: - τ_0_1.A => τ_0_0
 // CHECK-NEXT: - τ_0_0.A => τ_0_0
 // CHECK-NEXT: }
-// CHECK-NEXT: Homotopy generators: {
+// CHECK-NEXT: Rewrite loops: {
 // CHECK:      }
 // CHECK-NEXT: Property map: {
 // CHECK-NEXT:   [P:A] => { conforms_to: [P] }
