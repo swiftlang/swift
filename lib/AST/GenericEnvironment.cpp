@@ -87,9 +87,12 @@ Optional<Type> GenericEnvironment::getMappingIfPresent(
 Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
                                             Type type) {
   assert(!type->hasArchetype() && "already have a contextual type");
+  assert((env || !type->hasTypeParameter()) &&
+         "no generic environment provided for type with type parameters");
 
-  if (!env)
-    return type.substDependentTypesWithErrorTypes();
+  if (!env) {
+    return type;
+  }
 
   return env->mapTypeIntoContext(type);
 }
