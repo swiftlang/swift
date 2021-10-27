@@ -1769,6 +1769,24 @@ bool ShouldPrintChecker::shouldPrint(const Pattern *P,
   return ShouldPrint;
 }
 
+bool isNonSendableExtension(const Decl *D) {
+  ASTContext &ctx = D->getASTContext();
+
+  const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D);
+  if (!ED || !ED->getAttrs().isUnavailable(ctx))
+    return false;
+
+  auto nonSendable =
+      ED->getExtendedNominal()->getAttrs().getEffectiveSendableAttr();
+  if (!isa_and_nonnull<NonSendableAttr>(nonSendable))
+    return false;
+
+  // GetImplicitSendableRequest::evaluate() creates its extension with the
+  // attribute's AtLoc, so this is a good way to quickly check if the extension
+  // was synthesized for an '@_nonSendable' attribute.
+  return ED->getLocFromSource() == nonSendable->AtLoc;
+}
+
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
   #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
@@ -1791,15 +1809,18 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     return false;
   }
 
-  if (Options.SkipImplicit && D->isImplicit()) {
-    const auto &IgnoreList = Options.TreatAsExplicitDeclList;
-    if (std::find(IgnoreList.begin(), IgnoreList.end(), D) == IgnoreList.end())
+  // Optionally skip these checks for extensions synthesized for '@_nonSendable'
+  if (!Options.AlwaysPrintNonSendableExtensions || !isNonSendableExtension(D)) {
+    if (Options.SkipImplicit && D->isImplicit()) {
+      const auto &IgnoreList = Options.TreatAsExplicitDeclList;
+      if (!llvm::is_contained(IgnoreList, D))
         return false;
-  }
+    }
 
-  if (Options.SkipUnavailable &&
-      D->getAttrs().isUnavailable(D->getASTContext()))
-    return false;
+    if (Options.SkipUnavailable &&
+        D->getAttrs().isUnavailable(D->getASTContext()))
+      return false;
+  }
 
   if (Options.ExplodeEnumCaseDecls) {
     if (isa<EnumElementDecl>(D))

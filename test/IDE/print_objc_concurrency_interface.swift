@@ -23,10 +23,17 @@ import _Concurrency
 // CHECK-SAME: @unchecked Sendable
 
 // CHECK-LABEL: class NonSendableClass
+// CHECK: @available(*, unavailable)
+// CHECK-NEXT: extension NonSendableClass : @unchecked Sendable {
 
 // CHECK-LABEL: class AuditedSendable :
 // CHECK-SAME: @unchecked Sendable
 
 // CHECK-LABEL: class AuditedNonSendable
+// CHECK: @available(*, unavailable)
+// CHECK-NEXT: extension AuditedNonSendable : @unchecked Sendable {
 
 // CHECK-LABEL: class AuditedBoth
+// CHECK: @available(*, unavailable)
+// CHECK-NEXT: extension AuditedBoth : @unchecked Sendable {
+

@@ -4004,6 +4004,8 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
       auto inherits = ctx.AllocateCopy(makeArrayRef(
           InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
                          /*isUnchecked*/true)));
+      // If you change the use of AtLoc in the ExtensionDecl, make sure you
+      // update isNonSendableExtension() in ASTPrinter.
       auto extension = ExtensionDecl::create(ctx, attrMakingUnavailable->AtLoc,
                                              nullptr, inherits,
                                              nominal->getModuleScopeContext(),
