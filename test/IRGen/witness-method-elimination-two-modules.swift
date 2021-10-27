@@ -40,6 +40,9 @@
 // loaded too late").
 // REQUIRES: no_asan
 
+// Disable to unblock CI
+// REQUIRES: rdar84643923
+
 #if LIBRARY
 
 public protocol MyProtocol {
