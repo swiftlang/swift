@@ -50,5 +50,8 @@ ERROR(alignment_more_than_maximum,none,
       "@_alignment cannot increase alignment above maximum alignment of %0",
       (unsigned))
 
+ERROR(builtin_diagnose_error,none, "%0", (StringRef))
+WARNING(builtin_diagnose_warning,none, "%0", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

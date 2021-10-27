@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -1302,15 +1303,13 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::StaticAssert) {
-    auto condition = args.claimNext();
+  if (Builtin.ID == BuiltinValueKind::Diagnose) {
+    auto fatal = dyn_cast<llvm::Constant>(args.claimNext());
+    auto condition = dyn_cast<llvm::Constant>(args.claimNext());
     auto message = args.claimNext();
 
-    if (auto conditionConst = dyn_cast<llvm::Constant>(condition)) {
-      if (conditionConst->isZeroValue()) {
-        condition->dump();
-        auto sourceLoc = Inst->getLoc().getSourceLoc();
-
+    if (condition && condition->isZeroValue()) {
+      auto sourceLoc = Inst->getLoc().getSourceLoc(); {
         // If the function has been inlined, its source location may not be
         // available, but its caller should be available via the debug scope.
         // Look upwards for a function with a valid source location to which the
@@ -1320,14 +1319,22 @@ if (Builtin.ID == BuiltinValueKind::id) { \
           sourceLoc = debugScope->getLoc().getSourceLoc();
           debugScope = debugScope->InlinedCallSite;
         }
-
-        auto emittedMessage = getStaticStringValue(IGF, message)
-          .getValueOr("Assertion failure");
-        IGF.IGM.error(sourceLoc, emittedMessage);
       }
+
+      auto emittedMessage = getStaticStringValue(IGF, message)
+        .getValueOr("Assertion failure");
+
+      auto& Diags = IGF.IGM.Context.Diags;
+      if (fatal && !fatal->isZeroValue()) {
+        Diags.diagnose(sourceLoc, diag::builtin_diagnose_error, emittedMessage);
+      } else {
+        Diags.diagnose(sourceLoc, diag::builtin_diagnose_warning, emittedMessage);
+      }
+
     } else {
       // Not a compile-time constant at the LLVM layer. The caller is
-      // responsible for emitting a runtime check instead.
+      // responsible for emitting a runtime check instead. OR: test passed, so
+      // no diagnostic is to be emitted.
     }
     return;
   }

@@ -116,7 +116,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::IsConcrete:
     case BuiltinValueKind::IsBitwiseTakable:
     case BuiltinValueKind::IsSameMetatype:
-	case BuiltinValueKind::StaticAssert:
+	case BuiltinValueKind::Diagnose:
     case BuiltinValueKind::Alignof:
     case BuiltinValueKind::OnFastPath:
     case BuiltinValueKind::ExtractElement:

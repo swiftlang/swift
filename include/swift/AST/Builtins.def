@@ -574,10 +574,10 @@ BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
 /// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
 BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
 
-/// StaticAssert has type (Int1, Builtin.RawPointer) -> ()
+/// Diagnose has type (Int1, Builtin.RawPointer) -> ()
 ///
-/// Parameters: condition, message
-BUILTIN_MISC_OPERATION(StaticAssert, "staticAssert", "", Special)
+/// Parameters: fatal, condition, message
+BUILTIN_MISC_OPERATION(Diagnose, "diagnose", "", Special)
 
 /// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)

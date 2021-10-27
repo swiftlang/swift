@@ -607,10 +607,10 @@ public struct UnsafeMutableRawPointer: _Pointer, Sendable {
   public static func allocate(
     byteCount: Int, alignment: Int
   ) -> UnsafeMutableRawPointer {
-    _precondition(alignment >= 0, "Alignment value must be greater than or equal to zero",
-                  tryCheckingDuringCompilation: true)
-    _precondition(alignment == 0 || _isPowerOf2(alignment), "Alignment value must be a power of two",
-                  tryCheckingDuringCompilation: true)
+    _staticAssertIfConstant(byteCount >= 0, "Allocation byte count must be greater than or equal to zero")
+    _staticAssertIfConstant(alignment >= 0, "Alignment value must be greater than or equal to zero")
+    _staticAssertIfConstant(_isPowerOf2(alignment) || alignment == 0, "Alignment value must be a power of two")
+    
     // For any alignment <= _minAllocationAlignment, force alignment = 0.
     // This forces the runtime's "aligned" allocation path so that
     // deallocation does not require the original alignment.

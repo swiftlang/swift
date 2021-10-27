@@ -210,7 +210,7 @@ internal func _staticAssertIfConstant(
   _ condition: Bool,
   _ message: StaticString = StaticString()
 ) {
-  Builtin.staticAssert(condition._value, message.unsafeRawPointer)
+  Builtin.diagnose(true._value, condition._value, message.unsafeRawPointer)
 }
 
 /// Library precondition checks.
@@ -222,18 +222,16 @@ internal func _staticAssertIfConstant(
 @usableFromInline @_transparent
 internal func _precondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
-  tryCheckingDuringCompilation: Bool = false,
+  staticAssert: Bool = true,
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
-  guard tryCheckingDuringCompilation
-          || _isDebugAssertConfiguration()
-          || _isReleaseAssertConfiguration() else {
+  guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
     return
   }
 
   let condition = condition()
-  if tryCheckingDuringCompilation {
+  if staticAssert {
     _staticAssertIfConstant(condition, message)
   }
 
@@ -253,7 +251,7 @@ internal func _preconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  _precondition(false, message, file: file, line: line)
+  _precondition(false, message, staticAssert: false, file: file, line: line)
   _conditionallyUnreachable()
 }
 
@@ -263,14 +261,11 @@ internal func _preconditionFailure(
 @_transparent
 public func _overflowChecked<T>(
   _ args: (T, Bool),
-  tryCheckingDuringCompilation: Bool = false,
   file: StaticString = #file, line: UInt = #line
 ) -> T {
   let (result, error) = args
 
-  if tryCheckingDuringCompilation {
-    _staticAssertIfConstant(!error, "Overflow/underflow")
-  }
+  _staticAssertIfConstant(!error, "Overflow/underflow")
 
   if _isDebugAssertConfiguration() {
     if _slowPath(error) {
@@ -295,20 +290,13 @@ public func _overflowChecked<T>(
 @usableFromInline @_transparent
 internal func _debugPrecondition(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
-  tryCheckingDuringCompilation: Bool = false,
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug mode.
-  guard tryCheckingDuringCompilation || _isDebugAssertConfiguration() else {
-    return
-  }
-
-  let condition = condition()
-  if tryCheckingDuringCompilation {
-    _staticAssertIfConstant(condition, message)
-  }
-
   if _slowPath(_isDebugAssertConfiguration()) {
+    let condition = condition()
+    _staticAssertIfConstant(condition, message)
+
     if !_fastPath(condition) {
       _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
@@ -322,7 +310,7 @@ internal func _debugPreconditionFailure(
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
   if _slowPath(_isDebugAssertConfiguration()) {
-    _precondition(false, message, file: file, line: line)
+    _precondition(false, message, staticAssert: false, file: file, line: line)
   }
   _conditionallyUnreachable()
 }
@@ -336,12 +324,12 @@ internal func _debugPreconditionFailure(
 @usableFromInline @_transparent
 internal func _internalInvariant(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
-  tryCheckingDuringCompilation: Bool = false,
+  staticAssert: Bool = true,
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
   let condition = condition()
-  if tryCheckingDuringCompilation {
+  if staticAssert {
     _staticAssertIfConstant(condition, message)
   }
 
@@ -373,6 +361,6 @@ internal func _internalInvariantFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  _internalInvariant(false, message, file: file, line: line)
+  _internalInvariant(false, message, staticAssert: false, file: file, line: line)
   _conditionallyUnreachable()
 }
