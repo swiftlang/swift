@@ -74,7 +74,7 @@ struct AppliedRewriteStep {
 
 /// Records an evaluation step in a rewrite path.
 struct RewriteStep {
-  enum StepKind {
+  enum StepKind : unsigned {
     /// Apply a rewrite rule to the term at the top of the A stack.
     ///
     /// Formally, this is a whiskered, oriented rewrite rule. For example,
