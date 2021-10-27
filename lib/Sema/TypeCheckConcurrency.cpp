@@ -3946,8 +3946,8 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
       nominal->addExtension(extension);
 
       // Make it accessible to getTopLevelDecls()
-      if (auto sf = dyn_cast<SourceFile>(nominal->getModuleScopeContext()))
-        sf->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
+      if (auto file = dyn_cast<FileUnit>(nominal->getModuleScopeContext()))
+        file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
 
       conformanceDC = extension;
     }
