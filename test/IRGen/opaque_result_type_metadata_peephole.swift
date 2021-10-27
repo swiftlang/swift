@@ -42,25 +42,25 @@ dynamic var replaceable_opaque_var: some P {
 // CHECK-LABEL: define {{.*}} @"$s36opaque_result_type_metadata_peephole26testOpaqueMetadataAccessesyyF"
 public func testOpaqueMetadataAccesses() {
   // We can look through, since it's internal
-  // DEFAULT: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* @"$sSiN", i8** @"$sSi36opaque_result_type_metadata_external1PAAWP")
+  // DEFAULT: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* @"$sSiN", i8** {{%[0-9]+|@"\$sSi36opaque_result_type_metadata_external1PAAWP"}})
   // IMPLICIT-DYNAMIC: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* %{{.*}}, i8** %{{.*}})
   bar(x: foo())
   // We can look through, since it's internal
-  // DEFAULT: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* @"$sSiN", i8** @"$sSi36opaque_result_type_metadata_external1PAAWP")
+  // DEFAULT: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* @"$sSiN", i8** {{%[0-9]+|@"\$sSi36opaque_result_type_metadata_external1PAAWP"}})
   // IMPLICIT-DYNAMIC: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* %{{.*}}, i8** %{{.*}})
   bar(x: foo2())
   // We can't look through, since it's resilient
   // CHECK: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* %[[EXTERNAL_OPAQUE_METADATA:.*]], i8** %[[EXTERNAL_OPAQUE_PROTO:.*]])
   bar(x: external_opaque())
   // We can look through, since it's inlinable
-  // CHECK: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* @"$sSiN", i8** @"$sSi36opaque_result_type_metadata_external1PAAWP")
+  // CHECK: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* @"$sSiN", i8** {{%[0-9]+|@"\$sSi36opaque_result_type_metadata_external1PAAWP"}})
   bar(x: external_inlinable())
   // We can look through to the wrapped resilient opaque type
   // DEFAULT: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* %[[EXTERNAL_OPAQUE_METADATA]], i8** %[[EXTERNAL_OPAQUE_PROTO]])
   // IMPLICIT-DYNAMIC: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* %{{.*}}, i8** %{{.*}})
   bar(x: external_opaque_wrap())
   // We can look all the way through to the inlinable underlying type
-  // DEFAULT: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* @"$sSiN", i8** @"$sSi36opaque_result_type_metadata_external1PAAWP")
+  // DEFAULT: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* @"$sSiN", i8** {{%[0-9]+|@"\$sSi36opaque_result_type_metadata_external1PAAWP"}})
   // IMPLICIT-DYNAMIC: call {{.*}}3bar{{.*}}(%swift.opaque* {{.*}}, %swift.type* %{{.*}}, i8** %{{.*}})
   bar(x: external_inlinable_wrap())
 
