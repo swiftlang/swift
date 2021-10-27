@@ -1776,6 +1776,34 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
           if ((!failed.TypeWitness->getAnyNominal() ||
                failed.TypeWitness->isExistentialType()) &&
               failed.Result.isConformanceRequirement()) {
+            Type resultType;
+            SourceRange typeRange;
+            if (auto *var = dyn_cast<VarDecl>(failed.Witness)) {
+              resultType = var->getValueInterfaceType();
+              typeRange = var->getTypeSourceRangeForDiagnostics();
+            } else if (auto *func = dyn_cast<FuncDecl>(failed.Witness)) {
+              resultType = func->getResultInterfaceType();
+              typeRange = func->getResultTypeSourceRange();
+            } else if (auto *subscript = dyn_cast<SubscriptDecl>(failed.Witness)) {
+              resultType = subscript->getElementInterfaceType();
+              typeRange = subscript->getElementTypeSourceRange();
+            }
+
+            // If the type witness was inferred from an existential
+            // result type, suggest an opaque result type instead,
+            // which can conform to protocols.
+            if (failed.TypeWitness->isExistentialType() &&
+                resultType && resultType->isEqual(failed.TypeWitness) &&
+                typeRange.isValid()) {
+              diags.diagnose(typeRange.Start,
+                             diag::suggest_opaque_type_witness,
+                             assocType->getName(), failed.TypeWitness,
+                             failed.Result.getRequirement())
+                .highlight(typeRange)
+                .fixItInsert(typeRange.Start, "some ");
+              continue;
+            }
+
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_conform_impossible,
                            assocType->getName(), failed.TypeWitness,
