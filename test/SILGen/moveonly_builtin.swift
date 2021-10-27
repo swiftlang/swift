@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 import Swift
 
