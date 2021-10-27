@@ -236,7 +236,9 @@ public:
       // If this is a closure, only walk into its children if they
       // are type-checked in the context of the enclosing expression.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        if (!shouldTypeCheckInEnclosingExpression(closure))
+        // TODO: This has to be deleted once `EnableMultiStatementClosureInference`
+        //       is enabled by default.
+        if (!closure->hasSingleExpressionBody())
           return { false, expr };
         for (auto &Param : *closure->getParameters()) {
           Param->setSpecifier(swift::ParamSpecifier::Default);
@@ -335,8 +337,11 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
   referencedDecl = nullptr;
 
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::SuppressDiagnostics;
+
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(dc, ConstraintSystemFlags::SuppressDiagnostics);
+  ConstraintSystem cs(dc, options);
 
   // Attempt to solve the constraint system.
   const Type originalType = expr->getType();
@@ -818,7 +823,8 @@ bool TypeChecker::typeCheckForCodeCompletion(
     // expression and folding sequence expressions.
     auto failedPreCheck = ConstraintSystem::preCheckExpression(
         expr, DC,
-        /*replaceInvalidRefsWithErrors=*/true);
+        /*replaceInvalidRefsWithErrors=*/true,
+        /*leaveClosureBodiesUnchecked=*/true);
 
     target.setExpr(expr);
 
@@ -922,7 +928,9 @@ static Optional<Type> getTypeOfCompletionContextExpr(
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
   if (constraints::ConstraintSystem::preCheckExpression(
-          parsedExpr, DC, /*replaceInvalidRefsWithErrors=*/true))
+          parsedExpr, DC,
+          /*replaceInvalidRefsWithErrors=*/true,
+          /*leaveClosureBodiesUnchecked=*/true))
     return None;
 
   switch (kind) {

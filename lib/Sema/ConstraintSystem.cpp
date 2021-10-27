@@ -5845,6 +5845,18 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   return false;
 }
 
+bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
+  if (closure->hasSingleExpressionBody())
+    return true;
+
+  if (Options.contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked))
+    return false;
+
+  auto &ctx = closure->getASTContext();
+  return !closure->hasEmptyBody() &&
+         ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
+}
+
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
     : BindingProducer(bindings.getConstraintSystem(),
                       bindings.getTypeVariable()->getImpl().getLocator()),
