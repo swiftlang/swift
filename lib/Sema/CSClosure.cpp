@@ -854,7 +854,7 @@ private:
 
   bool isSupportedMultiStatementClosure() const {
     return !closure->hasSingleExpressionBody() &&
-           shouldTypeCheckInEnclosingExpression(closure);
+           cs.participatesInInference(closure);
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
@@ -885,7 +885,7 @@ private:
 bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
   auto &ctx = closure->getASTContext();
 
-  if (shouldTypeCheckInEnclosingExpression(closure)) {
+  if (participatesInInference(closure)) {
     ClosureConstraintGenerator generator(*this, closure,
                                          getConstraintLocator(closure));
     generator.visit(closure->getBody());

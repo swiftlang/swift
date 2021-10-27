@@ -1932,7 +1932,9 @@ public:
       DiagnosticTransaction transaction(diagEngine);
 
       HasError |= ConstraintSystem::preCheckExpression(
-          E, DC, /*replaceInvalidRefsWithErrors=*/true);
+          E, DC, /*replaceInvalidRefsWithErrors=*/true,
+          /*leaveClosureBodiesUnchecked=*/true);
+
       HasError |= transaction.hasErrors();
 
       if (!HasError)

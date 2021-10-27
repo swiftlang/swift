@@ -344,7 +344,8 @@ TypeChecker::typeCheckExpression(
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(
-          expr, dc, /*replaceInvalidRefsWithErrors=*/true)) {
+        expr, dc, /*replaceInvalidRefsWithErrors=*/true,
+        options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
     target.setExpr(expr);
     return None;
   }
@@ -588,14 +589,17 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   // Precheck the sequence.
   Expr *sequence = stmt->getSequence();
   if (ConstraintSystem::preCheckExpression(
-          sequence, dc, /*replaceInvalidRefsWithErrors=*/true))
+          sequence, dc, /*replaceInvalidRefsWithErrors=*/true,
+          /*leaveClosureBodiesUnchecked=*/false))
     return failed();
   stmt->setSequence(sequence);
 
   // Precheck the filtering condition.
   if (Expr *whereExpr = stmt->getWhere()) {
     if (ConstraintSystem::preCheckExpression(
-            whereExpr, dc, /*replaceInvalidRefsWithErrors=*/true))
+            whereExpr, dc,
+            /*replaceInvalidRefsWithErrors=*/true,
+            /*leaveClosureBodiesUnchecked=*/false))
       return failed();
 
     stmt->setWhere(whereExpr);
@@ -2052,26 +2056,19 @@ HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
   });
 }
 
-bool swift::shouldTypeCheckInEnclosingExpression(ClosureExpr *expr) {
-  if (expr->hasSingleExpressionBody())
-    return true;
-
-  auto &ctx = expr->getASTContext();
-  return !expr->hasEmptyBody() &&
-         ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
-}
-
-void swift::forEachExprInConstraintSystem(
+void ConstraintSystem::forEachExpr(
     Expr *expr, llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
+    ConstraintSystem &CS;
     llvm::function_ref<Expr *(Expr *)> callback;
 
-    ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
-    : callback(callback) {}
+    ChildWalker(ConstraintSystem &CS,
+                llvm::function_ref<Expr *(Expr *)> callback)
+        : CS(CS), callback(callback) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
-        if (!shouldTypeCheckInEnclosingExpression(closure))
+        if (!CS.participatesInInference(closure))
           return { false, callback(E) };
       }
       return { true, callback(E) };
@@ -2084,5 +2081,5 @@ void swift::forEachExprInConstraintSystem(
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
 
-  expr->walk(ChildWalker(callback));
+  expr->walk(ChildWalker(*this, callback));
 }

@@ -893,6 +893,8 @@ namespace {
     /// implicit `ErrorExpr` in place of invalid references.
     bool UseErrorExprs;
 
+    bool LeaveClosureBodiesUnchecked;
+
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -1080,9 +1082,11 @@ namespace {
 
   public:
     PreCheckExpression(DeclContext *dc, Expr *parent,
-                       bool replaceInvalidRefsWithErrors)
-        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent),
-          UseErrorExprs(replaceInvalidRefsWithErrors) {}
+                       bool replaceInvalidRefsWithErrors,
+                       bool leaveClosureBodiesUnchecked)
+        : Ctx(dc->getASTContext()), DC(dc),
+          ParentExpr(parent), UseErrorExprs(replaceInvalidRefsWithErrors),
+          LeaveClosureBodiesUnchecked(leaveClosureBodiesUnchecked) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
@@ -1428,8 +1432,13 @@ namespace {
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // If we won't be checking the body of the closure, don't walk into it here.
-  if (!shouldTypeCheckInEnclosingExpression(closure))
-    return false;
+  if (!closure->hasSingleExpressionBody()) {
+    if (LeaveClosureBodiesUnchecked)
+      return false;
+
+    if (!Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference)
+      return false;
+  }
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
@@ -2082,11 +2091,15 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
-                                          bool replaceInvalidRefsWithErrors) {
+                                          bool replaceInvalidRefsWithErrors,
+                                          bool leaveClosureBodiesUnchecked) {
   auto &ctx = dc->getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
 
-  PreCheckExpression preCheck(dc, expr, replaceInvalidRefsWithErrors);
+  PreCheckExpression preCheck(dc, expr,
+                              replaceInvalidRefsWithErrors,
+                              leaveClosureBodiesUnchecked);
+
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;
