@@ -1982,15 +1982,16 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
+  } else if (Triple.isWatchOS() && !Triple.isSimulatorEnvironment()) {
+    // watchOS does not support auto async frame pointers due to bitcode, so
+    // silently override "auto" to "never" when back-deploying. This approach
+    // sacrifies async backtraces when back-deploying but prevents crashes in
+    // older tools that cannot handle the async frame bit in the frame pointer.
+    unsigned major, minor, micro;
+    Triple.getWatchOSVersion(major, minor, micro);
+    if (major < 8)
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
   }
-
-  // watchOS does not support auto async frame pointers due to bitcode, so
-  // silently override "auto" to "always". This approach sacrifies async
-  // backtraces in older watchOS versions to gain better backtraces in newer
-  // versions.
-  if (Triple.isWatchOS() &&
-      Opts.SwiftAsyncFramePointer == SwiftAsyncFramePointerKind::Auto)
-    Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Always;
 
   return false;
 }
