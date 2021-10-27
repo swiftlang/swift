@@ -684,11 +684,11 @@ exit:
 // CHECK:       bb0({{%[^,]+}} : $Builtin.Int1, [[INSTANCE_1:%[^,]+]] : @owned $Klass, {{%[^,]+}} : @owned $Klass):
 // CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [[INSTANCE_1]]
 // CHECK:         copy_value [[LIFETIME_1]]
-// CHECK:         cond_br {{%[^,]+}}, [[BASIC_BLOCK1:bb[0-9]+]], [[BASIC_BLOCK2:bb[0-9]+]]
-// CHECK:       [[BASIC_BLOCK1]]:
+// CHECK:         cond_br {{%[^,]+}}, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
 // CHECK:         end_borrow [[LIFETIME_1]]
 // CHECK:         destroy_value [[INSTANCE_1]]
-// CHECK:       [[BASIC_BLOCK2]]:
+// CHECK:       [[RIGHT]]:
 // CHECK:         end_borrow [[LIFETIME_1]]
 // CHECK:         destroy_value [[INSTANCE_1]]
 // CHECK-LABEL: } // end sil function 'add_end_borrow_after_destroy_value'
