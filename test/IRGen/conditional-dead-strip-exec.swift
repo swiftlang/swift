@@ -15,6 +15,11 @@
 // FIXME(mracek): More work needed to get this to work on non-Apple platforms.
 // REQUIRES: VENDOR=apple
 
+// For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
+// ASan cannot work in ("Interceptors are not working, AddressSanitizer is
+// loaded too late").
+// REQUIRES: no_asan
+
 // (1) used
 @inline(never) func func1_used() { print("func1_used") }
 
