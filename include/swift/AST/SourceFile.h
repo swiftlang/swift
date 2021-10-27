@@ -89,9 +89,6 @@ private:
   /// same module.
   mutable Identifier PrivateDiscriminator;
 
-  /// A synthesized file corresponding to this file, created on-demand.
-  SynthesizedFileUnit *SynthesizedFile = nullptr;
-
   /// The root TypeRefinementContext for this SourceFile.
   ///
   /// This is set during type checking.
@@ -408,11 +405,6 @@ public:
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
   Optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
-
-  /// Returns the synthesized file for this source file, if it exists.
-  SynthesizedFileUnit *getSynthesizedFile() const { return SynthesizedFile; };
-
-  SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   virtual bool walk(ASTWalker &walker) override;
 
