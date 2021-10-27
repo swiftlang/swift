@@ -38,8 +38,12 @@
 #include <Availability.h>
 #include <TargetConditionals.h>
 #if TARGET_OS_WATCH
-// Bitcode compilation for the watch precludes defining the following asm
-// symbols, so we don't use them.
+// Bitcode compilation for the watch device precludes defining the following asm
+// symbols, so we don't use them... but simulators are okay.
+#if TARGET_OS_SIMULATOR
+asm("\n .globl _swift_async_extendedFramePointerFlags" \
+    "\n _swift_async_extendedFramePointerFlags = 0x0");
+#endif
 #else
 asm("\n .globl _swift_async_extendedFramePointerFlags" \
     "\n _swift_async_extendedFramePointerFlags = 0x0");
