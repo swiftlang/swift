@@ -3,6 +3,7 @@
 
 // RUN: %target-typecheck-verify-swift -module-name MyModule -target %target-cpu-apple-macosx10.15 -check-api-availability-only -enable-library-evolution
 
+/// The flag -check-api-availability-only should reject builds going up to IR and further.
 // RUN: not %target-build-swift -emit-executable %s -g -o %t -emit-module -Xfrontend -check-api-availability-only 2>&1 | %FileCheck %s
 // CHECK: the flag -check-api-availability-only does not support emitting IR
 
