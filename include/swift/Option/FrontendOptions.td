@@ -469,10 +469,6 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def check_api_availability_only : Flag<["-"],
-  "check-api-availability-only">,
-  HelpText<"Only check the availability of the APIs, ignore function bodies">;
-
 def enable_conformance_availability_errors : Flag<["-"],
   "enable-conformance-availability-errors">,
   HelpText<"Diagnose conformance availability violations as errors">;

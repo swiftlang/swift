@@ -23,17 +23,19 @@ public func test<T : P>(_ t: T) where T == T.A {
 
 // CHECK-LABEL: Requirement machine for <τ_0_0, τ_0_1 where τ_0_0 == τ_0_0.A, τ_0_1 : P, τ_0_0.A == τ_0_1.A>
 // CHECK-NEXT: Rewrite system: {
-// CHECK-NEXT: - [P].A => [P:A]
+// CHECK-NEXT: - [P].[P] => [P] [permanent]
+// CHECK-NEXT: - [P].A => [P:A] [permanent]
 // CHECK-NEXT: - [P:A].[P] => [P:A]
 // CHECK-NEXT: - τ_0_0.[P:A] => τ_0_0
 // CHECK-NEXT: - τ_0_1.[P] => τ_0_1
 // CHECK-NEXT: - τ_0_1.[P:A] => τ_0_0
+// CHECK-NEXT: - [P].[P:A] => [P:A]
 // CHECK-NEXT: - [P:A].A => [P:A].[P:A]
 // CHECK-NEXT: - τ_0_0.[P] => τ_0_0
 // CHECK-NEXT: - τ_0_1.A => τ_0_0
 // CHECK-NEXT: - τ_0_0.A => τ_0_0
 // CHECK-NEXT: }
-// CHECK-NEXT: Homotopy generators: {
+// CHECK-NEXT: Rewrite loops: {
 // CHECK:      }
 // CHECK-NEXT: Property map: {
 // CHECK-NEXT:   [P:A] => { conforms_to: [P] }

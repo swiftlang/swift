@@ -38,7 +38,7 @@ internal func _byteCountForTemporaryAllocation<T>(
   // emitting equivalent compile-time diagnostics because the call to
   // Builtin.stackAlloc() becomes unreachable.
   if _isComputed(capacity) {
-    _precondition(capacity > 0, "Allocation capacity must be greater than or equal to zero")
+    _precondition(capacity >= 0, "Allocation capacity must be greater than or equal to zero")
   }
   let stride = MemoryLayout<T>.stride
   let (byteCount, overflow) = capacity.multipliedReportingOverflow(by: stride)
