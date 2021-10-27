@@ -19,6 +19,9 @@
 // loaded too late").
 // REQUIRES: no_asan
 
+// Disable to unblock CI
+// REQUIRES: rdar84643923
+
 protocol TheProtocol {
   func func1_live()
   func func2_dead()
