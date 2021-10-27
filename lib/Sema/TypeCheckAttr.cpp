@@ -285,17 +285,15 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
     return;
   }
 
-  if (vd->hasStorage()) {
-    // We do not support fields of nominal types now.
-    if (isa<NominalTypeDecl>(dc)) {
-      auto error = diag::noimplicitcopy_attr_valid_only_on_local_let;
-      diagnoseAndRemoveAttr(attr, error);
-      return;
-    }
+  // We only support local lets.
+  if (!dc->isLocalContext()) {
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
   }
 
-  // We do not support static or global vars either yet.
-  if (dc->isModuleScopeContext() || (dc->isTypeContext() && vd->isStatic())) {
+  // We do not support static vars either yet.
+  if (dc->isTypeContext() && vd->isStatic()) {
     auto error = diag::noimplicitcopy_attr_valid_only_on_local_let;
     diagnoseAndRemoveAttr(attr, error);
     return;
