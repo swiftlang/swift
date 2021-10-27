@@ -36,8 +36,15 @@
 #endif
 
 #if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
+#include <Availability.h>
+#include <TargetConditionals.h>
+#if TARGET_OS_WATCH
+// Bitcode compilation for the watch precludes defining the following asm
+// symbols, so we don't use them.
+#else
 asm("\n .globl _swift_async_extendedFramePointerFlags" \
     "\n _swift_async_extendedFramePointerFlags = 0x0");
+#endif
 #else
 #ifdef __APPLE__
 #if __POINTER_WIDTH__ == 64

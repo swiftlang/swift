@@ -1984,6 +1984,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
   }
 
+  // watchOS does not support auto async frame pointers due to bitcode, so
+  // silently override "auto" to "always". This approach sacrifies async
+  // backtraces in older watchOS versions to gain better backtraces in newer
+  // versions.
+  if (Triple.isWatchOS() &&
+      Opts.SwiftAsyncFramePointer == SwiftAsyncFramePointerKind::Auto)
+    Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Always;
+
   return false;
 }
 
