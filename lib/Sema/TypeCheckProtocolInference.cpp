@@ -1768,6 +1768,9 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
             } else if (auto *func = dyn_cast<FuncDecl>(failed.Witness)) {
               resultType = func->getResultInterfaceType();
               typeRange = func->getResultTypeSourceRange();
+            } else if (auto *subscript = dyn_cast<SubscriptDecl>(failed.Witness)) {
+              resultType = subscript->getElementInterfaceType();
+              typeRange = subscript->getElementTypeSourceRange();
             }
 
             // If the type witness was inferred from an existential

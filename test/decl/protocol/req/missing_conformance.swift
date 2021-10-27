@@ -119,6 +119,15 @@ struct S4: P13 { // expected-error {{type 'S4' does not conform to protocol 'P13
   // expected-note@-1 {{cannot infer 'A' = 'P11' because 'P11' as a type cannot conform to protocols; did you mean to use an opaque result type?}}{{12-12=some }}
 }
 
+protocol P14 {
+  associatedtype A : P11 // expected-note {{unable to infer associated type 'A' for protocol 'P14'}}
+  subscript(i: Int) -> A { get }
+}
+struct S5: P14 { // expected-error {{type 'S5' does not conform to protocol 'P14'}}
+  subscript(i: Int) -> P11 { return i }
+  // expected-note@-1 {{cannot infer 'A' = 'P11' because 'P11' as a type cannot conform to protocols; did you mean to use an opaque result type?}}{{24-24=some }}
+}
+
 // SR-12759
 struct CountSteps1<T> : Collection {
   init(count: Int) { self.count = count }
