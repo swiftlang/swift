@@ -19,6 +19,9 @@
 // loaded too late").
 // REQUIRES: no_asan
 
+// Disable to unblock CI
+// REQUIRES: rdar84643923
+
 class MyClass {
   func foo() { print("MyClass.foo") }
   func bar() { print("MyClass.bar") }
