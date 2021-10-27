@@ -154,12 +154,13 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
       }
 
       llvm_unreachable("Invalid symbol kind");
-    } else if (rule.getLHS().back().getKind() != Symbol::Kind::Protocol) {
-      auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams);
-      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams);
-
-      sameTypeReqs[subjectType.getPointer()].Members.push_back(constraintType);
     }
+
+    assert(rule.getLHS().back().getKind() != Symbol::Kind::Protocol);
+    auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams);
+    auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams);
+
+    sameTypeReqs[subjectType.getPointer()].Members.push_back(constraintType);
   };
 
   if (getDebugOptions().contains(DebugFlags::Minimization)) {
@@ -193,10 +194,10 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
   }
 
   // Finally, sort the requirements in canonical order.
-  std::sort(reqs.begin(), reqs.end(),
-            [](const Requirement &lhs, const Requirement &rhs) -> bool {
-              return lhs.compare(rhs) < 0;
-            });
+  llvm::array_pod_sort(reqs.begin(), reqs.end(),
+                       [](const Requirement *lhs, const Requirement *rhs) -> int {
+                         return lhs->compare(*rhs);
+                       });
 
   return reqs;
 }

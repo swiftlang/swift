@@ -40,13 +40,6 @@ Optional<Symbol> Rule::isPropertyRule() const {
   if (!std::equal(RHS.begin(), RHS.end(), LHS.begin()))
     return None;
 
-  // A same-type requirement of the form 'Self.Foo == Self' can induce a
-  // conformance rule [P].[P] => [P]. Don't consider this a property-like
-  // rule, since it messes up the generating conformances algorithm and
-  // doesn't mean anything useful anyway.
-  if (RHS.size() == 1 && RHS[0] == LHS[1])
-    return None;
-
   return property;
 }
 
@@ -61,6 +54,16 @@ const ProtocolDecl *Rule::isProtocolConformanceRule() const {
   return nullptr;
 }
 
+/// If this is a rule of the form [P].[P] => [P] where [P] is a protocol
+/// symbol, return true, otherwise return false.
+bool Rule::isIdentityConformanceRule() const {
+  return (LHS.size() == 2 &&
+          RHS.size() == 1 &&
+          LHS[0] == RHS[0] &&
+          LHS[0] == LHS[1] &&
+          LHS[0].getKind() == Symbol::Kind::Protocol);
+}
+
 /// If this is a rule of the form [P].[Q] => [P] where [P] and [Q] are
 /// protocol symbols, return true, otherwise return false.
 bool Rule::isProtocolRefinementRule() const {
@@ -70,6 +73,19 @@ bool Rule::isProtocolRefinementRule() const {
           LHS[0].getKind() == Symbol::Kind::Protocol &&
           LHS[1].getKind() == Symbol::Kind::Protocol &&
           LHS[0] != LHS[1]);
+}
+
+/// Returns the length of the left hand side.
+unsigned Rule::getDepth() const {
+  auto result = LHS.size();
+
+  if (LHS.back().isSuperclassOrConcreteType()) {
+    for (auto substitution : LHS.back().getSubstitutions()) {
+      result = std::max(result, substitution.size());
+    }
+  }
+
+  return result;
 }
 
 /// Linear order on rules; compares LHS followed by RHS.
@@ -96,7 +112,7 @@ RewriteSystem::RewriteSystem(RewriteContext &ctx)
   Initialized = 0;
   Complete = 0;
   Minimized = 0;
-  RecordHomotopyGenerators = 0;
+  RecordLoops = 0;
 }
 
 RewriteSystem::~RewriteSystem() {
@@ -105,13 +121,13 @@ RewriteSystem::~RewriteSystem() {
 }
 
 void RewriteSystem::initialize(
-    bool recordHomotopyGenerators,
+    bool recordLoops,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&associatedTypeRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
-  RecordHomotopyGenerators = recordHomotopyGenerators;
+  RecordLoops = recordLoops;
 
   for (const auto &rule : associatedTypeRules) {
     bool added = addRule(rule.first, rule.second);
@@ -121,6 +137,146 @@ void RewriteSystem::initialize(
 
   for (const auto &rule : requirementRules)
     addRule(rule.first, rule.second);
+}
+
+/// Reduce a term by applying all rewrite rules until fixed point.
+///
+/// If \p path is non-null, records the series of rewrite steps taken.
+bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
+  bool changed = false;
+
+  MutableTerm original;
+  RewritePath subpath;
+
+  bool debug = false;
+  if (Debug.contains(DebugFlags::Simplify)) {
+    original = term;
+    debug = true;
+  }
+
+  while (true) {
+    bool tryAgain = false;
+
+    auto from = term.begin();
+    auto end = term.end();
+    while (from < end) {
+      auto ruleID = Trie.find(from, end);
+      if (ruleID) {
+        const auto &rule = getRule(*ruleID);
+        if (!rule.isSimplified()) {
+          auto to = from + rule.getLHS().size();
+          assert(std::equal(from, to, rule.getLHS().begin()));
+
+          unsigned startOffset = (unsigned)(from - term.begin());
+          unsigned endOffset = term.size() - rule.getLHS().size() - startOffset;
+
+          term.rewriteSubTerm(from, to, rule.getRHS());
+
+          if (path || debug) {
+            subpath.add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
+                                                    /*inverse=*/false));
+          }
+
+          changed = true;
+          tryAgain = true;
+          break;
+        }
+      }
+
+      ++from;
+    }
+
+    if (!tryAgain)
+      break;
+  }
+
+  if (debug) {
+    if (changed) {
+      llvm::dbgs() << "= Simplified " << original << " to " << term << " via ";
+      subpath.dump(llvm::dbgs(), original, *this);
+      llvm::dbgs() << "\n";
+    } else {
+      llvm::dbgs() << "= Irreducible term: " << term << "\n";
+    }
+  }
+
+  if (path != nullptr) {
+    assert(changed != subpath.empty());
+    path->append(subpath);
+  }
+
+  return changed;
+}
+
+/// Simplify terms appearing in the substitutions of the last symbol of \p term,
+/// which must be a superclass or concrete type symbol.
+void RewriteSystem::simplifySubstitutions(MutableTerm &term,
+                                          RewritePath &path) const {
+  auto symbol = term.back();
+  assert(symbol.isSuperclassOrConcreteType());
+
+  auto substitutions = symbol.getSubstitutions();
+  if (substitutions.empty())
+    return;
+
+  // Save the original rewrite path length so that we can reset if if we don't
+  // find anything to simplify.
+  unsigned oldSize = path.size();
+
+  // The term is on the A stack. Push all substitutions onto the A stack.
+  path.add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/false));
+
+  // Move all substitutions but the first one to the B stack.
+  for (unsigned i = 1; i < substitutions.size(); ++i)
+    path.add(RewriteStep::forShift(/*inverse=*/false));
+
+  // Simplify and collect substitutions.
+  SmallVector<Term, 2> newSubstitutions;
+  newSubstitutions.reserve(substitutions.size());
+
+  bool first = true;
+  bool anyChanged = false;
+  for (auto substitution : substitutions) {
+    // Move the next substitution from the B stack to the A stack.
+    if (!first)
+      path.add(RewriteStep::forShift(/*inverse=*/true));
+    first = false;
+
+    // The current substitution is at the top of the A stack; simplify it.
+    MutableTerm mutTerm(substitution);
+    anyChanged |= simplify(mutTerm, &path);
+
+    // Record the new substitution.
+    newSubstitutions.push_back(Term::get(mutTerm, Context));
+  }
+
+  // All simplified substitutions are now on the A stack. Collect them to
+  // produce the new term.
+  path.add(RewriteStep::forDecompose(substitutions.size(), /*inverse=*/true));
+
+  // If nothing changed, we don't have to rebuild the symbol.
+  if (!anyChanged) {
+    // The rewrite path should consist of a Decompose, followed by a number
+    // of Shifts, followed by a Compose.
+#ifndef NDEBUG
+    for (auto iter = path.begin() + oldSize; iter < path.end(); ++iter) {
+      assert(iter->Kind == RewriteStep::Shift ||
+             iter->Kind == RewriteStep::Decompose);
+    }
+#endif
+
+    path.resize(oldSize);
+    return;
+  }
+
+  // Build the new symbol with simplified substitutions.
+  auto newSymbol = (symbol.getKind() == Symbol::Kind::Superclass
+                    ? Symbol::forSuperclass(symbol.getSuperclass(),
+                                            newSubstitutions, Context)
+                    : Symbol::forConcreteType(symbol.getConcreteType(),
+                                              newSubstitutions, Context));
+
+  term.back() = newSymbol;
 }
 
 /// Adds a rewrite rule, returning true if the new rule was non-trivial.
@@ -149,6 +305,12 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
   // This avoids unnecessary work in the completion algorithm.
   RewritePath lhsPath;
   RewritePath rhsPath;
+
+  if (lhs.back().isSuperclassOrConcreteType())
+    simplifySubstitutions(lhs, lhsPath);
+
+  if (rhs.back().isSuperclassOrConcreteType())
+    simplifySubstitutions(rhs, rhsPath);
 
   simplify(lhs, &lhsPath);
   simplify(rhs, &rhsPath);
@@ -179,7 +341,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
     if (path) {
       // We already have a loop, since the simplified lhs is identical to the
       // simplified rhs.
-      recordHomotopyGenerator(lhs, loop);
+      recordRewriteLoop(lhs, loop);
 
       if (Debug.contains(DebugFlags::Add)) {
         llvm::dbgs() << "## Recorded trivial loop at " << lhs << ": ";
@@ -215,7 +377,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
     // add a rewrite step applying the new rule in reverse to close the loop.
     loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
                                          newRuleID, /*inverse=*/true));
-    recordHomotopyGenerator(lhs, loop);
+    recordRewriteLoop(lhs, loop);
 
     if (Debug.contains(DebugFlags::Add)) {
       llvm::dbgs() << "## Recorded non-trivial loop at " << lhs << ": ";
@@ -242,71 +404,6 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // Tell the caller that we added a new rule.
   return true;
-}
-
-/// Reduce a term by applying all rewrite rules until fixed point.
-///
-/// If \p path is non-null, records the series of rewrite steps taken.
-bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
-  bool changed = false;
-
-  MutableTerm original;
-  RewritePath forDebug;
-  if (Debug.contains(DebugFlags::Simplify)) {
-
-    original = term;
-    if (!path)
-      path = &forDebug;
-  }
-
-  while (true) {
-    bool tryAgain = false;
-
-    auto from = term.begin();
-    auto end = term.end();
-    while (from < end) {
-      auto ruleID = Trie.find(from, end);
-      if (ruleID) {
-        const auto &rule = getRule(*ruleID);
-        if (!rule.isSimplified()) {
-          auto to = from + rule.getLHS().size();
-          assert(std::equal(from, to, rule.getLHS().begin()));
-
-          unsigned startOffset = (unsigned)(from - term.begin());
-          unsigned endOffset = term.size() - rule.getLHS().size() - startOffset;
-
-          term.rewriteSubTerm(from, to, rule.getRHS());
-
-          if (path) {
-            path->add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
-                                                  /*inverse=*/false));
-          }
-
-          changed = true;
-          tryAgain = true;
-          break;
-        }
-      }
-
-      ++from;
-    }
-
-    if (!tryAgain)
-      break;
-  }
-
-  if (Debug.contains(DebugFlags::Simplify)) {
-    if (changed) {
-      llvm::dbgs() << "= Simplified " << original << " to " << term << " via ";
-      (path == nullptr ? &forDebug : path)->dump(llvm::dbgs(), original, *this);
-      llvm::dbgs() << "\n";
-    } else {
-      llvm::dbgs() << "= Irreducible term: " << term << "\n";
-    }
-  }
-
-  assert(path == nullptr || changed != path->empty());
-  return changed;
 }
 
 /// Delete any rules whose left hand sides can be reduced by other rules,
@@ -385,12 +482,13 @@ void RewriteSystem::simplifyRewriteSystem() {
     loop.add(RewriteStep::forRewriteRule(/*startOffset=*/0, /*endOffset=*/0,
                                          newRuleID, /*inverse=*/true));
 
-    recordHomotopyGenerator(MutableTerm(lhs), loop);
-
     if (Debug.contains(DebugFlags::Completion)) {
-      llvm::dbgs() << "$ Right hand side simplification recorded a loop: ";
-      HomotopyGenerators.back().dump(llvm::dbgs(), *this);
+      llvm::dbgs() << "$ Right hand side simplification recorded a loop at ";
+      llvm::dbgs() << lhs << ": ";
+      loop.dump(llvm::dbgs(), MutableTerm(lhs), *this);
     }
+
+    recordRewriteLoop(MutableTerm(lhs), loop);
   }
 }
 
@@ -464,8 +562,8 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
     out << "- " << rule << "\n";
   }
   out << "}\n";
-  out << "Homotopy generators: {\n";
-  for (const auto &loop : HomotopyGenerators) {
+  out << "Rewrite loops: {\n";
+  for (const auto &loop : Loops) {
     if (loop.isDeleted())
       continue;
 

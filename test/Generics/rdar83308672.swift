@@ -30,12 +30,9 @@ protocol B {
 
 // Note that T.X == T.Y implies T : B, but also T : B implies T.X == T.Y;
 // we can drop one requirement but not both.
-//
-// If T : B was explicitly stated, we drop T.X == T.Y; otherwise we keep
-// T.X == T.Y and drop T : B.
 
 // CHECK: rdar83308672.(file).G1@
-// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T.X == Self.T.Y>
+// CHECK-NEXT: Requirement signature: <Self where Self.T : A, Self.T : B>
 protocol G1 {
   associatedtype T : A where T.X == T.Y
 }
