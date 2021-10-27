@@ -282,8 +282,12 @@ option(SWIFT_DISABLE_DEAD_STRIPPING
 
 set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
     must specify the form of LTO by setting this to one of: 'full', 'thin'. This
-    option only affects the tools that run on the host (the compiler), and has
-    no effect on the target libraries (the standard library and the runtime).")
+    option affects the tools that run on the host (the compiler), 
+    and the target libraries (the standard library and the runtime).")
+
+if (SWIFT_TOOLS_ENABLE_LTO EQUAL TRUE)
+   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
 
 option(SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS
     "When building ThinLTO using ld64 on Darwin, controls whether to opt out of
