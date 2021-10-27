@@ -98,7 +98,8 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
             [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i))
-            typeCheckPatternBinding(PBD, i);
+            typeCheckPatternBinding(PBD, i,
+                                    /*LeaveClosureBodyUnchecked=*/true);
         }
       }
     } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
