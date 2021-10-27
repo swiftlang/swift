@@ -99,6 +99,39 @@
                 "swift-installer-scripts": "main"
             }
         },
+        "rebranch": {
+            "aliases": ["rebranch", "stable/20211026"],
+            "repos": {
+                "llvm-project": "stable/20211026",
+                "swift": "rebranch",
+                "cmark": "main",
+                "llbuild": "main",
+                "swift-tools-support-core": "main",
+                "swiftpm": "main",
+                "swift-argument-parser": "0.4.4",
+                "swift-atomics": "1.0.2",
+                "swift-collections": "1.0.1",
+                "swift-crypto": "1.1.5",
+                "swift-driver": "main",
+                "swift-numerics": "1.0.1",
+                "swift-syntax": "main",
+                "swift-system": "1.0.0",
+                "swift-stress-tester": "main",
+                "swift-corelibs-xctest": "main",
+                "swift-corelibs-foundation": "main",
+                "swift-corelibs-libdispatch": "main",
+                "swift-integration-tests": "main",
+                "swift-xcode-playground-support": "main",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "yams": "4.0.2",
+                "cmake": "v3.19.6",
+                "indexstore-db": "main",
+                "sourcekit-lsp": "main",
+                "swift-format": "main",
+                "swift-installer-scripts": "main"
+            }
+        },
        "release/5.5": {
             "aliases": ["release/5.5", "swift/release/5.5"],
             "repos": {
