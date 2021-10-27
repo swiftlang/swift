@@ -139,6 +139,75 @@ void RewriteSystem::initialize(
     addRule(rule.first, rule.second);
 }
 
+/// Reduce a term by applying all rewrite rules until fixed point.
+///
+/// If \p path is non-null, records the series of rewrite steps taken.
+bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
+  bool changed = false;
+
+  MutableTerm original;
+  RewritePath subpath;
+
+  bool debug = false;
+  if (Debug.contains(DebugFlags::Simplify)) {
+    original = term;
+    debug = true;
+  }
+
+  while (true) {
+    bool tryAgain = false;
+
+    auto from = term.begin();
+    auto end = term.end();
+    while (from < end) {
+      auto ruleID = Trie.find(from, end);
+      if (ruleID) {
+        const auto &rule = getRule(*ruleID);
+        if (!rule.isSimplified()) {
+          auto to = from + rule.getLHS().size();
+          assert(std::equal(from, to, rule.getLHS().begin()));
+
+          unsigned startOffset = (unsigned)(from - term.begin());
+          unsigned endOffset = term.size() - rule.getLHS().size() - startOffset;
+
+          term.rewriteSubTerm(from, to, rule.getRHS());
+
+          if (path || debug) {
+            subpath.add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
+                                                    /*inverse=*/false));
+          }
+
+          changed = true;
+          tryAgain = true;
+          break;
+        }
+      }
+
+      ++from;
+    }
+
+    if (!tryAgain)
+      break;
+  }
+
+  if (debug) {
+    if (changed) {
+      llvm::dbgs() << "= Simplified " << original << " to " << term << " via ";
+      subpath.dump(llvm::dbgs(), original, *this);
+      llvm::dbgs() << "\n";
+    } else {
+      llvm::dbgs() << "= Irreducible term: " << term << "\n";
+    }
+  }
+
+  if (path != nullptr) {
+    assert(changed != subpath.empty());
+    path->append(subpath);
+  }
+
+  return changed;
+}
+
 /// Simplify terms appearing in the substitutions of the last symbol of \p term,
 /// which must be a superclass or concrete type symbol.
 void RewriteSystem::simplifySubstitutions(MutableTerm &term,
@@ -335,75 +404,6 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // Tell the caller that we added a new rule.
   return true;
-}
-
-/// Reduce a term by applying all rewrite rules until fixed point.
-///
-/// If \p path is non-null, records the series of rewrite steps taken.
-bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
-  bool changed = false;
-
-  MutableTerm original;
-  RewritePath subpath;
-
-  bool debug = false;
-  if (Debug.contains(DebugFlags::Simplify)) {
-    original = term;
-    debug = true;
-  }
-
-  while (true) {
-    bool tryAgain = false;
-
-    auto from = term.begin();
-    auto end = term.end();
-    while (from < end) {
-      auto ruleID = Trie.find(from, end);
-      if (ruleID) {
-        const auto &rule = getRule(*ruleID);
-        if (!rule.isSimplified()) {
-          auto to = from + rule.getLHS().size();
-          assert(std::equal(from, to, rule.getLHS().begin()));
-
-          unsigned startOffset = (unsigned)(from - term.begin());
-          unsigned endOffset = term.size() - rule.getLHS().size() - startOffset;
-
-          term.rewriteSubTerm(from, to, rule.getRHS());
-
-          if (path || debug) {
-            subpath.add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
-                                                    /*inverse=*/false));
-          }
-
-          changed = true;
-          tryAgain = true;
-          break;
-        }
-      }
-
-      ++from;
-    }
-
-    if (!tryAgain)
-      break;
-  }
-
-  if (debug) {
-    if (changed) {
-      llvm::dbgs() << "= Simplified " << original << " to " << term << " via ";
-      subpath.dump(llvm::dbgs(), original, *this);
-      llvm::dbgs() << "\n";
-    } else {
-      llvm::dbgs() << "= Irreducible term: " << term << "\n";
-    }
-  }
-
-  if (path != nullptr) {
-    assert(changed != subpath.empty());
-    path->append(subpath);
-  }
-
-  return changed;
 }
 
 /// Delete any rules whose left hand sides can be reduced by other rules,
