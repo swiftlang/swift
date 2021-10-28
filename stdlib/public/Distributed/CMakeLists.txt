@@ -34,10 +34,6 @@ add_swift_target_library(swift_Distributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -Xfrontend -enable-experimental-distributed
-    -Xfrontend -define-availability
-    -Xfrontend "SwiftStdlib 5.1:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0"
-    -Xfrontend -define-availability
-    -Xfrontend "SwiftStdlib 5.6:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS _Concurrency
