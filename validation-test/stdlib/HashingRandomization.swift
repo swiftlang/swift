@@ -8,6 +8,8 @@
 // RUN: env %env-SWIFT_DETERMINISTIC_HASHING=1 %target-run %t/hash >> %t/deterministic.log
 // RUN: %FileCheck --check-prefixes=STABLE %s < %t/deterministic.log
 
+// REQUIRES: rdar://84778703
+
 // REQUIRES: executable_test
 
 // Freestanding doesn't support environment variables, and this test depends on SWIFT_DETERMINISTIC_HASHING=1
