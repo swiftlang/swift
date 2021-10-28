@@ -686,5 +686,9 @@ NOTE(capturepromotion_concurrentcapture_capturinguse_here, none,
 NOTE(capturepromotion_variable_defined_here,none,
      "variable defined here", ())
 
+// move operator used on generic or evalue
+ERROR(move_operator_used_on_generic_or_existential_value, none,
+      "move() used on a generic or existential value", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
