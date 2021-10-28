@@ -6036,6 +6036,10 @@ ERROR(wrap_invalid_attr_added_by_access_note, none,
 
 // Move Only diagnostics
 
+ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
+      none, "Can not use feature when experimental move only is disabled! Pass"
+      " the frontend flag -enable-experimental-move-only to swift to enable "
+      "the usage of this language feature", ())
 ERROR(noimplicitcopy_attr_valid_only_on_local_let,
       none, "'@_noImplicitCopy' attribute can only be applied to local lets", ())
 ERROR(noimplicitcopy_attr_invalid_in_generic_context,
