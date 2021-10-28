@@ -690,5 +690,16 @@ NOTE(capturepromotion_variable_defined_here,none,
 ERROR(move_operator_used_on_generic_or_existential_value, none,
       "move() used on a generic or existential value", ())
 
+// noimplicitcopy on generic or existential binding
+ERROR(noimplicitcopy_used_on_generic_or_existential, none,
+      "@_noImplicitCopy can not be used on a generic or existential typed "
+      "binding or a nominal type containing such typed things", ())
+
+// move only checker diagnostics
+ERROR(sil_moveonlychecker_value_consumed_more_than_once, none,
+      "'%0' consumed more than once", (StringRef))
+NOTE(sil_moveonlychecker_consuming_use_here, none,
+     "consuming use", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
