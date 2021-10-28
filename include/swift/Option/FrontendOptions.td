@@ -259,6 +259,10 @@ def enable_experimental_lexical_lifetimes :
   Flag<["-"], "enable-experimental-lexical-lifetimes">,
   HelpText<"Enable experimental lexical lifetimes">;
 
+def enable_experimental_move_only :
+  Flag<["-"], "enable-experimental-move-only">,
+  HelpText<"Enable experimental move only">;
+
 def enable_experimental_distributed :
   Flag<["-"], "enable-experimental-distributed">,
   HelpText<"Enable experimental 'distributed' actors and functions">;

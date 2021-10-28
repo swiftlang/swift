@@ -109,6 +109,10 @@ static llvm::cl::opt<bool> EnableExperimentalLexicalLifetimes(
     llvm::cl::desc("Enable experimental lexical lifetimes."));
 
 static llvm::cl::opt<bool>
+EnableExperimentalMoveOnly("enable-experimental-move-only",
+                   llvm::cl::desc("Enable experimental distributed actors."));
+
+static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
                    llvm::cl::desc("Enable experimental distributed actors."));
 
@@ -424,6 +428,8 @@ int main(int argc, char **argv) {
     EnableExperimentalConcurrency;
   Invocation.getLangOptions().EnableExperimentalDistributed =
     EnableExperimentalDistributed;
+  Invocation.getLangOptions().EnableExperimentalMoveOnly =
+    EnableExperimentalMoveOnly;
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
@@ -513,6 +519,11 @@ int main(int argc, char **argv) {
   SILOpts.DisableCopyPropagation = DisableCopyPropagation;
   SILOpts.EnableExperimentalLexicalLifetimes =
       EnableExperimentalLexicalLifetimes;
+  // Also enable lexical lifetimes if experimental move only is enabled. This is
+  // because move only depends on lexical lifetimes being enabled and it saved
+  // some typing ; ).
+  SILOpts.EnableExperimentalLexicalLifetimes |=
+    EnableExperimentalMoveOnly;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
