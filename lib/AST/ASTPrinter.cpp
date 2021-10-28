@@ -534,6 +534,7 @@ static bool willUseTypeReprPrinting(TypeLoc tyLoc,
           (tyLoc.getType().isNull() && tyLoc.getTypeRepr()));
 }
 
+static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl);
 namespace {
 /// AST pretty-printer.
 class PrintAST : public ASTVisitor<PrintAST> {
@@ -1003,7 +1004,22 @@ public:
     ASTVisitor::visit(D);
 
     if (haveFeatureChecks) {
-      printCompatibilityFeatureChecksPost(Printer);
+
+      printCompatibilityFeatureChecksPost(Printer, [&]() -> void {
+        auto features = getUniqueFeaturesUsed(D);
+        assert(!features.empty());
+        if (std::find_if(features.begin(), features.end(),
+                         [](Feature feature) -> bool {
+                           return getFeatureName(feature).equals(
+                               "SpecializeAttributeWithAvailability");
+                         }) != features.end()) {
+          Printer << "#else\n";
+          Options.PrintSpecializeAttributeWithAvailability = false;
+          ASTVisitor::visit(D);
+          Options.PrintSpecializeAttributeWithAvailability = true;
+          Printer.printNewline();
+        }
+      });
     }
 
     if (Synthesize) {
@@ -2818,6 +2834,16 @@ static bool usesFeatureBuiltinMove(Decl *decl) {
 
 static bool usesFeatureBuiltinCopy(Decl *decl) { return false; }
 
+static bool usesFeatureSpecializeAttributeWithAvailability(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    for (auto specialize : func->getAttrs().getAttributes<SpecializeAttr>()) {
+      if (!specialize->getAvailabeAttrs().empty())
+        return true;
+    }
+  }
+  return false;
+}
+
 static bool usesFeatureInheritActorContext(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     for (auto param : *func->getParameters()) {
@@ -2926,11 +2952,12 @@ bool swift::printCompatibilityFeatureChecksPre(
   return true;
 }
 
-void swift::printCompatibilityFeatureChecksPost(ASTPrinter &printer) {
+void swift::printCompatibilityFeatureChecksPost(
+    ASTPrinter &printer, llvm::function_ref<void()> printElse) {
   printer.printNewline();
+  printElse();
   printer << "#endif\n";
 }
-
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
   if (Options.TransformContext &&
