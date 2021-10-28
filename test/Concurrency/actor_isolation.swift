@@ -1007,65 +1007,81 @@ actor Butterfly {
   }
 }
 
-// Test the isolation of `self` in constructors and deinits of an actor.
-// We know that Task.init accepts a special closure that inherits the isolation
-// of the context based on the isolation of values captured in the closure,
-// like `self`.
+// expected-note@+1 2 {{calls to global function 'takeIsolated' from outside of its actor context are implicitly asynchronous}}
+func takeIsolated(_ val: isolated SelfParamIsolationNonMethod) {}
+func take(_ val: SelfParamIsolationNonMethod) {}
+
 actor SelfParamIsolationNonMethod {
   init(s0: Void) {
-    Task { self.f() }
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosureInheriting { self.f() }
 
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task.detached { self.f() }
+    acceptAsyncSendableClosure { self.f() }
+
+    // expected-error@+1 {{call to actor-isolated global function 'takeIsolated' in a synchronous nonisolated context}}
+    takeIsolated(self)
+
+    take(self)
   }
 
   @MainActor init(s1: Void) {
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task { self.f() }
+    acceptAsyncSendableClosureInheriting { self.f() }
 
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task.detached { self.f() }
+    acceptAsyncSendableClosure { self.f() }
   }
 
   init(a1: Void) async {
-    Task { self.f() }
+    acceptAsyncSendableClosureInheriting { self.f() }
 
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task.detached { self.f() }
+    acceptAsyncSendableClosure { self.f() }
+
+    takeIsolated(self)
+
+    take(self)
   }
 
   @MainActor init(a2: Void) async {
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task { self.f() }
+    acceptAsyncSendableClosureInheriting { self.f() }
 
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task.detached { self.f() }
+    acceptAsyncSendableClosure { self.f() }
   }
 
   nonisolated init(a3: Void) async {
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task { self.f() }
+    acceptAsyncSendableClosureInheriting { self.f() }
 
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task.detached { self.f() }
+    acceptAsyncSendableClosure { self.f() }
   }
 
   deinit {
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task { self.f() }
+    acceptAsyncSendableClosureInheriting { self.f() }
 
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task.detached { self.f() }
+    acceptAsyncSendableClosure { self.f() }
+
+    // expected-error@+1 {{call to actor-isolated global function 'takeIsolated' in a synchronous nonisolated context}}
+    takeIsolated(self)
+
+    take(self)
   }
 
   func f() {}
@@ -1074,21 +1090,21 @@ actor SelfParamIsolationNonMethod {
 @MainActor
 final class MainActorInit: Sendable {
   init() {
-    Task { self.f() }
+    acceptAsyncSendableClosureInheriting { self.f() }
 
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task.detached { self.f() }
+    acceptAsyncSendableClosure { self.f() }
   }
 
   deinit {
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task { self.f() }
+    acceptAsyncSendableClosureInheriting { self.f() }
 
     // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
     // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
-    Task.detached { self.f() }
+    acceptAsyncSendableClosure { self.f() }
   }
 
   func f() {}

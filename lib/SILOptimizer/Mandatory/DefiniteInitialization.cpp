@@ -2043,25 +2043,27 @@ bool LifetimeChecker::isRestrictedActorInitSelf(ActorInitKind *kind) const {
     auto isolation = getActorIsolation(ctor);
     switch (isolation.getKind()) {
       case ActorIsolation::Unspecified:
-        llvm_unreachable("actor decl with unspecified isolation?");
+        assert(ctor->isObjC() && "unexpected kind of actor ctor isolation");
+        break;
 
       case ActorIsolation::Independent:
         if (isExplicitlyNonIsolated(ctor))
           return result(ActorInitKind::NonIsolated, true);
-
-        llvm_unreachable("implicitly nonisolated actor init?");
+        break;
 
       case ActorIsolation::ActorInstance:
       case ActorIsolation::DistributedActorInstance:
-        if (ctor->hasAsync())
-          return result(ActorInitKind::PlainAsync, false);
-        else
-          return result(ActorInitKind::Plain, true);
+        break; // handle these below.
 
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe:
         return result(ActorInitKind::GlobalActorIsolated, true);
     };
+
+    if (ctor->hasAsync())
+      return result(ActorInitKind::PlainAsync, false);
+    else
+      return result(ActorInitKind::Plain, true);
   }
 
   return result(ActorInitKind::None, false);

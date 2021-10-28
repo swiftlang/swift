@@ -141,8 +141,8 @@ actor MyActor {
 
         Task { // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
                // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-            _ = self.hax
-            self.helloWorld()
+            _ = await self.hax
+            await self.helloWorld()
         }
     }
 
@@ -175,8 +175,8 @@ actor MyActor {
 
         Task { // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
                // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-            _ = self.hax
-            self.helloWorld()
+            _ = await self.hax
+            await self.helloWorld()
         }
     }
 
@@ -209,8 +209,8 @@ actor MyActor {
 
         Task { // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
                // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-            _ = self.hax
-            self.helloWorld()
+            _ = await self.hax
+            await self.helloWorld()
         }
     }
 
@@ -315,7 +315,7 @@ actor X {
 
     init(v1 start: Int) {
         self.counter = start
-        Task { self.setCounter(start + 1) } // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
+        Task { await self.setCounter(start + 1) } // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
                                                   // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         if self.counter != start {
