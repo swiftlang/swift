@@ -1246,6 +1246,18 @@ private:
   ASTNode visitBraceStmt(BraceStmt *braceStmt) {
     auto &cs = solution.getConstraintSystem();
 
+    // Diagnose defer statement being last one in block.
+    if (!braceStmt->empty()) {
+      if (auto stmt = braceStmt->getLastElement().dyn_cast<Stmt *>()) {
+        if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
+          auto &diags = closure->getASTContext().Diags;
+          diags
+              .diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_block_end)
+              .fixItReplace(deferStmt->getStartLoc(), "do");
+        }
+      }
+    }
+
     for (auto &node : braceStmt->getElements()) {
       if (auto expr = node.dyn_cast<Expr *>()) {
         // Rewrite the expression.
