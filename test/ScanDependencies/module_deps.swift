@@ -126,7 +126,11 @@ import SubE
 // CHECK: "commandLine": [
 // CHECK-NEXT: "-frontend"
 // CHECK-NEXT: "-only-use-extra-clang-opts"
-// CHECK-NOT: "BUILD_DIR/bin/clang"
+// CHECK-NOT:  "BUILD_DIR/bin/clang"
+// CHECK:      "-Xcc"
+// CHECK-NEXT: "-resource-dir"
+// CHECK-NEXT: "-Xcc"
+// CHECK-NEXT: "BUILD_DIR/lib/swift/clang"
 // CHECK:      "-fsystem-module",
 // CHECK-NEXT: "-emit-pcm",
 // CHECK-NEXT: "-module-name",
