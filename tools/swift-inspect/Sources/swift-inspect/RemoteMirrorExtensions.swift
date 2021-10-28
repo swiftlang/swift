@@ -39,18 +39,15 @@ extension SwiftReflectionContextRef {
     }
     let tr = swift_reflection_typeRefForMetadata(self, UInt(metadata));
     guard tr != 0 else {
-        fatalError("swift_reflection_typeRefForMetadata is null")
         return false
     }
     let genericArgCnt = swift_reflection_genericArgumentCountOfTypeRef(tr);
     guard genericArgCnt == 1 else {
-        fatalError("swift_reflection_genericArgumentCountOfTypeRef is \(genericArgCnt)")
         return false
     }
 
     let argTr = swift_reflection_genericArgumentOfTypeRef(tr, 0)
     guard argTr != 0 else {
-        fatalError("swift_reflection_genericArgumentOfTypeRef is null")
         return false
     }
     let typeInfo = swift_reflection_infoForTypeRef(self, argTr)
