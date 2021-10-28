@@ -477,26 +477,24 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
-  /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
-  /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
-  /// the names of the imported or referenced modules in source files in the main module, and X and Y
-  /// are the real (physical) module names on disk.
+  /// Convert a given module alias map (with `-module-alias` option) to a map of entries that are
+  /// keyed both module aliases and real names along with a boolean indicating whether the entry
+  /// is an alias or a real name.
+  /// An entry with a module alias as key will have value: (real module name, true), and
+  /// an entry with a module real name as key will have value: (module alias, false).
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
 
   /// Retrieve the actual module name if a module alias is used via '-module-alias Foo=X', where Foo is
   /// a module alias and X is the real (physical) name. Returns \p key if no aliasing is used.
   Identifier getRealModuleName(Identifier key) const;
 
-  /// Checks if the given \p key is a module alias or a module real name.
-  /// If \p key is a module alias, it returns a pair of its corresponding real name and 'true',
-  /// if \p key is a module real name, it returns a pair of its corresponding alias, and 'false', and
-  /// if \p key is a non-aliased module name, it returns a pair of that given name and 'true'.
-  ///
-  /// This can be used to check if the module real name appears in source files, in which case error diags
-  /// should be emitted (only aliases should allowed).
-  ///
-  /// \param key A module name (alias, real name, or non-aliased name)
-  /// \returns A pair of the module real name and 'true' if the \p key is an alias
+  /// Retrieve the value mapped to the given key.
+  /// \param key A module alias or real name (or non-aliased name) to look up
+  /// \returns A pair of a module alias or real name given \p key, and a boolean indicating if the
+  ///          \p key is an alias
+  /// If \p key is a module alias, it returns: (corresponding real name, true)
+  /// if \p key is a module real name, it returns: (corresponding alias, false), and
+  /// if \p key is a non-aliased module name, it returns (key, true).
   std::pair<Identifier, bool> getRealModuleNameOrAlias(Identifier key) const;
 
   /// Decide how to interpret two precedence groups.
