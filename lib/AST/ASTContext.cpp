@@ -1638,9 +1638,14 @@ void ASTContext::addModuleInterfaceChecker(
 
 void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
   for (auto k: aliasMap.keys()) {
-    auto val = aliasMap.lookup(k);
-    if (!val.empty()) {
-      ModuleAliasMap[getIdentifier(k)] = getIdentifier(val);
+    auto v = aliasMap.lookup(k);
+    if (!v.empty()) {
+      auto key = getIdentifier(k);
+      auto val = getIdentifier(v);
+      // key is a module alias, val is its corresponding real name
+      ModuleAliasMap[key] = std::make_pair(val, true);
+      // add an entry with an alias as key for an easier lookup later
+      ModuleAliasMap[val] = std::make_pair(key, false);
     }
   }
 }
@@ -1648,9 +1653,20 @@ void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
 Identifier ASTContext::getRealModuleName(Identifier key) const {
   auto found = ModuleAliasMap.find(key);
   if (found != ModuleAliasMap.end()) {
-    return found->second;
+    auto realOrAlias = found->second;
+    if (realOrAlias.second) // check if it's a real name given the key (alias)
+      return realOrAlias.first;
   }
   return key;
+}
+
+std::pair<Identifier, bool> ASTContext::getRealModuleNameOrAlias(Identifier key) const {
+  auto found = ModuleAliasMap.find(key);
+  if (found != ModuleAliasMap.end()) {
+    return found->second;
+  }
+  // No module aliasing is used for the given key
+  return std::make_pair(key, true);
 }
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(

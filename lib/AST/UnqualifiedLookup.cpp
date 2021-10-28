@@ -431,7 +431,19 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
 #endif
     return;
   }
-  ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
+
+  ModuleDecl *desiredModule = nullptr;
+  auto givenName = Name.getBaseIdentifier();
+  // Check if the given name appearing in the source file is a module
+  // real name or alias; for example, if `-module-alias Foo=Bar` was
+  // passed, the alias 'Foo' should appear in source files, not 'Bar'.
+  // If no module aliasing is used, this will simply return the given
+  // name and 'true' indicating the check passed.
+  auto checkResult = Ctx.getRealModuleNameOrAlias(givenName);
+  if (checkResult.second) { // Check passed
+    desiredModule = Ctx.getLoadedModule(givenName);
+  }
+
   if (!desiredModule && Name.getFullName() == Ctx.TheBuiltinModule->getName())
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {

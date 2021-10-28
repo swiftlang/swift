@@ -351,7 +351,7 @@ private:
   mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
   /// Mapping between aliases and real (physical) names of imported or referenced modules.
-  mutable llvm::DenseMap<Identifier, Identifier> ModuleAliasMap;
+  mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
 
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
@@ -486,6 +486,18 @@ public:
   /// Retrieve the actual module name if a module alias is used via '-module-alias Foo=X', where Foo is
   /// a module alias and X is the real (physical) name. Returns \p key if no aliasing is used.
   Identifier getRealModuleName(Identifier key) const;
+
+  /// Checks if the given \p key is a module alias or a module real name.
+  /// If \p key is a module alias, it returns a pair of its corresponding real name and 'true',
+  /// if \p key is a module real name, it returns a pair of its corresponding alias, and 'false', and
+  /// if \p key is a non-aliased module name, it returns a pair of that given name and 'true'.
+  ///
+  /// This can be used to check if the module real name appears in source files, in which case error diags
+  /// should be emitted (only aliases should allowed).
+  ///
+  /// \param key A module name (alias, real name, or non-aliased name)
+  /// \returns A pair of the module real name and 'true' if the \p key is an alias
+  std::pair<Identifier, bool> getRealModuleNameOrAlias(Identifier key) const;
 
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,

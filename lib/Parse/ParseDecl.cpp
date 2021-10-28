@@ -4819,6 +4819,19 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     return nullptr;
   }
 
+  // Look up if the imported module is being aliased via -module-alias,
+  // and check that the module alias appeared in source files instead of
+  // its corresponding real name
+  auto parsedModuleID = importPath.get().front().Item;
+  auto checkResult = Context.getRealModuleNameOrAlias(parsedModuleID);
+  if (!checkResult.second) {
+    // This means the parsed module name is the real name that appeared in
+    // the source file; only the module alias should be allowed
+    diagnose(importPath.front().Loc, diag::expected_module_alias)
+      .fixItReplace(importPath.front().Loc, checkResult.first.str());
+    return nullptr;
+  }
+
   auto *ID = ImportDecl::create(Context, CurDeclContext, ImportLoc, Kind,
                                 KindLoc, importPath.get());
   ID->getAttrs() = Attributes;
