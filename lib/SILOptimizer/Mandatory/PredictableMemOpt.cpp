@@ -2846,7 +2846,7 @@ static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
   return alloc;
 }
 
-static bool optimizeMemoryAccesses(SILFunction &fn) {
+bool swift::optimizeMemoryAccesses(SILFunction &fn) {
   bool changed = false;
   DeadEndBlocks deadEndBlocks(&fn);
 
@@ -2887,7 +2887,7 @@ static bool optimizeMemoryAccesses(SILFunction &fn) {
   return changed;
 }
 
-static bool eliminateDeadAllocations(SILFunction &fn) {
+bool swift::eliminateDeadAllocations(SILFunction &fn) {
   bool changed = false;
   DeadEndBlocks deadEndBlocks(&fn);
 
