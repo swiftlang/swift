@@ -22,7 +22,7 @@ distributed actor Capybara {
 
 
 // ==== Fake Transport ---------------------------------------------------------
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 5.6, *)
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address: String) {
@@ -30,7 +30,7 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 5.6, *)
 struct FakeTransport: ActorTransport {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented:\(#function)")
@@ -75,7 +75,7 @@ func test() async throws {
   print("valueWhenRemote: \(valueWhenRemote ?? "nil")")
 }
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     try! await test()

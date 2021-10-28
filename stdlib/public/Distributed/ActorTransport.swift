@@ -13,7 +13,7 @@
 import Swift
 import _Concurrency
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 5.6, *)
 public protocol ActorTransport: Sendable {
 
   // ==== ---------------------------------------------------------------------
