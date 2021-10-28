@@ -1,10 +1,7 @@
-// RUN: not --crash %target-swift-emit-silgen -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-emit-sil -enable-experimental-move-only -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -verify
 
-// REQUIRES: asserts
-
-// This test makes sure that we do not accept using Builtin.move on address only
-// types.
+import Swift
 
 func addressOnlyMove<T>(t: T) -> T {
-    Builtin.move(t)
+    _move(t) // expected-error {{move() used on a generic or existential value}}
 }
