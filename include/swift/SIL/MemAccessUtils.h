@@ -204,6 +204,11 @@ SILValue findReferenceRoot(SILValue ref);
 /// Find the first owned root of the reference.
 SILValue findOwnershipReferenceRoot(SILValue ref);
 
+/// Look through all ownership forwarding instructions to find the values which
+/// were originally borrowed.
+void findGuaranteedReferenceRoots(SILValue value,
+                                  SmallVectorImpl<SILValue> &roots);
+
 /// Find the aggregate containing the first owned root of the
 /// reference. Identical to findOwnershipReferenceRoot, but looks through
 /// struct_extract, tuple_extract, etc.
