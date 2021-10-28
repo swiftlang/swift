@@ -1035,6 +1035,14 @@ static ValueDecl *getStackDeallocOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
+static ValueDecl *getGetTempAllocStackPromotionSizeLimitOperation(
+  ASTContext &ctx,
+  Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(),
+                            _word);
+}
+
 static ValueDecl *getFenceOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
 }
@@ -2656,6 +2664,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getStackAllocOperation(Context, Id);
   case BuiltinValueKind::StackDealloc:
     return getStackDeallocOperation(Context, Id);
+  case BuiltinValueKind::GetTempAllocStackPromotionSizeLimit:
+    return getGetTempAllocStackPromotionSizeLimitOperation(Context, Id);
 
   case BuiltinValueKind::CastToNativeObject:
   case BuiltinValueKind::UnsafeCastToNativeObject:

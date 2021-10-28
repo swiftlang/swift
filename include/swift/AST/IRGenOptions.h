@@ -273,6 +273,12 @@ public:
   /// (includes alloc_stack allocations).
   unsigned StackPromotionSizeLimit = 1024;
 
+  /// The maximum number of bytes to automatically stack promote when calling
+  /// @c withUnsafeTemporaryAllocation() without checking with the runtime.
+  ///
+  /// @note Unlike @c StackPromotionSizeLimit, this value is per-call.
+  unsigned TempAllocStackPromotionSizeLimit = 1024;
+
   /// Emit code to verify that static and runtime type layout are consistent for
   /// the given type names.
   SmallVector<StringRef, 1> VerifyTypeLayoutNames;

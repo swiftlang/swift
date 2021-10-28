@@ -2162,6 +2162,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::DeallocRaw:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::StackDealloc:
+    case BuiltinValueKind::GetTempAllocStackPromotionSizeLimit:
     case BuiltinValueKind::Fence:
     case BuiltinValueKind::StaticReport:
     case BuiltinValueKind::Once:

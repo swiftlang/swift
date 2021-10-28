@@ -426,6 +426,10 @@ def stack_promotion_limit : Separate<["-"], "stack-promotion-limit">,
   HelpText<"Limit the size of stack promoted objects to the provided number "
            "of bytes.">;
 
+def temp_alloc_stack_promotion_limit : Separate<["-"], "temp-alloc-stack-promotion-limit">,
+  HelpText<"Limit the size of automatically stack-promoted buffers when "
+           "calling withUnsafeTemporaryAllocation().">;
+
 def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
   HelpText<"Dump Clang diagnostics to stderr">;
 

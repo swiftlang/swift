@@ -685,6 +685,12 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::GetTempAllocStackPromotionSizeLimit) {
+    auto limit = IGF.IGM.IRGen.Opts.TempAllocStackPromotionSizeLimit;
+    out.add(IGF.IGM.getSize(Size(limit)));
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::Fence) {
     SmallVector<Type, 4> Types;
     StringRef BuiltinName =

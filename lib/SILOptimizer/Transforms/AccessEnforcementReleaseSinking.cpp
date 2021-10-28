@@ -150,6 +150,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::DestroyTaskGroup:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::StackDealloc:
+    case BuiltinValueKind::GetTempAllocStackPromotionSizeLimit:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime
