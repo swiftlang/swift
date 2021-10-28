@@ -61,6 +61,7 @@ common_expected_dependencies = [
 vendor_apple_specific_dependencies = [
     "___stack_chk_fail", "___stack_chk_guard",
     "_getsectiondata", "__dyld_register_func_for_add_image",
+    "_pthread_get_stackaddr_np", "_pthread_get_stacksize_np", "_pthread_self",
 ]
 ################################################################################
 
