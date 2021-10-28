@@ -9,7 +9,7 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor DA: CustomStringConvertible {
   nonisolated var description: String {
     "DA(\(self.id))"
@@ -18,7 +18,7 @@ distributed actor DA: CustomStringConvertible {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address : String) {
@@ -39,7 +39,7 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct FakeTransport: ActorTransport {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     print("FakeTransport.decodeIdentity from:\(decoder)")
@@ -71,7 +71,7 @@ struct FakeTransport: ActorTransport {
 
 // ==== Test Coding ------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 class TestEncoder: Encoder {
   var codingPath: [CodingKey]
   var userInfo: [CodingUserInfoKey: Any]
@@ -135,7 +135,7 @@ class TestEncoder: Encoder {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 class TestDecoder: Decoder {
   let encoder: TestEncoder
   let data: String
@@ -190,7 +190,7 @@ class TestDecoder: Decoder {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test() {
   let transport = FakeTransport()
 
@@ -210,7 +210,7 @@ func test() {
   print("decoded da2: \(da2)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     test()

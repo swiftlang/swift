@@ -187,12 +187,12 @@ func callActorMethodFromGeneric(a: SomeActor) async {
   await a.someMethod()
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func makeActorInTask() async {
   Task.detached { await SomeActor() }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func callActorMethodInTask(a: SomeActor) async {
   Task.detached { await a.someMethod() }
 }

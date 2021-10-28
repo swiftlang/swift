@@ -20,7 +20,7 @@ import _Concurrency
 ///
 /// FIXME(distributed): We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
 @_marker
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol AnyActor: Sendable, AnyObject {}
 
 // ==== Distributed Actor -----------------------------------------------------
@@ -33,7 +33,7 @@ public protocol AnyActor: Sendable, AnyObject {}
 ///
 /// The 'DistributedActor' protocol provides the core functionality of any
 /// distributed actor.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol DistributedActor:
     AnyActor, Sendable, Identifiable, Hashable, Codable {
     /// Resolves the passed in `identity` against the `transport`, returning
@@ -79,7 +79,7 @@ public protocol DistributedActor:
 
 // ==== Hashable conformance ---------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension DistributedActor {
   nonisolated public func hash(into hasher: inout Hasher) {
     self.id.hash(into: &hasher)
@@ -93,11 +93,11 @@ extension DistributedActor {
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
-  @available(SwiftStdlib 5.5, *)
+  @available(SwiftStdlib 5.1, *)
   public static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_transport")!
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension DistributedActor {
   nonisolated public init(from decoder: Decoder) throws {
     guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
@@ -118,7 +118,7 @@ extension DistributedActor {
 
 // ==== Local actor special handling -------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension DistributedActor {
 
   /// Executes the passed 'body' only when the distributed actor is local instance.
@@ -143,10 +143,10 @@ extension DistributedActor {
 /******************************************************************************/
 
 /// Uniquely identifies a distributed actor, and enables sending messages and identifying remote actors.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol ActorIdentity: Sendable, Hashable, Codable {}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomStringConvertible {
   public let underlying: Any
   @usableFromInline let _hashInto: (inout Hasher) -> ()
@@ -208,11 +208,11 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomString
 /******************************************************************************/
 
 /// Error protocol to which errors thrown by any `ActorTransport` should conform.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol ActorTransportError: Error {
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct DistributedActorCodingError: ActorTransportError {
   public let message: String
 

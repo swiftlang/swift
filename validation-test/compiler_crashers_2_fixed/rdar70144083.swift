@@ -2,7 +2,7 @@
 
 // REQUIRES: concurrency
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol AsyncIteratorProtocol {
     associatedtype Element
     associatedtype Failure: Error
@@ -11,7 +11,7 @@ public protocol AsyncIteratorProtocol {
     mutating func cancel()
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol AsyncSequence {
     associatedtype Element
     associatedtype Failure: Error
@@ -20,7 +20,7 @@ public protocol AsyncSequence {
     func makeAsyncIterator() -> AsyncIterator
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct Just<Element>: AsyncSequence {
     typealias Failure = Never
 

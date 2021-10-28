@@ -12,22 +12,22 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor A {}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor DA {
   init(transport: ActorTransport) {}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor DA_userDefined {
   init(transport: ActorTransport) {}
 
   deinit {}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor DA_userDefined2 {
   init(transport: ActorTransport) {}
 
@@ -37,7 +37,7 @@ distributed actor DA_userDefined2 {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor DA_state {
   var name = "Hello"
   var age = 42
@@ -52,7 +52,7 @@ distributed actor DA_state {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address : String) {
@@ -60,7 +60,7 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 final class FakeTransport: @unchecked Sendable, ActorTransport {
 
   var n = 0
@@ -95,7 +95,7 @@ final class FakeTransport: @unchecked Sendable, ActorTransport {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test() {
   let transport = FakeTransport()
 
@@ -147,7 +147,7 @@ func test() {
   // CHECK-NEXT: Deinitializing
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     test()

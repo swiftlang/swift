@@ -7,7 +7,7 @@ enum BogusError: Error {
     case blah
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Convenient {
     var x: Int
     var y: Convenient?
@@ -80,13 +80,13 @@ actor Convenient {
 
 func randomInt() -> Int { return 4 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func callMethod(_ a: MyActor) {}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func passInout<T>(_ a: inout T) {}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor MyActor {
     var x: Int
     var y: Int
@@ -305,7 +305,7 @@ actor MyActor {
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor X {
     var counter: Int
 
@@ -329,10 +329,10 @@ struct CardboardBox<T> {
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 var globalVar: EscapeArtist? // expected-note 2 {{var declared here}}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor EscapeArtist {
     var x: Int
 

@@ -31,14 +31,14 @@ protocol MP { }
 
 class M : MP {
 
-  @available(SwiftStdlib 5.5, *)
+  @available(SwiftStdlib 5.1, *)
   func throwWithIndirectResult<T>(_ a: P<T>) async throws -> T {
     throw E.err
   }
 }
 
 extension MP {
-  @available(SwiftStdlib 5.5, *)
+  @available(SwiftStdlib 5.1, *)
   func l<A, B, C, D, E2, F> (_ a : P<A>, _ b: P<B>, _ c: P<C>, _ d : P<D>, _ e: P<E2>, _ f: P<F>) async throws -> (A, B, C, D, E2, F) {
     throw E.err
   }
@@ -48,7 +48,7 @@ extension MP {
   static func main() async {
     var tests = TestSuite("Async Throw")
 
-    if #available(SwiftStdlib 5.5, *) {
+    if #available(SwiftStdlib 5.1, *) {
       tests.test("throwing of naturally direct but indirect reabstration") {
         let task2 = detach {
           let m = M()

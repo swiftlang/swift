@@ -4,15 +4,15 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor Capybara { }
 
-//@available(SwiftStdlib 5.5, *)
+//@available(SwiftStdlib 5.1, *)
 //protocol Wheeker: DistributedActor { }
-//@available(SwiftStdlib 5.5, *)
+//@available(SwiftStdlib 5.1, *)
 //distributed actor GuineaPing: Wheeker { }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test(identity: AnyActorIdentity, transport: ActorTransport) async throws {
   let _: Capybara = try Capybara.resolve(identity, using: transport)
 

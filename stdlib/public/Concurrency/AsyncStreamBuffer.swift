@@ -51,7 +51,7 @@ func _lock(_ ptr: UnsafeRawPointer)
 func _unlock(_ ptr: UnsafeRawPointer)
 #endif
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncStream {
   internal final class _Storage: UnsafeSendable {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
@@ -283,7 +283,7 @@ extension AsyncStream {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream {
   internal final class _Storage: UnsafeSendable {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void

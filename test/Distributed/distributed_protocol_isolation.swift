@@ -7,7 +7,7 @@ import _Distributed
 // ==== -----------------------------------------------------------------------
 // MARK: Good cases
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 protocol DistProtocol: DistributedActor {
   // FIXME(distributed): avoid issuing these warnings, these originate from the call on the DistProtocol where we marked this func as dist isolated,
   func local() -> String
@@ -24,7 +24,7 @@ protocol DistProtocol: DistributedActor {
   distributed func distAsyncThrows() async throws -> String
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor SpecificDist: DistProtocol {
 
   nonisolated func local() -> String { "hi" }
@@ -47,7 +47,7 @@ distributed actor SpecificDist: DistProtocol {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func outside_good(dp: SpecificDist) async throws {
   _ = dp.local()
 
@@ -58,7 +58,7 @@ func outside_good(dp: SpecificDist) async throws {
   _ = try await dp.distAsyncThrows() // ok
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func outside_good_generic<DP: DistProtocol>(dp: DP) async throws {
   _ = dp.local() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   _ = await dp.local() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
@@ -76,7 +76,7 @@ func outside_good_generic<DP: DistProtocol>(dp: DP) async throws {
   _ = try await dp.distAsyncThrows() // ok
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func outside_good_ext<DP: DistProtocol>(dp: DP) async throws {
   _ = try await dp.dist() // implicit async throws
   _ = try await dp.dist(string: "") // implicit async throws
@@ -88,13 +88,13 @@ func outside_good_ext<DP: DistProtocol>(dp: DP) async throws {
 // ==== -----------------------------------------------------------------------
 // MARK: Error cases
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 protocol ErrorCases: DistributedActor {
   distributed func unexpectedAsyncThrows() -> String
   // expected-note@-1{{protocol requires function 'unexpectedAsyncThrows()' with type '() -> String'; do you want to add a stub?}}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor BadGreeter: ErrorCases {
   // expected-error@-1{{type 'BadGreeter' does not conform to protocol 'ErrorCases'}}
 

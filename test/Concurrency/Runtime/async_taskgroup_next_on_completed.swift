@@ -10,7 +10,7 @@
 
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_sum_nextOnCompleted() async {
   let numbers = [1, 2, 3, 4, 5]
   let expected = 15 // FIXME: numbers.reduce(0, +) this hangs?
@@ -60,7 +60,7 @@ func test_sum_nextOnCompleted() async {
   print("result: \(sum)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_sum_nextOnCompleted()

@@ -85,7 +85,7 @@ struct HasFunctions {
   var cfp: @convention(c) () -> Void
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @globalActor
 actor MyGlobalActor {
   static let shared = MyGlobalActor()

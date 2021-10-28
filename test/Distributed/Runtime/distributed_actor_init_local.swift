@@ -20,22 +20,22 @@ enum MyError: Error {
   case test
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor PickATransport1 {
   init(kappa transport: ActorTransport, other: Int) {}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor PickATransport2 {
   init(other: Int, theTransport: ActorTransport) async {}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor LocalWorker {
   init(transport: ActorTransport) {}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor Bug_CallsReadyTwice {
   var x: Int
   init(transport: ActorTransport, wantBug: Bool) async {
@@ -46,7 +46,7 @@ distributed actor Bug_CallsReadyTwice {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor Throwy {
   init(transport: ActorTransport, doThrow: Bool) throws {
     if doThrow {
@@ -55,7 +55,7 @@ distributed actor Throwy {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 distributed actor ThrowBeforeFullyInit {
   var x: Int
   init(transport: ActorTransport, doThrow: Bool) throws {
@@ -68,7 +68,7 @@ distributed actor ThrowBeforeFullyInit {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address: String) {
@@ -79,7 +79,7 @@ struct ActorAddress: ActorIdentity {
 // global to track available IDs
 var nextID: Int = 1
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct FakeTransport: ActorTransport {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented:\(#function)")
@@ -109,7 +109,7 @@ struct FakeTransport: ActorTransport {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test() async {
   let transport = FakeTransport()
 
@@ -156,7 +156,7 @@ func test() async {
   // CHECK-DAG: resign id:AnyActorIdentity(ActorAddress(address: "[[ID7]]"))
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test()
