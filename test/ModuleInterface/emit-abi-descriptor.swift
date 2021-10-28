@@ -21,6 +21,11 @@
 
 // RUN: %FileCheck %s < %t/FooBar.json
 
+// RUN: %target-swift-frontend -c -emit-module -emit-module-path %t/FooC.swiftmodule %t/Foo.swift -module-name Foo -emit-abi-descriptor-path %t/Foo-c.json -o %t/Foo.o
+
+// RUN: %FileCheck %s < %t/Foo-c.json
+
 // CHECK: "kind": "Root"
 // CHECK-NEXT: "name": "TopLevel"
 // CHECK-NEXT: "printedName": "TopLevel"
+// CHECK: "kind": "Function"
