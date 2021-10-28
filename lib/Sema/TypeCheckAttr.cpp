@@ -24,6 +24,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
@@ -270,6 +271,15 @@ public:
 } // end anonymous namespace
 
 void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
+  // Only allow for this attribute to be used when experimental move only is
+  // enabled.
+  if (!D->getASTContext().LangOpts.EnableExperimentalMoveOnly) {
+    auto error =
+        diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
   auto *dc = D->getDeclContext();
   auto *vd = dyn_cast<VarDecl>(D);
   if (!vd) {
