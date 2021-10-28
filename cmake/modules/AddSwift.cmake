@@ -730,7 +730,8 @@ function(add_libswift name)
 
   set(libswift_compile_options
       "-Xfrontend" "-validate-tbd-against-ir=none"
-      "-Xfrontend" "-enable-cxx-interop")
+      "-Xfrontend" "-enable-cxx-interop"
+      "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
 
   if(CMAKE_BUILD_TYPE STREQUAL Debug)
     list(APPEND libswift_compile_options "-g")

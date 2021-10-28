@@ -882,7 +882,6 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   FuncDecl *builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(
       getASTContext(),
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask))));
-
   auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
                                    {TupleType::getEmpty(ctx)},
                                    ArrayRef<ProtocolConformanceRef>{});
@@ -907,6 +906,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   // Get swiftJobRun
   FuncDecl *swiftJobRunFuncDecl = SGM.getSwiftJobRun();
+  assert(swiftJobRunFuncDecl && "Failed to find swift_job_run function decl");
   SILFunction *swiftJobRunSILFunc =
       SGM.getFunction(SILDeclRef(swiftJobRunFuncDecl, SILDeclRef::Kind::Func),
                       NotForDefinition);
@@ -924,6 +924,28 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   // Get main executor
   FuncDecl *getMainExecutorFuncDecl = SGM.getGetMainExecutor();
+  if (!getMainExecutorFuncDecl) {
+    // If it doesn't exist due to an SDK-compiler mismatch, we can conjure one
+    // up instead of crashing:
+    // @available(SwiftStdlib 5.5, *)
+    // @_silgen_name("swift_task_getMainExecutor")
+    // internal func _getMainExecutor() -> Builtin.Executor
+
+    ParameterList *emptyParams = ParameterList::createEmpty(getASTContext());
+    getMainExecutorFuncDecl = FuncDecl::createImplicit(
+        getASTContext(), StaticSpellingKind::None,
+        DeclName(
+            getASTContext(),
+            DeclBaseName(getASTContext().getIdentifier("_getMainExecutor")),
+            /*Arguments*/ emptyParams),
+        {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
+        getASTContext().TheExecutorType,
+        entryPoint.getDecl()->getModuleContext());
+    getMainExecutorFuncDecl->getAttrs().add(
+        new (getASTContext())
+            SILGenNameAttr("swift_task_getMainExecutor", /*implicit*/ true));
+  }
+
   SILFunction *getMainExeutorSILFunc = SGM.getFunction(
       SILDeclRef(getMainExecutorFuncDecl, SILDeclRef::Kind::Func),
       NotForDefinition);

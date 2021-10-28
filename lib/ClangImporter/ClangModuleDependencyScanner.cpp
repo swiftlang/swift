@@ -213,8 +213,22 @@ void ClangImporter::recordModuleDependencies(
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back(arg.str());
     };
-    // Add all args inheritted from creating the importer.
+
+    // Add all args inherited from creating the importer.
     auto It = allArgs.begin();
+
+    {
+      StringRef arg = *It;
+      if (arg == "clang" ||
+          arg.endswith(llvm::sys::path::get_separator().str() + "clang")) {
+        // Remove the initial path to clang executable argument, to avoid
+        // treating it as an executable input to compilation. It is not needed
+        // because the consumer of this command-line will invoke the emit-PCM
+        // action via swift-frontend.
+        It += 1;
+      }
+    }
+
     while(It != allArgs.end()) {
       StringRef arg = *It;
       // Remove the -target arguments because we should use the target triple
@@ -222,13 +236,6 @@ void ClangImporter::recordModuleDependencies(
       // from the depending Swift modules.
       if (arg == "-target") {
         It += 2;
-      } else if (arg == "clang" ||
-                 arg.endswith(llvm::sys::path::get_separator().str() + "clang")) {
-        // Remove the initial path to clang executable argument, to avoid
-        // treating it as an executable input to compilation. It is not needed
-        // because the consumer of this command-line will invoke the emit-PCM
-        // action via swift-frontend.
-        It += 1;
       } else if (arg.startswith("-fapinotes-swift-version=")) {
         // Remove the apinotes version because we should use the language version
         // specified in the interface file.
