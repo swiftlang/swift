@@ -68,7 +68,7 @@ Module Optimization' by the abbreviation 'WMO'.
 Reducing Dynamic Dispatch
 =========================
 
-Swift by default is a very dynamic language like Objective-C. Unlike Objective-C,
+Swift by default is not a very dynamic language like Objective-C. Unlike Objective-C,
 Swift gives the programmer the ability to improve runtime performance when
 necessary by removing or reducing this dynamism. This section goes through
 several examples of language constructs that can be used to perform such an
