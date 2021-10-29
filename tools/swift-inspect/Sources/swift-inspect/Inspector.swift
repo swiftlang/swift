@@ -34,6 +34,15 @@ class Inspector {
     mach_port_deallocate(mach_task_self_, task)
   }
 
+  func addReflectionInfoFromLoadedImages(context: SwiftReflectionContextRef) {
+    var numSuccessfulImages = 0
+    CSSymbolicatorForeachSymbolOwnerAtTime(symbolicator, kCSNow, { owner in
+      let address = CSSymbolOwnerGetBaseAddress(owner);
+      let name = CSSymbolOwnerGetName(owner)
+      let _ = swift_reflection_addImage(context, address)
+      })
+  }
+
   static func findTask(_ pid: pid_t, tryForkCorpse: Bool) -> task_t {
     var task = task_t()
     var kr = task_for_pid(mach_task_self_, pid, &task)
