@@ -585,6 +585,10 @@ private:
     case Node::Kind::IndexSubset:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
+    case Node::Kind::AssociatedConformanceProtocolRelativeAccessor:
+    case Node::Kind::AssociatedConformanceTypeRelativeAccessor:
+    case Node::Kind::ProtocolConformanceDescriptorRef:
+    case Node::Kind::AssociatedConformanceDescriptorRef:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2902,6 +2906,22 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << ")";
       Printer << " suspend resume partial function for ";
     }
+    return nullptr;
+  case Node::Kind::AssociatedConformanceProtocolRelativeAccessor:
+    Printer << "associated conformance protocol relative accessor at 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::AssociatedConformanceTypeRelativeAccessor:
+    Printer << "associated conformance type relative accessor at 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::ProtocolConformanceDescriptorRef:
+    Printer << "protocol conformance descriptor at ";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::AssociatedConformanceDescriptorRef:
+    Printer << "associated conformance descriptor at ";
+    Printer.writeHex(Node->getIndex());
     return nullptr;
   }
 

@@ -88,11 +88,13 @@ The following symbolic reference kinds are currently implemented:
    // The grammatical role of the symbolic reference is determined by the
    // kind of context descriptor referenced
 
-   protocol-conformance-ref ::= '\x03' .{4}  // Reference points directly to protocol conformance descriptor (NOT IMPLEMENTED)
-   protocol-conformance-ref ::= '\x04' .{4}  // Reference points indirectly to protocol conformance descriptor (NOT IMPLEMENTED)
+   #if SWIFT_RUNTIME_VERSION >= 5.5
+     protocol-conformance-ref ::= '\x03' .{4}  // Reference points directly to protocol conformance descriptor
+     protocol-conformance-ref ::= '\x04' .{4}  // Reference points indirectly to protocol conformance descriptor
 
-   dependent-associated-conformance ::= '\x05' .{4}  // Reference points directly to associated conformance descriptor (NOT IMPLEMENTED)
-   dependent-associated-conformance ::= '\x06' .{4}  // Reference points indirectly to associated conformance descriptor (NOT IMPLEMENTED)
+     dependent-associated-conformance ::= '\x05' .{4}  // Reference points directly to associated conformance descriptor
+     dependent-associated-conformance ::= '\x06' .{4}  // Reference points indirectly to associated conformance descriptor
+   #endif
 
    associated-conformance-access-function ::= '\x07' .{4}  // Reference points directly to associated conformance access function relative to the protocol
    associated-conformance-access-function ::= '\x08' .{4}  // Reference points directly to associated conformance access function relative to the conforming type
@@ -840,6 +842,20 @@ indicating the position of the appropriate value within the generic environment
 fixed position. An index of 1 ("0\_") is used to indicate "unknown"; all other
 values are adjusted by 2. That these indexes are not 0-based is a bug that's
 now codified into the ABI; the index 0 is therefore reserved.
+
+For example, if we have a conformance ``C: Collection``, and we're mangling
+the path required to extract ``C.Iterator: IteratorProtocol``, the path would
+be::
+
+  C: Collection -> C: Sequence -> C.Iterator: IteratorProtocol
+
+So we mangle::
+
+  <C> <Collection> 'HD' <index>
+  <Sequence> 'HI' <index>
+  <C.Iterator> <IteratorProtocol> 'HA' <index>
+
+(where items in angle brackets are themselves to be mangled).
 
 ::
 

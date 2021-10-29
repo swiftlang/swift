@@ -2738,6 +2738,30 @@ Remangler::mangleCanonicalPrespecializedGenericTypeCachingOnceToken(
   return ManglingError::Success;
 }
 
+ManglingError
+Remangler::mangleAssociatedConformanceProtocolRelativeAccessor(Node *node,
+                                                               unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError
+Remangler::mangleAssociatedConformanceTypeRelativeAccessor(Node *node,
+                                                           unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError
+Remangler::mangleProtocolConformanceDescriptorRef(Node *node,
+                                                  unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError
+Remangler::mangleAssociatedConformanceDescriptorRef(Node *node,
+                                                    unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 /// The top-level interface to the remangler.
 ManglingErrorOr<std::string>
 Demangle::mangleNodeOld(NodePointer node) {

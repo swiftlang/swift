@@ -65,7 +65,8 @@ protected:
 
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
-                                              const OpaqueTypeDecl *>;
+                                              const OpaqueTypeDecl *,
+                                              const ProtocolConformance *>;
 protected:
 
   /// If set, the mangler calls this function to determine whether to symbolic

@@ -366,18 +366,14 @@ IRGenModule::getLoweredTypeRef(SILType loweredType,
 
 /// Emit a mangled string referencing a specific protocol conformance, so that
 /// the runtime can fetch its witness table.
-///
-/// TODO: Currently this uses a stub mangling that just refers to an accessor
-/// function. We need to fully develop the mangling with the ability to refer
-/// to dependent conformances to be able to use mangled strings.
 llvm::Constant *
 IRGenModule::emitWitnessTableRefString(CanType type,
-                                      ProtocolConformanceRef conformance,
-                                      GenericSignature origGenericSig,
-                                      bool shouldSetLowBit) {
+                                       ProtocolConformanceRef conformance,
+                                       GenericSignature origGenericSig,
+                                       bool shouldSetLowBit) {
   std::tie(type, conformance)
     = substOpaqueTypesWithUnderlyingTypes(type, conformance);
-  
+
   auto origType = type;
   auto genericSig = origGenericSig.getCanonicalSignature();
 
@@ -390,56 +386,18 @@ IRGenModule::emitWitnessTableRefString(CanType type,
   std::string symbolName =
     mangler.mangleSymbolNameForMangledConformanceAccessorString(
       "get_witness_table", genericSig, type, conformance);
+  std::string mangled
+    = mangler.mangleProtocolConformance(genericSig, type, conformance);
 
   return getAddrOfStringForMetadataRef(symbolName, /*alignment=*/2,
       shouldSetLowBit,
       [&](ConstantInitBuilder &B) {
-        // Build a stub that loads the necessary bindings from the key path's
-        // argument buffer then fetches the metadata.
-        auto fnTy = llvm::FunctionType::get(WitnessTablePtrTy,
-                                            {Int8PtrTy}, /*vararg*/ false);
-        auto accessorThunk =
-          llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
-                                 symbolName, getModule());
-        accessorThunk->setAttributes(constructInitialAttributes());
-        
-        {
-          IRGenFunction IGF(*this, accessorThunk);
-          if (DebugInfo)
-            DebugInfo->emitArtificialFunction(IGF, accessorThunk);
-
-          if (type->hasTypeParameter()) {
-            auto bindingsBufPtr = IGF.collectParameters().claimNext();
-
-            bindFromGenericRequirementsBuffer(IGF, requirements,
-                Address(bindingsBufPtr, getPointerAlignment()),
-                MetadataState::Complete,
-                [&](CanType t) {
-                  return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-                });
-
-            type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
-          }
-          if (origType->hasTypeParameter()) {
-            auto origSig = genericEnv->getGenericSignature();
-            conformance = conformance.subst(origType,
-              QueryInterfaceTypeSubstitutions(genericEnv),
-              LookUpConformanceInSignature(origSig.getPointer()));
-          }
-          auto ret = emitWitnessTableRef(IGF, type, conformance);
-          IGF.Builder.CreateRet(ret);
-        }
-
-        // Form the mangled name with its relative reference.
         auto S = B.beginStruct();
         S.setPacked(true);
-        S.add(llvm::ConstantInt::get(Int8Ty, 255));
-        S.add(llvm::ConstantInt::get(Int8Ty, 9));
-        S.addRelativeAddress(accessorThunk);
-
-        // And a null terminator!
-        S.addInt(Int8Ty, 0);
-
+        auto literal = llvm::ConstantDataArray::getString(getLLVMContext(),
+                                                          mangled,
+                                                          /*null*/ false);
+        S.add(literal);
         return S.finishAndCreateFuture();
       });
 }

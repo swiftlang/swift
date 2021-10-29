@@ -118,3 +118,19 @@ public func _getTypeByMangledNameInContext(
   genericContext: UnsafeRawPointer?,
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
+
+@_silgen_name("swift_getWitnessByMangledNameInEnvironment")
+internal func _getWitnessByMangledNameInEnvironment(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt,
+  genericEnvironment: UnsafeRawPointer?,
+  genericArguments: UnsafeRawPointer?)
+  -> UnsafeRawPointer?
+
+@_silgen_name("swift_getWitnessByMangledNameInContext")
+internal func _getWitnessByMangledNameInContext(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt,
+  genericContext: UnsafeRawPointer?,
+  genericArguments: UnsafeRawPointer?)
+  -> UnsafeRawPointer?

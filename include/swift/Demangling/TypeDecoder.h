@@ -20,6 +20,7 @@
 
 #include "TypeLookupError.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/RequirementBase.h"
@@ -454,12 +455,15 @@ void decodeRequirement(NodePointer node,
 template <typename BuilderType>
 class TypeDecoder {
   using BuiltType = typename BuilderType::BuiltType;
+  using BuiltProtocolConformance = typename BuilderType::BuiltProtocolConformance;
+
   using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using Field = typename BuilderType::BuiltSILBoxField;
   using BuiltSubstitution = typename BuilderType::BuiltSubstitution;
   using BuiltRequirement = typename BuilderType::BuiltRequirement;
   using BuiltLayoutConstraint = typename BuilderType::BuiltLayoutConstraint;
+  using BuiltProtocolConformanceDecl = typename BuilderType::BuiltProtocolConformanceDecl;
   using NodeKind = Demangle::Node::Kind;
 
   BuilderType &Builder;
@@ -472,8 +476,224 @@ public:
     return decodeMangledType(Node, 0);
   }
 
+  /// Given a demangle tree, attempt to turn it into a protocol conformance.
+  BuiltProtocolConformance decodeMangledProtocolConformance(NodePointer Node) {
+    return decodeMangledProtocolConformance(Node, 0);
+  }
+
+  /// Given a demangle tree, attempt to turn it into a conformance decl.
+  BuiltProtocolConformanceDecl
+  decodeMangledProtocolConformanceDecl(BuiltType ConformingType,
+                                       NodePointer Node) {
+    return decodeMangledProtocolConformanceDecl(ConformingType, Node, 0);
+  }
+
 protected:
   static const unsigned MaxDepth = 1024;
+
+  BuiltProtocolConformance decodeMangledProtocolConformance(NodePointer Node,
+                                                            unsigned depth) {
+    if (!Node || depth > TypeDecoder::MaxDepth)
+      return BuiltProtocolConformance();
+
+    using NodeKind = Demangle::Node::Kind;
+    switch (Node->getKind()) {
+    case NodeKind::Global:
+      if (Node->getNumChildren() < 1)
+        return BuiltProtocolConformance();
+
+      return decodeMangledProtocolConformance(Node->getChild(0), depth + 1);
+
+    case NodeKind::ConcreteProtocolConformance: {
+      if (Node->getNumChildren() < 3)
+        return BuiltProtocolConformance();
+
+      auto conformingTypeOrError = decodeMangledType(Node->getChild(0),
+                                                     depth + 1);
+      if (conformingTypeOrError.isError())
+        return BuiltProtocolConformance();
+
+      auto conformingType = conformingTypeOrError.getValue();
+      auto conformanceDecl
+        = decodeMangledProtocolConformanceDecl(conformingType,
+                                               Node->getChild(1),
+                                               depth + 1);
+
+      if (!conformanceDecl)
+        return BuiltProtocolConformance();
+
+      std::vector<BuiltProtocolConformance> conformanceArgs;
+
+      if (Node->getChild(2)->getKind() != NodeKind::AnyProtocolConformanceList)
+        return BuiltProtocolConformance();
+
+      for (auto mangledArg : *Node->getChild(2)) {
+        auto arg = decodeMangledProtocolConformance(mangledArg, depth + 1);
+        if (!arg)
+          return BuiltProtocolConformance();
+        conformanceArgs.push_back(arg);
+      }
+
+      return Builder.createConcreteProtocolConformance(conformingType,
+                                                       conformanceDecl,
+                                                       conformanceArgs);
+    }
+
+    case NodeKind::DependentProtocolConformanceRoot: {
+      if (Node->getNumChildren() < 3)
+        return BuiltProtocolConformance();
+
+      auto conformingTypeOrError = decodeMangledType(Node->getChild(0),
+                                                     depth + 1);
+      if (conformingTypeOrError.isError())
+        return BuiltProtocolConformance();
+
+      auto conformingType = conformingTypeOrError.getValue();
+      auto conformingRequirement = decodeMangledProtocolType(Node->getChild(1),
+                                                             depth + 1);
+      if (!conformingRequirement)
+        return BuiltProtocolConformance();
+
+      if (!Node->getChild(2)->hasIndex())
+        return BuiltProtocolConformance();
+
+      auto index = Node->getChild(2)->getIndex();
+
+      return Builder.createDependentProtocolConformanceRoot(conformingType,
+                                                            conformingRequirement,
+                                                            index);
+    }
+
+    case NodeKind::DependentProtocolConformanceAssociated: {
+      if (Node->getNumChildren() < 3)
+        return BuiltProtocolConformance();
+
+      auto base = decodeMangledProtocolConformance(Node->getChild(0), depth + 1);
+      if (!base)
+        return BuiltProtocolConformance();
+
+      if (Node->getChild(1)->getKind() != NodeKind::DependentAssociatedConformance)
+        return BuiltProtocolConformance();
+      if (Node->getChild(1)->getNumChildren() < 2)
+        return BuiltProtocolConformance();
+
+      auto conformingTypeOrError
+        = decodeMangledType(Node->getChild(1)->getChild(0), depth + 1);
+      if (conformingTypeOrError.isError())
+        return BuiltProtocolConformance();
+      auto conformingType = conformingTypeOrError.getValue();
+      auto conformingRequirement
+        = decodeMangledProtocolType(Node->getChild(1)->getChild(1), depth + 1);
+      if (!conformingRequirement)
+        return BuiltProtocolConformance();
+
+      if (!Node->getChild(2)->hasIndex())
+        return BuiltProtocolConformance();
+
+      auto index = Node->getChild(2)->getIndex();
+
+      return Builder.createDependentProtocolConformanceAssociated(base,
+                                                                  conformingType,
+                                                                  conformingRequirement,
+                                                                  index);
+    }
+
+    case NodeKind::DependentProtocolConformanceInherited: {
+      if (Node->getNumChildren() < 3)
+        return BuiltProtocolConformance();
+
+      auto base = decodeMangledProtocolConformance(Node->getChild(0), depth + 1);
+      if (!base)
+        return BuiltProtocolConformance();
+
+      auto superRequirement = decodeMangledProtocolType(Node->getChild(1),
+                                                        depth + 1);
+      if (!superRequirement)
+        return BuiltProtocolConformance();
+
+      if (!Node->getChild(2)->hasIndex())
+        return BuiltProtocolConformance();
+
+      auto index = Node->getChild(2)->getIndex();
+
+      return Builder.createDependentProtocolConformanceInherited(base,
+                                                                 superRequirement,
+                                                                 index);
+    }
+
+    case NodeKind::AssociatedConformanceProtocolRelativeAccessor:
+    case NodeKind::AssociatedConformanceTypeRelativeAccessor: {
+      auto witnessFn = reinterpret_cast<AssociatedWitnessTableAccessFunction *>(
+        Node->getIndex());
+      return Builder.createProtocolConformanceFromAccessor(witnessFn);
+    }
+    default:
+      return BuiltProtocolConformance();
+    }
+  }
+
+  BuiltProtocolConformanceDecl
+  decodeMangledProtocolConformanceDecl(BuiltType ConformingType,
+                                       NodePointer Node,
+                                       unsigned depth) {
+    if (!Node || depth > TypeDecoder::MaxDepth)
+      return BuiltProtocolConformanceDecl();
+
+    using NodeKind = Demangle::Node::Kind;
+    switch (Node->getKind()) {
+    case NodeKind::ProtocolConformanceRefInTypeModule: {
+      if (Node->getNumChildren() < 1)
+        return BuiltProtocolConformanceDecl();
+
+      auto protocolRequirement = decodeMangledProtocolType(Node->getChild(0),
+                                                           depth + 1);
+      if (!protocolRequirement)
+        return BuiltProtocolConformanceDecl();
+
+      return Builder.createProtocolConformanceDeclInTypeModule(ConformingType,
+                                                               protocolRequirement);
+    }
+
+    case NodeKind::ProtocolConformanceRefInProtocolModule: {
+      if (Node->getNumChildren() < 1)
+        return BuiltProtocolConformanceDecl();
+
+      auto protocolRequirement = decodeMangledProtocolType(Node->getChild(0),
+                                                           depth + 1);
+      if (!protocolRequirement)
+        return BuiltProtocolConformanceDecl();
+
+      return Builder.createProtocolConformanceDeclInProtocolModule(ConformingType,
+                                                                   protocolRequirement);
+    }
+
+    case NodeKind::ProtocolConformanceRefInOtherModule: {
+      if (Node->getNumChildren() < 2)
+        return BuiltProtocolConformanceDecl();
+
+      auto protocolRequirement = decodeMangledProtocolType(Node->getChild(0),
+                                                           depth + 1);
+      if (!protocolRequirement)
+        return BuiltProtocolConformanceDecl();
+
+      auto moduleName = Node->getChild(1)->getText();
+
+      return Builder.createProtocolConformanceDeclRetroactive(ConformingType,
+                                                              protocolRequirement,
+                                                              moduleName);
+    }
+
+    case NodeKind::ProtocolConformanceDescriptorRef:
+    case NodeKind::AssociatedConformanceDescriptorRef: {
+      auto desc = reinterpret_cast<ProtocolConformanceDescriptor *>(
+        Node->getIndex());
+      return Builder.createProtocolConformanceDeclFromDescriptor(desc);
+    }
+
+    default:
+      return BuiltProtocolConformanceDecl();
+    }
+  }
 
   TypeLookupErrorOr<BuiltType> decodeMangledType(NodePointer Node,
                                                  unsigned depth) {
@@ -1545,6 +1765,12 @@ template <typename BuilderType>
 inline TypeLookupErrorOr<typename BuilderType::BuiltType>
 decodeMangledType(BuilderType &Builder, NodePointer Node) {
   return TypeDecoder<BuilderType>(Builder).decodeMangledType(Node);
+}
+
+template <typename BuilderType>
+inline TypeLookupErrorOr<typename BuilderType::BuiltProtocolConformance>
+decodeMangledProtocolConformance(BuilderType &Builder, NodePointer Node) {
+  return TypeDecoder<BuilderType>(Builder).decodeMangledProtocolConformance(Node);
 }
 
 SWIFT_END_INLINE_NAMESPACE

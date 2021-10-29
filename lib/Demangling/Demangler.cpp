@@ -601,6 +601,34 @@ NodePointer Demangler::demangleType(StringRef MangledName,
   return createNode(Node::Kind::Suffix, Text);
 }
 
+NodePointer Demangler::demangleConformance(StringRef MangledName,
+        std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver) {
+  DemangleInitRAII state(*this, MangledName,
+                         std::move(SymbolicReferenceResolver));
+
+  parseAndPushNodes();
+
+  if (NodePointer Result = popNode()) {
+    if (Result->getKind() == Node::Kind::Global) {
+      if (Result->getNumChildren() < 1)
+        return nullptr;
+      Result = Result->getChild(0);
+    }
+
+    switch (Result->getKind()) {
+    case Node::Kind::ConcreteProtocolConformance:
+    case Node::Kind::DependentProtocolConformanceRoot:
+    case Node::Kind::AssociatedConformanceProtocolRelativeAccessor:
+    case Node::Kind::AssociatedConformanceTypeRelativeAccessor:
+      return Result;
+    default:
+      return nullptr;
+    }
+  }
+
+  return nullptr;
+}
+
 bool Demangler::parseAndPushNodes() {
   const auto textSize = Text.size();
   while (Pos < textSize) {
@@ -718,6 +746,30 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
     kind = SymbolicReferenceKind::Context;
     direct = Directness::Indirect;
     break;
+  case 3:
+    kind = SymbolicReferenceKind::ProtocolConformanceDescriptor;
+    direct = Directness::Direct;
+    break;
+  case 4:
+    kind = SymbolicReferenceKind::ProtocolConformanceDescriptor;
+    direct = Directness::Indirect;
+    break;
+  case 5:
+    kind = SymbolicReferenceKind::AssociatedConformanceDescriptor;
+    direct = Directness::Direct;
+    break;
+  case 6:
+    kind = SymbolicReferenceKind::AssociatedConformanceDescriptor;
+    direct = Directness::Indirect;
+    break;
+  case 7:
+    kind = SymbolicReferenceKind::AssociatedConformanceProtocolRelativeAccessor;
+    direct = Directness::Direct;
+    break;
+  case 8:
+    kind = SymbolicReferenceKind::AssociatedConformanceTypeRelativeAccessor;
+    direct = Directness::Direct;
+    break;
   case 9:
     kind = SymbolicReferenceKind::AccessorFunctionReference;
     direct = Directness::Direct;
@@ -725,7 +777,7 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
   default:
     return nullptr;
   }
-  
+
   // Use the resolver, if any, to produce the demangling tree the symbolic
   // reference represents.
   NodePointer resolved = nullptr;

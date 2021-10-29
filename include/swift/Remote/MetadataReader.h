@@ -165,6 +165,9 @@ public:
   using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
   using BuiltRequirement = typename BuilderType::BuiltRequirement;
+  using BuiltProtocolConformance = typename BuilderType::BuiltProtocolConformance;
+  using BuiltProtocolConformanceDecl =
+    typename BuilderType::BuiltProtocolConformanceDecl;
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSignedPointer = typename Runtime::StoredSignedPointer;
   using StoredSize = typename Runtime::StoredSize;
@@ -439,10 +442,24 @@ public:
           
         return buildContextMangling(context, dem);
       }
+      case Demangle::SymbolicReferenceKind::AssociatedConformanceProtocolRelativeAccessor:
+      case Demangle::SymbolicReferenceKind::AssociatedConformanceTypeRelativeAccessor:
       case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
         // The symbolic reference points at a resolver function, but we can't
         // execute code in the target process to resolve it from here.
         return nullptr;
+      }
+      case Demangle::SymbolicReferenceKind::ProtocolConformanceDescriptor: {
+        return dem.createNode(
+          Node::Kind::ProtocolConformanceDescriptor,
+          remoteAddress
+        );
+      }
+      case Demangle::SymbolicReferenceKind::AssociatedConformanceDescriptor: {
+        return dem.createNode(
+          Node::Kind::AssociatedConformanceDescriptor,
+          remoteAddress
+        );
       }
       }
 
@@ -470,6 +487,12 @@ public:
   TypeLookupErrorOr<typename BuilderType::BuiltType>
   decodeMangledType(NodePointer Node) {
     return swift::Demangle::decodeMangledType(Builder, Node);
+  }
+
+  /// Given a demangle tree, attempt to turn it into a protocol conformance
+  TypeLookupErrorOr<typename BuilderType::BuiltProtocolConformance>
+  decodeMangledProtocolConformance(NodePointer Node) {
+    return swift::Demangle::decodeMangledProtocolConformance(Builder, Node);
   }
 
   /// Get the remote process's swift_isaMask.

@@ -615,6 +615,16 @@ public:
 
   std::string mangleSymbolNameForGenericEnvironment(
                                                 CanGenericSignature genericSig);
+
+  std::string mangleProtocolConformance(
+    CanGenericSignature GenericSig,
+    CanType Type,
+    ProtocolConformanceRef Conformance) {
+    beginManglingWithoutPrefix();
+    appendAnyProtocolConformance(GenericSig, Type, Conformance);
+    return finalize();
+  }
+
 protected:
   SymbolicMangling
   withSymbolicReferences(IRGenModule &IGM,

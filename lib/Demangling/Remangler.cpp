@@ -284,6 +284,16 @@ class Remangler : public RemanglerBase {
     return mangleChildNodes(Proto, depth);
   }
 
+  ManglingError mangleSymbolicReference(Node *node,
+                                        SymbolicReferenceKind kind,
+                                        const void *ptr,
+                                        unsigned depth) {
+    Node *tree = Resolver(kind, ptr);
+    if (!tree)
+      return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+    return mangle(tree, depth);
+  }
+
   ManglingError mangleProtocolList(Node *protocols, Node *superclass,
                                    bool hasExplicitAnyObject, unsigned depth);
 
@@ -3223,24 +3233,27 @@ ManglingError Remangler::mangleAssociatedTypeGenericParamRef(Node *node,
 
 ManglingError Remangler::mangleTypeSymbolicReference(Node *node,
                                                      unsigned depth) {
-  return mangle(
-      Resolver(SymbolicReferenceKind::Context, (const void *)node->getIndex()),
-      depth + 1);
+  return mangleSymbolicReference(node,
+                                 SymbolicReferenceKind::Context,
+                                 (const void *)node->getIndex(),
+                                 depth + 1);
 }
 
 ManglingError Remangler::mangleProtocolSymbolicReference(Node *node,
                                                          unsigned depth) {
-  return mangle(
-      Resolver(SymbolicReferenceKind::Context, (const void *)node->getIndex()),
-      depth + 1);
+  return mangleSymbolicReference(node,
+                                 SymbolicReferenceKind::Context,
+                                 (const void *)node->getIndex(),
+                                 depth + 1);
 }
 
 ManglingError
 Remangler::mangleOpaqueTypeDescriptorSymbolicReference(Node *node,
                                                        unsigned depth) {
-  return mangle(
-      Resolver(SymbolicReferenceKind::Context, (const void *)node->getIndex()),
-      depth + 1);
+  return mangleSymbolicReference(node,
+                                 SymbolicReferenceKind::Context,
+                                 (const void *)node->getIndex(),
+                                 depth + 1);
 }
 
 ManglingError Remangler::mangleSugaredOptional(Node *node, unsigned depth) {
@@ -3302,7 +3315,10 @@ ManglingError Remangler::mangleOpaqueType(Node *node, unsigned depth) {
 }
 ManglingError Remangler::mangleAccessorFunctionReference(Node *node,
                                                          unsigned depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+  return mangleSymbolicReference(node,
+                                 SymbolicReferenceKind::AccessorFunctionReference,
+                                 (const void *)node->getIndex(),
+                                 depth + 1);
 }
 
 ManglingError
@@ -3372,6 +3388,46 @@ ManglingError Remangler::mangleGlobalVariableOnceDeclList(Node *node,
     Buffer << '_';
   }
   return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleAssociatedConformanceProtocolRelativeAccessor(Node *node,
+                                                               unsigned depth) {
+  return mangleSymbolicReference(
+    node,
+    SymbolicReferenceKind::AssociatedConformanceProtocolRelativeAccessor,
+    (const void *)node->getIndex(),
+    depth + 1);
+}
+
+ManglingError
+Remangler::mangleAssociatedConformanceTypeRelativeAccessor(Node *node,
+                                                           unsigned depth) {
+  return mangleSymbolicReference(
+    node,
+    SymbolicReferenceKind::AssociatedConformanceTypeRelativeAccessor,
+    (const void *)node->getIndex(),
+    depth + 1);
+}
+
+ManglingError
+Remangler::mangleProtocolConformanceDescriptorRef(Node *node,
+                                                  unsigned depth) {
+  return mangleSymbolicReference(
+    node,
+    SymbolicReferenceKind::ProtocolConformanceDescriptor,
+    (const void *)node->getIndex(),
+    depth + 1);
+}
+
+ManglingError
+Remangler::mangleAssociatedConformanceDescriptorRef(Node *node,
+                                                    unsigned depth) {
+  return mangleSymbolicReference(
+    node,
+    SymbolicReferenceKind::AssociatedConformanceDescriptor,
+    (const void *)node->getIndex(),
+    depth + 1);
 }
 
 } // anonymous namespace

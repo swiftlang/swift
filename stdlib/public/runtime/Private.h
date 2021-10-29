@@ -398,6 +398,35 @@ public:
                                const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
+
+  /// Retrieve the witness table described by the given mangled name.
+  ///
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+  const WitnessTable *swift_getWitnessByMangledNode(
+                               MetadataRequest request,
+                               Demangler &demangler,
+                               Demangle::NodePointer node,
+                               const void * const *arguments,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
+
+  /// Retrieve the witness table described by the given mangled name.
+  ///
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+  const WitnessTable *swift_getWitnessByMangledName(
+                               MetadataRequest request,
+                               StringRef mangledName,
+                               const void * const *arguments,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
 #pragma clang diagnostic pop
 
   /// Function object that produces substitutions for the generic parameters
@@ -590,6 +619,15 @@ public:
   const Metadata *
   _getSimpleProtocolTypeMetadata(const ProtocolDescriptor *protocol);
 
+  /// Obtain a witness table for an associated type by demangling a conformance
+  /// string
+  const WitnessTable *_getAssocWitnessTableFromMangledName(
+    StringRef mangledName,
+    const Metadata *conformingType,
+    const Metadata *assocType,
+    const WitnessTable *wtable
+  );
+
   /// Given a type that we know can be used with the given conformance, find
   /// the superclass that introduced the conformance.
   const Metadata *findConformingSuperclass(
@@ -642,6 +680,17 @@ public:
   SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
   id _quickLookObjectForPointer(void *value);
 #endif
+
+  /// Retrieve a conformance descriptor given a type and protocol.
+  /// Note that this DOES NOT take into account generic arguments.
+  ///
+  /// \param type The type we're considering.
+  /// \param protocol The protocol to which the type may conform.
+  ///
+  /// \returns a protocol conformance descriptor, or nullptr if none found.
+  const ProtocolConformanceDescriptor *
+  swift_getConformanceDescriptor(const Metadata * const type,
+                                 const ProtocolDescriptor *protocol);
 
 } // end namespace swift
 

@@ -325,5 +325,11 @@ NODE(IndexSubset)
 NODE(AsyncAwaitResumePartialFunction)
 NODE(AsyncSuspendResumePartialFunction)
 
+// Added in Swift 5.6
+NODE(AssociatedConformanceProtocolRelativeAccessor)
+NODE(AssociatedConformanceTypeRelativeAccessor)
+NODE(ProtocolConformanceDescriptorRef)
+NODE(AssociatedConformanceDescriptorRef)
+
 #undef CONTEXT_NODE
 #undef NODE

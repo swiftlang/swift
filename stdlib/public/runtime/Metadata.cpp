@@ -5174,7 +5174,7 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                             reqBase, assocType);
 }
 
-using AssociatedConformanceWitness = std::atomic<void *>;
+using AssociatedConformanceWitness = std::atomic<const void *>;
 
 SWIFT_CC(swift)
 static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
@@ -5230,54 +5230,25 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
                      ~ProtocolRequirementFlags::AssociatedTypeMangledNameBit);
 
 
-  // Extract the mangled name itself.
-  if (*mangledNameBase == '\xFF')
-    ++mangledNameBase;
-
   StringRef mangledName =
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
-  // Relative reference to an associate conformance witness function.
-  // FIXME: This is intended to be a temporary mangling, to be replaced
-  // by a real "protocol conformance" mangling.
-  if (mangledName.size() == 5 &&
-      (mangledName[0] == '\x07' || mangledName[0] == '\x08')) {
-    // Resolve the relative reference to the witness function.
-    int32_t offset;
-    memcpy(&offset, mangledName.data() + 1, 4);
-    auto ptr = detail::applyRelativeOffset(mangledName.data() + 1, offset);
+  const WitnessTable *assocWitnessTable = _getAssocWitnessTableFromMangledName(
+    mangledName, conformingType, assocType, wtable);
 
-    // Call the witness function.
-    auto witnessFn = (AssociatedWitnessTableAccessFunction *)ptr;
-#if SWIFT_PTRAUTH
-    witnessFn = ptrauth_sign_unauthenticated(witnessFn,
-                                             ptrauth_key_function_pointer,
-                                             0);
-#endif
-
-    auto assocWitnessTable = witnessFn(assocType, conformingType, wtable);
-    assert((uintptr_t(assocWitnessTable) &
-            ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0);
-
-    // The access function returns an unsigned pointer for now.
-
-    auto valueToStore = assocWitnessTable;
-#if SWIFT_PTRAUTH
-    if (assocConformance->Flags.isSignedWithAddress()) {
-      uint16_t extraDiscriminator =
-        assocConformance->Flags.getExtraDiscriminator();
-      valueToStore = ptrauth_sign_unauthenticated(valueToStore,
+  #if SWIFT_PTRAUTH
+  if (assocConformance->Flags.isSignedWithAddress()) {
+    uint16_t extraDiscriminator =
+      assocConformance->Flags.getExtraDiscriminator();
+    assocWitnessTable = ptrauth_sign_unauthenticated(assocWitnessTable,
                          swift_ptrauth_key_associated_conformance,
                          ptrauth_blend_discriminator(witnessAddr,
                                                      extraDiscriminator));
-    }
-#endif
-    witnessAddr->store(valueToStore, std::memory_order_release);
-
-    return assocWitnessTable;
   }
+  #endif
+  witnessAddr->store(assocWitnessTable, std::memory_order_release);
 
-  swift_unreachable("Invalid mangled associate conformance");
+  return assocWitnessTable;
 }
 
 const WitnessTable *swift::swift_getAssociatedConformanceWitness(

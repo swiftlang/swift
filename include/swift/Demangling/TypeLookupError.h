@@ -179,6 +179,10 @@ public:
   TypeLookupErrorOr(const TypeLookupError &te) : Value(te) {}
 
   T getType() {
+    return getValue();
+  }
+
+  T getValue() {
     if (auto *ptr = Value.template dyn_cast<T>())
       return *ptr;
     return T();
