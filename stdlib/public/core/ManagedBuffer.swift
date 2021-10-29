@@ -145,10 +145,10 @@ extension ManagedBuffer {
 /// `Header` and contiguous storage for an arbitrary number of
 /// `Element` instances stored in that buffer.
 ///
-/// For most purposes, the `ManagedBuffer` class works fine for this
-/// purpose, and can simply be used on its own.  However, in cases
+/// For most purposes, the `ManagedBuffer` class can be used on its own.
+/// However, in cases
 /// where objects of various different classes must serve as storage,
-/// `ManagedBufferPointer` is needed.
+/// you need to also use `ManagedBufferPointer`.
 ///
 /// A valid buffer class is non-`@objc`, with no declared stored
 ///   properties.  Its `deinit` must destroy its
