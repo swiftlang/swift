@@ -3026,6 +3026,14 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
     auto overflow = llvm::MulOverflow(*capacityValue, *strideValue, byteCount);
     if (overflow) {
       Diags.diagnose(loc, diag::temporary_allocation_size_overflow);
+    } else {
+      // For architectures narrower than 64 bits, check if the byte count fits
+      // in a (signed) size value.
+      auto maxByteCount = llvm::APInt::getSignedMaxValue(
+        IGF.IGM.SizeTy->getBitWidth()).getSExtValue();
+      if (byteCount > maxByteCount) {
+        Diags.diagnose(loc, diag::temporary_allocation_size_overflow);
+      }
     }
     result = llvm::ConstantInt::get(IGF.IGM.SizeTy, byteCount);
 
