@@ -44,6 +44,9 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
+  /// Enable experimental support for emitting defined borrow scopes.
+  bool EnableExperimentalLexicalLifetimes = false;
+
   /// Force-run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
   /// When this is 'false' the pipeline has default behavior.
@@ -188,6 +191,9 @@ public:
   ///     original() // calls original() implementation if true
   /// }
   bool EnableDynamicReplacementCanCallPreviousImplementation = true;
+
+  /// Are we parsing the stdlib, i.e. -parse-stdlib?
+  bool ParseStdlib = false;
 
   /// The name of the file to which the backend should save optimization
   /// records.

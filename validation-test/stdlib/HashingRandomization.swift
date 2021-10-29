@@ -10,6 +10,9 @@
 
 // REQUIRES: executable_test
 
+// Freestanding doesn't support environment variables, and this test depends on SWIFT_DETERMINISTIC_HASHING=1
+// UNSUPPORTED: freestanding
+
 // This check verifies that the hash seed is randomly generated on every
 // execution of a Swift program unless the SWIFT_DETERMINISTIC_HASHING
 // environment variable is set.

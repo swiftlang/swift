@@ -11,8 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 internal struct _BridgingBufferHeader {
-  internal init(_ count: Int) { self.count = count }
   internal var count: Int
+
+  internal init(_ count: Int) { self.count = count }
 }
 
 // NOTE: older runtimes called this class _BridgingBufferStorage.

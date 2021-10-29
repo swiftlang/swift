@@ -392,11 +392,10 @@ void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
 }
 
 bool SILPassManager::isMandatoryFunctionPass(SILFunctionTransform *sft) {
-  return isMandatory || sft->getPassKind() ==
-             PassKind::NonTransparentFunctionOwnershipModelEliminator ||
-         sft->getPassKind() == PassKind::OwnershipModelEliminator ||
+  return isMandatory ||
          sft->getPassKind() ==
-             PassKind::NonStdlibNonTransparentFunctionOwnershipModelEliminator;
+             PassKind::NonTransparentFunctionOwnershipModelEliminator ||
+         sft->getPassKind() == PassKind::OwnershipModelEliminator;
 }
 
 void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
@@ -1096,7 +1095,11 @@ FixedSizeSlab *LibswiftPassInvocation::allocSlab(FixedSizeSlab *afterSlab) {
 }
 
 FixedSizeSlab *LibswiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
-  FixedSizeSlab *prev = std::prev(&*slab->getIterator());
+  FixedSizeSlab *prev = nullptr;
+  assert(!allocatedSlabs.empty());
+  if (&allocatedSlabs.front() != slab)
+    prev = &*std::prev(slab->getIterator());
+
   allocatedSlabs.remove(*slab);
   passManager->getModule()->freeSlab(slab);
   return prev;

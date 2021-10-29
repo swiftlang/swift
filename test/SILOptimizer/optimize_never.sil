@@ -75,7 +75,7 @@ public func boo4(c: C) -> Int32
 sil_global [serialized] @$ss7ProcessO5_argcs5Int32VvZ : $Int32
 
 
-sil_global private_external [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
+sil_global [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
 
 
 sil_global [serialized] @$ss7ProcessO11_unsafeArgvSpySpys4Int8VGGvZ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>

@@ -1,7 +1,19 @@
+@frozen
+public struct SomeData {
+  public init() {}
+}
+
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where T == Double)
+@_specialize(exported: true, availability: macOS 10.50, *; where T == SomeData)
 public func publicPrespecialized<T>(_ t: T) {
 }
+
+@_specialize(exported: true, where T == Int)
+@_specialize(exported: true, availability: macOS 10.50, *; where T == SomeData)
+@inlinable
+@inline(never)
+public func publicPrespecialized2<T>(_ t: T) { }
 
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where T == Double)

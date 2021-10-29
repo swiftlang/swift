@@ -338,4 +338,5 @@ _ = ExistentialToArchetypeCast(o: o, t: b)
 // CHECK-NOT: checked_cast_br %
 // CHECK: return %0 : $AnyObject
 // CHECK-NOT: checked_cast_br %
+// CHECK: } // end sil function '$s30specialize_checked_cast_branch26ExistentialToArchetypeCast1o1txyXl_xtlFyXl_Tg5'
 _ = ExistentialToArchetypeCast(o: o, t: o)

@@ -115,10 +115,6 @@ public:
     /// are permitted from elsewhere as a cross-actor reference, but
     /// contexts with unspecified isolation won't diagnose anything.
     GlobalActorUnsafe,
-
-    /// References to declarations that are part of a distributed actor are
-    /// only permitted if they are async.
-    DistributedActorSelf,
   };
 
 private:
@@ -149,8 +145,7 @@ public:
   /// Retrieve the actor type that the declaration is within.
   NominalTypeDecl *getActorType() const {
     assert(kind == ActorSelf || 
-           kind == CrossActorSelf || 
-           kind == DistributedActorSelf);
+           kind == CrossActorSelf);
     return data.actorType;
   }
 
@@ -174,6 +169,7 @@ public:
   /// the current actor or is a cross-actor access.
   static ActorIsolationRestriction forActorSelf(
       NominalTypeDecl *actor, bool isCrossActor) {
+
     ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf,
                                      isCrossActor);
     result.data.actorType = actor;
@@ -184,7 +180,8 @@ public:
   /// the current actor.
   static ActorIsolationRestriction forDistributedActorSelf(
       NominalTypeDecl *actor, bool isCrossActor) {
-    ActorIsolationRestriction result(DistributedActorSelf, isCrossActor);
+    ActorIsolationRestriction result(isCrossActor ? CrossActorSelf : ActorSelf,
+                                     isCrossActor);
     result.data.actorType = actor;
     return result;
   }
@@ -218,7 +215,7 @@ void checkOverrideActorIsolation(ValueDecl *value);
 /// as async functions or actors.
 bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 
-/// Diagnose the presence of any non-concurrent types when referencing a
+/// Diagnose the presence of any non-sendable types when referencing a
 /// given declaration from a particular declaration context.
 ///
 /// This function should be invoked any time that the given declaration
@@ -248,6 +245,10 @@ bool diagnoseNonSendableTypesInReference(
 void diagnoseMissingSendableConformance(
     SourceLoc loc, Type type, ModuleDecl *module);
 
+/// If the given nominal type is public and does not explicitly
+/// state whether it conforms to Sendable, provide a diagnostic.
+void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
+
 /// Diagnose any non-Sendable types that occur within the given type, using
 /// the given diagnostic.
 ///
@@ -258,7 +259,8 @@ void diagnoseMissingSendableConformance(
 /// \returns \c true if any diagnostics were produced, \c false otherwise.
 bool diagnoseNonSendableTypes(
     Type type, ModuleDecl *module, SourceLoc loc,
-    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose);
+    llvm::function_ref<
+      std::pair<DiagnosticBehavior, bool>(Type, DiagnosticBehavior)> diagnose);
 
 namespace detail {
   template<typename T>
@@ -279,7 +281,8 @@ bool diagnoseNonSendableTypes(
       type, module, loc, [&](Type specificType, DiagnosticBehavior behavior) {
     ctx.Diags.diagnose(loc, diag, type, diagArgs...)
       .limitBehavior(behavior);
-    return behavior == DiagnosticBehavior::Unspecified;
+    return std::pair<DiagnosticBehavior, bool>(
+        behavior, behavior == DiagnosticBehavior::Unspecified);
   });
 }
 
@@ -303,9 +306,22 @@ enum class SendableCheck {
 Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 checkGlobalActorAttributes(
     SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
-/// Get the explicit global actor specified for a closure.
 
+/// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);
+
+/// Adjust the given function type to account for concurrency-specific
+/// attributes whose affect on the type might differ based on context.
+/// This includes adjustments for unsafe parameter attributes like
+/// `@_unsafeSendable` and `@_unsafeMainActor` as well as a global actor
+/// on the declaration itself.
+AnyFunctionType *adjustFunctionTypeForConcurrency(
+    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue);
+
+/// Determine whether the given name is that of a DispatchQueue operation that
+/// takes a closure to be executed on the queue.
+bool isDispatchQueueOperationName(StringRef name);
 
 /// Check the correctness of the given Sendable conformance.
 ///

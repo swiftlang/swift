@@ -337,6 +337,7 @@ public:
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;
+  const bool EnableClangSPI;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -1222,7 +1223,7 @@ public:
       DeclContext *dc, const clang::FunctionDecl *clangDecl,
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
-      ArrayRef<GenericTypeParamDecl *> genericParams);
+      ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType);
 
   ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                                   bool isFromSystemModule);
@@ -1559,6 +1560,12 @@ bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
 /// even if imported as a non-static member function.
 bool isImportedAsStatic(clang::OverloadedOperatorKind op);
 
+/// \returns true if \p a has the same underlying type as \p b after removing
+/// any pointer/reference specifiers. Note that this does not currently look through
+/// nested types other than pointers or references.
+bool hasSameUnderlyingType(const clang::Type *a,
+                           const clang::TemplateTypeParmDecl *b);
+
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                                   ASTContext &ctx);
@@ -1605,7 +1612,9 @@ public:
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
                            const PlatformAvailability &avail)
-      : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
+      : // Update in response to D97702 landing.
+        clang::ModuleFileExtension(),
+        pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
         buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;

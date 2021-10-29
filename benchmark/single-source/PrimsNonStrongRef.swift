@@ -31,7 +31,7 @@
 
 import TestsUtils
 
-public let PrimsNonStrongRef: [BenchmarkInfo] = ({
+public let benchmarks: [BenchmarkInfo] = ({
     var benchmarks: [BenchmarkInfo] = []
 #if false
     // TODO: Stabilize weak benchmark.
@@ -1209,7 +1209,7 @@ where Node.BoxType == Box, Box.ValueType == Node
     // queue. If the queue already contains an edge to an adjacent node, we
     // replace existing one with the new one in case the new one costs less.
     for toNode: Box in (newnode.withValue { $0.adjList }) {
-      if treeEdges[toNode.withValue { $0.id }] != nil {
+      if treeEdges[toNode.withValue({ $0.id })] != nil {
         continue
       }
       let newcost = fun(newnode, toNode)
@@ -1241,7 +1241,7 @@ func run_PrimsNonStrongRef<Node: GraphNode, Box>(_ state: PrimsState<Node, Box>)
       cost += map[Edge(start: Box(graph[n]), end: Box(graph[i]))]!
     }
   }
-  CheckResults(Int(cost) == 49324)
+  check(Int(cost) == 49324)
 }
 
 @inline(__always)
@@ -1261,86 +1261,86 @@ func run_PrimsNonStrongRefClosureAccess<Node: GraphNode, Box>(_ state: PrimsStat
       cost += map[Edge(start: Box(graph[n]), end: Box(graph[i]))]!
     }
   }
-  CheckResults(Int(cost) == 49324)
+  check(Int(cost) == 49324)
 }
 
 
 @inline(never)
-public func run_PrimsWeak(_ N: Int) {
+public func run_PrimsWeak(_ n: Int) {
   let state = weakPrimsState
-  for _ in 0..<N {
+  for _ in 0..<n {
     run_PrimsNonStrongRef(state)
   }
 }
 
 @inline(never)
-public func run_PrimsWeakClosureAccess(_ N: Int) {
+public func run_PrimsWeakClosureAccess(_ n: Int) {
   let state = weakPrimsState
-  for _ in 0..<N {
+  for _ in 0..<n {
     run_PrimsNonStrongRefClosureAccess(state)
   }
 }
 
 @inline(never)
-public func run_PrimsUnownedSafe(_ N: Int) {
+public func run_PrimsUnownedSafe(_ n: Int) {
   let state = unownedSafePrimsState
-  for _ in 0..<N {
+  for _ in 0..<n {
     run_PrimsNonStrongRef(state)
   }
 }
 
 @inline(never)
-public func run_PrimsUnownedSafeClosureAccess(_ N: Int) {
+public func run_PrimsUnownedSafeClosureAccess(_ n: Int) {
   let state = unownedSafePrimsState
-  for _ in 0..<N {
+  for _ in 0..<n {
     run_PrimsNonStrongRefClosureAccess(state)
   }
 }
 
 @inline(never)
-public func run_PrimsUnownedUnsafe(_ N: Int) {
+public func run_PrimsUnownedUnsafe(_ n: Int) {
   let state = unownedUnsafePrimsState
-  for _ in 0..<N {
+  for _ in 0..<n {
     run_PrimsNonStrongRef(state)
   }
 }
 
 @inline(never)
-public func run_PrimsUnownedUnsafeClosureAccess(_ N: Int) {
+public func run_PrimsUnownedUnsafeClosureAccess(_ n: Int) {
   let state = unownedUnsafePrimsState
-  for _ in 0..<N {
+  for _ in 0..<n {
     run_PrimsNonStrongRefClosureAccess(state)
   }
 }
 
 @inline(never)
-public func run_PrimsUnmanaged(_ N: Int) {
+public func run_PrimsUnmanaged(_ n: Int) {
   let state = unmanagedPrimsState
-  for _ in 0..<N {
+  for _ in 0..<n {
     run_PrimsNonStrongRef(state)
   }
 }
 
 @inline(never)
-public func run_PrimsUnmanagedClosureAccess(_ N: Int) {
+public func run_PrimsUnmanagedClosureAccess(_ n: Int) {
   let state = unmanagedPrimsState
-  for _ in 0..<N {
+  for _ in 0..<n {
     run_PrimsNonStrongRefClosureAccess(state)
   }
 }
 
 @inline(never)
-public func run_PrimsUnmanagedUGR(_ N: Int) {
+public func run_PrimsUnmanagedUGR(_ n: Int) {
   let state = unmanagedUGRPrimsState
-  for _ in 0..<N {
+  for _ in 0..<n {
     run_PrimsNonStrongRef(state)
   }
 }
 
 @inline(never)
-public func run_PrimsUnmanagedUGRClosureAccess(_ N: Int) {
+public func run_PrimsUnmanagedUGRClosureAccess(_ n: Int) {
   let state = unmanagedUGRPrimsState
-  for _ in 0..<N {
+  for _ in 0..<n {
     run_PrimsNonStrongRefClosureAccess(state)
   }
 }

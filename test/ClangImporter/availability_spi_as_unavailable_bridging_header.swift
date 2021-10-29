@@ -1,5 +1,5 @@
 // REQUIRES: OS=macosx
-// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/frameworks/SPIContainer.framework/Headers/SPIContainer.h -verify
+// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/frameworks/SPIContainer.framework/Headers/SPIContainer.h -enable-clang-spi -verify
 
 
 @_spi(a) public let a: SPIInterface1

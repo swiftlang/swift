@@ -17,6 +17,7 @@
 # define SOURCEKITD_PUBLIC __declspec(dllexport)
 #endif
 
+#include "SourceKit/Support/CancellationToken.h"
 #include "sourcekitd/sourcekitd.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
@@ -44,8 +45,9 @@ bool sourcekitd_variant_array_apply_impl(
 
 namespace sourcekitd {
 
-using llvm::Optional;
 using llvm::None;
+using llvm::Optional;
+using SourceKit::SourceKitCancellationToken;
 
 // The IPC protocol version. This can be queried via a request.
 static const unsigned ProtocolMajorVersion = 1;
@@ -172,7 +174,11 @@ void set_interrupted_connection_handler(llvm::function_ref<void()> handler);
 
 typedef std::function<void(sourcekitd_response_t)> ResponseReceiver;
 
-void handleRequest(sourcekitd_object_t Request, ResponseReceiver Receiver);
+void handleRequest(sourcekitd_object_t Request,
+                   SourceKitCancellationToken CancellationToken,
+                   ResponseReceiver Receiver);
+
+void cancelRequest(SourceKitCancellationToken CancellationToken);
 
 void printRequestObject(sourcekitd_object_t Obj, llvm::raw_ostream &OS);
 void printResponse(sourcekitd_response_t Resp, llvm::raw_ostream &OS);

@@ -14,10 +14,10 @@
 /// information.
 ///
 /// This maps each access of identified storage onto a disjoint access
-/// location. Local accesses (Box and Stack) already have unique AccessedStorage
+/// location. Local accesses (Box and Stack) already have unique AccessStorage
 /// and should be removed by an earlier function pass if possible. This pass
 /// handles Class and Global access by partitioning their non-unique
-/// AccessedStorage objects into unique DisjointAccessLocations. These disjoint
+/// AccessStorage objects into unique DisjointAccessLocations. These disjoint
 /// access locations may be accessed across multiple functions, so a module pass
 /// is required to identify and optimize them.
 ///
@@ -26,9 +26,9 @@
 /// accesses are ignored because they are considered an access in the caller,
 /// while Class and Global access always occurs in the callee. Note that a SIL
 /// function argument value may be the source of a either a Class-kind
-/// AccessedStorage or an Argument-kind AccessedStorage. When the argument is
+/// AccessStorage or an Argument-kind AccessStorage. When the argument is
 /// used to access a class, it will always be identified as a Class-kind
-/// AccessedStorage even though its source is an argument.
+/// AccessStorage even though its source is an argument.
 ///
 /// For each function, discover the disjointly accessed locations. Each location
 /// is optimistically mapped to a `noNestedConflict` flag (if a location has not
@@ -49,7 +49,7 @@
 /// Note: This optimization must be aware of all possible access to a Class or
 /// Global address. This includes unpaired access instructions and keypath
 /// instructions. Ignoring any access pattern would weaken enforcement. For
-/// example, AccessedStorageAnalysis cannot be used here because that analysis
+/// example, AccessStorageAnalysis cannot be used here because that analysis
 /// may conservatively summarize some functions.
 //===----------------------------------------------------------------------===//
 
@@ -74,22 +74,22 @@ using llvm::SmallDenseSet;
 // only return Unidentified storage for a global variable access if the global
 // is defined in a different module.
 const VarDecl *
-getDisjointAccessLocation(AccessedStorageWithBase storageAndBase) {
+getDisjointAccessLocation(AccessStorageWithBase storageAndBase) {
   auto storage = storageAndBase.storage;
   switch (storage.getKind()) {
-  case AccessedStorage::Global:
-  case AccessedStorage::Class:
+  case AccessStorage::Global:
+  case AccessStorage::Class:
     // Class and Globals are always a VarDecl, but the global decl may have a
     // null value for global_addr -> phi.
-    return cast_or_null<VarDecl>(storage.getDecl(storageAndBase.base));
-  case AccessedStorage::Box:
-  case AccessedStorage::Stack:
-  case AccessedStorage::Tail:
-  case AccessedStorage::Argument:
-  case AccessedStorage::Yield:
-  case AccessedStorage::Unidentified:
+    return cast_or_null<VarDecl>(storageAndBase.getDecl());
+  case AccessStorage::Box:
+  case AccessStorage::Stack:
+  case AccessStorage::Tail:
+  case AccessStorage::Argument:
+  case AccessStorage::Yield:
+  case AccessStorage::Unidentified:
     return nullptr;
-  case AccessedStorage::Nested:
+  case AccessStorage::Nested:
     llvm_unreachable("Unexpected Nested access.");
   }
   llvm_unreachable("unhandled kind");
@@ -128,7 +128,7 @@ class GlobalAccessRemoval {
   /// Information for an access location that, if it is valid, must be disjoint
   /// from all other access locations.
   struct DisjointAccessLocationInfo {
-    AccessedStorage::Kind accessKind = AccessedStorage::Unidentified;
+    AccessStorage::Kind accessKind = AccessStorage::Unidentified;
     // False if any nested conflict has been seen at this location.
     bool noNestedConflict = true;
     BeginAccessSet beginAccessSet;
@@ -144,7 +144,7 @@ public:
 protected:
   void visitInstruction(SILInstruction *I);
   void recordAccess(SILInstruction *beginAccess, const VarDecl *decl,
-                    AccessedStorage::Kind storageKind,
+                    AccessStorage::Kind storageKind,
                     bool hasNoNestedConflict);
   void removeNonreentrantAccess();
 };
@@ -168,14 +168,14 @@ void GlobalAccessRemoval::perform() {
 
 void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
   if (auto *BAI = dyn_cast<BeginAccessInst>(I)) {
-    auto storageAndBase = AccessedStorageWithBase::compute(BAI->getSource());
+    auto storageAndBase = AccessStorageWithBase::compute(BAI->getSource());
     const VarDecl *decl = getDisjointAccessLocation(storageAndBase);
     recordAccess(BAI, decl, storageAndBase.storage.getKind(),
                  BAI->hasNoNestedConflict());
     return;
   }
   if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I)) {
-    auto storageAndBase = AccessedStorageWithBase::compute(BUAI->getSource());
+    auto storageAndBase = AccessStorageWithBase::compute(BUAI->getSource());
     const VarDecl *decl = getDisjointAccessLocation(storageAndBase);
     recordAccess(BUAI, decl, storageAndBase.storage.getKind(),
                  BUAI->hasNoNestedConflict());
@@ -187,7 +187,7 @@ void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
       switch (component.getKind()) {
       case KeyPathPatternComponent::Kind::StoredProperty:
         recordAccess(KPI, component.getStoredPropertyDecl(),
-                     AccessedStorage::Class, /*hasNoNestedConflict=*/false);
+                     AccessStorage::Class, /*hasNoNestedConflict=*/false);
         break;
       case KeyPathPatternComponent::Kind::GettableProperty:
       case KeyPathPatternComponent::Kind::SettableProperty:
@@ -218,7 +218,7 @@ void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
 // a class property or global.
 void GlobalAccessRemoval::recordAccess(SILInstruction *beginAccess,
                                        const VarDecl *decl,
-                                       AccessedStorage::Kind storageKind,
+                                       AccessStorage::Kind storageKind,
                                        bool hasNoNestedConflict) {
   if (!decl || module.isVisibleExternally(decl))
     return;

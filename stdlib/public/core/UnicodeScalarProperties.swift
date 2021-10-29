@@ -1315,8 +1315,8 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Canonical_Combining_Class" property in
   /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var canonicalCombiningClass: Unicode.CanonicalCombiningClass {
-    let rawValue = UInt8(__swift_stdlib_u_getIntPropertyValue(
-      icuValue, __swift_stdlib_UCHAR_CANONICAL_COMBINING_CLASS))
+    let normData = _swift_stdlib_getNormData(_scalar.value)
+    let rawValue = UInt8(normData >> 3)
     return Unicode.CanonicalCombiningClass(rawValue: rawValue)
   }
 }

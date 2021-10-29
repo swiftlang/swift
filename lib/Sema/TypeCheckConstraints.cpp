@@ -18,6 +18,7 @@
 
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticSuppression.h"
@@ -272,12 +273,14 @@ public:
 } // end anonymous namespace
 
 void constraints::performSyntacticDiagnosticsForTarget(
-    const SolutionApplicationTarget &target, bool isExprStmt) {
+    const SolutionApplicationTarget &target,
+    bool isExprStmt, bool disableExprAvailabiltyChecking) {
   auto *dc = target.getDeclContext();
   switch (target.kind) {
   case SolutionApplicationTarget::Kind::expression: {
     // First emit diagnostics for the main expression.
-    performSyntacticExprDiagnostics(target.getAsExpr(), dc, isExprStmt);
+    performSyntacticExprDiagnostics(target.getAsExpr(), dc,
+                                    isExprStmt, disableExprAvailabiltyChecking);
 
     // If this is a for-in statement, we also need to check the where clause if
     // present.
@@ -400,7 +403,9 @@ TypeChecker::typeCheckExpression(
   // expression now.
   if (!cs.shouldSuppressDiagnostics()) {
     bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
-    performSyntacticDiagnosticsForTarget(*resultTarget, isExprStmt);
+    performSyntacticDiagnosticsForTarget(
+        *resultTarget, isExprStmt,
+        options.contains(TypeCheckExprFlags::DisableExprAvailabilityChecking));
   }
 
   resultTarget->setExpr(result);
@@ -428,8 +433,19 @@ bool TypeChecker::typeCheckBinding(
             initializer, DC, patternType, pattern,
             /*bindPatternVarsOneWay=*/false);
 
+  auto options = TypeCheckExprOptions();
+  if (DC->getASTContext().LangOpts.CheckAPIAvailabilityOnly &&
+      PBD && !DC->getAsDecl()) {
+    // Skip checking the initializer for non-public decls when
+    // checking the API only.
+    auto VD = PBD->getAnchoringVarDecl(0);
+    if (!swift::shouldCheckAvailability(VD)) {
+      options |= TypeCheckExprFlags::DisableExprAvailabilityChecking;
+    }
+  }
+
   // Type-check the initializer.
-  auto resultTarget = typeCheckExpression(target);
+  auto resultTarget = typeCheckExpression(target, options);
 
   if (resultTarget) {
     initializer = resultTarget->getAsExpr();
@@ -1116,9 +1132,10 @@ void ConstraintSystem::print(raw_ostream &out) const {
   
   out << "Score: " << CurrentScore << "\n";
 
-  for (const auto &contextualType : contextualTypes) {
-    out << "Contextual Type: " << contextualType.second.getType().getString(PO);
-    if (TypeRepr *TR = contextualType.second.typeLoc.getTypeRepr()) {
+  for (const auto &contextualTypeEntry : contextualTypes) {
+    auto info = contextualTypeEntry.second.first;
+    out << "Contextual Type: " << info.getType().getString(PO);
+    if (TypeRepr *TR = info.typeLoc.getTypeRepr()) {
       out << " at ";
       TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
     }
@@ -1498,7 +1515,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case BridgingCoercion:
         return CheckedCastKind::BridgingCoercion;
       }
+
       assert(hasCoercion && "Not a coercion?");
+      (void)hasCoercion;
+
       return CheckedCastKind::Coercion;
     }
   }
@@ -2025,7 +2045,12 @@ HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
 }
 
 bool swift::shouldTypeCheckInEnclosingExpression(ClosureExpr *expr) {
-  return expr->hasSingleExpressionBody();
+  if (expr->hasSingleExpressionBody())
+    return true;
+
+  auto &ctx = expr->getASTContext();
+  return !expr->hasEmptyBody() &&
+         ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
 }
 
 void swift::forEachExprInConstraintSystem(

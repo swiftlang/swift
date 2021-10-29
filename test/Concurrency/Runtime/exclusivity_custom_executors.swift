@@ -3,14 +3,17 @@
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 
-// REQUIRES: rdar82734785
-
 // rdar://76038845
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
+
+// Crash expectations can't be implemented on WASI/WebAssembly.
+// UNSUPPORTED: OS=wasi
 
 // Disabled until test hang can be looked at.
 // UNSUPPORTED: OS=windows-msvc
+
+// UNSUPPORTED: use_os_stdlib
 
 // This test makes sure that we properly save/restore access when we
 // synchronously launch a task from a serial executor. The access from the task

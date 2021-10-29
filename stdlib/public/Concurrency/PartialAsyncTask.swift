@@ -22,7 +22,7 @@ internal func _swiftJobRun(_ job: UnownedJob,
 /// A job is a unit of scheduleable work.
 @available(SwiftStdlib 5.5, *)
 @frozen
-public struct UnownedJob {
+public struct UnownedJob: Sendable {
   private var context: Builtin.Job
 
   @_alwaysEmitIntoClient
@@ -34,7 +34,7 @@ public struct UnownedJob {
 
 @available(SwiftStdlib 5.5, *)
 @frozen
-public struct UnsafeContinuation<T, E: Error> {
+public struct UnsafeContinuation<T, E: Error>: Sendable {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
   @_alwaysEmitIntoClient

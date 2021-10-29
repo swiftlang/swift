@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,7 +19,7 @@ import MSVCRT
 import Darwin
 #endif
 
-public let CString = [
+public let benchmarks = [
   BenchmarkInfo(name: "CStringLongAscii", runFunction: run_CStringLongAscii, tags: [.validation, .api, .String, .bridging]),
   BenchmarkInfo(name: "CStringLongNonAscii", runFunction: run_CStringLongNonAscii, tags: [.validation, .api, .String, .bridging]),
   BenchmarkInfo(name: "CStringShortAscii", runFunction: run_CStringShortAscii, tags: [.validation, .api, .String, .bridging], legacyFactor: 10),
@@ -33,30 +33,30 @@ let japanese = "日本語（にほんご、にっぽんご）は、主に日本�
 var repeatedStr: String! = String(repeating: "x", count: 5 * (1 << 16))
 
 @inline(never)
-public func run_StringWithCString(_ N: Int) {
+public func run_StringWithCString(_ n: Int) {
   let str: String = repeatedStr
-  for _ in 0 ..< N {
+  for _ in 0 ..< n {
     str.withCString { blackHole($0) }
   }
 }
 
 @inline(never)
-public func run_CStringLongAscii(_ N: Int) {
+public func run_CStringLongAscii(_ n: Int) {
   var res = 0
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     // static string to c -> from c to String -> implicit conversion
     res &= strlen(ascii.withCString(String.init(cString:)))
   }
-  CheckResults(res == 0)
+  check(res == 0)
 }
 
 @inline(never)
-public func run_CStringLongNonAscii(_ N: Int) {
+public func run_CStringLongNonAscii(_ n: Int) {
   var res = 0
-  for _ in 1...N*500 {
+  for _ in 1...n*500 {
     res &= strlen(japanese.withCString(String.init(cString:)))
   }
-  CheckResults(res == 0)
+  check(res == 0)
 }
 
 
@@ -74,9 +74,9 @@ let input = ["-237392", "293715", "126809", "333779", "-362824", "144198",
 let reference = 517492
 
 @inline(never)
-public func run_CStringShortAscii(_ N: Int) {
+public func run_CStringShortAscii(_ n: Int) {
 
-  func DoOneIter(_ arr: [String]) -> Int {
+  func doOneIter(_ arr: [String]) -> Int {
     var r = 0
     for n in arr {
       r += Int(atoi(n))
@@ -88,11 +88,11 @@ public func run_CStringShortAscii(_ N: Int) {
   }
 
   var res = Int.max
-  for _ in 1...10*N {
+  for _ in 1...10*n {
     let strings = input.map {
       $0.withCString(String.init(cString:))
     }
-    res = res & DoOneIter(strings)
+    res = res & doOneIter(strings)
   }
-  CheckResults(res == reference)
+  check(res == reference)
 }

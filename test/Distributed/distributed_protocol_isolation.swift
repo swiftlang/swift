@@ -27,7 +27,7 @@ protocol DistProtocol: DistributedActor {
 @available(SwiftStdlib 5.5, *)
 distributed actor SpecificDist: DistProtocol {
 
-  nonisolated func local() -> String { "hi" } // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
+  nonisolated func local() -> String { "hi" }
 
   distributed func dist() -> String { "dist!" }
   distributed func dist(string: String) -> String { string }
@@ -49,7 +49,7 @@ distributed actor SpecificDist: DistProtocol {
 
 @available(SwiftStdlib 5.5, *)
 func outside_good(dp: SpecificDist) async throws {
-  _ = dp.local() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  _ = dp.local()
 
   _ = try await dp.dist() // implicit async throws
   _ = try await dp.dist(string: "") // implicit async throws

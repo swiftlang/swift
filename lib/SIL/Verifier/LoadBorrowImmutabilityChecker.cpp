@@ -357,7 +357,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutable(LoadBorrowInst *lbi) {
             [](EndBorrowInst *ebi) { return &ebi->getAllOperands()[0]; });
 
   switch (accessPath.getStorage().getKind()) {
-  case AccessedStorage::Nested: {
+  case AccessStorage::Nested: {
     // If we have a begin_access and...
     auto *bai = cast<BeginAccessInst>(accessPath.getStorage().getValue());
     // We do not have a modify, assume we are correct.
@@ -371,7 +371,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutable(LoadBorrowInst *lbi) {
     // nested within the begin_access scope (to ensure no aliasing access).
     return isImmutableInScope(lbi, endBorrowUses, accessPathWithBase);
   }
-  case AccessedStorage::Argument: {
+  case AccessStorage::Argument: {
     auto *arg =
         cast<SILFunctionArgument>(accessPath.getStorage().getArgument());
     if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
@@ -380,13 +380,13 @@ bool LoadBorrowImmutabilityAnalysis::isImmutable(LoadBorrowInst *lbi) {
     return isImmutableInScope(lbi, endBorrowUses, accessPathWithBase);
   }
   // FIXME: A yielded address could overlap with another in this function.
-  case AccessedStorage::Yield:
-  case AccessedStorage::Stack:
-  case AccessedStorage::Box:
-  case AccessedStorage::Class:
-  case AccessedStorage::Tail:
-  case AccessedStorage::Global:
-  case AccessedStorage::Unidentified:
+  case AccessStorage::Yield:
+  case AccessStorage::Stack:
+  case AccessStorage::Box:
+  case AccessStorage::Class:
+  case AccessStorage::Tail:
+  case AccessStorage::Global:
+  case AccessStorage::Unidentified:
     return isImmutableInScope(lbi, endBorrowUses, accessPathWithBase);
   }
   llvm_unreachable("Covered switch isn't covered?!");

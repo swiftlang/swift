@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -accessed-storage-dump -enable-sil-verify-all -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -access-storage-dump -enable-sil-verify-all -o /dev/null | %FileCheck %s
 // RUN: %target-sil-opt %s -access-path-verification -o /dev/null
 
 // REQUIRES: PTRSIZE=64

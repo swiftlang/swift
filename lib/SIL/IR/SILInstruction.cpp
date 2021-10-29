@@ -426,11 +426,6 @@ namespace {
       return true;
     }
 
-    bool visitProjectValueBufferInst(const ProjectValueBufferInst *RHS) {
-      auto *X = cast<ProjectValueBufferInst>(LHS);
-      return X->getValueType() == RHS->getValueType();
-    }
-
     bool visitProjectBoxInst(const ProjectBoxInst *RHS) {
       return true;
     }
@@ -1269,6 +1264,12 @@ bool SILInstruction::isAllocatingStack() const {
   if (auto *PA = dyn_cast<PartialApplyInst>(this))
     return PA->isOnStack();
 
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -1280,6 +1281,13 @@ bool SILInstruction::isDeallocatingStack() const {
     if (DRI->canAllocOnStack())
       return true;
   }
+
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (BI->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
+      return true;
+    }
+  }
+
   return false;
 }
 

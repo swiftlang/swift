@@ -18,9 +18,10 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Timer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/Timer.h"
 
 using namespace swift;
 using namespace llvm;

@@ -478,7 +478,8 @@ llvm::Value *IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
                                               const llvm::Twine &name) {
   assert(offset->getType() == IGM.SizeTy || offset->getType() == IGM.Int32Ty);
   auto addr = Builder.CreateBitCast(base, IGM.Int8PtrTy);
-  addr = Builder.CreateInBoundsGEP(addr, offset);
+  addr = Builder.CreateInBoundsGEP(
+      addr->getType()->getScalarType()->getPointerElementType(), addr, offset);
   return Builder.CreateBitCast(addr, objectType->getPointerTo(), name);
 }
 
@@ -960,6 +961,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   emitFieldDescriptor(D);
 
   IRGen.addClassForEagerInitialization(D);
+  IRGen.addBackDeployedObjCActorInitialization(D);
 
   emitNestedTypeDecls(D->getMembers());
 }
@@ -2527,15 +2529,24 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
 
 ClassDecl *
 irgen::getSuperclassDeclForMetadata(IRGenModule &IGM, ClassDecl *C) {
-  if (C->isNativeNSObjectSubclass())
+  if (C->isNativeNSObjectSubclass()) {
+    // When concurrency isn't available in the OS, use NSObject instead.
+    if (!IGM.isConcurrencyAvailable()) {
+      return IGM.getObjCRuntimeBaseClass(
+          IGM.Context.getSwiftId(KnownFoundationEntity::NSObject),
+          IGM.Context.getIdentifier("NSObject"));
+    }
+
     return IGM.getSwiftNativeNSObjectDecl();
+  }
   return C->getSuperclassDecl();
 }
 
 CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, ClassDecl *C) {
-  if (C->isNativeNSObjectSubclass())
-    return IGM.getSwiftNativeNSObjectDecl()->getDeclaredInterfaceType()
-                                           ->getCanonicalType();
+  if (C->isNativeNSObjectSubclass()) {
+    return getSuperclassDeclForMetadata(IGM, C)->getDeclaredInterfaceType()
+                                               ->getCanonicalType();
+  }
   if (auto superclass = C->getSuperclass())
     return superclass->getCanonicalType();
   return CanType();
@@ -2544,9 +2555,10 @@ CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, ClassDecl *C) {
 CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, CanType type,
                                         bool useArchetypes) {
   auto cls = type->getClassOrBoundGenericClass();
-  if (cls->isNativeNSObjectSubclass())
-    return IGM.getSwiftNativeNSObjectDecl()->getDeclaredInterfaceType()
-                                           ->getCanonicalType();
+  if (cls->isNativeNSObjectSubclass()) {
+    return getSuperclassDeclForMetadata(IGM, cls)->getDeclaredInterfaceType()
+                                                 ->getCanonicalType();
+  }
   if (auto superclass = type->getSuperclass(useArchetypes))
     return superclass->getCanonicalType();
   return CanType();
@@ -2672,6 +2684,46 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
   return {size, alignMask};
 }
 
+llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
+  assert(!method.getOverridden() && "must always be base method");
+
+  auto entity = LinkEntity::forMethodDescriptor(method);
+  auto mangled = entity.mangleAsString();
+  auto typeId = llvm::MDString::get(*IGM.LLVMContext, mangled);
+  return typeId;
+}
+
+static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
+                                       SILDeclRef method, Signature signature) {
+  if (IGF.IGM.getOptions().VirtualFunctionElimination) {
+    // For LLVM IR VFE, emit a @llvm.type.checked.load with the type of the
+    // method.
+    llvm::Function *checkedLoadIntrinsic = llvm::Intrinsic::getDeclaration(
+        &IGF.IGM.Module, llvm::Intrinsic::type_checked_load);
+    auto slotAsPointer = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int8PtrTy);
+    auto typeId = typeIdForMethod(IGF.IGM, method);
+
+    // Arguments for @llvm.type.checked.load: 1) target address, 2) offset -
+    // always 0 because target address is directly pointing to the right slot,
+    // 3) type identifier, i.e. the mangled name of the *base* method.
+    SmallVector<llvm::Value *, 8> args;
+    args.push_back(slotAsPointer.getAddress());
+    args.push_back(llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
+    args.push_back(llvm::MetadataAsValue::get(*IGF.IGM.LLVMContext, typeId));
+
+    // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
+    // which could mean redundant loads don't get removed.
+    llvm::Value *checkedLoad =
+        IGF.Builder.CreateCall(checkedLoadIntrinsic, args);
+    auto fnPtr = IGF.Builder.CreateExtractValue(checkedLoad, 0);
+    return IGF.Builder.CreateBitCast(fnPtr,
+                                     signature.getType()->getPointerTo());
+  }
+
+  // Not doing LLVM IR VFE, can just be a direct load.
+  return IGF.emitInvariantLoad(slot);
+}
+
 FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                               llvm::Value *metadata,
                                               SILDeclRef method,
@@ -2690,7 +2742,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto slot = IGF.emitAddressAtOffset(metadata, offset,
                                         signature.getType()->getPointerTo(),
                                         IGF.IGM.getPointerAlignment());
-    auto fnPtr = IGF.emitInvariantLoad(slot);
+    auto fnPtr = emitVTableSlotLoad(IGF, slot, method, signature);
     auto &schema = methodType->isAsync()
                        ? IGF.getOptions().PointerAuth.AsyncSwiftClassMethods
                        : IGF.getOptions().PointerAuth.SwiftClassMethods;

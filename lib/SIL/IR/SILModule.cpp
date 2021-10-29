@@ -79,12 +79,10 @@ class SILModule::SerializationCallback final
       decl->setLinkage(SILLinkage::SharedExternal);
       return;
     case SILLinkage::Private:
-      decl->setLinkage(SILLinkage::PrivateExternal);
-      return;
+      llvm_unreachable("cannot make a private external symbol");
     case SILLinkage::PublicExternal:
     case SILLinkage::HiddenExternal:
     case SILLinkage::SharedExternal:
-    case SILLinkage::PrivateExternal:
       return;
     }
   }
@@ -100,7 +98,8 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
       Options(Options), serialized(false),
       regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
-      SerializeSILAction(), Types(TC) {
+      prespecializedFunctionDeclsImported(false), SerializeSILAction(),
+      Types(TC) {
   assert(!context.isNull());
   if (auto *file = context.dyn_cast<FileUnit *>()) {
     AssociatedDeclContext = file;
@@ -416,6 +415,8 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
   // Builtins.def, so handle those first.
   if (OperationName.startswith("fence_"))
     Info.ID = BuiltinValueKind::Fence;
+  else if (OperationName.startswith("ifdef_"))
+    Info.ID = BuiltinValueKind::Ifdef;
   else if (OperationName.startswith("cmpxchg_"))
     Info.ID = BuiltinValueKind::CmpXChg;
   else if (OperationName.startswith("atomicrmw_"))
@@ -875,6 +876,42 @@ void SILModule::installSILRemarkStreamer() {
 
 bool SILModule::isStdlibModule() const {
   return TheSwiftModule->isStdlibModule();
+}
+void SILModule::performOnceForPrespecializedImportedExtensions(
+    llvm::function_ref<void(AbstractFunctionDecl *)> action) {
+  if (prespecializedFunctionDeclsImported)
+    return;
+
+  SmallVector<ModuleDecl *, 8> importedModules;
+  // Add the Swift module.
+  if (!isStdlibModule()) {
+    auto *SwiftStdlib = getASTContext().getStdlibModule(true);
+    if (SwiftStdlib)
+      importedModules.push_back(SwiftStdlib);
+  }
+
+  // Add explicitly imported modules.
+  SmallVector<Decl *, 32> topLevelDecls;
+  getSwiftModule()->getTopLevelDecls(topLevelDecls);
+  for (const Decl *D : topLevelDecls) {
+    if (auto importDecl = dyn_cast<ImportDecl>(D)) {
+      if (!importDecl->getModule() ||
+          importDecl->getModule()->isNonSwiftModule())
+        continue;
+      importedModules.push_back(importDecl->getModule());
+    }
+  }
+
+  for (auto *module : importedModules) {
+    SmallVector<Decl *, 16> prespecializations;
+    module->getExportedPrespecializations(prespecializations);
+    for (auto *p : prespecializations) {
+      if (auto *vd = dyn_cast<AbstractFunctionDecl>(p)) {
+        action(vd);
+      }
+    }
+  }
+  prespecializedFunctionDeclsImported = true;
 }
 
 SILProperty *SILProperty::create(SILModule &M,

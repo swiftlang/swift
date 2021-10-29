@@ -683,7 +683,7 @@ function (swift_benchmark_compile_archopts)
           ${objcfile}
           "-o" "${OUTPUT_EXEC}"
         COMMAND
-        "codesign" "-f" "-s" "-" "${OUTPUT_EXEC}")
+        "${srcdir}/../utils/swift-darwin-postprocess.py" "${OUTPUT_EXEC}")
   else()
     # TODO: rpath.
     add_custom_command(

@@ -49,7 +49,6 @@ extension AsyncSequence {
 /// An asynchronous sequence, up to a specified maximum length,
 /// containing the initial elements of a base asynchronous sequence.
 @available(SwiftStdlib 5.5, *)
-@frozen
 public struct AsyncPrefixSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -57,7 +56,7 @@ public struct AsyncPrefixSequence<Base: AsyncSequence> {
   @usableFromInline
   let count: Int
 
-  @inlinable
+  @usableFromInline
   init(_ base: Base, count: Int) {
     self.base = base
     self.count = count
@@ -75,7 +74,6 @@ extension AsyncPrefixSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the prefix sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -83,7 +81,7 @@ extension AsyncPrefixSequence: AsyncSequence {
     @usableFromInline
     var remaining: Int
 
-    @inlinable
+    @usableFromInline
     init(_ baseIterator: Base.AsyncIterator, count: Int) {
       self.baseIterator = baseIterator
       self.remaining = count

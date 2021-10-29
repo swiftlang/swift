@@ -23,6 +23,10 @@ public protocol ApplySite : AnyObject {
 extension ApplySite {
   public var callee: Value { operands[ApplyOperands.calleeOperandIndex].value }
 
+  public var arguments: LazyMapSequence<OperandArray, Value> {
+    operands[1..<operands.count].lazy.map { $0.value }
+  }
+
   public func argumentIndex(of operand: Operand) -> Int? {
     let opIdx = operand.index
     if opIdx >= ApplyOperands.firstArgumentIndex &&

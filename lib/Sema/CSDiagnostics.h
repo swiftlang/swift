@@ -351,9 +351,11 @@ public:
                             std::pair<Type, Type> conformance)
       : RequirementFailure(solution, conformance.first, conformance.second,
                            locator) {
+#ifndef NDEBUG
     auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
     assert(reqElt.getRequirementKind() == RequirementKind::Conformance ||
            reqElt.getRequirementKind() == RequirementKind::Layout);
+#endif
   }
 
   bool diagnoseAsError() override;
@@ -408,8 +410,10 @@ public:
   SameTypeRequirementFailure(const Solution &solution, Type lhs, Type rhs,
                              ConstraintLocator *locator)
       : RequirementFailure(solution, lhs, rhs, locator) {
+#ifndef NDEBUG
     auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
     assert(reqElt.getRequirementKind() == RequirementKind::SameType);
+#endif
   }
 
 protected:
@@ -444,8 +448,10 @@ public:
   SuperclassRequirementFailure(const Solution &solution, Type lhs, Type rhs,
                                ConstraintLocator *locator)
       : RequirementFailure(solution, lhs, rhs, locator) {
+#ifndef NDEBUG
     auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
     assert(reqElt.getRequirementKind() == RequirementKind::Superclass);
+#endif
   }
 
 protected:
@@ -697,6 +703,29 @@ protected:
 
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, Type contextualType);
+
+protected:
+  bool exprNeedsParensBeforeAddingAs(const Expr *expr, DeclContext *DC) const {
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
+                    DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc())
+                    .getSingle();
+    if (!asPG)
+      return true;
+    return exprNeedsParensInsideFollowingOperator(DC, const_cast<Expr *>(expr),
+                                                  asPG);
+  }
+
+  bool exprNeedsParensAfterAddingAs(const Expr *expr, DeclContext *DC) const {
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
+                    DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc())
+                    .getSingle();
+    if (!asPG)
+      return true;
+
+    return exprNeedsParensOutsideFollowingOperator(
+        DC, const_cast<Expr *>(expr), asPG,
+        [&](auto *E) { return findParentExpr(E); });
+  }
 };
 
 /// Diagnose errors related to using an array literal where a
@@ -731,7 +760,7 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  /// Emit tailored diagnostics for no-escape/non-concurrent parameter
+  /// Emit tailored diagnostics for no-escape/non-sendable parameter
   /// conversions e.g. passing such parameter as an @escaping or @Sendable
   /// argument, or trying to assign it to a variable which expects @escaping
   /// or @Sendable function.
@@ -846,9 +875,11 @@ public:
   ThrowingFunctionConversionFailure(const Solution &solution, Type fromType,
                                     Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {
+#ifndef NDEBUG
     auto fnType1 = fromType->castTo<FunctionType>();
     auto fnType2 = toType->castTo<FunctionType>();
     assert(fnType1->isThrowing() != fnType2->isThrowing());
+#endif
   }
 
   bool diagnoseAsError() override;
@@ -867,9 +898,11 @@ public:
   AsyncFunctionConversionFailure(const Solution &solution, Type fromType,
                                  Type toType, ConstraintLocator *locator)
       : ContextualFailure(solution, fromType, toType, locator) {
+#ifndef NDEBUG
     auto fnType1 = fromType->castTo<FunctionType>();
     auto fnType2 = toType->castTo<FunctionType>();
     assert(fnType1->isAsync() != fnType2->isAsync());
+#endif
   }
 
   bool diagnoseAsError() override;
@@ -887,29 +920,6 @@ public:
   ASTNode getAnchor() const override;
 
   bool diagnoseAsError() override;
-
-private:
-  bool exprNeedsParensBeforeAddingAs(const Expr *expr) {
-    auto *DC = getDC();
-    auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
-    if (!asPG)
-      return true;
-    return exprNeedsParensInsideFollowingOperator(DC, const_cast<Expr *>(expr),
-                                                  asPG);
-  }
-
-  bool exprNeedsParensAfterAddingAs(const Expr *expr) {
-    auto *DC = getDC();
-    auto asPG = TypeChecker::lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc()).getSingle();
-    if (!asPG)
-      return true;
-
-    return exprNeedsParensOutsideFollowingOperator(
-        DC, const_cast<Expr *>(expr), asPG,
-        [&](auto *E) { return findParentExpr(E); });
-  }
 };
 
 /// Diagnose failures related to passing value of some type
@@ -2537,11 +2547,10 @@ private:
 
 /// Warn situations where the compiler can statically know a runtime
 /// checked cast always succeed.
-class AlwaysSucceedCheckedCastFailure final : public CheckedCastBaseFailure {
+class NoopCheckedCast final : public CheckedCastBaseFailure {
 public:
-  AlwaysSucceedCheckedCastFailure(const Solution &solution, Type fromType,
-                                  Type toType, CheckedCastKind kind,
-                                  ConstraintLocator *locator)
+  NoopCheckedCast(const Solution &solution, Type fromType, Type toType,
+                  CheckedCastKind kind, ConstraintLocator *locator)
       : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
 
   bool diagnoseAsError() override;
@@ -2603,6 +2612,26 @@ public:
 class InvalidWeakAttributeUse final : public FailureDiagnostic {
 public:
   InvalidWeakAttributeUse(const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations where Swift -> C pointer implicit conversion
+/// is attempted on a Swift function instead of one imported from C header.
+///
+/// \code
+/// func test(_: UnsafePointer<UInt8>) {}
+///
+/// func pass_ptr(ptr: UnsafeRawPointer) {
+///   test(ptr) // Only okay if `test` was an imported C function.
+/// }
+/// \endcode
+class SwiftToCPointerConversionInInvalidContext final
+    : public FailureDiagnostic {
+public:
+  SwiftToCPointerConversionInInvalidContext(const Solution &solution,
+                                            ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;

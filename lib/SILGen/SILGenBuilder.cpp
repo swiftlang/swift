@@ -869,6 +869,16 @@ void SILGenBuilder::emitDestructureValueOperation(
   }
 }
 
+void SILGenBuilder::emitDestructureValueOperation(
+    SILLocation loc, ManagedValue value,
+    SmallVectorImpl<ManagedValue> &destructuredValues) {
+  CleanupCloner cloner(*this, value);
+  emitDestructureValueOperation(
+      loc, value.forward(SGF), [&](unsigned index, SILValue subValue) {
+        destructuredValues.push_back(cloner.clone(subValue));
+      });
+}
+
 ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
                                              unsigned index) {
   auto *pbi = createProjectBox(loc, mv.getValue(), index);

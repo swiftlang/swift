@@ -26,12 +26,14 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
@@ -66,8 +68,8 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/YAMLTraits.h"
 #include <algorithm>
 #include <memory>
 
@@ -781,6 +783,12 @@ importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-march=z13");
   }
 
+  if (triple.getArch() == llvm::Triple::x86_64) {
+    // Enable double wide atomic intrinsics on every x86_64 target.
+    // (This is the default on Darwin, but not so on other platforms.)
+    invocationArgStrs.push_back("-mcx16");
+  }
+
   if (!importerOpts.Optimization.empty()) {
     invocationArgStrs.push_back(importerOpts.Optimization);
   }
@@ -952,13 +960,17 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
 
 std::vector<std::string>
 ClangImporter::getClangArguments(ASTContext &ctx) {
-  if (ctx.ClangImporterOpts.ExtraArgsOnly) {
-    return ctx.ClangImporterOpts.ExtraArgs;
-  }
   std::vector<std::string> invocationArgStrs;
   // Clang expects this to be like an actual command line. So we need to pass in
   // "clang" for argv[0]
-  invocationArgStrs.push_back("clang");
+  invocationArgStrs.push_back(ctx.ClangImporterOpts.clangPath);
+  if (ctx.ClangImporterOpts.ExtraArgsOnly) {
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             ctx.ClangImporterOpts.ExtraArgs.begin(),
+                             ctx.ClangImporterOpts.ExtraArgs.end());
+    return invocationArgStrs;
+  }
+
   switch (ctx.ClangImporterOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
   case ClangImporterOptions::Modes::PrecompiledModule:
@@ -1170,7 +1182,7 @@ ClangImporter::create(ASTContext &ctx,
   //
   // FIXME: We shouldn't need to do this, the target should be immutable once
   // created. This complexity should be lifted elsewhere.
-  instance.getTarget().adjust(instance.getLangOpts());
+  instance.getTarget().adjust(clangDiags, instance.getLangOpts());
 
   if (importerOpts.Mode == ClangImporterOptions::Modes::EmbedBitcode)
     return importer;
@@ -1752,8 +1764,8 @@ void ClangImporter::collectSubModuleNames(
 
   // Look up the top-level module first.
   clang::Module *clangModule = clangHeaderSearch.lookupModule(
-      path.front().Item.str(), /*AllowSearch=*/true,
-      /*AllowExtraModuleMapSearch=*/true);
+      path.front().Item.str(), /*ImportLoc=*/clang::SourceLocation(),
+      /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return;
   clang::Module *submodule = clangModule;
@@ -1781,9 +1793,9 @@ bool ClangImporter::canImportModule(ImportPath::Element moduleID,
   // Look up the top-level module to see if it exists.
   // FIXME: This only works with top-level modules.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
-  clang::Module *clangModule =
-      clangHeaderSearch.lookupModule(moduleID.Item.str(), /*AllowSearch=*/true,
-                                     /*AllowExtraModuleMapSearch=*/true);
+  clang::Module *clangModule = clangHeaderSearch.lookupModule(
+      moduleID.Item.str(), /*ImportLoc=*/clang::SourceLocation(),
+      /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule) {
     return false;
   }
@@ -1860,8 +1872,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
   // Look up the top-level module first, to see if it exists at all.
   clang::Module *clangModule = clangHeaderSearch.lookupModule(
-      path.front().Item.str(), /*AllowSearch=*/true,
-      /*AllowExtraModuleMapSearch=*/true);
+      path.front().Item.str(), /*ImportLoc=*/clang::SourceLocation(),
+      /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return nullptr;
 
@@ -2191,6 +2203,7 @@ ClangImporter::Implementation::Implementation(
       DisableSwiftBridgeAttr(ctx.ClangImporterOpts.DisableSwiftBridgeAttr),
       BridgingHeaderExplicitlyRequested(!ctx.ClangImporterOpts.BridgingHeader.empty()),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
+      EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
@@ -2610,7 +2623,10 @@ public:
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo) override {
-    if (isDeclaredInModule(ModuleFilter, VD))
+    if (isDeclaredInModule(ModuleFilter, VD) ||
+        // Sometimes imported decls get put into the clang header module. If we
+        // found one of these decls, don't filter it out.
+        VD->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME)
       NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
@@ -2869,7 +2885,7 @@ void ClangImporter::lookupTypeDecl(
             !isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
           continue;
         }
-        auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
+        Decl *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
 
         // Namespaces are imported as extensions for enums.
         if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported)) {
@@ -3001,7 +3017,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
-      auto importedDecl = owner.importDecl(decl, owner.CurrentVersion);
+      Decl *importedDecl = owner.importDecl(decl, owner.CurrentVersion);
       if (!importedDecl) continue;
 
       // Find the enclosing extension, if there is one.
@@ -3367,9 +3383,7 @@ void ClangModuleUnit::lookupObjCMethods(
     if (objcMethod->isPropertyAccessor())
       (void)owner.importDecl(objcMethod->findPropertyDecl(true),
                              owner.CurrentVersion);
-
-    auto imported =
-        owner.importDecl(objcMethod, owner.CurrentVersion);
+    Decl *imported = owner.importDecl(objcMethod, owner.CurrentVersion);
     if (!imported) continue;
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(imported))
@@ -3568,7 +3582,8 @@ StringRef ClangModuleUnit::getExportedModuleName() const {
   if (clangModule && !clangModule->ExportAsModule.empty())
     return clangModule->ExportAsModule;
 
-  return getParentModule()->getName().str();
+  // Return module real name (see FileUnit::getExportedModuleName)
+  return getParentModule()->getRealName().str();
 }
 
 ModuleDecl *ClangModuleUnit::getOverlayModule() const {
@@ -3849,11 +3864,6 @@ void ClangImporter::Implementation::lookupValue(
           importDeclReal(clangDecl->getMostRecentDecl(), CurrentVersion,
                          /*useCanonicalDecl*/ !isNamespace);
 
-      if (isNamespace) {
-        if (auto extension = cast_or_null<ExtensionDecl>(realDecl))
-          realDecl = extension->getExtendedNominal();
-      }
-
       if (!realDecl)
         continue;
       decl = cast<ValueDecl>(realDecl);
@@ -4005,6 +4015,119 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   }
 }
 
+static SmallVector<SwiftLookupTable::SingleEntry, 4>
+lookupInClassTemplateSpecialization(
+    ASTContext &ctx, const clang::ClassTemplateSpecializationDecl *clangDecl,
+    DeclName name) {
+  // TODO: we could make this faster if we can cache class templates in the
+  // lookup table as well.
+  // Import all the names to figure out which ones we're looking for.
+  SmallVector<SwiftLookupTable::SingleEntry, 4> found;
+  for (auto member : clangDecl->decls()) {
+    auto namedDecl = dyn_cast<clang::NamedDecl>(member);
+    if (!namedDecl)
+      continue;
+
+    auto memberName = ctx.getClangModuleLoader()->importName(namedDecl);
+    if (!memberName)
+      continue;
+
+    // Use the base names here because *sometimes* our input name won't have
+    // any arguments.
+    if (name.getBaseName().compare(memberName.getBaseName()) == 0)
+      found.push_back(namedDecl);
+  }
+
+  return found;
+}
+
+SmallVector<SwiftLookupTable::SingleEntry, 4>
+ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
+                                   ClangDirectLookupDescriptor desc) const {
+  auto &ctx = desc.decl->getASTContext();
+  auto *clangDecl = desc.clangDecl;
+  // Class templates aren't in the lookup table.
+  if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
+    return lookupInClassTemplateSpecialization(ctx, spec, desc.name);
+
+  auto *clangModule =
+      getClangOwningModule(clangDecl, clangDecl->getASTContext());
+  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
+
+  auto *swiftDeclContext = desc.decl->getInnermostDeclContext();
+  auto *declContextTypeDecl = swiftDeclContext->getSelfNominalTypeDecl();
+  auto effectiveClangContext =
+      ctx.getClangModuleLoader()->getEffectiveClangContext(declContextTypeDecl);
+
+  auto foundDecls = lookupTable->lookup(
+      SerializedSwiftName(desc.name.getBaseName()), effectiveClangContext);
+  // Make sure that `clangDecl` is the parent of all the members we found.
+  SmallVector<SwiftLookupTable::SingleEntry, 4> filteredDecls;
+  llvm::copy_if(
+      foundDecls, std::back_inserter(filteredDecls),
+      [clangDecl](SwiftLookupTable::SingleEntry decl) {
+            auto first = decl.get<clang::NamedDecl *>()->getDeclContext();
+            auto second = cast<clang::DeclContext>(clangDecl);
+            if (auto firstDecl = dyn_cast<clang::Decl>(first)) {
+              if (auto secondDecl = dyn_cast<clang::Decl>(second))
+                return firstDecl->getCanonicalDecl() == secondDecl->getCanonicalDecl();
+              else
+                return false;
+            }
+            return first == second;
+      });
+  return filteredDecls;
+}
+
+TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
+    Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const {
+  EnumDecl *namespaceDecl = desc.namespaceDecl;
+  DeclName name = desc.name;
+  auto *clangNamespaceDecl =
+      cast<clang::NamespaceDecl>(namespaceDecl->getClangDecl());
+  auto &ctx = namespaceDecl->getASTContext();
+
+  TinyPtrVector<ValueDecl *> result;
+  for (auto redecl : clangNamespaceDecl->redecls()) {
+    auto allResults = evaluateOrDefault(
+        ctx.evaluator, ClangDirectLookupRequest({namespaceDecl, redecl, name}),
+        {});
+
+    for (auto found : allResults) {
+      auto clangMember = found.get<clang::NamedDecl *>();
+      if (auto import =
+              ctx.getClangModuleLoader()->importDeclDirectly(clangMember))
+        result.push_back(cast<ValueDecl>(import));
+    }
+  }
+
+  return result;
+}
+
+TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
+    Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
+  StructDecl *recordDecl = desc.recordDecl;
+  DeclName name = desc.name;
+
+  auto &ctx = recordDecl->getASTContext();
+  auto allResults = evaluateOrDefault(
+      ctx.evaluator,
+      ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
+      {});
+
+  // Find the results that are actually a member of "recordDecl".
+  TinyPtrVector<ValueDecl *> result;
+  for (auto found : allResults) {
+    auto named = found.get<clang::NamedDecl *>();
+    if (dyn_cast<clang::Decl>(named->getDeclContext()) ==
+        recordDecl->getClangDecl())
+      if (auto import = ctx.getClangModuleLoader()->importDeclDirectly(named))
+        result.push_back(cast<ValueDecl>(import));
+  }
+
+  return result;
+}
+
 TinyPtrVector<ValueDecl *>
 ClangImporter::Implementation::loadNamedMembers(
     const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {
@@ -4039,7 +4162,9 @@ ClangImporter::Implementation::loadNamedMembers(
   auto table = findLookupTable(*CMO);
   assert(table && "clang module without lookup table");
 
-  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
+  assert(!isa<clang::NamespaceDecl>(CD) && "Namespace members should be loaded"
+                                           "via a request.");
+  assert(isa<clang::ObjCContainerDecl>(CD));
 
   // Force the members of the entire inheritance hierarchy to be loaded and
   // deserialized before loading the named member of a class. This warms up
@@ -4052,6 +4177,7 @@ ClangImporter::Implementation::loadNamedMembers(
     if (auto *superclassDecl = classDecl->getSuperclassDecl())
       (void) const_cast<ClassDecl *>(superclassDecl)->lookupDirect(N);
 
+  // TODO: update this to use the requestified lookup.
   TinyPtrVector<ValueDecl *> Members;
   for (auto entry : table->lookup(SerializedSwiftName(N),
                                   effectiveClangContext)) {
@@ -4339,4 +4465,19 @@ ClangImporter::instantiateCXXClassTemplate(
 bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
   return isa<clang::CXXConstructorDecl>(method) || !method->isConst() ||
          method->getParent()->hasMutableFields();
+}
+
+SwiftLookupTable *
+ClangImporter::findLookupTable(const clang::Module *clangModule) {
+  return Impl.findLookupTable(clangModule);
+}
+
+/// Determine the effective Clang context for the given Swift nominal type.
+EffectiveClangContext
+ClangImporter::getEffectiveClangContext(const NominalTypeDecl *nominal) {
+  return Impl.getEffectiveClangContext(nominal);
+}
+
+Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
+  return Impl.importDecl(decl, Impl.CurrentVersion);
 }

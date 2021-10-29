@@ -651,9 +651,3 @@ SILTransform *swift::createNonTransparentFunctionOwnershipModelEliminator() {
   return new OwnershipModelEliminator(true /*skip transparent*/,
                                       false /*ignore stdlib*/);
 }
-
-SILTransform *
-swift::createNonStdlibNonTransparentFunctionOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(true /*skip transparent*/,
-                                      true /*ignore stdlib*/);
-}

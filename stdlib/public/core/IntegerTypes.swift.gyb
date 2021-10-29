@@ -1093,6 +1093,7 @@ public struct ${Self}
   /// A type that represents an integer literal.
   public typealias IntegerLiteralType = ${Self}
 
+  public var _value: Builtin.Int${bits}
 
   @_transparent
   public init(_builtinIntegerLiteral x: Builtin.IntLiteral) {
@@ -1625,8 +1626,6 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
   // Implementation details
-
-  public var _value: Builtin.Int${bits}
 
 % if self_type.is_word:
   @_transparent

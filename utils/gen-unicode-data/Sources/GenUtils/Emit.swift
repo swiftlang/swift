@@ -32,16 +32,14 @@ public func emitCollection<C: Collection>(
   name: String,
   into result: inout String
 ) where C.Element: FixedWidthInteger {
-  result += """
-  static const __swift_uint\(C.Element.bitWidth)_t \(name)[\(collection.count)] = {
-  
-  """
-  
-  formatCollection(collection, into: &result) {
+  emitCollection(
+    collection,
+    name: name,
+    type: "__swift_uint\(C.Element.bitWidth)_t",
+    into: &result
+  ) {
     "0x\(String($0, radix: 16, uppercase: true))"
   }
-  
-  result += "\n};\n\n"
 }
 
 // Emits an abstract minimal perfect hash function into C arrays.

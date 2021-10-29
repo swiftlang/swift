@@ -58,6 +58,9 @@ class ModuleFileSharedCore {
   /// The target the module was built for.
   StringRef TargetTriple;
 
+  /// The canonical name of the SDK the module was built with.
+  StringRef SDKName;
+
   /// The name of the module interface this module was compiled from.
   ///
   /// Empty if this module didn't come from an interface file.
@@ -81,6 +84,9 @@ class ModuleFileSharedCore {
 
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
+
+  /// \c true if this module was compiled with -enable-ossa-modules.
+  bool RequiresOSSAModules;
 
 public:
   /// Represents another module that has been imported as a dependency.
@@ -360,10 +366,12 @@ private:
   }
 
   /// Constructs a new module and validates it.
-  ModuleFileSharedCore(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
-                 std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-                 std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-                 bool isFramework, serialization::ValidationInfo &info);
+  ModuleFileSharedCore(
+      std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
+      bool isFramework, bool requiresOSSAModules,
+      serialization::ValidationInfo &info);
 
   /// Change the status of the current module.
   Status error(Status issue) {
@@ -488,6 +496,8 @@ public:
   /// of the buffer, even if there's an error in loading.
   /// \param isFramework If true, this is treated as a framework module for
   /// linking purposes.
+  /// \param requiresOSSAModules If true, this requires dependent modules to be
+  /// compiled with -enable-ossa-modules.
   /// \param[out] theModule The loaded module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
@@ -496,12 +506,13 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-       bool isFramework,
+       bool isFramework, bool requiresOSSAModules,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
-        std::move(moduleSourceInfoInputBuffer), isFramework, info);
+        std::move(moduleSourceInfoInputBuffer), isFramework,
+        requiresOSSAModules, info);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
       core->allocateBuffer(path, moduleInterfacePath);

@@ -15,8 +15,6 @@ distributed actor DA {
   // expected-error@-1{{'nonisolated' can not be applied to distributed actor stored properties}}
 
   nonisolated var computedNonisolated: Int {
-    // expected-note@-1{{distributed actor state is only available within the actor instance}}
-
     // nonisolated computed properties are outside of the actor and as such cannot access local
     _ = self.local // expected-error{{distributed actor-isolated property 'local' can only be referenced inside the distributed actor}}
 
@@ -33,7 +31,7 @@ distributed actor DA {
     // self is a distributed actor self is NOT isolated
     _ = self.local // expected-error{{distributed actor-isolated property 'local' can only be referenced inside the distributed actor}}
     _ = try await self.dist() // ok, was made implicitly throwing and async
-    _ = self.computedNonisolated // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+    _ = self.computedNonisolated // it's okay, only the body of computedNonisolated is wrong
   }
 
   nonisolated distributed func nonisolatedDistributed() async {

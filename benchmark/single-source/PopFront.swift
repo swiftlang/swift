@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let PopFront = [
+public let benchmarks = [
   BenchmarkInfo(name: "PopFrontArray",
     runFunction: run_PopFrontArray,
     tags: [.validation, .api, .Array],
@@ -26,25 +26,25 @@ public let PopFront = [
 let arrayCount = 1024
 
 @inline(never)
-public func run_PopFrontArray(_ N: Int) {
+public func run_PopFrontArray(_ n: Int) {
   let orig = Array(repeating: 1, count: arrayCount)
   var a = [Int]()
-  for _ in 1...N {
+  for _ in 1...n {
       var result = 0
       a.append(contentsOf: orig)
       while a.count != 0 {
         result += a[0]
         a.remove(at: 0)
       }
-      CheckResults(result == arrayCount)
+      check(result == arrayCount)
   }
 }
 
 @inline(never)
-public func run_PopFrontUnsafePointer(_ N: Int) {
+public func run_PopFrontUnsafePointer(_ n: Int) {
   let orig = Array(repeating: 1, count: arrayCount)
   let a = UnsafeMutablePointer<Int>.allocate(capacity: arrayCount)
-  for _ in 1...N {
+  for _ in 1...n {
       for i in 0..<arrayCount {
         a[i] = orig[i]
       }
@@ -55,7 +55,7 @@ public func run_PopFrontUnsafePointer(_ N: Int) {
         a.assign(from: a + 1, count: count - 1)
         count -= 1
       }
-      CheckResults(result == arrayCount)
+      check(result == arrayCount)
   }
   a.deallocate()
 }

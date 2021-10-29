@@ -5,7 +5,7 @@
 
 // https://bugs.swift.org/browse/SR-14333
 // UNSUPPORTED: OS=windows-msvc
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 @available(SwiftStdlib 5.5, *)

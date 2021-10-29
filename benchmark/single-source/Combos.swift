@@ -5,19 +5,20 @@
 
 import TestsUtils
 
-public var Combos = BenchmarkInfo(
-  name: "Combos",
-  runFunction: run_Combos,
-  tags: [.validation, .abstraction]
-)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "Combos",
+    runFunction: run_Combos,
+    tags: [.validation, .abstraction]
+  )
 
 @inline(never)
-public func run_Combos(_ N: Int) {
+public func run_Combos(_ n: Int) {
   let firstRef = [Character("A"), Character("0")]
   let lastRef = [Character("J"), Character("9")]
   var combos = [[Character]]()
 
-  for _ in 1...10*N {
+  for _ in 1...10*n {
     combos = combinations("ABCDEFGHIJ", "0123456789").map {
       return [$0] + [$1]
     }
@@ -27,7 +28,7 @@ public func run_Combos(_ N: Int) {
     }
   }
 
-  CheckResults(combos.first! == firstRef && combos.last! == lastRef)
+  check(combos.first! == firstRef && combos.last! == lastRef)
 }
 
 func combinations

@@ -66,6 +66,11 @@ public:
   void resetCache();
 
 private:
+  /// Using the specified invocation command, initialize the scanner instance
+  /// for this scan. Returns the `CompilerInstance` that will be used.
+  llvm::ErrorOr<std::unique_ptr<CompilerInstance>>
+  initScannerForAction(ArrayRef<const char *> Command);
+
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.
   llvm::ErrorOr<std::unique_ptr<CompilerInstance>>

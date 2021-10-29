@@ -37,7 +37,8 @@ struct swiftscan_dependency_info_s {
   /// The format is:
   /// `<module-kind>:<module-name>`
   /// where `module-kind` is one of:
-  /// "swiftTextual"
+  /// "swiftInterface"
+  /// "swiftSource"
   /// "swiftBinary"
   /// "swiftPlaceholder"
   /// "clang""
@@ -128,6 +129,9 @@ typedef struct {
 
   /// Options to the compile command required to build this clang modulemap
   swiftscan_string_set_t *command_line;
+
+  /// The swift-specific PCM arguments captured by this dependencies object
+  swiftscan_string_set_t *captured_pcm_args;
 } swiftscan_clang_details_t;
 
 struct swiftscan_module_details_s {

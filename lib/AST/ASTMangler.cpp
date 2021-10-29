@@ -547,7 +547,11 @@ std::string ASTMangler::mangleSILDifferentiabilityWitness(StringRef originalName
     Demangler demangler;
     auto *node = mangleSILDifferentiabilityWitnessAsNode(
         originalName, kind, config, demangler);
-    return mangleNode(node);
+    auto mangling = mangleNode(node);
+    if (!mangling.isSuccess()) {
+      llvm_unreachable("unexpected mangling failure");
+    }
+    return mangling.result();
   }
   beginManglingWithoutPrefix();
   appendOperator(originalName);
@@ -721,8 +725,11 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   TyMangling->addChild(Ty, Dem);
   Node *NewGlobal = Dem.createNode(Node::Kind::Global);
   NewGlobal->addChild(TyMangling, Dem);
-  std::string OldName = mangleNodeOld(NewGlobal);
-  return OldName;
+  auto mangling = mangleNodeOld(NewGlobal);
+  if (!mangling.isSuccess()) {
+    llvm_unreachable("unexpected mangling failure");
+  }
+  return mangling.result();
 #endif
 }
 
@@ -749,16 +756,14 @@ std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
   return finalize();
 }
 
-std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
-                                        StringRef USRPrefix) {
-#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-  return std::string(); // not needed for the parser library.
-#endif
-
+std::string ASTMangler::mangleAnyDecl(const ValueDecl *Decl, bool prefix) {
   DWARFMangling = true;
-  beginManglingWithoutPrefix();
+  if (prefix) {
+    beginMangling();
+  } else {
+    beginManglingWithoutPrefix();
+  }
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
-  Buffer << USRPrefix;
 
   if (auto Ctor = dyn_cast<ConstructorDecl>(Decl)) {
     appendConstructorEntity(Ctor, /*isAllocating=*/false);
@@ -777,8 +782,16 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
   if (!Decl->isInvalid())
-    verify(Storage.str().drop_front(USRPrefix.size()));
+    verify(Storage.str());
   return finalize();
+}
+
+std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
+                                        StringRef USRPrefix) {
+#if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+  return std::string(); // not needed for the parser library.
+#endif
+  return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, false)).str();
 }
 
 std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
@@ -835,7 +848,7 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
     case SymbolKind::DynamicThunk: return appendOperator("TD");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
-    case SymbolKind::DistributedThunk: return appendOperator("Td");
+    case SymbolKind::DistributedThunk: return appendOperator("TE");
   }
 }
 
@@ -1016,6 +1029,41 @@ void ASTMangler::appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl) {
   }
 }
 
+void ASTMangler::appendExistentialLayout(
+    const ExistentialLayout &layout, GenericSignature sig,
+    const ValueDecl *forDecl) {
+  bool First = true;
+  bool DroppedRequiresClass = false;
+  bool SawRequiresClass = false;
+  for (Type protoTy : layout.getProtocols()) {
+    auto proto = protoTy->castTo<ProtocolType>()->getDecl();
+    // If we aren't allowed to emit marker protocols, suppress them here.
+    if (!AllowMarkerProtocols && proto->isMarkerProtocol()) {
+      if (proto->requiresClass())
+        DroppedRequiresClass = true;
+
+      continue;
+    }
+
+    if (proto->requiresClass())
+      SawRequiresClass = true;
+
+    appendProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
+    appendListSeparator(First);
+  }
+  if (First)
+    appendOperator("y");
+
+  if (auto superclass = layout.explicitSuperclass) {
+    appendType(superclass, sig, forDecl);
+    return appendOperator("Xc");
+  } else if (layout.hasExplicitAnyObject ||
+             (DroppedRequiresClass && !SawRequiresClass)) {
+    return appendOperator("Xl");
+  }
+  return appendOperator("p");
+}
+
 /// Mangle a type into the buffer.
 ///
 void ASTMangler::appendType(Type type, GenericSignature sig,
@@ -1192,31 +1240,15 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendOperator("t");
 
     case TypeKind::Protocol: {
-      bool First = true;
-      appendProtocolName(cast<ProtocolType>(tybase)->getDecl());
-      appendListSeparator(First);
-      return appendOperator("p");
+      return appendExistentialLayout(
+          ExistentialLayout(cast<ProtocolType>(tybase)), sig, forDecl);
     }
 
     case TypeKind::ProtocolComposition: {
       // We mangle ProtocolType and ProtocolCompositionType using the
       // same production:
-      bool First = true;
       auto layout = type->getExistentialLayout();
-      for (Type protoTy : layout.getProtocols()) {
-        appendProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
-        appendListSeparator(First);
-      }
-      if (First)
-        appendOperator("y");
-
-      if (auto superclass = layout.explicitSuperclass) {
-        appendType(superclass, sig, forDecl);
-        return appendOperator("Xc");
-      } else if (layout.hasExplicitAnyObject) {
-        return appendOperator("Xl");
-      }
-      return appendOperator("p");
+      return appendExistentialLayout(layout, sig, forDecl);
     }
 
     case TypeKind::UnboundGeneric:
@@ -2168,8 +2200,16 @@ void ASTMangler::appendModule(const ModuleDecl *module,
                               StringRef useModuleName) {
   assert(!module->getParent() && "cannot mangle nested modules!");
 
-  StringRef ModName =
-      DWARFMangling ? module->getName().str() : module->getABIName().str();
+  // Use the module real name in mangling; this is the physical name
+  // of the module on-disk, which can be different if -module-alias is
+  // used.
+  // For example, if a module Foo has 'import Bar', and '-module-alias Bar=Baz'
+  // was passed, the name 'Baz' will be used for mangling besides loading.
+  StringRef ModName = module->getRealName().str();
+  if (!DWARFMangling &&
+      module->getABIName() != module->getName()) { // check if the ABI name is set
+    ModName = module->getABIName().str();
+  }
 
   // Try the special 'swift' substitution.
   if (ModName == STDLIB_NAME) {
@@ -2205,6 +2245,8 @@ void ASTMangler::appendModule(const ModuleDecl *module,
 /// Mangle the name of a protocol as a substitution candidate.
 void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
                                     bool allowStandardSubstitution) {
+  assert(AllowMarkerProtocols || !protocol->isMarkerProtocol());
+
   if (allowStandardSubstitution && tryAppendStandardSubstitution(protocol))
     return;
 
@@ -2335,6 +2377,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
       // Note: Namespaces are not really enums, but since namespaces are
       // imported as enums, be consistent.
       appendOperator("O");
+    } else if (isa<clang::ClassTemplateDecl>(namedDecl)) {
+      appendIdentifier(nominal->getName().str());
     } else {
       llvm_unreachable("unknown imported Clang type");
     }
@@ -2353,6 +2397,8 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
       appendOperator("a");
       break;
     case DeclKind::Protocol:
+      assert(AllowMarkerProtocols ||
+             !cast<ProtocolDecl>(decl)->isMarkerProtocol());
       appendOperator("P");
       break;
     case DeclKind::Class:
@@ -2645,7 +2691,7 @@ bool ASTMangler::appendGenericSignature(GenericSignature sig,
       genericParams = canSig.getGenericParams();
       requirements = canSig.getRequirements();
     } else {
-      requirementsBuffer = canSig->requirementsNotSatisfiedBy(contextSig);
+      requirementsBuffer = canSig.requirementsNotSatisfiedBy(contextSig);
       requirements = requirementsBuffer;
     }
   } else {
@@ -2672,6 +2718,11 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
   case RequirementKind::Layout: {
   } break;
   case RequirementKind::Conformance: {
+    // If we don't allow marker protocols but we have one here, skip it.
+    if (!AllowMarkerProtocols &&
+        reqt.getProtocolDecl()->isMarkerProtocol())
+      return;
+
     appendProtocolName(reqt.getProtocolDecl());
   } break;
   case RequirementKind::Superclass:
@@ -3209,6 +3260,12 @@ void ASTMangler::appendAnyProtocolConformance(
                                            GenericSignature genericSig,
                                            CanType conformingType,
                                            ProtocolConformanceRef conformance) {
+  // If we have a conformance to a marker protocol but we aren't allowed to
+  // emit marker protocols, skip it.
+  if (!AllowMarkerProtocols &&
+      conformance.getRequirement()->isMarkerProtocol())
+    return;
+
   if (conformingType->isTypeParameter()) {
     assert(genericSig && "Need a generic signature to resolve conformance");
     auto path = genericSig->getConformanceAccessPath(conformingType,
@@ -3321,5 +3378,13 @@ std::string ASTMangler::mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
   beginMangling();
   appendOpaqueDeclName(decl);
   appendOperator("MQ");
+  return finalize();
+}
+
+std::string
+ASTMangler::mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl) {
+  beginMangling();
+  appendOpaqueDeclName(decl);
+  appendOperator("Ho");
   return finalize();
 }

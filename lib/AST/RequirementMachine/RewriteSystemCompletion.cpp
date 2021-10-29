@@ -14,7 +14,7 @@
 // completion.
 //
 // We use a variation of the Knuth-Bendix algorithm 
-/// (https://en.wikipedia.org/wiki/Knuth–Bendix_completion_algorithm).
+// (https://en.wikipedia.org/wiki/Knuth–Bendix_completion_algorithm).
 //
 // The goal is to find 'overlapping' rules which would allow the same term to
 // be rewritten in two different ways. These two different irreducible
@@ -73,12 +73,7 @@ Symbol Symbol::prependPrefixToConcreteSubstitutions(
 /// - If P inherits from Q, this is just [P:T].
 /// - If Q inherits from P, this is just [Q:T].
 /// - If P and Q are unrelated, this is [P&Q:T].
-///
-/// Note that the protocol graph is not part of the caching key; each
-/// protocol graph is a subgraph of the global inheritance graph, so
-/// the specific choice of subgraph does not change the result.
-Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
-                                            const ProtocolGraph &graph) {
+Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs) {
   auto key = std::make_pair(lhs, rhs);
 
   auto found = MergedAssocTypes.find(key);
@@ -89,13 +84,13 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
   assert(lhs.getKind() == Symbol::Kind::AssociatedType);
   assert(rhs.getKind() == Symbol::Kind::AssociatedType);
   assert(lhs.getName() == rhs.getName());
-  assert(lhs.compare(rhs, graph) > 0);
+  assert(lhs.compare(rhs, *this) > 0);
 
   auto protos = lhs.getProtocols();
   auto otherProtos = rhs.getProtocols();
 
   // This must follow from lhs > rhs.
-  assert(protos.size() <= otherProtos.size());
+  assert(getProtocolSupport(protos) <= getProtocolSupport(otherProtos));
 
   // Compute sorted and merged list of protocols, with duplicates.
   llvm::TinyPtrVector<const ProtocolDecl *> newProtos;
@@ -104,7 +99,7 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
              std::back_inserter(newProtos),
              [&](const ProtocolDecl *lhs,
                  const ProtocolDecl *rhs) -> int {
-               return graph.compareProtocols(lhs, rhs) < 0;
+               return compareProtocols(lhs, rhs) < 0;
              });
 
   // Prune duplicates and protocols that are inherited by other
@@ -112,8 +107,13 @@ Symbol RewriteContext::mergeAssociatedTypes(Symbol lhs, Symbol rhs,
   llvm::TinyPtrVector<const ProtocolDecl *> minimalProtos;
   for (const auto *newProto : newProtos) {
     auto inheritsFrom = [&](const ProtocolDecl *thisProto) {
-      return (thisProto == newProto ||
-              graph.inheritsFrom(thisProto, newProto));
+      if (thisProto == newProto)
+        return true;
+
+      const auto &inherited = getInheritedProtocols(thisProto);
+      return std::find(inherited.begin(),
+                       inherited.end(),
+                       newProto) != inherited.end();
     };
 
     if (std::find_if(minimalProtos.begin(), minimalProtos.end(),
@@ -235,7 +235,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
 
     // Look for conformance requirements on [P1:T] and [P2:T].
     auto visitRule = [&](unsigned ruleID) {
-      const auto &otherRule = Rules[ruleID];
+      const auto &otherRule = getRule(ruleID);
       const auto &otherLHS = otherRule.getLHS();
       if (otherLHS.size() == 2 &&
           otherLHS[1].getKind() == Symbol::Kind::Protocol) {
@@ -291,6 +291,10 @@ void RewriteSystem::processMergedAssociatedTypes() {
 /// If so, record this rule for later. We'll try to merge the associated
 /// types in RewriteSystem::processMergedAssociatedTypes().
 void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
+  // FIXME: Figure out 3-cell representation for merged associated types
+  if (RecordLoops)
+    return;
+
   if (lhs.size() == rhs.size() &&
       std::equal(lhs.begin(), lhs.end() - 1, rhs.begin()) &&
       lhs.back().getKind() == Symbol::Kind::AssociatedType &&
@@ -301,8 +305,7 @@ void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
       llvm::dbgs() << lhs << " => " << rhs << "\n\n";
     }
 
-    auto mergedSymbol = Context.mergeAssociatedTypes(lhs.back(), rhs.back(),
-                                                     Protos);
+    auto mergedSymbol = Context.mergeAssociatedTypes(lhs.back(), rhs.back());
     if (Debug.contains(DebugFlags::Merge)) {
       llvm::dbgs() << "### Merged symbol " << mergedSymbol << "\n";
     }
@@ -310,8 +313,8 @@ void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
     // We must have mergedSymbol <= rhs < lhs, therefore mergedSymbol != lhs.
     assert(lhs.back() != mergedSymbol &&
            "Left hand side should not already end with merged symbol?");
-    assert(mergedSymbol.compare(rhs.back(), Protos) <= 0);
-    assert(rhs.back().compare(lhs.back(), Protos) < 0);
+    assert(mergedSymbol.compare(rhs.back(), Context) <= 0);
+    assert(rhs.back().compare(lhs.back(), Context) < 0);
 
     // If the merge didn't actually produce a new symbol, there is nothing else
     // to do.
@@ -367,7 +370,9 @@ bool
 RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                                    const Rule &lhs, const Rule &rhs,
                                    std::vector<std::pair<MutableTerm,
-                                                         MutableTerm>> &result) const {
+                                                         MutableTerm>> &pairs,
+                                   std::vector<RewritePath> &paths,
+                                   std::vector<RewriteLoop> &loops) const {
   auto end = lhs.getLHS().end();
   if (from + rhs.getLHS().size() < end) {
     // lhs == TUV -> X, rhs == U -> Y.
@@ -377,41 +382,98 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     //
     // In this case, T and V are both empty.
 
-    // Compute the term TYV.
+    // Compute the terms T and V.
     MutableTerm t(lhs.getLHS().begin(), from);
-    t.append(rhs.getRHS());
-    t.append(from + rhs.getLHS().size(), lhs.getLHS().end());
+    MutableTerm v(from + rhs.getLHS().size(), lhs.getLHS().end());
 
-    if (lhs.getRHS().size() == t.size() &&
-        std::equal(lhs.getRHS().begin(), lhs.getRHS().end(),
-                   t.begin())) {
+    // Compute the term TYV.
+    MutableTerm tyv(t);
+    tyv.append(rhs.getRHS());
+    tyv.append(v);
+
+    MutableTerm x(lhs.getRHS());
+
+    // Compute a path from X to TYV: (X => TUV) ⊗ T.(U => Y).V
+    RewritePath path;
+
+    // (1) First, apply the left hand side rule in the reverse direction:
+    //
+    //     (X => TUV)
+    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0,
+                                         /*endOffset=*/0,
+                                         getRuleID(lhs),
+                                         /*inverse=*/true));
+    // (2) Now, apply the right hand side in the forward direction:
+    //
+    //     T.(U => Y).V 
+    path.add(RewriteStep::forRewriteRule(t.size(), v.size(),
+                                         getRuleID(rhs),
+                                         /*inverse=*/false));
+
+    // If X == TYV, we have a trivial overlap.
+    if (x == tyv) {
+      loops.emplace_back(x, path);
       return false;
     }
 
-    result.emplace_back(MutableTerm(lhs.getRHS()), t);
+    // Add the pair (X, TYV).
+    pairs.emplace_back(x, tyv);
+    paths.push_back(path);
   } else {
     // lhs == TU -> X, rhs == UV -> Y.
 
-    // Compute the term T.
+    // Compute the terms T and V.
     MutableTerm t(lhs.getLHS().begin(), from);
+    MutableTerm v(rhs.getLHS().begin() + (lhs.getLHS().end() - from),
+                  rhs.getLHS().end());
 
     // Compute the term XV.
     MutableTerm xv(lhs.getRHS());
-    xv.append(rhs.getLHS().begin() + (lhs.getLHS().end() - from),
-              rhs.getLHS().end());
+    xv.append(v);
 
-    if (xv.back().isSuperclassOrConcreteType()) {
+    // Compute the term TY.
+    MutableTerm ty(t);
+    ty.append(rhs.getRHS());
+
+    // Compute a path from XV to TY: (X => TU).V ⊗ (σ - T) ⊗ T.(UV => Y)
+    RewritePath path;
+
+    // (1) First, apply the left hand side rule in the reverse direction:
+    //
+    //     (X => TU).V
+    path.add(RewriteStep::forRewriteRule(/*startOffset=*/0, v.size(),
+                                         getRuleID(lhs),
+                                         /*inverse=*/true));
+
+    // (2) Next, if the right hand side rule ends with a concrete type symbol,
+    // perform the concrete type adjustment:
+    //
+    //     (σ - T)
+    if (xv.back().isSuperclassOrConcreteType() &&
+        !xv.back().getSubstitutions().empty() &&
+        t.size() > 0) {
+      path.add(RewriteStep::forAdjustment(t.size(), /*inverse=*/true));
+
       xv.back() = xv.back().prependPrefixToConcreteSubstitutions(
           t, Context);
     }
 
-    // Compute the term TY.
-    t.append(rhs.getRHS());
+    // (3) Finally, apply the right hand side in the forward direction:
+    //
+    //     T.(UV => Y)
+    path.add(RewriteStep::forRewriteRule(t.size(), /*endOffset=*/0,
+                                         getRuleID(rhs),
+                                         /*inverse=*/false));
 
-    if (xv == t)
+    // If XV == TY, we have a trivial overlap.
+    if (xv == ty) {
+      loops.emplace_back(xv, path);
       return false;
+    }
 
-    result.emplace_back(xv, t);
+    // Add the pair (XV, TY).
+    pairs.emplace_back(xv, ty);
+    paths.push_back(path);
   }
 
   return true;
@@ -431,17 +493,26 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
 std::pair<RewriteSystem::CompletionResult, unsigned>
 RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
                                           unsigned maxDepth) {
+  assert(Initialized);
+  assert(!Minimized);
+
+  // Complete might already be set, if we're re-running completion after
+  // adding new rules in the property map's concrete type unification procedure.
+  Complete = 1;
+
   unsigned steps = 0;
 
   bool again = false;
 
-  do {
-    std::vector<std::pair<MutableTerm, MutableTerm>> resolvedCriticalPairs;
+  std::vector<std::pair<MutableTerm, MutableTerm>> resolvedCriticalPairs;
+  std::vector<RewritePath> resolvedPaths;
+  std::vector<RewriteLoop> resolvedLoops;
 
+  do {
     // For every rule, looking for other rules that overlap with this rule.
     for (unsigned i = 0, e = Rules.size(); i < e; ++i) {
-      const auto &lhs = Rules[i];
-      if (lhs.isDeleted())
+      const auto &lhs = getRule(i);
+      if (lhs.isSimplified())
         continue;
 
       // Look up every suffix of this rule in the trie using findAll(). This
@@ -458,14 +529,14 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           if (!CheckedOverlaps.insert(std::make_pair(i, j)).second)
             return;
 
-          const auto &rhs = Rules[j];
-          if (rhs.isDeleted())
+          const auto &rhs = getRule(j);
+          if (rhs.isSimplified())
             return;
 
           if (from == lhs.getLHS().begin()) {
             // While every rule will have an overlap of the first kind
             // with itself, it's not useful to consider since the
-            // resulting trivial pair is always trivial.
+            // resulting critical pair is always trivial.
             if (i == j)
               return;
 
@@ -480,9 +551,13 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
           }
 
           // Try to repair the confluence violation by adding a new rule.
-          if (computeCriticalPair(from, lhs, rhs, resolvedCriticalPairs)) {
+          if (computeCriticalPair(from, lhs, rhs,
+                                  resolvedCriticalPairs,
+                                  resolvedPaths,
+                                  resolvedLoops)) {
             if (Debug.contains(DebugFlags::Completion)) {
               const auto &pair = resolvedCriticalPairs.back();
+              const auto &path = resolvedPaths.back();
 
               llvm::dbgs() << "$ Overlapping rules: (#" << i << ") ";
               llvm::dbgs() << lhs << "\n";
@@ -492,13 +567,23 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
                            << pair.first << "\n";
               llvm::dbgs() << "$$ Second term of critical pair is "
                            << pair.second << "\n\n";
+
+              llvm::dbgs() << "$$ Resolved via path: ";
+              path.dump(llvm::dbgs(), pair.first, *this);
+              llvm::dbgs() << "\n\n";
             }
           } else {
             if (Debug.contains(DebugFlags::Completion)) {
+              const auto &loop = resolvedLoops.back();
+
               llvm::dbgs() << "$ Trivially overlapping rules: (#" << i << ") ";
               llvm::dbgs() << lhs << "\n";
-              llvm::dbgs() << "                -vs- (#" << j << ") ";
+              llvm::dbgs() << "                          -vs- (#" << j << ") ";
               llvm::dbgs() << rhs << ":\n";
+
+              llvm::dbgs() << "$$ Loop: ";
+              loop.dump(llvm::dbgs(), *this);
+              llvm::dbgs() << "\n\n";
             }
           }
         });
@@ -509,13 +594,18 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
     simplifyRewriteSystem();
 
+    assert(resolvedCriticalPairs.size() == resolvedPaths.size());
+
     again = false;
-    for (const auto &pair : resolvedCriticalPairs) {
+    for (unsigned index : indices(resolvedCriticalPairs)) {
+      const auto &pair = resolvedCriticalPairs[index];
+      const auto &path = resolvedPaths[index];
+
       // Check if we've already done too much work.
       if (Rules.size() > maxIterations)
         return std::make_pair(CompletionResult::MaxIterations, steps);
 
-      if (!addRule(pair.first, pair.second))
+      if (!addRule(pair.first, pair.second, &path))
         continue;
 
       // Check if the new rule is too long.
@@ -526,6 +616,14 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       ++steps;
       again = true;
     }
+
+    for (const auto &loop : resolvedLoops) {
+      recordRewriteLoop(loop);
+    }
+
+    resolvedCriticalPairs.clear();
+    resolvedPaths.clear();
+    resolvedLoops.clear();
 
     // If the added rules merged any associated types, process the merges now
     // before we continue with the completion procedure. This is important

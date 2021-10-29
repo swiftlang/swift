@@ -3,7 +3,7 @@
 
 // Even if concise #file is not available, we now allow you to write #filePath.
 // Check that we don't diagnose any errors in this file.
-// RUN: %target-typecheck-verify-swift -module-name Foo %s
+// RUN: %target-typecheck-verify-swift -module-name Foo
 
 // #filePath should appear in swiftinterfaces with this change.
 // RUN: %target-swift-frontend-typecheck -module-name Foo -emit-module-interface-path %t.swiftinterface %s

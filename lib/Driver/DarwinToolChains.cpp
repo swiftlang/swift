@@ -22,10 +22,10 @@
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Config.h"
 #include "swift/Driver/Compilation.h"
-#include "clang/Driver/DarwinSDKInfo.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Option/Options.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -600,11 +600,11 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
         micro = 0;
       }
 
-      // Mac Catalyst was introduced with an iOS deployment target of 13.0;
+      // Mac Catalyst was introduced with an iOS deployment target of 13.1;
       // the linker doesn't want to see a deployment target before that.
       if (major < 13) {
         major = 13;
-        minor = 0;
+        minor = 1;
         micro = 0;
       }
     } else {
@@ -960,7 +960,7 @@ toolchains::Darwin::validateOutputInfo(DiagnosticEngine &diags,
                                        const OutputInfo &outputInfo) const {
   // If we have been provided with an SDK, go read the SDK information.
   if (!outputInfo.SDKPath.empty()) {
-    auto SDKInfoOrErr = clang::driver::parseDarwinSDKInfo(
+    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
         *llvm::vfs::getRealFileSystem(), outputInfo.SDKPath);
     if (SDKInfoOrErr) {
       SDKInfo = *SDKInfoOrErr;

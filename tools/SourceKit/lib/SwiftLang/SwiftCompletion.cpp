@@ -133,6 +133,8 @@ static bool swiftCodeCompleteImpl(
         CompletionContext.ReusingASTContext = reusingASTContext;
         CompletionContext.setAnnotateResult(opts.annotatedDescription);
         CompletionContext.setIncludeObjectLiterals(opts.includeObjectLiterals);
+        CompletionContext.setAddInitsToTopLevel(opts.addInitsToTopLevel);
+        CompletionContext.setCallPatternHeuristics(opts.callPatternHeuristics);
         std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
             ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                     SwiftConsumer));
@@ -1077,6 +1079,8 @@ void SwiftLangSupport::codeCompleteOpen(
   unsigned resultOffset = 0;
   unsigned maxResults = 0;
   CodeCompletion::Options CCOpts;
+  // Enable "call pattern heuristics" by default for this API.
+  CCOpts.callPatternHeuristics = true;
   if (options)
     translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
                                    maxResults);
@@ -1119,20 +1123,9 @@ void SwiftLangSupport::codeCompleteOpen(
             extendCompletions(results, sink, info, nameToPopularity, CCOpts);
       });
 
-  // Add any codecomplete.open specific flags.
-  std::vector<const char *> extendedArgs(args.begin(), args.end());
-  if (CCOpts.addInitsToTopLevel) {
-    extendedArgs.push_back("-Xfrontend");
-    extendedArgs.push_back("-code-complete-inits-in-postfix-expr");
-  }
-  if (CCOpts.callPatternHeuristics) {
-    extendedArgs.push_back("-Xfrontend");
-    extendedArgs.push_back("-code-complete-call-pattern-heuristics");
-  }
-
   // Invoke completion.
   if (!swiftCodeCompleteImpl(*this, inputBuf, offset, swiftConsumer,
-                             extendedArgs, fileSystem, CCOpts, error)) {
+                             args, fileSystem, CCOpts, error)) {
     consumer.failed(error);
     return;
   }
@@ -1150,7 +1143,7 @@ void SwiftLangSupport::codeCompleteOpen(
   using CodeCompletion::SessionCacheRef;
   auto bufferCopy = llvm::MemoryBuffer::getMemBufferCopy(
       inputBuf->getBuffer(), inputBuf->getBufferIdentifier());
-  std::vector<std::string> argsCopy(extendedArgs.begin(), extendedArgs.end());
+  std::vector<std::string> argsCopy(args.begin(), args.end());
   SessionCacheRef session{new SessionCache(
       std::move(sink), std::move(bufferCopy), std::move(argsCopy), fileSystem,
       completionKind, typeContextKind, mayUseImplicitMemberExpr,

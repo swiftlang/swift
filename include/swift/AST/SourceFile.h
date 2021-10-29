@@ -515,7 +515,7 @@ public:
   /// null if the context hierarchy has not been built yet. Use
   /// TypeChecker::getOrBuildTypeRefinementContext() to get a built
   /// root of the hierarchy.
-  TypeRefinementContext *getTypeRefinementContext();
+  TypeRefinementContext *getTypeRefinementContext() const;
 
   /// Set the root refinement context for the file.
   void setTypeRefinementContext(TypeRefinementContext *TRC);

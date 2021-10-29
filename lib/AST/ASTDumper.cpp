@@ -578,11 +578,6 @@ namespace {
     void printAbstractTypeParamCommon(AbstractTypeParamDecl *decl,
                                       const char *name) {
       printCommon(decl, name);
-      if (decl->getDeclContext()->getGenericEnvironmentOfContext()) {
-        if (auto superclassTy = decl->getSuperclass()) {
-          OS << " superclass='" << superclassTy->getString() << "'";
-        }
-      }
     }
 
     void visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
@@ -2166,12 +2161,6 @@ public:
   }
   void visitCovariantReturnConversionExpr(CovariantReturnConversionExpr *E){
     printCommon(E, "covariant_return_conversion_expr") << '\n';
-    printRec(E->getSubExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-  void visitImplicitlyUnwrappedFunctionConversionExpr(
-      ImplicitlyUnwrappedFunctionConversionExpr *E) {
-    printCommon(E, "implicitly_unwrapped_function_conversion_expr") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

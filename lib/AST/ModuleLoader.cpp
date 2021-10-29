@@ -180,9 +180,10 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
   Optional<std::string> modulePath;
   // A map from secondary module name to a vector of overlay names.
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>> result;
-  // Mimic getModuleDefiningPath() for Swift and Clang module.
-  if (auto *swiftDep = getAsSwiftTextualModule()) {
-    if (swiftDep->swiftInterfaceFile.hasValue()) {
+
+  switch (getKind()) {
+    case swift::ModuleDependenciesKind::SwiftInterface: {
+      auto *swiftDep = getAsSwiftInterfaceModule();
       // Prefer interface path to binary module path if we have it.
       modulePath = swiftDep->swiftInterfaceFile;
       assert(modulePath.hasValue());
@@ -190,24 +191,36 @@ ModuleDependencies::collectCrossImportOverlayNames(ASTContext &ctx,
       if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
         modulePath = parentDir.str();
       }
-    } else {
-      // This must be a module compiled from source-code
-      assert(!swiftDep->sourceFiles.empty());
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftBinary: {
+      auto *swiftBinaryDep = getAsSwiftBinaryModule();
+      modulePath = swiftBinaryDep->compiledModulePath;
+      assert(modulePath.hasValue());
+      StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
+      if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
+        modulePath = parentDir.str();
+      }
+      break;
+    }
+    case swift::ModuleDependenciesKind::Clang: {
+      auto *clangDep = getAsClangModule();
+      modulePath = clangDep->moduleMapFile;
+      assert(modulePath.hasValue());
+      break;
+    }
+    case swift::ModuleDependenciesKind::SwiftSource: {
+      auto *swiftSourceDep = getAsSwiftSourceModule();
+      assert(!swiftSourceDep->sourceFiles.empty());
       return result;
     }
-  } else if (auto *swiftBinaryDep = getAsSwiftBinaryModule()) {
-    modulePath = swiftBinaryDep->compiledModulePath;
-    assert(modulePath.hasValue());
-    StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
-    if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
-      modulePath = parentDir.str();
+    case swift::ModuleDependenciesKind::SwiftPlaceholder: {
+      return result;
     }
-  } else if (auto *clangDep = getAsClangModule()) {
-    modulePath = clangDep->moduleMapFile;
-    assert(modulePath.hasValue());
-  } else { // PlaceholderSwiftModuleDependencies
-    return result;
+    case swift::ModuleDependenciesKind::LastKind:
+      llvm_unreachable("Unhandled dependency kind.");
   }
+  // Mimic getModuleDefiningPath() for Swift and Clang module.
   findOverlayFilesInternal(ctx, *modulePath, moduleName, SourceLoc(),
                            [&](StringRef file) {
     StringRef bystandingModule;

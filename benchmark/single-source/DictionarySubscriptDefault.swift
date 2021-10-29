@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let DictionarySubscriptDefault = [
+public let benchmarks = [
   BenchmarkInfo(name: "DictionarySubscriptDefaultMutation",
                 runFunction: run_DictionarySubscriptDefaultMutation,
                 tags: [.validation, .api, .Dictionary]),
@@ -29,8 +29,8 @@ public let DictionarySubscriptDefault = [
 ]
 
 @inline(never)
-public func run_DictionarySubscriptDefaultMutation(_ N: Int) {
-  for _ in 1...N {
+public func run_DictionarySubscriptDefaultMutation(_ n: Int) {
+  for _ in 1...n {
 
     var dict = [Int: Int]()
 
@@ -38,14 +38,14 @@ public func run_DictionarySubscriptDefaultMutation(_ N: Int) {
       dict[i % 100, default: 0] += 1
     }
 
-    CheckResults(dict.count == 100)
-    CheckResults(dict[0]! == 100)
+    check(dict.count == 100)
+    check(dict[0]! == 100)
   }
 }
 
 @inline(never)
-public func run_DictionarySubscriptDefaultMutationArray(_ N: Int) {
-  for _ in 1...N {
+public func run_DictionarySubscriptDefaultMutationArray(_ n: Int) {
+  for _ in 1...n {
 
     var dict = [Int: [Int]]()
 
@@ -53,8 +53,8 @@ public func run_DictionarySubscriptDefaultMutationArray(_ N: Int) {
       dict[i % 100, default: []].append(i)
     }
 
-    CheckResults(dict.count == 100)
-    CheckResults(dict[0]!.count == 100)
+    check(dict.count == 100)
+    check(dict[0]!.count == 100)
   }
 }
 
@@ -91,8 +91,8 @@ class Box<T : Hashable> : Hashable, P {
 }
 
 @inline(never)
-public func run_DictionarySubscriptDefaultMutationOfObjects(_ N: Int) {
-  for _ in 1...N {
+public func run_DictionarySubscriptDefaultMutationOfObjects(_ n: Int) {
+  for _ in 1...n {
 
     var dict = [Box<Int>: Box<Int>]()
 
@@ -100,14 +100,14 @@ public func run_DictionarySubscriptDefaultMutationOfObjects(_ N: Int) {
       dict[Box(i % 5), default: Box(0)].mutateValue { $0 += 1 }
     }
 
-    CheckResults(dict.count == 5)
-    CheckResults(dict[Box(0)]!.value == 100)
+    check(dict.count == 5)
+    check(dict[Box(0)]!.value == 100)
   }
 }
 
 @inline(never)
-public func run_DictionarySubscriptDefaultMutationArrayOfObjects(_ N: Int) {
-    for _ in 1...N {
+public func run_DictionarySubscriptDefaultMutationArrayOfObjects(_ n: Int) {
+    for _ in 1...n {
 
     var dict = [Box<Int>: [Box<Int>]]()
 
@@ -115,7 +115,7 @@ public func run_DictionarySubscriptDefaultMutationArrayOfObjects(_ N: Int) {
       dict[Box(i % 5), default: []].append(Box(i))
     }
 
-    CheckResults(dict.count == 5)
-    CheckResults(dict[Box(0)]!.count == 100)
+    check(dict.count == 5)
+    check(dict[Box(0)]!.count == 100)
   }
 }

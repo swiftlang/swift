@@ -175,6 +175,8 @@ bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
                      [](Operand *use) { return !use->isLifetimeEnding(); }))
       return false;
 
+    LLVM_DEBUG(llvm::dbgs() << "Sink forwarding: " << *svi << '\n');
+
     // Otherwise, delete all of the debug uses so we don't have to sink them as
     // well and then return true so we process svi in its new position.
     deleteAllDebugUses(svi, getInstModCallbacks());
@@ -209,6 +211,10 @@ bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
     }
 
     auto *newSVI = svi->clone(sviUser);
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "Sink forwarding: " << *svi << " to " << *newSVI << '\n');
+
     Worklist.add(newSVI);
     sviUse->set(newSVI);
   }
@@ -220,40 +226,63 @@ bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
 
 /// Canonicalize each extended OSSA lifetime that contains an instruction newly
 /// created during this SILCombine iteration.
-void SILCombiner::canonicalizeOSSALifetimes() {
+///
+/// \p currentInst is null if the current instruction was deleted during its
+/// SILCombine.
+///
+/// Avoid endless worklist iteration as follows:
+///
+/// - Canonicalization only runs on the canonical definition of the visited
+///   instruction if it was itself a copy or any new copies were inserted
+///   as a result of optimization.
+///
+/// - Instructions are only added back to the SILCombine worklist when
+///   canonicalization deletes an instruction. Only the canonical def being
+///   processed and its uses are added rather than arbitrary operands of the
+///   deleted instruction. This ensures that an instruction is only added back
+///   to the worklist after SILCombine either directly optimized it or created a
+///   new copy_value for which it is the canonical def or its use.
+void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   if (!enableCopyPropagation || !Builder.hasOwnership())
     return;
 
   SmallSetVector<SILValue, 16> defsToCanonicalize;
+
+  // copyInst was either optimized by a SILCombine visitor or is a copy_value
+  // produced by the visitor. Find the canonical def.
+  auto recordCopiedDef = [&defsToCanonicalize](CopyValueInst *copyInst) {
+    SILValue def = CanonicalizeOSSALifetime::getCanonicalCopiedDef(copyInst);
+
+    // getCanonicalCopiedDef returns a copy whenever that the copy's source is
+    // guaranteed. In that case, find the root of the borrowed lifetime. If it
+    // is a function argument, then a simple guaranteed canonicalization can be
+    // performed. Canonicalizing other borrow scopes is not handled by
+    // SILCombine because it's not a single-lifetime canonicalization.  Instead,
+    // SILCombine treats a copy that uses a borrowed value as a separate owned
+    // live range. Handling the compensation code across the borrow scope
+    // boundary requires post processing in a particular order.  The copy
+    // propagation pass knows how to handle that. To avoid complexity and ensure
+    // fast convergence, rewriting borrow scopes should not be combined with
+    // other unrelated transformations.
+    if (auto *copyDef = dyn_cast<CopyValueInst>(def)) {
+      if (SILValue borrowDef = CanonicalizeBorrowScope::getCanonicalBorrowedDef(
+              copyDef->getOperand())) {
+        if (isa<SILFunctionArgument>(borrowDef)) {
+          def = borrowDef;
+        }
+      }
+    }
+    defsToCanonicalize.insert(def);
+  };
+
+  if (auto *copyInst = dyn_cast_or_null<CopyValueInst>(currentInst))
+    recordCopiedDef(copyInst);
+
   for (auto *trackedInst : *Builder.getTrackingList()) {
     if (trackedInst->isDeleted())
       continue;
-
-    if (auto *cvi = dyn_cast<CopyValueInst>(trackedInst)) {
-      SILValue def = CanonicalizeOSSALifetime::getCanonicalCopiedDef(cvi);
-
-      // getCanonicalCopiedDef returns a copy whenever that the copy's source is
-      // guaranteed. In that case, find the root of the borrowed lifetime. If it
-      // is a function argument, then a simple guaranteed canonicalization can
-      // be performed. Canonicalizing other borrow scopes is not handled by
-      // SILCombine because it's not a single-lifetime canonicalization.
-      // Instead, SILCombine treats a copy that uses a borrowed value as a
-      // separate owned live range. Handling the compensation code across the
-      // borrow scope boundary requires post processing in a particular order.
-      // The copy propagation pass knows how to handle that. To avoid complexity
-      // and ensure fast convergence, rewriting borrow scopes should not be
-      // combined with other unrelated transformations.
-      if (auto *copy = dyn_cast<CopyValueInst>(def)) {
-        if (SILValue borrowDef =
-                CanonicalizeBorrowScope::getCanonicalBorrowedDef(
-                    copy->getOperand())) {
-          if (isa<SILFunctionArgument>(borrowDef)) {
-            def = borrowDef;
-          }
-        }
-      }
-      defsToCanonicalize.insert(def);
-    }
+    if (auto *copyInst = dyn_cast<CopyValueInst>(trackedInst))
+      recordCopiedDef(copyInst);
   }
   if (defsToCanonicalize.empty())
     return;
@@ -261,10 +290,6 @@ void SILCombiner::canonicalizeOSSALifetimes() {
   // Remove instructions deleted during canonicalization from SILCombine's
   // worklist. CanonicalizeOSSALifetime invalidates operands before invoking
   // the deletion callback.
-  //
-  // Note: a simpler approach would be to drain the Worklist before
-  // canonicalizing OSSA, then callbacks could be completely removed from
-  // CanonicalizeOSSALifetime.
   auto canonicalizeCallbacks =
       InstModCallbacks().onDelete([this](SILInstruction *instToDelete) {
         eraseInstFromFunction(*instToDelete,
@@ -279,23 +304,30 @@ void SILCombiner::canonicalizeOSSALifetimes() {
 
   while (!defsToCanonicalize.empty()) {
     SILValue def = defsToCanonicalize.pop_back_val();
-    if (auto functionArg = dyn_cast<SILFunctionArgument>(def)) {
-      if (!borrowCanonicalizer.canonicalizeFunctionArgument(functionArg))
-        continue;
-    } else if (!canonicalizer.canonicalizeValueLifetime(def)) {
+
+    deleter.getCallbacks().resetHadCallbackInvocation();
+
+    auto canonicalized = [&]() {
+      if (!deleter.getCallbacks().hadCallbackInvocation())
+        return;
+
+      if (auto *inst = def->getDefiningInstruction()) {
+        Worklist.add(inst);
+      }
+      for (auto *use : def->getUses()) {
+        Worklist.add(use->getUser());
+      }
+    };
+
+    if (def->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      if (auto functionArg = dyn_cast<SILFunctionArgument>(def)) {
+        if (borrowCanonicalizer.canonicalizeFunctionArgument(functionArg))
+          canonicalized();
+      }
       continue;
     }
-    MadeChange = true;
-
-    // Canonicalization may rewrite many copies and destroys within a single
-    // extended lifetime, but the extended lifetime of each canonical def is
-    // non-overlapping. If def was successfully canonicalized, simply add it
-    // and its users to the SILCombine worklist.
-    if (auto *inst = def->getDefiningInstruction()) {
-      Worklist.add(inst);
-    }
-    for (auto *use : def->getUses()) {
-      Worklist.add(use->getUser());
+    if (canonicalizer.canonicalizeValueLifetime(def)) {
+      canonicalized();
     }
   }
 }
@@ -367,27 +399,29 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     Builder.setInsertionPoint(I);
 
 #ifndef NDEBUG
-    std::string OrigI;
+    std::string OrigIStr;
 #endif
-    LLVM_DEBUG(llvm::raw_string_ostream SS(OrigI); I->print(SS);
-               OrigI = SS.str(););
-    LLVM_DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigI << '\n');
+    LLVM_DEBUG(llvm::raw_string_ostream SS(OrigIStr); I->print(SS);
+               OrigIStr = SS.str(););
+    LLVM_DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigIStr << '\n');
 
+    SILInstruction *currentInst = I;
     if (SILInstruction *Result = visit(I)) {
       ++NumCombined;
       // Should we replace the old instruction with a new one?
       Worklist.replaceInstructionWithInstruction(I, Result
 #ifndef NDEBUG
-          ,
-          OrigI
+                                                 ,
+                                                 OrigIStr
 #endif
       );
+      currentInst = Result;
       MadeChange = true;
     }
 
     // Eliminate copies created that this SILCombine iteration may have
     // introduced during OSSA-RAUW.
-    canonicalizeOSSALifetimes();
+    canonicalizeOSSALifetimes(currentInst->isDeleted() ? nullptr : currentInst);
 
     // Builder's tracking list has been accumulating instructions created by the
     // during this SILCombine iteration. To finish this iteration, go through

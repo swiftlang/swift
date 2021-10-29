@@ -36,48 +36,36 @@ func getConstCxxRvalueRef() -> UnsafePointer<CInt> {
 
 func setCxxRef() {
   var val: CInt = 21
-  withUnsafeMutablePointer(to: &val) {
-    setStaticIntRef($0)
-  }
+  setStaticIntRef(&val)
 }
 
-// CHECK: // closure #1 in setCxxRef()
-// CHECK: sil private @$s4main9setCxxRefyyFySpys5Int32VGXEfU_ : $@convention(thin) (UnsafeMutablePointer<Int32>) -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z15setStaticIntRefRi|\?setStaticIntRef@@YAXAEAH@Z}} : $@convention(c) (UnsafeMutablePointer<Int32>) -> ()
-// CHECK: apply [[REF]](%0) : $@convention(c) (UnsafeMutablePointer<Int32>) -> ()
+// CHECK: sil hidden @$s4main9setCxxRefyyF : $@convention(thin) () -> ()
+// CHECK: [[REF:%.*]] = function_ref @{{_Z15setStaticIntRefRi|\?setStaticIntRef@@YAXAEAH@Z}} : $@convention(c) (@inout Int32) -> ()
+// CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()
 
 func setCxxConstRef() {
   var val: CInt = 21
-  withUnsafePointer(to: &val) {
-    setConstStaticIntRef($0)
-  }
+  setConstStaticIntRef(&val)
 }
 
-// CHECK: // closure #1 in setCxxConstRef()
-// CHECK: sil private @$s4main14setCxxConstRefyyFySPys5Int32VGXEfU_ : $@convention(thin) (UnsafePointer<Int32>) -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z20setConstStaticIntRefRKi|\?setConstStaticIntRef@@YAXAEBH@Z}} : $@convention(c) (UnsafePointer<Int32>) -> ()
-// CHECK: apply [[REF]](%0) : $@convention(c) (UnsafePointer<Int32>) -> ()
+// CHECK: sil hidden @$s4main14setCxxConstRefyyF : $@convention(thin) () -> ()
+// CHECK: [[REF:%.*]] = function_ref @{{_Z20setConstStaticIntRefRKi|\?setConstStaticIntRef@@YAXAEBH@Z}} : $@convention(c) (@inout Int32) -> ()
+// CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()
 
 func setCxxRvalueRef() {
   var val: CInt = 21
-  withUnsafeMutablePointer(to: &val) {
-    setStaticIntRvalueRef($0)
-  }
+  setStaticIntRvalueRef(&val)
 }
 
-// CHECK: // closure #1 in setCxxRvalueRef()
-// CHECK: sil private @$s4main15setCxxRvalueRefyyFySpys5Int32VGXEfU_ : $@convention(thin) (UnsafeMutablePointer<Int32>) -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z21setStaticIntRvalueRefOi|\?setStaticIntRvalueRef@@YAX\$\$QEAH@Z}} : $@convention(c) (UnsafeMutablePointer<Int32>) -> ()
-// CHECK: apply [[REF]](%0) : $@convention(c) (UnsafeMutablePointer<Int32>) -> ()
+// CHECK: sil hidden @$s4main15setCxxRvalueRefyyF : $@convention(thin) () -> ()
+// CHECK: [[REF:%.*]] = function_ref @{{_Z21setStaticIntRvalueRefOi|\?setStaticIntRvalueRef@@YAX\$\$QEAH@Z}} : $@convention(c) (@inout Int32) -> ()
+// CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()
 
 func setCxxConstRvalueRef() {
   var val: CInt = 21
-  withUnsafePointer(to: &val) {
-    setConstStaticIntRvalueRef($0)
-  }
+  setConstStaticIntRvalueRef(&val)
 }
 
-// CHECK: // closure #1 in setCxxConstRvalueRef()
-// CHECK: sil private @$s4main20setCxxConstRvalueRefyyFySPys5Int32VGXEfU_ : $@convention(thin) (UnsafePointer<Int32>) -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z26setConstStaticIntRvalueRefOKi|\?setConstStaticIntRvalueRef@@YAX\$\$QEBH@Z}} : $@convention(c) (UnsafePointer<Int32>) -> ()
-// CHECK: apply [[REF]](%0) : $@convention(c) (UnsafePointer<Int32>) -> ()
+// CHECK: sil hidden @$s4main20setCxxConstRvalueRefyyF : $@convention(thin) () -> ()
+// CHECK: [[REF:%.*]] = function_ref @{{_Z26setConstStaticIntRvalueRefOKi|\?setConstStaticIntRvalueRef@@YAX\$\$QEBH@Z}} : $@convention(c) (@inout Int32) -> ()
+// CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()

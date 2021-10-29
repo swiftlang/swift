@@ -290,7 +290,9 @@ ERROR(guard_body_must_not_fallthrough,none,
       " to exit the scope", ())
 WARNING(unreachable_code,none, "will never be executed", ())
 NOTE(unreachable_code_uninhabited_param_note,none,
-	"'%0' is uninhabited, so this function body can never be executed", (StringRef))
+     "'%0' is of type %1 which cannot be constructed because %select{it "
+     "contains %3 which is an enum with no cases|it is an enum with no cases}2",
+     (StringRef, Type, bool, Type))
 NOTE(unreachable_code_branch,none,
      "condition always evaluates to %select{false|true}0", (bool))
 NOTE(call_to_noreturn_note,none,
@@ -676,13 +678,28 @@ WARNING(semantic_function_improper_nesting, none, "'@_semantics' function calls 
 
 // Capture promotion diagnostics
 WARNING(capturepromotion_concurrentcapture_mutation, none,
-        "'%0' mutated after capture by concurrent closure", (StringRef))
+        "'%0' mutated after capture by sendable closure", (StringRef))
 NOTE(capturepromotion_concurrentcapture_closure_here, none,
-     "variable captured by concurrent closure", ())
+     "variable captured by sendable closure", ())
 NOTE(capturepromotion_concurrentcapture_capturinguse_here, none,
      "capturing use", ())
 NOTE(capturepromotion_variable_defined_here,none,
      "variable defined here", ())
+
+// move operator used on generic or evalue
+ERROR(move_operator_used_on_generic_or_existential_value, none,
+      "move() used on a generic or existential value", ())
+
+// noimplicitcopy on generic or existential binding
+ERROR(noimplicitcopy_used_on_generic_or_existential, none,
+      "@_noImplicitCopy can not be used on a generic or existential typed "
+      "binding or a nominal type containing such typed things", ())
+
+// move only checker diagnostics
+ERROR(sil_moveonlychecker_value_consumed_more_than_once, none,
+      "'%0' consumed more than once", (StringRef))
+NOTE(sil_moveonlychecker_consuming_use_here, none,
+     "consuming use", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

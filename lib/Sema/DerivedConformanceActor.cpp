@@ -154,11 +154,14 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   if (property->getFormalAccess() == AccessLevel::Open)
     property->overwriteAccess(AccessLevel::Public);
 
-  // Clone any @available attributes from UnownedSerialExecutor.
-  // Really, though, the whole actor probably needs to be marked as
-  // unavailable.
-  for (auto attr: executorDecl->getAttrs().getAttributes<AvailableAttr>())
-    property->getAttrs().add(attr->clone(ctx, /*implicit*/true));
+  // Infer availability.
+  SmallVector<const Decl *, 2> asAvailableAs;
+  asAvailableAs.push_back(executorDecl);
+  if (auto enclosingDecl = property->getInnermostDeclWithAvailability())
+    asAvailableAs.push_back(enclosingDecl);
+
+  AvailabilityInference::applyInferredAvailableAttrs(
+      property, asAvailableAs, ctx);
 
   auto getter =
     derived.addGetterToReadOnlyDerivedProperty(property, executorType);

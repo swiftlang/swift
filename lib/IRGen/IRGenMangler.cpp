@@ -159,6 +159,8 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
       AllowConcurrencyStandardSubstitutions = false;
   }
 
+  llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(
+      AllowMarkerProtocols, false);
   return withSymbolicReferences(IGM, [&]{
     appendType(Ty, Sig);
   });
@@ -177,6 +179,14 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
     appendProtocolName(protocol);
     appendOperator("MS");
   }
+  return finalize();
+}
+
+std::string IRGenMangler::mangleProtocolConformanceDescriptorRecord(
+                                 const RootProtocolConformance *conformance) {
+  beginMangling();
+  appendProtocolConformance(conformance);
+  appendOperator("Hc");
   return finalize();
 }
 

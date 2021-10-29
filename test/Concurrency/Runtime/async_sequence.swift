@@ -4,7 +4,7 @@
 // REQUIRES: concurrency
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 
 // TODO: This crashes on linux for some strange reason
 // REQUIRES: OS=macosx

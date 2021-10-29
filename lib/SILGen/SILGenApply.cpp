@@ -1117,7 +1117,7 @@ public:
 
     // Otherwise, we have a statically-dispatched call.
     auto constant = SILDeclRef(e->getDecl());
-    if (e->getDecl()->getAttrs().hasAttribute<DistributedActorAttr>()) {
+    if (callSite && callSite->shouldApplyDistributedThunk()) {
       constant = constant.asDistributed(true);
     } else {
       constant = constant.asForeign(
@@ -1250,13 +1250,6 @@ public:
     // in an unchecked, ABI-compatible manner. They shouldn't prevent us form
     // forming a complete call.
     visitExpr(e);
-  }
-
-  void visitImplicitlyUnwrappedFunctionConversionExpr(
-      ImplicitlyUnwrappedFunctionConversionExpr *e) {
-    // These are generated for short term use in the type checker.
-    llvm_unreachable(
-        "We should not see ImplicitlyUnwrappedFunctionConversionExpr here");
   }
 
   void visitIdentityExpr(IdentityExpr *e) {

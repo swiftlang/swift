@@ -140,6 +140,11 @@ void SwitchEnumBuilder::emit() && {
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
                                     CleanupLocation(loc), branchDest);
+    // Begin a new binding scope, which is popped when the next innermost debug
+    // scope ends. The cleanup location loc isn't the perfect source location
+    // but it's close enough.
+    builder.getSILGenFunction().enterDebugScope(loc,
+                                                /*isBindingScope=*/true);
 
     builder.emitBlock(caseBlock);
 

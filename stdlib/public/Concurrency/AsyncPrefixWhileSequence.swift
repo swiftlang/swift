@@ -49,7 +49,6 @@ extension AsyncSequence {
 /// An asynchronous sequence, containing the initial, consecutive
 /// elements of the base sequence that satisfy a given predicate.
 @available(SwiftStdlib 5.5, *)
-@frozen
 public struct AsyncPrefixWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -57,7 +56,7 @@ public struct AsyncPrefixWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let predicate: (Base.Element) async -> Bool
 
-  @inlinable
+  @usableFromInline
   init(
     _ base: Base, 
     predicate: @escaping (Base.Element) async -> Bool
@@ -78,7 +77,6 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the prefix-while sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var predicateHasFailed = false
@@ -89,7 +87,7 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
     @usableFromInline
     let predicate: (Base.Element) async -> Bool
 
-    @inlinable
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
       predicate: @escaping (Base.Element) async -> Bool

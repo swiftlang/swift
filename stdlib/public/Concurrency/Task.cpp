@@ -27,7 +27,7 @@
 #include "Debug.h"
 #include "Error.h"
 
-#if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
 #endif
 
@@ -36,8 +36,19 @@
 #endif
 
 #if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
+#include <Availability.h>
+#include <TargetConditionals.h>
+#if TARGET_OS_WATCH
+// Bitcode compilation for the watch device precludes defining the following asm
+// symbols, so we don't use them... but simulators are okay.
+#if TARGET_OS_SIMULATOR
 asm("\n .globl _swift_async_extendedFramePointerFlags" \
     "\n _swift_async_extendedFramePointerFlags = 0x0");
+#endif
+#else
+asm("\n .globl _swift_async_extendedFramePointerFlags" \
+    "\n _swift_async_extendedFramePointerFlags = 0x0");
+#endif
 #else
 #ifdef __APPLE__
 #if __POINTER_WIDTH__ == 64
@@ -248,7 +259,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
 }
 
 static ExecutorRef executorForEnqueuedJob(Job *job) {
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+#if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
   return ExecutorRef::generic();
 #else
   void *jobQueue = job->SchedulerPrivate[Job::DispatchQueueIndex];
@@ -513,7 +524,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     headerSize += sizeof(AsyncTask::GroupChildFragment);
   }
   if (futureResultType) {
-    headerSize += FutureFragment::fragmentSize(futureResultType);
+    headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
     // Add the future async context prefix.
     headerSize += sizeof(FutureAsyncContextPrefix);
   } else {
@@ -1065,13 +1076,19 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
 }
 
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 SWIFT_CC(swift)
 static void swift_task_asyncMainDrainQueueImpl() {
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   bool Finished = false;
-  donateThreadToGlobalExecutorUntil([](void *context) {
+  swift_task_donateThreadToGlobalExecutorUntil([](void *context) {
     return *reinterpret_cast<bool*>(context);
   }, &Finished);
+#elif !SWIFT_CONCURRENCY_ENABLE_DISPATCH
+  // FIXME: consider implementing a concurrent global main queue for
+  // these environments?
+  swift_reportError(0, "operation unsupported without libdispatch: "
+                       "swift_task_asyncMainDrainQueue");
 #else
 #if defined(_WIN32)
   static void(FAR *pfndispatch_main)(void) = NULL;

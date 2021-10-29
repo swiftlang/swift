@@ -22,6 +22,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -38,8 +39,8 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
@@ -221,11 +222,10 @@ class ASTContext final {
   void operator=(const ASTContext&) = delete;
 
   ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-             SearchPathOptions &SearchPathOpts,
+             SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
              ClangImporterOptions &ClangImporterOpts,
              symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
-             SourceManager &SourceMgr,
-             DiagnosticEngine &Diags);
+             SourceManager &SourceMgr, DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -237,7 +237,7 @@ public:
   void operator delete(void *Data) throw();
 
   static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-                         SearchPathOptions &SearchPathOpts,
+                         SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
                          ClangImporterOptions &ClangImporterOpts,
                          symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                          SourceManager &SourceMgr, DiagnosticEngine &Diags);
@@ -254,6 +254,9 @@ public:
 
   /// The type checker options.
   const TypeCheckerOptions &TypeCheckerOpts;
+
+  /// Options for SIL.
+  const SILOptions &SILOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
@@ -347,6 +350,9 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
+  /// Mapping between aliases and real (physical) names of imported or referenced modules.
+  mutable llvm::DenseMap<Identifier, Identifier> ModuleAliasMap;
+
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
@@ -470,6 +476,16 @@ public:
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
+
+  /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
+  /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
+  /// the names of the imported or referenced modules in source files in the main module, and X and Y
+  /// are the real (physical) module names on disk.
+  void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
+
+  /// Retrieve the actual module name if a module alias is used via '-module-alias Foo=X', where Foo is
+  /// a module alias and X is the real (physical) name. Returns \p key if no aliasing is used.
+  Identifier getRealModuleName(Identifier key) const;
 
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,
@@ -1184,6 +1200,11 @@ public:
   /// method.
   bool isRecursivelyConstructingRequirementMachine(
       CanGenericSignature sig);
+
+  /// Retrieve or create a term rewriting system for answering queries on
+  /// type parameters written against the given protocol requirement signature.
+  rewriting::RequirementMachine *getOrCreateRequirementMachine(
+      const ProtocolDecl *proto);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.

@@ -38,7 +38,7 @@
 // Thank you for your help ensuring the stdlib remains compatible with its past!
 //                                            -- Your friendly stdlib engineers
 
-// REQUIRES: swift_stdlib_asserts
+// REQUIRES: swift_stdlib_asserts, array_cow_checks
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
@@ -60,5 +60,8 @@ Protocol _RuntimeFunctionCountersStats is a new API without @available attribute
 Struct _GlobalRuntimeFunctionCountersState is a new API without @available attribute
 Struct _ObjectRuntimeFunctionCountersState is a new API without @available attribute
 Struct _RuntimeFunctionCounters is a new API without @available attribute
+Func _COWChecksEnabled() is a new API without @available attribute
+Func _swift_isImmutableCOWBuffer(_:) is a new API without @available attribute
+Func _swift_setImmutableCOWBuffer(_:_:) is a new API without @available attribute
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

@@ -1670,9 +1670,67 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
-  // For empty names, there is nothing to do.
-  if (D->getDeclName().isEmpty())
+  // Spcial case: unnamed/anonymous fields.
+  if (auto field = dyn_cast<clang::FieldDecl>(D)) {
+    if (field->isAnonymousStructOrUnion() || field->getDeclName().isEmpty()) {
+      // Generate a field name for anonymous fields, this will be used in
+      // order to be able to expose the indirect fields injected from there
+      // as computed properties forwarding the access to the subfield.
+      std::string name;
+      llvm::raw_string_ostream nameStream(name);
+
+      nameStream << "__Anonymous_field" << field->getFieldIndex();
+      result.setDeclName(swiftCtx.getIdentifier(nameStream.str()));
+      result.setEffectiveContext(field->getDeclContext());
+      return result;
+    }
+  }
+
+  if (D->getDeclName().isEmpty()) {
+    // If the type has no name and no structure name, but is not anonymous,
+    // generate a name for it. Specifically this is for cases like:
+    //   struct a {
+    //     struct {} z;
+    //   }
+    // Where the member z is an unnamed struct, but does have a member-name
+    // and is accessible as a member of struct a.
+    if (auto recordDecl = dyn_cast<clang::RecordDecl>(
+                            D->getLexicalDeclContext())) {
+      for (auto field : recordDecl->fields()) {
+        auto fieldTagDecl = field->getType()->getAsTagDecl();
+        if (fieldTagDecl == D) {
+          // Create a name for the declaration from the field name.
+          std::string name;
+          llvm::raw_string_ostream nameStream(name);
+
+          const char *kind;
+          if (fieldTagDecl->isStruct())
+            kind = "struct";
+          else if (fieldTagDecl->isUnion())
+            kind = "union";
+          else if  (fieldTagDecl->isEnum())
+            kind = "enum";
+          else
+            llvm_unreachable("unknown decl kind");
+
+          nameStream << "__Unnamed_" << kind << "_";
+          if (field->isAnonymousStructOrUnion()) {
+            nameStream << "__Anonymous_field" << field->getFieldIndex();
+          } else {
+            assert(!field->getDeclName().isEmpty() &&
+                   "Microsoft anonymous struct extension?");
+            nameStream << field->getName();
+          }
+          result.setDeclName(swiftCtx.getIdentifier(nameStream.str()));
+          result.setEffectiveContext(D->getDeclContext());
+          return result;
+        }
+      }
+    }
+
+    // Otherwise, for empty names, there is nothing to do.
     return result;
+  }
 
   /// Whether the result is a function name.
   bool isFunction = false;
@@ -1709,11 +1767,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   case clang::DeclarationName::CXXOperatorName: {
     auto op = D->getDeclName().getCXXOverloadedOperator();
     auto functionDecl = dyn_cast<clang::FunctionDecl>(D);
-    if (!functionDecl) {
-      // This can happen for example for templated operators functions.
-      // We don't support those, yet.
+
+    if (auto functionTemplate = dyn_cast<clang::FunctionTemplateDecl>(D))
+      functionDecl = functionTemplate->getAsFunction();
+
+    if (!functionDecl)
       return ImportedName();
-    }
 
     switch (op) {
     case clang::OverloadedOperatorKind::OO_Plus:

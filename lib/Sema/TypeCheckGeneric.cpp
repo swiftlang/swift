@@ -20,7 +20,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -517,44 +516,6 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 /// Generic types
 ///
 
-GenericSignature TypeChecker::checkGenericSignature(
-                      GenericParamSource paramSource,
-                      DeclContext *dc,
-                      GenericSignature parentSig,
-                      bool allowConcreteGenericParams,
-                      SmallVector<Requirement, 2> additionalRequirements,
-                      SmallVector<TypeLoc, 2> inferenceSources) {
-  if (auto genericParamList = paramSource.dyn_cast<GenericParamList *>())
-    assert(genericParamList && "Missing generic parameters?");
-
-  auto request = InferredGenericSignatureRequest{
-    dc->getParentModule(), parentSig.getPointer(), paramSource,
-    additionalRequirements, inferenceSources,
-    allowConcreteGenericParams};
-  auto sig = evaluateOrDefault(dc->getASTContext().evaluator,
-                               request, nullptr);
-
-  // Debugging of the generic signature builder and generic signature
-  // generation.
-  if (dc->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
-    llvm::errs() << "\n";
-    if (auto *VD = dyn_cast_or_null<ValueDecl>(dc->getAsDecl())) {
-      VD->dumpRef(llvm::errs());
-      llvm::errs() << "\n";
-    } else {
-      dc->printContext(llvm::errs());
-    }
-    llvm::errs() << "Generic signature: ";
-    sig->print(llvm::errs());
-    llvm::errs() << "\n";
-    llvm::errs() << "Canonical generic signature: ";
-    sig.getCanonicalSignature()->print(llvm::errs());
-    llvm::errs() << "\n";
-  }
-
-  return sig;
-}
-
 /// Form the interface type of an extension from the raw type and the
 /// extension's list of generic parameters.
 static Type formExtensionInterfaceType(
@@ -649,6 +610,8 @@ static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
 GenericSignature
 GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                   GenericContext *GC) const {
+  auto &ctx = GC->getASTContext();
+
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
   // it.
   if (auto PD = dyn_cast<ProtocolDecl>(GC)) {
@@ -660,7 +623,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     // Debugging of the generic signature builder and generic signature
     // generation.
-    if (GC->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
+    if (ctx.TypeCheckerOpts.DebugGenericSignatures) {
       llvm::errs() << "\n";
       PD->printContext(llvm::errs());
       llvm::errs() << "Generic signature: ";
@@ -698,10 +661,10 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // If there is no generic context for the where clause to
     // rely on, diagnose that now and bail out.
     if (!GC->isGenericContext()) {
-      GC->getASTContext().Diags.diagnose(where->getWhereLoc(),
-                                         GC->getParent()->isModuleScopeContext()
-                                             ? diag::where_nongeneric_toplevel
-                                             : diag::where_nongeneric_ctx);
+      ctx.Diags.diagnose(where->getWhereLoc(),
+                         GC->getParent()->isModuleScopeContext()
+                             ? diag::where_nongeneric_toplevel
+                             : diag::where_nongeneric_ctx);
       return nullptr;
     }
   }
@@ -806,10 +769,33 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     inferenceSources.emplace_back(nullptr, extInterfaceType);
   }
 
-  return TypeChecker::checkGenericSignature(
-      GC, GC, parentSig,
-      allowConcreteGenericParams,
-      sameTypeReqs, inferenceSources);
+  auto request = InferredGenericSignatureRequest{
+      GC->getParentModule(), parentSig.getPointer(),
+      GC->getGenericParams(), WhereClauseOwner(GC),
+      sameTypeReqs, inferenceSources,
+      allowConcreteGenericParams};
+  auto sig = evaluateOrDefault(ctx.evaluator,
+                               request, nullptr);
+
+  // Debugging of the generic signature builder and generic signature
+  // generation.
+  if (ctx.TypeCheckerOpts.DebugGenericSignatures) {
+    llvm::errs() << "\n";
+    if (auto *VD = dyn_cast_or_null<ValueDecl>(GC->getAsDecl())) {
+      VD->dumpRef(llvm::errs());
+      llvm::errs() << "\n";
+    } else {
+      GC->printContext(llvm::errs());
+    }
+    llvm::errs() << "Generic signature: ";
+    sig->print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Canonical generic signature: ";
+    sig.getCanonicalSignature()->print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+
+  return sig;
 }
 
 ///

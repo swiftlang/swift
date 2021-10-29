@@ -145,8 +145,12 @@ if(NOT SWIFT_INCLUDE_TOOLS)
   else()
     list(APPEND SWIFT_LIT_ARGS
       "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
+      "--param" "swift_native_llvm_tools_path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
       "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
-      "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
+      "--param" "swift_native_clang_tools_path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
+      "--path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
+      "--param" "swift_native_swift_tools_path=${SWIFT_NATIVE_SWIFT_TOOLS_PATH}"
+      )
   endif()
   if(SWIFT_BUILD_STDLIB)
     list(APPEND SWIFT_LIT_ARGS
@@ -159,13 +163,19 @@ if (SWIFT_TEST_USE_LEAKS)
   list(APPEND SWIFT_LIT_ARGS "--param" "leaks-all")
 endif()
 
+if (SWIFT_ENABLE_ARRAY_COW_CHECKS)
+  list(APPEND SWIFT_LIT_ARGS
+       "--param" "array_cow_checks")
+endif()
+
 if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
   list(APPEND SWIFT_LIT_ARGS
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
-if(SWIFT_TOOLS_ENABLE_LIBSWIFT)
-  list(APPEND SWIFT_LIT_ARGS "--param" "libswift")
+if (LIBSWIFT_BUILD_MODE)
+  list(APPEND SWIFT_LIT_ARGS
+       "--param" "libswift_build_mode=${LIBSWIFT_BUILD_MODE}")
 endif()
 
 if (LLVM_USE_SANITIZER STREQUAL "Address")

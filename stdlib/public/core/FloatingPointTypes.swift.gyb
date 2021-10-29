@@ -288,6 +288,12 @@ extension ${Self}: BinaryFloatingPoint {
 
     @usableFromInline
     @_transparent
+    internal init(explicitSignificand: UInt64, signAndExponent: UInt16) {
+      _storage = (explicitSignificand, signAndExponent, 0, 0, 0)
+    }
+
+    @usableFromInline
+    @_transparent
     internal var explicitSignificand: UInt64 { return _storage.0 }
 
     @usableFromInline
@@ -304,12 +310,6 @@ extension ${Self}: BinaryFloatingPoint {
     @_transparent
     internal var exponentBitPattern: UInt {
       return UInt(signAndExponent) & 0x7fff
-    }
-
-    @usableFromInline
-    @_transparent
-    internal init(explicitSignificand: UInt64, signAndExponent: UInt16) {
-      _storage = (explicitSignificand, signAndExponent, 0, 0, 0)
     }
   }
 
@@ -1279,6 +1279,7 @@ extension ${Self}: Strideable {
 % if bits != 16:
 internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   internal typealias Base = ${Self}
+
   internal let _value: Base
 
   internal init(_ value: Base) {

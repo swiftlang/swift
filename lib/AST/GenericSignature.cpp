@@ -194,13 +194,13 @@ GenericSignatureImpl::getGenericSignatureBuilder() const {
 
 rewriting::RequirementMachine *
 GenericSignatureImpl::getRequirementMachine() const {
-  // The requirement machine is associated with the canonical signature.
-  if (!isCanonical())
-    return getCanonicalSignature()->getRequirementMachine();
+  if (Machine)
+    return Machine;
 
-  // Requirement machines are stored on the ASTContext.
-  return getASTContext().getOrCreateRequirementMachine(
-                                             CanGenericSignature(this));
+  const_cast<GenericSignatureImpl *>(this)->Machine
+      = getASTContext().getOrCreateRequirementMachine(
+          getCanonicalSignature());
+  return Machine;
 }
 
 bool GenericSignatureImpl::isEqual(GenericSignature Other) const {
@@ -539,7 +539,7 @@ Type GenericSignatureImpl::getSuperclassBound(Type type) const {
 
   auto computeViaRQM = [&]() {
     auto *machine = getRequirementMachine();
-    return machine->getSuperclassBound(type);
+    return machine->getSuperclassBound(type, getGenericParams());
   };
 
   auto &ctx = getASTContext();
@@ -772,7 +772,7 @@ Type GenericSignatureImpl::getConcreteType(Type type) const {
 
   auto computeViaRQM = [&]() {
     auto *machine = getRequirementMachine();
-    return machine->getConcreteType(type);
+    return machine->getConcreteType(type, getGenericParams());
   };
 
   auto &ctx = getASTContext();
@@ -967,6 +967,16 @@ bool GenericSignatureImpl::isRequirementSatisfied(
   return requirement.isSatisfied(conditionalRequirements, allowMissing);
 }
 
+SmallVector<Requirement, 4>
+GenericSignature::requirementsNotSatisfiedBy(GenericSignature otherSig) const {
+  // The null generic signature has no requirements, therefore all requirements
+  // are satisfied by any signature.
+  if (isNull()) {
+    return {};
+  }
+  return getPointer()->requirementsNotSatisfiedBy(otherSig);
+}
+
 SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
                                             GenericSignature otherSig) const {
   SmallVector<Requirement, 4> result;
@@ -1069,6 +1079,15 @@ bool GenericSignatureImpl::isCanonicalTypeInContext(
             !component->isEqual(equivClass->getAnchor(builder,
                                                       getGenericParams())));
   });
+}
+
+CanType GenericSignature::getCanonicalTypeInContext(Type type) const {
+  // The null generic signature has no requirements so cannot influence the
+  // structure of the can type computed here.
+  if (isNull()) {
+    return type->getCanonicalType();
+  }
+  return getPointer()->getCanonicalTypeInContext(type);
 }
 
 CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
@@ -1466,8 +1485,8 @@ int Requirement::compare(const Requirement &other) const {
 
   int compareProtos =
     TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
+  assert(compareProtos != 0 && "Duplicate conformance requirements");
 
-  assert(compareProtos != 0 && "Duplicate conformance requirement");
   return compareProtos;
 }
 

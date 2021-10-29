@@ -32,7 +32,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/OperatorNameLookup.h"
@@ -40,8 +39,8 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -61,12 +60,6 @@
 
 using namespace swift;
 
-#define DEBUG_TYPE "Serialization"
-
-STATISTIC(NumLazyRequirementSignaturesLoaded,
-          "# of lazily-deserialized requirement signatures loaded");
-
-#undef DEBUG_TYPE
 #define DEBUG_TYPE "TypeCheckDecl"
 
 namespace {
@@ -869,52 +862,261 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return false;
 }
 
-ArrayRef<Requirement>
-RequirementSignatureRequest::evaluate(Evaluator &evaluator,
-                                      ProtocolDecl *proto) const {
-  ASTContext &ctx = proto->getASTContext();
-
-  // First check if we have a deserializable requirement signature.
-  if (proto->hasLazyRequirementSignature()) {
-    ++NumLazyRequirementSignaturesLoaded;
-    // FIXME: (transitional) increment the redundant "always-on" counter.
-    if (ctx.Stats)
-      ++ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded;
-
-    auto contextData = static_cast<LazyProtocolData *>(
-        ctx.getOrCreateLazyContextData(proto, nullptr));
-
-    SmallVector<Requirement, 8> requirements;
-    contextData->loader->loadRequirementSignature(
-        proto, contextData->requirementSignatureData, requirements);
-    if (requirements.empty())
-      return None;
-    return ctx.AllocateCopy(requirements);
+static void addTypeRequirement(Type subjectType, Type constraintType,
+                               SourceLoc loc, bool wasInferred,
+                               SmallVectorImpl<StructuralRequirement> &result) {
+  // Check whether we have a reasonable constraint type at all.
+  if (!constraintType->isExistentialType() &&
+      !constraintType->getClassOrBoundGenericClass()) {
+    // FIXME: Diagnose
+    return;
   }
 
-  GenericSignatureBuilder builder(proto->getASTContext());
+  // Protocol requirements.
+  if (constraintType->isExistentialType()) {
+    auto layout = constraintType->getExistentialLayout();
 
-  // Add all of the generic parameters.
-  for (auto gp : *proto->getGenericParams())
-    builder.addGenericParameter(gp);
+    if (auto layoutConstraint = layout.getLayoutConstraint()) {
+      result.push_back({
+          Requirement(RequirementKind::Layout, subjectType, layoutConstraint),
+          loc, wasInferred});
+    }
 
-  // Add the conformance of 'self' to the protocol.
-  auto selfType =
-    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-  auto requirement =
-    Requirement(RequirementKind::Conformance, selfType,
-                proto->getDeclaredInterfaceType());
+    if (auto superclass = layout.explicitSuperclass) {
+      result.push_back({
+          Requirement(RequirementKind::Superclass, subjectType, superclass),
+          loc, wasInferred});
+    }
 
-  builder.addRequirement(
-          requirement,
-          GenericSignatureBuilder::RequirementSource::forRequirementSignature(
-                                                      builder, selfType, proto),
-          nullptr);
+    for (auto *proto : layout.getProtocols()) {
+      result.push_back({
+          Requirement(RequirementKind::Conformance, subjectType, proto),
+          loc, wasInferred});
+    }
 
-  auto reqSignature = std::move(builder).computeGenericSignature(
-                        /*allowConcreteGenericParams=*/false,
-                        /*requirementSignatureSelfProto=*/proto);
-  return reqSignature.getRequirements();
+    return;
+  }
+
+  // Superclass constraint.
+  result.push_back({
+      Requirement(RequirementKind::Superclass, subjectType, constraintType),
+      loc, wasInferred});
+}
+
+static void addSameTypeRequirement(Type lhs, Type rhs,
+                                   SourceLoc loc, bool wasInferred,
+                                   SmallVectorImpl<StructuralRequirement> &result) {
+  class Matcher : public TypeMatcher<Matcher> {
+    SourceLoc loc;
+    bool wasInferred;
+    SmallVectorImpl<StructuralRequirement> &result;
+
+  public:
+    Matcher(SourceLoc loc, bool wasInferred,
+            SmallVectorImpl<StructuralRequirement> &result)
+        : loc(loc), wasInferred(wasInferred), result(result) {}
+
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
+        result.push_back({Requirement(RequirementKind::SameType,
+                                      firstType, secondType),
+                          loc, wasInferred});
+        return true;
+      }
+
+      if (firstType->isTypeParameter()) {
+        result.push_back({Requirement(RequirementKind::SameType,
+                                      firstType, secondType),
+                          loc, wasInferred});
+        return true;
+      }
+
+      if (secondType->isTypeParameter()) {
+        result.push_back({Requirement(RequirementKind::SameType,
+                                      secondType, firstType),
+                          loc, wasInferred});
+        return true;
+      }
+
+      // FIXME: Diagnose concrete type conflict
+      return true;
+    }
+  } matcher(loc, wasInferred, result);
+
+  // FIXME: If both sides concrete and was not inferred, diagnose redundancy
+  // FIXME: If both sides are equal as type parameters and not inferred,
+  // diagnose redundancy
+  (void) matcher.match(lhs, rhs);
+}
+
+static void inferRequirements(Type type, SourceLoc loc,
+                              SmallVectorImpl<StructuralRequirement> &result) {
+
+}
+
+static void addRequirement(Requirement req, RequirementRepr *reqRepr, bool infer,
+                           SmallVectorImpl<StructuralRequirement> &result) {
+  auto firstType = req.getFirstType();
+  if (infer) {
+    auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
+                             : SourceLoc());
+    inferRequirements(firstType, firstLoc, result);
+  }
+
+  auto loc = (reqRepr ? reqRepr->getSeparatorLoc() : SourceLoc());
+
+  switch (req.getKind()) {
+  case RequirementKind::Superclass:
+  case RequirementKind::Conformance: {
+    if (!firstType->isTypeParameter()) {
+      // FIXME: Warn about redundancy if not inferred, diagnose conflicts
+      break;
+    }
+
+    auto secondType = req.getSecondType();
+    if (infer) {
+      auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
+                                : SourceLoc());
+      inferRequirements(secondType, secondLoc, result);
+    }
+
+    addTypeRequirement(firstType, secondType, loc, /*wasInferred=*/false,
+                       result);
+    break;
+  }
+
+  case RequirementKind::Layout:
+    if (!firstType->isTypeParameter()) {
+      // FIXME: Warn about redundancy if not inferred, diagnose conflicts
+      break;
+    }
+
+    result.push_back({req, loc, /*wasInferred=*/false});
+    break;
+
+  case RequirementKind::SameType: {
+    auto secondType = req.getSecondType();
+    if (infer) {
+      auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
+                                : SourceLoc());
+      inferRequirements(secondType, secondLoc, result);
+    }
+
+    addSameTypeRequirement(firstType, secondType, loc, /*wasInferred=*/false,
+                           result);
+    break;
+  }
+  }
+}
+
+static void addInheritedRequirements(TypeDecl *decl, Type type, bool infer,
+                              SmallVectorImpl<StructuralRequirement> &result) {
+  auto &ctx = decl->getASTContext();
+  auto inheritedTypes = decl->getInherited();
+
+  for (unsigned index : indices(inheritedTypes)) {
+    Type inheritedType
+      = evaluateOrDefault(ctx.evaluator,
+                          InheritedTypeRequest{decl, index,
+                            TypeResolutionStage::Structural},
+                          Type());
+    if (!inheritedType) continue;
+
+    auto *typeRepr = inheritedTypes[index].getTypeRepr();
+    SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
+    if (infer) {
+      inferRequirements(inheritedType, loc, result);
+    }
+
+    addTypeRequirement(type, inheritedType, loc, /*wasInferred=*/false,
+                       result);
+  }
+}
+
+ArrayRef<StructuralRequirement>
+StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *proto) const {
+  assert(!proto->hasLazyRequirementSignature());
+
+  SmallVector<StructuralRequirement, 4> result;
+
+  auto &ctx = proto->getASTContext();
+
+  auto selfTy = proto->getSelfInterfaceType();
+
+  addInheritedRequirements(proto, selfTy,
+                           /*infer=*/false, result);
+
+  // Add requirements from the protocol's own 'where' clause.
+  WhereClauseOwner(proto).visitRequirements(TypeResolutionStage::Structural,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
+        addRequirement(req, reqRepr, /*infer=*/false, result);
+        return false;
+      });
+
+  if (proto->isObjC()) {
+    // @objc protocols have an implicit AnyObject requirement on Self.
+    auto layout = LayoutConstraint::getLayoutConstraint(
+        LayoutConstraintKind::Class, ctx);
+    result.push_back({Requirement(RequirementKind::Layout, selfTy, layout),
+                      proto->getLoc(), /*inferred=*/true});
+
+    // Remaining logic is not relevant to @objc protocols.
+    return ctx.AllocateCopy(result);
+  }
+
+  // Add requirements for each of the associated types.
+  for (auto assocTypeDecl : proto->getAssociatedTypeMembers()) {
+    // Add requirements placed directly on this associated type.
+    auto assocType = assocTypeDecl->getDeclaredInterfaceType();
+    addInheritedRequirements(assocTypeDecl, assocType, /*infer=*/false,
+                             result);
+
+    // Add requirements from this associated type's where clause.
+    WhereClauseOwner(assocTypeDecl).visitRequirements(
+        TypeResolutionStage::Structural,
+        [&](const Requirement &req, RequirementRepr *reqRepr) {
+          addRequirement(req, reqRepr, /*infer=*/false, result);
+          return false;
+        });
+  }
+
+  return ctx.AllocateCopy(result);
+}
+
+ArrayRef<ProtocolDecl *>
+ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *proto) const {
+  auto &ctx = proto->getASTContext();
+  SmallVector<ProtocolDecl *, 4> result;
+
+  // If we have a serialized requirement signature, deserialize it and
+  // look at conformance requirements.
+  //
+  // FIXME: For now we just fall back to the GSB for all protocols
+  // unless -requirement-machine-protocol-signatures=on is passed.
+  if (proto->hasLazyRequirementSignature() ||
+      (ctx.LangOpts.RequirementMachineProtocolSignatures
+        == RequirementMachineMode::Disabled)) {
+    for (auto req : proto->getRequirementSignature()) {
+      if (req.getKind() == RequirementKind::Conformance) {
+        result.push_back(req.getProtocolDecl());
+      }
+    }
+
+    return ctx.AllocateCopy(result);
+  }
+
+  // Otherwise, we can't ask for the requirement signature, because
+  // this request is used as part of *building* the requirement
+  // signature. Look at the structural requirements instead.
+  for (auto req : proto->getStructuralRequirements()) {
+    if (req.req.getKind() == RequirementKind::Conformance)
+      result.push_back(req.req.getProtocolDecl());
+  }
+
+  return ctx.AllocateCopy(result);
 }
 
 Type
@@ -2618,10 +2820,11 @@ static ArrayRef<Decl *> evaluateMembersRequest(
         (void) var->getPropertyWrapperAuxiliaryVariables();
         (void) var->getPropertyWrapperInitializerInfo();
       }
+    }
 
-      if (auto *func = dyn_cast<FuncDecl>(member)) {
-        (void) func->getDistributedActorRemoteFuncDecl();
-      }
+    // For a distributed function, add the remote function.
+    if (auto *func = dyn_cast<FuncDecl>(member)) {
+      (void) func->getDistributedActorRemoteFuncDecl();
     }
   }
 

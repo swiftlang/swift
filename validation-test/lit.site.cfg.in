@@ -68,6 +68,9 @@ if "@SWIFT_TOOLS_ENABLE_LTO@".lower() in ["full", "thin"]:
 else:
    config.available_features.add("no_lto")
 
+if '@SWIFT_STDLIB_ENABLE_LTO@'.lower() in ['full', 'thin']:
+    config.available_features.add('stdlib_lto')
+
 if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
     config.available_features.add('asserts')
 else:
@@ -112,6 +115,15 @@ if "@SWIFT_USE_LINKER@" == "lld":
 else:
     # even if SWIFT_USE_LINKER isn't set, we cannot use BFD for Android
     config.android_linker_name = "gold"
+
+if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
+    config.available_features.add('differentiable_programming')
+if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
+    config.available_features.add('concurrency')
+if "@SWIFT_BACK_DEPLOY_CONCURRENCY@" == "TRUE":
+    config.available_features.add('back_deploy_concurrency')
+if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
+    config.available_features.add('distributed')
 
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))

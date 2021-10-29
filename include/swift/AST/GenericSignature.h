@@ -201,6 +201,18 @@ public:
   /// signature.
   GenericEnvironment *getGenericEnvironment() const;
 
+  /// Return the requirements of this generic signature that are not also
+  /// satisfied by \c otherSig.
+  ///
+  /// \param otherSig Another generic signature whose generic parameters are
+  /// equivalent to or a subset of the generic parameters in this signature.
+  SmallVector<Requirement, 4>
+  requirementsNotSatisfiedBy(GenericSignature otherSig) const;
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type) const;
+
   /// Check invariants.
   void verify() const;
 };
@@ -252,6 +264,8 @@ class alignas(1 << TypeAlignInBits) GenericSignatureImpl final
   const unsigned NumRequirements;
 
   GenericEnvironment *GenericEnv = nullptr;
+
+  rewriting::RequirementMachine *Machine = nullptr;
 
   // Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
@@ -373,18 +387,6 @@ public:
   bool isRequirementSatisfied(
       Requirement requirement, bool allowMissing = false) const;
 
-  /// Return the requirements of this generic signature that are not also
-  /// satisfied by \c otherSig.
-  ///
-  /// \param otherSig Another generic signature whose generic parameters are
-  /// equivalent to or a subset of the generic parameters in this signature.
-  SmallVector<Requirement, 4> requirementsNotSatisfiedBy(
-                                  GenericSignature otherSig) const;
-
-  /// Return the canonical version of the given type under this generic
-  /// signature.
-  CanType getCanonicalTypeInContext(Type type) const;
-
   bool isCanonicalTypeInContext(Type type) const;
   bool isCanonicalTypeInContext(Type type,
                                 GenericSignatureBuilder &builder) const;
@@ -462,6 +464,18 @@ private:
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
   GenericEnvironment *getGenericEnvironment() const;
+
+  /// Return the requirements of this generic signature that are not also
+  /// satisfied by \c otherSig.
+  ///
+  /// \param otherSig Another generic signature whose generic parameters are
+  /// equivalent to or a subset of the generic parameters in this signature.
+  SmallVector<Requirement, 4>
+  requirementsNotSatisfiedBy(GenericSignature otherSig) const;
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type) const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);

@@ -724,7 +724,7 @@ int doSerializeRawTree(const char *MainExecutablePath,
     if (!options::OutputFilename.empty()) {
       std::error_code errorCode;
       llvm::raw_fd_ostream os(options::OutputFilename, errorCode,
-                              llvm::sys::fs::F_None);
+                              llvm::sys::fs::OF_None);
       assert(!errorCode && "Couldn't open output file");
       swift::json::Output out(os);
       out << *Root;
@@ -738,7 +738,7 @@ int doSerializeRawTree(const char *MainExecutablePath,
     if (!options::DiagsOutputFilename.empty()) {
       std::error_code errorCode;
       llvm::raw_fd_ostream os(options::DiagsOutputFilename, errorCode,
-                              llvm::sys::fs::F_None);
+                              llvm::sys::fs::OF_None);
       if (errorCode) {
         llvm::errs() << "error opening file '" << options::DiagsOutputFilename
           << "': " << errorCode.message() << '\n';
@@ -762,7 +762,7 @@ int doDeserializeRawTree(const char *MainExecutablePath,
   auto Buffer = llvm::MemoryBuffer::getFile(InputFile);
   std::error_code errorCode;
   auto os = std::make_unique<llvm::raw_fd_ostream>(
-              OutputFileName, errorCode, llvm::sys::fs::F_None);
+              OutputFileName, errorCode, llvm::sys::fs::OF_None);
   swift::json::SyntaxDeserializer deserializer(llvm::MemoryBufferRef(*(Buffer.get())));
   deserializer.getSourceFileSyntax()->print(*os);
 

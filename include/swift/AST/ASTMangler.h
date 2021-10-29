@@ -60,6 +60,9 @@ protected:
   /// concurrency library.
   bool AllowConcurrencyStandardSubstitutions = true;
 
+  /// If enabled, marker protocols can be encoded in the mangled name.
+  bool AllowMarkerProtocols = true;
+
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
                                               const OpaqueTypeDecl *>;
@@ -252,6 +255,8 @@ public:
   std::string mangleTypeForTypeName(Type type);
 
   std::string mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl);
+
+  std::string mangleOpaqueTypeDescriptorRecord(const OpaqueTypeDecl *decl);
   
   std::string mangleDeclType(const ValueDecl *decl);
   
@@ -266,6 +271,7 @@ public:
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
+  std::string mangleAnyDecl(const ValueDecl *Decl, bool prefix);
   std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
@@ -291,6 +297,10 @@ public:
 
   static const clang::NamedDecl *
   getClangDeclForMangling(const ValueDecl *decl);
+
+  void appendExistentialLayout(
+      const ExistentialLayout &layout, GenericSignature sig,
+      const ValueDecl *forDecl);
 
 protected:
 

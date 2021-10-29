@@ -46,8 +46,8 @@ func foo() {}
 // SEMA_3: 1 {{.*}} source.statistic.num-ast-builds
 // SEMA_3: 1 {{.*}} source.statistic.num-asts-in-memory
 // SEMA_3: 1 {{.*}} source.statistic.max-asts-in-memory
-// SEMA_3: 0 {{.*}} source.statistic.num-ast-cache-hits
-// SEMA_3: 1 {{.*}} source.statistic.num-ast-snaphost-uses
+// SEMA_3: 1 {{.*}} source.statistic.num-ast-cache-hits
+// SEMA_3: 0 {{.*}} source.statistic.num-ast-snaphost-uses
 
 // RUN: %sourcekitd-test -req=sema %s -- -Xfrontend -disable-implicit-concurrency-module-import  %s == -req=related-idents -pos=1:6 %s -- -Xfrontend -disable-implicit-concurrency-module-import  %s == -req=stats | %FileCheck %s -check-prefix=SEMA_4
 
@@ -58,3 +58,14 @@ func foo() {}
 // SEMA_4: 1 {{.*}} source.statistic.max-asts-in-memory
 // SEMA_4: 1 {{.*}} source.statistic.num-ast-cache-hits
 // SEMA_4: 0 {{.*}} source.statistic.num-ast-snaphost-uses
+
+// Test that we can have two files open and don't need to rebuild an AST when doing the cursor info request on '%s' after opening '10bytes.swift'
+// RUN: %sourcekitd-test \
+// RUN: -req=sema %s -- -Xfrontend -disable-implicit-concurrency-module-import  %s == \
+// RUN: -req=sema %S/Inputs/10bytes.swift -- -Xfrontend -disable-implicit-concurrency-module-import %S/Inputs/10bytes.swift == \
+// RUN: -req=cursor -pos=1:6 %s -- -Xfrontend -disable-implicit-concurrency-module-import  %s == \
+// RUN: -req=stats | %FileCheck %s -check-prefix=OPEN_TWO_FILES
+
+// OPEN_TWO_FILES: 2 {{.*}} source.statistic.num-ast-builds
+// OPEN_TWO_FILES: 2 {{.*}} source.statistic.num-asts-in-memory
+// OPEN_TWO_FILES: 2 {{.*}} source.statistic.max-asts-in-memory

@@ -34,7 +34,6 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
-#include "swift/IDE/ModuleSourceFileInfo.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -636,9 +635,9 @@ CodeCompletionResult::withFlair(CodeCompletionFlair newFlair,
     return new (*Sink.Allocator) CodeCompletionResult(
         getSemanticContext(), newFlair, getNumBytesToErase(),
         getCompletionString(), getAssociatedDeclKind(), isSystem(),
-        getModuleName(), getSourceFilePath(), getNotRecommendedReason(),
-        getDiagnosticSeverity(), getDiagnosticMessage(),
-        getBriefDocComment(), getAssociatedUSRs(), getExpectedTypeRelation(),
+        getModuleName(), getNotRecommendedReason(), getDiagnosticSeverity(),
+        getDiagnosticMessage(), getBriefDocComment(), getAssociatedUSRs(),
+        getExpectedTypeRelation(),
         isOperator() ? getOperatorKind() : CodeCompletionOperatorKind::None);
   } else {
     return new (*Sink.Allocator) CodeCompletionResult(
@@ -1303,8 +1302,6 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         ModuleName, NotRecReason, copyString(*Sink.Allocator, BriefDocComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
         ExpectedTypeRelation);
-    if (!result->isSystem())
-      result->setSourceFilePath(getSourceFilePathForDecl(AssociatedDecl));
     if (NotRecReason != NotRecommendedReason::None) {
       // FIXME: We should generate the message lazily.
       if (const auto *VD = dyn_cast<ValueDecl>(AssociatedDecl)) {
@@ -1465,13 +1462,13 @@ void CodeCompletionContext::sortCompletionResults(
   // Sort nameCache, and then transform Results to return the pointers in order.
   std::sort(nameCache.begin(), nameCache.end(),
             [](const ResultAndName &LHS, const ResultAndName &RHS) {
-    int Result = StringRef(LHS.name).compare_lower(RHS.name);
-    // If the case insensitive comparison is equal, then secondary sort order
-    // should be case sensitive.
-    if (Result == 0)
-      Result = LHS.name.compare(RHS.name);
-    return Result < 0;
-  });
+              int Result = StringRef(LHS.name).compare_insensitive(RHS.name);
+              // If the case insensitive comparison is equal, then secondary
+              // sort order should be case sensitive.
+              if (Result == 0)
+                Result = LHS.name.compare(RHS.name);
+              return Result < 0;
+            });
 
   llvm::transform(nameCache, Results.begin(),
                   [](const ResultAndName &entry) { return entry.result; });
@@ -3369,7 +3366,7 @@ public:
   void addConstructorCallsForType(Type type, Identifier name,
                                   DeclVisibilityKind Reason,
                                   DynamicLookupInfo dynamicLookupInfo) {
-    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr)
+    if (!Sink.addInitsToTopLevel)
       return;
 
     assert(CurrDeclContext);
@@ -4462,7 +4459,7 @@ public:
     });
 
     // Optionally add object literals.
-    if (CompletionContext->includeObjectLiterals()) {
+    if (Sink.includeObjectLiterals) {
       auto floatType = context.getFloatType();
       addFromProto(LK::ColorLiteral, [&](Builder &builder) {
         builder.addBaseName("#colorLiteral");
@@ -5769,7 +5766,7 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
   CodeCompleteTokenExpr = static_cast<CodeCompletionExpr*>(CodeCompletionE);
 
   ShouldCompleteCallPatternAfterParen = true;
-  if (Context.LangOpts.CodeCompleteCallPatternHeuristics) {
+  if (CompletionContext.getCallPatternHeuristics()) {
     // Lookahead one token to decide what kind of call completions to provide.
     // When it appears that there is already code for the call present, just
     // complete values and/or argument labels.  Otherwise give the entire call
@@ -5911,7 +5908,7 @@ void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
   ShouldCompleteCallPatternAfterParen = false;
   if (isFirst) {
     ShouldCompleteCallPatternAfterParen = true;
-    if (Context.LangOpts.CodeCompleteCallPatternHeuristics) {
+    if (CompletionContext.getCallPatternHeuristics()) {
       // Lookahead one token to decide what kind of call completions to provide.
       // When it appears that there is already code for the call present, just
       // complete values and/or argument labels.  Otherwise give the entire call
@@ -6575,37 +6572,6 @@ static void postProcessResults(MutableArrayRef<CodeCompletionResult *> results,
   }
 }
 
-static void copyAllKnownSourceFileInfo(
-    ASTContext &Ctx, CodeCompletionResultSink &Sink) {
-  assert(Sink.SourceFiles.empty());
-
-  SmallVector<ModuleDecl *, 8> loadedModules;
-  loadedModules.reserve(Ctx.getNumLoadedModules());
-  for (auto &entry : Ctx.getLoadedModules())
-    loadedModules.push_back(entry.second);
-
-  auto &result = Sink.SourceFiles;
-  for (auto *M : loadedModules) {
-    // We don't need to check system modules.
-    if (M->isSystemModule())
-      continue;
-
-    M->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
-      if (info.getFilePath().empty())
-        return;
-      
-      bool isUpToDate = false;
-      if (info.isFromSourceFile()) {
-        // 'SourceFile' is always "up-to-date" because we've just loaded.
-        isUpToDate = true;
-      } else {
-        isUpToDate = isSourceFileUpToDate(info, Ctx);
-      }
-      result.emplace_back(copyString(*Sink.Allocator, info.getFilePath()), isUpToDate);
-    });
-  }
-}
-
 static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                                      CompletionLookup &Lookup,
                                      DeclContext *DC,
@@ -6657,7 +6623,6 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
       // ModuleFilename can be empty if something strange happened during
       // module loading, for example, the module file is corrupted.
       if (!ModuleFilename.empty()) {
-        auto &Ctx = TheModule->getASTContext();
         CodeCompletionCache::Key K{
             ModuleFilename.str(),
             std::string(TheModule->getName()),
@@ -6669,7 +6634,7 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
             SF.hasTestableOrPrivateImport(
                 AccessLevel::Internal, TheModule,
                 SourceFile::ImportQueryKind::PrivateOnly),
-            Ctx.LangOpts.CodeCompleteInitsInPostfixExpr,
+            CompletionContext.getAddInitsToTopLevel(),
             CompletionContext.getAnnotateResult(),
         };
 
@@ -6724,10 +6689,6 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
   postProcessResults(CompletionContext.getResultSink().Results,
                      CompletionContext.CodeCompletionKind, DC,
                      /*Sink=*/nullptr);
-
-  if (CompletionContext.requiresSourceFileInfo())
-    copyAllKnownSourceFileInfo(SF.getASTContext(),
-                               CompletionContext.getResultSink());
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
 }
@@ -7447,16 +7408,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
 void PrintingCodeCompletionConsumer::handleResults(
     CodeCompletionContext &context) {
-  if (context.requiresSourceFileInfo() &&
-      !context.getResultSink().SourceFiles.empty()) {
-    OS << "Known module source files\n";
-    for (auto &entry : context.getResultSink().SourceFiles) {
-      OS << (entry.IsUpToDate ? " + "  : " - ");
-      OS << entry.FilePath;
-      OS << "\n";
-    }
-    this->RequiresSourceFileInfo = true;
-  }
   auto results = context.takeResults();
   handleResults(results);
 }
@@ -7501,13 +7452,6 @@ void PrintingCodeCompletionConsumer::handleResults(
     StringRef comment = Result->getBriefDocComment();
     if (IncludeComments && !comment.empty()) {
       OS << "; comment=" << comment;
-    }
-
-    if (RequiresSourceFileInfo) {
-      StringRef sourceFilePath = Result->getSourceFilePath();
-      if (!sourceFilePath.empty()) {
-        OS << "; source=" << sourceFilePath;
-      }
     }
 
     if (Result->getDiagnosticSeverity() !=
@@ -7655,7 +7599,11 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     if (!V.hasValue()) {
       // No cached results found. Fill the cache.
       V = context.Cache.createValue();
-      (*V)->Sink.annotateResult = context.getAnnotateResult();
+      CodeCompletionResultSink &Sink = (*V)->Sink;
+      Sink.annotateResult = context.getAnnotateResult();
+      Sink.addInitsToTopLevel = context.getAddInitsToTopLevel();
+      Sink.enableCallPatternHeuristics = context.getCallPatternHeuristics();
+      Sink.includeObjectLiterals = context.includeObjectLiterals();
       lookupCodeCompletionResultsFromModule(
           (*V)->Sink, R.TheModule, R.Key.AccessPath,
           R.Key.ResultsHaveLeadingDot, SF);

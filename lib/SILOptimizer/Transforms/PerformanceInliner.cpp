@@ -447,7 +447,7 @@ bool SILPerformanceInliner::isProfitableToInline(
           // The access is dynamic and has no nested conflict
           // See if the storage location is considered by
           // access enforcement optimizations
-          auto storage = AccessedStorage::compute(BAI->getSource());
+          auto storage = AccessStorage::compute(BAI->getSource());
           if (BAI->hasNoNestedConflict() && (storage.isFormalAccessBase())) {
             BlockW.updateBenefit(ExclusivityBenefitWeight,
                                  ExclusivityBenefitBase);

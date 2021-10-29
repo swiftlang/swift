@@ -18,6 +18,7 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringMap.h"
 
 #include <string>
 #include <vector>
@@ -47,6 +48,9 @@ public:
 
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
+
+  /// The map of aliases and underlying names of imported or referenced modules.
+  llvm::StringMap<StringRef> ModuleAliasMap;
 
   /// The name of the module that the frontend is building.
   std::string ModuleName;
@@ -177,6 +181,11 @@ public:
   /// debugger to use. When unset, the options will only be present if the
   /// module appears to not be a public module.
   Optional<bool> SerializeOptionsForDebugging;
+
+  /// When true the debug prefix map entries will be applied to debugging
+  /// options before serialization. These can be reconstructed at debug time by
+  /// applying the inverse map in SearchPathOptions.SearchPathRemapper.
+  bool DebugPrefixSerializedDebuggingOptions = false;
 
   /// When true, check if all required SwiftOnoneSupport symbols are present in
   /// the module.
@@ -428,6 +437,7 @@ private:
   static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
   static bool canActionEmitABIDescriptor(ActionType);
+  static bool canActionEmitModuleSemanticInfo(ActionType);
 
 public:
   static bool doesActionGenerateSIL(ActionType);

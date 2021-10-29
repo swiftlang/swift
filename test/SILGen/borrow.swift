@@ -8,6 +8,8 @@ final class D {}
 // Make sure that we insert the borrow for a ref_element_addr lvalue in the
 // proper place.
 final class C {
+  init() {}
+  init?(failably: ()) {}
   var d: D = D()
 }
 

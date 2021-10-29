@@ -20,10 +20,12 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -32,7 +34,6 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -103,6 +104,15 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
 }
 
 namespace {
+
+/// When resilience is bypassed, direct access is legal, but the decls are still
+/// resilient.
+template <typename DeclType>
+bool checkResilience(DeclType *D, ModuleDecl *M,
+                     ResilienceExpansion expansion) {
+  return !D->getModuleContext()->getBypassResilience() &&
+         D->isResilient(M, expansion);
+}
 
 /// Metaprogramming-friendly base class.
 template <class Impl>
@@ -234,7 +244,7 @@ void verifyKeyPathComponent(SILModule &M,
             "property decl should be a member of the base with the same type "
             "as the component");
     require(property->hasStorage(), "property must be stored");
-    require(!property->isResilient(M.getSwiftModule(), expansion),
+    require(!checkResilience(property, M.getSwiftModule(), expansion),
             "cannot access storage of resilient property");
     auto propertyTy =
         loweredBaseTy.getFieldType(property, M, typeExpansionContext);
@@ -666,7 +676,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILFunction &F;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
-  SmallVector<StringRef, 16> DebugVars;
+  SmallVector<std::pair<StringRef, SILType>, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
   std::unique_ptr<DominanceInfo> Dominance;
@@ -1265,7 +1275,34 @@ public:
     if (!varInfo)
       return;
 
+    // Retrive debug variable type
+    SILType DebugVarTy;
+    if (varInfo->Type)
+      DebugVarTy = *varInfo->Type;
+    else {
+      // Fetch from related SSA value
+      switch (inst->getKind()) {
+      case SILInstructionKind::AllocStackInst:
+      case SILInstructionKind::AllocBoxInst:
+        DebugVarTy = inst->getResult(0)->getType();
+        break;
+      case SILInstructionKind::DebugValueInst:
+        DebugVarTy = inst->getOperand(0)->getType();
+        if (DebugVarTy.isAddress()) {
+          auto Expr = varInfo->DIExpr.operands();
+          if (!Expr.empty() &&
+              Expr.begin()->getOperator() == SILDIExprOperator::Dereference)
+            DebugVarTy = DebugVarTy.getObjectType();
+        }
+        break;
+      default:
+        llvm_unreachable("impossible instruction kind");
+      }
+    }
+
     auto *debugScope = inst->getDebugScope();
+    if (varInfo->ArgNo)
+      require(!varInfo->Name.empty(), "function argument without a name");
 
     // Check that there is at most one debug variable defined for each argument
     // slot if our debug scope is not an inlined call site.
@@ -1276,18 +1313,20 @@ public:
     if (debugScope && !debugScope->InlinedCallSite)
       if (unsigned argNum = varInfo->ArgNo) {
         // It is a function argument.
-        if (argNum < DebugVars.size() && !DebugVars[argNum].empty() &&
-            !varInfo->Name.empty()) {
-          require(DebugVars[argNum] == varInfo->Name,
+        if (argNum < DebugVars.size() && !DebugVars[argNum].first.empty()) {
+          require(DebugVars[argNum].first == varInfo->Name,
                   "Scope contains conflicting debug variables for one function "
                   "argument");
+          // Check for type
+          require(DebugVars[argNum].second == DebugVarTy,
+                  "conflicting debug variable type!");
         } else {
           // Reserve enough space.
           while (DebugVars.size() <= argNum) {
-            DebugVars.push_back(StringRef());
+            DebugVars.push_back({StringRef(), SILType()});
           }
         }
-        DebugVars[argNum] = varInfo->Name;
+        DebugVars[argNum] = {varInfo->Name, DebugVarTy};
       }
 
     // Check the (auxiliary) debug variable scope
@@ -1946,6 +1985,22 @@ public:
                         "result of build*ExecutorRef");
       return;
     }
+
+    if (builtinKind == BuiltinValueKind::Move) {
+      // We expect that this builtin will be specialized during transparent
+      // inlining into move_value if we inline into a non-generic context. If
+      // the builtin still remains and is not in the specific move semantic
+      // function (which is the only function marked with
+      // semantics::LIFETIMEMANAGEMENT_MOVE), then we know that we did
+      // transparent inlining into a function that did not result in the Builtin
+      // being specialized out which is user error.
+      //
+      // NOTE: Once we have opaque values, this restriction will go away. This
+      // is just so we can call Builtin.move outside of the stdlib.
+      auto semanticName = semantics::LIFETIMEMANAGEMENT_MOVE;
+      require(BI->getFunction()->hasSemanticsAttr(semanticName),
+              "_move used within a generic context");
+    }
   }
   
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
@@ -2016,7 +2071,7 @@ public:
   void checkAllocGlobalInst(AllocGlobalInst *AGI) {
     SILGlobalVariable *RefG = AGI->getReferencedGlobal();
     if (auto *VD = RefG->getDecl()) {
-      require(!VD->isResilient(F.getModule().getSwiftModule(),
+      require(!checkResilience(VD, F.getModule().getSwiftModule(),
                                F.getResilienceExpansion()),
               "cannot access storage of resilient global");
     }
@@ -2035,7 +2090,7 @@ public:
         RefG->getLoweredTypeInContext(F.getTypeExpansionContext()),
         "global_addr/value must be the type of the variable it references");
     if (auto *VD = RefG->getDecl()) {
-      require(!VD->isResilient(F.getModule().getSwiftModule(),
+      require(!checkResilience(VD, F.getModule().getSwiftModule(),
                                F.getResilienceExpansion()),
               "cannot access storage of resilient global");
     }
@@ -2194,7 +2249,7 @@ public:
     //
     // First check that identifyFormalAccess returns without asserting. For
     // Unsafe enforcement, that is sufficient. For any other enforcement
-    // level also require that it returns a valid AccessedStorage object.
+    // level also require that it returns a valid AccessStorage object.
     // Unsafe enforcement is used for some unrecognizable access patterns,
     // like debugger variables. The compiler never cares about the source of
     // those accesses.
@@ -2205,7 +2260,7 @@ public:
     // I will probably enable a much broader SILVerification of address-type
     // block arguments first to ensure we never hit this check again.
     /*
-    AccessedStorage storage = identifyFormalAccess(BAI);
+    AccessStorage storage = identifyFormalAccess(BAI);
     if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe)
       require(storage, "Unknown formal access pattern");
     */
@@ -2245,7 +2300,7 @@ public:
     }
 
     // First check that identifyFormalAccess never asserts.
-    AccessedStorage storage = identifyFormalAccess(BUAI);
+    AccessStorage storage = identifyFormalAccess(BUAI);
     // Only allow Unsafe and Builtin access to have invalid storage.
     if (BUAI->getEnforcement() != SILAccessEnforcement::Unsafe
         && !BUAI->isFromBuiltin()) {
@@ -2646,21 +2701,6 @@ public:
             "closure parameter must not be a @noescape closure");
   }
 
-  void checkAllocValueBufferInst(AllocValueBufferInst *I) {
-    require(I->getOperand()->getType().isAddress(),
-            "Operand value should be an address");
-    require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
-            "Operand value should be a Builtin.UnsafeValueBuffer");
-    verifyOpenedArchetype(I, I->getValueType().getASTType());
-  }
-
-  void checkProjectValueBufferInst(ProjectValueBufferInst *I) {
-    require(I->getOperand()->getType().isAddress(),
-            "Operand value should be an address");
-    require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
-            "Operand value should be a Builtin.UnsafeValueBuffer");
-  }
-
   void checkProjectBoxInst(ProjectBoxInst *I) {
     require(I->getOperand()->getType().isObject(),
             "project_box operand should be a value");
@@ -2710,21 +2750,14 @@ public:
     }
   }
   
-  void checkDeallocValueBufferInst(DeallocValueBufferInst *I) {
-    require(I->getOperand()->getType().isAddress(),
-            "Operand value should be an address");
-    require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
-            "Operand value should be a Builtin.UnsafeValueBuffer");
-  }
-  
   void checkStructInst(StructInst *SI) {
     auto *structDecl = SI->getType().getStructOrBoundGenericStruct();
     require(structDecl, "StructInst must return a struct");
     require(!structDecl->hasUnreferenceableStorage(),
             "Cannot build a struct with unreferenceable storage from elements "
             "using StructInst");
-    require(!structDecl->isResilient(F.getModule().getSwiftModule(),
-                                     F.getResilienceExpansion()),
+    require(!checkResilience(structDecl, F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
     require(SI->getType().isObject(),
             "StructInst must produce an object");
@@ -2925,8 +2958,8 @@ public:
     require(cd, "Operand of dealloc_ref must be of class type");
 
     if (!DI->canAllocOnStack()) {
-      require(!cd->isResilient(F.getModule().getSwiftModule(),
-                              F.getResilienceExpansion()),
+      require(!checkResilience(cd, F.getModule().getSwiftModule(),
+                               F.getResilienceExpansion()),
               "cannot directly deallocate resilient class");
     }
   }
@@ -3042,7 +3075,7 @@ public:
             "result of struct_extract cannot be address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "must struct_extract from struct");
-    require(!sd->isResilient(F.getModule().getSwiftModule(),
+    require(!checkResilience(sd, F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
     require(!EI->getField()->isStatic(),
@@ -3091,7 +3124,7 @@ public:
             "must derive struct_element_addr from address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "struct_element_addr operand must be struct address");
-    require(!sd->isResilient(F.getModule().getSwiftModule(),
+    require(!checkResilience(sd, F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
     require(EI->getType().isAddress(),
@@ -3124,7 +3157,7 @@ public:
     SILType operandTy = EI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_element_addr operand must be a class instance");
-    require(!cd->isResilient(F.getModule().getSwiftModule(),
+    require(!checkResilience(cd, F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient class");
 
@@ -3148,7 +3181,7 @@ public:
     SILType operandTy = RTAI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_tail_addr operand must be a class instance");
-    require(!cd->isResilient(F.getModule().getSwiftModule(),
+    require(!checkResilience(cd, F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient class");
     require(cd, "ref_tail_addr operand must be a class instance");
@@ -3158,7 +3191,7 @@ public:
     SILType operandTy = DSI->getOperand()->getType();
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "must struct_extract from struct");
-    require(!sd->isResilient(F.getModule().getSwiftModule(),
+    require(!checkResilience(sd, F.getModule().getSwiftModule(),
                              F.getResilienceExpansion()),
             "cannot access storage of resilient struct");
     if (F.hasOwnership()) {
@@ -3199,6 +3232,7 @@ public:
   }
 
   SILType getMethodSelfType(CanSILFunctionType ft) {
+    SILFunctionConventions fnConv(ft, F.getModule());
     return fnConv.getSILType(ft->getParameters().back(),
                              F.getTypeExpansionContext());
   }
@@ -5393,6 +5427,7 @@ public:
                   "stack dealloc with empty stack");
           if (op != state.Stack.back()) {
             llvm::errs() << "Recent stack alloc: " << *state.Stack.back();
+            llvm::errs() << "Matching stack alloc: " << *op;
             require(op == state.Stack.back(),
                     "stack dealloc does not match most recent stack alloc");
           }
@@ -5979,6 +6014,8 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
       continue;
 
     SILFunction *F = E.getMethodWitness().Witness;
+    if (!F)
+      continue;
 
 #if 0
     // FIXME: For now, all default witnesses are private.

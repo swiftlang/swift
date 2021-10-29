@@ -354,6 +354,9 @@ StepResult ComponentStep::take(bool prevFailed) {
     // Produce a disjunction step.
     return suspend(
         std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+  } else if (auto *conjunction = CS.selectConjunction()) {
+    return suspend(
+        std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
   } else if (!CS.solverState->allowsFreeTypeVariables() &&
              CS.hasFreeTypeVariables()) {
     // If there are no disjunctions or type variables to bind
@@ -717,7 +720,7 @@ bool swift::isSIMDOperator(ValueDecl *value) {
   if (nominal->getName().empty())
     return false;
 
-  return nominal->getName().str().startswith_lower("simd");
+  return nominal->getName().str().startswith_insensitive("simd");
 }
 
 bool DisjunctionStep::shortCircuitDisjunctionAt(
@@ -776,4 +779,202 @@ bool DisjunctionStep::attempt(const DisjunctionChoice &choice) {
   }
 
   return choice.attempt(CS);
+}
+
+bool ConjunctionStep::attempt(const ConjunctionElement &element) {
+  ++CS.solverState->NumConjunctionTerms;
+
+  // Outside or previous element score doesn't affect
+  // subsequent elements.
+  CS.solverState->BestScore.reset();
+
+  // Apply solution inferred for all the previous elements
+  // because this element could reference declarations
+  // established in previous element(s).
+  if (!Solutions.empty()) {
+    assert(Solutions.size() == 1);
+    // Note that solution is removed here. This is done
+    // because we want build a single complete solution
+    // incrementally.
+    CS.applySolution(Solutions.pop_back_val());
+  }
+
+  // Make sure that element is solved in isolation
+  // by dropping all scoring information.
+  CS.CurrentScore = Score();
+
+  auto success = element.attempt(CS);
+
+  // If element attempt has failed, mark whole conjunction
+  // as a failure.
+  if (!success)
+    markAsFailed();
+
+  return success;
+}
+
+StepResult ConjunctionStep::resume(bool prevFailed) {
+  // Return from the follow-up splitter step that
+  // attempted to apply information gained from the
+  // isolated constraint to the outer context.
+  if (Snapshot && Snapshot->isScoped()) {
+    if (CS.isDebugMode())
+      getDebugLogger() << ")\n";
+
+    return done(/*isSuccess=*/!prevFailed);
+  }
+
+  // If conjunction step is re-taken and there should be
+  // active choice, let's see if it has be solved or not.
+  assert(ActiveChoice);
+
+  // Rewind back the constraint system information.
+  ActiveChoice.reset();
+
+  if (CS.isDebugMode())
+    getDebugLogger() << ")\n";
+
+  // Check whether it makes sense to continue solving
+  // this conjunction. Note that for conjunction constraint
+  // to be considered a success all of its elements have
+  // to produce a single solution.
+  {
+    auto failConjunction = [&]() {
+      markAsFailed();
+      return done(/*isSuccess=*/false);
+    };
+
+    if (prevFailed)
+      return failConjunction();
+
+    // There could be a local ambiguity related to
+    // the current element, let's try to resolve it.
+    if (Solutions.size() > 1)
+      filterSolutions(Solutions, /*minimize=*/true);
+
+    // In diagnostic mode we need to stop a conjunction
+    // but consider it successful if there are:
+    //
+    // - More than one solution for this element. Ambiguity
+    //   needs to get propagated back to the outer context
+    //   to be diagnosed.
+    // - A single solution that requires one or more fixes,
+    //   continuing would result in more errors associated
+    //   with the failed element.
+    if (CS.shouldAttemptFixes()) {
+      if (Solutions.size() > 1)
+        Producer.markExhausted();
+
+      if (Solutions.size() == 1) {
+        auto score = Solutions.front().getFixedScore();
+        if (score.Data[SK_Fix] > 0)
+          Producer.markExhausted();
+      }
+    } else if (Solutions.size() != 1) {
+      return failConjunction();
+    }
+
+    // Since there is only one solution, let's
+    // consider this element as solved.
+    AnySolved = true;
+  }
+
+  // After all of the elements have been checked, let's
+  // see if conjunction was successful and if so, continue
+  // solving along the current path until complete
+  // solution is reached.
+  if (Producer.isExhausted()) {
+    // If one of the elements failed, that means while
+    // conjunction failed with it.
+    if (HadFailure)
+      return done(/*isSuccess=*/false);
+
+    // If this was an isolated conjunction solver needs to do
+    // the following:
+    //
+    // a. Return all of the previously out-of-scope constraints;
+    // b. Apply solution reached for the conjunction;
+    // c. Continue solving along this path to reach a
+    //    complete solution using type information
+    //    inferred from this step.
+    if (Conjunction->isIsolated()) {
+      if (CS.isDebugMode()) {
+        auto &log = getDebugLogger();
+        log << "(applying conjunction result to outer context\n";
+      }
+
+      assert(
+          Snapshot &&
+          "Isolated conjunction requires a snapshot of the constraint system");
+
+      // In diagnostic mode it's valid for an element to have
+      // multiple solutions. Ambiguity just needs to be merged
+      // into the outer context to be property diagnosed.
+      if (Solutions.size() > 1) {
+        assert(CS.shouldAttemptFixes());
+
+        // Restore all outer type variables, constraints
+        // and scoring information.
+        Snapshot.reset();
+
+        // Restore original scores of outer context before
+        // trying to produce a combined solution.
+        restoreOriginalScores();
+
+        // Apply all of the information deduced from the
+        // conjunction (up to the point of ambiguity)
+        // back to the outer context and form a joined solution.
+        for (auto &solution : Solutions) {
+          ConstraintSystem::SolverScope scope(CS);
+
+          CS.applySolution(solution);
+
+          // `applySolution` changes best/current scores
+          // of the constraint system, so they have to be
+          // restored right afterwards because score of the
+          // element does contribute to the overall score.
+          restoreOriginalScores();
+
+          // Note that `worseThanBestSolution` isn't checked
+          // here because `Solutions` were pre-filtered, and
+          // outer score is the same for all of them.
+          OuterSolutions.push_back(CS.finalize());
+        }
+
+        return done(/*isSuccess=*/true);
+      }
+
+      // Restore outer type variables and prepare to solve
+      // constraints associated with outer context together
+      // with information deduced from the conjunction.
+      Snapshot->setupOuterContext(Solutions.pop_back_val());
+
+      // Pretend that conjunction never happend.
+      restoreOuterState();
+
+      // Now that all of the information from the conjunction has
+      // been applied, let's attempt to solve the outer scope.
+      return suspend(std::make_unique<SplitterStep>(CS, OuterSolutions));
+    }
+  }
+
+  // Attempt next conjunction choice.
+  return take(prevFailed);
+}
+
+void ConjunctionStep::restoreOuterState() const {
+  // Restore best/current score, since upcoming step is going to
+  // work with outer scope in relation to the conjunction.
+  restoreOriginalScores();
+
+  // Active all of the previously out-of-scope constraints
+  // because conjunction can propagate type information up
+  // by allowing its elements to reference type variables
+  // from outer scope (e.g. variable declarations and or captures).
+  {
+    CS.ActiveConstraints.splice(CS.ActiveConstraints.end(),
+                                CS.InactiveConstraints);
+    for (auto &constraint : CS.ActiveConstraints)
+      constraint.setActive(true);
+  }
 }

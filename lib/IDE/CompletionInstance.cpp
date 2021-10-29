@@ -328,16 +328,18 @@ bool CompletionInstance::performCachedOperationIfPossible(
 
   LangOptions langOpts = CI.getASTContext().LangOpts;
   TypeCheckerOptions typeckOpts = CI.getASTContext().TypeCheckerOpts;
+  SILOptions silOpts = CI.getASTContext().SILOpts;
   SearchPathOptions searchPathOpts = CI.getASTContext().SearchPathOpts;
   DiagnosticEngine tmpDiags(tmpSM);
   ClangImporterOptions clangOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts;
   std::unique_ptr<ASTContext> tmpCtx(
-      ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangOpts,
+      ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
                       symbolOpts, tmpSM, tmpDiags));
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
+  registerClangImporterRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)
@@ -612,6 +614,10 @@ bool swift::ide::CompletionInstance::performOperation(
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &, bool)> Callback) {
+
+  // Always disable source location resolutions from .swiftsourceinfo file
+  // because they're somewhat heavy operations and aren't needed for completion.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
 
   // Disable to build syntax tree because code-completion skips some portion of
   // source text. That breaks an invariant of syntax tree building.

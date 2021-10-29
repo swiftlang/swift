@@ -71,37 +71,37 @@ public struct FooRuncingOptions : OptionSet {
 
 public struct FooStruct1 {
 
-    public var x: Int32
-
-    public var y: Double
-
     public init()
 
     public init(x: Int32, y: Double)
+
+    public var x: Int32
+
+    public var y: Double
 }
 public typealias FooStruct1Pointer = UnsafeMutablePointer<FooStruct1>
 
 public struct FooStruct2 {
 
-    public var x: Int32
-
-    public var y: Double
-
     public init()
 
     public init(x: Int32, y: Double)
+
+    public var x: Int32
+
+    public var y: Double
 }
 public typealias FooStructTypedef1 = FooStruct2
 
 public struct FooStructTypedef2 {
 
-    public var x: Int32
-
-    public var y: Double
-
     public init()
 
     public init(x: Int32, y: Double)
+
+    public var x: Int32
+
+    public var y: Double
 }
 
 /// Aaa.  FooTypedef1.  Bbb.
@@ -270,11 +270,11 @@ public func _internalTopLevelFunc()
 
 public struct _InternalStruct {
 
-    public var x: Int32
-
     public init()
 
     public init(x: Int32)
+
+    public var x: Int32
 }
 
 extension FooClassBase {
@@ -1036,76 +1036,76 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1465,
-    key.length: 3
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1477,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1484,
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1469,
+    key.offset: 1489,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1472,
+    key.offset: 1492,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1499,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 1502,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1515,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1522,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1526,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 1529,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1483,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1490,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1494,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1497,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1509,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1516,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1528,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1535,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1540,
-    key.length: 1
+    key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1543,
-    key.length: 5
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1547,
+    key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1550,
+    key.offset: 1551,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1553,
+    key.offset: 1554,
     key.length: 6
   },
   {
@@ -1156,76 +1156,76 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1673,
-    key.length: 3
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1685,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1692,
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1677,
+    key.offset: 1697,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1680,
+    key.offset: 1700,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1707,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 1710,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1723,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1730,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1734,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 1737,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1691,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1698,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1702,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1705,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1717,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1724,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1736,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1743,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1748,
-    key.length: 1
+    key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1751,
-    key.length: 5
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1755,
+    key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1758,
+    key.offset: 1759,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1761,
+    key.offset: 1762,
     key.length: 6
   },
   {
@@ -1271,76 +1271,76 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 1866,
-    key.length: 3
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1878,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1885,
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1870,
+    key.offset: 1890,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1873,
+    key.offset: 1893,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1900,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 1903,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 1916,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1923,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 1927,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 1930,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1884,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1891,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1895,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1898,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1910,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1917,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1929,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 1936,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 1941,
-    key.length: 1
+    key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1944,
-    key.length: 5
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 1948,
+    key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 1951,
+    key.offset: 1952,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 1954,
+    key.offset: 1955,
     key.length: 6
   },
   {
@@ -2891,46 +2891,46 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 5515,
-    key.length: 3
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 5527,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 5534,
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 5519,
+    key.offset: 5539,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 5522,
+    key.offset: 5542,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 5533,
+    key.offset: 5554,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 5540,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 5552,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 5559,
-    key.length: 4
+    key.offset: 5561,
+    key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 5564,
+    key.offset: 5565,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 5567,
+    key.offset: 5568,
     key.length: 5
   },
   {
@@ -3756,25 +3756,25 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1472,
+    key.offset: 1492,
     key.length: 5,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1497,
+    key.offset: 1502,
     key.length: 6,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1543,
+    key.offset: 1529,
     key.length: 5,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1553,
+    key.offset: 1554,
     key.length: 6,
     key.is_system: 1
   },
@@ -3791,25 +3791,25 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1680,
+    key.offset: 1700,
     key.length: 5,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1705,
+    key.offset: 1710,
     key.length: 6,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1751,
+    key.offset: 1737,
     key.length: 5,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1761,
+    key.offset: 1762,
     key.length: 6,
     key.is_system: 1
   },
@@ -3820,25 +3820,25 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1873,
+    key.offset: 1893,
     key.length: 5,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1898,
+    key.offset: 1903,
     key.length: 6,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1944,
+    key.offset: 1930,
     key.length: 5,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 1954,
+    key.offset: 1955,
     key.length: 6,
     key.is_system: 1
   },
@@ -4150,13 +4150,13 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 5522,
+    key.offset: 5542,
     key.length: 5,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 5567,
+    key.offset: 5568,
     key.length: 5,
     key.is_system: 1
   },
@@ -4882,18 +4882,70 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     ],
     key.substructure: [
       {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.name: "init()",
+        key.offset: 1465,
+        key.length: 6,
+        key.nameoffset: 1465,
+        key.namelength: 6,
+        key.attributes: [
+          {
+            key.offset: 1458,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.name: "init(x:y:)",
+        key.offset: 1484,
+        key.length: 25,
+        key.nameoffset: 1484,
+        key.namelength: 25,
+        key.attributes: [
+          {
+            key.offset: 1477,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ],
+        key.substructure: [
+          {
+            key.kind: source.lang.swift.decl.var.parameter,
+            key.name: "x",
+            key.offset: 1489,
+            key.length: 8,
+            key.typename: "Int32",
+            key.nameoffset: 1489,
+            key.namelength: 1
+          },
+          {
+            key.kind: source.lang.swift.decl.var.parameter,
+            key.name: "y",
+            key.offset: 1499,
+            key.length: 9,
+            key.typename: "Double",
+            key.nameoffset: 1499,
+            key.namelength: 1
+          }
+        ]
+      },
+      {
         key.kind: source.lang.swift.decl.var.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "x",
-        key.offset: 1465,
+        key.offset: 1522,
         key.length: 12,
         key.typename: "Int32",
-        key.nameoffset: 1469,
+        key.nameoffset: 1526,
         key.namelength: 1,
         key.attributes: [
           {
-            key.offset: 1458,
+            key.offset: 1515,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -4904,68 +4956,16 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "y",
-        key.offset: 1490,
+        key.offset: 1547,
         key.length: 13,
         key.typename: "Double",
-        key.nameoffset: 1494,
+        key.nameoffset: 1551,
         key.namelength: 1,
         key.attributes: [
           {
-            key.offset: 1483,
-            key.length: 6,
-            key.attribute: source.decl.attribute.public
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.accessibility: source.lang.swift.accessibility.public,
-        key.name: "init()",
-        key.offset: 1516,
-        key.length: 6,
-        key.nameoffset: 1516,
-        key.namelength: 6,
-        key.attributes: [
-          {
-            key.offset: 1509,
-            key.length: 6,
-            key.attribute: source.decl.attribute.public
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.accessibility: source.lang.swift.accessibility.public,
-        key.name: "init(x:y:)",
-        key.offset: 1535,
-        key.length: 25,
-        key.nameoffset: 1535,
-        key.namelength: 25,
-        key.attributes: [
-          {
-            key.offset: 1528,
-            key.length: 6,
-            key.attribute: source.decl.attribute.public
-          }
-        ],
-        key.substructure: [
-          {
-            key.kind: source.lang.swift.decl.var.parameter,
-            key.name: "x",
             key.offset: 1540,
-            key.length: 8,
-            key.typename: "Int32",
-            key.nameoffset: 1540,
-            key.namelength: 1
-          },
-          {
-            key.kind: source.lang.swift.decl.var.parameter,
-            key.name: "y",
-            key.offset: 1550,
-            key.length: 9,
-            key.typename: "Double",
-            key.nameoffset: 1550,
-            key.namelength: 1
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
           }
         ]
       }
@@ -5006,18 +5006,70 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     ],
     key.substructure: [
       {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.name: "init()",
+        key.offset: 1673,
+        key.length: 6,
+        key.nameoffset: 1673,
+        key.namelength: 6,
+        key.attributes: [
+          {
+            key.offset: 1666,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.name: "init(x:y:)",
+        key.offset: 1692,
+        key.length: 25,
+        key.nameoffset: 1692,
+        key.namelength: 25,
+        key.attributes: [
+          {
+            key.offset: 1685,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ],
+        key.substructure: [
+          {
+            key.kind: source.lang.swift.decl.var.parameter,
+            key.name: "x",
+            key.offset: 1697,
+            key.length: 8,
+            key.typename: "Int32",
+            key.nameoffset: 1697,
+            key.namelength: 1
+          },
+          {
+            key.kind: source.lang.swift.decl.var.parameter,
+            key.name: "y",
+            key.offset: 1707,
+            key.length: 9,
+            key.typename: "Double",
+            key.nameoffset: 1707,
+            key.namelength: 1
+          }
+        ]
+      },
+      {
         key.kind: source.lang.swift.decl.var.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "x",
-        key.offset: 1673,
+        key.offset: 1730,
         key.length: 12,
         key.typename: "Int32",
-        key.nameoffset: 1677,
+        key.nameoffset: 1734,
         key.namelength: 1,
         key.attributes: [
           {
-            key.offset: 1666,
+            key.offset: 1723,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -5028,68 +5080,16 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "y",
-        key.offset: 1698,
+        key.offset: 1755,
         key.length: 13,
         key.typename: "Double",
-        key.nameoffset: 1702,
+        key.nameoffset: 1759,
         key.namelength: 1,
         key.attributes: [
           {
-            key.offset: 1691,
-            key.length: 6,
-            key.attribute: source.decl.attribute.public
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.accessibility: source.lang.swift.accessibility.public,
-        key.name: "init()",
-        key.offset: 1724,
-        key.length: 6,
-        key.nameoffset: 1724,
-        key.namelength: 6,
-        key.attributes: [
-          {
-            key.offset: 1717,
-            key.length: 6,
-            key.attribute: source.decl.attribute.public
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.accessibility: source.lang.swift.accessibility.public,
-        key.name: "init(x:y:)",
-        key.offset: 1743,
-        key.length: 25,
-        key.nameoffset: 1743,
-        key.namelength: 25,
-        key.attributes: [
-          {
-            key.offset: 1736,
-            key.length: 6,
-            key.attribute: source.decl.attribute.public
-          }
-        ],
-        key.substructure: [
-          {
-            key.kind: source.lang.swift.decl.var.parameter,
-            key.name: "x",
             key.offset: 1748,
-            key.length: 8,
-            key.typename: "Int32",
-            key.nameoffset: 1748,
-            key.namelength: 1
-          },
-          {
-            key.kind: source.lang.swift.decl.var.parameter,
-            key.name: "y",
-            key.offset: 1758,
-            key.length: 9,
-            key.typename: "Double",
-            key.nameoffset: 1758,
-            key.namelength: 1
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
           }
         ]
       }
@@ -5130,18 +5130,70 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     ],
     key.substructure: [
       {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.name: "init()",
+        key.offset: 1866,
+        key.length: 6,
+        key.nameoffset: 1866,
+        key.namelength: 6,
+        key.attributes: [
+          {
+            key.offset: 1859,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.name: "init(x:y:)",
+        key.offset: 1885,
+        key.length: 25,
+        key.nameoffset: 1885,
+        key.namelength: 25,
+        key.attributes: [
+          {
+            key.offset: 1878,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
+          }
+        ],
+        key.substructure: [
+          {
+            key.kind: source.lang.swift.decl.var.parameter,
+            key.name: "x",
+            key.offset: 1890,
+            key.length: 8,
+            key.typename: "Int32",
+            key.nameoffset: 1890,
+            key.namelength: 1
+          },
+          {
+            key.kind: source.lang.swift.decl.var.parameter,
+            key.name: "y",
+            key.offset: 1900,
+            key.length: 9,
+            key.typename: "Double",
+            key.nameoffset: 1900,
+            key.namelength: 1
+          }
+        ]
+      },
+      {
         key.kind: source.lang.swift.decl.var.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "x",
-        key.offset: 1866,
+        key.offset: 1923,
         key.length: 12,
         key.typename: "Int32",
-        key.nameoffset: 1870,
+        key.nameoffset: 1927,
         key.namelength: 1,
         key.attributes: [
           {
-            key.offset: 1859,
+            key.offset: 1916,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -5152,68 +5204,16 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.accessibility: source.lang.swift.accessibility.public,
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "y",
-        key.offset: 1891,
+        key.offset: 1948,
         key.length: 13,
         key.typename: "Double",
-        key.nameoffset: 1895,
+        key.nameoffset: 1952,
         key.namelength: 1,
         key.attributes: [
           {
-            key.offset: 1884,
-            key.length: 6,
-            key.attribute: source.decl.attribute.public
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.accessibility: source.lang.swift.accessibility.public,
-        key.name: "init()",
-        key.offset: 1917,
-        key.length: 6,
-        key.nameoffset: 1917,
-        key.namelength: 6,
-        key.attributes: [
-          {
-            key.offset: 1910,
-            key.length: 6,
-            key.attribute: source.decl.attribute.public
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.accessibility: source.lang.swift.accessibility.public,
-        key.name: "init(x:y:)",
-        key.offset: 1936,
-        key.length: 25,
-        key.nameoffset: 1936,
-        key.namelength: 25,
-        key.attributes: [
-          {
-            key.offset: 1929,
-            key.length: 6,
-            key.attribute: source.decl.attribute.public
-          }
-        ],
-        key.substructure: [
-          {
-            key.kind: source.lang.swift.decl.var.parameter,
-            key.name: "x",
             key.offset: 1941,
-            key.length: 8,
-            key.typename: "Int32",
-            key.nameoffset: 1941,
-            key.namelength: 1
-          },
-          {
-            key.kind: source.lang.swift.decl.var.parameter,
-            key.name: "y",
-            key.offset: 1951,
-            key.length: 9,
-            key.typename: "Double",
-            key.nameoffset: 1951,
-            key.namelength: 1
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
           }
         ]
       }
@@ -6451,15 +6451,13 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     ],
     key.substructure: [
       {
-        key.kind: source.lang.swift.decl.var.instance,
+        key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
-        key.setter_accessibility: source.lang.swift.accessibility.public,
-        key.name: "x",
+        key.name: "init()",
         key.offset: 5515,
-        key.length: 12,
-        key.typename: "Int32",
-        key.nameoffset: 5519,
-        key.namelength: 1,
+        key.length: 6,
+        key.nameoffset: 5515,
+        key.namelength: 6,
         key.attributes: [
           {
             key.offset: 5508,
@@ -6471,30 +6469,14 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.accessibility: source.lang.swift.accessibility.public,
-        key.name: "init()",
-        key.offset: 5540,
-        key.length: 6,
-        key.nameoffset: 5540,
-        key.namelength: 6,
-        key.attributes: [
-          {
-            key.offset: 5533,
-            key.length: 6,
-            key.attribute: source.decl.attribute.public
-          }
-        ]
-      },
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.accessibility: source.lang.swift.accessibility.public,
         key.name: "init(x:)",
-        key.offset: 5559,
+        key.offset: 5534,
         key.length: 14,
-        key.nameoffset: 5559,
+        key.nameoffset: 5534,
         key.namelength: 14,
         key.attributes: [
           {
-            key.offset: 5552,
+            key.offset: 5527,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -6503,11 +6485,29 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
           {
             key.kind: source.lang.swift.decl.var.parameter,
             key.name: "x",
-            key.offset: 5564,
+            key.offset: 5539,
             key.length: 8,
             key.typename: "Int32",
-            key.nameoffset: 5564,
+            key.nameoffset: 5539,
             key.namelength: 1
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.var.instance,
+        key.accessibility: source.lang.swift.accessibility.public,
+        key.setter_accessibility: source.lang.swift.accessibility.public,
+        key.name: "x",
+        key.offset: 5561,
+        key.length: 12,
+        key.typename: "Int32",
+        key.nameoffset: 5565,
+        key.namelength: 1,
+        key.attributes: [
+          {
+            key.offset: 5554,
+            key.length: 6,
+            key.attribute: source.decl.attribute.public
           }
         ]
       }

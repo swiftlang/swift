@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,13 +14,14 @@
 // for performance measuring.
 import TestsUtils
 
-public let Phonebook = BenchmarkInfo(
-  name: "Phonebook",
-  runFunction: run_Phonebook,
-  tags: [.validation, .api, .String],
-  setUpFunction: { blackHole(names) },
-  legacyFactor: 7
-)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "Phonebook",
+    runFunction: run_Phonebook,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(names) },
+    legacyFactor: 7
+  )
 
 let words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
@@ -71,8 +72,8 @@ func <(lhs: Record, rhs: Record) -> Bool {
 }
 
 @inline(never)
-public func run_Phonebook(_ N: Int) {
-  for _ in 1...N {
+public func run_Phonebook(_ n: Int) {
+  for _ in 1...n {
     var t = names
     t.sort()
   }

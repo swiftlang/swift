@@ -209,7 +209,7 @@ const SILDebugScope *GenericCloner::remapScope(const SILDebugScope *DS) {
   return RemappedScope;
 }
 
-void GenericCloner::fixUp(SILFunction *f) {
+void GenericCloner::postFixUp(SILFunction *f) {
   for (auto *apply : noReturnApplies) {
     auto applyBlock = apply->getParent();
     applyBlock->split(std::next(SILBasicBlock::iterator(apply)));

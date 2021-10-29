@@ -2,9 +2,13 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -include-locals  -source-filename %s | %FileCheck -check-prefix=LOCAL %s
 
 func foo(a: Int, b: Int, c: Int) {
+  // CHECK-NOT: [[@LINE-1]]:10 | function/acc-get/Swift | getter:a
+  // CHECK-NOT: [[@LINE-1]]:10 | function/acc-set/Swift | setter:a
+
     let x = a + b
     // LOCAL: [[@LINE-1]]:9 | variable(local)/Swift | x | [[x_USR:.*]] | Def,RelChild | rel: 1
     // CHECK-NOT: [[@LINE-2]]:9 | variable(local)/Swift | x | {{.*}} | Def,RelChild | rel: 1
+    // LOCAL-NOT: [[@LINE-3]]:13 | function/acc-get/Swift | getter:a
 
     let y = x + c
     // LOCAL: [[@LINE-1]]:9 | variable(local)/Swift | y | [[y_USR:.*]] | Def,RelChild | rel: 1

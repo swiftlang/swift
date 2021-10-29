@@ -2840,6 +2840,23 @@ public:
 
     bool hasInternalLabel() const { return !InternalLabel.empty(); }
     Identifier getInternalLabel() const { return InternalLabel; }
+
+    /// Return true if argument name is valid and matches \c paramName.
+    ///
+    /// The three tests to check if argument name is valid are:
+    /// 1. allow argument if it matches \c paramName,
+    /// 2. allow argument if  $_  for omitted projected value label,
+    /// 3. allow argument if it matches \c paramName without its \c $ prefix.
+    bool matchParameterLabel(Identifier const &paramName) const {
+      auto argLabel = getLabel();
+      if (argLabel == paramName)
+        return true;
+      if ((argLabel.str() == "$_") && paramName.empty())
+        return true;
+      if (argLabel.hasDollarPrefix() && argLabel.str().drop_front() == paramName.str())
+        return true;
+      return false;
+    }
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
 
@@ -3378,8 +3395,6 @@ struct ParameterListInfo {
   SmallBitVector defaultArguments;
   SmallBitVector acceptsUnlabeledTrailingClosures;
   SmallBitVector propertyWrappers;
-  SmallBitVector unsafeSendable;
-  SmallBitVector unsafeMainActor;
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
 
@@ -3399,16 +3414,6 @@ public:
   /// The ParamDecl at the given index if the parameter has an applied
   /// property wrapper.
   bool hasExternalPropertyWrapper(unsigned paramIdx) const;
-
-  /// Whether the given parameter is unsafe Sendable, meaning that
-  /// we will treat it as Sendable in a context that has adopted concurrency
-  /// features.
-  bool isUnsafeSendable(unsigned paramIdx) const;
-
-  /// Whether the given parameter is unsafe MainActor, meaning that
-  /// we will treat it as being part of the main actor but that it is not
-  /// part of the type system.
-  bool isUnsafeMainActor(unsigned paramIdx) const;
 
   /// Whether the given parameter is a closure that should allow capture of
   /// 'self' to be implicit, without requiring "self.".
@@ -4636,7 +4641,9 @@ public:
       AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr,
-      bool isReabstractionThunk = false);
+      bool isReabstractionThunk = false,
+      CanType origTypeOfAbstraction = CanType());
+
 
   /// Returns the type of the transpose function for the given parameter
   /// indices, transpose function generic signature (optional), and other

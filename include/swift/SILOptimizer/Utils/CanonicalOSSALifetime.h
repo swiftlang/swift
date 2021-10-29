@@ -96,13 +96,13 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 
-#include "swift/Basic/DAGNodeWorklist.h"
+#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SILOptimizer/Utils/PrunedLiveness.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -113,6 +113,13 @@ extern llvm::Statistic NumCopiesGenerated;
 
 /// Insert a copy on this operand. Trace and update stats.
 void copyLiveUse(Operand *use, InstModCallbacks &instModCallbacks);
+
+/// Diagnose that the given value is a move only type for which \p use causes a
+/// need to copy the move only value.
+///
+/// copy on this operand. Trace and update stats.
+void diagnoseRequiredCopyOfMoveOnly(Operand *use,
+                                    InstModCallbacks &instModCallbacks);
 
 /// Information about consumes on the extended-lifetime boundary. Consuming uses
 /// within the lifetime are not included--they will consume a copy after
@@ -244,6 +251,15 @@ private:
   /// If true, then new destroy_value instructions will be poison.
   bool poisonRefsMode;
 
+  /// If true and we are processing a value of move_only type, emit a diagnostic
+  /// when-ever we need to insert a copy_value.
+  std::function<void(Operand *)> moveOnlyCopyValueNotification;
+
+  /// If true and we are processing a value of move_only type, pass back to the
+  /// caller any consuming uses that are going to be used as part of the final
+  /// lifetime boundary in case we need to emit diagnostics.
+  std::function<void(Operand *)> moveOnlyFinalConsumingUse;
+
   NonLocalAccessBlockAnalysis *accessBlockAnalysis;
   // Lazily initialize accessBlocks only when
   // extendLivenessThroughOverlappingAccess is invoked.
@@ -271,10 +287,10 @@ private:
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
   /// Visited set for general def-use traversal that prevents revisiting values.
-  DAGNodeWorklist<SILValue, 8> defUseWorklist;
+  GraphNodeWorklist<SILValue, 8> defUseWorklist;
 
   /// Visited set general CFG traversal that prevents revisiting blocks.
-  DAGNodeWorklist<SILBasicBlock *, 8> blockWorklist;
+  GraphNodeWorklist<SILBasicBlock *, 8> blockWorklist;
 
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
@@ -296,10 +312,27 @@ private:
   CanonicalOSSAConsumeInfo consumes;
 
 public:
-  CanonicalizeOSSALifetime(bool pruneDebugMode, bool poisonRefsMode,
-                           NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                           DominanceInfo *domTree, InstructionDeleter &deleter)
+  void maybeNotifyMoveOnlyCopy(Operand *use) {
+    if (!moveOnlyCopyValueNotification)
+      return;
+    moveOnlyCopyValueNotification(use);
+  }
+
+  void maybeNotifyFinalConsumingUse(Operand *use) {
+    if (!moveOnlyFinalConsumingUse)
+      return;
+    moveOnlyFinalConsumingUse(use);
+  }
+
+  CanonicalizeOSSALifetime(
+      bool pruneDebugMode, bool poisonRefsMode,
+      NonLocalAccessBlockAnalysis *accessBlockAnalysis, DominanceInfo *domTree,
+      InstructionDeleter &deleter,
+      std::function<void(Operand *)> moveOnlyCopyValueNotification = nullptr,
+      std::function<void(Operand *)> moveOnlyFinalConsumingUse = nullptr)
       : pruneDebugMode(pruneDebugMode), poisonRefsMode(poisonRefsMode),
+        moveOnlyCopyValueNotification(moveOnlyCopyValueNotification),
+        moveOnlyFinalConsumingUse(moveOnlyFinalConsumingUse),
         accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
         deleter(deleter) {}
 
@@ -357,8 +390,8 @@ protected:
 
   void findOrInsertDestroys();
 
-  void insertDestroyOnCFGEdge(SILBasicBlock *predBB, SILBasicBlock *succBB,
-                              bool needsPoison);
+  void findOrInsertDestroyOnCFGEdge(SILBasicBlock *predBB,
+                                    SILBasicBlock *succBB, bool needsPoison);
 
   void rewriteCopies();
 

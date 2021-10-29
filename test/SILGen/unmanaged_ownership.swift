@@ -63,5 +63,4 @@ func project(fn fn: () -> Holder) -> C {
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()
 // CHECK-NEXT: [[T1:%.*]] = struct_extract [[T0]] : $Holder, #Holder.value
 // CHECK-NEXT: [[T2:%.*]] = strong_copy_unmanaged_value [[T1]]
-// CHECK-NOT: destroy_value [[BORROWED_FN_COPY]]
 // CHECK-NEXT: return [[T2]]

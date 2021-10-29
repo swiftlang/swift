@@ -15,12 +15,11 @@ import TestsUtils
 // Mini benchmark implementing a naive String search algorithm that
 // at the moment shows a lot of ARC traffic.
 let t: [BenchmarkCategory] = [.String, .refcount]
-let N = 100
 
 var longStringFoFoFoFox: String?
 var longArrayFoFoFoFox: [UInt8]?
 
-public let FindStringNaive = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "FindString.Loop1.Substring",
     runFunction: runBenchLoop1Substring,

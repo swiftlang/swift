@@ -58,10 +58,9 @@
 
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
-                    "alloc_value_buffer" "alloc_global"
+                    "alloc_global"
                     "dealloc_stack" "dealloc_box" "project_box" "dealloc_ref"
-                    "dealloc_partial_ref" "dealloc_value_buffer"
-                    "project_value_buffer")
+                    "dealloc_partial_ref")
                   'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Debug Information.

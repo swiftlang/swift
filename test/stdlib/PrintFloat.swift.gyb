@@ -10,6 +10,7 @@
 // UNSUPPORTED: CPU=arm64_32 && OS=watchos
 
 import StdlibUnittest
+import SwiftPrivateLibcExtras
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)

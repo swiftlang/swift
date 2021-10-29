@@ -103,9 +103,8 @@ protected:
     ClangImporterOptions clangImpOpts;
     symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
     SILOptions silOpts;
-    auto ctx =
-        ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangImpOpts,
-                        symbolGraphOpts, sourceMgr, diags);
+    auto ctx = ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
+                               clangImpOpts, symbolGraphOpts, sourceMgr, diags);
 
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,
@@ -149,7 +148,8 @@ protected:
     ASSERT_TRUE(bufOrErr);
 
     auto bufData = (*bufOrErr)->getBuffer();
-    auto validationInfo = serialization::validateSerializedAST(bufData);
+    auto validationInfo = serialization::validateSerializedAST(
+        bufData, silOpts.EnableOSSAModules);
     ASSERT_EQ(serialization::Status::Valid, validationInfo.status);
     ASSERT_EQ(bufData, moduleBuffer->getBuffer());
   }

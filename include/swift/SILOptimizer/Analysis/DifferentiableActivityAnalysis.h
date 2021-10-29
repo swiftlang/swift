@@ -49,7 +49,6 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_DIFFERENTIABLEACTIVITYANALYSIS_H_
 
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
@@ -135,8 +134,8 @@ private:
   bool hasTangentSpace(SILValue value) {
     auto type = value->getType().getASTType();
     // Remap archetypes in the derivative generic signature, if it exists.
-    if (derivativeGenericSignature && type->hasArchetype()) {
-      type = derivativeGenericSignature->getCanonicalTypeInContext(
+    if (type->hasArchetype()) {
+      type = derivativeGenericSignature.getCanonicalTypeInContext(
           type->mapTypeOutOfContext());
     }
     // Look up conformance in the current module.

@@ -155,10 +155,6 @@ public:
     SGM.useConformancesFromType(ASI->getType().getASTType());
   }
 
-  void visitAllocValueBufferInst(AllocValueBufferInst *AVBI) {
-    SGM.useConformancesFromType(AVBI->getType().getASTType());
-  }
-
   void visitApplyInst(ApplyInst *AI) {
     SGM.useConformancesFromObjectiveCType(AI->getSubstCalleeType());
     SGM.useConformancesFromSubstitutions(AI->getSubstitutionMap());

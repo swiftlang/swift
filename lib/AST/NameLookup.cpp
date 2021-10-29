@@ -34,8 +34,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
@@ -1220,6 +1222,12 @@ void ExtensionDecl::addedMember(Decl *member) {
   }
 }
 
+void NominalTypeDecl::addMemberToLookupTable(Decl *member) {
+  prepareLookupTable();
+
+  LookupTable->addMember(member);
+}
+
 // For lack of anywhere more sensible to put it, here's a diagram of the pieces
 // involved in finding members and extensions of a NominalTypeDecl.
 //
@@ -1332,7 +1340,9 @@ void NominalTypeDecl::prepareLookupTable() {
   } else {
     LookupTable->addMembers(getMembers());
   }
+}
 
+void NominalTypeDecl::addLoadedExtensions() {
   for (auto e : getExtensions()) {
     // If we can lazy-load this extension, only take the members we've loaded
     // so far.
@@ -1424,10 +1434,10 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   decl->prepareLookupTable();
 
-  // If we're allowed to load extensions, call prepareExtensions to ensure we
+  // If we're allowed to load extensions, call addLoadedExtensions to ensure we
   // properly invalidate the lazily-complete cache for any extensions brought in
   // by modules loaded after-the-fact. This can happen with the LLDB REPL.
-  decl->prepareExtensions();
+  decl->addLoadedExtensions();
 
   auto &Table = *decl->LookupTable;
   if (!useNamedLazyMemberLoading) {
@@ -1440,15 +1450,34 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
     Table.updateLookupTable(decl);
   } else if (!Table.isLazilyComplete(name.getBaseName())) {
-    // The lookup table believes it doesn't have a complete accounting of this
-    // name - either because we're never seen it before, or another extension
-    // was registered since the last time we searched. Ask the loaders to give
-    // us a hand.
     DeclBaseName baseName(name.getBaseName());
-    populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
-    populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
 
-    Table.markLazilyComplete(baseName);
+    if (isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl())) {
+      // Namespaces will never have any members so we can just return whatever
+      // the lookup finds.
+      return evaluateOrDefault(
+          ctx.evaluator, CXXNamespaceMemberLookup({cast<EnumDecl>(decl), name}),
+          {});
+    } else if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
+      auto allFound = evaluateOrDefault(
+          ctx.evaluator,
+          ClangRecordMemberLookup({cast<StructDecl>(decl), name}), {});
+      // Add all the members we found, later we'll combine these with the
+      // existing members.
+      for (auto found : allFound)
+        Table.addMember(found);
+
+      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
+    } else {
+      // The lookup table believes it doesn't have a complete accounting of this
+      // name - either because we're never seen it before, or another extension
+      // was registered since the last time we searched. Ask the loaders to give
+      // us a hand.
+      populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
+      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
+    }
+
+    Table.markLazilyComplete(name.getBaseName());
   }
 
   // Look for a declaration with this name.

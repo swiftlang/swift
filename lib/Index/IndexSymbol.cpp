@@ -249,6 +249,11 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     info.Properties |= SymbolProperty::Local;
   }
 
+  if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (FD->hasAsync())
+      info.Properties |= SymbolProperty::SwiftAsync;
+  }
+
   return info;
 }
 

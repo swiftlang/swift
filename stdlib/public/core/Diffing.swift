@@ -193,19 +193,19 @@ private struct _V {
   private let isOdd: Bool
 #endif
 
-  // The way negative indexes are implemented is by interleaving them in the empty slots between the valid positive indexes
-  @inline(__always) private static func transform(_ index: Int) -> Int {
-    // -3, -1, 1, 3 -> 3, 1, 0, 2 -> 0...3
-    // -2, 0, 2 -> 2, 0, 1 -> 0...2
-    return (index <= 0 ? -index : index &- 1)
-  }
-
   init(maxIndex largest: Int) {
 #if INTERNAL_CHECKS_ENABLED
     _internalInvariant(largest >= 0)
     isOdd = largest % 2 == 1
 #endif
     a = [Int](repeating: 0, count: largest + 1)
+  }
+
+  // The way negative indexes are implemented is by interleaving them in the empty slots between the valid positive indexes
+  @inline(__always) private static func transform(_ index: Int) -> Int {
+    // -3, -1, 1, 3 -> 3, 1, 0, 2 -> 0...3
+    // -2, 0, 2 -> 2, 0, 1 -> 0...2
+    return (index <= 0 ? -index : index &- 1)
   }
 
   subscript(index: Int) -> Int {

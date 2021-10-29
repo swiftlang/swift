@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -133,7 +133,7 @@ def run_function_name(benchmark_name):
       r'_\1', control_flow_separator_re.sub( # remove dashes
         '', benchmark_name)))
 }%
-public let ExistentialPerformance: [BenchmarkInfo] = [
+public let benchmarks: [BenchmarkInfo] = [
 % for (Name, Group, Variant) in Names:
   BenchmarkInfo(name: "Existential.${Name}",
     runFunction: ${run_function_name(Group)
@@ -239,9 +239,9 @@ func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential)
 }
 % for (group, setup, multiple, workload) in Workloads:
 ${"""
-func {0}(_ N: Int) {{
+func {0}(_ n: Int) {{
 {1}
-  for _ in 0 ..< N * {2} {{{3}  }}
+  for _ in 0 ..< n * {2} {{{3}  }}
 }}""".format(run_function_name(group), setup, multiple, workload)}
 % end
 

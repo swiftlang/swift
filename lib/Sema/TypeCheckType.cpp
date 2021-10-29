@@ -338,8 +338,8 @@ bool TypeResolution::areSameType(Type type1, Type type2) const {
         type2->isTypeParameter()) {
       return genericSig->areSameTypeParameterInContext(type1, type2);
     }
-    return genericSig->getCanonicalTypeInContext(type1)
-      == genericSig->getCanonicalTypeInContext(type2);
+    return genericSig.getCanonicalTypeInContext(type1) ==
+           genericSig.getCanonicalTypeInContext(type2);
   }
 
   // Otherwise, perform a structural check.

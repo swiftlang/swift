@@ -1658,18 +1658,23 @@ bool PatternBindingDecl::hasStorage() const {
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
-                                    DeclContext *InitContext) {
+                                    DeclContext *InitContext,
+                                    bool isFullyValidated) {
   auto PatternList = getMutablePatternList();
   PatternList[i].setPattern(P);
   PatternList[i].setInitContext(InitContext);
   
   // Make sure that any VarDecl's contained within the pattern know about this
   // PatternBindingDecl as their parent.
-  if (P)
+  if (P) {
     P->forEachVariable([&](VarDecl *VD) {
       if (!VD->isCaptureList())
         VD->setParentPatternBinding(this);
     });
+
+    if (isFullyValidated)
+      PatternList[i].setFullyValidated();
+  }
 }
 
 
@@ -1916,7 +1921,7 @@ static bool isDirectToStorageAccess(const DeclContext *UseDC,
   // If the storage is resilient, we cannot access it directly at all.
   if (var->isResilient(UseDC->getParentModule(),
                        UseDC->getResilienceExpansion()))
-    return false;
+    return var->getModuleContext()->getBypassResilience();
 
   if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD)) {
     // The access must also be a member access on 'self' in all language modes.
@@ -2932,10 +2937,6 @@ bool ValueDecl::isDynamic() const {
   return evaluateOrDefault(ctx.evaluator,
     IsDynamicRequest{const_cast<ValueDecl *>(this)},
     getAttrs().hasAttribute<DynamicAttr>());
-}
-
-bool ValueDecl::isDistributedActorIndependent() const {
-  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
 }
 
 bool ValueDecl::isObjCDynamicInGenericClass() const {
@@ -5202,6 +5203,20 @@ StringRef ProtocolDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
+ArrayRef<StructuralRequirement>
+ProtocolDecl::getStructuralRequirements() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               StructuralRequirementsRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
+
+ArrayRef<ProtocolDecl *>
+ProtocolDecl::getProtocolDependencies() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               ProtocolDependenciesRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
+
 ArrayRef<Requirement> ProtocolDecl::getRequirementSignature() const {
   return evaluateOrDefault(getASTContext().evaluator,
                RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
@@ -5355,10 +5370,6 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
       return true;
   }
   return false;
-}
-
-bool AbstractStorageDecl::isDistributedActorIndependent() const {
-  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
 }
 
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
@@ -7720,27 +7731,6 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
     const AutoDiffConfig &config) {
   prepareDerivativeFunctionConfigurations();
   DerivativeFunctionConfigs->insert(config);
-}
-
-bool AbstractFunctionDecl::hasKnownUnsafeSendableFunctionParams() const {
-  auto nominal = getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal)
-    return false;
-
-  // DispatchQueue operations.
-  auto nominalName = nominal->getName().str();
-  if (nominalName == "DispatchQueue") {
-    auto name = getBaseName().userFacingName();
-    return llvm::StringSwitch<bool>(name)
-      .Case("sync", true)
-      .Case("async", true)
-      .Case("asyncAndWait", true)
-      .Case("asyncAfter", true)
-      .Case("concurrentPerform", true)
-      .Default(false);
-  }
-
-  return false;
 }
 
 void FuncDecl::setResultInterfaceType(Type type) {

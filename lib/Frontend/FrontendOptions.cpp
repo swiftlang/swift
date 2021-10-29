@@ -524,14 +524,17 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   }
   llvm_unreachable("unhandled action");
 }
-bool FrontendOptions::canActionEmitABIDescriptor(ActionType action) {
+bool FrontendOptions::canActionEmitModuleSemanticInfo(ActionType action) {
   switch (action) {
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
   case ActionType::CompileModuleFromInterface:
+  // For test
+  case ActionType::Typecheck:
     return true;
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::ResolveImports:
-  case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -550,8 +553,6 @@ bool FrontendOptions::canActionEmitABIDescriptor(ActionType action) {
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
   case ActionType::PrintFeature:
-  case ActionType::MergeModules:
-  case ActionType::EmitModuleOnly:
   case ActionType::EmitSIL:
   case ActionType::EmitSIBGen:
   case ActionType::EmitSIB:
@@ -564,6 +565,13 @@ bool FrontendOptions::canActionEmitABIDescriptor(ActionType action) {
     return false;
   }
   llvm_unreachable("unhandled action");
+}
+bool FrontendOptions::canActionEmitABIDescriptor(ActionType action) {
+  if (canActionEmitModule(action))
+    return true;
+  if (action == ActionType::CompileModuleFromInterface)
+    return true;
+  return false;
 }
 bool FrontendOptions::canActionEmitModule(ActionType action) {
   switch (action) {

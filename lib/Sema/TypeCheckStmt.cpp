@@ -365,7 +365,7 @@ static LabeledStmt *findUnlabeledBreakOrContinueStmtTarget(
 ///
 /// \returns the target, if one was found, or \c nullptr if no such target
 /// exists.
-static LabeledStmt *findBreakOrContinueStmtTarget(
+LabeledStmt *swift::findBreakOrContinueStmtTarget(
     ASTContext &ctx, SourceFile *sourceFile,
     SourceLoc loc, Identifier targetName, SourceLoc targetLoc,
     bool isContinue, DeclContext *dc) {
@@ -596,7 +596,7 @@ static void checkFallthroughPatternBindingsAndTypes(
 /// Check the correctness of a 'fallthrough' statement.
 ///
 /// \returns true if an error occurred.
-static bool checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt) {
+bool swift::checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt) {
   CaseStmt *fallthroughSource;
   CaseStmt *fallthroughDest;
   ASTContext &ctx = dc->getASTContext();
@@ -1954,6 +1954,10 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   const auto &tyOpts = ctx.TypeCheckerOpts;
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
     timer.emplace(AFD);
+
+  auto SF = AFD->getParentSourceFile();
+  if (SF)
+    TypeChecker::buildTypeRefinementContextHierarchyDelayed(*SF, AFD);
 
   BraceStmt *body = AFD->getBody();
   assert(body && "Expected body to type-check");

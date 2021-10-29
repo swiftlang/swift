@@ -43,13 +43,23 @@ static llvm::cl::opt<bool>
     SILViewCFG("sil-view-cfg", llvm::cl::init(false),
                llvm::cl::desc("Enable the sil cfg viewer pass"));
 
-static llvm::cl::opt<bool> SILViewGuaranteedCFG(
-    "sil-view-guaranteed-cfg", llvm::cl::init(false),
+static llvm::cl::opt<bool> SILViewCanonicalCFG(
+    "sil-view-canonical-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass after diagnostics"));
+
+static llvm::cl::opt<bool> SILPrintCanonicalModule(
+    "sil-print-canonical-module", llvm::cl::init(false),
+    llvm::cl::desc("Print the textual SIL module after diagnostics"));
 
 static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
+
+
+llvm::cl::opt<bool> SILDisableLateOMEByDefault(
+    "sil-disable-late-ome-by-default", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Disable late OME for non-transparent functions by default"));
 
 //===----------------------------------------------------------------------===//
 //                          Diagnostic Pass Pipeline
@@ -58,6 +68,12 @@ static llvm::cl::opt<bool> SILViewSILGenCFG(
 static void addCFGPrinterPipeline(SILPassPipelinePlan &P, StringRef Name) {
   P.startPipeline(Name);
   P.addCFGPrinter();
+}
+
+static void addModulePrinterPipeline(SILPassPipelinePlan &plan,
+                                     StringRef name) {
+  plan.startPipeline(name);
+  plan.addModulePrinter();
 }
 
 static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
@@ -122,7 +138,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addSILSkippingChecker();
 #endif
 
-  if (Options.shouldOptimize()) {
+  if (Options.shouldOptimize() && !Options.EnableExperimentalLexicalLifetimes) {
     P.addDestroyHoisting();
   }
   P.addMandatoryInlining();
@@ -147,6 +163,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Now that we have emitted constant propagation diagnostics, try to eliminate
   // dead allocations.
   P.addPredictableDeadAllocationElimination();
+
+  // Now perform move only checking.
+  P.addMoveOnlyChecker();
 
   P.addOptimizeHopToExecutor();
 
@@ -183,8 +202,11 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
   // Otherwise run the rest of diagnostics.
   addMandatoryDiagnosticOptPipeline(P);
 
-  if (SILViewGuaranteedCFG) {
-    addCFGPrinterPipeline(P, "SIL View Guaranteed CFG");
+  if (SILViewCanonicalCFG) {
+    addCFGPrinterPipeline(P, "SIL View Canonical CFG");
+  }
+  if (SILPrintCanonicalModule) {
+    addModulePrinterPipeline(P, "SIL Print Canonical Module");
   }
   return P;
 }
@@ -475,7 +497,7 @@ static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
 static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("PrepareOptimizationPasses");
 
-  // Verify AccessedStorage once in OSSA before optimizing.
+  // Verify AccessStorage once in OSSA before optimizing.
 #ifndef NDEBUG
   P.addAccessPathVerification();
 #endif
@@ -505,18 +527,12 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // not blocked by any other passes' optimizations, so do it early.
   P.addDifferentiabilityWitnessDevirtualizer();
 
-  // Strip ownership from non-transparent functions when we are not compiling
-  // the stdlib module. When compiling the stdlib, we eliminate ownership on
-  // these functions later with a nromal call to
-  // P.addNonTransparentFunctionOwnershipModelEliminator().
-  //
-  // This is done so we can push ownership through the pass pipeline first for
-  // the stdlib and then everything else.
-  if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-    return;
+  if (!P.getOptions().EnableOSSAModules && SILDisableLateOMEByDefault) {
+    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+      return;
 
-  if (!P.getOptions().EnableOSSAModules)
     P.addNonTransparentFunctionOwnershipModelEliminator();
+  }
 
   // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();
@@ -529,6 +545,13 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Needed to serialize static initializers of globals for cross-module
   // optimization.
   P.addGlobalOpt();
+
+  if (!P.getOptions().EnableOSSAModules && !SILDisableLateOMEByDefault) {
+    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
+      return;
+
+    P.addNonTransparentFunctionOwnershipModelEliminator();
+  }
 
   // Add the outliner pass (Osize).
   P.addOutliner();
@@ -730,7 +753,7 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // A loop might have only one dynamic access now, i.e. hoistable
   P.addLICM();
 
-  // Verify AccessedStorage once again after optimizing and lowering OSSA.
+  // Verify AccessStorage once again after optimizing and lowering OSSA.
 #ifndef NDEBUG
   P.addAccessPathVerification();
 #endif

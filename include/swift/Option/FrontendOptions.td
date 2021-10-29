@@ -68,6 +68,10 @@ def emit_abi_descriptor_path
   : Separate<["-"], "emit-abi-descriptor-path">, MetaVarName<"<path>">,
     HelpText<"Output the ABI descriptor of current module to <path>">;
 
+def emit_module_semantic_info_path
+  : Separate<["-"], "emit-module-semantic-info-path">, MetaVarName<"<path>">,
+    HelpText<"Output semantic info of current module to <path>">;
+
 def serialize_module_interface_dependency_hashes
   : Flag<["-"], "serialize-module-interface-dependency-hashes">,
     Flags<[HelpHidden]>;
@@ -137,6 +141,10 @@ def enable_testable_attr_requires_testable_module :
 def disable_testable_attr_requires_testable_module :
   Flag<["-"], "disable-testable-attr-requires-testable-module">,
   HelpText<"Disable checking of @testable">;
+
+def enable_clang_spi :
+  Flag<["-"], "enable-clang-spi">,
+  HelpText<"Import Clang SPIs as Swift SPIs">;
 
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
@@ -246,6 +254,14 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
 def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
+
+def enable_experimental_lexical_lifetimes :
+  Flag<["-"], "enable-experimental-lexical-lifetimes">,
+  HelpText<"Enable experimental lexical lifetimes">;
+
+def enable_experimental_move_only :
+  Flag<["-"], "enable-experimental-move-only">,
+  HelpText<"Enable experimental move only">;
 
 def enable_experimental_distributed :
   Flag<["-"], "enable-experimental-distributed">,
@@ -488,6 +504,24 @@ def disable_swift3_objc_inference :
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Add 'dynamic' to all declarations">;
+
+def enable_llvm_vfe : Flag<["-"], "enable-llvm-vfe">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Use LLVM IR Virtual Function Elimination on Swift class virtual tables">;
+
+def enable_llvm_wme : Flag<["-"], "enable-llvm-wme">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Use LLVM IR Witness Method Elimination on Swift protocol witness tables">;
+
+def internalize_at_link : Flag<["-"], "internalize-at-link">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Allow internalizing public symbols and vtables at link time (assume"
+  " all client code of public types is part of the same link unit, or that"
+  " external symbols are explicitly requested via -exported_symbols_list)">;
+
+def conditional_runtime_records : Flag<["-"], "conditional-runtime-records">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Allow removal of runtime metadata records (public types, protocol conformances) based on whether they're used or unused">;
 
 def disable_previous_implementation_calls_in_dynamic_replacements :
   Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
@@ -741,6 +775,10 @@ def experimental_one_way_closure_params :
   Flag<["-"], "experimental-one-way-closure-params">,
   HelpText<"Enable experimental support for one-way closure parameters">;
 
+def experimental_multi_statement_closures :
+  Flag<["-"], "experimental-multi-statement-closures">,
+  HelpText<"Enable experimental support for type inference in multi-statement closures">;
+
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
   HelpText<"Directory of prebuilt modules for loading module interfaces">;
@@ -798,6 +836,10 @@ def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
 
+def swift_async_frame_pointer_EQ : Joined<["-"], "swift-async-frame-pointer=">,
+  Flags<[FrontendOption]>,
+  HelpText<"One of 'auto', 'always' or 'never'">;
+
 def previous_module_installname_map_file
   : Separate<["-"], "previous-module-installname-map-file">, MetaVarName<"<path>">,
     HelpText<"Path to a Json file indicating module name to installname map for @_originallyDefinedIn">;
@@ -807,6 +849,9 @@ def enable_type_layouts : Flag<["-"], "enable-type-layout">,
 
 def disable_type_layouts : Flag<["-"], "disable-type-layout">,
   HelpText<"Disable type layout based lowering">;
+
+def force_struct_type_layouts : Flag<["-"], "force-struct-type-layouts">,
+  HelpText<"Force type layout based lowering for structs">;
 
 def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
   HelpText<"Don't lock interface file when building module">;
@@ -822,6 +867,9 @@ def target_sdk_version : Separate<["-"], "target-sdk-version">,
 
 def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
   HelpText<"The version of target variant SDK used for compilation">;
+
+def target_sdk_name : Separate<["-"], "target-sdk-name">,
+  HelpText<"Canonical name of the target SDK used for compilation">;
 
 def extra_clang_options_only : Flag<["-"], "only-use-extra-clang-opts">,
   HelpText<"Options passed via -Xcc are sufficient for Clang configuration">;

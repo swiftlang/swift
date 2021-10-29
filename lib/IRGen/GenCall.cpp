@@ -1092,16 +1092,19 @@ namespace {
         llvm_unreachable("OpenCL type in ABI lowering");
 
       // We should never see ARM SVE types at all.
-#define SVE_TYPE(Name, Id, ...) \
-      case clang::BuiltinType::Id:
+#define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
         llvm_unreachable("ARM SVE type in ABI lowering");
 
       // We should never see PPC MMA types at all.
-#define PPC_VECTOR_TYPE(Name, Id, Size) \
-      case clang::BuiltinType::Id:
+#define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/PPCTypes.def"
         llvm_unreachable("PPC MMA type in ABI lowering");
+
+      // We should never see RISC-V V types at all.
+#define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/RISCVVTypes.def"
+        llvm_unreachable("RISC-V V type in ABI lowering");
 
       // Handle all the integer types as opaque values.
 #define BUILTIN_TYPE(Id, SingletonId)
@@ -2017,7 +2020,9 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     } else if (auto *function = functionPointer.getRawAsyncFunction()) {
       fn = function;
     } else {
-      llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(getAFPPtr(), 0);
+      llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(
+          getAFPPtr()->getType()->getScalarType()->getPointerElementType(),
+          getAFPPtr(), 0);
       fn = IGF.emitLoadOfRelativePointer(
           Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
           /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
@@ -2034,7 +2039,9 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
                                     initialContextSize.getValue());
     } else {
       assert(!functionPointer.useStaticContextSize());
-      auto *sizePtr = IGF.Builder.CreateStructGEP(getAFPPtr(), 1);
+      auto *sizePtr = IGF.Builder.CreateStructGEP(
+          getAFPPtr()->getType()->getScalarType()->getPointerElementType(),
+          getAFPPtr(), 1);
       size = IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
     }
   }
@@ -4827,7 +4834,9 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
     }
     auto *descriptorPtr =
         IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.AsyncFunctionPointerPtrTy);
-    auto *addrPtr = IGF.Builder.CreateStructGEP(descriptorPtr, 0);
+    auto *addrPtr = IGF.Builder.CreateStructGEP(
+        descriptorPtr->getType()->getScalarType()->getPointerElementType(),
+        descriptorPtr, 0);
     auto *result = IGF.emitLoadOfRelativePointer(
         Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
         /*expectedType*/ getFunctionType()->getPointerTo());

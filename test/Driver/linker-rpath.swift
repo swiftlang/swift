@@ -17,7 +17,7 @@
 // RUN: %swiftc_driver_plain -driver-print-jobs -target arm64-apple-ios14 %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
 // RUN: %swiftc_driver_plain -driver-print-jobs -target arm64-apple-ios15 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
 
-// RUN: %swiftc_driver_plain -driver-print-jobs -target arm64-apple-ios13-macabi %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
+// RUN: %swiftc_driver_plain -driver-print-jobs -target arm64-apple-ios13.1-macabi %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
 // RUN: %swiftc_driver_plain -driver-print-jobs -target arm64-apple-ios14-macabi %S/../Inputs/empty.swift | %FileCheck -check-prefix RPATH %s
 // RUN: %swiftc_driver_plain -driver-print-jobs -target arm64-apple-ios15-macabi %S/../Inputs/empty.swift | %FileCheck -check-prefix NO-RPATH %s
 

@@ -116,10 +116,10 @@ void ExclusiveBorrowFormalAccess::diagnoseConflict(
     return;
   }
 
-  auto lhsStorage = component->getAccessedStorage();
+  auto lhsStorage = component->getAccessStorage();
   if (!lhsStorage) return;
 
-  auto rhsStorage = rhs.component->getAccessedStorage();
+  auto rhsStorage = rhs.component->getAccessStorage();
   if (!rhsStorage) return;
 
   // If the decls match, then this could conflict.
@@ -532,7 +532,7 @@ namespace {
       llvm_unreachable("called project on a pseudo-component");
     }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
+    Optional<AccessStorage> getAccessStorage() const override {
       return None;
     }
   };
@@ -618,7 +618,7 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
   if (!SGF.getOptions().VerifyExclusivity)
     return address;
 
-  auto storage = AccessedStorage::compute(address);
+  auto storage = AccessStorage::compute(address);
   // Unsafe access may have invalid storage (e.g. a RawPointer).
   if (storage && !isPossibleFormalAccessStorage(storage, &SGF.F))
     return address;
@@ -930,7 +930,7 @@ namespace {
 
     virtual bool isLoadingPure() const override { return true; }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
+    Optional<AccessStorage> getAccessStorage() const override {
       return None;
     }
 
@@ -1662,8 +1662,8 @@ namespace {
     /// the same dynamic PathComponent type as the receiver) to see if they are
     /// identical.  If so, there is a conflicting writeback happening, so emit a
     /// diagnostic.
-    Optional<AccessedStorage> getAccessedStorage() const override {
-      return AccessedStorage{Storage, IsSuper,
+    Optional<AccessStorage> getAccessStorage() const override {
+      return AccessStorage{Storage, IsSuper,
                              Indices.isNull() ? nullptr : &Indices,
                              ArgListForDiagnostics };
     }
@@ -1728,8 +1728,8 @@ namespace {
       return SGF.emitAssignToLValue(loc, std::move(value), std::move(lv));
     }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
-      return AccessedStorage{Storage, IsSuper,
+    Optional<AccessStorage> getAccessStorage() const override {
+      return AccessStorage{Storage, IsSuper,
                              Indices.isNull() ? nullptr : &Indices,
                              ArgListForDiagnostics};
     }
@@ -1862,8 +1862,8 @@ namespace {
       OS.indent(indent) << "EndApplyPseudoComponent";
     }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
-      return AccessedStorage{Storage, IsSuper,
+    Optional<AccessStorage> getAccessStorage() const override {
+      return AccessStorage{Storage, IsSuper,
                              PeekedIndices.isNull() ? nullptr : &PeekedIndices,
                              ArgListForDiagnostics};
     }
@@ -2098,7 +2098,7 @@ namespace {
                                       SGFContext());
     }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
+    Optional<AccessStorage> getAccessStorage() const override {
       return None;
     }
 
@@ -2305,7 +2305,7 @@ namespace {
 
     virtual bool isLoadingPure() const override { return true; }
 
-    Optional<AccessedStorage> getAccessedStorage() const override {
+    Optional<AccessStorage> getAccessStorage() const override {
       return None;
     }
 

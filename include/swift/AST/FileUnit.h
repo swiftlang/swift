@@ -288,12 +288,14 @@ public:
     return nullptr;
   }
 
-  /// Returns the name to use when referencing entities in this file.
+  /// Returns the real name of the enclosing module to use when referencing entities in this file.
+  /// The 'real name' is the actual binary name of the module, which can be different from the 'name'
+  /// if module aliasing was used (via -module-alias flag).
   ///
-  /// Usually this is the module name itself, but certain Clang features allow
+  /// Usually this is the module real name itself, but certain Clang features allow
   /// substituting another name instead.
   virtual StringRef getExportedModuleName() const {
-    return getParentModule()->getName().str();
+    return getParentModule()->getRealName().str();
   }
 
   /// Traverse the decls within this file.

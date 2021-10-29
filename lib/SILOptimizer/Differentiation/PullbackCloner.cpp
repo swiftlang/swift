@@ -211,8 +211,9 @@ private:
 
   Optional<TangentSpace> getTangentSpace(CanType type) {
     // Use witness generic signature to remap types.
-    if (auto witnessGenSig = getWitness()->getDerivativeGenericSignature())
-      type = witnessGenSig->getCanonicalTypeInContext(type);
+    type =
+        getWitness()->getDerivativeGenericSignature().getCanonicalTypeInContext(
+            type);
     return type->getAutoDiffTangentSpace(
         LookUpConformanceInModule(getModule().getSwiftModule()));
   }

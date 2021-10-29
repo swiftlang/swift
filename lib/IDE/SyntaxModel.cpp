@@ -1606,7 +1606,7 @@ public:
       ;
     StringRef ident(identStart, ptr - identStart);
 
-    if (ident.equals_lower("parameter")) {
+    if (ident.equals_insensitive("parameter")) {
       if (numSpaces > 1 || !advanceIf(' '))
         return None;
       while (advanceIf([](char c) { return c != ':'; }))
@@ -1616,7 +1616,7 @@ public:
       return ident;
 
     } else if (advanceIf(':')) {
-      if (ident.equals_lower("parameters") && numSpaces > 1)
+      if (ident.equals_insensitive("parameters") && numSpaces > 1)
         return None;
       auto lowerIdent = ident.lower();
       bool isField = llvm::StringSwitch<bool>(lowerIdent)

@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 627; // move_value inst
+const uint16_t SWIFTMODULE_VERSION_MINOR = 637; // @_noImplicitCopy
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -754,7 +754,10 @@ namespace control_block {
   enum {
     METADATA = 1,
     MODULE_NAME,
-    TARGET
+    TARGET,
+    SDK_NAME,
+    REVISION,
+    IS_OSSA
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -778,6 +781,21 @@ namespace control_block {
   using TargetLayout = BCRecordLayout<
     TARGET,
     BCBlob // LLVM triple
+  >;
+
+  using SDKNameLayout = BCRecordLayout<
+    SDK_NAME,
+    BCBlob
+  >;
+
+  using RevisionLayout = BCRecordLayout<
+    REVISION,
+    BCBlob
+  >;
+
+  using IsOSSALayout = BCRecordLayout<
+    IS_OSSA,
+    BCFixed<1>
   >;
 }
 
@@ -1336,6 +1354,7 @@ namespace decls_block {
     BCFixed<1>,              // isIUO?
     BCFixed<1>,              // isVariadic?
     BCFixed<1>,              // isAutoClosure?
+    BCFixed<1>,              // isIsolated?
     DefaultArgumentField,    // default argument kind
     BCBlob                   // default argument text
   >;
@@ -1876,6 +1895,11 @@ namespace decls_block {
     BCFixed<2>  // inline value
   >;
 
+  using NonSendableDeclAttrLayout = BCRecordLayout<
+    NonSendable_DECL_ATTR,
+    BCFixed<1>  // assumed flag
+  >;
+
   using OptimizeDeclAttrLayout = BCRecordLayout<
     Optimize_DECL_ATTR,
     BCFixed<2>  // optimize value
@@ -1915,15 +1939,16 @@ namespace decls_block {
   >;
 
   using SpecializeDeclAttrLayout = BCRecordLayout<
-    Specialize_DECL_ATTR,
-    BCFixed<1>, // exported flag
-    BCFixed<1>, // specialization kind
-    GenericSignatureIDField, // specialized signature
-    DeclIDField, // target function
-    BCVBR<4>,   // # of arguments (+1) or 1 if simple decl name, 0 if no target
-    BCVBR<4>,   // # of SPI groups
-    BCArray<IdentifierIDField> // target function pieces, spi groups
-  >;
+      Specialize_DECL_ATTR,
+      BCFixed<1>,              // exported flag
+      BCFixed<1>,              // specialization kind
+      GenericSignatureIDField, // specialized signature
+      DeclIDField,             // target function
+      BCVBR<4>, // # of arguments (+1) or 1 if simple decl name, 0 if no target
+      BCVBR<4>, // # of SPI groups
+      BCVBR<4>, // # of availability attributes
+      BCArray<IdentifierIDField> // target function pieces, spi groups
+      >;
 
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,

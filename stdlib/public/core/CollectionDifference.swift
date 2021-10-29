@@ -72,59 +72,6 @@ public struct CollectionDifference<ChangeElement> {
   /// The removals contained by this difference, from lowest offset to highest.
   public let removals: [Change]
 
-  /// The public initializer calls this function to ensure that its parameter
-  /// meets the conditions set in its documentation.
-  ///
-  /// - Parameter changes: a collection of `CollectionDifference.Change`
-  ///   instances intended to represent a valid state transition for
-  ///   `CollectionDifference`.
-  ///
-  /// - Returns: whether the parameter meets the following criteria:
-  ///
-  ///   1. All insertion offsets are unique
-  ///   2. All removal offsets are unique
-  ///   3. All associations between insertions and removals are symmetric
-  ///
-  /// Complexity: O(`changes.count`)
-  private static func _validateChanges<Changes: Collection>(
-    _ changes : Changes
-  ) -> Bool where Changes.Element == Change {
-    if changes.isEmpty { return true }
-
-    var insertAssocToOffset = Dictionary<Int,Int>()
-    var removeOffsetToAssoc = Dictionary<Int,Int>()
-    var insertOffset = Set<Int>()
-    var removeOffset = Set<Int>()
-
-    for change in changes {
-      let offset = change._offset
-      if offset < 0 { return false }
-
-      switch change {
-      case .remove(_, _, _):
-        if removeOffset.contains(offset) { return false }
-        removeOffset.insert(offset)
-      case .insert(_, _, _):
-        if insertOffset.contains(offset) { return false }
-        insertOffset.insert(offset)
-      } 
-
-      if let assoc = change._associatedOffset {
-        if assoc < 0 { return false }
-        switch change {
-        case .remove(_, _, _):
-          if removeOffsetToAssoc[offset] != nil { return false }
-          removeOffsetToAssoc[offset] = assoc
-        case .insert(_, _, _):
-          if insertAssocToOffset[assoc] != nil { return false }
-          insertAssocToOffset[assoc] = offset
-        }
-      }
-    }
-
-    return removeOffsetToAssoc == insertAssocToOffset
-  }
-
   /// Creates a new collection difference from a collection of changes.
   ///
   /// To find the difference between two collections, use the 
@@ -199,6 +146,59 @@ public struct CollectionDifference<ChangeElement> {
 
     removals = Array(sortedChanges[0..<firstInsertIndex])
     insertions = Array(sortedChanges[firstInsertIndex..<sortedChanges.count])
+  }
+
+  /// The public initializer calls this function to ensure that its parameter
+  /// meets the conditions set in its documentation.
+  ///
+  /// - Parameter changes: a collection of `CollectionDifference.Change`
+  ///   instances intended to represent a valid state transition for
+  ///   `CollectionDifference`.
+  ///
+  /// - Returns: whether the parameter meets the following criteria:
+  ///
+  ///   1. All insertion offsets are unique
+  ///   2. All removal offsets are unique
+  ///   3. All associations between insertions and removals are symmetric
+  ///
+  /// Complexity: O(`changes.count`)
+  private static func _validateChanges<Changes: Collection>(
+    _ changes : Changes
+  ) -> Bool where Changes.Element == Change {
+    if changes.isEmpty { return true }
+
+    var insertAssocToOffset = Dictionary<Int,Int>()
+    var removeOffsetToAssoc = Dictionary<Int,Int>()
+    var insertOffset = Set<Int>()
+    var removeOffset = Set<Int>()
+
+    for change in changes {
+      let offset = change._offset
+      if offset < 0 { return false }
+
+      switch change {
+      case .remove(_, _, _):
+        if removeOffset.contains(offset) { return false }
+        removeOffset.insert(offset)
+      case .insert(_, _, _):
+        if insertOffset.contains(offset) { return false }
+        insertOffset.insert(offset)
+      } 
+
+      if let assoc = change._associatedOffset {
+        if assoc < 0 { return false }
+        switch change {
+        case .remove(_, _, _):
+          if removeOffsetToAssoc[offset] != nil { return false }
+          removeOffsetToAssoc[offset] = assoc
+        case .insert(_, _, _):
+          if insertAssocToOffset[assoc] != nil { return false }
+          insertAssocToOffset[assoc] = offset
+        }
+      }
+    }
+
+    return removeOffsetToAssoc == insertAssocToOffset
   }
 
   public func inverse() -> Self {

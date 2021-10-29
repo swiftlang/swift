@@ -28,7 +28,7 @@ class SynthesizedFileUnit final : public FileUnit {
   SourceFile &SF;
 
   /// Synthesized top level declarations.
-  TinyPtrVector<ValueDecl *> TopLevelDecls;
+  TinyPtrVector<Decl *> TopLevelDecls;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -43,7 +43,7 @@ public:
   SourceFile &getSourceFile() const { return SF; }
 
   /// Add a synthesized top-level declaration.
-  void addTopLevelDecl(ValueDecl *D) { TopLevelDecls.push_back(D); }
+  void addTopLevelDecl(Decl *D) { TopLevelDecls.push_back(D); }
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl *> &result) const override;
@@ -56,7 +56,7 @@ public:
 
   void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
-  ArrayRef<ValueDecl *> getTopLevelDecls() const {
+  ArrayRef<Decl *> getTopLevelDecls() const {
     return TopLevelDecls;
   };
 

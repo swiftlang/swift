@@ -20,15 +20,15 @@
 /// data fields change, such as the user's name.
 ///
 /// `Identifiable` leaves the duration and scope of the identity unspecified.
-/// Identities could be any of the following:
+/// Identities can have any of the following characteristics:
 ///
-/// - Guaranteed always unique (e.g. UUIDs).
-/// - Persistently unique per environment (e.g. database record keys).
-/// - Unique for the lifetime of a process (e.g. global incrementing integers).
-/// - Unique for the lifetime of an object (e.g. object identifiers).
-/// - Unique within the current collection (e.g. collection index).
+/// - Guaranteed always unique, like UUIDs.
+/// - Persistently unique per environment, like database record keys.
+/// - Unique for the lifetime of a process, like global incrementing integers.
+/// - Unique for the lifetime of an object, like object identifiers.
+/// - Unique within the current collection, like collection indices.
 ///
-/// It is up to both the conformer and the receiver of the protocol to document
+/// It's up to both the conformer and the receiver of the protocol to document
 /// the nature of the identity.
 ///
 /// Conforming to the Identifiable Protocol

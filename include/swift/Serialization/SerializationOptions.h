@@ -14,6 +14,7 @@
 #define SWIFT_SERIALIZATION_SERIALIZATIONOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/PathRemapper.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
@@ -32,15 +33,20 @@ namespace swift {
     const char *DocOutputPath = nullptr;
     const char *SourceInfoOutputPath = nullptr;
     std::string SymbolGraphOutputDir;
+    std::string ABIDescriptorPath;
     bool SkipSymbolGraphInheritedDocs = true;
     bool IncludeSPISymbolsInSymbolGraph = false;
     llvm::VersionTuple UserModuleVersion;
+    std::string SDKName;
 
     StringRef GroupInfoPath;
     StringRef ImportedHeader;
     StringRef ModuleLinkName;
     StringRef ModuleInterface;
-    ArrayRef<std::string> ExtraClangOptions;
+    std::vector<std::string> ExtraClangOptions;
+
+    /// Path prefixes that should be rewritten in debug info.
+    PathRemapper DebuggingOptionsPrefixMap;
 
     /// Describes a single-file dependency for this module, along with the
     /// appropriate strategy for how to verify if it's up-to-date.
@@ -139,6 +145,7 @@ namespace swift {
     bool IsSIB = false;
     bool DisableCrossModuleIncrementalInfo = false;
     bool StaticLibrary = false;
+    bool IsOSSA = false;
   };
 
 } // end namespace swift

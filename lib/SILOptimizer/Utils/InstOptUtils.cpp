@@ -22,6 +22,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -864,8 +865,8 @@ void swift::placeFuncRef(ApplyInst *ai, DominanceInfo *domInfo) {
 /// Add an argument, \p val, to the branch-edge that is pointing into
 /// block \p Dest. Return a new instruction and do not erase the old
 /// instruction.
-TermInst *swift::addArgumentToBranch(SILValue val, SILBasicBlock *dest,
-                                     TermInst *branch) {
+TermInst *swift::addArgumentsToBranch(ArrayRef<SILValue> vals,
+                                      SILBasicBlock *dest, TermInst *branch) {
   SILBuilderWithScope builder(branch);
 
   if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
@@ -879,10 +880,12 @@ TermInst *swift::addArgumentToBranch(SILValue val, SILBasicBlock *dest,
       falseArgs.push_back(arg);
 
     if (dest == cbi->getTrueBB()) {
-      trueArgs.push_back(val);
+      for (auto val : vals)
+        trueArgs.push_back(val);
       assert(trueArgs.size() == dest->getNumArguments());
     } else {
-      falseArgs.push_back(val);
+      for (auto val : vals)
+        falseArgs.push_back(val);
       assert(falseArgs.size() == dest->getNumArguments());
     }
 
@@ -898,7 +901,8 @@ TermInst *swift::addArgumentToBranch(SILValue val, SILBasicBlock *dest,
     for (auto arg : bi->getArgs())
       args.push_back(arg);
 
-    args.push_back(val);
+    for (auto val : vals)
+      args.push_back(val);
     assert(args.size() == dest->getNumArguments());
     return builder.createBranch(bi->getLoc(), bi->getDestBB(), args);
   }
@@ -1386,14 +1390,12 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
 
   for (Operand *argOp : argsToHandle) {
     SILValue arg = argOp->get();
-    int argIdx = argOp->getOperandNumber() - pai->getArgumentOperandNumber();
-    SILDebugVariable dbgVar(/*Constant*/ true, argIdx);
 
     SILValue tmp = arg;
     if (arg->getType().isAddress()) {
       // Move the value to a stack-allocated temporary.
       SILBuilderWithScope builder(pai, builderCtxt);
-      tmp = builder.createAllocStack(pai->getLoc(), arg->getType(), dbgVar);
+      tmp = builder.createAllocStack(pai->getLoc(), arg->getType());
       builder.createCopyAddr(pai->getLoc(), arg, tmp, IsTake_t::IsTake,
                              IsInitialization_t::IsInitialization);
     }
@@ -1923,15 +1925,19 @@ swift::cloneFullApplySiteReplacingCallee(FullApplySite applySite,
   llvm_unreachable("Unhandled case?!");
 }
 
-SILBasicBlock::iterator
-swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
-                              InstModCallbacks &callbacks) {
-  assert(svi != newValue && "Cannot RAUW a value with itself");
-  SILBasicBlock::iterator nextii = std::next(svi->getIterator());
-
-  // Only SingleValueInstructions are currently simplified.
-  while (!svi->use_empty()) {
-    Operand *use = *svi->use_begin();
+// FIXME: For any situation where this may be called on an unbounded number of
+// uses, it should perform a single callback invocation to notify the client
+// that newValue has new uses rather than a callback for every new use.
+//
+// FIXME: This should almost certainly replace end_lifetime uses rather than
+// deleting them.
+SILBasicBlock::iterator swift::replaceAllUses(SILValue oldValue,
+                                              SILValue newValue,
+                                              SILBasicBlock::iterator nextii,
+                                              InstModCallbacks &callbacks) {
+  assert(oldValue != newValue && "Cannot RAUW a value with itself");
+  while (!oldValue->use_empty()) {
+    Operand *use = *oldValue->use_begin();
     SILInstruction *user = use->getUser();
     // Erase the end of scope marker.
     if (isEndOfScopeMarker(user)) {
@@ -1942,10 +1948,60 @@ swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
     }
     callbacks.setUseValue(use, newValue);
   }
+  return nextii;
+}
+
+SILBasicBlock::iterator
+swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
+                              InstModCallbacks &callbacks) {
+  SILBasicBlock::iterator nextii = replaceAllUses(
+      svi, newValue, std::next(svi->getIterator()), callbacks);
 
   callbacks.deleteInst(svi);
 
   return nextii;
+}
+
+SILBasicBlock::iterator
+swift::replaceAllUsesAndErase(SILValue oldValue, SILValue newValue,
+                              InstModCallbacks &callbacks) {
+  auto *blockArg = dyn_cast<SILPhiArgument>(oldValue);
+  if (!blockArg) {
+    // SingleValueInstruction SSA replacement.
+    return replaceAllUsesAndErase(cast<SingleValueInstruction>(oldValue),
+                                  newValue, callbacks);
+  }
+  llvm_unreachable("Untested");
+#if 0 // FIXME: to be enabled in a following commit
+  TermInst *oldTerm = blockArg->getTerminatorForResult();
+  assert(oldTerm && "can only replace and erase terminators, not phis");
+
+  // Before:
+  //     oldTerm bb1, bb2
+  //   bb1(%oldValue):
+  //     use %oldValue
+  //   bb2:
+  //
+  // After:
+  //     br bb1
+  //   bb1:
+  //     use %newValue
+  //   bb2:
+
+  auto nextii = replaceAllUses(blockArg, newValue,
+                               oldTerm->getParent()->end(), callbacks);
+  // Now that oldValue is replaced, the terminator should have no uses
+  // left. The caller should have removed uses from other results.
+  for (auto *succBB : oldTerm->getSuccessorBlocks()) {
+    assert(succBB->getNumArguments() == 1 && "expected terminator result");
+    succBB->eraseArgument(0);
+  }
+  auto *newBr = SILBuilderWithScope(oldTerm).createBranch(
+    oldTerm->getLoc(), blockArg->getParent());
+  callbacks.createdNewInst(newBr);
+  callbacks.deleteInst(oldTerm);
+  return nextii;
+#endif
 }
 
 /// Given that we are going to replace use's underlying value, if the use is a
@@ -2127,6 +2183,69 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         if (auto VarInfo = ASI->getVarInfo())
           SILBuilder(SI, ASI->getDebugScope())
               .createDebugValue(SI->getLoc(), SI->getSrc(), *VarInfo);
+      }
+  }
+
+  // If a `struct` SIL instruction is "unwrapped" and removed,
+  // for instance, in favor of using its enclosed value directly,
+  // we need to make sure any of its related `debug_value` instruction
+  // is preserved.
+  if (auto *STI = dyn_cast<StructInst>(I)) {
+    auto STVal = STI->getResult(0);
+    llvm::ArrayRef<VarDecl *> FieldDecls =
+      STI->getStructDecl()->getStoredProperties();
+    for (Operand *U : getDebugUses(STVal)) {
+      auto *DbgInst = cast<DebugValueInst>(U->getUser());
+      auto VarInfo = DbgInst->getVarInfo();
+      if (!VarInfo)
+        continue;
+      if (VarInfo->DIExpr.hasFragment())
+        // Since we can't merge two different op_fragment
+        // now, we're simply bailing out if there is an
+        // existing op_fragment in DIExpresison.
+        // TODO: Try to merge two op_fragment expressions here.
+        continue;
+      for (VarDecl *FD : FieldDecls) {
+        SILDebugVariable NewVarInfo = *VarInfo;
+        auto FieldVal = STI->getFieldValue(FD);
+        // Build the corresponding fragment DIExpression
+        auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
+        NewVarInfo.DIExpr.append(FragDIExpr);
+
+        if (!NewVarInfo.Type)
+          NewVarInfo.Type = STI->getType();
+
+        // Create a new debug_value
+        SILBuilder(DbgInst, DbgInst->getDebugScope())
+          .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
+      }
+    }
+  }
+
+  if (auto *IA = dyn_cast<IndexAddrInst>(I)) {
+    if (IA->getBase() && IA->getIndex())
+      // Only handle cases where offset is constant.
+      if (const auto *LiteralInst =
+            dyn_cast<IntegerLiteralInst>(IA->getIndex())) {
+        SILValue Base = IA->getBase();
+        SILValue ResultAddr = IA->getResult(0);
+        APInt OffsetVal = LiteralInst->getValue();
+        const SILDIExprElement ExprElements[3] = {
+          SILDIExprElement::createOperator(OffsetVal.isNegative() ?
+            SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
+          SILDIExprElement::createConstInt(OffsetVal.getLimitedValue()),
+          SILDIExprElement::createOperator(SILDIExprOperator::Plus)
+        };
+        for (Operand *U : getDebugUses(ResultAddr)) {
+          auto *DbgInst = cast<DebugValueInst>(U->getUser());
+          auto VarInfo = DbgInst->getVarInfo();
+          if (!VarInfo)
+            continue;
+          VarInfo->DIExpr.prependElements(ExprElements);
+          // Create a new debug_value
+          SILBuilder(DbgInst, DbgInst->getDebugScope())
+            .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
+        }
       }
   }
 }

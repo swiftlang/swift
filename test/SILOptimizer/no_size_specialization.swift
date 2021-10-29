@@ -7,9 +7,9 @@ func foo<T>(_ t: T) -> T {
 }
 
 // CHECK-O-LABEL: sil @{{.*}}test
-// CHECK-O: %0 = integer_literal
-// CHECK-O: %1 = struct $Int
-// CHECK-O: return %1
+// CHECK-O: %[[LITERAL:.+]] = integer_literal $Builtin.Int{{[0-9]+}}, 27
+// CHECK-O: %[[STRUCT:.+]] = struct $Int (%[[LITERAL]] : $Builtin.Int{{[0-9]+}})
+// CHECK-O: return %[[STRUCT]]
 
 // CHECK-OSIZE-LABEL: sil {{.*}} @{{.*}}foo
 

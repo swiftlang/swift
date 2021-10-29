@@ -1367,11 +1367,15 @@ Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
     if (size->getType() != index->getType())
       size = IGF.Builder.CreateZExtOrTrunc(size, index->getType());
     llvm::Value *distance = IGF.Builder.CreateNSWMul(index, size);
-    destValue = IGF.Builder.CreateInBoundsGEP(byteAddr, distance);
+    destValue = IGF.Builder.CreateInBoundsGEP(
+        byteAddr->getType()->getScalarType()->getPointerElementType(), byteAddr,
+        distance);
     destValue = IGF.Builder.CreateBitCast(destValue, base.getType());
   } else {
     // We don't expose a non-inbounds GEP operation.
-    destValue = IGF.Builder.CreateInBoundsGEP(base.getAddress(), index);
+    destValue = IGF.Builder.CreateInBoundsGEP(
+        base.getAddress()->getType()->getScalarType()->getPointerElementType(),
+        base.getAddress(), index);
     stride = fixedTI->getFixedStride();
   }
   if (auto *IndexConst = dyn_cast<llvm::ConstantInt>(index)) {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,33 +19,35 @@
 import TestsUtils
 import Foundation
 
-public let CharacterPropertiesFetch = BenchmarkInfo(
-  name: "CharacterPropertiesFetch",
-  runFunction: run_CharacterPropertiesFetch,
-  tags: [.validation, .api, .String],
-  setUpFunction: { blackHole(workload) },
-  legacyFactor: 10)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "CharacterPropertiesFetch",
+    runFunction: run_CharacterPropertiesFetch,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(workload) },
+    legacyFactor: 10),
 
-public let CharacterPropertiesStashed = BenchmarkInfo(
-  name: "CharacterPropertiesStashed",
-  runFunction: run_CharacterPropertiesStashed,
-  tags: [.validation, .api, .String],
-  setUpFunction: { setupStash() },
-  legacyFactor: 10)
+  BenchmarkInfo(
+    name: "CharacterPropertiesStashed",
+    runFunction: run_CharacterPropertiesStashed,
+    tags: [.validation, .api, .String],
+    setUpFunction: { setupStash() },
+    legacyFactor: 10),
 
-public let CharacterPropertiesStashedMemo = BenchmarkInfo(
-  name: "CharacterPropertiesStashedMemo",
-  runFunction: run_CharacterPropertiesStashedMemo,
-  tags: [.validation, .api, .String],
-  setUpFunction: { setupMemo() },
-  legacyFactor: 10)
+  BenchmarkInfo(
+    name: "CharacterPropertiesStashedMemo",
+    runFunction: run_CharacterPropertiesStashedMemo,
+    tags: [.validation, .api, .String],
+    setUpFunction: { setupMemo() },
+    legacyFactor: 10),
 
-public let CharacterPropertiesPrecomputed = BenchmarkInfo(
-  name: "CharacterPropertiesPrecomputed",
-  runFunction: run_CharacterPropertiesPrecomputed,
-  tags: [.validation, .api, .String],
-  setUpFunction: { setupPrecomputed() },
-  legacyFactor: 10)
+  BenchmarkInfo(
+    name: "CharacterPropertiesPrecomputed",
+    runFunction: run_CharacterPropertiesPrecomputed,
+    tags: [.validation, .api, .String],
+    setUpFunction: { setupPrecomputed() },
+    legacyFactor: 10),
+]
 
 extension Character {
   var firstScalar: UnicodeScalar { return unicodeScalars.first! }
@@ -358,8 +360,8 @@ let workload = """
 """
 
 @inline(never)
-public func run_CharacterPropertiesFetch(_ N: Int) {
-  for _ in 1...N {
+public func run_CharacterPropertiesFetch(_ n: Int) {
+  for _ in 1...n {
     for c in workload {
         blackHole(isAlphanumeric(c))
         blackHole(isCapitalized(c))
@@ -376,8 +378,8 @@ public func run_CharacterPropertiesFetch(_ N: Int) {
 }
 
 @inline(never)
-public func run_CharacterPropertiesStashed(_ N: Int) {
-  for _ in 1...N {
+public func run_CharacterPropertiesStashed(_ n: Int) {
+  for _ in 1...n {
     for c in workload {
         blackHole(isAlphanumericStashed(c))
         blackHole(isCapitalizedStashed(c))
@@ -394,8 +396,8 @@ public func run_CharacterPropertiesStashed(_ N: Int) {
 }
 
 @inline(never)
-public func run_CharacterPropertiesStashedMemo(_ N: Int) {
-  for _ in 1...N {
+public func run_CharacterPropertiesStashedMemo(_ n: Int) {
+  for _ in 1...n {
     for c in workload {
         blackHole(isAlphanumericStashedMemo(c))
         blackHole(isCapitalizedStashedMemo(c))
@@ -412,8 +414,8 @@ public func run_CharacterPropertiesStashedMemo(_ N: Int) {
 }
 
 @inline(never)
-public func run_CharacterPropertiesPrecomputed(_ N: Int) {
-  for _ in 1...N {
+public func run_CharacterPropertiesPrecomputed(_ n: Int) {
+  for _ in 1...n {
     for c in workload {
         blackHole(isAlphanumericPrecomputed(c))
         blackHole(isCapitalizedPrecomputed(c))

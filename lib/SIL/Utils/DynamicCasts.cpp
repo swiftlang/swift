@@ -1288,14 +1288,14 @@ void swift::emitIndirectConditionalCastWithScalar(
     return B.emitLoadValueOperation(loc, srcAddr, LoadOwnershipQualifier::Take);
   })();
 
-  B.createCheckedCastBranch(loc, /*exact*/ false, srcValue, targetLoweredType,
-                            targetFormalType, scalarSuccBB, scalarFailBB,
-                            TrueCount, FalseCount);
+  auto *ccb = B.createCheckedCastBranch(
+      loc, /*exact*/ false, srcValue, targetLoweredType, targetFormalType,
+      scalarSuccBB, scalarFailBB, TrueCount, FalseCount);
 
   // Emit the success block.
   B.setInsertionPoint(scalarSuccBB); {
     SILValue succValue = scalarSuccBB->createPhiArgument(
-        targetLoweredType, srcValue.getOwnershipKind());
+        targetLoweredType, ccb->getForwardingOwnershipKind());
 
     switch (consumption) {
     // On success, we take with both take_always and take_on_success.

@@ -4,20 +4,22 @@
 
 import TestsUtils
 
-public let NibbleSort = BenchmarkInfo(
-  name: "NibbleSort",
-  runFunction: run_NibbleSort,
-  tags: [.validation],
-  legacyFactor: 10
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "NibbleSort",
+    runFunction: run_NibbleSort,
+    tags: [.validation],
+    legacyFactor: 10
+  ),
+]
 
 @inline(never)
-public func run_NibbleSort(_ N: Int) {
+public func run_NibbleSort(_ n: Int) {
   let vRef: UInt64 = 0xfeedbba000000000
   let v: UInt64 = 0xbadbeef
   var c = NibbleCollection(v)
 
-  for _ in 1...1_000*N {
+  for _ in 1...1_000*n {
     c.val = v
     c.sort()
 
@@ -26,7 +28,7 @@ public func run_NibbleSort(_ N: Int) {
     }
   }
 
-  CheckResults(c.val == vRef)
+  check(c.val == vRef)
 }
 
 struct NibbleCollection {

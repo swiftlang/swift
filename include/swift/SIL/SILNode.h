@@ -238,8 +238,6 @@ protected:
   );
   static_assert(32-1-1-NumAllocationInstBits >= 14, "Reconsider bitfield use?");
 
-  UIWTDOB_BITFIELD_EMPTY(AllocValueBufferInst, AllocationInst);
-
   // TODO: Sort the following in SILNodes.def order
 
   SWIFT_INLINE_BITFIELD_EMPTY(NonValueInstruction, SILInstruction);
@@ -368,10 +366,8 @@ protected:
   UIWTDOB_BITFIELD_EMPTY(ObjCMethodInst, MethodInst);
 
   SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);
-  SWIFT_INLINE_BITFIELD(PointerToAddressInst, ConversionInst, 1+1,
-    IsStrict : 1,
-    IsInvariant : 1
-  );
+  SWIFT_INLINE_BITFIELD(PointerToAddressInst, ConversionInst, 8 + 1 + 1,
+                        Alignment : 8, IsStrict : 1, IsInvariant : 1);
 
   UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 1,
                    WithoutActuallyEscaping : 1);

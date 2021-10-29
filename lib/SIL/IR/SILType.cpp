@@ -94,6 +94,10 @@ SILType SILType::getOptionalType(SILType type) {
   return getPrimitiveType(CanType(optType), type.getCategory());
 }
 
+SILType SILType::getEmptyTupleType(const ASTContext &C) {
+  return getPrimitiveObjectType(C.TheEmptyTupleType);
+}
+
 SILType SILType::getSILTokenType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheSILTokenType);
 }

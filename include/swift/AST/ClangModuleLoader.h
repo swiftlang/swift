@@ -33,6 +33,8 @@ namespace swift {
 
 class Decl;
 class DeclContext;
+class EffectiveClangContext;
+class SwiftLookupTable;
 class VisibleDeclConsumer;
 
 /// Represents the different namespaces for types in C.
@@ -177,6 +179,9 @@ public:
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) = 0;
 
+  /// Imports a clang decl directly, rather than looking up its name.
+  virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
+
   /// Instantiate and import class template using given arguments.
   ///
   /// This method will find the clang::ClassTemplateSpecialization decl if
@@ -241,6 +246,21 @@ public:
 
   virtual Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                         DeclContext *dc) = 0;
+
+  /// Find the lookup table that corresponds to the given Clang module.
+  ///
+  /// \param clangModule The module, or null to indicate that we're talking
+  /// about the directly-parsed headers.
+  virtual SwiftLookupTable *
+  findLookupTable(const clang::Module *clangModule) = 0;
+
+  virtual DeclName
+  importName(const clang::NamedDecl *D,
+             clang::DeclarationName givenName = clang::DeclarationName()) = 0;
+
+  /// Determine the effective Clang context for the given Swift nominal type.
+  EffectiveClangContext virtual getEffectiveClangContext(
+      const NominalTypeDecl *nominal) = 0;
 };
 
 /// Describes a C++ template instantiation error.

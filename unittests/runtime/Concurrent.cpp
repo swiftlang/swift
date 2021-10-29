@@ -45,6 +45,8 @@ TEST(ConcurrentReadableArrayTest, SingleThreaded) {
   check();
 }
 
+#ifndef SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
+
 TEST(ConcurrentReadableArrayTest, MultiThreaded) {
   const int insertCount = 100000;
 
@@ -542,3 +544,4 @@ TEST(ConcurrentReadableHashMapTest, MultiThreaded4) {
   runTest(16, 1);
   runTest(16, 8);
 }
+#endif // !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME

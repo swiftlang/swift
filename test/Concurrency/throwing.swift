@@ -3,8 +3,11 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+
+// SR-15252
+// XFAIL: OS=windows-msvc
 
 import _Concurrency
 import StdlibUnittest

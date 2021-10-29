@@ -163,8 +163,6 @@ func _stdlib_atomicLoadARCRef(
 
 /// A 32 byte buffer.
 internal struct _Buffer32 {
-  internal init() {}
-
   internal var _x0: UInt8 = 0
   internal var _x1: UInt8 = 0
   internal var _x2: UInt8 = 0
@@ -198,6 +196,8 @@ internal struct _Buffer32 {
   internal var _x30: UInt8 = 0
   internal var _x31: UInt8 = 0
 
+  internal init() {}
+
   internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result {
@@ -209,8 +209,6 @@ internal struct _Buffer32 {
 
 /// A 72 byte buffer.
 internal struct _Buffer72 {
-  internal init() {}
-
   internal var _x0: UInt8 = 0
   internal var _x1: UInt8 = 0
   internal var _x2: UInt8 = 0
@@ -283,6 +281,8 @@ internal struct _Buffer72 {
   internal var _x69: UInt8 = 0
   internal var _x70: UInt8 = 0
   internal var _x71: UInt8 = 0
+
+  internal init() {}
 
   internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result

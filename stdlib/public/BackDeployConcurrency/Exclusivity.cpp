@@ -14,22 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 #include <cinttypes>
-
 #include "swift/Runtime/Exclusivity.h"
-#include "../runtime/ExclusivityPrivate.h"
-#include "../runtime/SwiftTLSContext.h"
 
 using namespace swift;
-using namespace swift::runtime;
 
-// Thread-local storage used by the back-deployed concurrency library.
-namespace {
+void swift::swift_task_enterThreadLocalContextBackDeploy(char *state) { }
 
-static thread_local SwiftTLSContext TLSContext;
+void swift::swift_task_exitThreadLocalContextBackDeploy(char *state) { }
 
-} // anonymous namespace
-
-SwiftTLSContext &SwiftTLSContext::get() { return TLSContext; }
-
-// Bring in the concurrency-specific exclusivity code.
-#include "../runtime/ConcurrencyExclusivity.inc"
+// Forcibly disable exclusivity checking, because the back-deployed concurrency
+// library cannot communicate with older Swift runtimes effectively.
+__attribute__((constructor)) static void disableExclusivityChecking() {
+  _swift_disableExclusivityChecking = true;
+}

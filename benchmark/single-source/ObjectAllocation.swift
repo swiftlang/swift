@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,11 +16,12 @@ import TestsUtils
 // 53% _swift_release_dealloc
 // 30% _swift_alloc_object
 // 10% retain/release
-public var ObjectAllocation = BenchmarkInfo(
-  name: "ObjectAllocation",
-  runFunction: run_ObjectAllocation,
-  tags: [.runtime, .cpubench]
-)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "ObjectAllocation",
+    runFunction: run_ObjectAllocation,
+    tags: [.runtime, .cpubench]
+  )
 
 final class XX {
   var xx: Int
@@ -118,22 +119,22 @@ func testArray() -> Int {
 }
 
 @inline(never)
-public func run_ObjectAllocation(_ N: Int) {
+public func run_ObjectAllocation(_ n: Int) {
 
-  var SingleObjectResult = 0
-  var TreeResult = 0
-  var ListResult = 0
-  var ArrayResult = 0
+  var singleObjectResult = 0
+  var treeResult = 0
+  var listResult = 0
+  var arrayResult = 0
 
-  for _ in 0..<N {
-    SingleObjectResult = testSingleObject()
-    TreeResult = testTree()
-    ListResult = testList()
-    ArrayResult = testArray()
+  for _ in 0..<n {
+    singleObjectResult = testSingleObject()
+    treeResult = testTree()
+    listResult = testList()
+    arrayResult = testArray()
   }
 
-  CheckResults(SingleObjectResult == 499500)
-  CheckResults(TreeResult == 90000)
-  CheckResults(ListResult == 48375)
-  CheckResults(ArrayResult == 3000)
+  check(singleObjectResult == 499500)
+  check(treeResult == 90000)
+  check(listResult == 48375)
+  check(arrayResult == 3000)
 }

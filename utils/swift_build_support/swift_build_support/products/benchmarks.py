@@ -52,14 +52,16 @@ class Benchmarks(product.Product):
         return self.args.test_toolchainbenchmarks
 
     def _get_test_environment(self, host_target):
+        env = {
+            "SWIFT_DETERMINISTIC_HASHING": "1"
+        }
         if platform.system() == 'Darwin':
             # the resulting binaries would search first in /usr/lib/swift,
             # we need to prefer the libraries we just built
-            return {'DYLD_LIBRARY_PATH': os.path.join(
+            env['DYLD_LIBRARY_PATH'] = os.path.join(
                 _get_toolchain_path(host_target, self, self.args),
-                'usr', 'lib', 'swift', 'macosx')}
-
-        return None
+                'usr', 'lib', 'swift', 'macosx')
+        return env
 
     def test(self, host_target):
         """Just run a single instance of the command for both .debug and

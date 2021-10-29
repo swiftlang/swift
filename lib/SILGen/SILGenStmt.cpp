@@ -358,10 +358,19 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
                  diag::unreachable_code);
         if (!S->getElements().empty()) {
           for (auto *arg : SGF.getFunction().getArguments()) {
-            if (arg->getType().getASTType()->isStructurallyUninhabited()) {
+            auto argTy = arg->getType().getASTType();
+            if (argTy->isStructurallyUninhabited()) {
+              // Use the interface type in this diagnostic because the SIL type
+              // unpacks tuples. But, the SIL type being exploded means it
+              // points directly at the offending tuple element type and we can
+              // use that to point the user at problematic component(s).
+              auto argIFaceTy = arg->getDecl()->getInterfaceType();
               diagnose(getASTContext(), S->getStartLoc(),
                        diag::unreachable_code_uninhabited_param_note,
-                       arg->getDecl()->getBaseName().userFacingName());
+                       arg->getDecl()->getBaseName().userFacingName(),
+                       argIFaceTy,
+                       argIFaceTy->is<EnumType>(),
+                       argTy);
               break;
             }
           }
@@ -784,9 +793,6 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
   // Emit the condition bindings, branching to the bodyBB if they fail.
   auto NumFalseTaken = SGF.loadProfilerCount(S->getBody());
   auto NumNonTaken = SGF.loadProfilerCount(S);
-  // Begin a new 'guard' scope, which is popped when the next innermost debug
-  // scope ends.
-  SGF.enterDebugScope(S, /*isGuardScope=*/true);
   SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
 }
 

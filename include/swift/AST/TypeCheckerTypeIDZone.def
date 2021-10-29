@@ -131,10 +131,12 @@ SWIFT_REQUEST(TypeChecker, HasImplementationOnlyImportsRequest,
 SWIFT_REQUEST(TypeChecker, ModuleLibraryLevelRequest,
               LibraryLevel(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
-              GenericSignature (ModuleDecl *, const GenericSignatureImpl *,
-                                 GenericParamSource,
-                                 SmallVector<Requirement, 2>,
-                                 SmallVector<TypeLoc, 2>, bool),
+              GenericSignature (ModuleDecl *,
+                                const GenericSignatureImpl *,
+                                GenericParamList *,
+                                WhereClauseOwner,
+                                SmallVector<Requirement, 2>,
+                                SmallVector<TypeLoc, 2>, bool),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DistributedModuleIsAvailableRequest,
               bool(ModuleDecl *), Cached, NoLocationInfo)
@@ -217,6 +219,12 @@ SWIFT_REQUEST(TypeChecker, ProtocolRequiresClassRequest, bool(ProtocolDecl *),
 SWIFT_REQUEST(TypeChecker, RequirementRequest,
               Requirement(WhereClauseOwner, unsigned, TypeResolutionStage),
               Cached, HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, StructuralRequirementsRequest,
+              ArrayRef<StructuralRequirement>(ProtocolDecl *), Cached,
+              HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, ProtocolDependenciesRequest,
+              ArrayRef<ProtocolDecl *>(ProtocolDecl *), Cached,
+              HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, RequirementSignatureRequest,
               ArrayRef<Requirement>(ProtocolDecl *), SeparatelyCached,
               NoLocationInfo)

@@ -106,9 +106,9 @@ public:
       argType = argType.getObjectType();
     }
 
-    if (argType != paramType) {
+    if (argType.getASTType() != paramType.getASTType()) {
       // Reabstract the value if necessary.
-      mv = SGF.emitOrigToSubstValue(loc, mv, orig, t);
+      mv = SGF.emitOrigToSubstValue(loc, mv.ensurePlusOne(SGF, loc), orig, t);
     }
 
     // If the value is a (possibly optional) ObjC block passed into the entry
@@ -251,10 +251,15 @@ struct ArgumentInitHelper {
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
     }
-    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(argrv.getValue());
     SILValue value = argrv.getValue();
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
+      if (SGF.getASTContext().SILOpts.EnableExperimentalLexicalLifetimes &&
+          value->getOwnershipKind() == OwnershipKind::Owned) {
+        value =
+            SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
+        SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+      }
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
       if (auto AllocStack = dyn_cast<AllocStackInst>(value))
@@ -262,6 +267,7 @@ struct ArgumentInitHelper {
       else
         SGF.B.createDebugValueAddr(loc, value, varinfo);
     }
+    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
   }
 
   void emitParam(ParamDecl *PD) {
@@ -296,12 +302,11 @@ struct ArgumentInitHelper {
     // Emit debug information for the argument.
     SILLocation loc(PD);
     loc.markAsPrologue();
+    SILDebugVariable DebugVar(PD->isLet(), ArgNo);
     if (argrv.getType().isAddress())
-      SGF.B.createDebugValueAddr(loc, argrv.getValue(),
-                                 SILDebugVariable(PD->isLet(), ArgNo));
+      SGF.B.createDebugValueAddr(loc, argrv.getValue(), DebugVar);
     else
-      SGF.B.createDebugValue(loc, argrv.getValue(),
-                             SILDebugVariable(PD->isLet(), ArgNo));
+      SGF.B.createDebugValue(loc, argrv.getValue(), DebugVar);
   }
 };
 } // end anonymous namespace
@@ -385,7 +390,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     if (auto *AllocStack = dyn_cast<AllocStackInst>(val))
       AllocStack->setArgNo(ArgNo);
     else {
-      SILDebugVariable DbgVar(/*Constant*/ true, ArgNo);
+      SILDebugVariable DbgVar(VD->isLet(), ArgNo);
       SGF.B.createDebugValue(Loc, val, DbgVar);
     }
 
@@ -410,7 +415,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
         SILType::getPrimitiveObjectType(boxTy), VD);
     SILValue addr = SGF.B.createProjectBox(VD, box, 0);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
-    SILDebugVariable DbgVar(/*Constant*/ false, ArgNo);
+    SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
     break;
   }
@@ -421,7 +426,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILType ty = SGF.getLoweredType(type).getAddressType();
     SILValue addr = SGF.F.begin()->createFunctionArgument(ty, VD);
     SGF.VarLocs[VD] = SILGenFunction::VarLoc::get(addr);
-    SILDebugVariable DbgVar(/*Constant*/ true, ArgNo);
+    SILDebugVariable DbgVar(VD->isLet(), ArgNo);
     SGF.B.createDebugValueAddr(Loc, addr, DbgVar);
     break;
   }
@@ -578,10 +583,7 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
       break;
     }
   } else if (auto *closureExpr = dyn_cast<AbstractClosureExpr>(FunctionDC)) {
-    bool wantExecutor = F.isAsync() ||
-      (wantDataRaceChecks &&
-       !(isa<ClosureExpr>(closureExpr) &&
-         cast<ClosureExpr>(closureExpr)->isUnsafeMainActor()));
+    bool wantExecutor = F.isAsync() || wantDataRaceChecks;
     auto actorIsolation = closureExpr->getActorIsolation();
     switch (actorIsolation.getKind()) {
     case ClosureActorIsolation::Independent:
@@ -640,7 +642,7 @@ SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
     actorType->getTypeOfMember(SGM.SwiftModule, sharedInstanceDecl);
 
   auto metaRepr =
-    nominal->isResilient(SGM.SwiftModule, ResilienceExpansion::Maximal)
+    nominal->isResilient(SGM.SwiftModule, F.getResilienceExpansion())
     ? MetatypeRepresentation::Thick
     : MetatypeRepresentation::Thin;
 

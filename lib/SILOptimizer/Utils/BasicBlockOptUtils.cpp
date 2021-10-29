@@ -100,8 +100,7 @@ static bool canBorrowGuaranteedResult(SILValue guaranteedResult) {
     // conversion to a non-guaranteed value. Either way, not interesting.
     return true;
   }
-  SmallVector<Operand *, 16> usePoints;
-  return findInnerTransitiveGuaranteedUses(guaranteedResult, usePoints);
+  return findInnerTransitiveGuaranteedUses(guaranteedResult);
 }
 
 bool swift::canCloneTerminator(TermInst *termInst) {

@@ -362,6 +362,11 @@ ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
       (Type,Type))
 
+ERROR(cannot_convert_argument_value_for_swift_func,none,
+      "cannot convert value of type %0 to expected argument type %1 "
+      "because %2 %3 was not imported from C header",
+      (Type,Type, DescriptiveDeclKind, DeclName))
+
 NOTE(candidate_has_invalid_argument_at_position,none,
      "candidate expects %select{|in-out }2value of type %0 for parameter #%1 (got %3)",
      (Type, unsigned, bool, Type))
@@ -766,6 +771,10 @@ ERROR(serialization_module_too_old,Fatal,
       "compiled module was created by an older version of the compiler; "
       "rebuild %0 and try again: %1",
       (Identifier, StringRef))
+ERROR(serialization_module_incompatible_revision,Fatal,
+      "compiled module was created by a different version of the compiler; "
+      "rebuild %0 and try again: %1",
+      (Identifier, StringRef))
 ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,Fatal,
@@ -782,6 +791,9 @@ ERROR(serialization_name_mismatch_repl,none,
 ERROR(serialization_target_incompatible,Fatal,
       "module %0 was created for incompatible target %1: %2",
       (Identifier, StringRef, StringRef))
+ERROR(serialization_sdk_mismatch,Fatal,
+      "cannot load module %0 built with SDK '%1' when using SDK '%2': %3",
+      (Identifier, StringRef, StringRef, StringRef))
 ERROR(serialization_target_incompatible_repl,none,
       "module %0 was created for incompatible target %1: %2",
       (Identifier, StringRef, StringRef))
@@ -1588,8 +1600,8 @@ ERROR(originally_definedin_topleve_decl,none,
 ERROR(originally_definedin_need_available,none,
       "need @available attribute for @%0", (StringRef))
 
-ERROR(originally_definedin_must_after_available_version,none,
-      "moved version from @%0 must after introduced OS version", (StringRef))
+ERROR(originally_definedin_must_not_before_available_version,none,
+      "symbols are moved to the current module before they were available in the OSs", (StringRef))
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -1937,10 +1949,19 @@ NOTE(nonsendable_tuple_type,none,
      "a tuple type must be composed of 'Sendable' elements to conform to "
      "'Sendable'", ())
 NOTE(non_sendable_nominal,none,
-     "%0 %1 does not conform to the `Sendable` protocol",
+     "%0 %1 does not conform to the 'Sendable' protocol",
       (DescriptiveDeclKind, DeclName))
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %0 %1 conform to the 'Sendable' protocol",
+     (DescriptiveDeclKind, DeclName))
+WARNING(public_decl_needs_sendable,none,
+        "public %0 %1 does not specify whether it is 'Sendable' or not",
+        (DescriptiveDeclKind, DeclName))
+NOTE(explicit_unchecked_sendable,none,
+     "add '@unchecked Sendable' conformance to %0 %1 if this type manually implements concurrency safety",
+     (DescriptiveDeclKind, DeclName))
+NOTE(explicit_disable_sendable,none,
+     "make %0 %1 explicitly non-Sendable to suppress this warning",
      (DescriptiveDeclKind, DeclName))
 
 NOTE(required_by_opaque_return,none,
@@ -2241,6 +2262,11 @@ NOTE(associated_type_deduction_witness_failed,none,
 NOTE(associated_type_witness_conform_impossible,none,
      "candidate can not infer %0 = %1 because %1 "
      "is not a nominal type and so can't conform to %2",
+     (Identifier, Type, Type))
+NOTE(suggest_opaque_type_witness,none,
+     "cannot infer %0 = %1 because %1 as a type cannot "
+     "conform to protocols; did you mean to use an opaque "
+     "result type?",
      (Identifier, Type, Type))
 NOTE(associated_type_witness_inherit_impossible,none,
      "candidate can not infer %0 = %1 because %1 "
@@ -2943,6 +2969,9 @@ ERROR(broken_encodable_requirement,none,
       "Encodable protocol is broken: unexpected requirement", ())
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
+ERROR(codable_synthesis_empty_enum_not_supported,none,
+      "cannot automatically synthesize %0 conformance for empty enum %1",
+      (Type, Identifier))
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
 WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
@@ -2960,7 +2989,7 @@ WARNING(differentiable_immutable_wrapper_implicit_noderivative_fixit,none,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
       "synthesis of the 'Differentiable.move(by:)' requirement for %0 "
-      "requires all stored properties not marked with `@noDerivative` to be "
+      "requires all stored properties not marked with '@noDerivative' to be "
       "mutable or have a non-mutating 'move(by:)'; use 'var' instead, or "
       "add an explicit '@noDerivative' attribute "
       "%select{|, or conform %0 to 'AdditiveArithmetic'}1",
@@ -3693,20 +3722,20 @@ NOTE(ambiguous_because_of_trailing_closure,none,
 // Cannot capture inout-ness of a parameter
 // Partial application of foreign functions not supported
 ERROR(partial_application_of_function_invalid,none,
-      "partial application of %select{"
+      "cannot reference %select{"
         "'mutating' method|"
         "'super.init' initializer chain|"
         "'self.init' initializer delegation|"
         "'super' instance method with metatype base"
-      "}0 is not allowed",
+      "}0 as function value",
       (unsigned))
 WARNING(partial_application_of_function_invalid_swift4,none,
-      "partial application of %select{"
+      "cannot reference %select{"
         "'mutating' method|"
         "'super.init' initializer chain|"
         "'self.init' initializer delegation|"
         "'super' instance method with metatype base"
-      "}0 is not allowed; calling the function has undefined behavior and will "
+      "}0 as function value; calling the function has undefined behavior and will "
       "be an error in future Swift versions",
       (unsigned))
 
@@ -3876,28 +3905,28 @@ NOTE(silence_debug_description_in_interpolation_segment_call,none,
      "use 'String(describing:)' to silence this warning", ())
 
 NOTE(noescape_parameter,none,
-    "parameter %1 is implicitly %select{non-escaping|non-concurrent}0",
+    "parameter %1 is implicitly %select{non-escaping|non-sendable}0",
      (unsigned, Identifier))
 NOTE(generic_parameters_always_escaping,none,
      "generic parameters are always considered '@escaping'", ())
 
 ERROR(passing_noattrfunc_to_attrfunc,none,
-      "passing %select{non-escaping|non-concurrent}0 parameter %1 to function "
+      "passing %select{non-escaping|non-sendable}0 parameter %1 to function "
       "expecting %select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noespace_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
 ERROR(assigning_noattrfunc_to_attrfunc,none,
-      "assigning %select{non-escaping|non-concurrent}0 parameter %1 to "
+      "assigning %select{non-escaping|non-sendable}0 parameter %1 to "
       "%select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(general_noattrfunc_to_attr,none,
-      "using %select{non-escaping|non-concurrent}0 parameter %1 in a context "
+      "using %select{non-escaping|non-sendable}0 parameter %1 in a context "
       "expecting %select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noattrfunc_to_type,none,
-      "converting %select{non-escaping|non-concurrent function}0 value to %1 "
+      "converting %select{non-escaping|non-sendable function}0 value to %1 "
       "may %select{allow it to escape|introduce data races}0",
       (unsigned, Type))
 NOTE(escape_expected_at_parameter_position,none,
@@ -4322,10 +4351,20 @@ NOTE(note_add_async_to_function,none,
 NOTE(note_add_nonisolated_to_decl,none,
      "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
+NOTE(note_add_distributed_to_decl,none,
+     "add 'distributed' to %0 to make this %1 witness the protocol requirement",
+     (DeclName, DescriptiveDeclKind))
+NOTE(note_distributed_requirement_defined_here,none,
+     "distributed function requirement %0 declared here",
+     (DeclName))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
      (StringRef, DescriptiveDeclKind, DeclName, Type))
 FIXIT(insert_globalactor_attr, "@%0 ", (Type))
+
+ERROR(main_function_must_be_mainActor,none,
+      "main() must be '@MainActor'", ())
+
 ERROR(not_objc_function_async,none,
       "'async' %0 cannot be represented in Objective-C", (DescriptiveDeclKind))
 NOTE(not_objc_function_type_async,none,
@@ -4391,8 +4430,8 @@ ERROR(actor_isolated_non_self_reference,none,
         "from the main actor|from a non-isolated context}3",
         (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
 ERROR(distributed_actor_isolated_non_self_reference,none,
-      "distributed actor-isolated %0 %1 can only be referenced "
-      "inside the distributed actor",
+      "distributed actor-isolated %0 %1 can only be referenced inside the "
+      "distributed actor",
       (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'_Distributed' module not imported, required for 'distributed actor'",
@@ -4446,10 +4485,10 @@ NOTE(actor_isolated_sync_func,none,
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
 NOTE(distributed_actor_isolated_method_note,none,
-     "only 'distributed' functions can be called from outside the distributed actor", // TODO: improve error message
+     "only 'distributed' functions can be called from outside the distributed actor", // TODO(distributed): improve error message
      ())
 ERROR(distributed_actor_isolated_method,none,
-      "only 'distributed' functions can be called from outside the distributed actor", // TODO: improve error message to be more like 'non-distributed' ... defined here
+      "only 'distributed' functions can be called from outside the distributed actor", // TODO(distributed): improve error message to be more like 'non-distributed' ... defined here
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "distributed function parameter '%0' of type %1 does not conform to 'Codable'",
@@ -4533,10 +4572,10 @@ ERROR(concurrent_value_outside_source_file,none,
       "%0 %1; use '@unchecked Sendable' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_nonfinal_class,none,
-      "non-final class %0 cannot conform to `Sendable`; "
-      "use `@unchecked Sendable`", (DeclName))
+      "non-final class %0 cannot conform to 'Sendable'; "
+      "use '@unchecked Sendable'", (DeclName))
 ERROR(concurrent_value_inherit,none,
-      "`Sendable` class %1 cannot inherit from another class"
+      "'Sendable' class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
 ERROR(non_sendable_type,none,
@@ -4603,9 +4642,6 @@ ERROR(distributed_actor_user_defined_special_property,none,
       "property %0 cannot be defined explicitly, as it conflicts with "
       "distributed actor synthesized stored property",
       (DeclName))
-ERROR(distributed_actor_independent_property_must_be_let,none,
-      "_distributedActorIndependent can be applied to properties, however they must be 'let'",
-      ())
 NOTE(distributed_actor_isolated_property,none,
       "distributed actor state is only available within the actor instance", // TODO: reword in terms of isolation
       ())
@@ -5915,6 +5951,9 @@ ERROR(marker_protocol_requirement, none,
 ERROR(marker_protocol_inherit_nonmarker, none,
       "marker protocol %0 cannot inherit non-marker protocol %1",
       (DeclName, DeclName))
+ERROR(marker_protocol_inherit_class, none,
+      "marker protocol %0 cannot inherit class %1",
+      (DeclName, Type))
 ERROR(marker_protocol_cast,none,
       "marker protocol %0 cannot be used in a conditional cast", (DeclName))
 ERROR(marker_protocol_conditional_conformance,none,
@@ -5994,6 +6033,17 @@ ERROR(wrap_invalid_attr_added_by_access_note, none,
       (DiagnosticInfo *, StringRef, StringRef, DescriptiveDeclKind))
 
 #undef WHICH_ACCESS_NOTE
+
+// Move Only diagnostics
+
+ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
+      none, "Can not use feature when experimental move only is disabled! Pass"
+      " the frontend flag -enable-experimental-move-only to swift to enable "
+      "the usage of this language feature", ())
+ERROR(noimplicitcopy_attr_valid_only_on_local_let,
+      none, "'@_noImplicitCopy' attribute can only be applied to local lets", ())
+ERROR(noimplicitcopy_attr_invalid_in_generic_context,
+      none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

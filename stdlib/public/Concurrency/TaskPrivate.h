@@ -100,20 +100,6 @@ void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
 
-#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
-#define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
-#else
-#define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 0
-#endif
-
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-/// Donate this thread to the global executor until either the
-/// given condition returns true or we've run out of cooperative
-/// tasks to run.
-void donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
-                                       void *context);
-#endif
-
 /// release() establishes a happens-before relation with a preceding acquire()
 /// on the same address.
 void _swift_tsan_acquire(void *addr);

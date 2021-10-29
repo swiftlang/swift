@@ -19,14 +19,15 @@
 
 #include "swift/AST/ArgumentList.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeAlignments.h"
-#include "swift/AST/Availability.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -307,12 +308,13 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1,
     ThrowsIsSet : 1,
     Throws : 1,
     ImplicitlyAsync : 1,
     ImplicitlyThrows : 1,
-    NoAsync : 1
+    NoAsync : 1,
+    ShouldApplyDistributedThunk : 1
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(CallExpr, ApplyExpr);
@@ -1206,7 +1208,9 @@ public:
   /// which are cross-actor invoked, because such calls actually go over the
   /// transport/network, and may throw from this, rather than the function
   /// implementation itself..
-  bool isImplicitlyThrows() const { return Bits.DeclRefExpr.IsImplicitlyThrows; }
+  bool isImplicitlyThrows() const {
+    return Bits.DeclRefExpr.IsImplicitlyThrows;
+  }
 
   /// Set whether this reference must account for a `throw` occurring for reasons
   /// other than the function implementation itself throwing, e.g. an
@@ -1449,6 +1453,8 @@ public:
   DeclNameLoc getNameLoc() const { return Loc; }
   SourceLoc getLoc() const { return Loc.getBaseNameLoc(); }
   SourceRange getSourceRange() const { return Loc.getSourceRange(); }
+
+  bool isForOperator() const { return getDecls().front()->isOperator(); }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OverloadedDeclRef;
@@ -3096,26 +3102,6 @@ public:
   }
 };
 
-/// Perform a function conversion from a function returning an
-/// Optional<T> to a function returning T.
-///
-/// This is generated during expression type checking in places where
-/// we need to force the result type of a function being called. When
-/// we go to rewrite the call, we remove this node and force the
-/// result of the call to the underlying function. It should never
-/// exist outside of this final stage of expression type checking.
-class ImplicitlyUnwrappedFunctionConversionExpr
-    : public ImplicitConversionExpr {
-public:
-  ImplicitlyUnwrappedFunctionConversionExpr(Expr *subExpr, Type type)
-      : ImplicitConversionExpr(ExprKind::ImplicitlyUnwrappedFunctionConversion,
-                               subExpr, type) {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ImplicitlyUnwrappedFunctionConversion;
-  }
-};
-
 /// MetatypeConversionExpr - Convert a metatype to another metatype
 /// using essentially a derived-to-base conversion.
 class MetatypeConversionExpr : public ImplicitConversionExpr {
@@ -3697,12 +3683,6 @@ public:
     SeparatelyTypeChecked,
   };
 
-  /// Bits used to indicate contextual information that is concurrency-specific.
-  enum UnsafeConcurrencyBits {
-    Sendable = 1 << 0,
-    MainActor = 1 << 1
-  };
-
 private:
   /// The attributes attached to the closure.
   DeclAttributes Attributes;
@@ -3717,10 +3697,7 @@ private:
   /// the CaptureListExpr which would normally maintain this sort of
   /// information about captured variables), we need to have some way to access
   /// this information directly on the ClosureExpr.
-  ///
-  /// The integer indicates how the closure is contextually concurrent.
-  llvm::PointerIntPair<VarDecl *, 2, uint8_t>
-      CapturedSelfDeclAndUnsafeConcurrent;
+  VarDecl *CapturedSelfDecl;
 
   /// The location of the "async", if present.
   SourceLoc AsyncLoc;
@@ -3750,7 +3727,7 @@ public:
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
       Attributes(attributes), BracketRange(bracketRange),
-      CapturedSelfDeclAndUnsafeConcurrent(capturedSelfDecl, 0),
+      CapturedSelfDecl(capturedSelfDecl),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
       InLoc(inLoc),
       ExplicitResultTypeAndBodyState(explicitResultType, BodyState::Parsed),
@@ -3878,27 +3855,7 @@ public:
 
   /// VarDecl captured by this closure under the literal name \c self , if any.
   VarDecl *getCapturedSelfDecl() const {
-    return CapturedSelfDeclAndUnsafeConcurrent.getPointer();
-  }
-
-  bool isUnsafeSendable() const {
-    return CapturedSelfDeclAndUnsafeConcurrent.getInt() &
-        UnsafeConcurrencyBits::Sendable;
-  }
-
-  bool isUnsafeMainActor() const {
-    return CapturedSelfDeclAndUnsafeConcurrent.getInt() &
-        UnsafeConcurrencyBits::MainActor;
-  }
-
-  void setUnsafeConcurrent(bool sendable, bool forMainActor) {
-    uint8_t bits = 0;
-    if (sendable)
-      bits |= UnsafeConcurrencyBits::Sendable;
-    if (forMainActor)
-      bits |= UnsafeConcurrencyBits::MainActor;
-
-    CapturedSelfDeclAndUnsafeConcurrent.setInt(bits);
+    return CapturedSelfDecl;
   }
 
   /// Get the type checking state of this closure's body.
@@ -4335,6 +4292,7 @@ protected:
     Bits.ApplyExpr.ImplicitlyAsync = false;
     Bits.ApplyExpr.ImplicitlyThrows = false;
     Bits.ApplyExpr.NoAsync = false;
+    Bits.ApplyExpr.ShouldApplyDistributedThunk = false;
   }
 
 public:
@@ -4391,7 +4349,7 @@ public:
   ///
   /// where the new closure is declared to be async.
   ///
-  /// When the application is implciitly async, the result describes
+  /// When the application is implicitly async, the result describes
   /// the actor to which we need to need to hop.
   Optional<ImplicitActorHopTarget> isImplicitlyAsync() const {
     if (!Bits.ApplyExpr.ImplicitlyAsync)
@@ -4417,6 +4375,15 @@ public:
   }
   void setImplicitlyThrows(bool flag) {
     Bits.ApplyExpr.ImplicitlyThrows = flag;
+  }
+
+  /// Informs IRGen to that this expression should be applied as its distributed
+  /// thunk, rather than invoking the function directly.
+  bool shouldApplyDistributedThunk() const {
+    return Bits.ApplyExpr.ShouldApplyDistributedThunk;
+  }
+  void setShouldApplyDistributedThunk(bool flag) {
+    Bits.ApplyExpr.ShouldApplyDistributedThunk = flag;
   }
 
   ValueDecl *getCalledValue() const;

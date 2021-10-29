@@ -28,20 +28,45 @@ bb0:
   return %2 : $()
 }
 
-sil [ossa] [always_inline] @callee_begin_borrow_defined : $@convention(thin) () -> () {
+sil [ossa] [always_inline] @callee_begin_borrow_lexical : $@convention(thin) () -> () {
   %instance = alloc_ref $X
-  %guaranteed_c = begin_borrow [defined] %instance : $X
+  %guaranteed_c = begin_borrow [lexical] %instance : $X
   end_borrow %guaranteed_c : $X
   destroy_value %instance : $X
   %res = tuple ()
   return %res : $()
 }
 
-// CHECK-LABEL: sil [ossa] @caller_begin_borrow_defined
-// CHECK: begin_borrow [defined]
-// CHECK-LABEL: } // end sil function 'caller_begin_borrow_defined'
-sil [ossa] @caller_begin_borrow_defined : $@convention(thin) () -> () {
-  %callee_begin_borrow_defined = function_ref @callee_begin_borrow_defined : $@convention(thin) () -> ()
-  %res = apply %callee_begin_borrow_defined() : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [ossa] @caller_begin_borrow_lexical
+// CHECK: begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_begin_borrow_lexical'
+sil [ossa] @caller_begin_borrow_lexical : $@convention(thin) () -> () {
+  %callee_begin_borrow_lexical = function_ref @callee_begin_borrow_lexical : $@convention(thin) () -> ()
+  %res = apply %callee_begin_borrow_lexical() : $@convention(thin) () -> ()
+  return %res : $()
+}
+
+sil [ossa] @callee_alloc_stack : $@convention(thin) () -> () {
+  %instance = alloc_stack $Builtin.NativeObject
+  dealloc_stack %instance : $*Builtin.NativeObject
+  %instance2 = alloc_stack [dynamic_lifetime] $Builtin.NativeObject
+  dealloc_stack %instance2 : $*Builtin.NativeObject
+  %instance3 = alloc_stack [lexical] $Builtin.NativeObject
+  dealloc_stack %instance3 : $*Builtin.NativeObject
+  %instance4 = alloc_stack [dynamic_lifetime] [lexical] $Builtin.NativeObject
+  dealloc_stack %instance4 : $*Builtin.NativeObject
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_alloc_stack_lexical
+// CHECK: alloc_stack
+// CHECK: alloc_stack [dynamic_lifetime]
+// CHECK: alloc_stack [lexical]
+// CHECK: alloc_stack [dynamic_lifetime] [lexical]
+// CHECK-LABEL: } // end sil function 'caller_alloc_stack_lexical'
+sil [ossa] @caller_alloc_stack_lexical : $@convention(thin) () -> () {
+  %callee_alloc_stack = function_ref @callee_alloc_stack : $@convention(thin) () -> ()
+  %res = apply %callee_alloc_stack() : $@convention(thin) () -> ()
   return %res : $()
 }

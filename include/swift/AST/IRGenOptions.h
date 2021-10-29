@@ -81,6 +81,12 @@ enum class IRGenEmbedMode : unsigned {
   EmbedBitcode
 };
 
+enum class SwiftAsyncFramePointerKind : unsigned {
+   Auto, // Choose Swift async extended frame info based on deployment target.
+   Always, // Unconditionally emit Swift async extended frame info.
+   Never,  // Don't emit Swift async extended frame info.
+};
+
 using clang::PointerAuthSchema;
 
 struct PointerAuthOptions : clang::PointerAuthOptions {
@@ -282,6 +288,8 @@ public:
 
   IRGenLLVMLTOKind LLVMLTOKind : 2;
 
+  SwiftAsyncFramePointerKind SwiftAsyncFramePointer : 2;
+
   /// Add names to LLVM values.
   unsigned HasValueNamesSetting : 1;
   unsigned ValueNames : 1;
@@ -327,6 +335,10 @@ public:
   /// vw functions instead of outlined copy/destroy functions.
   unsigned UseTypeLayoutValueHandling : 1;
 
+  /// Also force structs to be lowered to aligned group TypeLayouts rather than
+  /// using TypeInfo entries.
+  unsigned ForceStructTypeLayouts : 1;
+
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 
@@ -344,6 +356,14 @@ public:
   unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
 
   unsigned EnableGlobalISel : 1;
+
+  unsigned VirtualFunctionElimination : 1;
+
+  unsigned WitnessMethodElimination : 1;
+
+  unsigned ConditionalRuntimeRecords : 1;
+
+  unsigned InternalizeAtLink : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -391,17 +411,22 @@ public:
         Playground(false),
         EmitStackPromotionChecks(false), FunctionSections(false),
         PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
-        LLVMLTOKind(IRGenLLVMLTOKind::None), HasValueNamesSetting(false),
+        LLVMLTOKind(IRGenLLVMLTOKind::None),
+        SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
+        HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
-        UseTypeLayoutValueHandling(true),
+        UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),
-        EnableGlobalISel(false), CmdArgs(),
+        EnableGlobalISel(false), VirtualFunctionElimination(false),
+        WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
+        InternalizeAtLink(false),
+        CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 

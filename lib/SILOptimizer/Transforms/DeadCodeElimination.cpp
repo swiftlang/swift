@@ -284,18 +284,23 @@ void DCE::markLive() {
         // Nested borrow handling can be complex in the presence of reborrows.
         // So it is not handled currently.
         auto *borrowInst = cast<BeginBorrowInst>(&I);
-        if (borrowInst->getOperand().getOwnershipKind() !=
-            OwnershipKind::Owned) {
+        if (borrowInst->getOperand().getOwnershipKind() ==
+            OwnershipKind::Guaranteed) {
           markInstructionLive(borrowInst);
-          // Visit all end_borrows and mark them live
-          visitTransitiveEndBorrows(BorrowedValue(borrowInst),
-            [&](EndBorrowInst *endBorrow) {
-              markInstructionLive(endBorrow);
-            });
+          // Visit the end_borrows of all the borrow scopes that this
+          // begin_borrow could be borrowing.
+          SmallVector<SILValue, 4> roots;
+          findGuaranteedReferenceRoots(borrowInst->getOperand(), roots);
+          for (auto root : roots) {
+            visitTransitiveEndBorrows(BorrowedValue(root),
+                                      [&](EndBorrowInst *endBorrow) {
+                                        markInstructionLive(endBorrow);
+                                      });
+          }
           continue;
         }
         // If not populate reborrowDependencies for this borrow
-        findReborrowDependencies(cast<BeginBorrowInst>(&I));
+        findReborrowDependencies(borrowInst);
         break;
       }
       default:
@@ -601,13 +606,19 @@ bool DCE::removeDead() {
           // may also have been dead and a destroy_value of its baseValue may
           // have been inserted before the pred's terminator. Make sure to
           // adjust the insertPt before any destroy_value.
+          //
+          // FIXME: This code currently can reorder destroys, e.g., when the
+          //        block already contains a destroy_value just before the
+          //        terminator.  Fix this by making note of the added
+          //        destroy_value insts and only moving the insertion point
+          //        before those that are newly added.
           for (SILInstruction &predInst : llvm::reverse(*pred)) {
             if (&predInst == predTerm)
               continue;
             if (!isa<DestroyValueInst>(&predInst)) {
-              insertPt = &*std::next(predInst.getIterator());
               break;
             }
+            insertPt = &predInst;
           }
         }
 

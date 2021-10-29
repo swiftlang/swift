@@ -29,8 +29,11 @@ In contrast to LLVM IR, SIL is a generally target-independent format
 representation that can be used for code distribution, but it can also express
 target-specific concepts as well as LLVM can.
 
-For more information on developing the implementation of SIL and SIL passes, see
-`SILProgrammersManual.md <SILProgrammersManual.md>`_.
+For more information on developing the implementation of SIL and SIL passes, see:
+
+- `SILProgrammersManual.md <SILProgrammersManual.md>`_.
+- `SILFunctionConventions.md <SILFunctionConventions.md>`_.
+- `SILMemoryAccess.md <SILMemoryAccess.md>`_.
 
 SIL in the Swift Compiler
 -------------------------
@@ -3079,7 +3082,7 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? '[lexical]'? sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
   // %1 has type $*T
@@ -3101,6 +3104,9 @@ deallocated in last-in, first-out stack order.
 The ``dynamic_lifetime`` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time.
 This is the case, e.g. for conditionally initialized objects.
+
+The optional ``lexical`` attribute specifies that the storage corresponds to a
+local variable in the Swift source.
 
 The memory is not retainable. To allocate a retainable box for a value
 type, use ``alloc_box``.
@@ -3191,23 +3197,6 @@ count of zero destroys the contained value as if by ``destroy_addr``.
 Releasing a box is undefined behavior if the box's value is uninitialized.
 To deallocate a box whose value has not been initialized, ``dealloc_box``
 should be used.
-
-alloc_value_buffer
-``````````````````
-
-::
-
-   sil-instruction ::= 'alloc_value_buffer' sil-type 'in' sil-operand
-
-   %1 = alloc_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-   // The result has type $*(Int, T).
-
-Given the address of an unallocated value buffer, allocate space in it
-for a value of the given type.  This instruction has undefined
-behavior if the value buffer is currently allocated.
-
-The type operand must be a lowered object type.
 
 alloc_global
 ````````````
@@ -3436,44 +3425,6 @@ This does not destroy the reference type instance. The contents of the
 heap object must have been fully uninitialized or destroyed before
 ``dealloc_ref`` is applied.
 
-dealloc_value_buffer
-````````````````````
-
-::
-
-   sil-instruction ::= 'dealloc_value_buffer' sil-type 'in' sil-operand
-
-   dealloc_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-
-Given the address of a value buffer, deallocate the storage in it.
-This instruction has undefined behavior if the value buffer is not
-currently allocated, or if it was allocated with a type other than the
-type operand.
-
-The type operand must be a lowered object type.
-
-project_value_buffer
-````````````````````
-
-::
-
-   sil-instruction ::= 'project_value_buffer' sil-type 'in' sil-operand
-
-   %1 = project_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-   // The result has type $*(Int, T).
-
-Given the address of a value buffer, return the address of the value
-storage in it.  This instruction has undefined behavior if the value
-buffer is not currently allocated, or if it was allocated with a type
-other than the type operand.
-
-The result is the same value as was originally returned by
-``alloc_value_buffer``.
-
-The type operand must be a lowered object type.
-
 Debug Information
 ~~~~~~~~~~~~~~~~~
 
@@ -3668,7 +3619,7 @@ begin_borrow
 
 ::
 
-   sil-instruction ::= 'begin_borrow' '[defined]'? sil-operand
+   sil-instruction ::= 'begin_borrow' '[lexical]'? sil-operand
 
    %1 = begin_borrow %0 : $T
 
@@ -3681,7 +3632,7 @@ region in between this borrow and its lifetime ending use, ``%0`` must be
 live. This makes sense semantically since ``%1`` is modeling a new value with a
 dependent lifetime on ``%0``.
 
-The optional ``defined`` attribute specifies that the operand corresponds to a
+The optional ``lexical`` attribute specifies that the operand corresponds to a
 local variable in the Swift source, so special care must be taken when moving
 the end_borrow.
 
@@ -3836,7 +3787,7 @@ mark_function_escape
 
   sil-instruction ::= 'mark_function_escape' sil-operand (',' sil-operand)
 
-  %2 = mark_function_escape %1 : $*T
+  mark_function_escape %1 : $*T
 
 Indicates that a function definition closes over a symbolic memory location.
 This instruction is variadic, and all of its operands must be addresses.
@@ -6194,7 +6145,8 @@ pointer_to_address
 ``````````````````
 ::
 
-  sil-instruction ::= 'pointer_to_address' sil-operand 'to' ('[' 'strict' ']')? sil-type
+  sil-instruction ::= 'pointer_to_address' sil-operand 'to' ('[' 'strict' ']')? ('[' 'invariant' ']')? ('[' 'alignment' '=' alignment ']')? sil-type
+  alignment ::= [0-9]+
 
   %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
   // %1 will be of type $*T
@@ -6214,6 +6166,12 @@ type. A memory access from an address that is not strict cannot have
 its address substituted with a strict address, even if other nearby
 memory accesses at the same location are strict.
 
+The ``invariant`` flag is set if loading from the returned address
+always produces the same value.
+
+The ``alignment`` integer value specifies the byte alignment of the
+address. ``alignment=0`` is the default, indicating the natural
+alignment of ``T``.
 
 unchecked_ref_cast
 ``````````````````

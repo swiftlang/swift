@@ -22,7 +22,7 @@ import TestsUtils
 //  - Uniquing initializer for Dictionary with short string keys
 //
 
-public let WordCount = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "WordSplitASCII",
     runFunction: run_WordSplitASCII,
@@ -206,19 +206,19 @@ struct Words: IteratorProtocol, Sequence {
 }
 
 @inline(never)
-public func run_WordSplitASCII(_ N: Int) {
-  for _ in 1...N {
+public func run_WordSplitASCII(_ n: Int) {
+  for _ in 1...n {
     let words = Array(Words(identity(asciiText)))
-    CheckResults(words.count == 280)
+    check(words.count == 280)
     blackHole(words)
   }
 }
 
 @inline(never)
-public func run_WordSplitUTF16(_ N: Int) {
-  for _ in 1...N {
+public func run_WordSplitUTF16(_ n: Int) {
+  for _ in 1...n {
     let words = Array(Words(identity(utf16Text)))
-    CheckResults(words.count == 280)
+    check(words.count == 280)
     blackHole(words)
   }
 }
@@ -227,19 +227,19 @@ let asciiWords = Array(Words(asciiText))
 let utf16Words = Array(Words(utf16Text))
 
 @inline(never)
-public func run_WordCountUniqueASCII(_ N: Int) {
-  for _ in 1...10*N {
+public func run_WordCountUniqueASCII(_ n: Int) {
+  for _ in 1...10*n {
     let words = Set(identity(asciiWords))
-    CheckResults(words.count == 168)
+    check(words.count == 168)
     blackHole(words)
   }
 }
 
 @inline(never)
-public func run_WordCountUniqueUTF16(_ N: Int) {
-  for _ in 1...10*N {
+public func run_WordCountUniqueUTF16(_ n: Int) {
+  for _ in 1...10*n {
     let words = Set(identity(utf16Words))
-    CheckResults(words.count == 168)
+    check(words.count == 168)
     blackHole(words)
   }
 }
@@ -257,21 +257,21 @@ where S.Element == String {
 }
 
 @inline(never)
-public func run_WordCountHistogramASCII(_ N: Int) {
-  for _ in 1...N {
+public func run_WordCountHistogramASCII(_ n: Int) {
+  for _ in 1...n {
     let words = histogram(for: identity(asciiWords))
-    CheckResults(words.count == 168)
-    CheckResults(words[0] == ("and", 15))
+    check(words.count == 168)
+    check(words[0] == ("and", 15))
     blackHole(words)
   }
 }
 
 @inline(never)
-public func run_WordCountHistogramUTF16(_ N: Int) {
-  for _ in 1...N {
+public func run_WordCountHistogramUTF16(_ n: Int) {
+  for _ in 1...n {
     let words = histogram(for: identity(utf16Words))
-    CheckResults(words.count == 168)
-    CheckResults(words[0] == ("and", 15))
+    check(words.count == 168)
+    check(words[0] == ("and", 15))
     blackHole(words)
   }
 }

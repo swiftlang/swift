@@ -64,7 +64,6 @@ extension AsyncSequence {
 /// An asynchronous sequence that concatenates the results of calling a given
 /// error-throwing transformation with each element of this sequence.
 @available(SwiftStdlib 5.5, *)
-@frozen
 public struct AsyncThrowingFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -93,7 +92,6 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the flat map sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator

@@ -39,7 +39,7 @@ TEST(FileSystem, MoveFileIfDifferentEmpty) {
   path::append(sourceFile, "source.txt");
   {
     std::error_code error;
-    llvm::raw_fd_ostream emptyOut(sourceFile, error, fs::F_None);
+    llvm::raw_fd_ostream emptyOut(sourceFile, error, fs::OF_None);
     ASSERT_NO_ERROR(error);
   }
 
@@ -63,7 +63,7 @@ TEST(FileSystem, MoveFileIfDifferentEmpty) {
   // Test 2: Move empty over empty.
   {
     std::error_code error;
-    llvm::raw_fd_ostream emptyOut(destFile, error, fs::F_None);
+    llvm::raw_fd_ostream emptyOut(destFile, error, fs::OF_None);
     ASSERT_NO_ERROR(error);
   }
 
@@ -84,7 +84,7 @@ TEST(FileSystem, MoveFileIfDifferentEmpty) {
   // Test 3: Move empty over non-empty.
   {
     std::error_code error;
-    llvm::raw_fd_ostream nonEmptyOut(destFile, error, fs::F_None);
+    llvm::raw_fd_ostream nonEmptyOut(destFile, error, fs::OF_None);
     ASSERT_NO_ERROR(error);
     nonEmptyOut << "a";
   }
@@ -123,7 +123,7 @@ TEST(FileSystem, MoveFileIfDifferentNonEmpty) {
   path::append(sourceFile, "source.txt");
   {
     std::error_code error;
-    llvm::raw_fd_ostream sourceOut(sourceFile, error, fs::F_None);
+    llvm::raw_fd_ostream sourceOut(sourceFile, error, fs::OF_None);
     sourceOut << "original";
     ASSERT_NO_ERROR(error);
   }
@@ -148,7 +148,7 @@ TEST(FileSystem, MoveFileIfDifferentNonEmpty) {
   // Test 2: Move source over empty.
   {
     std::error_code error;
-    llvm::raw_fd_ostream emptyOut(destFile, error, fs::F_None);
+    llvm::raw_fd_ostream emptyOut(destFile, error, fs::OF_None);
     ASSERT_NO_ERROR(error);
   }
 
@@ -168,7 +168,7 @@ TEST(FileSystem, MoveFileIfDifferentNonEmpty) {
   // Test 3: Move source over non-empty-but-different.
   {
     std::error_code error;
-    llvm::raw_fd_ostream nonEmptyOut(destFile, error, fs::F_None);
+    llvm::raw_fd_ostream nonEmptyOut(destFile, error, fs::OF_None);
     ASSERT_NO_ERROR(error);
     nonEmptyOut << "different";
   }
@@ -188,7 +188,7 @@ TEST(FileSystem, MoveFileIfDifferentNonEmpty) {
   // Test 4: Move source over identical.
   {
     std::error_code error;
-    llvm::raw_fd_ostream nonEmptyOut(destFile, error, fs::F_None);
+    llvm::raw_fd_ostream nonEmptyOut(destFile, error, fs::OF_None);
     ASSERT_NO_ERROR(error);
     nonEmptyOut << "original";
   }
@@ -233,7 +233,7 @@ TEST(FileSystem, MoveFileIfDifferentNonExistent) {
 
   {
     std::error_code error;
-    llvm::raw_fd_ostream emptyOut(destFile, error, fs::F_None);
+    llvm::raw_fd_ostream emptyOut(destFile, error, fs::OF_None);
     ASSERT_NO_ERROR(error);
   }
 
@@ -254,7 +254,7 @@ TEST(FileSystem, MoveFileIfDifferentInvalid) {
   path::append(sourceFile, "source.txt");
   {
     std::error_code error;
-    llvm::raw_fd_ostream emptyOut(sourceFile, error, fs::F_None);
+    llvm::raw_fd_ostream emptyOut(sourceFile, error, fs::OF_None);
     ASSERT_NO_ERROR(error);
   }
 

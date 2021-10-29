@@ -1,6 +1,9 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
+// Freestanding doesn't support environment variables, and this test depends on SWIFT_DETERMINISTIC_HASHING=1
+// UNSUPPORTED: freestanding
+
 import Swift
 import SwiftPrivate
 import StdlibUnittest

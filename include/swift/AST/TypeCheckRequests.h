@@ -368,6 +368,44 @@ public:
   void cacheResult(bool value) const;
 };
 
+class StructuralRequirementsRequest :
+    public SimpleRequest<StructuralRequirementsRequest,
+                         ArrayRef<StructuralRequirement>(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<StructuralRequirement>
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class ProtocolDependenciesRequest :
+    public SimpleRequest<ProtocolDependenciesRequest,
+                         ArrayRef<ProtocolDecl *>(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<ProtocolDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Compute the requirements that describe a protocol.
 class RequirementSignatureRequest :
     public SimpleRequest<RequirementSignatureRequest,
@@ -421,6 +459,8 @@ struct WhereClauseOwner {
                      SpecializeAttr *, DifferentiableAttr *>
       source;
 
+  WhereClauseOwner() : dc(nullptr) {}
+
   WhereClauseOwner(GenericContext *genCtx);
   WhereClauseOwner(AssociatedTypeDecl *atd);
 
@@ -440,6 +480,10 @@ struct WhereClauseOwner {
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
     return llvm::hash_value(owner.source.getOpaqueValue());
+  }
+
+  operator bool() const {
+    return dc != nullptr;
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,
@@ -1399,11 +1443,12 @@ public:
 class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
                          GenericSignature (ModuleDecl *,
-                                            const GenericSignatureImpl *,
-                                            GenericParamSource,
-                                            SmallVector<Requirement, 2>,
-                                            SmallVector<TypeLoc, 2>,
-                                            bool),
+                                           const GenericSignatureImpl *,
+                                           GenericParamList *,
+                                           WhereClauseOwner,
+                                           SmallVector<Requirement, 2>,
+                                           SmallVector<TypeLoc, 2>,
+                                           bool),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1414,9 +1459,10 @@ private:
   // Evaluation.
   GenericSignature
   evaluate(Evaluator &evaluator,
-           ModuleDecl *module,
+           ModuleDecl *parentModule,
            const GenericSignatureImpl *baseSignature,
-           GenericParamSource paramSource,
+           GenericParamList *genericParams,
+           WhereClauseOwner whereClause,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
            bool allowConcreteGenericParams) const;

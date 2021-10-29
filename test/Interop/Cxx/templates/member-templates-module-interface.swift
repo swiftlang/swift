@@ -13,8 +13,8 @@
 // CHECK: }
 
 // CHECK: struct __CxxTemplateInst32TemplateClassWithMemberTemplatesIiE {
-// CHECK:   var value: Int32
 // CHECK:   init(_ val: Int32)
+// CHECK:   var value: Int32
 // CHECK:   mutating func setValue<U>(_ val: U)
 // CHECK: }
 

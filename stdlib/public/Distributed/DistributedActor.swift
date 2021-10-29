@@ -35,7 +35,7 @@ public protocol AnyActor: Sendable, AnyObject {}
 /// distributed actor.
 @available(SwiftStdlib 5.5, *)
 public protocol DistributedActor:
-    AnyActor, Identifiable, Hashable, Codable {
+    AnyActor, Sendable, Identifiable, Hashable, Codable {
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.
     ///
@@ -113,6 +113,28 @@ extension DistributedActor {
   nonisolated public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.id)
+  }
+}
+
+// ==== Local actor special handling -------------------------------------------
+
+@available(SwiftStdlib 5.5, *)
+extension DistributedActor {
+
+  /// Executes the passed 'body' only when the distributed actor is local instance.
+  ///
+  /// The `Self` passed to the the body closure is isolated, meaning that the
+  /// closure can be used to call non-distributed functions, or even access actor
+  /// state.
+  ///
+  /// When the actor is remote, the closure won't be executed and this function will return nil.
+  public nonisolated func whenLocal<T>(_ body: @Sendable (isolated Self) async throws -> T)
+    async rethrows -> T? where T: Sendable {
+    if __isLocalActor(self) {
+       return try await body(self)
+    } else {
+      return nil
+    }
   }
 }
 
@@ -221,10 +243,3 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 @_silgen_name("swift_distributedActor_remote_initialize")
 func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
-
-/// Called to destroy the default actor instance in an actor.
-/// The implementation will call this within the actor's deinit.
-///
-/// This will call `actorTransport.resignIdentity(self.id)`.
-@_silgen_name("swift_distributedActor_destroy")
-func _distributedActorDestroy(_ actor: AnyObject)

@@ -628,6 +628,9 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
                 expectEqual(a, b.applying(diff.inverse())!)
               }}}}}}
   }
+}
+
+if #available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *) {
 
   suite.test("Fast applicator error condition") {
     let bear = "bear"
@@ -690,6 +693,9 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
       .insert(offset: base.count, element: 4, associatedWith: nil)
     ])!))
   }
+}
+
+if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
 
   suite.test("Fast applicator fuzzer") {
     func makeArray() -> [Int] {

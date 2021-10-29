@@ -13,6 +13,8 @@
 #define DEBUG_TYPE "sil-inliner"
 
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/AST/Builtins.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -20,6 +22,7 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+
 using namespace swift;
 
 static bool canInlineBeginApply(BeginApplyInst *BA) {
@@ -289,13 +292,17 @@ protected:
   void visitHopToExecutorInst(HopToExecutorInst *Inst);
 
   void visitTerminator(SILBasicBlock *BB);
+  void visitBuiltinInst(BuiltinInst *BI);
 
   /// This hook is called after either of the top-level visitors:
   /// cloneReachableBlocks or cloneSILFunction.
   ///
-  /// After fixUp, the SIL must be valid and semantically equivalent to the SIL
-  /// before cloning.
-  void fixUp(SILFunction *calleeFunction);
+  /// After `preFixUp` is called `commonFixUp` will be called.
+  void preFixUp(SILFunction *calleeFunction);
+
+  /// After postFixUp, the SIL must be valid and semantically equivalent to the
+  /// SIL before cloning.
+  void postFixUp(SILFunction *calleeFunction);
 
   const SILDebugScope *getOrCreateInlineScope(const SILDebugScope *DS);
 
@@ -424,17 +431,19 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   SmallVector<SILValue, 4> entryArgs;
   entryArgs.reserve(AppliedArgs.size());
   SmallBitVector borrowedArgs(AppliedArgs.size());
+  SmallBitVector copiedArgs(AppliedArgs.size());
 
   auto calleeConv = getCalleeFunction()->getConventions();
   for (auto p : llvm::enumerate(AppliedArgs)) {
     SILValue callArg = p.value();
     unsigned idx = p.index();
-    // Insert begin/end borrow for guaranteed arguments.
-    if (idx >= calleeConv.getSILArgIndexOfFirstParam() &&
-        calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
-      if (SILValue newValue = borrowFunctionArgument(callArg, Apply)) {
-        callArg = newValue;
-        borrowedArgs[idx] = true;
+    if (idx >= calleeConv.getSILArgIndexOfFirstParam()) {
+      // Insert begin/end borrow for guaranteed arguments.
+      if (calleeConv.getParamInfoForSILArg(idx).isGuaranteed()) {
+        if (SILValue newValue = borrowFunctionArgument(callArg, Apply)) {
+          callArg = newValue;
+          borrowedArgs[idx] = true;
+        }
       }
     }
     entryArgs.push_back(callArg);
@@ -443,7 +452,6 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   // Create the return block and set ReturnToBB for use in visitTerminator
   // callbacks.
   SILBasicBlock *callerBlock = Apply.getParent();
-  SILBasicBlock *throwBlock = nullptr;
   SmallVector<SILInstruction *, 1> endBorrowInsertPts;
 
   switch (Apply.getKind()) {
@@ -476,7 +484,7 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
     auto *tai = cast<TryApplyInst>(Apply);
     ReturnToBB = tai->getNormalBB();
     endBorrowInsertPts.push_back(&*ReturnToBB->begin());
-    throwBlock = tai->getErrorBB();
+    endBorrowInsertPts.push_back(&*tai->getErrorBB()->begin());
     break;
   }
   }
@@ -492,11 +500,6 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
       for (auto *insertPt : endBorrowInsertPts) {
         SILBuilderWithScope returnBuilder(insertPt, getBuilder());
         returnBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
-      }
-
-      if (throwBlock) {
-        SILBuilderWithScope throwBuilder(throwBlock->begin(), getBuilder());
-        throwBuilder.createEndBorrow(Apply.getLoc(), entryArgs[i]);
       }
     }
   }
@@ -567,12 +570,14 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
   visit(BB->getTerminator());
 }
 
-void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
+void SILInlineCloner::preFixUp(SILFunction *calleeFunction) {
   // "Completing" the BeginApply only fixes the end of the apply scope. The
   // begin_apply itself lingers.
   if (BeginApply)
     BeginApply->complete();
+}
 
+void SILInlineCloner::postFixUp(SILFunction *calleeFunction) {
   NextIter = std::next(Apply.getInstruction()->getIterator());
 
   assert(!Apply.getInstruction()->hasUsesOfAnyResult());
@@ -596,13 +601,28 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
                                                  FullApplySite AI) {
-  if (!AI.getFunction()->hasOwnership() ||
-      callArg.getOwnershipKind() != OwnershipKind::Owned) {
+  auto enableLexicalLifetimes = Apply.getFunction()
+                                    ->getModule()
+                                    .getASTContext()
+                                    .SILOpts.EnableExperimentalLexicalLifetimes;
+  auto argOwnershipRequiresBorrow = [&]() {
+    auto kind = callArg.getOwnershipKind();
+    if (enableLexicalLifetimes) {
+      // At this point, we know that the function argument is @guaranteed.
+      // If the value passed as that parameter has ownership, always add a
+      // lexical borrow scope to ensure that the value stays alive for the
+      // duration of the inlined callee.
+      return kind != OwnershipKind::None;
+    }
+    return kind == OwnershipKind::Owned;
+  };
+  if (!AI.getFunction()->hasOwnership() || !argOwnershipRequiresBorrow()) {
     return SILValue();
   }
 
   SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
-  return beginBuilder.createBeginBorrow(AI.getLoc(), callArg);
+  return beginBuilder.createBeginBorrow(AI.getLoc(), callArg,
+                                        /*isLexical=*/enableLexicalLifetimes);
 }
 
 void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {
@@ -612,6 +632,7 @@ void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {
 
   return SILCloner<SILInlineCloner>::visitDebugValueInst(Inst);
 }
+
 void SILInlineCloner::visitHopToExecutorInst(HopToExecutorInst *Inst) {
   // Drop hop_to_executor in non async functions.
   if (!Apply.getFunction()->isAsync()) {
@@ -621,6 +642,7 @@ void SILInlineCloner::visitHopToExecutorInst(HopToExecutorInst *Inst) {
 
   return SILCloner<SILInlineCloner>::visitHopToExecutorInst(Inst);
 }
+
 const SILDebugScope *
 SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (!CalleeScope)
@@ -647,6 +669,55 @@ SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
       ParentScope ? getOrCreateInlineScope(ParentScope) : nullptr, InlinedAt);
   InlinedScopeCache.insert({CalleeScope, InlinedScope});
   return InlinedScope;
+}
+
+template <typename... T, typename... U>
+static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
+                     U &&...args) {
+  Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
+
+void SILInlineCloner::visitBuiltinInst(BuiltinInst *Inst) {
+  if (IKind == InlineKind::MandatoryInline) {
+    if (auto kind = Inst->getBuiltinKind()) {
+      if (*kind == BuiltinValueKind::Move) {
+        auto otherResultAddr = getOpValue(Inst->getOperand(0));
+        auto otherSrcAddr = getOpValue(Inst->getOperand(1));
+        auto otherType = otherSrcAddr->getType();
+
+        if (!otherType.isLoadable(*Inst->getFunction())) {
+          // If otherType is not loadable, emit a diagnostic since it was used
+          // on a generic or existential value.
+          diagnose(Inst->getModule().getASTContext(),
+                   getOpLocation(Inst->getLoc()).getSourceLoc(),
+                   diag::move_operator_used_on_generic_or_existential_value);
+          return SILCloner<SILInlineCloner>::visitBuiltinInst(Inst);
+        }
+
+        // If our otherType is loadable, convert it to move_value.
+        getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+        // We stash otherValue in originalOtherValue in case we need to
+        // perform a writeback.
+        auto opLoc = getOpLocation(Inst->getLoc());
+
+        assert(otherType.isAddress());
+
+        SILValue otherValue = getBuilder().emitLoadValueOperation(
+            opLoc, otherSrcAddr, LoadOwnershipQualifier::Take);
+
+        auto *mvi = getBuilder().createMoveValue(opLoc, otherValue);
+
+        getBuilder().emitStoreValueOperation(opLoc, mvi, otherResultAddr,
+                                             StoreOwnershipQualifier::Init);
+
+        // We know that Inst returns a tuple value that isn't used by anything
+        // else, so this /should/ be safe.
+        return recordClonedInstruction(Inst, mvi);
+      }
+    }
+  }
+
+  return SILCloner<SILInlineCloner>::visitBuiltinInst(Inst);
 }
 
 //===----------------------------------------------------------------------===//
@@ -802,7 +873,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocValueBufferInst:
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
@@ -827,12 +897,10 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::DeallocStackInst:
-  case SILInstructionKind::DeallocValueBufferInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::EndApplyInst:
-  case SILInstructionKind::ProjectValueBufferInst:
   case SILInstructionKind::ProjectBoxInst:
   case SILInstructionKind::ProjectExistentialBoxInst:
   case SILInstructionKind::ReleaseValueInst:

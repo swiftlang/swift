@@ -334,6 +334,14 @@ extension Substring {
   public struct UTF8View: Sendable {
     @usableFromInline
     internal var _slice: Slice<String.UTF8View>
+
+    /// Creates an instance that slices `base` at `_bounds`.
+    @inlinable
+    internal init(_ base: String.UTF8View, _bounds: Range<Index>) {
+      _slice = Slice(
+        base: String(base._guts).utf8,
+        bounds: _bounds)
+    }
   }
 }
 
@@ -342,14 +350,6 @@ extension Substring.UTF8View: BidirectionalCollection {
   public typealias Indices = String.UTF8View.Indices
   public typealias Element = String.UTF8View.Element
   public typealias SubSequence = Substring.UTF8View
-
-  /// Creates an instance that slices `base` at `_bounds`.
-  @inlinable
-  internal init(_ base: String.UTF8View, _bounds: Range<Index>) {
-    _slice = Slice(
-      base: String(base._guts).utf8,
-      bounds: _bounds)
-  }
 
   //
   // Plumb slice operations through
@@ -471,6 +471,14 @@ extension Substring {
   public struct UTF16View: Sendable {
     @usableFromInline
     internal var _slice: Slice<String.UTF16View>
+
+    /// Creates an instance that slices `base` at `_bounds`.
+    @inlinable
+    internal init(_ base: String.UTF16View, _bounds: Range<Index>) {
+      _slice = Slice(
+        base: String(base._guts).utf16,
+        bounds: _bounds)
+    }
   }
 }
 
@@ -479,14 +487,6 @@ extension Substring.UTF16View: BidirectionalCollection {
   public typealias Indices = String.UTF16View.Indices
   public typealias Element = String.UTF16View.Element
   public typealias SubSequence = Substring.UTF16View
-
-  /// Creates an instance that slices `base` at `_bounds`.
-  @inlinable
-  internal init(_ base: String.UTF16View, _bounds: Range<Index>) {
-    _slice = Slice(
-      base: String(base._guts).utf16,
-      bounds: _bounds)
-  }
 
   //
   // Plumb slice operations through
@@ -597,6 +597,14 @@ extension Substring {
   public struct UnicodeScalarView: Sendable {
     @usableFromInline
     internal var _slice: Slice<String.UnicodeScalarView>
+
+    /// Creates an instance that slices `base` at `_bounds`.
+    @inlinable
+    internal init(_ base: String.UnicodeScalarView, _bounds: Range<Index>) {
+      _slice = Slice(
+        base: String(base._guts).unicodeScalars,
+        bounds: _bounds)
+    }
   }
 }
 
@@ -605,14 +613,6 @@ extension Substring.UnicodeScalarView: BidirectionalCollection {
   public typealias Indices = String.UnicodeScalarView.Indices
   public typealias Element = String.UnicodeScalarView.Element
   public typealias SubSequence = Substring.UnicodeScalarView
-
-  /// Creates an instance that slices `base` at `_bounds`.
-  @inlinable
-  internal init(_ base: String.UnicodeScalarView, _bounds: Range<Index>) {
-    _slice = Slice(
-      base: String(base._guts).unicodeScalars,
-      bounds: _bounds)
-  }
 
   //
   // Plumb slice operations through

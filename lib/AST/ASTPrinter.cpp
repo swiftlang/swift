@@ -30,6 +30,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -44,6 +45,7 @@
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
@@ -263,7 +265,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
     DAK_SetterAccess,
     DAK_Lazy,
     DAK_StaticInitializeObjCMetadata,
-    DAK_RestatedObjCConformance
+    DAK_RestatedObjCConformance,
+    DAK_NonSendable,
   };
 
   return result;
@@ -991,7 +994,7 @@ public:
       }
     }
 
-    
+
     Printer.callPrintDeclPre(D, Options.BracketOptions);
 
     bool haveFeatureChecks = Options.PrintCompatibilityFeatureChecks &&
@@ -2157,10 +2160,58 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   indent();
 }
 
+// This provides logic for looking up all members of a namespace. This is
+// intentionally implemented only in the printer and should *only* be used for
+// debugging, testing, generating module dumps, etc. (In other words, if you're
+// trying to get all the members of a namespace in another part of the compiler,
+// you're probably doing somethign wrong. This is a very expensive operation,
+// so we want to do it only when absolutely nessisary.)
+static void addNamespaceMembers(Decl *decl,
+                                llvm::SmallVector<Decl *, 16> &members) {
+  auto &ctx = decl->getASTContext();
+  auto namespaceDecl = cast<clang::NamespaceDecl>(decl->getClangDecl());
+
+  // This is only to keep track of the members we've already seen.
+  llvm::SmallPtrSet<Decl *, 16> addedMembers;
+  for (auto redecl : namespaceDecl->redecls()) {
+    for (auto member : redecl->decls()) {
+      if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
+        // Add all specializtaions to a worklist so we don't accidently mutate
+        // the list of decls we're iterating over.
+        llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *, 16> specWorklist;
+        for (auto spec : classTemplate->specializations())
+          specWorklist.insert(spec);
+        for (auto spec : specWorklist) {
+          if (auto import =
+                  ctx.getClangModuleLoader()->importDeclDirectly(spec))
+            if (addedMembers.insert(import).second)
+              members.push_back(import);
+        }
+      }
+
+      auto namedDecl = dyn_cast<clang::NamedDecl>(member);
+      if (!namedDecl)
+        continue;
+
+      auto name = ctx.getClangModuleLoader()->importName(namedDecl);
+      if (!name)
+        continue;
+
+      // If we're building libSyntaxParser, #if out the clang importer request
+      // because libSyntaxParser doesn't know about the clang importer.
+      CXXNamespaceMemberLookup lookupRequest({cast<EnumDecl>(decl), name});
+      for (auto found : evaluateOrDefault(ctx.evaluator, lookupRequest, {})) {
+        if (addedMembers.insert(found).second)
+          members.push_back(found);
+      }
+    }
+  }
+}
+
 void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
                                   bool openBracket,
                                   bool closeBracket) {
-  llvm::SmallVector<Decl *, 3> Members;
+  llvm::SmallVector<Decl *, 16> Members;
   auto AddMembers = [&](IterableDeclContext *idc) {
     if (Options.PrintCurrentMembersOnly) {
       for (auto RD : idc->getMembers())
@@ -2187,6 +2238,8 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
         }
       }
     }
+    if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl()))
+      addNamespaceMembers(D, Members);
   }
   printMembers(Members, needComma, openBracket, closeBracket);
 }
@@ -2337,13 +2390,16 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
   llvm::interleave(decl->getImportPath(),
                    [&](const ImportPath::Element &Elem) {
                      if (!Mods.empty()) {
-                       Identifier Name = Elem.Item;
+                       // Should print the module real name in case module
+                       // aliasing is used (see -module-alias), since that's
+                       // the actual binary name.
+                       Identifier Name = decl->getASTContext().getRealModuleName(Elem.Item);
                        if (Options.MapCrossImportOverlaysToDeclaringModule) {
                          if (auto *MD = Mods.front().getAsSwiftModule()) {
                            ModuleDecl *Declaring = const_cast<ModuleDecl*>(MD)
                              ->getDeclaringModuleIfCrossImportOverlay();
                            if (Declaring)
-                             Name = Declaring->getName();
+                             Name = Declaring->getRealName();
                          }
                        }
                        Printer.printModuleRef(Mods.front(), Name);
@@ -2756,6 +2812,10 @@ static bool usesFeatureBuiltinCreateAsyncTaskInGroup(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinMove(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureInheritActorContext(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     for (auto param : *func->getParameters()) {
@@ -2784,14 +2844,14 @@ static bool usesFeatureImplicitSelfCapture(Decl *decl) {
 /// want a baseline version.
 static std::vector<Feature> getFeaturesUsed(Decl *decl) {
   std::vector<Feature> features;
-  
+
   // Go through each of the features, checking whether the declaration uses that
   // feature. This also ensures that the resulting set is in sorted order.
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
   if (usesFeature##FeatureName(decl))                                 \
     features.push_back(Feature::FeatureName);
 #include "swift/Basic/Features.def"
-  
+
   return features;
 }
 
@@ -2852,7 +2912,7 @@ bool swift::printCompatibilityFeatureChecksPre(
   if (features.empty())
     return false;
 
-  printer.printNewline();  
+  printer.printNewline();
   printer << "#if compiler(>=5.3) && ";
   llvm::interleave(features.begin(), features.end(),
     [&](Feature feature) {
@@ -2977,7 +3037,7 @@ void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
   if (PDD->isError()) {
     Printer << tok::pound_error;
   } else {
-    Printer << tok::pound_warning; 
+    Printer << tok::pound_warning;
   }
 
   Printer << "(\"" << PDD->getMessage()->getValue() << "\")";
@@ -3609,7 +3669,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   }
 
   printBodyIfNecessary(decl);
-  
+
   // If the function has an opaque result type, print the opaque type decl.
   if (auto opaqueResult = decl->getOpaqueResultTypeDecl()) {
     Printer.printNewline();
@@ -4321,7 +4381,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
         Mod = Declaring;
     }
 
-    Identifier Name = Mod->getName();
+    // Should use the module real (binary) name here and everywhere else the
+    // module is printed in case module aliasing is used (see -module-alias)
+    Identifier Name = Mod->getRealName();
     if (Options.UseExportedModuleNames && !ExportedModuleName.empty()) {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
@@ -4342,7 +4404,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   bool isLLDBExpressionModule(ModuleDecl *M) {
     if (!M)
       return false;
-    return M->getName().str().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
+    return M->getRealName().str().startswith(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
   }
 
   bool shouldPrintFullyQualified(TypeBase *T) {
@@ -4373,7 +4435,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
     // Don't print qualifiers for types from the standard library.
     if (M->isStdlibModule() ||
-        M->getName() == M->getASTContext().Id_ObjectiveC ||
+        M->getRealName() == M->getASTContext().Id_ObjectiveC ||
         M->isSystemModule() ||
         isLLDBExpressionModule(M))
       return false;
@@ -4636,7 +4698,9 @@ public:
 
   void visitModuleType(ModuleType *T) {
     Printer << "module<";
-    Printer.printModuleRef(T->getModule(), T->getModule()->getName());
+    // Should print the module real name in case module aliasing is
+    // used (see -module-alias), since that's the actual binary name.
+    Printer.printModuleRef(T->getModule(), T->getModule()->getRealName());
     Printer << ">";
   }
 
@@ -4939,7 +5003,7 @@ public:
                });
     Printer << ">";
   }
-  
+
   void visitGenericFunctionType(GenericFunctionType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
     SWIFT_DEFER {
@@ -5021,7 +5085,7 @@ public:
                             PrintAST::PrintRequirements);
       Printer << " ";
     }
-  
+
     // If this is a substituted function type, then its generic signature is
     // independent of the enclosing context, and defines the parameters active
     // in the interface params and results. Unsubstituted types use the existing
@@ -5044,7 +5108,7 @@ public:
                                  PrintAST::PrintRequirements);
       sub->Printer << " ";
     }
-  
+
     // Capture list used here to ensure we don't print anything using `this`
     // printer, but only the sub-Printer.
     [T, sub, &subOptions] {
@@ -5226,7 +5290,7 @@ public:
       Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
     visit(T->getOpenedExistentialType());
   }
-  
+
   void printArchetypeCommon(ArchetypeType *T,
                             const AbstractTypeParamDecl *Decl) {
     if (Options.AlternativeTypeNames) {
@@ -5251,11 +5315,11 @@ public:
     visitParentType(T->getParent());
     printArchetypeCommon(T, T->getAssocType());
   }
-  
+
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
     printArchetypeCommon(T, T->getInterfaceType()->getDecl());
   }
-  
+
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
     switch (Options.OpaqueReturnTypePrinting) {
     case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
@@ -5272,14 +5336,14 @@ public:
       // type.
       Printer << "@_opaqueReturnTypeOf(";
       OpaqueTypeDecl *decl = T->getDecl();
-      
+
       Printer.printEscapedStringLiteral(
                                    decl->getOpaqueReturnTypeIdentifier().str());
-      
+
       Printer << ", " << T->getInterfaceType()
                           ->castTo<GenericTypeParamType>()
                           ->getIndex();
-      
+
       // The identifier after the closing parenthesis is irrelevant and can be
       // anything. It just needs to be there for the @_opaqueReturnTypeOf
       // attribute to apply to, but the attribute alone references the opaque
@@ -5433,7 +5497,7 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
     break;
   }
 }
-  
+
 void LayoutConstraint::dump() const {
   if (!*this) {
     llvm::errs() << "(null)\n";
@@ -5696,13 +5760,13 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(this);
     os << normal->getProtocol()->getName()
-       << " module " << normal->getDeclContext()->getParentModule()->getName();
+       << " module " << normal->getDeclContext()->getParentModule()->getRealName();
     break;
   }
   case ProtocolConformanceKind::Self: {
     auto self = cast<SelfProtocolConformance>(this);
     os << self->getProtocol()->getName()
-       << " module " << self->getDeclContext()->getParentModule()->getName();
+       << " module " << self->getDeclContext()->getParentModule()->getRealName();
     break;
   }
   case ProtocolConformanceKind::Specialized: {

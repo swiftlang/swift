@@ -248,28 +248,36 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
     // Handle the message
     xpc_retain(event);
     dispatch_async(msgHandlingQueue, ^{
-      xpc_object_t contents = xpc_dictionary_get_value(event, "msg");
+      if (xpc_object_t contents =
+              xpc_dictionary_get_value(event, xpc::KeyMsg)) {
+        SourceKitCancellationToken cancelToken =
+            reinterpret_cast<SourceKitCancellationToken>(
+                xpc_dictionary_get_uint64(event, xpc::KeyCancelToken));
+        auto Responder = std::make_shared<XPCResponder>(event, peer);
+        xpc_release(event);
 
-      if (!contents) {
+        assert(xpc_get_type(contents) == XPC_TYPE_ARRAY);
+        sourcekitd_object_t req = xpc_array_get_value(contents, 0);
+        sourcekitd::handleRequest(req, /*CancellationToken=*/cancelToken,
+                                  [Responder](sourcekitd_response_t response) {
+                                    Responder->sendReply(response);
+                                  });
+      } else if (xpc_object_t contents =
+                     xpc_dictionary_get_value(event, "ping")) {
         // Ping back.
-        contents = xpc_dictionary_get_value(event, "ping");
-        assert(contents && "unexpected message");
         xpc_object_t reply = xpc_dictionary_create_reply(event);
+        xpc_release(event);
         assert(reply);
         xpc_connection_send_message(peer, reply);
         xpc_release(reply);
-        return;
+      } else if (SourceKitCancellationToken cancelToken =
+                     reinterpret_cast<SourceKitCancellationToken>(
+                         xpc_dictionary_get_uint64(event,
+                                                   xpc::KeyCancelRequest))) {
+        sourcekitd::cancelRequest(/*CancellationToken=*/cancelToken);
+      } else {
+        assert(false && "unexpected message");
       }
-
-      auto Responder = std::make_shared<XPCResponder>(event, peer);
-      xpc_release(event);
-
-      assert(xpc_get_type(contents) == XPC_TYPE_ARRAY);
-      sourcekitd_object_t req = xpc_array_get_value(contents, 0);
-      sourcekitd::handleRequest(req,
-        [Responder](sourcekitd_response_t response) {
-          Responder->sendReply(response);
-        });
     });
   }
 }

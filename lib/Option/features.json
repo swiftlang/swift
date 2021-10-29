@@ -11,6 +11,9 @@
     },
     {
       "name": "library-level"
+    },
+    {
+      "name": "emit-abi-descriptor"
     }
   ]
 }

@@ -56,7 +56,6 @@ extension AsyncSequence {
 /// An asynchronous sequence that maps a given closure over the asynchronous
 /// sequence’s elements, omitting results that don't return a value.
 @available(SwiftStdlib 5.5, *)
-@frozen
 public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline
   let base: Base
@@ -64,7 +63,7 @@ public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline
   let transform: (Base.Element) async -> ElementOfResult?
 
-  @inlinable
+  @usableFromInline
   init(
     _ base: Base, 
     transform: @escaping (Base.Element) async -> ElementOfResult?
@@ -85,7 +84,6 @@ extension AsyncCompactMapSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the compact map sequence.
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ElementOfResult
 
@@ -95,7 +93,7 @@ extension AsyncCompactMapSequence: AsyncSequence {
     @usableFromInline
     let transform: (Base.Element) async -> ElementOfResult?
 
-    @inlinable
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
       transform: @escaping (Base.Element) async -> ElementOfResult?
