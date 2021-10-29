@@ -516,7 +516,7 @@ extension String {
   ///     memory with room for `capacity` UTF-8 code units, initializes
   ///     that memory, and returns the number of initialized elements.
   @inline(__always)
-  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(SwiftStdlib 5.3, *)
   public init(
     unsafeUninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (

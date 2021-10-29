@@ -1155,7 +1155,7 @@ public struct ${Self}
   ///   `source` must be representable in this type after rounding toward
   ///   zero.
 %     if FloatType == 'Float16':
-  @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(SwiftStdlib 5.3, *)
 %     end
   @_transparent
   public init(_ source: ${FloatType}) {
@@ -1193,7 +1193,7 @@ public struct ${Self}
   ///
   /// - Parameter source: A floating-point value to convert to an integer.
 %     if FloatType == 'Float16':
-  @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(SwiftStdlib 5.3, *)
 %     end
   @_transparent
   public init?(exactly source: ${FloatType}) {

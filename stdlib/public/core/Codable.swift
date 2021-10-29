@@ -4732,7 +4732,7 @@ extension RawRepresentable where RawValue == Float, Self: Decodable {
 }
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 extension Float16: Codable {
   /// Creates a new instance by decoding from the given decoder.
   ///

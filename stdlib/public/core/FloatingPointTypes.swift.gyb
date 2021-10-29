@@ -40,7 +40,7 @@ RawSignificand = 'UInt' + str(SignificandSize)
 
 def Availability(bits):
     if bits == 16:
-        return '@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)'
+        return '@available(SwiftStdlib 5.3, *)'
     return ''
 
 if Self == 'Float16':
@@ -1366,7 +1366,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 ${SelfDocComment}
 @frozen
 %  if bits == 16:
-@available(macOS 11, iOS 14, tvOS 14, watchOS 7, *)
+@available(SwiftStdlib 5.3, *)
 @available(macOS, unavailable)
 @available(macCatalyst, unavailable)
 %  else:
@@ -1385,7 +1385,7 @@ public struct ${Self} {
 // from the implicit conformance emitted into the generated .swiftinterface
 // file. See https://github.com/apple/swift/pull/36669 for details.
 // FIXME: rdar://76092800
-@available(macOS 11, iOS 14, tvOS 14, watchOS 7, *)
+@available(SwiftStdlib 5.3, *)
 @available(macOS, unavailable)
 @available(macCatalyst, unavailable)
 extension ${Self}: Sendable { }
