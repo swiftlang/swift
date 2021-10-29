@@ -1369,7 +1369,7 @@ public:
              numSPIGroups };
   }
 
-  ArrayRef<AvailableAttr *> getAvailabeAttrs() const {
+  ArrayRef<AvailableAttr *> getAvailableAttrs() const {
     return {this->template getTrailingObjects<AvailableAttr *>(),
             numAvailableAttrs};
   }

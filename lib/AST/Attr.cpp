@@ -985,7 +985,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // Don't print the _specialize attribute if we are asked to skip the ones
     // with availability parameters.
     if (!Options.PrintSpecializeAttributeWithAvailability &&
-        !attr->getAvailabeAttrs().empty())
+        !attr->getAvailableAttrs().empty())
       return false;
 
     Printer << "@" << getAttrName() << "(";
@@ -999,7 +999,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "kind: " << kind << ", ";
     if (target)
       Printer << "target: " << target << ", ";
-    auto availAttrs = attr->getAvailabeAttrs();
+    auto availAttrs = attr->getAvailableAttrs();
     if (!availAttrs.empty()) {
       Printer << "availability: ";
       auto numAttrs = availAttrs.size();
