@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "MiscDiagnostics.h"
 #include "TypeChecker.h"
 #include "swift/Sema/ConstraintSystem.h"
 
@@ -1163,11 +1164,16 @@ private:
 
     auto forEachTarget =
         rewriteTarget(*cs.getSolutionApplicationTarget(forEachStmt));
+
     if (!forEachTarget)
       hadError = true;
 
     auto body = visit(forEachStmt->getBody()).get<Stmt *>();
     forEachStmt->setBody(cast<BraceStmt>(body));
+
+    // Check to see if the sequence expr is throwing (in async context),
+    // if so require the stmt to have a `try`.
+    hadError |= diagnoseUnhandledThrowsInAsyncContext(closure, forEachStmt);
 
     return forEachStmt;
   }

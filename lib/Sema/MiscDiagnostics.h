@@ -32,6 +32,7 @@ namespace swift {
   class Stmt;
   class TopLevelCodeDecl;
   class ValueDecl;
+  class ForEachStmt;
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
 void performSyntacticExprDiagnostics(
@@ -115,6 +116,12 @@ void fixItEncloseTrailingClosure(ASTContext &ctx,
 /// we emit a diagnostic suggesting the async call.
 void checkFunctionAsyncUsage(AbstractFunctionDecl *decl);
 void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
+
+/// Detect and diagnose a missing `try` in `for-in` loop sequence
+/// expression in async context (denoted with `await` keyword).
+bool diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
+                                           ForEachStmt *forEach);
+
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

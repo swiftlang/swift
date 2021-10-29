@@ -613,24 +613,10 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   if (!typeCheckExpression(target))
     return failed();
 
-  // check to see if the sequence expr is throwing (and async), if so require 
-  // the stmt to have a try loc
-  if (stmt->getAwaitLoc().isValid()) {
-    // fetch the sequence out of the statement
-    // else wise the value is potentially unresolved
-    auto Ty = stmt->getSequence()->getType();
-    auto module = dc->getParentModule();
-    auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
-    
-    if (conformanceRef.hasEffect(EffectKind::Throws) &&
-        stmt->getTryLoc().isInvalid()) {
-      auto &diags = dc->getASTContext().Diags;
-      diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled, "call")
-        .fixItInsert(stmt->getAwaitLoc(), "try");
-
-      return failed();
-    }
-  }
+  // Check to see if the sequence expr is throwing (in async context),
+  // if so require the stmt to have a `try`.
+  if (diagnoseUnhandledThrowsInAsyncContext(dc, stmt))
+    return failed();
 
   return false;
 }

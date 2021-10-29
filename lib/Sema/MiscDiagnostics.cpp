@@ -5133,3 +5133,33 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
 
   return None;
 }
+
+bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
+                                                  ForEachStmt *forEach) {
+  if (!forEach->getAwaitLoc().isValid())
+    return false;
+
+  auto &ctx = dc->getASTContext();
+
+  auto sequenceProto = TypeChecker::getProtocol(
+      ctx, forEach->getForLoc(), KnownProtocolKind::AsyncSequence);
+
+  if (!sequenceProto)
+    return false;
+
+  // fetch the sequence out of the statement
+  // else wise the value is potentially unresolved
+  auto Ty = forEach->getSequence()->getType();
+  auto module = dc->getParentModule();
+  auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
+
+  if (conformanceRef.hasEffect(EffectKind::Throws) &&
+      forEach->getTryLoc().isInvalid()) {
+    ctx.Diags
+        .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
+        .fixItInsert(forEach->getAwaitLoc(), "try");
+    return true;
+  }
+
+  return false;
+}
