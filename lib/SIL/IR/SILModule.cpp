@@ -151,6 +151,13 @@ SILModule::~SILModule() {
 }
 
 void SILModule::checkForLeaks() const {
+
+  /// Leak checking is not thread safe, because the instruction counters are
+  /// global non-atomic variables. Leak checking can only be done in case there
+  /// is a single SILModule in a single thread.
+  if (!getOptions().checkSILModuleLeaks)
+    return;
+
   int instsInModule = std::distance(scheduledForDeletion.begin(),
                                     scheduledForDeletion.end());
   for (const SILFunction &F : *this) {
