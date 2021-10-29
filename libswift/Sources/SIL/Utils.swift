@@ -81,6 +81,19 @@ extension BridgedStringRef {
   }
 }
 
+#if os(Linux)
+
+extension std.__cxx11.string {
+  public var string: String {
+    // TODO: remove this once a new version of Swift is released (and call
+    // c_str() directly).
+    let mutableSelf = self
+    return String(cString: mutableSelf.c_str())
+  }
+}
+
+#else
+
 extension std.__1.string {
   public var string: String {
     // TODO: remove this once a new version of Swift is released (and call
@@ -89,6 +102,8 @@ extension std.__1.string {
     return String(cString: mutableSelf.c_str())
   }
 }
+
+#endif
 
 extension String {
   public func withBridgedStringRef<T>(_ c: (BridgedStringRef) -> T) -> T {
