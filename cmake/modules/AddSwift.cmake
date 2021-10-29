@@ -741,9 +741,12 @@ function(add_libswift name)
 
   get_bootstrapping_path(build_dir ${CMAKE_CURRENT_BINARY_DIR} "${ALS_BOOTSTRAPPING}")
 
+  set(sdk_option "")
+
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(deployment_version "10.15") # TODO: once #38675 lands, replace this with
 #   set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
+    set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
   endif()
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
       ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
@@ -777,7 +780,7 @@ function(add_libswift name)
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       DEPENDS ${sources} ${deps} ${ALS_DEPENDS}
       COMMAND ${ALS_SWIFT_EXEC} "-c" "-o" ${module_obj_file}
-              "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}"
+              ${sdk_option}
               "-target" ${target}
               "-module-name" ${module} "-emit-module"
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
@@ -980,8 +983,11 @@ function(add_swift_host_tool executable)
     elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
       # At build time link against the built swift libraries from the
       # previous bootstrapping stage.
-      get_bootstrapping_swift_lib_dir(bs_lib_dir "${ASHT_BOOTSTRAPPING}")
-      target_link_directories(${executable} PRIVATE ${bs_lib_dir})
+      if (NOT "${ASHT_BOOTSTRAPPING}" STREQUAL "0")
+        get_bootstrapping_swift_lib_dir(bs_lib_dir "${ASHT_BOOTSTRAPPING}")
+        target_link_directories(${executable} PRIVATE ${bs_lib_dir})
+        target_link_libraries(${executable} PRIVATE "swiftCore")
+      endif()
 
       # At runtime link against the built swift libraries from the current
       # bootstrapping stage.
