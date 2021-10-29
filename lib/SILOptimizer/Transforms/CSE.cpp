@@ -732,8 +732,10 @@ bool CSE::processLazyPropertyGetters() {
     SILBasicBlock *callBlock = ai->getParent();
 
     // Inline the getter...
+    InstructionDeleter deleter;
     SILInliner::inlineFullApply(ai, SILInliner::InlineKind::PerformanceInline,
-                                FuncBuilder);
+                                FuncBuilder, deleter);
+    deleter.cleanupDeadInstructions();
     
     // ...and fold the switch_enum in the first block to the Optional.some case.
     // The Optional.none branch becomes dead.

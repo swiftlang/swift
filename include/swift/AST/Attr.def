@@ -679,6 +679,16 @@ SIMPLE_DECL_ATTR(_noImplicitCopy, NoImplicitCopy,
   OnVar,
   122)
 
+SIMPLE_DECL_ATTR(_noLocks, NoLocks,
+  OnAbstractFunction | OnSubscript | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  123)
+
+SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
+  OnAbstractFunction | OnSubscript | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  124)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 

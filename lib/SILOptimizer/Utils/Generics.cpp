@@ -1829,11 +1829,12 @@ ReabstractionInfo::ReabstractionInfo(ModuleDecl *targetModule,
 GenericFuncSpecializer::GenericFuncSpecializer(
     SILOptFunctionBuilder &FuncBuilder, SILFunction *GenericFunc,
     SubstitutionMap ParamSubs,
-    const ReabstractionInfo &ReInfo)
+    const ReabstractionInfo &ReInfo,
+    bool isMandatory)
     : FuncBuilder(FuncBuilder), M(GenericFunc->getModule()),
       GenericFunc(GenericFunc),
       ParamSubs(ParamSubs),
-      ReInfo(ReInfo) {
+      ReInfo(ReInfo), isMandatory(isMandatory) {
 
   assert((GenericFunc->isDefinition() || ReInfo.isPrespecialized()) &&
          "Expected definition or pre-specialized entry-point to specialize!");
@@ -1888,7 +1889,7 @@ void ReabstractionInfo::verify() const {
 SILFunction *
 GenericFuncSpecializer::tryCreateSpecialization(bool forcePrespecialization) {
   // Do not create any new specializations at Onone.
-  if (!GenericFunc->shouldOptimize() && !forcePrespecialization)
+  if (!GenericFunc->shouldOptimize() && !forcePrespecialization && !isMandatory)
     return nullptr;
 
   LLVM_DEBUG(llvm::dbgs() << "Creating a specialization: "
@@ -2564,7 +2565,8 @@ void swift::trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FuncBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
     SmallVectorImpl<SILFunction *> &NewFunctions,
-    OptRemark::Emitter &ORE) {
+    OptRemark::Emitter &ORE,
+    bool isMandatory) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
   auto *F = Apply.getFunction();
   auto *RefF =
@@ -2683,7 +2685,7 @@ void swift::trySpecializeApplyOfGeneric(
 
   GenericFuncSpecializer FuncSpecializer(FuncBuilder,
                                          RefF, Apply.getSubstitutionMap(),
-                                         ReInfo);
+                                         ReInfo, isMandatory);
   SILFunction *SpecializedF = prespecializedF
                                   ? prespecializedF
                                   : FuncSpecializer.lookupSpecialization();

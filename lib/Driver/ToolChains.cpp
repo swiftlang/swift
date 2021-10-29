@@ -477,6 +477,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-cross-module-optimization");
   }
                                  
+  if (context.Args.hasArg(options::OPT_ExperimentalPerformanceAnnotations)) {
+    Arguments.push_back("-experimental-performance-annotations");
+  }
 
   file_types::ID remarksFileType = file_types::TY_YAMLOptRecord;
   // If a specific format is specified for the remarks, forward that as is.

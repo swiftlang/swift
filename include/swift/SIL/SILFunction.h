@@ -60,6 +60,12 @@ enum IsExactSelfClass_t {
   IsExactSelfClass,
 };
 
+enum class PerformanceConstraints : uint8_t {
+  None = 0,
+  NoAllocation = 1,
+  NoLocks = 2,
+};
+
 class SILSpecializeAttr final {
   friend SILFunction;
 public:
@@ -231,6 +237,8 @@ private:
   AvailabilityContext Availability;
 
   Purpose specialPurpose = Purpose::None;
+
+  PerformanceConstraints perfConstraints = PerformanceConstraints::None;
 
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
@@ -811,6 +819,12 @@ public:
 
   void setOptimizationMode(OptimizationMode mode) {
     OptMode = unsigned(mode);
+  }
+
+  PerformanceConstraints getPerfConstraints() const { return perfConstraints; }
+
+  void setPerfConstraints(PerformanceConstraints perfConstr) {
+    perfConstraints = perfConstr;
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
