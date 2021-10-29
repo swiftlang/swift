@@ -66,3 +66,7 @@ class SwiftDocCRender(product.Product):
         shell.call(["mkdir", "-p", install_path])
         shell.call(
             ["rsync", "-a", artifact_dist_path_with_trailing_slash, install_path])
+
+    @classmethod
+    def get_dependencies(cls):
+        return []
