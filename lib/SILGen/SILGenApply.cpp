@@ -3299,26 +3299,33 @@ private:
   }
   
   void maybeEmitForeignArgument() {
-    if (Foreign.async
-        && Foreign.async->completionHandlerParamIndex() == Args.size()) {
-      SILParameterInfo param = claimNextParameters(1).front();
-      (void)param;
+    bool keepGoing = true;
+    while (keepGoing) {
+      keepGoing = false;
+      if (Foreign.async &&
+          Foreign.async->completionHandlerParamIndex() == Args.size()) {
+        SILParameterInfo param = claimNextParameters(1).front();
+        (void)param;
 
-      // Leave a placeholder in the position. We'll fill this in with a block
-      // capturing the current continuation right before we invoke the
-      // function.
-      // (We can't do this immediately, because evaluating other arguments
-      // may require suspending the async task, which is not allowed while its
-      // continuation is active.)
-      Args.push_back(ManagedValue::forInContext());
-    } else if (Foreign.error
-               && Foreign.error->getErrorParameterIndex() == Args.size()) {
-      SILParameterInfo param = claimNextParameters(1).front();
-      assert(param.getConvention() == ParameterConvention::Direct_Unowned);
-      (void) param;
+        // Leave a placeholder in the position. We'll fill this in with a block
+        // capturing the current continuation right before we invoke the
+        // function.
+        // (We can't do this immediately, because evaluating other arguments
+        // may require suspending the async task, which is not allowed while its
+        // continuation is active.)
+        Args.push_back(ManagedValue::forInContext());
+        keepGoing = true;
+      }
+      if (Foreign.error &&
+          Foreign.error->getErrorParameterIndex() == Args.size()) {
+        SILParameterInfo param = claimNextParameters(1).front();
+        assert(param.getConvention() == ParameterConvention::Direct_Unowned);
+        (void)param;
 
-      // Leave a placeholder in the position.
-      Args.push_back(ManagedValue::forInContext());
+        // Leave a placeholder in the position.
+        Args.push_back(ManagedValue::forInContext());
+        keepGoing = true;
+      }
     }
   }
 
@@ -3541,7 +3548,9 @@ struct ParamLowering {
       }
     }
 
-    if (foreign.error || foreign.async)
+    if (foreign.error)
+      ++count;
+    if (foreign.async)
       ++count;
 
     if (foreign.self.isImportAsMember()) {
@@ -4202,18 +4211,12 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
 
     args.push_back({});
 
-    if (!foreign.async || (foreign.async && foreign.error)) {
-      // Claim the foreign error argument(s) with the method formal params.
-      auto siteForeignError = ForeignInfo{{}, foreign.error, {}};
-      std::move(*callSite).emit(SGF, origFormalType, substFnType, paramLowering,
-                                args.back(), delayedArgs, siteForeignError);
-    }
-    if (foreign.async) {
-      // Claim the foreign async argument(s) with the method formal params.
-      auto siteForeignAsync = ForeignInfo{{}, {}, foreign.async};
-      std::move(*callSite).emit(SGF, origFormalType, substFnType, paramLowering,
-                                args.back(), delayedArgs, siteForeignAsync);
-    }
+    // Claim the foreign error and/or async arguments when claiming the formal
+    // params.
+    auto siteForeignError = ForeignInfo{{}, foreign.error, foreign.async};
+    // Claim the method formal params.
+    std::move(*callSite).emit(SGF, origFormalType, substFnType, paramLowering,
+                              args.back(), delayedArgs, siteForeignError);
   }
 
   uncurriedLoc = callSite->Loc;
