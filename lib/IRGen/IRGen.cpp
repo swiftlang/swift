@@ -231,6 +231,12 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
         llvm::createAlwaysInlinerLegacyPass(/*insertlifetime*/false);
   }
 
+  // LLVM MergeFunctions doesn't understand the string in the metadata on calls
+  // in @llvm.type.checked.load intrinsics is important, and mis-compiles
+  // (mis-merge) unrelated functions.
+  if (Opts.VirtualFunctionElimination || Opts.WitnessMethodElimination)
+    PMBuilder.MergeFunctions = false;
+
   bool RunSwiftSpecificLLVMOptzns =
       !Opts.DisableSwiftSpecificLLVMOptzns && !Opts.DisableLLVMOptzns;
 
