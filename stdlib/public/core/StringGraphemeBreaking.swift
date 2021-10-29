@@ -99,24 +99,14 @@ extension _StringGuts {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
-    let nextIdx: Int
-
     if _slowPath(isForeign) {
-      nextIdx = nextBoundary(startingAt: i) {
-        let scalars = String.UnicodeScalarView(self)
-        let idx = String.Index(_encodedOffset: $0)
+      return _foreignOpaqueCharacterStride(startingAt: i)
+    }
 
-        let scalar = scalars[idx]
-        let nextIdx = scalars.index(after: idx)
-
-        return (scalar, nextIdx._encodedOffset)
-      }
-    } else {
-      nextIdx = withFastUTF8 { utf8 in
-        nextBoundary(startingAt: i) {
-          let (scalar, len) = _decodeScalar(utf8, startingAt: $0)
-          return (scalar, $0 &+ len)
-        }
+    let nextIdx = withFastUTF8 { utf8 in
+      nextBoundary(startingAt: i) {
+        let (scalar, len) = _decodeScalar(utf8, startingAt: $0)
+        return (scalar, $0 &+ len)
       }
     }
 
@@ -126,43 +116,81 @@ extension _StringGuts {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(endingAt i: Int) -> Int {
-    let previousIdx: Int
-
     if _slowPath(isForeign) {
-      previousIdx = previousBoundary(endingAt: i) {
-        let scalars = String.UnicodeScalarView(self)
-        let idx = String.Index(_encodedOffset: $0)
+      return _foreignOpaqueCharacterStride(endingAt: i)
+    }
 
-        let previousIdx = scalars.index(before: idx)
-        let scalar = scalars[previousIdx]
-
-        return (scalar, previousIdx._encodedOffset)
-      }
-    } else {
-      previousIdx = withFastUTF8 { utf8 in
-        previousBoundary(endingAt: i) {
-          let (scalar, len) = _decodeScalar(utf8, endingAt: $0)
-          return (scalar, $0 &- len)
-        }
+    let previousIdx = withFastUTF8 { utf8 in
+      previousBoundary(endingAt: i) {
+        let (scalar, len) = _decodeScalar(utf8, endingAt: $0)
+        return (scalar, $0 &- len)
       }
     }
 
     return i &- previousIdx
   }
+
+  @inline(never)
+  @_effects(releasenone)
+  private func _foreignOpaqueCharacterStride(startingAt i: Int) -> Int {
+#if _runtime(_ObjC)
+    _internalInvariant(isForeign)
+
+    let nextIdx = nextBoundary(startingAt: i) {
+      let scalars = String.UnicodeScalarView(self)
+      let idx = String.Index(_encodedOffset: $0)
+
+      let scalar = scalars[idx]
+      let nextIdx = scalars.index(after: idx)
+
+      return (scalar, nextIdx._encodedOffset)
+    }
+
+    return nextIdx &- i
+#else
+  fatalError("No foreign strings on Linux in this version of Swift")
+#endif
+  }
+
+  @inline(never)
+  @_effects(releasenone)
+  private func _foreignOpaqueCharacterStride(endingAt i: Int) -> Int {
+#if _runtime(_ObjC)
+    _internalInvariant(isForeign)
+
+    let previousIdx = previousBoundary(endingAt: i) {
+      let scalars = String.UnicodeScalarView(self)
+      let idx = String.Index(_encodedOffset: $0)
+
+      let previousIdx = scalars.index(before: idx)
+      let scalar = scalars[previousIdx]
+
+      return (scalar, previousIdx._encodedOffset)
+    }
+
+    return i &- previousIdx
+#else
+  fatalError("No foreign strings on Linux in this version of Swift")
+#endif
+  }
 }
 
 internal struct _GraphemeBreakingState {
-  var isBackwards: Bool = false
+  // When walking forwards in a string, we need to know whether or not we've
+  // entered an emoji sequence to be able to eventually break after all of the
+  // emoji's various extenders and zero width joiners. This bit allows us to
+  // keep track of whether or not we're still in an emoji sequence when deciding
+  // to break.
   var isInEmojiSequence: Bool = false
+
+  // When walking forward in a string, we need to not break on emoji flag
+  // sequences. Emoji flag sequences are composed of 2 regional indicators, so
+  // when we see our first (.regionalIndicator, .regionalIndicator) decision,
+  // we need to know to return false in this case. However, if the next scalar
+  // is another regional indicator, we reach the same decision rule, but in this
+  // case we actually need to break there's a boundary between emoji flag
+  // sequences.
   var shouldBreakRI: Bool = false
-
-  static func forward() -> _GraphemeBreakingState {
-    _GraphemeBreakingState()
-  }
-
-  static func backward() -> _GraphemeBreakingState {
-    _GraphemeBreakingState(isBackwards: true)
-  }
 }
 
 extension _StringGuts {
@@ -173,7 +201,7 @@ extension _StringGuts {
     nextScalar: (Int) -> (Unicode.Scalar, end: Int)
   ) -> Int {
     _internalInvariant(index != endIndex._encodedOffset)
-    var state = _GraphemeBreakingState.forward()
+    var state = _GraphemeBreakingState()
     var index = index
 
     while true {
@@ -201,7 +229,7 @@ extension _StringGuts {
     previousScalar: (Int) -> (Unicode.Scalar, start: Int)
   ) -> Int {
     _internalInvariant(index != startIndex._encodedOffset)
-    var state = _GraphemeBreakingState.backward()
+    var state = _GraphemeBreakingState()
     var index = index
 
     while true {
@@ -214,7 +242,13 @@ extension _StringGuts {
 
       let (scalar1, _) = previousScalar(index)
 
-      if shouldBreak(scalar1, between: scalar2, &state, index) {
+      if shouldBreak(
+        scalar1,
+        between: scalar2,
+        &state,
+        index,
+        isBackwards: true
+      ) {
         break
       }
     }
@@ -233,7 +267,8 @@ extension _StringGuts {
     _ scalar1: Unicode.Scalar,
     between scalar2: Unicode.Scalar,
     _ state: inout _GraphemeBreakingState,
-    _ index: Int
+    _ index: Int,
+    isBackwards: Bool = false
   ) -> Bool {
     // GB3
     if scalar1.value == 0xD, scalar2.value == 0xA {
@@ -315,24 +350,23 @@ extension _StringGuts {
 
     // GB11
     case (.zwj, .extendedPictographic):
-      if state.isBackwards {
-        checkIfInEmojiSequence(&state, index)
+      if isBackwards {
+        return !checkIfInEmojiSequence(index)
       }
 
-      if state.isInEmojiSequence {
-        return false
-      } else {
-        return true
-      }
+      return !state.isInEmojiSequence
 
     // GB12 & GB13
     case (.regionalIndicator, .regionalIndicator):
-      if state.isBackwards {
-        countRIs(&state, index)
+      if isBackwards {
+        return countRIs(index)
       }
 
-      state.shouldBreakRI.toggle()
-      return !state.shouldBreakRI
+      defer {
+        state.shouldBreakRI.toggle()
+      }
+
+      return state.shouldBreakRI
 
     // GB999
     default:
@@ -384,14 +418,12 @@ extension _StringGuts {
   //                    know that we are in an emoji sequence so our initial
   //                    break question is answered as NO.
   internal func checkIfInEmojiSequence(
-    _ state: inout _GraphemeBreakingState,
     _ index: Int
-  ) {
+  ) -> Bool {
     var emojiIdx = String.Index(_encodedOffset: index)
 
     guard emojiIdx != startIndex else {
-      state.isInEmojiSequence = false
-      return
+      return false
     }
 
     let scalars = String.UnicodeScalarView(self)
@@ -407,13 +439,13 @@ extension _StringGuts {
       case .extend:
         continue
       case .extendedPictographic:
-        state.isInEmojiSequence = true
-        return
+        return true
       default:
-        state.isInEmojiSequence = false
-        return
+        return false
       }
     }
+
+    return false
   }
   
   // When walking backwards, it's impossible to know whether we break when we
@@ -447,14 +479,12 @@ extension _StringGuts {
   //         | = Not a .regionalIndicator. riCount = 1 which is odd, so break
   //             the last two .regionalIndicators.
   internal func countRIs(
-    _ state: inout _GraphemeBreakingState,
     _ index: Int
-  ) {
+  ) -> Bool {
     var riIdx = String.Index(_encodedOffset: index)
 
     guard riIdx != startIndex else {
-      state.shouldBreakRI = false
-      return
+      return false
     }
 
     var riCount = 0
@@ -475,6 +505,6 @@ extension _StringGuts {
       riCount += 1
     }
 
-    state.shouldBreakRI = riCount & 1 != 0
+    return riCount & 1 != 0
   }
 }
