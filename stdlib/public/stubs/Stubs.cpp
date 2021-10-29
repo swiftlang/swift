@@ -506,7 +506,12 @@ __swift_bool swift_stdlib_isStackAllocationSafe(__swift_size_t byteCount,
 
 __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
                                                  __swift_uintptr_t *outEnd) {
-#if defined(__APPLE__)
+#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+  // This platform does not support threads, so the API we'd call to get stack
+  // bounds (i.e. libpthread) is not going to be usable.
+  return false;
+  
+#elif defined(__APPLE__)
   pthread_t thread = pthread_self();
   // On Apple platforms, the stack grows down, so that the end of the stack
   // comes before the beginning on the number line, and an address on the stack
