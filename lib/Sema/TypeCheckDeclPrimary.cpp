@@ -1715,6 +1715,10 @@ public:
            inFlight.fixItInsert(ID->getStartLoc(),
                               "@_implementationOnly ");
         }
+
+        static bool treatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
+        if (!treatAsError)
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
     }
   }
