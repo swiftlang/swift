@@ -187,7 +187,7 @@ extension String {
 @inlinable
 @_transparent
 @_semantics("lifetimemanagement.move")
-func _move<T>(_ value: __owned T) -> T {
+public func _move<T>(_ value: __owned T) -> T {
     #if $BuiltinMove
         Builtin.move(value)
     #else

@@ -13,4 +13,9 @@ suite.test("copy") {
   expectTrue(k === _copy(k))
 }
 
+suite.test("move") {
+  let k = Klass()
+  expectTrue(k === _move(k))
+}
+
 runAllTests()
