@@ -2377,8 +2377,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
   bool hasExplicitSource = llvm::any_of(
       equivClass->concreteTypeConstraints,
       [](const ConcreteConstraint &constraint) {
-        return (!constraint.source->isDerivedRequirement() &&
-                constraint.source->getLoc().isValid());
+        return !constraint.source->isDerivedRequirement();
       });
 
   if (hasExplicitSource) {
