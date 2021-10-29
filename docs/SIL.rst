@@ -1107,6 +1107,15 @@ Specifies for which types specialized code should be generated.
   sil-function-attribute ::= '[clang "' identifier '"]'
 
 The clang node owner.
+::
+
+  sil-function-attribute ::= '[' performance-constraint ']'
+  performance-constraint :: 'no_locks'
+  performance-constraint :: 'no_allocation'
+
+Specifies the performance constraints for the function, which defines which type
+of runtime functions are allowed to be called from the function.
+
 
 Basic Blocks
 ~~~~~~~~~~~~

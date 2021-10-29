@@ -93,6 +93,8 @@ public:
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(RestatedObjCConformance)
   IGNORED_ATTR(Semantics)
+  IGNORED_ATTR(NoLocks)
+  IGNORED_ATTR(NoAllocation)
   IGNORED_ATTR(EmitAssemblyVisionRemarks)
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(SILGenName)

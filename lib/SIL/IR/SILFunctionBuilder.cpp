@@ -105,6 +105,12 @@ void SILFunctionBuilder::addFunctionAttributes(
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
 
+  if (Attrs.hasAttribute<NoLocksAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoLocks);
+  } else if (Attrs.hasAttribute<NoAllocationAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoAllocation);
+  }
+
   // Validate `@differentiable` attributes by calling `getParameterIndices`.
   // This is important for:
   // - Skipping invalid `@differentiable` attributes in non-primary files.

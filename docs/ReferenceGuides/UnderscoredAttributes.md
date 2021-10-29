@@ -625,3 +625,12 @@ for more details.
 
 Marks a var decl as a variable that must be copied explicitly using the builtin
 function Builtin.copy.
+
+## `@_noAllocation`, `@_noLocks`
+
+These attributes are performance annotations. If a function is annotated with
+such an attribute, the compiler issues a diagnostic message if the function
+calls a runtime function which allocates memory or locks, respectively.
+The `@_noLocks` attribute implies `@_noAllocation` because a memory allocation
+also locks.
+

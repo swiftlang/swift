@@ -33,6 +33,7 @@
 #include "swift/Basic/SuccessorMap.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/RuntimeEffect.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
@@ -759,7 +760,15 @@ public:
   unsigned InvariantMetadataID; /// !invariant.load
   unsigned DereferenceableID;   /// !dereferenceable
   llvm::MDNode *InvariantNode;
-  
+
+#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
+  RuntimeEffect effectOfRuntimeFuncs = RuntimeEffect::NoEffect;
+  llvm::SmallVector<const char *> emittedRuntimeFuncs;
+
+  void registerRuntimeEffect(ArrayRef<RuntimeEffect> realtime,
+                             const char *funcName);
+#endif
+
   llvm::CallingConv::ID C_CC;          /// standard C calling convention
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention

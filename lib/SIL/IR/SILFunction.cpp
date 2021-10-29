@@ -187,6 +187,7 @@ void SILFunction::init(SILLinkage Linkage, StringRef Name,
   this->IsStaticallyLinked = false;
   this->IsWithoutActuallyEscapingThunk = false;
   this->OptMode = unsigned(OptimizationMode::NotSet);
+  this->perfConstraints = PerformanceConstraints::None;
   this->EffectsKindAttr = unsigned(E);
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);

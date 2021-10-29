@@ -168,6 +168,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMoveOnlyChecker();
 
   P.addOptimizeHopToExecutor();
+  P.addMandatoryGenericSpecializer();
 
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
@@ -179,6 +180,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   if (P.getOptions().EnableCopyPropagation) {
     P.addDiagnoseLifetimeIssues();
   }
+  
+  P.addPerformanceDiagnostics();
+  
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
 }
