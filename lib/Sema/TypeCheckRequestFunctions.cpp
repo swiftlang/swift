@@ -297,9 +297,11 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
         if (witness != lookupDecl)
           continue;
 
-        // Substitute into the result builder type.
-        auto subs =
-            conformance->getSubstitutions(lookupDecl->getModuleContext());
+        // Substitute Self and associated type witnesses into the
+        // result builder type.
+        auto subs = SubstitutionMap::getProtocolSubstitutions(
+            protocol, dc->getSelfTypeInContext(),
+            ProtocolConformanceRef(conformance));
         Type subResultBuilderType = resultBuilderType.subst(subs);
 
         matches.push_back(
