@@ -26,7 +26,7 @@
 /// Create module Lib that imports XLogging WITH -module-alias XLogging=AppleLogging
 // RUN: not %target-swift-frontend -module-name LibC %t/FileLibImportRealName.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-path %t/LibC.swiftmodule 2> %t/result-LibC.output
 // RUN: %FileCheck %s -input-file %t/result-LibC.output -check-prefix CHECK-NOT-IMPORT
-// CHECK-NOT-IMPORT: error: module real name should not appear in source files; only the module alias is allowed
+// CHECK-NOT-IMPORT: error: cannot refer to module as 'AppleLogging' because it has been aliased; use 'XLogging' instead
 
 /// 4-1. Fail: referencing the real module name that's aliased should fail
 /// Create module Lib that imports XLogging WITH -module-alias XLogging=AppleLogging

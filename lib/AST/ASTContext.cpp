@@ -1653,19 +1653,25 @@ void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
   }
 }
 
-Identifier ASTContext::getRealModuleName(Identifier key, bool reverseLookup) const {
+Identifier ASTContext::getRealModuleName(Identifier key, bool alwaysReturnRealName, bool lookupAliasFromReal) const {
   auto found = ModuleAliasMap.find(key);
   if (found == ModuleAliasMap.end())
     return key;
 
   // Found an entry
   auto realOrAlias = found->second;
-  // If reverseLookup, i.e. look up an alias by real name, but the found
-  // entry is keyed by an alias, return an empty Identifier
-  if (reverseLookup && realOrAlias.second)
-    return Identifier();
 
-  // Return a real name or an alias (if reverseLookup) mapped to the given key
+  // If alwaysReturnRealName, return the real name if the key is an
+  // alias or the key itself since that's the real name
+  if (alwaysReturnRealName) {
+     return realOrAlias.second ? realOrAlias.first : key;
+  }
+
+  // If lookupAliasFromReal, and the found entry should be keyed by a real
+  // name, return the entry value, otherwise, return an empty Identifier.
+  if (lookupAliasFromReal == realOrAlias.second)
+      return Identifier();
+
   return realOrAlias.first;
 }
 
