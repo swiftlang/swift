@@ -1859,8 +1859,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
         return elt.first == fn;
       }) == resultBuilderTransformed.end() &&
          "already transformed this body along this path!?!");
-  resultBuilderTransformed.push_back(
-      std::make_pair(fn, std::move(*applied)));
+  resultBuilderTransformed.insert(std::make_pair(fn, std::move(*applied)));
 
   // If builder is applied to the closure expression then
   // `closure body` to `closure result` matching should

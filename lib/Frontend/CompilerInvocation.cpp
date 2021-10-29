@@ -443,6 +443,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
 
+  Opts.EnableExperimentalMoveOnly |=
+    Args.hasArg(OPT_enable_experimental_move_only);
+
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
@@ -1399,6 +1402,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalLexicalLifetimes |=
       Args.hasArg(OPT_enable_experimental_lexical_lifetimes);
+  // If experimental move only is enabled, always enable lexical lifetime as
+  // well. Move only depends on lexical lifetimes.
+  Opts.EnableExperimentalLexicalLifetimes |=
+      Args.hasArg(OPT_enable_experimental_move_only);
+
   Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
   Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
@@ -1982,6 +1990,15 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
+  } else if (Triple.isWatchOS() && !Triple.isSimulatorEnvironment()) {
+    // watchOS does not support auto async frame pointers due to bitcode, so
+    // silently override "auto" to "never" when back-deploying. This approach
+    // sacrifies async backtraces when back-deploying but prevents crashes in
+    // older tools that cannot handle the async frame bit in the frame pointer.
+    unsigned major, minor, micro;
+    Triple.getWatchOSVersion(major, minor, micro);
+    if (major < 8)
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
   }
 
   return false;

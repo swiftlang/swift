@@ -2176,8 +2176,12 @@ static void addNamespaceMembers(Decl *decl,
   for (auto redecl : namespaceDecl->redecls()) {
     for (auto member : redecl->decls()) {
       if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
-        // Hack in the class template specializations that live here.
-        for (auto spec : classTemplate->specializations()) {
+        // Add all specializtaions to a worklist so we don't accidently mutate
+        // the list of decls we're iterating over.
+        llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *, 16> specWorklist;
+        for (auto spec : classTemplate->specializations())
+          specWorklist.insert(spec);
+        for (auto spec : specWorklist) {
           if (auto import =
                   ctx.getClangModuleLoader()->importDeclDirectly(spec))
             if (addedMembers.insert(import).second)
@@ -2805,6 +2809,10 @@ static bool usesFeatureBuiltinTaskGroupWithArgument(Decl *decl) {
 }
 
 static bool usesFeatureBuiltinCreateAsyncTaskInGroup(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinMove(Decl *decl) {
   return false;
 }
 

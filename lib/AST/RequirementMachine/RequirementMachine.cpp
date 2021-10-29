@@ -275,6 +275,15 @@ void RewriteSystemBuilder::processProtocolDependencies() {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
     }
 
+    MutableTerm lhs;
+    lhs.add(Symbol::forProtocol(proto, Context));
+    lhs.add(Symbol::forProtocol(proto, Context));
+
+    MutableTerm rhs;
+    rhs.add(Symbol::forProtocol(proto, Context));
+
+    AssociatedTypeRules.emplace_back(lhs, rhs);
+
     for (auto *assocType : proto->getAssociatedTypeMembers())
       addAssociatedType(assocType, proto);
 
@@ -449,7 +458,7 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 
   // Add the initial set of rewrite rules to the rewrite system, also
   // providing the protocol graph to use for the linear order on terms.
-  System.initialize(/*recordHomotopyGenerators=*/false,
+  System.initialize(/*recordLoops=*/false,
                     std::move(builder.AssociatedTypeRules),
                     std::move(builder.RequirementRules));
 
@@ -490,7 +499,7 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
 
   // Add the initial set of rewrite rules to the rewrite system, also
   // providing the protocol graph to use for the linear order on terms.
-  System.initialize(/*recordHomotopyGenerators=*/true,
+  System.initialize(/*recordLoops=*/true,
                     std::move(builder.AssociatedTypeRules),
                     std::move(builder.RequirementRules));
 

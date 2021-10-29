@@ -23,7 +23,10 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/LockFileManager.h"
 
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
 #include <unistd.h>
@@ -706,15 +709,6 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   auto loadedModuleTracePath = input.getLoadedModuleTracePath();
   if (loadedModuleTracePath.empty())
     return false;
-  std::error_code EC;
-  llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::OF_Append);
-
-  if (out.has_error() || EC) {
-    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                        loadedModuleTracePath, EC.message());
-    out.clear_error();
-    return true;
-  }
 
   SmallPtrSet<ModuleDecl *, 32> abiDependencies;
   {
@@ -762,7 +756,71 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
     json::jsonize(jsonOutput, trace, /*Required=*/true);
   }
   stringBuffer += "\n";
-  out << stringBuffer;
 
+  // If writing to stdout, just perform a normal write.
+  // If writing to a file, ensure the write is atomic by creating a filesystem lock
+  // on the output file path.
+  std::error_code EC;
+  if (loadedModuleTracePath == "-") {
+    llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::OF_Append);
+    if (out.has_error() || EC) {
+      ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                          loadedModuleTracePath, EC.message());
+      out.clear_error();
+      return true;
+    }
+    out << stringBuffer;
+  } else {
+    while (1) {
+      // Attempt to lock the output file.
+      // Only one process is allowed to append to this file at a time.
+      llvm::LockFileManager Locked(loadedModuleTracePath);
+      switch (Locked) {
+        case llvm::LockFileManager::LFS_Error:{
+          // If we error acquiring a lock, we cannot ensure appends
+          // to the trace file are atomic - cannot ensure output correctness.
+          ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                              loadedModuleTracePath,
+                              "Failed to acquire filesystem lock");
+          Locked.unsafeRemoveLockFile();
+          return true;
+        }
+        case llvm::LockFileManager::LFS_Owned: {
+          // Lock acquired, perform the write and release the lock.
+          llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::OF_Append);
+          if (out.has_error() || EC) {
+            ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                loadedModuleTracePath, EC.message());
+            out.clear_error();
+            return true;
+          }
+          out << stringBuffer;
+          out.close();
+          Locked.unsafeRemoveLockFile();
+          return false;
+        }
+        case llvm::LockFileManager::LFS_Shared: {
+          // Someone else owns the lock on this file, wait.
+          switch (Locked.waitForUnlock(256)) {
+            case llvm::LockFileManager::Res_Success:
+              LLVM_FALLTHROUGH;
+            case llvm::LockFileManager::Res_OwnerDied: {
+              continue; // try again to get the lock.
+            }
+            case llvm::LockFileManager::Res_Timeout: {
+              // We could error on timeout to avoid potentially hanging forever, but
+              // it may be more likely that an interrupted process failed to clear the lock,
+              // causing other waiting processes to time-out. Let's clear the lock and try
+              // again right away. If we do start seeing compiler hangs in this location,
+              // we will need to re-consider.
+              Locked.unsafeRemoveLockFile();
+              continue;
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
   return true;
 }

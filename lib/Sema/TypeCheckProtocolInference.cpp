@@ -1199,7 +1199,23 @@ AssociatedTypeDecl *AssociatedTypeInference::completeSolution(
         // If the substitution produced an error, we're done.
         if (type->hasError())
           return witness.getAssocType();
+
+        // FIXME: If we still have a type parameter and it isn't a generic
+        // parameter of the conforming nominal, it's either a cycle or a
+        // solution that is beyond the current algorithm, i.e.
+        //
+        // protocol P {
+        //   associatedtype A = B
+        //   associatedtype B = C
+        //   associatedtype C = Int
+        // }
+        // struct Conformer: P {}
+        if (type->hasTypeParameter() &&
+            !adoptee->getAnyNominal()->isGeneric()) {
+          return witness.getAssocType();
+        }
       }
+
       type = dc->mapTypeIntoContext(type);
     }
 
@@ -1760,6 +1776,34 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
           if ((!failed.TypeWitness->getAnyNominal() ||
                failed.TypeWitness->isExistentialType()) &&
               failed.Result.isConformanceRequirement()) {
+            Type resultType;
+            SourceRange typeRange;
+            if (auto *var = dyn_cast<VarDecl>(failed.Witness)) {
+              resultType = var->getValueInterfaceType();
+              typeRange = var->getTypeSourceRangeForDiagnostics();
+            } else if (auto *func = dyn_cast<FuncDecl>(failed.Witness)) {
+              resultType = func->getResultInterfaceType();
+              typeRange = func->getResultTypeSourceRange();
+            } else if (auto *subscript = dyn_cast<SubscriptDecl>(failed.Witness)) {
+              resultType = subscript->getElementInterfaceType();
+              typeRange = subscript->getElementTypeSourceRange();
+            }
+
+            // If the type witness was inferred from an existential
+            // result type, suggest an opaque result type instead,
+            // which can conform to protocols.
+            if (failed.TypeWitness->isExistentialType() &&
+                resultType && resultType->isEqual(failed.TypeWitness) &&
+                typeRange.isValid()) {
+              diags.diagnose(typeRange.Start,
+                             diag::suggest_opaque_type_witness,
+                             assocType->getName(), failed.TypeWitness,
+                             failed.Result.getRequirement())
+                .highlight(typeRange)
+                .fixItInsert(typeRange.Start, "some ");
+              continue;
+            }
+
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_conform_impossible,
                            assocType->getName(), failed.TypeWitness,

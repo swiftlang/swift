@@ -620,6 +620,9 @@ public:
   /// Get the SIL token type.
   static SILType getSILTokenType(const ASTContext &C);
 
+  /// Return '()'
+  static SILType getEmptyTupleType(const ASTContext &C);
+
   //
   // Utilities for treating SILType as a pointer-like type.
   //

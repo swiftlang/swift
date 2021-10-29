@@ -360,13 +360,12 @@ class SDKNodeDecl: public SDKNode {
   Optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;
   StringRef ObjCName;
-  mutable Optional<StringRef> demangledName;
+
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind);
   virtual ~SDKNodeDecl() = default;
 public:
   StringRef getUsr() const { return Usr; }
-  StringRef getDemangledName() const;
   StringRef getLocation() const { return Location; }
   StringRef getModuleName() const {return ModuleName;}
   StringRef getHeaderName() const;

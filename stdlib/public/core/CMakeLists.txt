@@ -171,6 +171,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF8Validation.swift
   Substring.swift
   SwiftNativeNSArray.swift
+  TemporaryAllocation.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift

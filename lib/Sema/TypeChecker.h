@@ -134,6 +134,9 @@ enum class TypeCheckExprFlags {
   /// unchecked. This is used by source tooling functionalities such as code
   /// completion.
   LeaveClosureBodyUnchecked = 0x04,
+
+  /// Don't type check expressions for correct availability.
+  DisableExprAvailabilityChecking = 0x08,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;

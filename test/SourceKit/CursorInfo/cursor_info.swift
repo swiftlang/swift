@@ -261,6 +261,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK3-NEXT: source.lang.swift
 // CHECK3-NEXT: Int{{$}}
 // CHECK3-NEXT: $sSiD
+// CHECK3-NEXT: cursor_info{{$}}
 // CHECK3-NEXT: <Declaration>let x: <Type usr="s:Si">Int</Type></Declaration>
 // CHECK3-NEXT: <decl.var.parameter><syntaxtype.keyword>let</syntaxtype.keyword> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 
@@ -302,6 +303,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK7-NEXT: source.lang.swift
 // CHECK7-NEXT: S1.Type
 // CHECK7-NEXT: $s
+// CHECK7-NEXT: cursor_info{{$}}
 // CHECK7-NEXT: <Declaration>struct S1</Declaration>
 // CHECK7-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
 // CHECK7-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="13" column="8"><Name>S1</Name><USR>s:11cursor_info2S1V</USR><Declaration>struct S1</Declaration><CommentParts><Abstract><Para>Aaa.  S1.  Bbb.</Para></Abstract></CommentParts></Class>
@@ -314,6 +316,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK8-NEXT: (CC.Type) -> (Int) -> CC
 // CHECK8-NEXT: $s1x11cursor_info2CCCSi_tcD
 // CHECK8-NEXT: <Container>$s11cursor_info2CCCD</Container>
+// CHECK8-NEXT: cursor_info{{$}}
 // CHECK8-NEXT: <Declaration>init(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK8-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -419,6 +422,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK29-NEXT: source.lang.swift
 // CHECK29-NEXT: (C3) -> ()
 // CHECK29-NEXT: $syycD
+// CHECK29-NEXT: cursor_info{{$}}
 // CHECK29-NEXT: <Declaration>deinit</Declaration>
 // CHECK29-NEXT: <decl.function.destructor><syntaxtype.keyword>deinit</syntaxtype.keyword></decl.function.destructor>
 
@@ -429,6 +433,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK30-NEXT: source.lang.swift
 // CHECK30-NEXT: (C3.Type) -> (Int) -> C3?
 // CHECK30-NEXT: $s1x11cursor_info2C3CSgSi_tcD
+// CHECK30-NEXT: cursor_info{{$}}
 // CHECK30-NEXT: <Declaration>init!(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK30-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>!(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -439,6 +444,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK31-NEXT: source.lang.swift
 // CHECK31-NEXT: (C3.Type) -> (Int) -> C3?
 // CHECK31-NEXT: $s1y11cursor_info2C3CSgSi_tcD
+// CHECK31-NEXT: cursor_info{{$}}
 // CHECK31-NEXT: <Declaration>init?(y: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK31-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>?(<decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -449,6 +455,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK32-NEXT: source.lang.swift
 // CHECK32-NEXT: (C3.Type) -> (Int) throws -> C3
 // CHECK32-NEXT: $s1z11cursor_info2C3CSi_tKcD
+// CHECK32-NEXT: cursor_info{{$}}
 // CHECK32-NEXT: <Declaration>init(z: <Type usr="s:Si">Int</Type>) throws</Declaration>
 // CHECK32-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>z</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>throws</syntaxtype.keyword></decl.function.constructor>
 
@@ -757,6 +764,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK87-NEXT: source.lang.swift
 // CHECK87-NEXT: HasLocalizationKey.Type
 // CHECK87-NEXT: $s
+// CHECK87-NEXT: cursor_info{{$}}
 // CHECK87-NEXT: <Declaration>struct HasLocalizationKey</Declaration>
 // CHECK87-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>HasLocalizationKey</decl.name></decl.struct>
 // CHECK87-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="213" column="8"><Name>HasLocalizationKey</Name><USR>s:11cursor_info18HasLocalizationKeyV</USR><Declaration>struct HasLocalizationKey</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract></CommentParts></Class>
@@ -769,6 +777,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK88-NEXT: source.lang.swift
 // CHECK88-NEXT: () -> ()
 // CHECK88-NEXT: $s
+// CHECK88-NEXT: cursor_info{{$}}
 // CHECK88-NEXT: <Declaration>func hasLocalizationKey2()</Declaration>
 // CHECK88-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hasLocalizationKey2</decl.name>()</decl.function.free>
 // CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="216" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration><CommentParts></CommentParts></Function>

@@ -3,13 +3,16 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %swiftc_driver -emit-module %s -target %target-cpu-apple-macosx10.15 -emit-module-interface -emit-module-interface-path %t/main.swiftinterface -enable-library-evolution -Xfrontend -check-api-availability-only -verify-emitted-module-interface
+// RUN: %swiftc_driver -emit-module %s -target %target-cpu-apple-macosx10.15 -emit-module-interface -emit-module-interface-path %t/main.swiftinterface -enable-library-evolution -check-api-availability-only -verify-emitted-module-interface
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/main.swiftinterface
 
 // REQUIRES: OS=macosx
 
 @available(macOS 11.0, *)
 public protocol NewProto {}
+
+@available(macOS 11.0, *)
+public struct NewStruct {}
 
 @available(macOS 11.0, *)
 public func newFunc() {}
@@ -57,6 +60,10 @@ public struct Struct {
   internal var internalVar: NewProto
   private var privateVar: NewProto
   fileprivate var fileprivateVar: NewProto
+
+  internal var internalAssigned = NewStruct()
+  private var privateAssigned = NewStruct()
+  fileprivate var fileprivateAssigned = NewStruct()
 
   @available(macOS 11.0, *)
   public typealias PubTA = NewProto

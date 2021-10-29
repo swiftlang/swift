@@ -495,6 +495,12 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   if (!tempObj)
     return;
 
+  // If the storage corresponds to a source-level var, do not optimize here.
+  // Mem2Reg will transform the lexical alloc_stack into a lexical begin_borrow
+  // which will ensure that the value's lifetime isn't observably shortened.
+  if (tempObj->isLexical())
+    return;
+
   bool isOSSA = copyInst->getFunction()->hasOwnership();
   
   SILValue copySrc = copyInst->getSrc();
@@ -630,6 +636,13 @@ TempRValueOptPass::tryOptimizeStoreIntoTemp(StoreInst *si) {
 
   auto *tempObj = dyn_cast<AllocStackInst>(si->getDest());
   if (!tempObj) {
+    return std::next(si->getIterator());
+  }
+
+  // If the storage corresponds to a source-level var, do not optimize here.
+  // Mem2Reg will transform the lexical alloc_stack into a lexical begin_borrow
+  // which will ensure that the value's lifetime isn't observably shortened.
+  if (tempObj->isLexical()) {
     return std::next(si->getIterator());
   }
 

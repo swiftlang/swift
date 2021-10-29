@@ -109,11 +109,13 @@ Solution ConstraintSystem::finalize() {
   // For each of the constraint restrictions, record it with simplified,
   // canonical types.
   if (solverState) {
-    for (auto &restriction : ConstraintRestrictions) {
-      using std::get;
-      CanType first = simplifyType(get<0>(restriction))->getCanonicalType();
-      CanType second = simplifyType(get<1>(restriction))->getCanonicalType();
-      solution.ConstraintRestrictions[{first, second}] = get<2>(restriction);
+    for (const auto &entry : ConstraintRestrictions) {
+      const auto &types = entry.first;
+      auto restriction = entry.second;
+
+      CanType first = simplifyType(types.first)->getCanonicalType();
+      CanType second = simplifyType(types.second)->getCanonicalType();
+      solution.ConstraintRestrictions[{first, second}] = restriction;
     }
   }
 
@@ -127,13 +129,6 @@ Solution ConstraintSystem::finalize() {
 
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
-    // We shouldn't ever register disjunction choices multiple times,
-    // but saving and re-applying solutions can cause us to get
-    // multiple entries.  We should use an optimized PartialSolution
-    // structure for that use case, which would optimize a lot of
-    // stuff here.
-    assert(!solution.DisjunctionChoices.count(choice.first) ||
-           solution.DisjunctionChoices[choice.first] == choice.second);
     solution.DisjunctionChoices.insert(choice);
   }
 
@@ -231,36 +226,35 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
-  for (auto restriction : solution.ConstraintRestrictions) {
-    auto &types = restriction.first;
-    ConstraintRestrictions.push_back(std::make_tuple(types.first.getPointer(),
-                                                     types.second.getPointer(),
-                                                     restriction.second));
+  for ( auto &restriction : solution.ConstraintRestrictions) {
+    auto *type1 = restriction.first.first.getPointer();
+    auto *type2 = restriction.first.second.getPointer();
+
+    ConstraintRestrictions.insert({{type1, type2}, restriction.second});
   }
 
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
-    DisjunctionChoices.push_back(choice);
+    DisjunctionChoices.insert(choice);
   }
 
   // Remember all of the argument/parameter matching choices we made.
   for (auto &argumentMatch : solution.argumentMatchingChoices) {
-    argumentMatchingChoices.push_back(argumentMatch);
+    argumentMatchingChoices.insert(argumentMatch);
   }
 
   // Register the solution's opened types.
   for (const auto &opened : solution.OpenedTypes) {
-    OpenedTypes.push_back(opened);
+    OpenedTypes.insert(opened);
   }
 
   // Register the solution's opened existential types.
   for (const auto &openedExistential : solution.OpenedExistentialTypes) {
-    OpenedExistentialTypes.push_back(openedExistential);
+    OpenedExistentialTypes.insert(openedExistential);
   }
 
   // Register the defaulted type variables.
-  DefaultedConstraints.insert(DefaultedConstraints.end(),
-                              solution.DefaultedConstraints.begin(),
+  DefaultedConstraints.insert(solution.DefaultedConstraints.begin(),
                               solution.DefaultedConstraints.end());
 
   // Add the node types back.
@@ -298,7 +292,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (const auto &transformed : solution.resultBuilderTransformed) {
-    resultBuilderTransformed.push_back(transformed);
+    resultBuilderTransformed.insert(transformed);
   }
 
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
@@ -306,7 +300,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (auto &valueConversion : solution.ImplicitValueConversions) {
-    ImplicitValueConversions.push_back(valueConversion);
+    ImplicitValueConversions.insert(valueConversion);
   }
 
   // Register the argument lists.
@@ -315,7 +309,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register any fixes produced along this path.
-  Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
+  Fixes.insert(solution.Fixes.begin(), solution.Fixes.end());
 }
 
 /// Restore the type variable bindings to what they were before
@@ -404,6 +398,12 @@ void truncate(llvm::SmallMapVector<K, V, N> &map, unsigned newSize) {
   assert(newSize <= map.size() && "Not a truncation!");
   for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
     map.pop_back();
+}
+
+template <typename V>
+void truncate(llvm::SetVector<V> &vector, unsigned newSize) {
+  while (vector.size() > newSize)
+    vector.pop_back();
 }
 
 } // end anonymous namespace
@@ -542,8 +542,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
     return;
 
   // Erase the end of various lists.
-  while (cs.TypeVariables.size() > numTypeVariables)
-    cs.TypeVariables.pop_back();
+  truncate(cs.TypeVariables, numTypeVariables);
 
   truncate(cs.ResolvedOverloads, numResolvedOverloads);
 

@@ -1219,9 +1219,8 @@ void ConstraintSystem::recordOpenedTypes(
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
-  OpenedTypes.push_back({ locatorPtr,
-    llvm::makeArrayRef(openedTypes,
-                       replacements.size()) });
+  OpenedTypes.insert(
+      {locatorPtr, llvm::makeArrayRef(openedTypes, replacements.size())});
 }
 
 /// Determine how many levels of argument labels should be removed from the
@@ -1883,7 +1882,7 @@ ConstraintSystem::getTypeOfMemberReference(
     }
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
-    OpenedExistentialTypes.push_back(
+    OpenedExistentialTypes.insert(
         {getConstraintLocator(locator), openedArchetype});
     baseOpenedTy = openedArchetype;
   }
@@ -5807,24 +5806,14 @@ getRequirementInfo(ConstraintSystem &cs, ConstraintLocator *reqLocator) {
   auto newPath = path.drop_back(iter - path.rbegin() + 1);
   auto *baseLoc = cs.getConstraintLocator(reqLocator->getAnchor(), newPath);
 
-  auto openedTypes = cs.getOpenedTypes();
-  auto substitutions = llvm::find_if(
-      openedTypes,
-      [&baseLoc](
-          const std::pair<ConstraintLocator *, ArrayRef<OpenedType>> &entry) {
-        return entry.first == baseLoc;
-      });
-
-  if (substitutions == openedTypes.end())
-    return None;
-
+  auto substitutions = cs.getOpenedTypes(baseLoc);
   auto replacement =
-      llvm::find_if(substitutions->second, [&GP](const OpenedType &entry) {
+      llvm::find_if(substitutions, [&GP](const OpenedType &entry) {
         auto *typeVar = entry.second;
         return typeVar->getImpl().getGenericParameter() == GP;
       });
 
-  if (replacement == substitutions->second.end())
+  if (replacement == substitutions.end())
     return None;
 
   auto *repr = cs.getRepresentative(replacement->second);

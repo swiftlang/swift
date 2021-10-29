@@ -81,7 +81,7 @@ endfunction()
 # NOTE(compnerd) we use a macro here as this modifies global variables
 macro(swift_swap_compiler_if_needed target)
   if(NOT CMAKE_C_COMPILER_ID MATCHES Clang)
-    if(CMAKE_SYSTEM_NAME STREQUAL CMAKE_HOST_SYSTEM_NAME)
+    if(CMAKE_SYSTEM_NAME STREQUAL CMAKE_HOST_SYSTEM_NAME AND CMAKE_SYSTEM_PROCESSOR STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
       if(SWIFT_BUILT_STANDALONE)
         get_target_property(CLANG_LOCATION clang LOCATION)
         get_filename_component(CLANG_LOCATION ${CLANG_LOCATION} DIRECTORY)

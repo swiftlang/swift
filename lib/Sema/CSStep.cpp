@@ -916,7 +916,10 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
         // Restore all outer type variables, constraints
         // and scoring information.
         Snapshot.reset();
-        restoreOuterState();
+
+        // Restore original scores of outer context before
+        // trying to produce a combined solution.
+        restoreOriginalScores();
 
         // Apply all of the information deduced from the
         // conjunction (up to the point of ambiguity)
@@ -925,6 +928,13 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
           ConstraintSystem::SolverScope scope(CS);
 
           CS.applySolution(solution);
+
+          // `applySolution` changes best/current scores
+          // of the constraint system, so they have to be
+          // restored right afterwards because score of the
+          // element does contribute to the overall score.
+          restoreOriginalScores();
+
           // Note that `worseThanBestSolution` isn't checked
           // here because `Solutions` were pre-filtered, and
           // outer score is the same for all of them.
@@ -953,9 +963,9 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 }
 
 void ConjunctionStep::restoreOuterState() const {
-  // Restore best score, since upcoming step is going to
+  // Restore best/current score, since upcoming step is going to
   // work with outer scope in relation to the conjunction.
-  CS.solverState->BestScore = BestScore;
+  restoreOriginalScores();
 
   // Active all of the previously out-of-scope constraints
   // because conjunction can propagate type information up
@@ -967,8 +977,4 @@ void ConjunctionStep::restoreOuterState() const {
     for (auto &constraint : CS.ActiveConstraints)
       constraint.setActive(true);
   }
-
-  // Restore score to the one before conjunction. This has
-  // be done after solution, reached for the body, is applied.
-  CS.CurrentScore = CurrentScore;
 }

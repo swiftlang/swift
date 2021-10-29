@@ -292,7 +292,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
 /// types in RewriteSystem::processMergedAssociatedTypes().
 void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
   // FIXME: Figure out 3-cell representation for merged associated types
-  if (RecordHomotopyGenerators)
+  if (RecordLoops)
     return;
 
   if (lhs.size() == rhs.size() &&
@@ -372,7 +372,7 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                                    std::vector<std::pair<MutableTerm,
                                                          MutableTerm>> &pairs,
                                    std::vector<RewritePath> &paths,
-                                   std::vector<HomotopyGenerator> &loops) const {
+                                   std::vector<RewriteLoop> &loops) const {
   auto end = lhs.getLHS().end();
   if (from + rhs.getLHS().size() < end) {
     // lhs == TUV -> X, rhs == U -> Y.
@@ -506,7 +506,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
   std::vector<std::pair<MutableTerm, MutableTerm>> resolvedCriticalPairs;
   std::vector<RewritePath> resolvedPaths;
-  std::vector<HomotopyGenerator> resolvedLoops;
+  std::vector<RewriteLoop> resolvedLoops;
 
   do {
     // For every rule, looking for other rules that overlap with this rule.
@@ -618,7 +618,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     }
 
     for (const auto &loop : resolvedLoops) {
-      recordHomotopyGenerator(loop);
+      recordRewriteLoop(loop);
     }
 
     resolvedCriticalPairs.clear();
