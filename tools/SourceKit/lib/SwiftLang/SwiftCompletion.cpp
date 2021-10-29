@@ -116,7 +116,7 @@ static void swiftCodeCompleteImpl(
               Lang.getCompletionInstance()->codeComplete(
                   CIParams.Invocation, Args, FileSystem,
                   CIParams.completionBuffer, Offset, CIParams.DiagC,
-                  std::move(CompletionContext), DeliverTransformed);
+                  CompletionContext, DeliverTransformed);
             },
             Callback);
       });

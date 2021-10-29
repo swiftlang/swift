@@ -1156,7 +1156,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
         Inst.codeComplete(
             Params.Invocation, Params.Args, Params.FileSystem,
             Params.CompletionBuffer, Params.Offset, Params.DiagC,
-            std::move(CompletionContext),
+            CompletionContext,
             [&](CancellableResult<CodeCompleteResult> Result) {
               ExitCode = printCodeCompletionResults(
                   Result, CodeCompletionKeywords, CodeCompletionComments,
@@ -1484,8 +1484,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     bool CallbackCalled = false;
     CompletionInst.codeComplete(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
-        CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-        std::move(CompletionContext),
+        CodeCompletionDiagnostics ? &PrintDiags : nullptr, CompletionContext,
         [&](CancellableResult<CodeCompleteResult> Result) {
           CallbackCalled = true;
           switch (Result.getKind()) {

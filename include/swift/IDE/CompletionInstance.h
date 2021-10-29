@@ -154,7 +154,7 @@ public:
       swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-      DiagnosticConsumer *DiagC, ide::CodeCompletionContext &&CompletionContext,
+      DiagnosticConsumer *DiagC, ide::CodeCompletionContext &CompletionContext,
       llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback);
 
   void typeContextInfo(
