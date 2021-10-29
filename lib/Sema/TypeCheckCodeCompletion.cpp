@@ -339,6 +339,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
+  options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(dc, options);
@@ -433,6 +434,7 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
   options |= ConstraintSystemFlags::ReusePrecheckedType;
+  options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   // Construct a constraint system from this expression.
   ConstraintSystem CS(DC, options);
@@ -840,6 +842,8 @@ bool TypeChecker::typeCheckForCodeCompletion(
     options |= ConstraintSystemFlags::AllowFixes;
     options |= ConstraintSystemFlags::SuppressDiagnostics;
     options |= ConstraintSystemFlags::ForCodeCompletion;
+    options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
+
 
     ConstraintSystem cs(DC, options);
 
@@ -1010,7 +1014,9 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   parsedExpr = parsedExpr->walk(SanitizeExpr(ctx, /*shouldReusePrecheckedType=*/false));
 
   DiagnosticSuppression suppression(ctx.Diags);
-  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC);
+  auto resultTy = TypeChecker::typeCheckExpression(
+      parsedExpr, DC,
+      /*contextualInfo=*/{}, TypeCheckExprFlags::LeaveClosureBodyUnchecked);
   return !resultTy;
 }
 
