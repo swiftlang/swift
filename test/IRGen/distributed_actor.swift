@@ -7,7 +7,7 @@ import _Distributed
 // Type descriptor.
 // CHECK-LABEL: @"$s17distributed_actor7MyActorC0B9Transport12_Distributed0dE0_pvpWvd"
 
-@available(SwiftStdlib 5.1, *)
+@available(SwiftStdlib 5.6, *)
 public distributed actor MyActor {
     // nothing
 }
