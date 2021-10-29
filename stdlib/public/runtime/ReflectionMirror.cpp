@@ -339,6 +339,7 @@ static bool _shouldReportMissingReflectionMetadataWarnings() {
 /// at runtime. This is usually mostly harmless, but it's good to alert
 /// users that it happens.
 static void
+SWIFT_FORMAT(1, 2)
 missing_reflection_metadata_warning(const char *fmt, ...) {
   bool shouldWarn =
     SWIFT_LAZY_CONSTANT(_shouldReportMissingReflectionMetadataWarnings());

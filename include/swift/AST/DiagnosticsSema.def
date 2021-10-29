@@ -2263,6 +2263,11 @@ NOTE(associated_type_witness_conform_impossible,none,
      "candidate can not infer %0 = %1 because %1 "
      "is not a nominal type and so can't conform to %2",
      (Identifier, Type, Type))
+NOTE(suggest_opaque_type_witness,none,
+     "cannot infer %0 = %1 because %1 as a type cannot "
+     "conform to protocols; did you mean to use an opaque "
+     "result type?",
+     (Identifier, Type, Type))
 NOTE(associated_type_witness_inherit_impossible,none,
      "candidate can not infer %0 = %1 because %1 "
      "is not a class type and so can't inherit from %2",
@@ -6028,6 +6033,17 @@ ERROR(wrap_invalid_attr_added_by_access_note, none,
       (DiagnosticInfo *, StringRef, StringRef, DescriptiveDeclKind))
 
 #undef WHICH_ACCESS_NOTE
+
+// Move Only diagnostics
+
+ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
+      none, "Can not use feature when experimental move only is disabled! Pass"
+      " the frontend flag -enable-experimental-move-only to swift to enable "
+      "the usage of this language feature", ())
+ERROR(noimplicitcopy_attr_valid_only_on_local_let,
+      none, "'@_noImplicitCopy' attribute can only be applied to local lets", ())
+ERROR(noimplicitcopy_attr_invalid_in_generic_context,
+      none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

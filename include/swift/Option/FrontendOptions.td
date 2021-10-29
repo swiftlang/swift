@@ -259,6 +259,10 @@ def enable_experimental_lexical_lifetimes :
   Flag<["-"], "enable-experimental-lexical-lifetimes">,
   HelpText<"Enable experimental lexical lifetimes">;
 
+def enable_experimental_move_only :
+  Flag<["-"], "enable-experimental-move-only">,
+  HelpText<"Enable experimental move only">;
+
 def enable_experimental_distributed :
   Flag<["-"], "enable-experimental-distributed">,
   HelpText<"Enable experimental 'distributed' actors and functions">;
@@ -468,10 +472,6 @@ def disable_deserialization_recovery :
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
-
-def check_api_availability_only : Flag<["-"],
-  "check-api-availability-only">,
-  HelpText<"Only check the availability of the APIs, ignore function bodies">;
 
 def enable_conformance_availability_errors : Flag<["-"],
   "enable-conformance-availability-errors">,

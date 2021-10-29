@@ -63,11 +63,8 @@ bool printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS);
 /// \returns true if it failed, false on success.
 bool printDeclUSR(const Decl *D, raw_ostream &OS);
 
-/// Get mangled name from a USR.
-std::string getMangledNameFromUSR(StringRef usr);
-
-/// Demangle a mangled name to a human readable name.
-std::string demangleMangledName(StringRef mangled);
+/// Demangle a mangle-name-based USR to a human readable name.
+std::string demangleUSR(StringRef mangled);
 
 } // namespace ide
 } // namespace swift

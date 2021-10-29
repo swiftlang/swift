@@ -5751,7 +5751,7 @@ diagnoseMetadataDependencyCycle(const Metadata *start,
                             &details);
   }
 
-  fatalError(0, diagnostic.c_str());
+  fatalError(0, "%s", diagnostic.c_str());
 }
 
 /// Check whether the given metadata dependency is satisfied, and if not,

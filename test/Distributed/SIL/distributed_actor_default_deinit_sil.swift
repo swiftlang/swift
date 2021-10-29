@@ -1,14 +1,11 @@
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -enable-experimental-distributed | %FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -enable-experimental-distributed -disable-availability-checking | %FileCheck %s --enable-var-scope --dump-input=fail
 // REQUIRES: concurrency
 // REQUIRES: distributed
-
-// REQUIRES: OS=macosx
 
 import _Distributed
 
 class SomeClass {}
 
-@available(macOS 12, *)
 distributed actor MyDistActor {
   let localOnlyField: SomeClass
 

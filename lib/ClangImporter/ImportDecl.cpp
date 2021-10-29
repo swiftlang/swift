@@ -8745,9 +8745,19 @@ void ClangImporter::Implementation::importAttributes(
   // Map __attribute__((warn_unused_result)).
   if (!ClangDecl->hasAttr<clang::WarnUnusedResultAttr>()) {
     if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
-      if (!MD->getResultInterfaceType()->isVoid()) {
+      // Ask if the clang function's return type is void to prevent eagerly
+      // loading the result type of the imported function.
+      bool hasVoidReturnType = false;
+      if (auto clangFunction = dyn_cast<clang::FunctionDecl>(ClangDecl))
+        hasVoidReturnType = clangFunction->getReturnType()->isVoidType();
+      if (auto clangMethod = dyn_cast<clang::ObjCMethodDecl>(ClangDecl))
+        hasVoidReturnType = clangMethod->getReturnType()->isVoidType();
+      // Async functions might get re-written to be non-void, so if this is an
+      // async function, eagerly load the result type and check.
+      if (MD->hasAsync())
+        hasVoidReturnType = MD->getResultInterfaceType()->isVoid();
+      if (!hasVoidReturnType)
         MD->getAttrs().add(new (C) DiscardableResultAttr(/*implicit*/true));
-      }
     }
   }
   // Map __attribute__((const)).

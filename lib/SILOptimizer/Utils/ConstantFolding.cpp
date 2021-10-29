@@ -476,48 +476,6 @@ static SILValue constantFoldCompare(BuiltinInst *BI, BuiltinValueKind ID) {
       return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
     }
   }
-
-  // Fold x < 0 into false, if x is known to be a result of an unsigned
-  // operation with overflow checks enabled.
-  BuiltinInst *BIOp;
-  if (match(BI, m_BuiltinInst(BuiltinValueKind::ICMP_SLT,
-                              m_TupleExtractOperation(m_BuiltinInst(BIOp), 0),
-                              m_Zero()))) {
-    // Check if Other is a result of an unsigned operation with overflow.
-    switch (BIOp->getBuiltinInfo().ID) {
-    default:
-      break;
-    case BuiltinValueKind::UAddOver:
-    case BuiltinValueKind::USubOver:
-    case BuiltinValueKind::UMulOver:
-      // Was it an operation with an overflow check?
-      if (match(BIOp->getOperand(2), m_One())) {
-        SILBuilderWithScope B(BI);
-        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
-      }
-    }
-  }
-
-  // Fold x >= 0 into true, if x is known to be a result of an unsigned
-  // operation with overflow checks enabled.
-  if (match(BI, m_BuiltinInst(BuiltinValueKind::ICMP_SGE,
-                              m_TupleExtractOperation(m_BuiltinInst(BIOp), 0),
-                              m_Zero()))) {
-    // Check if Other is a result of an unsigned operation with overflow.
-    switch (BIOp->getBuiltinInfo().ID) {
-    default:
-      break;
-    case BuiltinValueKind::UAddOver:
-    case BuiltinValueKind::USubOver:
-    case BuiltinValueKind::UMulOver:
-      // Was it an operation with an overflow check?
-      if (match(BIOp->getOperand(2), m_One())) {
-        SILBuilderWithScope B(BI);
-        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
-      }
-    }
-  }
-
   return nullptr;
 }
 

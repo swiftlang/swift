@@ -856,8 +856,7 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getMoveOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
-                            _parameters(_owned(_typeparam(0))),
-                            _moveOnly(_typeparam(0)));
+                            _parameters(_owned(_typeparam(0))), _typeparam(0));
 }
 
 static ValueDecl *getTransferArrayOperation(ASTContext &ctx, Identifier id) {
@@ -1021,6 +1020,18 @@ static ValueDecl *getAllocOperation(ASTContext &ctx, Identifier id) {
 static ValueDecl *getDeallocOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_rawPointer, _word, _word),
+                            _void);
+}
+
+static ValueDecl *getStackAllocOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_word, _word, _word),
+                            _rawPointer);
+}
+
+static ValueDecl *getStackDeallocOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
                             _void);
 }
 
@@ -2640,6 +2651,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DeallocRaw:
     return getDeallocOperation(Context, Id);
+
+  case BuiltinValueKind::StackAlloc:
+    return getStackAllocOperation(Context, Id);
+  case BuiltinValueKind::StackDealloc:
+    return getStackDeallocOperation(Context, Id);
 
   case BuiltinValueKind::CastToNativeObject:
   case BuiltinValueKind::UnsafeCastToNativeObject:

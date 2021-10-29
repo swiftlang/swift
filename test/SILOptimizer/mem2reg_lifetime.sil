@@ -523,6 +523,8 @@ enum E {
 case one(C)
 }
 
+sil [ossa] @getC : $@convention(thin) () -> @owned C
+
 sil [ossa] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
 sil [ossa] @callee_error_owned : $@convention(thin) (@owned C) -> @error Error
@@ -1542,6 +1544,185 @@ entry(%instance : @owned $C):
   store %instance to [init] %addr : $*C
   %instance_loaded = load [take] %addr : $*C
   store %instance_loaded to [init] %addr : $*C
+  unreachable
+}
+
+
+// CHECK-LABEL: sil [ossa] @unreachable_5 : $@convention(thin) (@owned C) -> () {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_5'
+sil [ossa] @unreachable_5 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : @owned $C):
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr :$*C
+  br exit
+exit:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_6 : $@convention(thin) (@owned C) -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'unreachable_6'
+sil [ossa] @unreachable_6 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : @owned $C):
+  br exit
+unr:
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr :$*C
+  br die
+die:
+  unreachable
+exit:
+  %res = tuple ()
+  return %res : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @unreachable_7 : $@convention(thin) (@owned C) -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'unreachable_7'
+sil [ossa] @unreachable_7 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : @owned $C):
+  cond_br undef, exit, die_later
+unr:
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr :$*C
+  br die_later_2
+die_later_2:
+  br die
+die_later:
+  br die
+die:
+  unreachable
+exit:
+  %res = tuple ()
+  return %res : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @unreachable_8 : $@convention(thin) (@owned C) -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'unreachable_8'
+sil [ossa] @unreachable_8 : $@convention(thin) (@owned C) -> () {
+entry(%instance_1 : @owned $C):
+  cond_br undef, exit, die_later
+unr:
+  %addr = alloc_stack [lexical] $C
+  store %instance_1 to [init] %addr : $*C
+  cond_br undef, die_later_2_a, die_later_2_b
+die_later_2_a:
+  br die_later_2
+die_later_2_b:
+  br die_later_2
+die_later_2:
+  br die
+die_later:
+  br die
+die:
+  unreachable
+exit:
+  %res = tuple ()
+  return %res : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @unreachable_loop_1 : $@convention(thin) () -> () {
+// CHECK:       {{bb[0-9]+}}:
+// CHECK:         [[GET_C:%[^,]+]] = function_ref @getC : $@convention(thin) () -> @owned C
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]() : $@convention(thin) () -> @owned C
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         br [[LOOP_HEADER:bb[0-9]+]]
+// CHECK:       [[LOOP_HEADER]]:
+// CHECK:         br [[LOOP_BODY:bb[0-9]+]]
+// CHECK:       [[LOOP_BODY]]:
+// CHECK:         br [[LOOP_EXIT:bb[0-9]+]]
+// CHECK:       [[LOOP_EXIT]]:
+// CHECK:         cond_br undef, [[LOOP_BACKEDGE:bb[0-9]+]], [[DIE:bb[0-9]+]]
+// CHECK:       [[LOOP_BACKEDGE]]:
+// CHECK:         br [[LOOP_HEADER]]
+// CHECK:       [[DIE]]:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_loop_1'
+sil [ossa] @unreachable_loop_1 : $@convention(thin) () -> () {
+entry:
+  %delegate_var = alloc_stack [lexical] $C
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %delegate = apply %getC() : $@convention(thin) () -> @owned C
+  store %delegate to [init] %delegate_var : $*C
+  br loop_header
+loop_header:
+  br loop_body
+loop_body:
+  br loop_exit
+loop_exit:
+  cond_br undef, loop_backedge, die
+loop_backedge:
+  br loop_header
+die:
+  unreachable
+}
+
+
+// CHECK-LABEL: sil [ossa] @unreachable_loop_2 : $@convention(thin) () -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'unreachable_loop_2'
+sil [ossa] @unreachable_loop_2 : $@convention(thin) () -> () {
+entry:
+  br loop_header
+unr:
+  %delegate_var = alloc_stack [lexical] $C
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %delegate = apply %getC() : $@convention(thin) () -> @owned C
+  store %delegate to [init] %delegate_var : $*C
+  br loop_header
+loop_header:
+  br loop_body
+loop_body:
+  br loop_exit
+loop_exit:
+  cond_br undef, loop_backedge, die
+loop_backedge:
+  br loop_header
+die:
+  unreachable
+}
+
+
+// CHECK-LABEL: sil [ossa] @unreachable_loop_3 : $@convention(thin) () -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'unreachable_loop_3'
+sil [ossa] @unreachable_loop_3 : $@convention(thin) () -> () {
+entry:
+  br die_entry
+die_entry:
+  br die
+unr:
+  %delegate_var = alloc_stack [lexical] $C
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %delegate = apply %getC() : $@convention(thin) () -> @owned C
+  store %delegate to [init] %delegate_var : $*C
+  br loop_header
+loop_header:
+  br loop_body
+loop_body:
+  br loop_exit
+loop_exit:
+  cond_br undef, loop_backedge, die_loop
+loop_backedge:
+  br loop_header
+die_loop:
+  br die
+die:
   unreachable
 }
 

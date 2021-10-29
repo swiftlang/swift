@@ -422,6 +422,10 @@ def define_availability : Separate<["-"], "define-availability">,
   HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,
   MetaVarName<"<macro>">;
 
+def check_api_availability_only : Flag<["-"], "check-api-availability-only">,
+  Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
+  HelpText<"Only check the availability of the APIs, ignore function bodies">;
+
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
