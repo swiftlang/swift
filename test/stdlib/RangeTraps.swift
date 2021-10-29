@@ -116,6 +116,12 @@ RangeTraps.test("throughNaN")
   _ = ...Double.nan
 }
 
+RangeTraps.test("UIntOverflow")
+  .code {
+  expectCrashLater()
+  _blackHole((0 ..< UInt.max).count)
+}
+
 if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
   // Debug check was introduced in https://github.com/apple/swift/pull/34961
   RangeTraps.test("UncheckedHalfOpen")
