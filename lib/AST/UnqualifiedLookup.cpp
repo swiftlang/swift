@@ -439,8 +439,8 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
   // passed, the alias 'Foo' should appear in source files, not 'Bar'.
   // If no module aliasing is used, this will simply return the given
   // name and 'true' indicating the check passed.
-  auto checkResult = Ctx.getRealModuleNameOrAlias(givenName);
-  if (checkResult.second) { // Check passed
+  // Is this *not* the real name of an aliased module?
+  if (!Ctx.getRealModuleName(givenName).empty()) {
     desiredModule = Ctx.getLoadedModule(givenName);
   }
 
