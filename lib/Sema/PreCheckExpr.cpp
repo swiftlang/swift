@@ -1419,11 +1419,12 @@ namespace {
 
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
       // With multi-statement closure inference enabled, constraint generation
-      // is responsible for pattern verification and type-checking, so there
-      // is no need to walk into patterns in that mode.
-      bool shouldWalkIntoPatterns =
-          !Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
-      return {shouldWalkIntoPatterns, pattern};
+      // is responsible for pattern verification and type-checking in the body
+      // of the closure, so there is no need to walk into patterns.
+      bool walkIntoPatterns =
+          !(isa<ClosureExpr>(DC) &&
+            Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference);
+      return {walkIntoPatterns, pattern};
     }
   };
 } // end anonymous namespace
