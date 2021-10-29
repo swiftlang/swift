@@ -31,6 +31,29 @@ extension SwiftReflectionContextRef {
     return String(cString: cstr)
   }
 
+  func isAContiguousArrayOfClassElementType(metadata: swift_reflection_ptr_t) ->
+  Bool {
+    guard let name = name(metadata: metadata) else { return false }
+    guard name.starts(with: "Swift._ContiguousArrayStorage") else {
+        return false
+    }
+    let tr = swift_reflection_typeRefForMetadata(self, UInt(metadata));
+    guard tr != 0 else {
+        return false
+    }
+    let genericArgCnt = swift_reflection_genericArgumentCountOfTypeRef(tr);
+    guard genericArgCnt == 1 else {
+        return false
+    }
+
+    let argTr = swift_reflection_genericArgumentOfTypeRef(tr, 0)
+    guard argTr != 0 else {
+        return false
+    }
+    let typeInfo = swift_reflection_infoForTypeRef(self, argTr)
+    return typeInfo.Kind == SWIFT_STRONG_REFERENCE
+  }
+
   func name(proto: swift_reflection_ptr_t) -> String? {
     guard let cstr = swift_reflection_copyDemangledNameForProtocolDescriptor(
       self, proto) else { return nil }

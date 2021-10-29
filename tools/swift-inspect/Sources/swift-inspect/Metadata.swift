@@ -35,7 +35,8 @@ extension Allocation {
     let ptr = context.metadataPointer(allocation: allocation_t)
     if ptr != 0 {
       let name = context.name(metadata: ptr) ?? "<unknown>"
-      return .init(ptr: ptr, name: name)
+      let isClass = context.isAContiguousArrayOfClassElementType(metadata: ptr)
+      return .init(ptr: ptr, name: name, isArrayOfClass: isClass)
     } else {
       return nil
     }
@@ -59,6 +60,7 @@ struct Metadata {
   let ptr: swift_reflection_ptr_t
   var allocation: Allocation? = nil
   let name: String
+  let isArrayOfClass: Bool
   
   var offset: Int? { allocation.map { Int(self.ptr - $0.ptr) } }
 }
