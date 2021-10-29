@@ -69,6 +69,13 @@ enum Sym {
     symbol(symbolicationHandle, "task_peek_string")
   static let task_stop_peeking: @convention(c) (task_t) -> kern_return_t =
     symbol(symbolicationHandle, "task_stop_peeking")
+
+  static let CSSymbolicatorForeachSymbolOwnerAtTime:
+    @convention(c) (CSSymbolicatorRef, CSMachineTime, @convention(block) (CSSymbolOwnerRef) -> Void) -> UInt =
+      symbol(coreSymbolicationHandle, "CSSymbolicatorForeachSymbolOwnerAtTime")
+
+  static let CSSymbolOwnerGetBaseAddress: @convention(c) (CSSymbolOwnerRef) -> mach_vm_address_t =
+    symbol(symbolicationHandle, "CSSymbolOwnerGetBaseAddress")
 }
 
 typealias CSMachineTime = UInt64
@@ -143,6 +150,19 @@ func CSSymbolicatorGetSymbolWithAddressAtTime(
   _ time: CSMachineTime
 ) -> CSSymbolRef {
   Sym.CSSymbolicatorGetSymbolWithAddressAtTime(symbolicator, address, time)
+}
+
+func CSSymbolicatorForeachSymbolOwnerAtTime(
+  _ symbolicator: CSSymbolicatorRef,
+  _ time: CSMachineTime,
+  _ symbolIterator: (CSSymbolOwnerRef) -> Void
+  ) ->  UInt {
+      return Sym.CSSymbolicatorForeachSymbolOwnerAtTime(symbolicator, time,
+                                                        symbolIterator)
+}
+
+func CSSymbolOwnerGetBaseAddress(_ symbolOwner: CSSymbolOwnerRef) -> mach_vm_address_t {
+    return Sym.CSSymbolOwnerGetBaseAddress(symbolOwner)
 }
 
 func task_start_peeking(_ task: task_t) -> Bool {
