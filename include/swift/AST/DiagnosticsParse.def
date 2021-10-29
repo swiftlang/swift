@@ -303,7 +303,8 @@ ERROR(getset_cannot_be_implied,none,
 ERROR(decl_expected_module_name,none,
       "expected module name in import declaration", ())
 ERROR(expected_module_alias,none,
-      "module real name should not appear in source files; only the module alias is allowed", ())
+      "cannot refer to module as %0 because it has been aliased; use %1 "
+      "instead", (Identifier, Identifier))
 
 // Extension
 ERROR(expected_lbrace_extension,PointsToFirstBadToken,
