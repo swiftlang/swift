@@ -153,19 +153,6 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       getIRGenOptions().PublicLinkLibraries;
   serializationOpts.SDKName = getLangOptions().SDKName;
   serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
-
-  if (opts.EmitSymbolGraph) {
-    if (!opts.SymbolGraphOutputDir.empty()) {
-      serializationOpts.SymbolGraphOutputDir = opts.SymbolGraphOutputDir;
-    } else {
-      serializationOpts.SymbolGraphOutputDir = serializationOpts.OutputPath;
-    }
-    SmallString<256> OutputDir(serializationOpts.SymbolGraphOutputDir);
-    llvm::sys::fs::make_absolute(OutputDir);
-    serializationOpts.SymbolGraphOutputDir = OutputDir.str().str();
-  }
-  serializationOpts.SkipSymbolGraphInheritedDocs = opts.SkipInheritedDocs;
-  serializationOpts.IncludeSPISymbolsInSymbolGraph = opts.IncludeSPISymbolsInSymbolGraph;
   
   if (!getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;

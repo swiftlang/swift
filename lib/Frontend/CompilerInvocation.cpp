@@ -1107,8 +1107,20 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
 
+  if (auto *A = Args.getLastArg(OPT_symbol_graph_minimum_access_level)) {
+    Opts.MinimumAccessLevel =
+        llvm::StringSwitch<AccessLevel>(A->getValue())
+            .Case("open", AccessLevel::Open)
+            .Case("public", AccessLevel::Public)
+            .Case("internal", AccessLevel::Internal)
+            .Case("fileprivate", AccessLevel::FilePrivate)
+            .Case("private", AccessLevel::Private)
+            .Default(AccessLevel::Public);
+  } else {
+    Opts.MinimumAccessLevel = AccessLevel::Public;
+  }
+
   // default values for generating symbol graphs during a build
-  Opts.MinimumAccessLevel = AccessLevel::Public;
   Opts.PrettyPrint = false;
   Opts.EmitSynthesizedMembers = true;
   Opts.PrintMessages = false;
