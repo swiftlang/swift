@@ -165,7 +165,7 @@ extension ${Self}: LosslessStringConvertible {
   %if bits == 16:
     self.init(Substring(text))
   %else:
-    if #available(SwiftStdlib 5.3, *) {
+    if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) { //SwiftStdlib 5.3
       self.init(Substring(text))
     } else {
       self = 0.0
