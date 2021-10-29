@@ -8513,6 +8513,11 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
       std::move(builder).computeGenericSignature(
                                       /*allowConcreteGenericParams=*/true);
 
+    // If the new signature once again contains the removed requirement, it's
+    // not redundant.
+    if (newSig->isEqual(sig))
+      continue;
+
     // If the removed requirement is satisfied by the new generic signature,
     // it is redundant. Complain.
     if (newSig->isRequirementSatisfied(requirements[victimIndex])) {
