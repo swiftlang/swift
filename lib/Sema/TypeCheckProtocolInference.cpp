@@ -1165,22 +1165,16 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
   llvm_unreachable("unhandled result");
 }
 
-AssociatedTypeDecl *AssociatedTypeInference::completeSolution(
+AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes, unsigned reqDepth) {
+  if (unresolvedAssocTypes.empty()) {
+    return nullptr;
+  }
+
   // Examine the solution for errors and attempt to compute abstract type
   // witnesses for associated types that are still lacking an entry.
   llvm::SmallVector<AbstractTypeWitness, 2> abstractTypeWitnesses;
   for (auto *const assocType : unresolvedAssocTypes) {
-    const auto typeWitness = typeWitnesses.begin(assocType);
-    if (typeWitness != typeWitnesses.end()) {
-      // The solution contains an error.
-      if (typeWitness->first->hasError()) {
-        return assocType;
-      }
-
-      continue;
-    }
-
     // Try to compute the type without the aid of a specific potential witness.
     if (const auto &typeWitness = computeAbstractTypeWitness(assocType)) {
       // Record the type witness immediately to make it available
@@ -1285,9 +1279,28 @@ void AssociatedTypeInference::findSolutionsRec(
     // Introduce a hash table scope; we may add type witnesses here.
     TypeWitnessesScope typeWitnessesScope(typeWitnesses);
 
-    // Validate and complete the solution.
+    // Filter out the associated types that remain unresolved.
+    SmallVector<AssociatedTypeDecl *, 4> stillUnresolved;
+    for (auto *const assocType : unresolvedAssocTypes) {
+      const auto typeWitness = typeWitnesses.begin(assocType);
+      if (typeWitness == typeWitnesses.end()) {
+        stillUnresolved.push_back(assocType);
+      } else {
+        // If an erroneous type witness has already been recorded for one of
+        // the associated types, give up.
+        if (typeWitness->first->hasError()) {
+          if (!missingTypeWitness)
+            missingTypeWitness = assocType;
+
+          return;
+        }
+      }
+    }
+
+    // Attempt to infer abstract type witnesses for associated types that
+    // could not be resolved otherwise.
     if (auto *const assocType =
-            completeSolution(unresolvedAssocTypes, reqDepth)) {
+            inferAbstractTypeWitnesses(stillUnresolved, reqDepth)) {
       // The solution is decisively incomplete; record the associated type
       // we failed on and bail out.
       if (!missingTypeWitness)
@@ -1298,6 +1311,7 @@ void AssociatedTypeInference::findSolutionsRec(
 
     ++NumSolutionStates;
 
+    // Validate and complete the solution.
     // Fold the dependent member types within this type.
     for (auto assocType : proto->getAssociatedTypeMembers()) {
       if (conformance->hasTypeWitness(assocType))

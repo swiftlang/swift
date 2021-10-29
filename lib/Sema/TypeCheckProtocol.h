@@ -1040,14 +1040,12 @@ private:
   /// requirements of the given constrained extension.
   bool checkConstrainedExtension(ExtensionDecl *ext);
 
-  /// Validate the current tentative solution represented by \p typeWitnesses
-  /// and attempt to resolve abstract type witnesses for associated types that
-  /// could not be inferred otherwise.
+  /// Attempt to infer abstract type witnesses for the given set of associated
+  /// types.
   ///
   /// \returns \c nullptr, or the associated type that failed.
-  AssociatedTypeDecl *
-  completeSolution(ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
-                   unsigned reqDepth);
+  AssociatedTypeDecl *inferAbstractTypeWitnesses(
+      ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes, unsigned reqDepth);
 
   /// Top-level operation to find solutions for the given unresolved
   /// associated types.
