@@ -424,6 +424,14 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     }
 
     case ActorIsolation::Independent:
+      // While some synchronous, non-delegating actor inits are
+      // nonisolated, they need cross-actor restrictions (e.g., for Sendable).
+      if (auto *ctor = dyn_cast<ConstructorDecl>(decl))
+        if (!ctor->isConvenienceInit())
+          if (auto *parent = dyn_cast<ClassDecl>(ctor->getParent()))
+              if (parent->isAnyActor())
+                return forActorSelf(parent, /*isCrossActor=*/true);
+
       return forUnrestricted();
 
     case ActorIsolation::Unspecified:
