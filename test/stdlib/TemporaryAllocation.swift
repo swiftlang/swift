@@ -55,6 +55,7 @@ TemporaryAllocationTestSuite.test("untypedEmptyAllocationIsStackAllocated") {
   }
 }
 
+#if !os(WASI)
 TemporaryAllocationTestSuite.test("crashOnNegativeByteCount") {
   expectCrash {
     let byteCount = Int.random(in: -2 ..< -1)
@@ -68,6 +69,7 @@ TemporaryAllocationTestSuite.test("crashOnNegativeAlignment") {
     withUnsafeTemporaryAllocation(byteCount: 16, alignment: alignment) { _ in }
   }
 }
+#endif
 
 TemporaryAllocationTestSuite.test("untypedAllocationIsAligned") {
   withUnsafeTemporaryAllocation(byteCount: 1, alignment: 8) { buffer in
@@ -106,12 +108,14 @@ TemporaryAllocationTestSuite.test("voidAllocationIsStackAllocated") {
   }
 }
 
+#if !os(WASI)
 TemporaryAllocationTestSuite.test("crashOnNegativeValueCount") {
   expectCrash {
     let capacity = Int.random(in: -2 ..< -1)
     withUnsafeTemporaryAllocation(of: Int.self, capacity: capacity) { _ in }
   }
 }
+#endif
 
 TemporaryAllocationTestSuite.test("typedAllocationIsAligned") {
   withUnsafeTemporaryAllocation(of: Int.self, capacity: 1) { buffer in
