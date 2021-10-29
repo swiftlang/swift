@@ -1418,6 +1418,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_disable_actor_data_race_checks, /*default=*/false);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
+  Opts.EnablePerformanceAnnotations |=
+      Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);

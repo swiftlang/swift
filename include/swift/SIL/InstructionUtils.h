@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_INSTRUCTIONUTILS_H
 #define SWIFT_SIL_INSTRUCTIONUTILS_H
 
+#include "swift/SIL/RuntimeEffect.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -139,6 +140,15 @@ SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 /// Returns true if \p PAI is only used by an assign_by_wrapper instruction as
 /// init or set function.
 bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
+
+/// Returns the runtime effects of \p inst.
+///
+/// Predicts which runtime calls are called in the generated code for `inst`.
+/// This is sometimes a conservative approximation, i.e. more runtime effects
+/// are reported than actually happen.
+/// If the runtime effects can be associated with a type, this type is returned
+/// in `impactType`. That's useful for diagnostics.
+RuntimeEffect getRuntimeEffect(SILInstruction *inst, SILType &impactType);
 
 /// If V is a function closure, return the reaching set of partial_apply's.
 void findClosuresForFunctionValue(SILValue V,

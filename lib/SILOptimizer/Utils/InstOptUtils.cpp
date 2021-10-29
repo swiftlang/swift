@@ -2249,3 +2249,26 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       }
   }
 }
+
+IntegerLiteralInst *swift::optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
+                                                         SILBuilder &builder) {
+  assert(bi->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass);
+  assert(bi->hasSubstitutions() && "Expected substitutions for canBeClass");
+
+  auto const &subs = bi->getSubstitutions();
+  assert((subs.getReplacementTypes().size() == 1) &&
+         "Expected one substitution in call to canBeClass");
+
+  auto ty = subs.getReplacementTypes()[0]->getCanonicalType();
+  switch (ty->canBeClass()) {
+  case TypeTraitResult::IsNot:
+    return builder.createIntegerLiteral(bi->getLoc(), bi->getType(),
+                                        APInt(8, 0));
+  case TypeTraitResult::Is:
+    return builder.createIntegerLiteral(bi->getLoc(), bi->getType(),
+                                        APInt(8, 1));
+  case TypeTraitResult::CanBe:
+    return nullptr;
+  }
+  llvm_unreachable("Unhandled TypeTraitResult in switch.");
+}

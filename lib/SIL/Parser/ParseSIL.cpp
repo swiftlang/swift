@@ -943,6 +943,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  SILFunction::Purpose *specialPurpose,
                                  Inline_t *inlineStrategy,
                                  OptimizationMode *optimizationMode,
+                                 PerformanceConstraints *perfConstraints,
                                  bool *isLet,
                                  bool *isWeakImported,
                                  AvailabilityContext *availability,
@@ -1019,6 +1020,10 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *optimizationMode = OptimizationMode::ForSpeed;
     else if (optimizationMode && SP.P.Tok.getText() == "Osize")
       *optimizationMode = OptimizationMode::ForSize;
+    else if (perfConstraints && SP.P.Tok.getText() == "no_locks")
+      *perfConstraints = PerformanceConstraints::NoLocks;
+    else if (perfConstraints && SP.P.Tok.getText() == "no_allocation")
+      *perfConstraints = PerformanceConstraints::NoAllocation;
     else if (inlineStrategy && SP.P.Tok.getText() == "always_inline")
       *inlineStrategy = AlwaysInline;
     else if (MRK && SP.P.Tok.getText() == "readnone")
@@ -6187,6 +6192,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   bool isWithoutActuallyEscapingThunk = false;
   Inline_t inlineStrategy = InlineDefault;
   OptimizationMode optimizationMode = OptimizationMode::NotSet;
+  PerformanceConstraints perfConstr = PerformanceConstraints::None;
   SmallVector<std::string, 1> Semantics;
   SmallVector<ParsedSpecAttr, 4> SpecAttrs;
   ValueDecl *ClangDecl = nullptr;
@@ -6198,7 +6204,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
           &isThunk, &isDynamic, &isExactSelfClass, &DynamicallyReplacedFunction,
           &objCReplacementFor, &specialPurpose, &inlineStrategy,
-          &optimizationMode, nullptr, &isWeakImported, &availability,
+          &optimizationMode, &perfConstr, nullptr, &isWeakImported, &availability,
           &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
@@ -6242,6 +6248,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
       isWithoutActuallyEscapingThunk);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
+    FunctionState.F->setPerfConstraints(perfConstr);
     FunctionState.F->setEffectsKind(MRK);
     if (ClangDecl)
       FunctionState.F->setClangNodeOwner(ClangDecl);
@@ -6410,7 +6417,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   if (parseSILLinkage(GlobalLinkage, P) ||
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr,
+                           nullptr, nullptr, nullptr,
                            &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
@@ -6462,7 +6469,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -6531,7 +6538,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr,
                            VTableState, M))
     return true;
 
@@ -7037,7 +7044,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
   if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr,
                            WitnessState, M))
     return true;
 

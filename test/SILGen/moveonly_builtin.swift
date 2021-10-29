@@ -1,6 +1,8 @@
 // RUN: %target-swift-emit-silgen -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-experimental-move-only | %FileCheck %s
 // RUN: %target-swift-emit-sil -module-name moveonly -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-experimental-move-only | %FileCheck -check-prefix=CHECK-SIL %s
 
+// REQUIRES: rdar84780237
+
 import Swift
 
 class Klass {}
