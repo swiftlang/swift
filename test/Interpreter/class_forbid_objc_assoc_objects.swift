@@ -11,11 +11,11 @@ defer { runAllTests() }
 
 var Tests = TestSuite("AssocObject")
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 final class AllowedToHaveAssocObject {
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("no crash when set assoc object, assign") {
     let x = AllowedToHaveAssocObject()
     objc_setAssociatedObject(x, "myKey", "myValue", .OBJC_ASSOCIATION_ASSIGN)
@@ -42,12 +42,12 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   }
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 @_semantics("objc.forbidAssociatedObjects")
 final class UnableToHaveAssocObjects {
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("crash when set assoc object, assign")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
@@ -89,7 +89,7 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   }
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 @_semantics("objc.forbidAssociatedObjects")
 final class UnableToHaveAssocObjectsGeneric<T> {
   var state: T
@@ -97,7 +97,7 @@ final class UnableToHaveAssocObjectsGeneric<T> {
   init(state: T) { self.state = state }
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("crash when set assoc object (generic)")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
@@ -110,16 +110,16 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
 // In this case, we mark the child. This is unsound since we will get different
 // answers since the type checker isn't enforcing this.
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 class UnsoundAbleToHaveAssocObjectsParentClass {
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 @_semantics("objc.forbidAssociatedObjects")
 final class UnsoundUnableToHaveAssocObjectsSubClass : UnsoundAbleToHaveAssocObjectsParentClass {
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("no crash when set assoc object set only on child subclass, but assoc to parent")
   .code {
     let x = UnsoundAbleToHaveAssocObjectsParentClass()
@@ -137,16 +137,16 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
 
 // In this case, we mark the parent. It seems like the bit is propagated... I am
 // not sure.
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 @_semantics("objc.forbidAssociatedObjects")
 class UnsoundAbleToHaveAssocObjectsParentClass2 {
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 final class UnsoundUnableToHaveAssocObjectsSubClass2 : UnsoundAbleToHaveAssocObjectsParentClass2 {
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("crash when set assoc object set only on parent class")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
@@ -156,11 +156,11 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   }
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 class UnsoundUnableToHaveAssocObjectsSubClass3 : UnsoundAbleToHaveAssocObjectsParentClass2 {
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("crash when set assoc object set only on parent class, child not final")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
@@ -174,18 +174,18 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
 
 // In this case, we mark the child. This is unsound since we will get different
 // answers since the type checker isn't enforcing this.
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 class GenericAbleToHaveAssocObjectsParentClass<T> {
   public var state: T
   init(state: T) { self.state = state }
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 @_semantics("objc.forbidAssociatedObjects")
 final class GenericUnableToHaveAssocObjectsSubClass<T> : GenericAbleToHaveAssocObjectsParentClass<T> {
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("no crash when set assoc object set only on child subclass, but assoc to parent")
   .code {
     let x = GenericAbleToHaveAssocObjectsParentClass(state: 5)
@@ -203,18 +203,18 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
 
 // In this case, we mark the parent. It seems like the bit is propagated... I am
 // not sure.
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 @_semantics("objc.forbidAssociatedObjects")
 class GenericAbleToHaveAssocObjectsParentClass2<T> {
   public var state: T
   init(state: T) { self.state = state }
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 final class GenericUnableToHaveAssocObjectsSubClass2<T> : GenericAbleToHaveAssocObjectsParentClass2<T> {
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("crash when set assoc object set only on parent class")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
@@ -224,11 +224,11 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   }
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 class GenericUnableToHaveAssocObjectsSubClass3<T> : GenericAbleToHaveAssocObjectsParentClass2<T> {
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("crash when set assoc object set only on parent class, child not final")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {

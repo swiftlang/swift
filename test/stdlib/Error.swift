@@ -217,7 +217,7 @@ func throwJazzHands() throws {
 }
 
 ErrorTests.test("willThrow") {
-  if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
+  if #available(SwiftStdlib 5.2, *) {
     // Error isn't allowed in a @convention(c) function when ObjC interop is
     // not available, so pass it through an OpaquePointer.
     typealias WillThrow = @convention(c) (OpaquePointer) -> Void

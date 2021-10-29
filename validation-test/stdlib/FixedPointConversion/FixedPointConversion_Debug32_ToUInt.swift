@@ -361,7 +361,7 @@ FixedPointConversion_Debug32_ToUInt
 //===----------------------------------------------------------------------===//
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+if #available(SwiftStdlib 5.3, *) {
 
 FixedPointConversion_Debug32_ToUInt
 .test("FromFloat16_NeverTraps")
