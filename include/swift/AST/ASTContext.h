@@ -350,7 +350,13 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
-  /// Mapping between aliases and real (physical) names of imported or referenced modules.
+  /// Set if a `-module-alias` was passed. Used to store mapping between module aliases and
+  /// their corresponding real names, and vice versa for a reverse lookup, which is needed to check
+  /// if the module names appearing in source files are aliases or real names.
+  /// \see ASTContext::getRealModuleName.
+  ///
+  /// The boolean in the value indicates whether or not the entry is keyed by an alias vs real name,
+  /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
   mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
 
   /// Retrieve the allocator for the given arena.
@@ -477,25 +483,21 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
-  /// Convert a given module alias map (with `-module-alias` option) to a map of entries that are
-  /// keyed both module aliases and real names along with a boolean indicating whether the entry
-  /// is an alias or a real name.
-  /// An entry with a module alias as key will have value: (real module name, true), and
-  /// an entry with a module real name as key will have value: (module alias, false).
+  /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
+  /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
+  /// the names of the imported or referenced modules in source files in the main module, and X and Y
+  /// are the real (physical) module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
 
-  /// Retrieve the actual module name if a module alias is used via '-module-alias Foo=X', where Foo is
-  /// a module alias and X is the real (physical) name. Returns \p key if no aliasing is used.
-  Identifier getRealModuleName(Identifier key) const;
-
-  /// Retrieve the value mapped to the given key.
-  /// \param key A module alias or real name (or non-aliased name) to look up
-  /// \returns A pair of a module alias or real name given \p key, and a boolean indicating if the
-  ///          \p key is an alias
-  /// If \p key is a module alias, it returns: (corresponding real name, true)
-  /// if \p key is a module real name, it returns: (corresponding alias, false), and
-  /// if \p key is a non-aliased module name, it returns (key, true).
-  std::pair<Identifier, bool> getRealModuleNameOrAlias(Identifier key) const;
+  /// Look up the module alias map by the given \p key.
+  ///
+  /// \param key A module alias or real name to look up the map by.
+  /// \param reverseLookup Default to false, but if true, it will treat the \p key as a real name and
+  ///        look up the alias, which can be used to guard against real names appearing in source files.
+  /// \returns The real name or alias mapped to the key.
+  ///          If \p reverseLookup is true but the \p key is an alias, it will return an empty Identifier.
+  ///          If no aliasing is used, \p key will be returned.
+  Identifier getRealModuleName(Identifier key, bool reverseLookup = false) const;
 
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,

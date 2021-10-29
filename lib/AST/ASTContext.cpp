@@ -1637,6 +1637,9 @@ void ASTContext::addModuleInterfaceChecker(
 }
 
 void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
+  // This setter should be called only once after ASTContext has been initialized
+  assert(ModuleAliasMap.empty());
+  
   for (auto k: aliasMap.keys()) {
     auto v = aliasMap.lookup(k);
     if (!v.empty()) {
@@ -1650,23 +1653,20 @@ void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
   }
 }
 
-Identifier ASTContext::getRealModuleName(Identifier key) const {
+Identifier ASTContext::getRealModuleName(Identifier key, bool reverseLookup) const {
   auto found = ModuleAliasMap.find(key);
-  if (found != ModuleAliasMap.end()) {
-    auto realOrAlias = found->second;
-    if (realOrAlias.second) // check if it's a real name given the key (alias)
-      return realOrAlias.first;
-  }
-  return key;
-}
+  if (found == ModuleAliasMap.end())
+    return key;
 
-std::pair<Identifier, bool> ASTContext::getRealModuleNameOrAlias(Identifier key) const {
-  auto found = ModuleAliasMap.find(key);
-  if (found != ModuleAliasMap.end()) {
-    return found->second;
-  }
-  // No module aliasing is used for the given key
-  return std::make_pair(key, true);
+  // Found an entry
+  auto realOrAlias = found->second;
+  // If reverseLookup, i.e. look up an alias by real name, but the found
+  // entry is keyed by an alias, return an empty Identifier
+  if (reverseLookup && realOrAlias.second)
+    return Identifier();
+
+  // Return a real name or an alias (if reverseLookup) mapped to the given key
+  return realOrAlias.first;
 }
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(

@@ -4826,7 +4826,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   if (Context.getRealModuleName(parsedModuleID).empty()) {
     // If reached here, it means the parsed module name is a real module name
     // which appeared in the source file; only a module alias should be allowed
-    auto aliasName = Context.getRealModuleName(parsedModuleID, /*lookupAliasFromReal=*/true);
+    auto aliasName = Context.getRealModuleName(parsedModuleID, /*reverseLookup=*/true);
     diagnose(importPath.front().Loc, diag::expected_module_alias,
                      parsedModuleID, aliasName)
       .fixItReplace(importPath.front().Loc, aliasName.str());
