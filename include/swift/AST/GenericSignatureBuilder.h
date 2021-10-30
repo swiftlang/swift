@@ -608,6 +608,8 @@ public:
                       bool allowConcreteGenericParams,
                       const ProtocolDecl *requirementSignatureSelfProto) &&;
 
+  bool hadAnyError() const;
+
   /// Finalize the set of requirements and compute the generic
   /// signature.
   ///
@@ -616,9 +618,6 @@ public:
   GenericSignature computeGenericSignature(
                       bool allowConcreteGenericParams = false,
                       const ProtocolDecl *requirementSignatureSelfProto = nullptr) &&;
-
-  /// Compute the requirement signature for the given protocol.
-  static GenericSignature computeRequirementSignature(ProtocolDecl *proto);
 
 private:
   /// Finalize the set of requirements, performing any remaining checking

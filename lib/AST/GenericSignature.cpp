@@ -1749,5 +1749,5 @@ swift::buildGenericSignature(ASTContext &ctx,
         baseSignature.getPointer(),
         addedParameters,
         addedRequirements},
-      GenericSignature());
+      GenericSignatureWithError()).getPointer();
 }

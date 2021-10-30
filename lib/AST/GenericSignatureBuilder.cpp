@@ -8342,6 +8342,10 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
       requirementSignatureSelfProto);
 }
 
+bool GenericSignatureBuilder::hadAnyError() const {
+  return Impl->HadAnyError;
+}
+
 GenericSignature GenericSignatureBuilder::computeGenericSignature(
                                           bool allowConcreteGenericParams,
                                           const ProtocolDecl *requirementSignatureSelfProto) && {
@@ -8577,7 +8581,7 @@ static bool isCanonicalRequest(GenericSignature baseSignature,
   return true;
 }
 
-GenericSignature
+GenericSignatureWithError
 AbstractGenericSignatureRequest::evaluate(
          Evaluator &evaluator,
          const GenericSignatureImpl *baseSignatureImpl,
@@ -8587,7 +8591,7 @@ AbstractGenericSignatureRequest::evaluate(
   // If nothing is added to the base signature, just return the base
   // signature.
   if (addedParameters.empty() && addedRequirements.empty())
-    return baseSignature;
+    return GenericSignatureWithError(baseSignature, /*hadError=*/false);
 
   ASTContext &ctx = addedParameters.empty()
       ? addedRequirements.front().getFirstType()->getASTContext()
@@ -8600,8 +8604,9 @@ AbstractGenericSignatureRequest::evaluate(
                            baseSignature.getGenericParams().begin(),
                            baseSignature.getGenericParams().end());
 
-    return GenericSignature::get(addedParameters,
-                                 baseSignature.getRequirements());
+    auto result = GenericSignature::get(addedParameters,
+                                        baseSignature.getRequirements());
+    return GenericSignatureWithError(result, /*hadError=*/false);
   }
 
   // If the request is non-canonical, we won't need to build our own
@@ -8624,16 +8629,18 @@ AbstractGenericSignatureRequest::evaluate(
     }
 
     // Build the canonical signature.
-    auto canSignatureResult = evaluator(
+    auto canSignatureResult = evaluateOrDefault(
+        ctx.evaluator,
         AbstractGenericSignatureRequest{
           canBaseSignature.getPointer(), std::move(canAddedParameters),
-          std::move(canAddedRequirements)});
-    if (!canSignatureResult || !*canSignatureResult)
-      return GenericSignature();
+          std::move(canAddedRequirements)},
+        GenericSignatureWithError());
+    if (!canSignatureResult.getPointer())
+      return GenericSignatureWithError();
 
     // Substitute in the original generic parameters to form the sugared
     // result the original request wanted.
-    auto canSignature = *canSignatureResult;
+    auto canSignature = canSignatureResult.getPointer();
     SmallVector<GenericTypeParamType *, 2> resugaredParameters;
     resugaredParameters.reserve(canSignature.getGenericParams().size());
     if (baseSignature) {
@@ -8660,7 +8667,9 @@ AbstractGenericSignatureRequest::evaluate(
       resugaredRequirements.push_back(*resugaredReq);
     }
 
-    return GenericSignature::get(resugaredParameters, resugaredRequirements);
+    return GenericSignatureWithError(
+        GenericSignature::get(resugaredParameters, resugaredRequirements),
+        canSignatureResult.getInt());
   }
 
   // Create a generic signature that will form the signature.
@@ -8677,11 +8686,13 @@ AbstractGenericSignatureRequest::evaluate(
   for (const auto &req : addedRequirements)
     builder.addRequirement(req, source, nullptr);
 
-  return std::move(builder).computeGenericSignature(
+  bool hadError = builder.hadAnyError();
+  auto result = std::move(builder).computeGenericSignature(
       /*allowConcreteGenericParams=*/true);
+  return GenericSignatureWithError(result, hadError);
 }
 
-GenericSignature
+GenericSignatureWithError
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator,
         ModuleDecl *parentModule,
@@ -8801,7 +8812,9 @@ InferredGenericSignatureRequest::evaluate(
       
   for (const auto &req : addedRequirements)
     builder.addRequirement(req, source, parentModule);
-  
-  return std::move(builder).computeGenericSignature(
+
+  bool hadError = builder.hadAnyError();
+  auto result = std::move(builder).computeGenericSignature(
       allowConcreteGenericParams);
+  return GenericSignatureWithError(result, hadError);
 }

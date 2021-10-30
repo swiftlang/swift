@@ -770,8 +770,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       GC->getGenericParams(), WhereClauseOwner(GC),
       sameTypeReqs, inferenceSources,
       allowConcreteGenericParams};
-  auto sig = evaluateOrDefault(ctx.evaluator,
-                               request, nullptr);
+  auto sig = evaluateOrDefault(ctx.evaluator, request,
+                               GenericSignatureWithError()).getPointer();
 
   // Debugging of the generic signature builder and generic signature
   // generation.

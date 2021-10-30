@@ -441,8 +441,8 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
       DC->getParentModule(), /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
       {}, {}, /*allowConcreteGenericParams=*/true};
-  auto sig = evaluateOrDefault(DC->getASTContext().evaluator,
-                               request, GenericSignature());
+  auto sig = evaluateOrDefault(DC->getASTContext().evaluator, request,
+                               GenericSignatureWithError()).getPointer();
 
   return sig.getGenericEnvironment();
 }
