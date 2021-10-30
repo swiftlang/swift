@@ -8453,34 +8453,32 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
   llvm::errs() << "\n";
 
   // Try building a new signature having the same requirements.
-  auto genericParams = sig.getGenericParams();
-  auto requirements = sig.getRequirements();
+  SmallVector<GenericTypeParamType *, 2> genericParams;
+  for (auto *genericParam :  sig.getGenericParams())
+    genericParams.push_back(genericParam);
+
+  SmallVector<Requirement, 2> requirements;
+  for (auto requirement : sig.getRequirements())
+    requirements.push_back(requirement);
 
   {
     PrettyStackTraceGenericSignature debugStack("verifying", sig);
 
-    // Form a new generic signature builder.
-    GenericSignatureBuilder builder(context);
-
-    // Add the generic parameters.
-    for (auto gp : genericParams)
-      builder.addGenericParameter(gp);
-
-    // Add the requirements.
-    auto source = FloatingRequirementSource::forAbstract();
-    for (auto req : requirements)
-      builder.addRequirement(req, source, nullptr);
+    auto newSigWithError = evaluateOrDefault(
+        context.evaluator,
+        AbstractGenericSignatureRequest{
+            nullptr,
+            genericParams,
+            requirements},
+        GenericSignatureWithError());
 
     // If there were any errors, the signature was invalid.
-    if (builder.Impl->HadAnyError) {
+    if (newSigWithError.getInt()) {
       context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_valid,
                              sig->getAsString());
     }
 
-    // Form a generic signature from the result.
-    auto newSig =
-      std::move(builder).computeGenericSignature(
-                                      /*allowConcreteGenericParams=*/true);
+    auto newSig = newSigWithError.getPointer();
 
     // The new signature should be equal.
     if (!newSig->isEqual(sig)) {
@@ -8493,28 +8491,27 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
   for (unsigned victimIndex : indices(requirements)) {
     PrettyStackTraceGenericSignature debugStack("verifying", sig, victimIndex);
 
-    // Form a new generic signature builder.
-    GenericSignatureBuilder builder(context);
-
-    // Add the generic parameters.
-    for (auto gp : genericParams)
-      builder.addGenericParameter(gp);
-
     // Add the requirements *except* the victim.
-    auto source = FloatingRequirementSource::forAbstract();
+    SmallVector<Requirement, 2> newRequirements;
     for (unsigned i : indices(requirements)) {
       if (i != victimIndex)
-        builder.addRequirement(requirements[i], source, nullptr);
+        newRequirements.push_back(requirements[i]);
     }
+
+    auto newSigWithError = evaluateOrDefault(
+        context.evaluator,
+        AbstractGenericSignatureRequest{
+          nullptr,
+          genericParams,
+          newRequirements},
+        GenericSignatureWithError());
 
     // If there were any errors, we formed an invalid signature, so
     // just continue.
-    if (builder.Impl->HadAnyError) continue;
+    if (newSigWithError.getInt())
+      continue;
 
-    // Form a generic signature from the result.
-    auto newSig =
-      std::move(builder).computeGenericSignature(
-                                      /*allowConcreteGenericParams=*/true);
+    auto newSig = newSigWithError.getPointer();
 
     // If the new signature once again contains the removed requirement, it's
     // not redundant.
