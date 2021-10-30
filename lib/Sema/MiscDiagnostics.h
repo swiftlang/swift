@@ -13,6 +13,7 @@
 #ifndef SWIFT_SEMA_MISC_DIAGNOSTICS_H
 #define SWIFT_SEMA_MISC_DIAGNOSTICS_H
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Expr.h"
@@ -26,7 +27,9 @@ namespace swift {
   class AbstractFunctionDecl;
   class ApplyExpr;
   class CallExpr;
+  class ClosureExpr;
   class DeclContext;
+  class Decl;
   class Expr;
   class InFlightDiagnostic;
   class Stmt;
@@ -121,6 +124,17 @@ void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
 /// expression in async context (denoted with `await` keyword).
 bool diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
                                            ForEachStmt *forEach);
+
+class BaseDiagnosticWalker : public ASTWalker {
+  bool walkToDeclPre(Decl *D) override;
+
+  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+    return false;
+  }
+
+private:
+  static bool shouldWalkIntoDeclInClosureContext(Decl *D);
+};
 
 } // namespace swift
 
