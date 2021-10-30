@@ -802,16 +802,6 @@ public:
                                                  ProtocolDecl *protocol,
                                                  GenericSignature sig);
 
-  /// Verify the correctness of the given generic signature.
-  ///
-  /// This routine will test that the given generic signature is both minimal
-  /// and canonical, emitting errors if it is not.
-  static void verifyGenericSignature(ASTContext &context,
-                                     GenericSignature sig);
-
-  /// Verify all of the generic sigantures in the given module.
-  static void verifyGenericSignaturesInModule(ModuleDecl *module);
-
   /// Dump all of the requirements, both specified and inferred. It cannot be
   /// statically proven that this doesn't modify the GSB.
   SWIFT_DEBUG_HELPER(void dump());

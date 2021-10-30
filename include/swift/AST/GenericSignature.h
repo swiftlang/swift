@@ -496,6 +496,16 @@ int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
 
 int compareDependentTypes(Type type1, Type type2);
 
+/// Verify the correctness of the given generic signature.
+///
+/// This routine will test that the given generic signature is both minimal
+/// and canonical, emitting errors if it is not.
+void validateGenericSignature(ASTContext &context,
+                              GenericSignature sig);
+
+/// Verify all of the generic signatures in the given module.
+void validateGenericSignaturesInModule(ModuleDecl *module);
+
 /// Build a generic signature from the given requirements, which are not
 /// required to be minimal or canonical, and may contain unresolved
 /// DependentMemberTypes.
