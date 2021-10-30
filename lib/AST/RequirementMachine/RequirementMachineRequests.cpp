@@ -21,13 +21,13 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include <vector>
 
+#include "../GenericSignatureBuilder.h" // FIXME: This is temporary
 #include "RequirementMachine.h"
 
 using namespace swift;

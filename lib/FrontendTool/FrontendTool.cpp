@@ -30,7 +30,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
-#include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
@@ -469,7 +469,7 @@ static void verifyGenericSignaturesIfNeeded(const FrontendOptions &opts,
   if (verifyGenericSignaturesInModule.empty())
     return;
   if (auto module = Context.getModuleByName(verifyGenericSignaturesInModule))
-    GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
+    swift::validateGenericSignaturesInModule(module);
 }
 
 static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,

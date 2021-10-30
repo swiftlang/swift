@@ -114,7 +114,9 @@ class GenericSignature {
 
 public:
   /// Create a new generic signature with the given type parameters and
-  /// requirements.
+  /// requirements. The requirements must already be minimal and canonical;
+  /// to build a signature from an arbitrary set of requirements, use
+  /// swift::buildGenericSignature() instead.
   static GenericSignature get(ArrayRef<GenericTypeParamType *> params,
                               ArrayRef<Requirement> requirements,
                               bool isKnownCanonical = false);
@@ -493,6 +495,31 @@ int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
                            AssociatedTypeDecl *assocType2);
 
 int compareDependentTypes(Type type1, Type type2);
+
+/// Verify the correctness of the given generic signature.
+///
+/// This routine will test that the given generic signature is both minimal
+/// and canonical, emitting errors if it is not.
+void validateGenericSignature(ASTContext &context,
+                              GenericSignature sig);
+
+/// Verify all of the generic signatures in the given module.
+void validateGenericSignaturesInModule(ModuleDecl *module);
+
+/// Build a generic signature from the given requirements, which are not
+/// required to be minimal or canonical, and may contain unresolved
+/// DependentMemberTypes.
+///
+/// If \p baseSignature is non-null, the new parameters and requirements
+/// are added on; existing requirements of the base signature might become
+/// redundant.
+///
+/// If \p baseSignature is null, build a new signature from scratch.
+GenericSignature buildGenericSignature(
+    ASTContext &ctx,
+    GenericSignature baseSignature,
+    SmallVector<GenericTypeParamType *, 2> addedParameters,
+    SmallVector<Requirement, 2> addedRequirements);
 
 } // end namespace swift
 

@@ -2256,12 +2256,10 @@ static bool parseSILDifferentiabilityWitnessConfigAndFunction(
     SmallVector<Requirement, 4> witnessRequirements(
         witnessGenSig.getRequirements().begin(),
         witnessGenSig.getRequirements().end());
-    witnessGenSig = evaluateOrDefault(
-        P.Context.evaluator,
-        AbstractGenericSignatureRequest{origGenSig.getPointer(),
-                                        /*addedGenericParams=*/{},
-                                        std::move(witnessRequirements)},
-        nullptr);
+    witnessGenSig = buildGenericSignature(
+        P.Context, origGenSig,
+        /*addedGenericParams=*/{},
+        std::move(witnessRequirements));
   }
   auto origFnType = resultOrigFn->getLoweredFunctionType();
   auto *parameterIndices = IndexSubset::get(
@@ -3138,6 +3136,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     UNARY_INSTRUCTION(IsUnique)
     UNARY_INSTRUCTION(DestroyAddr)
     UNARY_INSTRUCTION(CopyValue)
+    UNARY_INSTRUCTION(ExplicitCopyValue)
     UNARY_INSTRUCTION(MoveValue)
     UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
@@ -6273,13 +6272,10 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           // Resolve types and convert requirements.
           FunctionState.convertRequirements(Attr.requirements, requirements);
           auto *fenv = FunctionState.F->getGenericEnvironment();
-          auto genericSig = evaluateOrDefault(
-              P.Context.evaluator,
-              AbstractGenericSignatureRequest{
-                fenv->getGenericSignature().getPointer(),
-                /*addedGenericParams=*/{ },
-                std::move(requirements)},
-                GenericSignature());
+          auto genericSig = buildGenericSignature(P.Context,
+                                                  fenv->getGenericSignature(),
+                                                  /*addedGenericParams=*/{ },
+                                                  std::move(requirements));
           FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
               FunctionState.F->getModule(), genericSig, Attr.exported,
               Attr.kind, Attr.target, Attr.spiGroupID, Attr.spiModule, Attr.availability));
