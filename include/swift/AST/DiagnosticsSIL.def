@@ -718,6 +718,10 @@ NOTE(capturepromotion_variable_defined_here,none,
 ERROR(move_operator_used_on_generic_or_existential_value, none,
       "move() used on a generic or existential value", ())
 
+// copy operator used on generic or evalue
+ERROR(copy_operator_used_on_generic_or_existential_value, none,
+      "copy() used on a generic or existential value", ())
+
 // noimplicitcopy on generic or existential binding
 ERROR(noimplicitcopy_used_on_generic_or_existential, none,
       "@_noImplicitCopy can not be used on a generic or existential typed "

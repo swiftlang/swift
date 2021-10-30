@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -690,6 +691,43 @@ void SILInlineCloner::visitBuiltinInst(BuiltinInst *Inst) {
         // else, so this /should/ be safe.
         return recordClonedInstruction(Inst, mvi);
       }
+
+      if (*kind == BuiltinValueKind::Copy) {
+        auto otherResultAddr = getOpValue(Inst->getOperand(0));
+        auto otherSrcAddr = getOpValue(Inst->getOperand(1));
+        auto otherType = otherSrcAddr->getType();
+
+        if (!otherType.isLoadable(*Inst->getFunction())) {
+          // If otherType is not loadable, emit a diagnostic since it was used
+          // on a generic or existential value.
+          diagnose(Inst->getModule().getASTContext(),
+                   getOpLocation(Inst->getLoc()).getSourceLoc(),
+                   diag::copy_operator_used_on_generic_or_existential_value);
+          return SILCloner<SILInlineCloner>::visitBuiltinInst(Inst);
+        }
+
+        getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+        // We stash otherValue in originalOtherValue in case we need to
+        // perform a writeback.
+        auto opLoc = getOpLocation(Inst->getLoc());
+
+        assert(otherType.isAddress());
+
+        // Perform a load_borrow and then copy that.
+        SILValue otherValue =
+            getBuilder().emitLoadBorrowOperation(opLoc, otherSrcAddr);
+
+        auto *mvi = getBuilder().createExplicitCopyValue(opLoc, otherValue);
+
+        getBuilder().emitStoreValueOperation(opLoc, mvi, otherResultAddr,
+                                             StoreOwnershipQualifier::Init);
+        // End the borrowed value.
+        getBuilder().emitEndBorrowOperation(opLoc, otherValue);
+
+        // We know that Inst returns a tuple value that isn't used by anything
+        // else, so this /should/ be safe.
+        return recordClonedInstruction(Inst, mvi);
+      }
     }
   }
 
@@ -868,6 +906,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::RetainValueAddrInst:
   case SILInstructionKind::UnmanagedRetainValueInst:
   case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::DeallocBoxInst:
   case SILInstructionKind::DeallocExistentialBoxInst:
   case SILInstructionKind::DeallocRefInst:
