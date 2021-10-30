@@ -1609,6 +1609,7 @@
           "name": "CodingKeyRepresentable",
           "printedName": "CodingKeyRepresentable",
           "usr": "s:s22CodingKeyRepresentableP",
+          "mangledName": "$ss22CodingKeyRepresentableP",
           "isABIPlaceholder": true
         },
         {
