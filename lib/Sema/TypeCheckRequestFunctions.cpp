@@ -298,11 +298,16 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
           continue;
 
         // Substitute Self and associated type witnesses into the
-        // result builder type.
+        // result builder type. Then, map all type parameters from
+        // the conforming type into context. We don't want type
+        // parameters to appear in the result builder type, because
+        // the result builder type will only be used inside the body
+        // of this decl; it's not part of the interface type.
         auto subs = SubstitutionMap::getProtocolSubstitutions(
-            protocol, dc->getSelfTypeInContext(),
+            protocol, dc->getSelfInterfaceType(),
             ProtocolConformanceRef(conformance));
-        Type subResultBuilderType = resultBuilderType.subst(subs);
+        Type subResultBuilderType = dc->mapTypeIntoContext(
+            resultBuilderType.subst(subs));
 
         matches.push_back(
             Match::forConformance(
