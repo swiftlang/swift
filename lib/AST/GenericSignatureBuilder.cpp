@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "GenericSignatureBuilderImpl.h"
-#include "swift/AST/GenericSignatureBuilder.h"
+#include "GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"

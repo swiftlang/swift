@@ -14,10 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "GenericSignatureBuilderImpl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -26,6 +24,8 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
+#include "GenericSignatureBuilder.h"
+#include "GenericSignatureBuilderImpl.h"
 #include "RequirementMachine/RequirementMachine.h"
 #include <functional>
 
