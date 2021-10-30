@@ -1742,6 +1742,14 @@
         },
         {
           "kind": "Conformance",
+          "name": "CodingKeyRepresentable",
+          "printedName": "CodingKeyRepresentable",
+          "usr": "s:s22CodingKeyRepresentableP",
+          "mangledName": "$ss22CodingKeyRepresentableP",
+          "isABIPlaceholder": true
+        },
+        {
+          "kind": "Conformance",
           "name": "CustomReflectable",
           "printedName": "CustomReflectable",
           "usr": "s:s17CustomReflectableP",
