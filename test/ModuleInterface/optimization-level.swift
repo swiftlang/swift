@@ -10,7 +10,7 @@
 // optimization passes don't run when compiling a .swiftinterface that was
 // generated with -Onone.
 
-// OPT: GlobalOpt
-// UNOPT-NOT: GlobalOpt
+// OPT: AccessMarkerElimination
+// UNOPT-NOT: AccessMarkerElimination
 public func f() {}
 
