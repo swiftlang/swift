@@ -7267,6 +7267,15 @@ class CopyValueInst
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
+class ExplicitCopyValueInst
+    : public UnaryInstructionBase<SILInstructionKind::ExplicitCopyValueInst,
+                                  SingleValueInstruction> {
+  friend class SILBuilder;
+
+  ExplicitCopyValueInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+};
+
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   class StrongCopy##Name##ValueInst                                            \
       : public UnaryInstructionBase<                                           \

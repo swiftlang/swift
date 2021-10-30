@@ -2001,6 +2001,22 @@ public:
       require(BI->getFunction()->hasSemanticsAttr(semanticName),
               "_move used within a generic context");
     }
+
+    if (builtinKind == BuiltinValueKind::Copy) {
+      // We expect that this builtin will be specialized during transparent
+      // inlining into explicit_copy_value if we inline into a non-generic
+      // context. If the builtin still remains and is not in the specific copy
+      // semantic function (which is the only function marked with
+      // semantics::LIFETIMEMANAGEMENT_COPY), then we know that we did
+      // transparent inlining into a function that did not result in the Builtin
+      // being specialized out which is user error.
+      //
+      // NOTE: Once we have opaque values, this restriction will go away. This
+      // is just so we can call Builtin.copy outside of the stdlib.
+      auto semanticName = semantics::LIFETIMEMANAGEMENT_COPY;
+      require(BI->getFunction()->hasSemanticsAttr(semanticName),
+              "_copy used within a generic context");
+    }
   }
   
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {

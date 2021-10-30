@@ -575,6 +575,10 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // A copy_value's retain semantics are fully encapsulated in OSSA
   // invariants. It has no side effects relative to other OSSA values.
   BRIDGED_SINGLE_VALUE_INST(CopyValueInst, copy_value,
+                            SingleValueInstruction, None, DoesNotRelease)
+  // A copy_value instruction that was explicitly asked for by the user. Left
+  // alone by OSSA optimizations.
+  SINGLE_VALUE_INST(ExplicitCopyValueInst, explicit_copy_value,
                     SingleValueInstruction, None, DoesNotRelease)
 #define UNCHECKED_REF_STORAGE(Name, name, ...) \
   SINGLE_VALUE_INST(StrongCopy##Name##ValueInst, strong_copy_##name##_value, \

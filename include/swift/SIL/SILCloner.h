@@ -1714,6 +1714,21 @@ void SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitExplicitCopyValueInst(
+    ExplicitCopyValueInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    SILValue newValue = getBuilder().emitCopyValueOperation(
+        getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()));
+    return recordFoldedValue(Inst, newValue);
+  }
+
+  recordClonedInstruction(
+      Inst, getBuilder().createExplicitCopyValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitMoveValueInst(MoveValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
