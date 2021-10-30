@@ -608,6 +608,8 @@ public:
                       bool allowConcreteGenericParams,
                       const ProtocolDecl *requirementSignatureSelfProto) &&;
 
+  bool hadAnyError() const;
+
   /// Finalize the set of requirements and compute the generic
   /// signature.
   ///
@@ -616,9 +618,6 @@ public:
   GenericSignature computeGenericSignature(
                       bool allowConcreteGenericParams = false,
                       const ProtocolDecl *requirementSignatureSelfProto = nullptr) &&;
-
-  /// Compute the requirement signature for the given protocol.
-  static GenericSignature computeRequirementSignature(ProtocolDecl *proto);
 
 private:
   /// Finalize the set of requirements, performing any remaining checking
@@ -802,16 +801,6 @@ public:
   ConformanceAccessPath getConformanceAccessPath(Type type,
                                                  ProtocolDecl *protocol,
                                                  GenericSignature sig);
-
-  /// Verify the correctness of the given generic signature.
-  ///
-  /// This routine will test that the given generic signature is both minimal
-  /// and canonical, emitting errors if it is not.
-  static void verifyGenericSignature(ASTContext &context,
-                                     GenericSignature sig);
-
-  /// Verify all of the generic sigantures in the given module.
-  static void verifyGenericSignaturesInModule(ModuleDecl *module);
 
   /// Dump all of the requirements, both specified and inferred. It cannot be
   /// statically proven that this doesn't modify the GSB.

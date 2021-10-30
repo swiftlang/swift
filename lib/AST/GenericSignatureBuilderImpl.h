@@ -8,7 +8,7 @@
 #ifndef SWIFT_AST_GENERIC_SIGNATURE_BUILDER_IMPL_H
 #define SWIFT_AST_GENERIC_SIGNATURE_BUILDER_IMPL_H
 
-#include "swift/AST/GenericSignatureBuilder.h"
+#include "GenericSignatureBuilder.h"
 
 namespace swift {
 

@@ -901,12 +901,9 @@ getGenericEnvironmentAndSignatureWithRequirements(
   SmallVector<Requirement, 2> RequirementsCopy(Requirements.begin(),
                                                Requirements.end());
 
-  auto NewGenSig = evaluateOrDefault(
-      M.getASTContext().evaluator,
-      AbstractGenericSignatureRequest{
-        OrigGenSig.getPointer(), { }, std::move(RequirementsCopy)},
-      GenericSignature());
-
+  auto NewGenSig = buildGenericSignature(M.getASTContext(),
+                                         OrigGenSig, { },
+                                         std::move(RequirementsCopy));
   auto NewGenEnv = NewGenSig.getGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
@@ -1572,10 +1569,8 @@ FunctionSignaturePartialSpecializer::
     return { nullptr, nullptr };
 
   // Finalize the archetype builder.
-  auto GenSig = evaluateOrDefault(
-      Ctx.evaluator,
-      AbstractGenericSignatureRequest{nullptr, AllGenericParams, AllRequirements},
-      GenericSignature());
+  auto GenSig = buildGenericSignature(Ctx, GenericSignature(),
+                                      AllGenericParams, AllRequirements);
   auto *GenEnv = GenSig.getGenericEnvironment();
   return { GenEnv, GenSig };
 }

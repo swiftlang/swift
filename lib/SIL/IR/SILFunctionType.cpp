@@ -405,10 +405,7 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
     });
   }
 
-  return evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{sig.getPointer(), {}, reqs},
-      GenericSignature()).getCanonicalSignature();
+  return buildGenericSignature(ctx, sig, {}, reqs).getCanonicalSignature();
 }
 
 /// Given an original type, computes its tangent type for the purpose of

@@ -537,14 +537,9 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
       subMap = SubstitutionMap::get(superclassCtorSig,
                                     substFn, lookupConformanceFn);
 
-      genericSig = evaluateOrDefault(
-          ctx.evaluator,
-          AbstractGenericSignatureRequest{
-            classSig.getPointer(),
-            std::move(newParamTypes),
-            std::move(requirements)
-          },
-          GenericSignature());
+      genericSig = buildGenericSignature(ctx, classSig,
+                                         std::move(newParamTypes),
+                                         std::move(requirements));
     }
   }
 

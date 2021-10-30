@@ -897,12 +897,8 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
 
   decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
                     ASTBuilder>(node, requirements, *this);
-  return evaluateOrDefault(Ctx.evaluator,
-                           AbstractGenericSignatureRequest{
-                               nominalDecl->getGenericSignature().getPointer(),
-                               {},
-                               std::move(requirements)},
-                           GenericSignature())
+  return buildGenericSignature(Ctx, nominalDecl->getGenericSignature(),
+                               {}, std::move(requirements))
       .getCanonicalSignature();
 }
 
