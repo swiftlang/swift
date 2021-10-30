@@ -10,6 +10,8 @@ open class Cl {
   final func finalMethod() {}
 }
 
+func initFunc() -> Int { return 3 }
+
 struct Str : P {
   let x: Int
 
@@ -17,6 +19,9 @@ struct Str : P {
     return a + x
   }
 
+  static let s = 27
+  static var s2 = 10 + s
+  static var s3 = initFunc() // expected-error {{global/static variable initialization can cause locking}}
 }
 
 struct AllocatingStr : P {
@@ -107,3 +112,14 @@ func testRecursion(_ i: Int) -> Int {
   }
   return 0
 }
+
+@_noLocks
+func testGlobal() -> Int {
+  return Str.s + Str.s2
+}
+
+@_noLocks
+func testGlobalWithComplexInit() -> Int {
+  return Str.s3 // expected-note {{called from here}}
+}
+
