@@ -9199,11 +9199,10 @@ GenericSignature ClangImporter::Implementation::buildGenericSignature(
     }
   }
 
-  return evaluateOrDefault(
-      SwiftContext.evaluator,
-      AbstractGenericSignatureRequest{
-        nullptr, std::move(genericParamTypes), std::move(requirements)},
-      GenericSignature());
+  return swift::buildGenericSignature(
+      SwiftContext, GenericSignature(),
+      std::move(genericParamTypes),
+      std::move(requirements));
 }
 
 Decl *

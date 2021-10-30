@@ -2286,7 +2286,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       /*allowConcreteGenericParams=*/true};
 
   auto specializedSig = evaluateOrDefault(Ctx.evaluator, request,
-                                          GenericSignature());
+                                          GenericSignatureWithError())
+      .getPointer();
 
   // Check the validity of provided requirements.
   checkSpecializeAttrRequirements(attr, genericSig, specializedSig, Ctx);
@@ -4349,7 +4350,8 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
 
     // Compute generic signature for derivative functions.
     derivativeGenSig = evaluateOrDefault(ctx.evaluator, request,
-                                         GenericSignature());
+                                         GenericSignatureWithError())
+        .getPointer();
 
     bool hadInvalidRequirements = false;
     for (auto req : derivativeGenSig.requirementsNotSatisfiedBy(originalGenSig)) {
