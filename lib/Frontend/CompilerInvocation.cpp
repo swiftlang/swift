@@ -1107,8 +1107,20 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
 
+  if (auto *A = Args.getLastArg(OPT_symbol_graph_minimum_access_level)) {
+    Opts.MinimumAccessLevel =
+        llvm::StringSwitch<AccessLevel>(A->getValue())
+            .Case("open", AccessLevel::Open)
+            .Case("public", AccessLevel::Public)
+            .Case("internal", AccessLevel::Internal)
+            .Case("fileprivate", AccessLevel::FilePrivate)
+            .Case("private", AccessLevel::Private)
+            .Default(AccessLevel::Public);
+  } else {
+    Opts.MinimumAccessLevel = AccessLevel::Public;
+  }
+
   // default values for generating symbol graphs during a build
-  Opts.MinimumAccessLevel = AccessLevel::Public;
   Opts.PrettyPrint = false;
   Opts.EmitSynthesizedMembers = true;
   Opts.PrintMessages = false;
@@ -1418,6 +1430,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_disable_actor_data_race_checks, /*default=*/false);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
+  Opts.EnablePerformanceAnnotations |=
+      Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);

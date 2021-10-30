@@ -65,6 +65,7 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
@@ -1301,7 +1302,9 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   serializationOpts.SerializeAllSIL = true;
   serializationOpts.IsSIB = true;
 
-  serialize(MSF, serializationOpts, SM);
+  symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
+
+  serialize(MSF, serializationOpts, symbolGraphOptions, SM);
   return Context.hadError();
 }
 
@@ -1554,11 +1557,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       fine_grained_dependencies::withReferenceDependencies(
           Mod, *Instance.getDependencyTracker(), Mod->getModuleFilename(),
           alsoEmitDotFile, [&](SourceFileDepGraph &&g) {
-            serialize(MSF, serializationOpts, SM.get(), &g);
+            serialize(MSF, serializationOpts, Invocation.getSymbolGraphOptions(), SM.get(), &g);
             return false;
           });
     } else {
-      serialize(MSF, serializationOpts, SM.get());
+      serialize(MSF, serializationOpts, Invocation.getSymbolGraphOptions(), SM.get());
     }
   };
 

@@ -707,6 +707,20 @@ namespace RuntimeConstants {
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
 
+#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
+  const auto NoEffect = RuntimeEffect::NoEffect;
+  const auto Locking = RuntimeEffect::Locking;
+  const auto Allocating = RuntimeEffect::Allocating;
+  const auto Deallocating = RuntimeEffect::Deallocating;
+  const auto RefCounting = RuntimeEffect::RefCounting;
+  const auto ObjectiveC = RuntimeEffect::ObjectiveC;
+  const auto Concurrency = RuntimeEffect::Concurrency;
+  const auto AutoDiff = RuntimeEffect::AutoDiff;
+  const auto MetaData = RuntimeEffect::MetaData;
+  const auto Casting = RuntimeEffect::Casting;
+  const auto ExclusivityChecking = RuntimeEffect::ExclusivityChecking;
+#endif
+
   RuntimeAvailability AlwaysAvailable(ASTContext &Context) {
     return RuntimeAvailability::AlwaysAvailable;
   }
@@ -962,23 +976,39 @@ llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
       LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
 }
 
+#ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
+void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
+                                         const char *funcName) {
+  for (RuntimeEffect rt : effect) {
+    effectOfRuntimeFuncs = RuntimeEffect((unsigned)effectOfRuntimeFuncs |
+                                         (unsigned)rt);
+    emittedRuntimeFuncs.push_back(funcName);
+  }
+}
+#else
+#define registerRuntimeEffect(...)
+#endif
+
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS) \
-  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS), QUOTE(ATTRS))
+#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT) \
+  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS), \
+                QUOTE(ATTRS), QUOTE(EFFECT))
 
 #define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
 #define NO_ARGS {}
 #define ATTRS(...) { __VA_ARGS__ }
 #define NO_ATTRS {}
+#define EFFECT(...) { __VA_ARGS__ }
 
-#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS)        \
+#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT)\
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
+    registerRuntimeEffect(EFFECT, #NAME);                                      \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
-                        AVAILABILITY(this->Context),                          \
+                        AVAILABILITY(this->Context),                           \
                         RETURNS, ARGS, ATTRS);                                 \
   }
 

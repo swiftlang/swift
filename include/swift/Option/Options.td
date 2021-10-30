@@ -798,6 +798,10 @@ def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Perform cross-module optimization">;
 
+def ExperimentalPerformanceAnnotations : Flag<["-"], "experimental-performance-annotations">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Perform cross-module optimization">;
+
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
   HelpText<"Remove runtime safety checks.">;
@@ -1277,6 +1281,11 @@ def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
          SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
+
+def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-access-level">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Include symbols with this access level or more when emitting a symbol graph">,
+  MetaVarName<"<level>">;
 
 def pretty_print: Flag<["-"], "pretty-print">,
   Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,

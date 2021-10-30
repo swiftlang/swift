@@ -715,6 +715,20 @@ void endLifetimeAtLeakingBlocks(SILValue value,
 bool tryEliminateOnlyOwnershipUsedForwardingInst(
     SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks);
 
+/// Constant-fold the Builtin.canBeClass if the type is known.
+IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
+                                                  SILBuilder &builder);
+
+/// Performs "predictable" memory access optimizations.
+///
+/// See the PredictableMemoryAccessOptimizations pass.
+bool optimizeMemoryAccesses(SILFunction &fn);
+
+/// Performs "predictable" dead allocation optimizations.
+///
+/// See the PredictableDeadAllocationElimination pass.
+bool eliminateDeadAllocations(SILFunction &fn);
+
 } // end namespace swift
 
 #endif

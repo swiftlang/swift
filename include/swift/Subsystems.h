@@ -86,6 +86,10 @@ namespace swift {
     class SourceFileDepGraph;
   }
 
+  namespace symbolgraphgen {
+    struct SymbolGraphOptions;
+  }
+
   /// @{
 
   /// \returns true if the declaration should be verified.  This can return
@@ -187,6 +191,7 @@ namespace swift {
   /// Serializes a module or single source file to the given output file.
   void
   serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
+            const symbolgraphgen::SymbolGraphOptions &symbolGraphOptions,
             const SILModule *M = nullptr,
             const fine_grained_dependencies::SourceFileDepGraph *DG = nullptr);
 

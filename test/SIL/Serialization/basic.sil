@@ -90,6 +90,20 @@ bb0(%0 : $Builtin.NativeObject):
   return %1 : $Builtin.NativeObject
 }
 
+// CHECK-LABEL: sil [no_allocation] [ossa] @test_no_allocation : $@convention(thin) () -> () {
+sil [no_allocation] [ossa] @test_no_allocation : $@convention(thin) () -> () {
+bb0:
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [no_locks] [ossa] @test_no_locks : $@convention(thin) () -> () {
+sil [no_locks] [ossa] @test_no_locks : $@convention(thin) () -> () {
+bb0:
+  %1 = tuple ()
+  return %1 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_pointer_to_address : $@convention(thin) (Builtin.RawPointer, Builtin.Int64) -> () {
 // CHECK:   pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Builtin.Int64
 // CHECK:   pointer_to_address %0 : $Builtin.RawPointer to [invariant] $*Builtin.Int64

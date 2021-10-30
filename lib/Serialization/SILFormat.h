@@ -283,6 +283,7 @@ namespace sil_block {
                      BCFixed<3>,  // specialPurpose
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode
+                     BCFixed<3>,  // perfConstraints
                      BCFixed<2>,  // classSubclassScope
                      BCFixed<1>,  // hasCReferences
                      BCFixed<3>,  // side effect info.

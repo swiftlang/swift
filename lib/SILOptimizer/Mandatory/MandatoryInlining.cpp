@@ -874,8 +874,18 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
                    ? PAI->getSubstitutionMap()
                    : InnerAI.getSubstitutionMap());
 
-      SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::MandatoryInline,
-                         Subs);
+
+      // Register a callback to record potentially unused function values after
+      // inlining.
+      ClosureCleanup closureCleanup;
+
+      InstructionDeleter deleter(InstModCallbacks().onNotifyWillBeDeleted(
+        [&closureCleanup](SILInstruction *I) {
+          closureCleanup.recordDeadFunction(I);
+        }));
+
+      SILInliner Inliner(FuncBuilder, deleter,
+                         SILInliner::InlineKind::MandatoryInline, Subs);
       if (!Inliner.canInlineApplySite(InnerAI))
         continue;
 
@@ -910,22 +920,17 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
                                           CapturedArgs, IsCalleeGuaranteed);
       }
 
-      // Register a callback to record potentially unused function values after
-      // inlining.
-      ClosureCleanup closureCleanup;
-      Inliner.setDeletionCallback([&closureCleanup](SILInstruction *I) {
-        closureCleanup.recordDeadFunction(I);
-      });
-
       invalidatedStackNesting |= Inliner.invalidatesStackNesting(InnerAI);
 
       // Inlining deletes the apply, and can introduce multiple new basic
       // blocks. After this, CalleeValue and other instructions may be invalid.
       // nextBB will point to the last inlined block
-      auto firstInlinedInstAndLastBB =
+      SILBasicBlock *lastBB =
           Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
-      nextBB = firstInlinedInstAndLastBB.second->getReverseIterator();
+      nextBB = lastBB->getReverseIterator();
       ++NumMandatoryInlines;
+
+      deleter.cleanupDeadInstructions();
 
       // The IR is now valid, and trivial dead arguments are removed. However,
       // we may be able to remove dead callee computations (e.g. dead

@@ -1466,6 +1466,8 @@ namespace  {
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
+    UNINTERESTING_ATTR(NoLocks)
+    UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(Final)

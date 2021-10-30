@@ -345,7 +345,6 @@ public:
 #include "swift/SILOptimizer/PassManager/Passes.def"
 
   /// Instruction visitor helpers.
-  SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
 
   // Optimize the "isConcrete" builtin.
   SILInstruction *optimizeBuiltinIsConcrete(BuiltinInst *I);
