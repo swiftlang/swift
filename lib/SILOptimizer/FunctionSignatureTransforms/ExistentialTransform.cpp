@@ -335,12 +335,9 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   convertExistentialArgTypesToGenericArgTypes(GenericParams, Requirements);
 
   /// Compute the updated generic signature.
-  NewGenericSig = evaluateOrDefault(
-      Ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        OrigGenericSig.getPointer(), std::move(GenericParams),
-        std::move(Requirements)},
-      GenericSignature());
+  NewGenericSig = buildGenericSignature(Ctx, OrigGenericSig,
+                                        std::move(GenericParams),
+                                        std::move(Requirements));
 
   /// Create a lambda for GenericParams.
   auto getCanonicalType = [&](Type t) -> CanType {

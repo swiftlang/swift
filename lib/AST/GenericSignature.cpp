@@ -22,6 +22,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
@@ -1735,4 +1736,18 @@ void GenericSignature::verify() const {
       abort();
     }
   }
+}
+
+GenericSignature
+swift::buildGenericSignature(ASTContext &ctx,
+                             GenericSignature baseSignature,
+                             SmallVector<GenericTypeParamType *, 2> addedParameters,
+                             SmallVector<Requirement, 2> addedRequirements) {
+  return evaluateOrDefault(
+      ctx.evaluator,
+      AbstractGenericSignatureRequest{
+        baseSignature.getPointer(),
+        addedParameters,
+        addedRequirements},
+      GenericSignature());
 }

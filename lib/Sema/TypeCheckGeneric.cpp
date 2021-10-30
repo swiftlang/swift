@@ -256,13 +256,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  auto interfaceSignature = evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        outerGenericSignature.getPointer(),
-        std::move(genericParamTypes),
-        std::move(requirements)},
-      GenericSignature());
+  auto interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
+                                                  genericParamTypes,
+                                                  std::move(requirements));
 
   // Create the OpaqueTypeDecl for the result type.
   // It has the same parent context and generic environment as the originating

@@ -4253,13 +4253,11 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
   }
 # endif
 #endif
-  auto signature = evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        Decl->getOpaqueInterfaceGenericSignature().getPointer(),
+  auto signature = buildGenericSignature(
+        ctx,
+        Decl->getOpaqueInterfaceGenericSignature(),
         /*genericParams=*/{ },
-        std::move(newRequirements)},
-      nullptr);
+        std::move(newRequirements));
 
   auto reqs = signature->getLocalRequirements(opaqueParamType);
   auto superclass = reqs.superclass;
@@ -5024,10 +5022,10 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
   auto genericParam = GenericTypeParamType::get(0, 0, *this);
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           existential);
-  auto genericSig = evaluateOrDefault(
-      evaluator,
-      AbstractGenericSignatureRequest{nullptr, {genericParam}, {requirement}},
-      GenericSignature());
+  auto genericSig = buildGenericSignature(*this,
+                                          GenericSignature(),
+                                          {genericParam},
+                                          {requirement});
 
   CanGenericSignature canGenericSig(genericSig);
 
@@ -5125,13 +5123,9 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     }
   }
 
-  auto genericSig = evaluateOrDefault(
-      evaluator,
-      AbstractGenericSignatureRequest{
-        derivedClassSig.getPointer(),
-        std::move(addedGenericParams),
-        std::move(addedRequirements)},
-      GenericSignature());
+  auto genericSig = buildGenericSignature(*this, derivedClassSig,
+                                          std::move(addedGenericParams),
+                                          std::move(addedRequirements));
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
 }
