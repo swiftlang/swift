@@ -5205,6 +5205,36 @@ independent of the operand. In terms of specific types:
 In ownership qualified functions, a ``copy_value`` produces a +1 value that must
 be consumed at most once along any path through the program.
 
+explicit_copy_value
+```````````````````
+
+::
+
+   sil-instruction ::= 'explicit_copy_value' sil-operand
+
+   %1 = explicit_copy_value %0 : $A
+
+Performs a copy of a loadable value as if by the value's type lowering and
+returns the copy. The returned copy semantically is a value that is completely
+independent of the operand. In terms of specific types:
+
+1. For trivial types, this is equivalent to just propagating through the trivial
+   value.
+2. For reference types, this is equivalent to performing a ``strong_retain``
+   operation and returning the reference.
+3. For ``@unowned`` types, this is equivalent to performing an
+   ``unowned_retain`` and returning the operand.
+4. For aggregate types, this is equivalent to recursively performing a
+   ``copy_value`` on its components, forming a new aggregate from the copied
+   components, and then returning the new aggregate.
+
+In ownership qualified functions, a ``explicit_copy_value`` produces a +1 value
+that must be consumed at most once along any path through the program.
+
+When move only variable checking is performed, ``explicit_copy_value`` is
+treated as an explicit copy asked for by the user that should not be rewritten
+and should be treated as a non-consuming use.
+
 move_value
 ``````````
 

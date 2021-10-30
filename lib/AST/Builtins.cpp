@@ -859,6 +859,11 @@ static ValueDecl *getMoveOperation(ASTContext &ctx, Identifier id) {
                             _parameters(_owned(_typeparam(0))), _typeparam(0));
 }
 
+static ValueDecl *getCopyOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
+                            _parameters(_typeparam(0)), _typeparam(0));
+}
+
 static ValueDecl *getTransferArrayOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted),
@@ -2526,6 +2531,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty())
       return nullptr;
     return getMoveOperation(Context, Id);
+
+  case BuiltinValueKind::Copy:
+    if (!Types.empty())
+      return nullptr;
+    return getCopyOperation(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
