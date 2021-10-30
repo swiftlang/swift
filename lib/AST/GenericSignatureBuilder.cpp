@@ -2377,8 +2377,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
   bool hasExplicitSource = llvm::any_of(
       equivClass->concreteTypeConstraints,
       [](const ConcreteConstraint &constraint) {
-        return (!constraint.source->isDerivedRequirement() &&
-                constraint.source->getLoc().isValid());
+        return !constraint.source->isDerivedRequirement();
       });
 
   if (hasExplicitSource) {
@@ -8512,6 +8511,11 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
     auto newSig =
       std::move(builder).computeGenericSignature(
                                       /*allowConcreteGenericParams=*/true);
+
+    // If the new signature once again contains the removed requirement, it's
+    // not redundant.
+    if (newSig->isEqual(sig))
+      continue;
 
     // If the removed requirement is satisfied by the new generic signature,
     // it is redundant. Complain.
