@@ -305,12 +305,10 @@ synthesizeGenericSignature(SynthesisContext &SC,
   CollectGenericParams collector(SC);
   list.Params.visit(collector);
 
-  return evaluateOrDefault(
-    SC.Context.evaluator,
-    AbstractGenericSignatureRequest{
-      nullptr, std::move(collector.GenericParamTypes),
-               std::move(collector.AddedRequirements)},
-    nullptr);
+  return buildGenericSignature(SC.Context,
+                               GenericSignature(),
+                               std::move(collector.GenericParamTypes),
+                               std::move(collector.AddedRequirements));
 }
 
 /// Build a builtin function declaration.
@@ -671,8 +669,8 @@ namespace {
     bool Async = false;
     BuiltinThrowsKind Throws = BuiltinThrowsKind::None;
 
-    // Accumulate params and requirements here, so that we can make the
-    // appropriate `AbstractGenericSignatureRequest` when `build()` is called.
+    // Accumulate params and requirements here, so that we can call
+    // `buildGenericSignature()` when `build()` is called.
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> addedRequirements;
 
@@ -727,11 +725,10 @@ namespace {
     }
 
     FuncDecl *build(Identifier name) {
-      auto GenericSig = evaluateOrDefault(
-        Context.evaluator,
-        AbstractGenericSignatureRequest{
-          nullptr, std::move(genericParamTypes), std::move(addedRequirements)},
-        nullptr);
+      auto GenericSig = buildGenericSignature(
+          Context, GenericSignature(),
+          std::move(genericParamTypes),
+          std::move(addedRequirements));
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList, GenericSig,
