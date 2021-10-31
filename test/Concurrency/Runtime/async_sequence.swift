@@ -14,27 +14,27 @@ import StdlibUnittest
 // Utility functions for closure based operators to force them into throwing
 // and async and throwing async contexts.
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func throwing<T>(_ value: T) throws -> T {
   return value
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asynchronous<T>(_ value: T) async -> T {
   return value
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asynchronousThrowing<T>(_ value: T) async throws -> T {
   return value
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct Failure: Error, Equatable {
   var value = 1
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func failable<T, E: Error>(
   _ results: [Result<T, E>]
 ) -> AsyncThrowingMapSequence<AsyncLazySequence<[Result<T, E>]>, T> {
@@ -42,7 +42,7 @@ func failable<T, E: Error>(
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Sequence {
   @inlinable
   public var async: AsyncLazySequence<Self> {
@@ -52,7 +52,7 @@ extension Sequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncLazySequence<S: Sequence>: AsyncSequence {
   public typealias Element = S.Element
   public typealias AsyncIterator = Iterator
@@ -85,7 +85,7 @@ public struct AsyncLazySequence<S: Sequence>: AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   @inlinable
   public func collect() async rethrows -> [Element] {
@@ -98,7 +98,7 @@ extension AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence where Element: Equatable {
   func `throw`(_ error: Error, on element: Element) -> AsyncThrowingMapSequence<Self, Element> {
     return map { (value: Element) throws -> Element in
@@ -110,7 +110,7 @@ extension AsyncSequence where Element: Equatable {
 
 @main struct Main {
   static func main() async {
-    if #available(SwiftStdlib 5.5, *) {
+    if #available(SwiftStdlib 5.1, *) {
 
     var AsyncLazySequenceTests = TestSuite("AsyncLazySequence")
 

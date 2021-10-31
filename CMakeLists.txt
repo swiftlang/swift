@@ -525,6 +525,18 @@ if(SWIFT_ENABLE_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
   endif()
 endif()
 
+set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS
+  "SwiftStdlib 5.0:macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2"
+  "SwiftStdlib 5.1:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0"
+  "SwiftStdlib 5.2:macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4"
+  "SwiftStdlib 5.3:macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0"
+  "SwiftStdlib 5.4:macOS 11.3, iOS 14.5, watchOS 7.4, tvOS 14.5"
+  "SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0"
+  "SwiftStdlib 5.6:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999"
+  "SwiftStdlib 9999:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999" # Unknown future release
+  CACHE STRING
+  "Availability macros for stdlib versions")
+
 #
 # Include CMake modules
 #

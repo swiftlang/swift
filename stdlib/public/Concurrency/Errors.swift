@@ -13,7 +13,7 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_deletedAsyncMethodError")
 public func swift_deletedAsyncMethodError() async {
     fatalError("Fatal error: Call of deleted method")

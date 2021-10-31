@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Creates an asynchronous sequence that maps the given closure over the
   /// asynchronous sequence’s elements, omitting results that don't return a
@@ -55,7 +55,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence that maps a given closure over the asynchronous
 /// sequence’s elements, omitting results that don't return a value.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline
   let base: Base
@@ -73,7 +73,7 @@ public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncCompactMapSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///

@@ -12,7 +12,7 @@ enum SomeError: Error {
   case bad
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     let condition = false

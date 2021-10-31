@@ -4,7 +4,7 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 distributed actor D {
 
   func hello() {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
@@ -17,7 +17,7 @@ distributed actor D {
   distributed func distHelloAsyncThrows() async throws { } // ok
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 func test_not_distributed_funcs(distributed: D) async {
   distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
@@ -30,7 +30,7 @@ func test_not_distributed_funcs(distributed: D) async {
   // expected-error@-3{{call can throw, but it is not marked with 'try' and the error is not handled}} // TODO: no need to diagnose this, it is impossible to call anyway
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 func test_outside(distributed: D) async throws {
   distributed.distHello() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}

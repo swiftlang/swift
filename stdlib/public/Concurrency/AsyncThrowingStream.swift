@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncThrowingStream<Element, Failure: Error> {
   public struct Continuation: Sendable {
     /// Indication of the type of termination informed to
@@ -143,7 +143,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream: AsyncSequence {
   /// The asynchronous iterator for iterating a AsyncThrowingStream.
   ///
@@ -165,7 +165,7 @@ extension AsyncThrowingStream: AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream.Continuation {
   /// Resume the task awaiting the next iteration point by having it return
   /// normally from its suspension point or buffer the value if no awaiting

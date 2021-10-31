@@ -9,7 +9,7 @@
 
 // UNSUPPORTED: linux
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_is_asyncSequence() async {
   print(#function)
 
@@ -33,7 +33,7 @@ func test_taskGroup_is_asyncSequence() async {
   print("result: \(sum)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_throwingTaskGroup_is_asyncSequence() async throws {
   print(#function)
 
@@ -57,7 +57,7 @@ func test_throwingTaskGroup_is_asyncSequence() async throws {
   print("result: \(sum)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_is_asyncSequence()

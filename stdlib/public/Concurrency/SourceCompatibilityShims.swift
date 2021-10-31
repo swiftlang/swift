@@ -16,7 +16,7 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
   @available(*, deprecated, message: "Task.Priority has been removed; use TaskPriority")
   public typealias Priority = TaskPriority
@@ -37,7 +37,7 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension TaskPriority {
   @available(*, deprecated, message: "unspecified priority will be removed; use nil")
   @_alwaysEmitIntoClient
@@ -52,7 +52,7 @@ extension TaskPriority {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 public func withTaskCancellationHandler<T>(
   handler: @Sendable () -> Void,
@@ -61,7 +61,7 @@ public func withTaskCancellationHandler<T>(
   try await withTaskCancellationHandler(operation: operation, onCancel: handler)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
   @available(*, deprecated, message: "`Task.withCancellationHandler` has been replaced by `withTaskCancellationHandler` and will be removed shortly.")
   @_alwaysEmitIntoClient
@@ -73,7 +73,7 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
@@ -87,7 +87,7 @@ extension Task where Failure == Error {
 }
 
 @discardableResult
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "`detach` was replaced by `Task.detached` and will be removed shortly.")
 @_alwaysEmitIntoClient
 public func detach<T>(
@@ -98,7 +98,7 @@ public func detach<T>(
 }
 
 @discardableResult
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "`detach` was replaced by `Task.detached` and will be removed shortly.")
 @_alwaysEmitIntoClient
 public func detach<T>(
@@ -109,7 +109,7 @@ public func detach<T>(
 }
 
 @discardableResult
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "`asyncDetached` was replaced by `Task.detached` and will be removed shortly.")
 @_alwaysEmitIntoClient
 public func asyncDetached<T>(
@@ -120,7 +120,7 @@ public func asyncDetached<T>(
 }
 
 @discardableResult
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "`asyncDetached` was replaced by `Task.detached` and will be removed shortly.")
 @_alwaysEmitIntoClient
 public func asyncDetached<T>(
@@ -130,7 +130,7 @@ public func asyncDetached<T>(
   return Task.detached(priority: priority, operation: operation)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "`async` was replaced by `Task.init` and will be removed shortly.")
 @discardableResult
 @_alwaysEmitIntoClient
@@ -141,7 +141,7 @@ public func async<T>(
   .init(priority: priority, operation: operation)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "`async` was replaced by `Task.init` and will be removed shortly.")
 @discardableResult
 @_alwaysEmitIntoClient
@@ -152,7 +152,7 @@ public func async<T>(
   .init(priority: priority, operation: operation)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
   @available(*, deprecated, message: "`Task.Group` was replaced by `ThrowingTaskGroup` and `TaskGroup` and will be removed shortly.")
   public typealias Group<TaskResult: Sendable> = ThrowingTaskGroup<TaskResult, Error>
@@ -170,7 +170,7 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task {
   @available(*, deprecated, message: "get() has been replaced by .value")
   @_alwaysEmitIntoClient
@@ -185,7 +185,7 @@ extension Task {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task where Failure == Never {
   @available(*, deprecated, message: "get() has been replaced by .value")
   @_alwaysEmitIntoClient
@@ -194,7 +194,7 @@ extension Task where Failure == Never {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension TaskGroup {
   @available(*, deprecated, renamed: "addTask(priority:operation:)")
   @_alwaysEmitIntoClient
@@ -244,7 +244,7 @@ extension TaskGroup {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension ThrowingTaskGroup {
   @available(*, deprecated, renamed: "addTask(priority:operation:)")
   @_alwaysEmitIntoClient
@@ -294,10 +294,10 @@ extension ThrowingTaskGroup {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "please use UnsafeContination<..., Error>")
 public typealias UnsafeThrowingContinuation<T> = UnsafeContinuation<T, Error>
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @available(*, deprecated, renamed: "UnownedJob")
 public typealias PartialAsyncTask = UnownedJob

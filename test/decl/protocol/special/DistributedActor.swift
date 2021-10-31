@@ -47,12 +47,12 @@ distributed actor D5: P1 {
 // ==== Tests ------------------------------------------------------------------
 
 // Make sure the conformances have been added implicitly.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func acceptDistributedActor<Act: DistributedActor>(_: Act.Type) { }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func acceptAnyActor<Act: AnyActor>(_: Act.Type) { }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func testConformance() {
   acceptDistributedActor(D1.self)
   acceptAnyActor(D1.self)
