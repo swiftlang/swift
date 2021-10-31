@@ -8,7 +8,5 @@ public class Klass {}
 // CHECK-SIL: bb0(%0 : @noImplicitCopy $Klass):
 
 public func arguments(@_noImplicitCopy _ x: Klass) -> Klass {
-    let y = x
-    let z = x
     return x
 }

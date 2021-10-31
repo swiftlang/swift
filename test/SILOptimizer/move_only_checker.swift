@@ -357,3 +357,17 @@ public func aggGenericStructAccessField<T>(_ x: AggGenericStruct<T>) {
         print(x2.lhs)
     }
 }
+
+/////////////////////////////////
+// No Implicit Copy Attributes //
+/////////////////////////////////
+
+public func klassNoImplicitCopyArgument(@_noImplicitCopy _ x: Klass) -> Klass {
+    return x
+}
+
+public func klassNoImplicitCopyArgumentError(@_noImplicitCopy _ x: Klass) -> Klass { // expected-error {{'x' consumed more than once}}
+    let y = x // expected-note {{consuming use}}
+    print(y)
+    return x // expected-note {{consuming use}}
+}

@@ -275,9 +275,17 @@ struct ArgumentInitHelper {
     if (!argrv.getType().isAddress()) {
       if (SGF.getASTContext().SILOpts.EnableExperimentalLexicalLifetimes &&
           value->getOwnershipKind() == OwnershipKind::Owned) {
+        bool isNoImplicitCopy = false;
+        if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+          isNoImplicitCopy = arg->isNoImplicitCopy();
         value =
             SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
         SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+        if (isNoImplicitCopy) {
+          value = SGF.B.emitCopyValueOperation(loc, value);
+          value = SGF.B.createMoveValue(loc, value);
+          SGF.enterDestroyCleanup(value);
+        }
       }
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
