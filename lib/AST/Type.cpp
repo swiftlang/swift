@@ -1589,9 +1589,13 @@ bool TypeBase::satisfiesClassConstraint() {
 }
 
 bool TypeBase::mayBeCallable(DeclContext *dc) {
-  return is<AnyFunctionType>() || hasTypeParameter() ||
-         isTypeVariableOrMember() || isCallableNominalType(dc) ||
-         hasDynamicCallableAttribute();
+  if (is<AnyFunctionType>() || hasTypeParameter() ||
+         isTypeVariableOrMember())
+    return true;
+
+  dc->getASTContext().CallableTypeLookups.insert(getCanonicalType());
+
+  return isCallableNominalType(dc) || hasDynamicCallableAttribute();
 }
 
 bool TypeBase::isCallableNominalType(DeclContext *dc) {

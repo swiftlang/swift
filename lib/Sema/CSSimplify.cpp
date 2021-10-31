@@ -10326,6 +10326,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     }
   }
 
+  getASTContext().CallableTypeLookups.erase(desugar2->getCanonicalType());
+
   // Handle applications of types with `callAsFunction` methods.
   // Do this before stripping optional types below, when `shouldAttemptFixes()`
   // is true.

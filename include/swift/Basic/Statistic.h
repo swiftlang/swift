@@ -141,7 +141,6 @@ public:
   // flamegraphs.
   struct StatsProfilers;
 
-private:
   bool currentProcessExitStatusSet;
   int currentProcessExitStatus;
   long maxChildRSS = 0;

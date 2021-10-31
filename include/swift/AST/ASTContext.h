@@ -330,6 +330,8 @@ public:
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
 
+  llvm::DenseSet<CanType> CallableTypeLookups;
+
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.

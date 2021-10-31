@@ -947,6 +947,23 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   if (auto *stats = ctx.Stats)
     countASTStats(*stats, Instance);
 
+  using namespace llvm::sys;
+  if (!Invocation.getFrontendOptions().StatsOutputDir.empty() &&
+      !ctx.CallableTypeLookups.empty()) {
+    SmallString<128> OutputFile = Instance.getStatsReporter()->StatsFilename;
+    std::string Filename = path::filename(OutputFile).str();
+    path::remove_filename(OutputFile);
+    path::append(OutputFile, "callabletypelookup" + Filename);
+    std::error_code EC;
+    llvm::raw_fd_ostream ostream(OutputFile, EC, fs::OF_Append | fs::OF_Text);
+    if (!EC) {
+      for (auto ty : ctx.CallableTypeLookups) {
+        ty->print(ostream);
+        ostream << "\n";
+      }
+    }
+  }
+
   // Report mangling stats if there was no error.
   if (!ctx.hadError())
     Mangle::printManglingStats();
