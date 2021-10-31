@@ -18,6 +18,7 @@
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 
@@ -28,8 +29,6 @@ bool DerivedConformance::canDeriveDistributedActor(
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   return classDecl && classDecl->isDistributedActor() && dc == nominal;
 }
-
-// ==== ------------------------------------------------------------------------
 
 /******************************************************************************/
 /******************************* RESOLVE FUNCTION *****************************/
@@ -62,8 +61,8 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
     return param;
   };
 
-  auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+  Type addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+  Type transportType = getDistributedActorTransportType(decl);
 
   // (_ identity: AnyActorIdentity, using transport: ActorTransport)
   auto *params = ParameterList::create(
@@ -137,8 +136,7 @@ static ValueDecl *deriveDistributedActor_actorTransport(
   // let actorTransport: ActorTransport
   // ```
   // (no need for @actorIndependent because it is an immutable let)
-  auto propertyType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-
+  Type propertyType = getDistributedActorTransportType(derived.Nominal);
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(

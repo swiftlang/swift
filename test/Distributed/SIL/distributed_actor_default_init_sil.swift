@@ -20,10 +20,10 @@ distributed actor MyDistActor {
 // CHECK:    [[TP_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorTransport
 // CHECK:    copy_addr [[TPORT]] to [initialization] [[TP_FIELD]] : $*ActorTransport // id: %6
                 // *** obtain an identity ***
-// CHECK:    [[TPORT_OPEN:%[0-9]+]] = open_existential_addr immutable_access [[TPORT]]
 // CHECK:    [[SELF_METATYPE:%[0-9]+]] = metatype $@thick MyDistActor.Type
-// CHECK:    [[ASSIGN_ID_FN:%[0-9]+]] = witness_method $@opened({{.*}}) ActorTransport, #ActorTransport.assignIdentity : <Self where Self : ActorTransport><Act where Act : DistributedActor> (Self) -> (Act.Type) -> AnyActorIdentity, [[TPORT_OPEN]]
 // CHECK:    [[ID_STACK:%[0-9+]+]] = alloc_stack $AnyActorIdentity
+// CHECK:    [[TPORT_OPEN:%[0-9]+]] = open_existential_addr immutable_access [[TPORT]]
+// CHECK:    [[ASSIGN_ID_FN:%[0-9]+]] = witness_method $@opened({{.*}}) ActorTransport, #ActorTransport.assignIdentity : <Self where Self : ActorTransport><Act where Act : DistributedActor> (Self) -> (Act.Type) -> AnyActorIdentity, [[TPORT_OPEN]]
 // CHECK:    = apply [[ASSIGN_ID_FN]]<@opened({{.*}}) ActorTransport, MyDistActor>([[ID_STACK]], [[SELF_METATYPE]], [[TPORT_OPEN]])
                 // *** save identity ***
 // CHECK:    [[ID_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
