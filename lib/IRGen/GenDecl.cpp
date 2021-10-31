@@ -1133,6 +1133,12 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   if (hasCodeCoverageInstrumentation(f, m))
     return false;
 
+  // Needed by lldb to print global variables which are propagated by the
+  // mandatory GlobalOpt.
+  if (m.getOptions().OptMode == OptimizationMode::NoOptimization &&
+      f.isGlobalInit())
+    return false;
+
   return true;
 }
 

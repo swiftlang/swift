@@ -181,6 +181,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addDiagnoseLifetimeIssues();
   }
   
+  P.addGlobalOpt();
   P.addPerformanceDiagnostics();
   
   // Canonical swift requires all non cond_br critical edges to be split.

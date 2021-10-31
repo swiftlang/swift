@@ -12,8 +12,10 @@
 // The only way to inspect the serialized module is sil-opt. The swift
 // driver will only output the SIL that it deserializes.
 
+func initFunc() -> Int { return 42 }
+
 @usableFromInline
-let MyConst = 42
+let MyConst = initFunc()
 @usableFromInline
 var MyVar = 3
 
