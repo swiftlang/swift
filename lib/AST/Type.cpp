@@ -1588,6 +1588,12 @@ bool TypeBase::satisfiesClassConstraint() {
   return mayHaveSuperclass() || isObjCExistentialType();
 }
 
+bool TypeBase::mayBeCallable(DeclContext *dc) {
+  return is<AnyFunctionType>() || hasTypeParameter() ||
+         isTypeVariableOrMember() || isCallableNominalType(dc) ||
+         hasDynamicCallableAttribute();
+}
+
 bool TypeBase::isCallableNominalType(DeclContext *dc) {
   // Don't allow callAsFunction to be used with dynamic lookup.
   if (isAnyObject())

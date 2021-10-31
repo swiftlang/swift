@@ -852,6 +852,11 @@ public:
             getAnyNominal());
   }
 
+  /// Determine whether this type may be valid for a function call. This is
+  /// conservative, and includes e.g type parameters, which may be substituted
+  /// with function types.
+  bool mayBeCallable(DeclContext *dc);
+
   /// Checks whether this is a type that supports being called through the
   /// implementation of a \c callAsFunction method. Note that this does not
   /// check access control.
