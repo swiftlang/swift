@@ -298,7 +298,7 @@ Just like access control modifiers, we prefer to put `@available` attributes on 
 
 ```swift
 // 😢👎
-@available(macOS 10.6, iOS 10, watchOS 3, tvOS 12, *)
+@available(SwiftStdlib 5.2, *)
 extension String {
   public func blanch() { ... }
   public func roast() { ... }
@@ -306,26 +306,55 @@ extension String {
 
 // 🥲👍
 extension String {
-  @available(macOS 10.6, iOS 10, watchOS 3, tvOS 12, *)
+  @available(SwiftStdlib 5.2, *)
   public func blanch() { ... }
 
-  @available(macOS 10.6, iOS 10, watchOS 3, tvOS 12, *)
+  @available(SwiftStdlib 5.2, *)
   public func roast() { ... }
 }
 ```
 
 This coding style is enforced by the ABI checker -- it will complain if an extension member declaration that needs an availability doesn't have it directly attached.
 
-Features under development that haven't been released yet must be marked with the placeholder version number `9999`. This special version is always considered available in custom builds of the Swift toolchain (including development snapshots), but not in any ABI-stable production release.
+This repository defines a set of availability macros (of the form `SwiftStdlib x.y`) that map Swift Stdlib releases to the OS versions that shipped them, for all ABI stable platforms. The following two definitions are equivalent, but the second one is less error-prone, so we prefer that:
 
 ```swift
+extension String {
+  // 😵‍💫👎
+  @available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
+  public func fiddle() { ... }
+
+  // 😎👍
+  @available(SwiftStdlib 5.2, *)
+  public func fiddle() { ... }
+}
+```
+
+(Mistakes in the OS version number list are very easy to miss during review, but can have major ABI consequences.)
+
+This is especially important for newly introduced APIs, where the corresponding OS releases may not even be known yet. 
+
+Features under development that haven't shipped yet must be marked as available in the placeholder OS version `9999`. This special version is always considered available in custom builds of the Swift toolchain (including development snapshots), but not in any ABI-stable production release. 
+
+Never explicitly spell out such placeholder availability -- instead, use the `SwiftStdlib` macro corresponding to the Swift version we're currently working on:
+
+```swift
+// 😵‍💫👎
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public struct FutureFeature {
+  ...
+}
+
+// 😎👍
+@available(SwiftStdlib 6.3, *) // Or whatever
 public struct FutureFeature {
   ...
 }
 ```
 
-On these platforms, the Swift Standard Library ships as an integrated part of the operating system; as such, it is the platform owners' responsibility to update these placeholder version numbers to actual versions as part of their release process.
+This way, platform owners can easily update declarations to the correct set of version numbers by simply changing the definition of the macro, rather than having to update each individual declaration.
+
+If we haven't defined a version number for the "next" Swift release yet, please use the special placeholder version `SwiftStdlib 9999`, which always expands to 9999 versions. Declarations that use this version will need to be manually updated once we decide on the corresponding Swift version number.
 
 ## Internals
 

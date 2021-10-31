@@ -84,7 +84,7 @@ import Swift
 /// If the iterator needs to clean up on cancellation, it can do so after
 /// checking for cancellation as described above, or in `deinit` if it's
 /// a reference type.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @rethrows
 public protocol AsyncIteratorProtocol {
   associatedtype Element

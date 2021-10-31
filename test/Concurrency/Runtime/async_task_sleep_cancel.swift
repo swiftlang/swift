@@ -11,7 +11,7 @@ import _Concurrency
 // FIXME: should not depend on Dispatch
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static let pause = 500_000_000 // 500ms
 

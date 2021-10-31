@@ -203,7 +203,7 @@ func adopt(voucher: voucher_t?) {
 
 let tests = TestSuite("Voucher Propagation")
 
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 5.1, *) {
   tests.test("simple voucher propagation") {
     withVouchers { v1, v2, v3 in
       let a = Accumulator(label: "a: ")

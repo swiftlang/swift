@@ -4,7 +4,7 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 distributed actor DA {
 
   let local: Int = 42

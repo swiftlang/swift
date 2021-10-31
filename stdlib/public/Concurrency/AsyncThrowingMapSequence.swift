@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Creates an asynchronous sequence that maps the given error-throwing
   /// closure over the asynchronous sequence’s elements.
@@ -66,7 +66,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence that maps the given error-throwing closure over the
 /// asynchronous sequence’s elements.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let base: Base
@@ -84,7 +84,7 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingMapSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///

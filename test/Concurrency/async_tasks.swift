@@ -1,11 +1,11 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking
 // REQUIRES: concurrency
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func someAsyncFunc() async -> String { "" }
 
 struct MyError: Error {}
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func someThrowingAsyncFunc() async throws -> String { throw MyError() }
 
 // ==== Unsafe Continuations ---------------------------------------------------
@@ -27,7 +27,7 @@ func buyVegetables(
 ) {}
 
 // returns 1 or more vegetables or throws an error
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
   try await withUnsafeThrowingContinuation { continuation in
     var veggies: [Vegetable] = []
@@ -43,7 +43,7 @@ func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_unsafeContinuations() async {
   // the closure should not allow async operations;
   // after all: if you have async code, just call it directly, without the unsafe continuation
@@ -64,7 +64,7 @@ func test_unsafeContinuations() async {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_unsafeThrowingContinuations() async throws {
   let _: String = try await withUnsafeThrowingContinuation { continuation in
     continuation.resume(returning: "")
@@ -89,7 +89,7 @@ func test_unsafeThrowingContinuations() async throws {
 
 // ==== Detached Tasks ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_detached() async throws {
   let handle = Task.detached {
     await someAsyncFunc() // able to call async functions
@@ -99,7 +99,7 @@ func test_detached() async throws {
   _ = result
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_detached_throwing() async -> String {
   let handle: Task<String, Error> = Task.detached {
     try await someThrowingAsyncFunc() // able to call async functions

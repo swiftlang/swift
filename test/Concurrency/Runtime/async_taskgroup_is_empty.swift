@@ -10,12 +10,12 @@
 
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_isEmpty() async {
   print("before all")
   let result = await withTaskGroup(of: Int.self, returning: Int.self) { group in
@@ -44,7 +44,7 @@ func test_taskGroup_isEmpty() async {
   print("result: \(result)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_isEmpty()

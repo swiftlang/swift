@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -disable-objc-attr-requires-foundation-module -define-availability 'SwiftStdlib 5.5:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0' | %FileCheck %s
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -disable-objc-attr-requires-foundation-module -define-availability 'SwiftStdlib 5.1:macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0' | %FileCheck %s
 
 struct S<T> {}
 
@@ -341,5 +341,5 @@ public func testAvailability3<T>(_ t: T) {}
 
 // CHECK: @_specialize(exported: true, kind: full, availability: macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *; where T == Int)
 // CHECK: public func testAvailability4<T>(_ t: T)
-@_specialize(exported: true, availability: SwiftStdlib 5.5, *; where T == Int)
+@_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
 public func testAvailability4<T>(_ t: T) {}

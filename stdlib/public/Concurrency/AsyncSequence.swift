@@ -71,7 +71,7 @@ import Swift
 ///     }
 ///     // Prints: Odd Even Odd Even Odd Even Odd Even Odd Even
 ///
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @rethrows
 public protocol AsyncSequence {
   /// The type of asynchronous iterator that produces elements of this
@@ -87,7 +87,7 @@ public protocol AsyncSequence {
   __consuming func makeAsyncIterator() -> AsyncIterator
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Returns the result of combining the elements of the asynchronous sequence
   /// using the given closure.
@@ -173,7 +173,7 @@ extension AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @inlinable
 @inline(__always)
 func _contains<Source: AsyncSequence>(
@@ -188,7 +188,7 @@ func _contains<Source: AsyncSequence>(
   return false
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Returns a Boolean value that indicates whether the asynchronous sequence
   /// contains an element that satisfies the given predicate.
@@ -249,7 +249,7 @@ extension AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence where Element: Equatable {
   /// Returns a Boolean value that indicates whether the asynchronous sequence
   /// contains the given element.
@@ -277,7 +277,7 @@ extension AsyncSequence where Element: Equatable {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @inlinable
 @inline(__always)
 func _first<Source: AsyncSequence>(
@@ -292,7 +292,7 @@ func _first<Source: AsyncSequence>(
   return nil
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Returns the first element of the sequence that satisfies the given
   /// predicate.
@@ -322,7 +322,7 @@ extension AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Returns the minimum element in the asynchronous sequence, using the given
   /// predicate as the comparison between elements.
@@ -435,7 +435,7 @@ extension AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence where Element: Comparable {
   /// Returns the minimum element in an asynchronous sequence of comparable
   /// elements.

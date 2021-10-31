@@ -46,7 +46,7 @@ import Swift
 ///       print(digit)
 ///     }
 ///
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncStream<Element> {
   public struct Continuation: Sendable {
     /// Indication of the type of termination informed to
@@ -189,7 +189,7 @@ public struct AsyncStream<Element> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncStream: AsyncSequence {
   /// The asynchronous iterator for iterating a AsyncStream.
   ///
@@ -220,7 +220,7 @@ extension AsyncStream: AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncStream.Continuation {
   /// Resume the task awaiting the next iteration point by having it return
   /// normally from its suspension point or buffer the value if no awaiting

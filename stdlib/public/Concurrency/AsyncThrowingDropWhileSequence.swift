@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Omits elements from the base sequence until a given error-throwing closure
   /// returns false, after which it passes through all remaining elements.
@@ -65,7 +65,7 @@ extension AsyncSequence {
 /// An asynchronous sequence which omits elements from the base sequence until a
 /// given error-throwing closure returns false, after which it passes through
 /// all remaining elements.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncThrowingDropWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -83,7 +83,7 @@ public struct AsyncThrowingDropWhileSequence<Base: AsyncSequence> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingDropWhileSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///

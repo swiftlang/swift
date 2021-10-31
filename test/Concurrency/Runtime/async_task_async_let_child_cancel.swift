@@ -9,7 +9,7 @@
 
 // REQUIRES: rdar_77671328
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func printWaitPrint(_ int: Int) async -> Int {
   print("start, cancelled:\(Task.isCancelled), id:\(int)")
   while !Task.isCancelled {
@@ -19,7 +19,7 @@ func printWaitPrint(_ int: Int) async -> Int {
   return int
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test() async {
   let h = detach {
     await printWaitPrint(0)
@@ -70,7 +70,7 @@ func test() async {
   print("exit")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test()

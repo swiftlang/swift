@@ -385,6 +385,10 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "distributed")
         endif()
 
+        # Define availability macros, escaping semicolons to get around CMake
+        string(REPLACE ";" "\\$<SEMICOLON>" availability_defs "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS}")
+        list(APPEND LIT_ARGS "--param" "availability_macros=${availability_defs}")
+
         foreach(test_subset ${TEST_SUBSETS})
           set(directories)
           set(dependencies ${test_dependencies})
