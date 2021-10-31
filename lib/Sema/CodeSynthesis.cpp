@@ -299,13 +299,11 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       // copy access level of distributed actor init from the nominal decl
       accessLevel = decl->getEffectiveAccess();
 
-      auto transportDecl = ctx.getActorTransportDecl();
-
       // Create the parameter.
       auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_transport, Loc,
-                                      ctx.Id_transport, transportDecl);
+                                      ctx.Id_transport, decl);
       arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(transportDecl->getDeclaredInterfaceType());
+      arg->setInterfaceType(getDistributedActorTransportType(decl));
       arg->setImplicit();
 
       params.push_back(arg);

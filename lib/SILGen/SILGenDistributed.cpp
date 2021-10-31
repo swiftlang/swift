@@ -52,12 +52,15 @@ static VarDecl* lookupProperty(NominalTypeDecl *ty, DeclName name) {
 static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
                                SILValue actorSelf,
                                VarDecl* prop, SILValue value) {
-  auto fieldAddr = SGF.B.createRefElementAddr(loc, actorSelf, prop,
-                                  SGF.getLoweredType(prop->getInterfaceType()));
-  SGF.B.createCopyAddr(loc,
-                   /*src*/value,
-                   /*dest*/fieldAddr,
-                   IsNotTake, IsInitialization);
+  CanType propType = SGF.F.mapTypeIntoContext(prop->getInterfaceType())
+      ->getCanonicalType();
+  SILType loweredPropType = SGF.getLoweredType(propType);
+  auto fieldAddr = SGF.B.createRefElementAddr(loc, actorSelf, prop, loweredPropType);
+
+  if (fieldAddr->getType().isAddress())
+    SGF.B.createCopyAddr(loc, value, fieldAddr, IsNotTake, IsInitialization);
+  else
+    SGF.B.emitStoreValueOperation(loc, value, fieldAddr, StoreOwnershipQualifier::Init);
 }
 
 /******************************************************************************/
@@ -116,34 +119,7 @@ static void emitTransportInit(SILGenFunction &SGF,
   VarDecl *var = lookupProperty(classDecl, C.Id_actorTransport);
   assert(var);
       
-  // If the argument is not existential, it will be a concrete type
-  // that can be erased to that existential.
-  SILValue transportValue = transportArg;
-  if (!transportArg->getType().isExistentialType()) {
-    auto &existentialTL = SGF.getTypeLowering(var->getInterfaceType());
-    auto concreteFormalType = transportArg->getType().getASTType();
-
-    auto archetype = OpenedArchetypeType::getAny(var->getInterfaceType());
-    AbstractionPattern abstractionPattern(archetype);
-    auto &concreteTL = SGF.getTypeLowering(abstractionPattern,
-                                           concreteFormalType);
-
-    auto module = dc->getParentModule();
-    auto actorTransportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
-    ProtocolConformanceRef conformances[] = {
-        module->lookupConformance(concreteFormalType, actorTransportProto) };
-    ManagedValue mv =
-      SGF.emitExistentialErasure(loc, concreteFormalType,
-                                 concreteTL, existentialTL,
-                                 C.AllocateCopy(conformances),
-                                 SGFContext(),
-                 [&](SGFContext C) -> ManagedValue {
-                   return ManagedValue::forBorrowedRValue(transportArg);
-                 });
-    transportValue = mv.getValue();
-  }
-  
-  initializeProperty(SGF, loc, actorSelf.getValue(), var, transportValue);
+  initializeProperty(SGF, loc, actorSelf.getValue(), var, transportArg);
 }
 
 /// Emits the distributed actor's identity (`id`) initialization.
@@ -161,85 +137,27 @@ static void emitIdentityInit(SILGenFunction &SGF, ConstructorDecl *ctor,
   auto *dc = ctor->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
 
-  ProtocolDecl *transportProto = C.getProtocol(KnownProtocolKind::ActorTransport);
-  ProtocolDecl *distributedActorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
-
-  assert(distributedActorProto);
-  assert(transportProto);
-
-  SILValue transportValue = findFirstActorTransportArg(F);
-
-  // --- Open the transport existential, if needed.
-  auto transportASTType = transportValue->getType().getASTType();
-  if (transportASTType->isAnyExistentialType()) {
-    OpenedArchetypeType *Opened;
-    transportASTType =
-        transportASTType->openAnyExistentialType(Opened)->getCanonicalType();
-    transportValue = B.createOpenExistentialAddr(
-        loc, transportValue, F.getLoweredType(transportASTType),
-        OpenedExistentialAccess::Immutable);
-  }
-
   // --- prepare `Self.self` metatype
   auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
-  // This would be bad: since not ok for generic
-  // auto selfMetatype = SGF.getLoweredType(selfTyDecl->getInterfaceType());
-  auto selfMetatype =
-       SGF.getLoweredType(F.mapTypeIntoContext(selfTyDecl->getInterfaceType()));
-  // selfVarDecl.getType() // TODO: do this; then dont need the self type decl
+  auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType());
+  auto selfMetatype = SGF.getLoweredType(MetatypeType::get(selfTy));
   SILValue selfMetatypeValue = B.createMetatype(loc, selfMetatype);
 
-  // === Make the transport.assignIdentity call
-  // --- prepare the witness_method
-  // Note: it does not matter on what module we perform the lookup,
-  // it is currently ignored. So the Stdlib module is good enough.
-  auto *module = SGF.getModule().getSwiftModule();
-
-  // the conformance here is just an abstract thing so we can simplify
-  auto transportConfRef = ProtocolConformanceRef(transportProto);
-  assert(!transportConfRef.isInvalid() && "Missing conformance to `ActorTransport`");
-
-  auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType()); // TODO: thats just self var devl getType
-
-  auto distributedActorConfRef = module->lookupConformance(
-      selfTy,
-      distributedActorProto);
-  assert(!distributedActorConfRef.isInvalid() && "Missing conformance to `DistributedActor`");
-
-  auto assignIdentityMethod =
-      cast<FuncDecl>(transportProto->getSingleRequirement(C.Id_assignIdentity));
-  auto assignIdentityRef = SILDeclRef(assignIdentityMethod, SILDeclRef::Kind::Func);
-  auto assignIdentitySILTy =
-      SGF.getConstantInfo(SGF.getTypeExpansionContext(), assignIdentityRef)
-          .getSILType();
-
-  auto assignWitnessMethod = B.createWitnessMethod(
-      loc,
-      /*lookupTy*/transportASTType,
-      /*Conformance*/transportConfRef,
-      /*member*/assignIdentityRef,
-      /*methodTy*/assignIdentitySILTy);
-
-  // --- prepare conformance subs
-  auto genericSig = assignIdentityMethod->getGenericSignature();
-
-  SubstitutionMap subs =
-      SubstitutionMap::get(genericSig,
-                           {transportASTType, selfTy},
-                           {transportConfRef, distributedActorConfRef});
-
-  VarDecl *var = lookupProperty(classDecl, C.Id_id);
+  SILValue transport = findFirstActorTransportArg(F);
 
   // --- create a temporary storage for the result of the call
   // it will be deallocated automatically as we exit this scope
-  auto resultTy = SGF.getLoweredType(var->getInterfaceType());
+  VarDecl *var = lookupProperty(classDecl, C.Id_id);
+  auto resultTy = SGF.getLoweredType(
+      F.mapTypeIntoContext(var->getInterfaceType()));
   auto temp = SGF.emitTemporaryAllocation(loc, resultTy);
 
-  // ---- actually call transport.assignIdentity(Self.self)
-  B.createApply(
-      loc, assignWitnessMethod, subs,
-      { temp, selfMetatypeValue, transportValue});
+  // --- emit the call itself.
+  emitActorTransportWitnessCall(
+      B, loc, C.Id_assignIdentity, transport, SGF.getLoweredType(selfTy),
+      { temp, selfMetatypeValue });
 
+  // --- initialize the property.
   initializeProperty(SGF, loc, borrowedSelfArg.getValue(), var, temp);
 }
 
@@ -282,74 +200,15 @@ static void createDistributedActorFactory_resolve(
     SILValue transportValue, Type selfTy, SILValue selfMetatypeValue,
     SILType resultTy, SILBasicBlock *normalBB, SILBasicBlock *errorBB) {
   auto &B = SGF.B;
-  auto &SGM = SGF.SGM;
-  auto &F = SGF.F;
-  SILGenFunctionBuilder builder(SGM);
 
   auto loc = SILLocation(fd);
   loc.markAutoGenerated();
 
-  ProtocolDecl *distributedActorProto =
-      C.getProtocol(KnownProtocolKind::DistributedActor);
-  ProtocolDecl *transportProto =
-      C.getProtocol(KnownProtocolKind::ActorTransport);
-  assert(distributedActorProto);
-  assert(transportProto);
-
-  // // --- Open the transport existential
-  OpenedArchetypeType *Opened;
-  auto transportASTType = transportValue->getType().getASTType();
-  auto openedTransportType =
-      transportASTType->openAnyExistentialType(Opened)->getCanonicalType();
-  auto openedTransportSILType = F.getLoweredType(openedTransportType);
-  auto transportArchetypeValue =
-      B.createOpenExistentialAddr(loc, transportValue, openedTransportSILType,
-                                  OpenedExistentialAccess::Immutable);
-
-  // --- prepare the witness_method
-  // Note: it does not matter on what module we perform the lookup,
-  // it is currently ignored. So the Stdlib module is good enough.
-  auto *module = SGF.getModule().getSwiftModule();
-
-  // the conformance here is just an abstract thing so we can simplify
-  auto transportConfRef = ProtocolConformanceRef(transportProto);
-  assert(!transportConfRef.isInvalid() &&
-         "Missing conformance to `ActorTransport`");
-
-  auto distributedActorConfRef =
-      module->lookupConformance(selfTy, distributedActorProto);
-  assert(!distributedActorConfRef.isInvalid() &&
-         "Missing conformance to `DistributedActor`");
-
-  auto resolveMethod =
-      cast<FuncDecl>(transportProto->getSingleRequirement(C.Id_resolve));
-  auto resolveRef = SILDeclRef(resolveMethod, SILDeclRef::Kind::Func);
-  auto constantInfo =
-      SGF.getConstantInfo(SGF.getTypeExpansionContext(), resolveRef);
-  auto resolveSILTy = constantInfo.getSILType();
-
-  auto resolveWitnessMethod =
-      B.createWitnessMethod(loc,
-                            /*lookupTy*/ openedTransportType,
-                            /*Conformance*/ transportConfRef,
-                            /*member*/ resolveRef,
-                            /*methodTy*/ resolveSILTy);
-
-  // // --- prepare conformance subs
-  auto genericSig = resolveMethod->getGenericSignature();
-
-  SubstitutionMap subs =
-      SubstitutionMap::get(genericSig, {openedTransportType, selfTy},
-                           {transportConfRef, distributedActorConfRef});
-
   // // ---- actually call transport.resolve(id, as: Self.self)
-
-  SmallVector<SILValue, 3> params;
-  params.push_back(identityValue);
-  params.push_back(selfMetatypeValue);
-  params.push_back(transportArchetypeValue); // self for the call, as last param
-
-  B.createTryApply(loc, resolveWitnessMethod, subs, params, normalBB, errorBB);
+  emitActorTransportWitnessCall(
+      B, loc, C.Id_resolve, transportValue, SGF.getLoweredType(selfTy),
+      { identityValue, selfMetatypeValue },
+      std::make_pair(normalBB, errorBB));
 }
 
 /// Function body of:
@@ -374,8 +233,6 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
 
   // --- Parameter: transport
   SILArgument *transportArg = F.getArgument(1);
-  assert(
-      transportArg->getType().getASTType()->isEqual(C.getActorTransportType()));
 
   SILValue selfArgValue = F.getSelfArgument();
   ManagedValue selfArg = ManagedValue::forUnmanaged(selfArgValue);
@@ -496,53 +353,28 @@ void SILGenFunction::emitResignIdentityCall(SILLocation loc,
   ASTContext &ctx = getASTContext();
   
   FormalEvaluationScope scope(*this);
-  
+
   // ==== locate: self.id
   auto *idVarDeclRef = lookupProperty(actorDecl, ctx.Id_id);
-  auto idRef =
-  B.createRefElementAddr(loc, actorSelf, idVarDeclRef,
-                         getLoweredType(idVarDeclRef->getType()));
-  
+  CanType idType = F.mapTypeIntoContext(
+      idVarDeclRef->getInterfaceType())->getCanonicalType();
+  auto idRef = B.createRefElementAddr(loc, actorSelf, idVarDeclRef,
+                                      getLoweredType(idType));
+
   // ==== locate: self.actorTransport
   auto transportVarDeclRef = lookupProperty(actorDecl, ctx.Id_actorTransport);
+  CanType transportType = F.mapTypeIntoContext(
+      transportVarDeclRef->getInterfaceType())->getCanonicalType();
   auto transportRef =
-  B.createRefElementAddr(loc, actorSelf, transportVarDeclRef,
-                         getLoweredType(transportVarDeclRef->getType()));
-  
-  // ==== locate: self.transport.resignIdentity(...)
-  auto *transportDecl = ctx.getActorTransportDecl();
-  auto resignFnDecls = transportDecl->lookupDirect(ctx.Id_resignIdentity);
-  assert(resignFnDecls.size() == 1);
-  auto *resignFnDecl = resignFnDecls.front();
-  auto resignFnRef = SILDeclRef(resignFnDecl);
-  
-  // ==== perform the call
-  auto openedTransport =
-  OpenedArchetypeType::get(transportVarDeclRef->getType());
-  auto transportAddr =
-    B.createOpenExistentialAddr(loc, /*operand=*/transportRef.getValue(),
-                                getLoweredType(openedTransport),
-                                OpenedExistentialAccess::Immutable);
-  
-  auto resignFnType =
-    SGM.M.Types.getConstantFunctionType(TypeExpansionContext::minimal(),
-                                        resignFnRef);
-  
-  auto conformance = ProtocolConformanceRef(transportDecl);
-  auto witness =
-    B.createWitnessMethod(loc, openedTransport,
-                          conformance, resignFnRef,
-                          SILType::getPrimitiveObjectType(resignFnType));
-  
-  auto subs = SubstitutionMap::getProtocolSubstitutions(transportDecl,
-                                                        openedTransport,
-                                                        conformance);
-  
-  SmallVector<SILValue, 2> params;
-  params.push_back(idRef.getValue());
-  params.push_back(transportAddr); // self for the call, as last param
-  
-  B.createApply(loc, witness, subs, params);
+    B.createRefElementAddr(loc, actorSelf, transportVarDeclRef,
+                           getLoweredType(transportType));
+
+  // Perform the call.
+  emitActorTransportWitnessCall(
+      B, loc, ctx.Id_resignIdentity,
+      transportRef.getValue(),
+      SILType(),
+      { idRef.getValue() });
 }
 
 void

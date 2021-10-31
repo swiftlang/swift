@@ -229,3 +229,13 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
   checkDistributedActorProperties(decl);
 }
 
+Type swift::getDistributedActorTransportType(NominalTypeDecl *actor) {
+  assert(actor->isDistributedActor());
+  auto &ctx = actor->getASTContext();
+
+  auto protocol = ctx.getProtocol(KnownProtocolKind::ActorTransport);
+  if (!protocol)
+    return ErrorType::get(ctx);
+
+  return protocol->getDeclaredInterfaceType();
+}
