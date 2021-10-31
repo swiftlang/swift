@@ -91,6 +91,7 @@
 #define SWIFT_SILOPTIMIZER_UTILS_PRUNEDLIVENESS_H
 
 #include "swift/SIL/SILBasicBlock.h"
+#include "llvm/ADT/MapVector.h"
 
 namespace swift {
 
@@ -221,11 +222,19 @@ class PrunedLiveness {
   // they may be the last use in the block.
   //
   // Non-lifetime-ending within a LiveOut block are uninteresting.
-  llvm::SmallDenseMap<SILInstruction *, bool, 8> users;
+  llvm::SmallMapVector<SILInstruction *, bool, 8> users;
+
+  /// A side array that stores any non lifetime ending uses we find in live out
+  /// blocks. This is used to enable our callers to emit errors on non-lifetime
+  /// ending uses that extend liveness into a loop body.
+  SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut;
 
 public:
-  PrunedLiveness(SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
-      : liveBlocks(discoveredBlocks) {}
+  PrunedLiveness(SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr,
+                 SmallSetVector<SILInstruction *, 8>
+                     *nonLifetimeEndingUsesInLiveOut = nullptr)
+      : liveBlocks(discoveredBlocks),
+        nonLifetimeEndingUsesInLiveOut(nonLifetimeEndingUsesInLiveOut) {}
 
   bool empty() const {
     assert(!liveBlocks.empty() || users.empty());
@@ -235,6 +244,8 @@ public:
   void clear() {
     liveBlocks.clear();
     users.clear();
+    if (nonLifetimeEndingUsesInLiveOut)
+      nonLifetimeEndingUsesInLiveOut->clear();
   }
 
   unsigned numLiveBlocks() const { return liveBlocks.numLiveBlocks(); }
@@ -243,6 +254,47 @@ public:
   /// returns the list of all live blocks with no duplicates.
   ArrayRef<SILBasicBlock *> getDiscoveredBlocks() const {
     return liveBlocks.getDiscoveredBlocks();
+  }
+
+  using NonLifetimeEndingUsesInLiveOutRange =
+      iterator_range<SILInstruction *const *>;
+
+  NonLifetimeEndingUsesInLiveOutRange
+  getNonLifetimeEndingUsesInLiveOut() const {
+    assert(nonLifetimeEndingUsesInLiveOut &&
+           "Called without passing in nonLifetimeEndingUsesInLiveOut to "
+           "constructor?!");
+    return llvm::make_range(nonLifetimeEndingUsesInLiveOut->begin(),
+                            nonLifetimeEndingUsesInLiveOut->end());
+  }
+
+  using NonLifetimeEndingUsesInLiveOutBlocksRange =
+      TransformRange<NonLifetimeEndingUsesInLiveOutRange,
+                     function_ref<SILBasicBlock *(const SILInstruction *&)>>;
+  NonLifetimeEndingUsesInLiveOutBlocksRange
+  getNonLifetimeEndingUsesInLiveOutBlocks() const {
+    function_ref<SILBasicBlock *(const SILInstruction *&)> op;
+    op = [](const SILInstruction *&ptr) -> SILBasicBlock * {
+      return ptr->getParent();
+    };
+    return NonLifetimeEndingUsesInLiveOutBlocksRange(
+        getNonLifetimeEndingUsesInLiveOut(), op);
+  }
+
+  using UserRange = iterator_range<const std::pair<SILInstruction *, bool> *>;
+  UserRange getAllUsers() const {
+    return llvm::make_range(users.begin(), users.end());
+  }
+
+  using UserBlockRange = TransformRange<
+      UserRange,
+      function_ref<SILBasicBlock *(const std::pair<SILInstruction *, bool> &)>>;
+  UserBlockRange getAllUserBlocks() const {
+    function_ref<SILBasicBlock *(const std::pair<SILInstruction *, bool> &)> op;
+    op = [](const std::pair<SILInstruction *, bool> &pair) -> SILBasicBlock * {
+      return pair.first->getParent();
+    };
+    return UserBlockRange(getAllUsers(), op);
   }
 
   void initializeDefBlock(SILBasicBlock *defBB) {
