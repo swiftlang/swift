@@ -1,17 +1,17 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor A {
   func f() { }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Actor {
   func g() { }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func testA<T: Actor>(
   a: isolated A,
   b: isolated T,
@@ -22,20 +22,20 @@ func testA<T: Actor>(
   b.g()
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 typealias Fn = (isolated A) -> Void
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func globalFunc(_ a: A) { }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func globalFuncIsolated(_: isolated A) { // expected-note{{calls to global function 'globalFuncIsolated' from outside of its actor context are implicitly asynchronous}}
   let _: Int = globalFuncIsolated // expected-error{{cannot convert value of type '(isolated A) -> ()' to specified type 'Int'}}
   let _: (A) -> Void = globalFuncIsolated // expected-error{{cannot convert value of type '(isolated A) -> ()' to specified type '(A) -> Void'}}
   let _: Fn = globalFunc // okay
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func testIsolatedParamCalls(a: isolated A, b: A) {
   globalFunc(a)
   globalFunc(b)
@@ -44,7 +44,7 @@ func testIsolatedParamCalls(a: isolated A, b: A) {
   globalFuncIsolated(b) // expected-error{{call to actor-isolated global function 'globalFuncIsolated' in a synchronous nonisolated context}}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func testIsolatedParamCallsAsync(a: isolated A, b: A) async {
   globalFunc(a)
   globalFunc(b)
@@ -69,7 +69,7 @@ func check() {
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 protocol P {
   func f(isolated: MyActor) async
   func g(isolated x: MyActor) async
@@ -80,7 +80,7 @@ protocol P {
   func l(isolated _: Int) -> Int
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct S: P {
   func f(isolated: MyActor) async { await isolated.hello() }
   func g(isolated x: MyActor) async { await x.hello() }
@@ -105,7 +105,7 @@ func redecl(_: isolated TestActor) { } // expected-error{{invalid redeclaration 
 
 func tuplify<Ts>(_ fn: (Ts) -> Void) {} // expected-note {{in call to function 'tuplify'}}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func testTuplingIsolated(_ a: isolated A, _ b: isolated A) {
   tuplify(testTuplingIsolated)
   // expected-error@-1 {{generic parameter 'Ts' could not be inferred}}
@@ -113,7 +113,7 @@ func testTuplingIsolated(_ a: isolated A, _ b: isolated A) {
 }
 
 // Inference of "isolated" on closure parameters.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func testIsolatedClosureInference(a: A) {
   let _: (isolated A) -> Void = {
     $0.f()

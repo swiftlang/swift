@@ -210,7 +210,7 @@ actor MultiVarActor {
     }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor TaskMaster {
     var task: Task<Void, Never>?
 

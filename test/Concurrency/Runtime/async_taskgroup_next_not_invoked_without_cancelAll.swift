@@ -10,7 +10,7 @@
 
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_skipCallingNext() async {
   let numbers = [1, 1]
 
@@ -43,7 +43,7 @@ func test_skipCallingNext() async {
   assert(result == 0)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_skipCallingNext()

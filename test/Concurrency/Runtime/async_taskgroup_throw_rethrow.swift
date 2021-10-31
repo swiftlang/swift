@@ -10,12 +10,12 @@
 struct Boom: Error {}
 struct IgnoredBoom: Error {}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func echo(_ i: Int) async -> Int { i }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func boom() async throws -> Int { throw Boom() }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_throws_rethrows() async {
   do {
     let got = try await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
@@ -45,7 +45,7 @@ func test_taskGroup_throws_rethrows() async {
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_throws_rethrows()

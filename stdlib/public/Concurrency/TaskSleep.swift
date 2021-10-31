@@ -12,7 +12,7 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
   @available(*, deprecated, renamed: "Task.sleep(nanoseconds:)")
   public static func sleep(_ duration: UInt64) async {

@@ -17,7 +17,7 @@ import Swift
 ///
 /// The `Actor` protocol generalizes over all actor types. Actor types
 /// implicitly conform to this protocol.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol Actor: AnyObject, Sendable {
 
   /// Retrieve the executor for this actor as an optimized, unowned
@@ -37,17 +37,17 @@ public protocol Actor: AnyObject, Sendable {
 
 /// Called to initialize the default actor instance in an actor.
 /// The implementation will call this within the actor's initializer.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_defaultActor_initialize")
 public func _defaultActorInitialize(_ actor: AnyObject)
 
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_defaultActor_destroy")
 public func _defaultActorDestroy(_ actor: AnyObject)
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueMainExecutor")
 @usableFromInline
 internal func _enqueueOnMain(_ job: UnownedJob)

@@ -8,13 +8,13 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 enum TL {
   @TaskLocal
   static var number: Int = 0
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @discardableResult
 func printTaskLocal<V>(
     _ key: TaskLocal<V>,
@@ -32,7 +32,7 @@ func printTaskLocal<V>(
 
 // ==== ------------------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func synchronous_bind() {
 
   func synchronous() {
@@ -50,7 +50,7 @@ func synchronous_bind() {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() {
     synchronous_bind()

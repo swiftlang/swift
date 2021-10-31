@@ -8,29 +8,29 @@ import OtherActors
 let immutableGlobal: String = "hello"
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func globalFunc() { }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func acceptClosure<T>(_: () -> T) { }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func acceptConcurrentClosure<T>(_: @Sendable () -> T) { }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func acceptEscapingClosure<T>(_: @escaping () -> T) { }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func acceptEscapingClosure<T>(_: @escaping (String) -> ()) async -> T? { nil }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @discardableResult func acceptAsyncClosure<T>(_: () async -> T) -> T { }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func acceptInout<T>(_: inout T) {}
 
 
 // ----------------------------------------------------------------------
 // Actor state isolation restrictions
 // ----------------------------------------------------------------------
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor MySuperActor {
   var superState: Int = 25 // expected-note {{mutation of this property is only permitted within the actor}}
 
@@ -51,7 +51,7 @@ class Point { // expected-note{{class 'Point' does not conform to the 'Sendable'
   var y : Int = 0
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor MyActor: MySuperActor { // expected-error{{actor types do not support inheritance}}
   let immutable: Int = 17
   // expected-note@+2 2{{property declared here}}
@@ -81,14 +81,14 @@ actor MyActor: MySuperActor { // expected-error{{actor types do not support inhe
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Camera {
   func accessProp(act : MyActor) async -> String {
     return await act.name
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func checkAsyncPropertyAccess() async {
   let act = MyActor()
   let _ : Int = await act.mutable + act.mutable
@@ -109,7 +109,7 @@ func checkAsyncPropertyAccess() async {
   _ = act.point  // expected-warning{{cannot use property 'point' with a non-sendable type 'Point' across actors}}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension MyActor {
   nonisolated var actorIndependentVar: Int {
     get { 5 }
@@ -321,35 +321,35 @@ extension MyActor {
 // ----------------------------------------------------------------------
 // Global actor isolation restrictions
 // ----------------------------------------------------------------------
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor SomeActor { }
 
 @globalActor
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct SomeGlobalActor {
   static let shared = SomeActor()
 }
 
 @globalActor
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct SomeOtherGlobalActor {
   static let shared = SomeActor()
 }
 
 @globalActor
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct GenericGlobalActor<T> {
   static var shared: SomeActor { SomeActor() }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @SomeGlobalActor func onions() {} // expected-note{{calls to global function 'onions()' from outside of its actor context are implicitly asynchronous}}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @MainActor func beets() { onions() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'onions()' in a synchronous main actor-isolated context}}
 // expected-note@-1{{calls to global function 'beets()' from outside of its actor context are implicitly asynchronous}}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Crystal {
   // expected-note@+2 {{property declared here}}
   // expected-note@+1 2 {{mutation of this property is only permitted within the actor}}
@@ -378,21 +378,21 @@ actor Crystal {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @SomeGlobalActor func syncGlobalActorFunc() { syncGlobalActorFunc() } // expected-note {{calls to global function 'syncGlobalActorFunc()' from outside of its actor context are implicitly asynchronous}}
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @SomeGlobalActor func asyncGlobalActorFunc() async { await asyncGlobalActorFunc() }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @SomeOtherGlobalActor func syncOtherGlobalActorFunc() { }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @SomeOtherGlobalActor func asyncOtherGlobalActorFunc() async {
   await syncGlobalActorFunc()
   await asyncGlobalActorFunc()
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func testGlobalActorClosures() {
   let _: Int = acceptAsyncClosure { @SomeGlobalActor in
     syncGlobalActorFunc()
@@ -406,7 +406,7 @@ func testGlobalActorClosures() {
   acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-error{{converting function value of type '@SomeGlobalActor @Sendable () -> Int' to '@Sendable () -> Int' loses global actor 'SomeGlobalActor'}}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension MyActor {
   @SomeGlobalActor func onGlobalActor(otherActor: MyActor) async {
     // Access to other functions in this actor are okay.
@@ -470,7 +470,7 @@ extension MyActor {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 struct GenericStruct<T> {
   @GenericGlobalActor<T> func f() { } // expected-note {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 
@@ -485,7 +485,7 @@ struct GenericStruct<T> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension GenericStruct where T == String {
   @GenericGlobalActor<T>
   func h2() {
@@ -504,7 +504,7 @@ func badNumberUser() {
   print("The protected number is: \(number)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func asyncBadNumberUser() async {
   print("The protected number is: \(await number)")
 }
@@ -512,7 +512,7 @@ func asyncBadNumberUser() async {
 // ----------------------------------------------------------------------
 // Non-actor code isolation restrictions
 // ----------------------------------------------------------------------
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func testGlobalRestrictions(actor: MyActor) async {
   let _ = MyActor()
 
@@ -572,7 +572,7 @@ func testGlobalRestrictions(actor: MyActor) async {
 
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func f() {
   acceptConcurrentClosure {
     _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
@@ -586,7 +586,7 @@ func f() {
 // ----------------------------------------------------------------------
 // Local function isolation restrictions
 // ----------------------------------------------------------------------
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func checkLocalFunctions() async {
   var i = 0
   var j = 0
@@ -635,7 +635,7 @@ func checkLocalFunctions() async {
 // Lazy properties with initializers referencing 'self'
 // ----------------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor LazyActor {
     var v: Int = 0
     // expected-note@-1 6 {{property declared here}}
@@ -673,7 +673,7 @@ actor LazyActor {
 }
 
 // Infer global actors from context only for instance members.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @MainActor
 class SomeClassInActor {
   enum ID: String { case best }
@@ -681,7 +681,7 @@ class SomeClassInActor {
   func inActor() { } // expected-note{{calls to instance method 'inActor()' from outside of its actor context are implicitly asynchronous}}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension SomeClassInActor.ID {
   func f(_ object: SomeClassInActor) { // expected-note{{add '@MainActor' to make instance method 'f' part of global actor 'MainActor'}}
     object.inActor() // expected-error{{call to main actor-isolated instance method 'inActor()' in a synchronous nonisolated context}}
@@ -691,7 +691,7 @@ extension SomeClassInActor.ID {
 // ----------------------------------------------------------------------
 // Initializers (through typechecking only)
 // ----------------------------------------------------------------------
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor SomeActorWithInits {
   var mutableState: Int = 17
   var otherMutableState: Int
@@ -757,7 +757,7 @@ actor SomeActorWithInits {
   nonisolated func nonisolated() {}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @MainActor
 class SomeClassWithInits {
   var mutableState: Int = 17
@@ -797,7 +797,7 @@ class SomeClassWithInits {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func outsideSomeClassWithInits() { // expected-note 3 {{add '@MainActor' to make global function 'outsideSomeClassWithInits()' part of global actor 'MainActor'}}
   _ = SomeClassWithInits() // expected-error{{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
   _ = SomeClassWithInits.shared // expected-error{{static property 'shared' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
@@ -823,11 +823,11 @@ func testCrossModuleLets(actor: OtherModuleActor) async {
 // Actor protocols.
 // ----------------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor A: Actor { // ok
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 class C: Actor, UnsafeSendable {
   // expected-error@-1{{non-actor type 'C' cannot conform to the 'Actor' protocol}}
   // expected-warning@-2{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
@@ -836,47 +836,47 @@ class C: Actor, UnsafeSendable {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 protocol P: Actor {
   func f()
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension P {
   func g() { f() }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor MyActorP: P {
   func f() { }
 
   func h() { g() }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 protocol SP {
   static func s()
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor ASP: SP {
   static func s() { }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 protocol SPD {
   static func sd()
 }
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension SPD {
   static func sd() { }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor ASPD: SPD {
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func testCrossActorProtocol<T: P>(t: T) async {
   await t.f()
   await t.g()
@@ -896,7 +896,7 @@ func testCrossActorProtocol<T: P>(t: T) async {
 func acceptAsyncSendableClosure<T>(_: @Sendable () async -> T) { }
 func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable () async -> T) { }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension MyActor {
   func testSendableAndInheriting() {
     acceptAsyncSendableClosure {
@@ -918,14 +918,14 @@ extension MyActor {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @MainActor // expected-note {{'GloballyIsolatedProto' is isolated to global actor 'MainActor' here}}
 protocol GloballyIsolatedProto {
 }
 
 // rdar://75849035 - trying to conform an actor to a global-actor isolated protocol should result in an error
 func test_conforming_actor_to_global_actor_protocol() {
-  @available(SwiftStdlib 5.5, *)
+  @available(SwiftStdlib 5.1, *)
   actor MyValue : GloballyIsolatedProto {}
   // expected-error@-1 {{actor 'MyValue' cannot conform to global actor isolated protocol 'GloballyIsolatedProto'}}
 }
