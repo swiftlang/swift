@@ -8,7 +8,7 @@
 
 import Foundation
 
-if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+if #available(SwiftStdlib 5.5, *) {
   // This tests behavior that was fixed in
   // https://github.com/apple/swift/pull/36355
 

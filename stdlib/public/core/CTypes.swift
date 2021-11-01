@@ -58,7 +58,7 @@ public typealias CLongLong = Int64
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 /// The C '_Float16' type.
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 public typealias CFloat16 = Float16
 #endif
 

@@ -308,7 +308,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
 %  MaskExt = "Builtin.sext_" + VecPre + "Int1_" + VecPre + "Int" + str(bits)
 %  if bits == 16:
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 %  end
 extension SIMD${n} where Scalar == ${Scalar} {
   @_alwaysEmitIntoClient

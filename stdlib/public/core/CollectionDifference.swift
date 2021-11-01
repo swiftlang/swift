@@ -12,7 +12,7 @@
 
 /// A collection of insertions and removals that describe the difference 
 /// between two ordered collection states.
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 public struct CollectionDifference<ChangeElement> {
   /// A single change to a collection.
   @frozen
@@ -233,7 +233,7 @@ public struct CollectionDifference<ChangeElement> {
 ///   }
 /// }
 /// ```
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference: Collection {
   public typealias Element = Change
 
@@ -281,7 +281,7 @@ extension CollectionDifference: Collection {
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference.Index: Equatable {
   @inlinable
   public static func == (
@@ -292,7 +292,7 @@ extension CollectionDifference.Index: Equatable {
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference.Index: Comparable {
   @inlinable
   public static func < (
@@ -303,7 +303,7 @@ extension CollectionDifference.Index: Comparable {
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference.Index: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
@@ -311,19 +311,19 @@ extension CollectionDifference.Index: Hashable {
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference.Change: Equatable where ChangeElement: Equatable {}
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference: Equatable where ChangeElement: Equatable {}
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference.Change: Hashable where ChangeElement: Hashable {}
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference: Hashable where ChangeElement: Hashable {}
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference where ChangeElement: Hashable {
   /// Returns a new collection difference with associations between individual
   /// elements that have been removed and inserted only once.
@@ -380,7 +380,7 @@ extension CollectionDifference where ChangeElement: Hashable {
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference.Change: Codable where ChangeElement: Codable {
   private enum _CodingKeys: String, CodingKey {
     case offset
@@ -417,12 +417,12 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference: Codable where ChangeElement: Codable {}
 
-@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference: Sendable where ChangeElement: Sendable { }
-@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference.Change: Sendable where ChangeElement: Sendable { }
-@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference.Index: Sendable where ChangeElement: Sendable { }

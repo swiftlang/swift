@@ -378,7 +378,7 @@ UnsafeMutableBufferPointerTestSuite.test("initialize(from: Slice)") {
 }
 
 UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable") {
-  guard #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+  guard #available(SwiftStdlib 5.3, *) else {
     return
   }
 

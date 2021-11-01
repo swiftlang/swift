@@ -5,7 +5,7 @@
 import StdlibUnittest
 import Foundation
 
-@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+@available(SwiftStdlib 5.1, *)
 private func testWebSocketTask() {
   let task = URLSession.shared.webSocketTask(with: URL(string:"wss://test.example")!)
 
@@ -26,7 +26,7 @@ private func testWebSocketTask() {
   }
 }
 
-@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+@available(SwiftStdlib 5.1, *)
 private func testURLError(_ error: Error) {
   if let error = error as? URLError {
     if error.networkUnavailableReason == .constrained {
@@ -39,13 +39,13 @@ private func testURLError(_ error: Error) {
   }
 }
 
-@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+@available(SwiftStdlib 5.1, *)
 private func testURLCache() {
   _ = URLCache(memoryCapacity: 0, diskCapacity: 0)
   _ = URLCache(memoryCapacity: 0, diskCapacity: 0, directory: URL(fileURLWithPath: "/tmp"))
 }
 
-@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+@available(SwiftStdlib 5.1, *)
 private func testTaskMetrics(_ metrics: URLSessionTaskMetrics) {
   if let transaction = metrics.transactionMetrics.last {
     if transaction.remotePort == 443 {

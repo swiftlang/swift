@@ -304,7 +304,7 @@ internal func _float16ToStringImpl(
   _ debug: Bool
 ) -> Int
 
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 internal func _float16ToString(
   _ value: Float16,
   debug: Bool
