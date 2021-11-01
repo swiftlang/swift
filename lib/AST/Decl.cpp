@@ -2708,7 +2708,7 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
       if (type->is<FunctionType>()) {
         return mapSignatureFunctionType(ctx, type, false, false, false, 1);
       }
-      
+
       return type;
     });
 }
@@ -2850,12 +2850,11 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 CanType ValueDecl::getOverloadSignatureType() const {
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(this)) {
     bool isMethod = afd->hasImplicitSelfDecl();
-    return mapSignatureFunctionType(
-                           getASTContext(), getInterfaceType(),
-                           /*topLevelFunction=*/true,
-                           isMethod,
-                           /*isInitializer=*/isa<ConstructorDecl>(afd),
-                           getNumCurryLevels())->getCanonicalType();
+    return mapSignatureFunctionType(getASTContext(), getInterfaceType(),
+                                    /*topLevelFunction=*/true, isMethod,
+                                    /*isInitializer=*/isa<ConstructorDecl>(afd),
+                                    getNumCurryLevels())
+        ->getMinimalCanonicalType();
   }
 
   if (isa<AbstractStorageDecl>(this)) {
@@ -2866,12 +2865,12 @@ CanType ValueDecl::getOverloadSignatureType() const {
     if (isa<VarDecl>(this)) {
       defaultSignatureType = TupleType::getEmpty(getASTContext());
     } else {
-      defaultSignatureType = mapSignatureFunctionType(
-          getASTContext(), getInterfaceType(),
-          /*topLevelFunction=*/true,
-          /*isMethod=*/false,
-          /*isInitializer=*/false,
-          getNumCurryLevels())->getCanonicalType();
+      defaultSignatureType =
+          mapSignatureFunctionType(getASTContext(), getInterfaceType(),
+                                   /*topLevelFunction=*/true,
+                                   /*isMethod=*/false,
+                                   /*isInitializer=*/false, getNumCurryLevels())
+              ->getMinimalCanonicalType();
     }
 
     // We want to curry the default signature type with the 'self' type of the
@@ -2879,14 +2878,14 @@ CanType ValueDecl::getOverloadSignatureType() const {
     // is unique across different contexts, such as between a protocol extension
     // and struct decl.
     return defaultSignatureType->addCurriedSelfType(getDeclContext())
-                               ->getCanonicalType();
+        ->getMinimalCanonicalType();
   }
 
   if (isa<EnumElementDecl>(this)) {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
         /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
-    return mappedType->getCanonicalType();
+    return mappedType->getMinimalCanonicalType();
   }
 
   // Note: If you add more cases to this function, you should update the

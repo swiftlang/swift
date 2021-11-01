@@ -1559,6 +1559,49 @@ CanType TypeBase::getCanonicalType(GenericSignature sig) {
   return sig.getCanonicalTypeInContext(this);
 }
 
+CanType TypeBase::getMinimalCanonicalType() const {
+  const auto MinimalTy = getCanonicalType().transform([](Type Ty) -> Type {
+    const CanType CanTy = CanType(Ty);
+
+    if (const auto ET = dyn_cast<ExistentialType>(CanTy)) {
+      const auto PCT =
+          dyn_cast<ProtocolCompositionType>(ET.getConstraintType());
+      if (!PCT) {
+        return CanTy;
+      }
+
+      const auto MinimalTy = PCT->getMinimalCanonicalType();
+      if (MinimalTy->getClassOrBoundGenericClass()) {
+        return MinimalTy;
+      }
+
+      return ExistentialType::get(MinimalTy);
+    }
+
+    if (const auto EM = dyn_cast<ExistentialMetatypeType>(CanTy)) {
+      const auto PCT = dyn_cast<ProtocolCompositionType>(EM.getInstanceType());
+      if (!PCT) {
+        return CanTy;
+      }
+
+      const auto MinimalTy = PCT->getMinimalCanonicalType();
+      if (MinimalTy->getClassOrBoundGenericClass()) {
+        return MetatypeType::get(MinimalTy);
+      }
+
+      return ExistentialMetatypeType::get(MinimalTy);
+    }
+
+    if (const auto Composition = dyn_cast<ProtocolCompositionType>(CanTy)) {
+      return Composition->getMinimalCanonicalType();
+    }
+
+    return CanTy;
+  });
+
+  return CanType(MinimalTy);
+}
+
 TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
   auto Func = [Recursive](Type Ty) -> Type {
     if (auto boundGeneric = dyn_cast<BoundGenericType>(Ty.getPointer())) {
@@ -3753,9 +3796,59 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   if (CanTypes.size() == 1 && !HasExplicitAnyObject)
     return CanTypes.front();
 
-  // TODO: Canonicalize away HasExplicitAnyObject if it is implied
-  // by one of our member protocols.
   return build(C, CanTypes, HasExplicitAnyObject);
+}
+
+CanType ProtocolCompositionType::getMinimalCanonicalType() const {
+  const CanType CanTy = getCanonicalType();
+
+  // If the canonical type is not a composition, it's minimal.
+  const auto Composition = dyn_cast<ProtocolCompositionType>(CanTy);
+  if (!Composition) {
+    return CanTy;
+  }
+
+  // Nothing to minimize.
+  if (Composition->getMembers().empty()) {
+    return CanTy;
+  }
+
+  // The only cases we're missing out on proper minimization is when a
+  // composition has an explicit superclass or AnyObject constraint.
+  if (!Composition->hasExplicitAnyObject() &&
+      !Composition->getMembers().front()->getClassOrBoundGenericClass()) {
+    // Already minimal.
+    return CanTy;
+  }
+
+  auto &Ctx = CanTy->getASTContext();
+
+  // Use generic signature minimization: the requirements of the signature will
+  // represent the minimal composition.
+  const auto Sig = Ctx.getOpenedArchetypeSignature(CanTy);
+  const auto &Reqs = Sig.getRequirements();
+  if (Reqs.size() == 1) {
+    return Reqs.front().getSecondType()->getCanonicalType();
+  }
+
+  llvm::SmallVector<Type, 2> MinimalMembers;
+  bool MinimalHasExplicitAnyObject = false;
+  for (const auto &Req : Reqs) {
+    switch (Req.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+      MinimalMembers.push_back(Req.getSecondType());
+      break;
+    case RequirementKind::Layout:
+      MinimalHasExplicitAnyObject = true;
+      break;
+    case RequirementKind::SameType:
+      llvm_unreachable("");
+    }
+  }
+
+  // The resulting composition is necessarily canonical.
+  return CanType(build(Ctx, MinimalMembers, MinimalHasExplicitAnyObject));
 }
 
 ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
