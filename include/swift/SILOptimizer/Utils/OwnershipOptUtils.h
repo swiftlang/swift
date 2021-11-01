@@ -73,6 +73,11 @@ void extendLocalBorrow(BeginBorrowInst *beginBorrow,
 /// newly created phis do not yet have a borrow scope.
 bool createBorrowScopeForPhiOperands(SILPhiArgument *newPhi);
 
+SILValue
+makeGuaranteedValueAvailable(SILValue value, SILInstruction *user,
+                             DeadEndBlocks &deBlocks,
+                             InstModCallbacks callbacks = InstModCallbacks());
+
 //===----------------------------------------------------------------------===//
 //                        GuaranteedOwnershipExtension
 //===----------------------------------------------------------------------===//

@@ -973,6 +973,15 @@ SILValue OwnershipLifetimeExtender::borrowOverSingleNonLifetimeEndingUser(
       newValue, borrowPt, ArrayRef<SILInstruction *>(nonLifetimeEndingUser));
 }
 
+SILValue swift::makeGuaranteedValueAvailable(SILValue value,
+                                             SILInstruction *user,
+                                             DeadEndBlocks &deBlocks,
+                                             InstModCallbacks callbacks) {
+  OwnershipFixupContext ctx{callbacks, deBlocks};
+  OwnershipLifetimeExtender extender{ctx};
+  return extender.borrowOverSingleNonLifetimeEndingUser(value, user);
+}
+
 //===----------------------------------------------------------------------===//
 //                OwnershipRAUWUtility - RAUW + fix ownership
 //===----------------------------------------------------------------------===//
