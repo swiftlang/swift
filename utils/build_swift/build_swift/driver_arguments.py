@@ -518,7 +518,7 @@ def create_argument_parser():
            default=defaults.DSYMUTIL_JOBS,
            metavar='COUNT',
            help='the maximum number of parallel dsymutil jobs to use when '
-                'extracting symbols. Tweak with caution, since dsymutil'
+                'extracting symbols. Tweak with caution, since dsymutil '
                 'is memory intensive.')
 
     option('--disable-guaranteed-normal-arguments', store_true,
