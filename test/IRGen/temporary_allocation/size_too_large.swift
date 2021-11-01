@@ -3,7 +3,7 @@
 @_silgen_name("blackHole")
 func blackHole(_ value: UnsafeMutableRawPointer?) -> Void
 
-withUnsafeTemporaryAllocation(byteCount: 1, alignment: -1) { buffer in
+withUnsafeTemporaryAllocation(of: Int.self, capacity: .max) { buffer in
     blackHole(buffer.baseAddress)
 }
-// CHECK: error: alignment value must be greater than zero
+// CHECK: error: allocation byte count too large
