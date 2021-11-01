@@ -4351,7 +4351,14 @@ ClangImporter::instantiateCXXClassTemplate(
 
 bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
   return isa<clang::CXXConstructorDecl>(method) || !method->isConst() ||
-         method->getParent()->hasMutableFields();
+         method->getParent()->hasMutableFields() ||
+         (method->hasAttrs() &&
+          llvm::any_of(method->getAttrs(), [](clang::Attr *a) {
+            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(a)) {
+              return swiftAttr->getAttribute() == "mutating";
+            }
+            return false;
+          }));
 }
 
 SwiftLookupTable *
