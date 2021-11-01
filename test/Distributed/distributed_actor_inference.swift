@@ -65,9 +65,9 @@ distributed actor SomeDistributedActor_6 {
 
 @available(SwiftStdlib 5.6, *)
 distributed actor SomeDistributedActor_7 {
-  distributed func dont_1() async throws -> Int { 42 } // expected-error{{Distributed function's 'dont_1' remote counterpart '_remote_dont_1' cannot not be implemented manually.}}
-  distributed func dont_2() async throws -> Int { 42 } // expected-error{{Distributed function's 'dont_2' remote counterpart '_remote_dont_2' cannot not be implemented manually.}}
-  distributed func dont_3() async throws -> Int { 42 } // expected-error{{Distributed function's 'dont_3' remote counterpart '_remote_dont_3' cannot not be implemented manually.}}
+  distributed func dont_1() async throws -> Int { 42 } // expected-error{{distributed function's 'dont_1' remote counterpart '_remote_dont_1' cannot not be implemented manually.}}
+  distributed func dont_2() async throws -> Int { 42 } // expected-error{{distributed function's 'dont_2' remote counterpart '_remote_dont_2' cannot not be implemented manually.}}
+  distributed func dont_3() async throws -> Int { 42 } // expected-error{{distributed function's 'dont_3' remote counterpart '_remote_dont_3' cannot not be implemented manually.}}
 }
 
 @available(SwiftStdlib 5.6, *)

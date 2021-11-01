@@ -7,9 +7,9 @@ import _Distributed
 @available(SwiftStdlib 5.6, *)
 distributed actor D {
 
-  func hello() {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
-  func helloAsync() async {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
-  func helloAsyncThrows() async throws {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
+  func hello() {} // expected-note{{distributed actor-isolated instance method 'hello()' declared here}}
+  func helloAsync() async {} // expected-note{{distributed actor-isolated instance method 'helloAsync()' declared here}}
+  func helloAsyncThrows() async throws {} // expected-note{{distributed actor-isolated instance method 'helloAsyncThrows()' declared here}}
 
   distributed func distHello() { } // ok
   distributed func distHelloAsync() async { } // ok
@@ -19,12 +19,12 @@ distributed actor D {
 
 @available(SwiftStdlib 5.6, *)
 func test_not_distributed_funcs(distributed: D) async {
-  distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
-  distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  distributed.hello() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
+  distributed.helloAsync() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
   // expected-error@-1{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-2{{call is 'async'}}
   // {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
   // expected-error@-1{{expression is 'async' but is not marked with 'await'}} // TODO: no need to diagnose this, it is impossible to call anyway
   // expected-note@-2{{call is 'async'}}
   // expected-error@-3{{call can throw, but it is not marked with 'try' and the error is not handled}} // TODO: no need to diagnose this, it is impossible to call anyway
