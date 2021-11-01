@@ -444,7 +444,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
             initializer, DC, patternType, pattern,
             /*bindPatternVarsOneWay=*/false);
 
-  auto options = TypeCheckExprOptions();
   if (DC->getASTContext().LangOpts.CheckAPIAvailabilityOnly &&
       PBD && !DC->getAsDecl()) {
     // Skip checking the initializer for non-public decls when
