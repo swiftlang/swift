@@ -245,7 +245,9 @@ extension _NativeDictionary { // ensureUnique
   }
 
   /// Ensure storage of self is uniquely held and can hold at least `capacity`
-  /// elements. Returns true iff contents were rehashed.
+  /// elements.
+  ///
+  /// -Returns: `true` if contents were rehashed; otherwise, `false`.
   @inlinable
   @_semantics("optimize.sil.specialize.generic.size.never")
   internal mutating func ensureUnique(isUnique: Bool, capacity: Int) -> Bool {
