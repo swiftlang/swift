@@ -45,6 +45,7 @@
     "Unicode.swift",
     "UnicodeData.swift",
     "UnicodeEncoding.swift",
+    "UnicodeGraphemeBreakProperty.swift",
     "UnicodeHelpers.swift",
     "UnicodeParser.swift",
     "UnicodeScalar.swift",

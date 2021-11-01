@@ -7,6 +7,7 @@ set(swift_stubs_sources
     ThreadLocalStorage.cpp
     MathStubs.cpp
     UnicodeData.cpp
+    UnicodeGrapheme.cpp
     UnicodeNormalization.cpp
 )
 set(swift_stubs_objc_sources
