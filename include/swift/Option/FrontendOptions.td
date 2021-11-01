@@ -181,9 +181,9 @@ def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules implicitly by the compiler">;
 
-def explict_swift_module_map
+def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
-    HelpText<"Specify a JSON file containing information of explict Swift modules">;
+    HelpText<"Specify a JSON file containing information of explicit Swift modules">;
 
 def placeholder_dependency_module_map
   : Separate<["-"], "placeholder-dependency-module-map-file">, MetaVarName<"<path>">,
@@ -194,7 +194,7 @@ def batch_scan_input_file
     HelpText<"Specify a JSON file containing modules to perform batch dependencies scanning">;
 
 def import_prescan : Flag<["-"], "import-prescan">,
-   HelpText<"When performing a dependency scan, only dentify all imports of the main Swift module sources">;
+   HelpText<"When performing a dependency scan, only identify all imports of the main Swift module sources">;
 
 def serialize_dependency_scan_cache : Flag<["-"], "serialize-dependency-scan-cache">,
    HelpText<"After performing a dependency scan, serialize the scanner's internal state.">;
@@ -816,7 +816,7 @@ def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
   HelpText<"Enable verification of access markers used to enforce exclusivity.">;
 
 def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
-  HelpText<"Diable verification of access markers used to enforce exclusivity.">;
+  HelpText<"Disable verification of access markers used to enforce exclusivity.">;
 
 def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
   HelpText<"Completely disable legacy type layout">;
