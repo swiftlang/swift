@@ -4,7 +4,7 @@ import Swift
 
 class Klass {}
 
-func argumentsAndReturns(@_noImplicitCopy _ x: Klass) -> Klass { // expected-error {{@_noImplicitCopy may only be used on 'var' declarations}}
+func argumentsAndReturns(@_noImplicitCopy _ x: Klass) -> Klass {
     return x
 }
 func letDecls(_ x: Klass) -> () {
@@ -40,12 +40,12 @@ struct MyStruct {
         return getKlass()
     }
 
-    func foo<T>(@_noImplicitCopy _ t: T) { // expected-error {{@_noImplicitCopy may only be used on 'var' declarations}}
+    func foo<T>(@_noImplicitCopy _ t: T) {
     }
 }
 
 struct MyGenericStruct<T> {
-    func foo(@_noImplicitCopy _ t: T) { // expected-error {{@_noImplicitCopy may only be used on 'var' declarations}}
+    func foo(@_noImplicitCopy _ t: T) {
     }
 }
 
@@ -53,7 +53,7 @@ protocol P {
     @_noImplicitCopy var x: Builtin.NativeObject { get } // expected-error {{'@_noImplicitCopy' attribute can only be applied to local lets}}
 }
 
-func foo<T>(@_noImplicitCopy _ t: T) { // expected-error {{@_noImplicitCopy may only be used on 'var' declarations}}
+func foo<T>(@_noImplicitCopy _ t: T) {
 }
 
 // Do not error on class fields. The noImplicitCopy field is separate from the
@@ -67,7 +67,7 @@ class MyClass {
         return getKlass()
     }
 
-    func foo<T>(@_noImplicitCopy _ t: T) { // expected-error {{@_noImplicitCopy may only be used on 'var' declarations}}
+    func foo<T>(@_noImplicitCopy _ t: T) {
     }
 }
 
@@ -83,7 +83,7 @@ class MyGenericClass<T> {
         return nil
     }
 
-    func foo(@_noImplicitCopy _ t: T) { // expected-error {{@_noImplicitCopy may only be used on 'var' declarations}}
+    func foo(@_noImplicitCopy _ t: T) {
     }
 }
 

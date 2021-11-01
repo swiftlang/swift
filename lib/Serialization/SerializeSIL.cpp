@@ -585,9 +585,14 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
                                    SA->getOwnershipKind())::innerty>::type,
                                uint8_t>::value,
                   "Expected an underlying uint8_t type");
+    // This is 31 bits in size.
     unsigned packedMetadata = 0;
-    packedMetadata |= unsigned(SA->getType().getCategory());
-    packedMetadata |= unsigned(SA->getOwnershipKind()) << 8;
+    packedMetadata |= unsigned(SA->getType().getCategory());  // 8 bits
+    packedMetadata |= unsigned(SA->getOwnershipKind()) << 8;  // 8 bits
+    packedMetadata |= unsigned(SA->isNoImplicitCopy()) << 16; // 1 bit
+    // Used: 17 bits. Free: 15.
+    //
+    // TODO: We should be able to shrink the packed metadata of the first two.
     Args.push_back(packedMetadata);
 
     Args.push_back(vId);

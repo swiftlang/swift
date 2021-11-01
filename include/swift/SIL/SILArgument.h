@@ -111,6 +111,8 @@ public:
            node->getKind() <= SILNodeKind::Last_SILArgument;
   }
 
+  bool isNoImplicitCopy() const;
+
   unsigned getIndex() const;
 
   /// Return true if this block argument is actually a phi argument as
@@ -311,11 +313,15 @@ public:
 class SILFunctionArgument : public SILArgument {
   friend class SILBasicBlock;
 
+  bool noImplicitCopy = false;
+
   SILFunctionArgument(SILBasicBlock *parentBlock, SILType type,
                       ValueOwnershipKind ownershipKind,
-                      const ValueDecl *decl = nullptr)
+                      const ValueDecl *decl = nullptr,
+                      bool isNoImplicitCopy = false)
       : SILArgument(ValueKind::SILFunctionArgument, parentBlock, type,
-                    ownershipKind, decl) {}
+                    ownershipKind, decl),
+        noImplicitCopy(isNoImplicitCopy) {}
   // A special constructor, only intended for use in
   // SILBasicBlock::replaceFunctionArg.
   explicit SILFunctionArgument(SILType type, ValueOwnershipKind ownershipKind,
@@ -324,6 +330,10 @@ class SILFunctionArgument : public SILArgument {
   }
 
 public:
+  bool isNoImplicitCopy() const { return noImplicitCopy; }
+
+  void setNoImplicitCopy(bool newValue) { noImplicitCopy = newValue; }
+
   bool isIndirectResult() const;
 
   SILArgumentConvention getArgumentConvention() const;
@@ -363,6 +373,12 @@ inline bool SILArgument::isPhiArgument() const {
     return false;
   }
   llvm_unreachable("Covered switch is not covered?!");
+}
+
+inline bool SILArgument::isNoImplicitCopy() const {
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(this))
+    return fArg->isNoImplicitCopy();
+  return false;
 }
 
 inline bool SILArgument::isTerminatorResult() const {
