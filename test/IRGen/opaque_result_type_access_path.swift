@@ -31,18 +31,18 @@ extension X : P where T : P {
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 func bar() -> some P {
   return 27
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 func foo() -> some P {
   return X(bar())
 }
 
 // CHECK: 27
-if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+if #available(SwiftStdlib 5.1, *) {
 print(foo().get())
 } else {
   print(27)

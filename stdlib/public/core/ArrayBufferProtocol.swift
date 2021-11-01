@@ -49,8 +49,8 @@ where Indices == Range<Int> {
     minimumCapacity: Int
   ) -> _ContiguousArrayBuffer<Element>?
 
-  /// Returns `true` iff this buffer is backed by a uniquely-referenced mutable
-  /// _ContiguousArrayBuffer.
+  /// Returns `true` if this buffer is backed by a uniquely-referenced mutable
+  /// _ContiguousArrayBuffer; otherwise, returns `false`.
   ///
   /// - Note: This function must remain mutating; otherwise the buffer
   ///   may acquire spurious extra references, which will cause

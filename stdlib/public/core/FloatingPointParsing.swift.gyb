@@ -30,8 +30,8 @@ cFuncSuffix2 = {16: 'f16', 32: 'f', 64: 'd', 80: 'ld'}
 
 }%
 
-/// Returns `true` iff isspace(u) would return nonzero when the current
-/// locale is the C locale.
+/// Returns `true` if isspace(u) would return nonzero when the current
+/// locale is the C locale; otherwise, returns false.
 @inlinable // FIXME(sil-serialize-all)
 internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
   return "\t\n\u{b}\u{c}\r ".utf16.contains(u)
@@ -47,7 +47,7 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 % end
 
 %if bits == 16:
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 %end
 extension ${Self}: LosslessStringConvertible {
   /// Creates a new instance from the given string.
@@ -165,7 +165,7 @@ extension ${Self}: LosslessStringConvertible {
   %if bits == 16:
     self.init(Substring(text))
   %else:
-    if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+    if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) { //SwiftStdlib 5.3
       self.init(Substring(text))
     } else {
       self = 0.0
@@ -195,7 +195,7 @@ extension ${Self}: LosslessStringConvertible {
   // In particular, we still have to export
   // _swift_stdlib_strtoXYZ_clocale()
   // as ABI to support old compiled code that still requires it.
-  @available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(SwiftStdlib 5.3, *)
   public init?(_ text: Substring) {
     self = 0.0
     let success = withUnsafeMutablePointer(to: &self) { p -> Bool in

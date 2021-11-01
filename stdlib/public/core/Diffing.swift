@@ -12,7 +12,7 @@
 
 // MARK: Diff application to RangeReplaceableCollection
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 extension CollectionDifference {
   fileprivate func _fastEnumeratedApply(
     _ consume: (Change) throws -> Void
@@ -67,7 +67,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n* + *c*), where *n* is `self.count` and *c* is the
   ///   number of changes contained by the parameter.
-  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  @available(SwiftStdlib 5.1, *)
   public func applying(_ difference: CollectionDifference<Element>) -> Self? {
 
     func append(
@@ -142,7 +142,7 @@ extension BidirectionalCollection {
   /// - Complexity: Worst case performance is O(*n* * *m*), where *n* is the
   ///   count of this collection and *m* is `other.count`. You can expect
   ///   faster execution when the collections share many common elements.
-  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  @available(SwiftStdlib 5.1, *)
   public func difference<C: BidirectionalCollection>(
     from other: C,
     by areEquivalent: (C.Element, Element) -> Bool
@@ -169,7 +169,7 @@ extension BidirectionalCollection where Element: Equatable {
   ///   count of this collection and *m* is `other.count`. You can expect
   ///   faster execution when the collections share many common elements, or
   ///   if `Element` conforms to `Hashable`.
-  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  @available(SwiftStdlib 5.1, *)
   public func difference<C: BidirectionalCollection>(
     from other: C
   ) -> CollectionDifference<Element> where C.Element == Self.Element {
@@ -224,7 +224,7 @@ private struct _V {
   }
 }
 
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(SwiftStdlib 5.1, *)
 private func _myers<C,D>(
   from old: C, to new: D,
   using cmp: (C.Element, D.Element) -> Bool

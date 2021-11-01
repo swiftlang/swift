@@ -915,7 +915,10 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     auto ValueCategory = SILValueCategory(Args[I + 1] & 0xF);
     SILType SILArgTy = getSILType(ArgTy, ValueCategory, Fn);
     if (IsEntry) {
-      Arg = CurrentBB->createFunctionArgument(SILArgTy);
+      auto *fArg = CurrentBB->createFunctionArgument(SILArgTy);
+      bool isNoImplicitCopy = (Args[I + 1] >> 16) & 0x1;
+      fArg->setNoImplicitCopy(isNoImplicitCopy);
+      Arg = fArg;
     } else {
       auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
       Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind);
