@@ -431,9 +431,11 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                              : CTP_DefaultParameter});
 }
 
-bool TypeChecker::typeCheckBinding(
-    Pattern *&pattern, Expr *&initializer, DeclContext *DC,
-    Type patternType, PatternBindingDecl *PBD, unsigned patternNumber) {
+bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
+                                   DeclContext *DC, Type patternType,
+                                   PatternBindingDecl *PBD,
+                                   unsigned patternNumber,
+                                   TypeCheckExprOptions options) {
   SolutionApplicationTarget target =
     PBD ? SolutionApplicationTarget::forInitialization(
             initializer, DC, patternType, PBD, patternNumber,
@@ -442,7 +444,6 @@ bool TypeChecker::typeCheckBinding(
             initializer, DC, patternType, pattern,
             /*bindPatternVarsOneWay=*/false);
 
-  auto options = TypeCheckExprOptions();
   if (DC->getASTContext().LangOpts.CheckAPIAvailabilityOnly &&
       PBD && !DC->getAsDecl()) {
     // Skip checking the initializer for non-public decls when
@@ -491,7 +492,8 @@ bool TypeChecker::typeCheckBinding(
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                           unsigned patternNumber,
-                                          Type patternType) {
+                                          Type patternType,
+                                          TypeCheckExprOptions options) {
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
@@ -520,8 +522,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
     }
   }
 
-  bool hadError = TypeChecker::typeCheckBinding(
-      pattern, init, DC, patternType, PBD, patternNumber);
+  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC, patternType,
+                                                PBD, patternNumber, options);
   if (!init) {
     PBD->setInvalid();
     return true;

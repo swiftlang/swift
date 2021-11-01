@@ -400,7 +400,7 @@ Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
 
 void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-void typeCheckDecl(Decl *D);
+void typeCheckDecl(Decl *D, bool LeaveClosureBodiesUnchecked = false);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
@@ -665,9 +665,11 @@ void coerceParameterListToType(ParameterList *P, AnyFunctionType *FN);
 bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
                       Type patternType,
                       PatternBindingDecl *PBD = nullptr,
-                      unsigned patternNumber = 0);
+                      unsigned patternNumber = 0,
+                      TypeCheckExprOptions options = {});
 bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
-                             Type patternType = Type());
+                             Type patternType = Type(),
+                             TypeCheckExprOptions options = {});
 
 /// Type-check a for-each loop's pattern binding and sequence together.
 ///
