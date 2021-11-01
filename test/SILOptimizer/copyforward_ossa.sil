@@ -7,6 +7,14 @@ import Builtin
 import Swift
 
 class AClass {}
+
+struct NonTrivialStruct {
+  var cls : AClass
+}
+
+sil @get_nontrivialstruct : $@convention(thin) () -> @out NonTrivialStruct
+sil @use_aclass : $@convention(thin) (@in_guaranteed AClass) -> ()
+
 sil @f_in : $@convention(thin) <T> (@in T) -> ()
 sil @f_in_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
 sil @f_out : $@convention(thin) <T> () -> @out T
@@ -846,4 +854,60 @@ bb0(%0 : $*Float, %1 : $Float):
   dealloc_stack %2 : $*Float
   %15 = tuple ()
   return %15 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_dynamic_lifetime : 
+// CHECK: [[STK:%.*]] = alloc_stack [dynamic_lifetime] $NonTrivialStruct
+// CHECK: copy_addr [take] {{.*}} to [initialization] [[STK]] : $*NonTrivialStruct
+// CHECK-LABEL: } // end sil function 'test_dynamic_lifetime'
+sil [ossa] @test_dynamic_lifetime : $@convention(thin) () -> @out NonTrivialStruct {
+bb0(%0 : $*NonTrivialStruct):
+  %1 = alloc_stack $Builtin.Int1
+  %2 = alloc_stack [dynamic_lifetime] $NonTrivialStruct
+  %3 = integer_literal $Builtin.Int1, 0
+  store %3 to [trivial] %1 : $*Builtin.Int1
+  br bb1
+
+bb1:
+  %6 = load [trivial] %1 : $*Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  destroy_addr %2 : $*NonTrivialStruct
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %11 = integer_literal $Builtin.Int1, -1
+  store %11 to [trivial] %1 : $*Builtin.Int1
+  %13 = alloc_stack $NonTrivialStruct
+  %14 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @out NonTrivialStruct
+  %15 = apply %14(%13) : $@convention(thin) () -> @out NonTrivialStruct
+  copy_addr [take] %13 to [initialization] %2 : $*NonTrivialStruct
+  dealloc_stack %13 : $*NonTrivialStruct
+  %18 = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.cls
+  %19 = function_ref @use_aclass : $@convention(thin) (@in_guaranteed AClass) -> ()
+  apply %19(%18) : $@convention(thin) (@in_guaranteed AClass) -> ()
+  cond_br undef, bb5, bb9
+
+bb5:
+  br bb10
+
+bb9:
+  br bb10
+
+bb10:
+  cond_br undef, bb11, bb12
+
+bb11:
+  br bb1
+
+bb12:
+  copy_addr [take] %2 to [initialization] %0 : $*NonTrivialStruct
+  dealloc_stack %2 : $*NonTrivialStruct
+  %33 = tuple ()
+  dealloc_stack %1 : $*Builtin.Int1
+  return %33 : $()
 }
