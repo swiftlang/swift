@@ -1700,6 +1700,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // witness.
   Opts.LazyInitializeProtocolConformances = Triple.isOSBinFormatCOFF();
 
+  // PE/COFF cannot deal with the cross-module reference to the
+  // AsyncFunctionPointer data block.  Force the use of indirect
+  // AsyncFunctionPointer access.
+  Opts.IndirectAsyncFunctionPointer = Triple.isOSBinFormatCOFF();
+
   if (Args.hasArg(OPT_disable_legacy_type_info)) {
     Opts.DisableLegacyTypeInfo = true;
   }
