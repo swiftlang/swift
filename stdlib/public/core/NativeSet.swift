@@ -224,7 +224,9 @@ extension _NativeSet { // ensureUnique
   }
 
   /// Ensure storage of self is uniquely held and can hold at least `capacity`
-  /// elements. Returns true iff contents were rehashed.
+  /// elements.
+  ///
+  /// -Returns: `true` if contents were rehashed; otherwise, `false`.
   @inlinable
   @inline(__always)
   internal mutating func ensureUnique(isUnique: Bool, capacity: Int) -> Bool {

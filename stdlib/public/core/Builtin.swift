@@ -182,8 +182,8 @@ internal func _conditionallyUnreachable() -> Never {
 @_silgen_name("_swift_isClassOrObjCExistentialType")
 internal func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 
-/// Returns `true` iff `T` is a class type or an `@objc` existential such as
-/// `AnyObject`.
+/// Returns `true` if `T` is a class type or an `@objc` existential such as
+/// `AnyObject`; otherwise, returns `false`.
 @inlinable
 @inline(__always)
 internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
@@ -303,8 +303,8 @@ func _uncheckedUnsafeAssume(_ condition: Bool) {
 
 //===--- Runtime shim wrappers --------------------------------------------===//
 
-/// Returns `true` iff the class indicated by `theClass` uses native
-/// Swift reference-counting.
+/// Returns `true` if the class indicated by `theClass` uses native
+/// Swift reference-counting; otherwise, returns `false`.
 #if _runtime(_ObjC)
 // Declare it here instead of RuntimeShims.h, because we need to specify
 // the type of argument to be AnyClass. This is currently not possible
