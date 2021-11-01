@@ -3210,6 +3210,8 @@ ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
 ProtocolCompositionType *
 ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
                                bool HasExplicitAnyObject) {
+  assert(Members.size() != 1 || HasExplicitAnyObject);
+
   // Check to see if we've already seen this protocol composition before.
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;

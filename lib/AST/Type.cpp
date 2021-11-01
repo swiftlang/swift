@@ -3712,6 +3712,16 @@ bool ProtocolCompositionType::requiresClass() {
 Type ProtocolCompositionType::get(const ASTContext &C,
                                   ArrayRef<Type> Members,
                                   bool HasExplicitAnyObject) {
+  // Fast path for 'AnyObject' and 'Any'.
+  if (Members.empty()) {
+    return build(C, Members, HasExplicitAnyObject);
+  }
+
+  // If there's a single member and no layout constraint, return that type.
+  if (Members.size() == 1 && !HasExplicitAnyObject) {
+    return Members.front();
+  }
+
   for (Type t : Members) {
     if (!t->isCanonical())
       return build(C, Members, HasExplicitAnyObject);
@@ -3730,11 +3740,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   if (Superclass)
     HasExplicitAnyObject = false;
 
-  // If one protocol remains with no further constraints, its nominal
-  // type is the canonical type.
-  if (Protocols.size() == 1 && !Superclass && !HasExplicitAnyObject)
-    return Protocols.front()->getDeclaredInterfaceType();
-
   // Form the set of canonical protocol types from the protocol
   // declarations, and use that to build the canonical composition type.
   SmallVector<Type, 4> CanTypes;
@@ -3743,6 +3748,10 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   llvm::transform(
       Protocols, std::back_inserter(CanTypes),
       [](ProtocolDecl *Proto) { return Proto->getDeclaredInterfaceType(); });
+
+  // If one member remains and no layout constraint, return that type.
+  if (CanTypes.size() == 1 && !HasExplicitAnyObject)
+    return CanTypes.front();
 
   // TODO: Canonicalize away HasExplicitAnyObject if it is implied
   // by one of our member protocols.
