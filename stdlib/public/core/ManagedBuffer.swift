@@ -91,47 +91,26 @@ extension ManagedBuffer {
       firstElementAddress
     return realCapacity
   }
-  
-  /// Renamed to firstElementPointer for API.
-  @inlinable
-  internal final var firstElementAddress: UnsafeMutablePoiner<Element> { firstElementPointer }
 
-  /// A pointer to the first element in the buffer.
-  ///
-  /// This pointer is fixed for the lifetime of the `ManagedBuffer` object.
   @inlinable
-  @available(swift 6.0)
-  public final var firstElementPointer: UnsafeMutablePointer<Element> {
+  internal final var firstElementAddress: UnsafeMutablePointer<Element> {
     return UnsafeMutablePointer(
       Builtin.projectTailElems(self, Element.self))
   }
-  
-  /// A pointer to the elements of the buffer.
-  ///
-  /// This pointer is fixed for the lifetime of the `ManagedBuffer` object.
-  @inlinable
-  @available(OpenBSD, unavailable, message: "Use firstElementPointer and capacity provided at creation")
-  public final var elements: UnsafeMutableBufferPointer<Element> {
-    return UnsafeMutableBufferPointer(start: firstElementAddress, count: capacity)
-  }
 
-  /// Renamed to headerPointer for API.
-  @inlineable
-  internal final var headerAddress: UnsafeMutablePointer<Header> { headerPointer }
-  
-  /// A pointer to the buffer’s stored `Header`.
-  ///
-  /// This pointer is fixed for the lifetime of the `ManagedBuffer` object.
   @inlinable
-  @available(swift 6.0)
-  public final var headerPointer: UnsafeMutablePointer<Header> {
+  internal final var headerAddress: UnsafeMutablePointer<Header> {
     return UnsafeMutablePointer<Header>(Builtin.addressof(&header))
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
   /// `Header`.
+  ///
+  /// - Note: This pointer is fixed when the buffer is created, but it is only valid
+  ///   for the lifetime of the buffer. The buffer is guaranteed to live for the
+  ///   duration of the call to `body`, but may be deallocated immediately thereafter
+  ///   if its lifetime is not otherwise extended.
   @inlinable
-  @deprecated(swift 6.0, message: "Use headerPointer")
   public final func withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
   ) rethrows -> R {
@@ -140,8 +119,12 @@ extension ManagedBuffer {
 
   /// Call `body` with an `UnsafeMutablePointer` to the `Element`
   /// storage.
+  ///
+  /// - Note: This pointer is fixed when the buffer is created, but it is only valid
+  ///   for the lifetime of the buffer. The buffer is guaranteed to live for the
+  ///   duration of the call to `body`, but may be deallocated immediately thereafter
+  ///   if its lifetime is not otherwise extended.
   @inlinable
-  @deprecated(swift 6.0, message: "Use elements or firstElementPointer")
   public final func withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
@@ -150,8 +133,12 @@ extension ManagedBuffer {
 
   /// Call `body` with `UnsafeMutablePointer`s to the stored `Header`
   /// and raw `Element` storage.
+  ///
+  /// - Note: These pointers are fixed when the buffer is created, but it is only valid
+  ///   for the lifetime of the buffer. The buffer is guaranteed to live for the
+  ///   duration of the call to `body`, but may be deallocated immediately thereafter
+  ///   if its lifetime is not otherwise extended.
   @inlinable
-  @deprecated(swift 6.0, message: "Use headerPointer and elements or firstElementPointer")
   public final func withUnsafeMutablePointers<R>(
     _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
