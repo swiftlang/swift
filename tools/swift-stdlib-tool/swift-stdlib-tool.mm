@@ -637,20 +637,6 @@ void process(NSString *path, void(^dylibVisitor)(NSString *),
 }
 
 
-@implementation NSString (sst)
--(NSString *)sst_stringByAppendingPathComponents:(NSArray *)components
-{
-    NSString *result = self;
-    @autoreleasepool {
-        for (NSString *component in components) {
-            result = [result stringByAppendingPathComponent:component];
-        }
-        [result retain];
-    }
-    return [result autorelease];
-}
-@end
-
 @implementation NSTask (sst)
 -(NSString *)sst_command {
     NSMutableString *command = [self.launchPath mutableCopy];
@@ -985,10 +971,22 @@ int main(int argc, const char *argv[])
             // Use platform to set src_dirs relative to us.
             NSString *root_path = [[self_executable stringByDeletingLastPathComponent]
                                     stringByDeletingLastPathComponent];
-            src_dirs = [@[
-                [root_path sst_stringByAppendingPathComponents: @[ @"lib", @"swift-5.0", platform ]],
-                [root_path sst_stringByAppendingPathComponents: @[ @"lib", @"swift-5.5", platform ]],
-            ] mutableCopy];
+            NSURL *root_url = [[NSURL fileURLWithPath:root_path isDirectory:YES]
+                               URLByAppendingPathComponent:@"lib"];
+            NSArray<NSURL *> *URLs = [
+                fm contentsOfDirectoryAtURL:root_url
+                 includingPropertiesForKeys:@[NSURLNameKey, NSURLIsDirectoryKey]
+                                    options:NSDirectoryEnumerationSkipsHiddenFiles error:nil];
+
+            for (NSURL *URL in URLs) {
+                if ([URL.lastPathComponent hasPrefix:@"swift-"]) {
+                    [src_dirs addObject:[[URL URLByAppendingPathComponent:platform] path]];
+                }
+            }
+
+            if (![src_dirs count]) {
+                fail("Couldn't discover Swift library directories in: %s", root_path.fileSystemRepresentation);
+            }
         } else if (!platform) {
             // src_dirs is set but platform is not.
             // Pick platform from any src_dirs' name.
