@@ -19,6 +19,8 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
@@ -26,10 +28,10 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -958,7 +960,7 @@ void BridgedReturn::outline(SILFunction *Fun, ApplyInst *NewOutlinedCall) {
   if (deBlocks) {
     deBlocks->updateForNewBlock(NewTailBB);
   }
-	auto Loc = switchInfo.SwitchEnum->getLoc();
+  auto Loc = switchInfo.SwitchEnum->getLoc();
 
   {
     SILBuilder Builder(StartBB);
@@ -1062,7 +1064,12 @@ ObjCMethodCall::outline(SILModule &M) {
     for (auto Arg : BridgedCall->getArguments()) {
       if (BridgedArgIdx < BridgedArguments.size() &&
           BridgedArguments[BridgedArgIdx].Idx == OrigSigIdx) {
-        Args.push_back(BridgedArguments[BridgedArgIdx].bridgedValue());
+        auto bridgedArgValue = BridgedArguments[BridgedArgIdx].bridgedValue();
+        if (bridgedArgValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
+          bridgedArgValue = makeGuaranteedValueAvailable(
+              bridgedArgValue, BridgedCall, *deBlocks);
+        }
+        Args.push_back(bridgedArgValue);
         ++BridgedArgIdx;
       } else {
         // Otherwise, use the original type convention.
@@ -1299,8 +1306,8 @@ public:
 /// functions.
 bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
                 SmallVectorImpl<SILFunction *> &FunctionsAdded,
-                InstModCallbacks callbacks,
-                DeadEndBlocks *deBlocks) {
+                InstModCallbacks callbacks = InstModCallbacks(),
+                DeadEndBlocks *deBlocks = nullptr) {
   BasicBlockWorklist Worklist(Fun->getEntryBlock());
   OutlinePatterns patterns(FuncBuilder, callbacks, deBlocks);
   bool changed = false;
@@ -1346,7 +1353,6 @@ public:
     if (!Fun->optimizeForSize())
       return;
 
-
     // Dump function if requested.
     if (DumpFuncsBeforeOutliner.size() &&
         Fun->getName().contains(DumpFuncsBeforeOutliner)) {
@@ -1363,7 +1369,8 @@ public:
     bool Changed = false;
 
     if (Fun->hasOwnership()) {
-      Changed = tryOutline(FuncBuilder, Fun, FunctionsAdded, callbacks, deBlocks);
+      Changed =
+          tryOutline(FuncBuilder, Fun, FunctionsAdded, callbacks, deBlocks);
     } else {
       Changed = tryOutline(FuncBuilder, Fun, FunctionsAdded);
     }
