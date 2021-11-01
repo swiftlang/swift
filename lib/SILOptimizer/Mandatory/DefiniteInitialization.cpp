@@ -29,6 +29,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -1148,8 +1149,11 @@ static void replaceValueMetatypeInstWithMetatypeArgument(
         valueMetatype->getLoc(), metatypeArgument,
         valueMetatype->getType());
   }
-  InstModCallbacks callbacks;
-  replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument, callbacks);
+  InstructionDeleter deleter;
+  DeadEndBlocks deBlocks(valueMetatype->getFunction());
+  OwnershipFixupContext ctx{deleter, deBlocks};
+  OwnershipRAUWHelper helper(ctx, valueMetatype, metatypeArgument);
+  helper.perform();
 }
 
 void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {

@@ -145,7 +145,7 @@ public:
 /// meant to be composed with.
 struct OwnershipFixupContext {
   Optional<InstModCallbacks> inlineCallbacks;
-  InstModCallbacks &callbacks;
+  InstructionDeleter &deleter;
   DeadEndBlocks &deBlocks;
 
   // Cache the use-points for the lifetime of an inner guaranteed value (which
@@ -181,8 +181,10 @@ struct OwnershipFixupContext {
   };
   AddressFixupContext extraAddressFixupInfo;
 
-  OwnershipFixupContext(InstModCallbacks &callbacks, DeadEndBlocks &deBlocks)
-      : callbacks(callbacks), deBlocks(deBlocks) {}
+  OwnershipFixupContext(InstructionDeleter &deleter, DeadEndBlocks &deBlocks)
+      : deleter(deleter), deBlocks(deBlocks) {}
+
+  InstModCallbacks &getCallbacks() { return deleter.getCallbacks(); }
 
   void clear() {
     guaranteedUsePoints.clear();
@@ -272,8 +274,7 @@ public:
   ///
   /// Precondition: \p replacementValue is either invalid or has the same type
   /// as \p oldValue and is a valid OSSA replacement.
-  SILBasicBlock::iterator
-  perform(SILValue replacementValue = SILValue());
+  void perform(SILValue replacementValue = SILValue());
 
 private:
   void invalidate() {
@@ -315,8 +316,8 @@ public:
   operator bool() const { return isValid(); }
   bool isValid() const { return bool(ctx) && bool(use) && bool(newValue); }
 
-  /// Perform the actual RAUW.
-  SILBasicBlock::iterator perform();
+  /// Perform the actual replacement.
+  void perform();
 
 private:
   void invalidate() {

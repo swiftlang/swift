@@ -34,6 +34,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_UPDATINGINSTRUCTIONITERATOR_H
 #define SWIFT_SILOPTIMIZER_UTILS_UPDATINGINSTRUCTIONITERATOR_H
 
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -104,6 +105,8 @@ public:
       const UpdatingListIterator<OtherIteratorBase, !IsReverse, Registry> &rhs)
       : UpdatingListIterator(IteratorBase(rhs.base)) {}
 
+  operator IteratorBase() const { return base; }
+
   /// This returns nullptr for deleted instructions.
   value_type operator*() const { return isDeleted ? nullptr : &*base; }
 
@@ -172,9 +175,12 @@ class UpdatingInstructionIteratorRegistry {
   InstModCallbacks callbacks;
 
 public:
-  UpdatingInstructionIteratorRegistry(
-      InstModCallbacks chainedCallbacks = InstModCallbacks()) {
-    rechainCallbacks(chainedCallbacks);
+  UpdatingInstructionIteratorRegistry() {
+    InstModCallbacks dummyCallbacks;
+    rechainCallbacks(std::move(dummyCallbacks));
+  }
+  UpdatingInstructionIteratorRegistry(InstModCallbacks &&chainedCallbacks) {
+    rechainCallbacks(std::move(chainedCallbacks));
   }
 
   // The callbacks capture 'this'. So copying is invalid.
@@ -186,27 +192,36 @@ public:
 
   InstModCallbacks &getCallbacks() { return callbacks; }
 
-  void rechainCallbacks(InstModCallbacks chainedCallbacks) {
+  void rechainCallbacks(InstModCallbacks &&chainedCallbacks) {
     // Copy the two std::functions that we need. The rest of the callbacks are
     // copied implicitly by assignment.
     auto chainedDelete = chainedCallbacks.deleteInstFunc;
+    if (chainedDelete) {
+      callbacks = chainedCallbacks.onDelete(
+          [this, chainedDelete](SILInstruction *toDelete) {
+            notifyDelete(toDelete);
+            chainedDelete(toDelete);
+          });
+    } else {
+      callbacks = chainedCallbacks.onDelete(
+          [this, chainedDelete](SILInstruction *toDelete) {
+            notifyDelete(toDelete);
+            toDelete->eraseFromParent();
+          });
+    }
     auto chainedNew = chainedCallbacks.createdNewInstFunc;
-    callbacks = chainedCallbacks
-                    .onDelete([this, chainedDelete](SILInstruction *toDelete) {
-                      notifyDelete(toDelete);
-                      if (chainedDelete) {
-                        chainedDelete(toDelete);
-                        return;
-                      }
-                      toDelete->eraseFromParent();
-                    })
-                    .onCreateNewInst(
-                        [this, chainedNew](SILInstruction *newlyCreatedInst) {
-                          notifyNew(newlyCreatedInst);
-                          if (chainedNew) {
-                            chainedNew(newlyCreatedInst);
-                          }
-                        });
+    if (chainedNew) {
+      callbacks = callbacks.onCreateNewInst(
+          [this, chainedNew](SILInstruction *newlyCreatedInst) {
+            notifyNew(newlyCreatedInst);
+            chainedNew(newlyCreatedInst);
+          });
+    } else {
+      callbacks = callbacks.onCreateNewInst(
+          [this, chainedNew](SILInstruction *newlyCreatedInst) {
+            notifyNew(newlyCreatedInst);
+          });
+    }
   }
 
   void registerIterator(UpdatingInstructionIterator *i) {

@@ -67,6 +67,11 @@ template <typename VectorT = std::vector<SILInstruction *>,
 class SILInstructionWorklist : SILInstructionWorklistBase {
   BlotSetVector<SILInstruction *, VectorT, MapT> worklist;
 
+  /// Record changes made since the last call to resetChecked(). This includes
+  /// SIL modification made via the SILInstructionWorklist interface and
+  /// modifications that invoked a callback to update the worklist.
+  bool madeChange = false;
+
   /// For invoking Swift instruction passes in libswift.
   LibswiftPassInvocation *libswiftPassInvocation = nullptr;
 
@@ -77,6 +82,29 @@ public:
   SILInstructionWorklist(const char *loggingName = "InstructionWorklist")
       : SILInstructionWorklistBase(loggingName) {}
 
+  InstModCallbacks createCallbacks() {
+    // Note: Do not register an onDelete callback. That should only be used for
+    // the InstructionDeleter's iterator invalidation. Local deleters need to be
+    // able to chain their onDelete callbacks, while dropping all the
+    // worklist-related callbacks.
+    return InstModCallbacks()
+        .onNotifyWillBeDeleted([this](SILInstruction *instThatWillBeDeleted) {
+          madeChange = true;
+          addOperandsToWorklist(*instThatWillBeDeleted);
+        })
+        .onCreateNewInst([this](SILInstruction *newlyCreatedInst) {
+          madeChange = true;
+          add(newlyCreatedInst);
+          addUsersOfAllResultsToWorklist(newlyCreatedInst);
+        })
+        .onNotifyWillReplaceUses([this](SILValue oldValue, SILValue newValue) {
+          madeChange = true;
+          if (size() < 10000) {
+            addUsersToWorklist(oldValue);
+          }
+        });
+  }
+
   void setLibswiftPassInvocation(LibswiftPassInvocation *invocation) {
     libswiftPassInvocation = invocation;
   }
@@ -86,6 +114,12 @@ public:
 
   /// Returns the number of elements in the worklist.
   unsigned size() const { return worklist.size(); }
+
+  /// Return true if instructions have been modified since the last call to
+  /// resetChecked(). This includes SIL modification made via the
+  /// SILInstructionWorklist interface and modifications that invoked a callback
+  /// to update the worklist.
+  bool changed() const { return madeChange; }
 
   /// Add the specified instruction to the worklist if it isn't already in it.
   void add(SILInstruction *instruction) {
@@ -125,7 +159,14 @@ public:
 
   /// Remove the top element from the worklist.
   SILInstruction *pop_back_val() {
-    return worklist.pop_back_val().getValueOr(nullptr);
+    while (auto *inst = worklist.pop_back_val().getValueOr(nullptr)) {
+      if (!inst->isDeleted())
+        return inst;
+
+      if (worklist.empty())
+        break;
+    }
+    return nullptr;
   }
 
   /// When an instruction has been simplified, add all of its users to the
@@ -179,6 +220,8 @@ public:
 
     // Do an explicit clear, shrinking the storage if needed.
     worklist.clear();
+
+    madeChange = false;
   }
 
   /// Find usages of \p instruction and replace them with usages of \p result.
@@ -200,6 +243,8 @@ public:
                                          std::string instructionDescription
 #endif
   ) {
+    madeChange = true;
+
     if (result == instruction) {
 #ifndef NDEBUG
       withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
@@ -245,6 +290,8 @@ public:
   // parent block. Add newInstruction to the worklist.
   SILInstruction *insertNewInstBefore(SILInstruction *newInstruction,
                                       SILInstruction &old) {
+    madeChange = true;
+
     assert(newInstruction && newInstruction->getParent() == nullptr &&
            "newInstruction instruction already inserted into a basic block!");
     SILBasicBlock *block = old.getParent();
@@ -259,6 +306,8 @@ public:
   // new value.
   void replaceInstUsesWith(SingleValueInstruction &instruction,
                            ValueBase *value) {
+    madeChange = true;
+
     addUsersToWorklist(&instruction); // Add all modified instrs to worklist.
 
     withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
@@ -275,6 +324,8 @@ public:
   // uses of oldValue to the worklist, replace all uses of oldValue
   // with newValue.
   void replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
+    madeChange = true;
+
     addUsersToWorklist(oldValue); // Add all modified instrs to worklist.
 
     withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
@@ -287,6 +338,8 @@ public:
   }
 
   void replaceInstUsesPairwiseWith(SILInstruction *oldI, SILInstruction *newI) {
+    madeChange = true;
+
     withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
       stream << loggingName << ": Replacing " << *oldI << '\n'
              << "  "
@@ -304,12 +357,14 @@ public:
     }
   }
 
-  // Some instructions can never be "trivially dead" due to side effects or
-  // producing a void value. In those cases, visit methods should use this
-  // method to delete the given instruction.
+  // TODO: Remove this API. Users should be rewritten to use
+  // InstrutionDeleter. Otherwise, any deleter alive while the worklist is
+  // processed can have invalid iterators. And any dead code exposed by this
+  // deletion may not be cleanup up.
   void eraseInstFromFunction(SILInstruction &instruction,
-                             SILBasicBlock::iterator &iterator,
                              bool addOperandsToWorklist = true) {
+    madeChange = true;
+
     // Try to salvage debug info first.
     swift::salvageDebugInfo(&instruction);
     // Then delete old debug users.
@@ -317,26 +372,21 @@ public:
       while (!result->use_empty()) {
         auto *user = result->use_begin()->getUser();
         assert(user->isDebugInstruction());
-        if (iterator == user->getIterator())
-          ++iterator;
         erase(user);
         user->eraseFromParent();
       }
     }
-    if (iterator == instruction.getIterator())
-      ++iterator;
-
     eraseSingleInstFromFunction(instruction, addOperandsToWorklist);
   }
 
-  void eraseInstFromFunction(SILInstruction &instruction,
-                             bool addOperandsToWorklist = true) {
-    SILBasicBlock::iterator nullIter;
-    return eraseInstFromFunction(instruction, nullIter, addOperandsToWorklist);
-  }
-
+  // TODO: Remove this API. Users should be rewritten to use
+  // InstrutionDeleter. Otherwise, any deleter alive while the worklist is
+  // processed can have invalid iterators. And any dead code exposed by this
+  // deletion may not be cleanup up.
   void eraseSingleInstFromFunction(SILInstruction &instruction,
                                    bool shouldAddOperandsToWorklist) {
+    madeChange = true;
+
     withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
       stream << loggingName << ": ERASE " << instruction << '\n';
     });

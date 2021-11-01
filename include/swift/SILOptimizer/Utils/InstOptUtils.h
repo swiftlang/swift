@@ -140,6 +140,27 @@ void collectUsesOfValue(SILValue V,
 /// value itself)
 void eraseUsesOfValue(SILValue value);
 
+/// Fix OSSA lifetime before dropping \p operand.
+///
+/// Return the new destroy_value or end_borrow, or nullptr.
+SILInstruction *dropOSSAOperand(Operand *operand);
+
+/// Fix OSSA lifetime for lifetime-ending operands before dropping all operands
+/// of \p inst.
+///
+/// Invoke callbacks.createdNewInst for any new destroy_values or end_borrows.
+void dropOSSAOperands(SILInstruction *inst, InstModCallbacks &callbacks);
+
+/// Fix OSSA lifetime before replacing \p operand with \p newValue.
+///
+/// Skip replacement if \p operand is used by a scope-ending instruction.
+///
+/// Return the new destroy_value or end_borrow, or nullptr.
+///
+/// The caller must ensure the OSSA lifetime of \p newValue will be valid after
+/// replacement.
+SILInstruction *replaceOSSAOperand(Operand *operand, SILValue newValue);
+
 /// Gets the concrete value which is stored in an existential box.
 /// Returns %value in following pattern:
 ///
@@ -489,56 +510,9 @@ FullApplySite cloneFullApplySiteReplacingCallee(FullApplySite applySite,
                                                 SILValue newCallee,
                                                 SILBuilderContext &builderCtx);
 
-/// Replace all uses of \p oldValue with \p newValue, notifying the callbacks
-/// of new uses and when end-of-scope instructions are deleted.
-SILBasicBlock::iterator replaceAllUses(SILValue oldValue, SILValue newValue,
-                                       SILBasicBlock::iterator nextii,
-                                       InstModCallbacks &callbacks);
-
-/// This is a low level routine that makes all uses of \p svi use of \p
-/// newValue (ignoring end scope markers) and then deletes \p svi and all end
-/// scope markers. Then returns the next inst to process.
-SILBasicBlock::iterator replaceAllUsesAndErase(SingleValueInstruction *svi,
-                                               SILValue newValue,
-                                               InstModCallbacks &callbacks);
-
-/// This is a low level routine that makes all uses of \p mvi use of \p
-/// newValues (ignoring end scope markers) and then deletes \p mvi and all end
-/// scope markers. Then returns the next inst to process.
-SILBasicBlock::iterator replaceAllUsesAndErase(MultipleValueInstruction *mvi,
-                                               ArrayRef<SILValue> newValues,
-                                               InstModCallbacks &callbacks);
-
-/// Replace all uses of \p oldValue with \p newValue, delete the instruction
-/// that defines \p oldValue, and notify the callbacks of new uses and when
-/// the defining instruction and its end-of-scope instructions are deleted.
-///
-/// Precondition: \p oldValue must be a SingleValueInstruction or a terminator
-/// result. \p oldValue must be the only result with remaining uses. For
-/// terminators with multiple results, remove all other results for, e.g. via
-/// replaceAllUsesWithUndef().
-///
-/// If \p oldValue is a terminator result, a new branch instruction is inserted
-/// in place of the old terminator and all basic block successors become
-/// unreachable except for the successor containing the replaced result.
-SILBasicBlock::iterator replaceAllUsesAndErase(SILValue oldValue,
-                                               SILValue newValue,
-                                               InstModCallbacks &callbacks);
-
-/// This API is equivalent to performing \p use->set(\p newValue) except that:
-///
-/// 1. If the user of \p use is an end scope, this API no-opts. This API is only
-///    used in contexts where we are rewriting uses and are not interesting in
-///    end scope instructions since we are moving uses from one scope to another
-///    scope.
-///
-/// 2. If the user of \p use is not an end scope, but is a lifetime ending use
-///    of \p use->get(), we insert a destroy_value|end_borrow as appropriate on
-///    \p use->get() to ensure \p use->get()'s lifetime is still ended. We
-///    assume that if \p use->getUser() is lifetime ending, that our caller has
-///    ensured that we can end \p newValue's lifetime.
-SILBasicBlock::iterator replaceSingleUse(Operand *use, SILValue newValue,
-                                         InstModCallbacks &callbacks);
+/// Replace all non-scope-ending uses of \p oldValue with \p newValue.
+void replaceAllUses(SILValue oldValue, SILValue newValue,
+                    InstructionDeleter &deleter);
 
 /// Creates a copy of \p value and inserts additional control equivalent copy
 /// and destroy at leaking blocks to adjust ownership and make available for use

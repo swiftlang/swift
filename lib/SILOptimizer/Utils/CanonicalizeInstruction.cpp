@@ -41,58 +41,43 @@ STATISTIC(NumSimplified, "Number of instructions simplified");
 #undef DEBUG_TYPE
 #define DEBUG_TYPE pass.debugType
 
-// Vtable anchor.
-CanonicalizeInstruction::~CanonicalizeInstruction() {}
-
 // Helper to delete an instruction, or mark it for deletion.
 //
-// Return an iterator to the next non-deleted instruction. The incoming iterator
-// may already have advanced beyond 'inst'.
-static SILBasicBlock::iterator killInstruction(SILInstruction *inst,
-                                               SILBasicBlock::iterator nextII,
-                                               CanonicalizeInstruction &pass) {
-  if (nextII == inst->getIterator())
-    ++nextII;
-  pass.killInstruction(inst);
-  return nextII;
-}
-
-// Helper to delete, or mark for deletion, an instruction with potential debug
-// or end of scope uses. All "real" uses must already be removed.
+// \p inst may not have any remaining users except for incidental uses,
+// including debug_value, end_borrow. It may also have destroy_value, which is
+// effectively an incidental use even though it is not yet explicitly recognized
+// as such.
 //
-// fix_lifetime uses are not currently handled here. They are generally
+// FIXME: fix_lifetime uses are not currently handled here. They are generally
 // (incorrectly) treated as "incidental" uses, but no canonicalizations need
 // them yet.
-static SILBasicBlock::iterator
-killInstAndIncidentalUses(SingleValueInstruction *inst,
-                          SILBasicBlock::iterator nextII,
-                          CanonicalizeInstruction &pass) {
-  while (!inst->use_empty()) {
-    auto *user = inst->use_begin()->getUser();
-    assert(user->isDebugInstruction() || isEndOfScopeMarker(user));
-    nextII = killInstruction(user, nextII, pass);
-  }
-  return killInstruction(inst, nextII, pass);
+static void killInstruction(SILInstruction *inst,
+                            CanonicalizeInstruction &pass) {
+  pass.deleter.forceDelete(inst);
 }
 
 //===----------------------------------------------------------------------===//
 //                          Instruction Simplification
 //===----------------------------------------------------------------------===//
 
-// If simplification is successful, return a valid iterator to the next
-// intruction that wasn't erased.
-static Optional<SILBasicBlock::iterator>
-simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
-  // Erase the simplified instruction and any instructions that end its
-  // scope. Nothing needs to be added to the worklist except for Result,
-  // because the instruction and all non-replaced users will be deleted.
-  pass.callbacks.resetHadCallbackInvocation();
-  auto result = simplifyAndReplaceAllSimplifiedUsesAndErase(
-      inst, pass.callbacks, &pass.deadEndBlocks);
-  if (!pass.callbacks.hadCallbackInvocation())
-    return None;
-
-  return result;
+// Erases the simplified instruction and any instructions that end its
+// scope. Nothing needs to be added to the worklist except for Result,
+// because the instruction and all non-replaced users will be deleted.
+//
+// Return true if simplification is successful. \p inst may be deleted.
+static bool simplifyAndReplace(SILInstruction *inst,
+                               CanonicalizeInstruction &pass) {
+#ifndef NDEBUG
+  std::string instDesc;
+  LLVM_DEBUG(llvm::raw_string_ostream ss(instDesc); ss << *inst);
+#endif
+  if (simplifyAndReplaceAllSimplifiedUsesAndErase(inst, pass.deleter,
+                                                  &pass.deadEndBlocks)) {
+    LLVM_DEBUG(llvm::dbgs() << "simplified " << instDesc);
+    ++NumSimplified;
+    return true;
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -146,13 +131,8 @@ static void replaceUsesOfExtract(SingleValueInstruction *extract,
 // (load (struct_element_addr %base, #field)
 //
 // TODO: Consider handling LoadBorrowInst.
-static SILBasicBlock::iterator
-splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
-  // Keep track of the next iterator after any newly added or to-be-deleted
-  // instructions. This must be valid regardless of whether the pass immediately
-  // deletes the instructions or simply records them for later deletion.
-  auto nextII = std::next(loadInst->getIterator());
-
+static bool splitAggregateLoad(LoadOperation loadInst,
+                               CanonicalizeInstruction &pass) {
   bool needsBorrow;
   if (auto qual = loadInst.getOwnershipQualifier()) {
     switch (*qual) {
@@ -168,7 +148,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
       // for any fields that aren't already extracted. This would be
       // out-of-place for this transform, and I'm not sure if this a case that
       // needs to be handled in CanonicalizeInstruction.
-      return nextII;
+      return false;
     }
   } else {
     // If we don't have a qual, we have a borrow.
@@ -198,12 +178,12 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
       }
       auto *borrow = dyn_cast<BeginBorrowInst>(user);
       if (!borrow)
-        return nextII;
+        return false;
 
       // The transformation below also assumes a single borrow use.
       auto *borrowedOper = borrow->getSingleNonEndingUse();
       if (!borrowedOper)
-        return nextII;
+        return false;
 
       borrows.push_back(borrow);
       user = borrowedOper->getUser();
@@ -217,7 +197,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
 
     // If we have any non SEI, TEI instruction, don't do anything here.
     if (!isa<StructExtractInst>(user) && !isa<TupleExtractInst>(user))
-      return nextII;
+      return false;
 
     auto extract = cast<SingleValueInstruction>(user);
     projections.push_back({Projection(extract), extract});
@@ -251,7 +231,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
   // TODO: This logic subtly anticipates SILGen behavior. In the future, change
   // SILGen to avoid emitting the full load and never delete loads in Raw SIL.
   if (projections.empty() && loadInst->getModule().getStage() == SILStage::Raw)
-    return nextII;
+    return false;
 
   // Create a new address projection instruction and load instruction for each
   // unique projection.
@@ -265,7 +245,7 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
     // replace all uses of the projection with the load we created previously.
     if (lastProj && proj == *lastProj) {
       replaceUsesOfExtract(extract, *lastNewLoad, pass);
-      nextII = killInstruction(extract, nextII, pass);
+      killInstruction(extract, pass);
       continue;
     }
 
@@ -318,18 +298,19 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
       }
     }
     replaceUsesOfExtract(extract, *lastNewLoad, pass);
-    nextII = killInstruction(extract, nextII, pass);
+    killInstruction(extract, pass);
   }
 
   // Remove the now unused borrows.
   for (auto *borrow : borrows)
-    nextII = killInstAndIncidentalUses(borrow, nextII, pass);
+    killInstruction(borrow, pass);
 
   // Erase the old load.
   for (auto *destroy : lifetimeEndingInsts)
-    nextII = killInstruction(destroy, nextII, pass);
+    killInstruction(destroy, pass);
 
-  return killInstAndIncidentalUses(*loadInst, nextII, pass);
+  killInstruction(*loadInst, pass);
+  return true;
 }
 
 // Given a store within a single property struct, recursively form the parent
@@ -343,13 +324,8 @@ splitAggregateLoad(LoadOperation loadInst, CanonicalizeInstruction &pass) {
 // support in `createAggFromFirstLevelProjections`.
 // Note: we will not be able to support tuples because we cannot have a
 // single-element tuple.
-static SILBasicBlock::iterator
-broadenSingleElementStores(StoreInst *storeInst,
-                           CanonicalizeInstruction &pass) {
-  // Keep track of the next iterator after any newly added or to-be-deleted
-  // instructions. This must be valid regardless of whether the pass immediately
-  // deletes the instructions or simply records them for later deletion.
-  auto nextII = std::next(storeInst->getIterator());
+static bool broadenSingleElementStores(StoreInst *storeInst,
+                                       CanonicalizeInstruction &pass) {
   auto *f = storeInst->getFunction();
 
   ProjectionPath projections(storeInst->getDest()->getType());
@@ -381,7 +357,7 @@ broadenSingleElementStores(StoreInst *storeInst,
 
   // If we couldn't create a projection, bail.
   if (projections.empty())
-    return nextII;
+    return false;
 
   // Now work our way back up. At this point we know all operations we are going
   // to do succeed (cast<SingleValueInst>, createAggFromFirstLevelProjections,
@@ -403,7 +379,8 @@ broadenSingleElementStores(StoreInst *storeInst,
                       storeInst->getOwnershipQualifier());
 
   // Erase the original store.
-  return killInstruction(storeInst, nextII, pass);
+  killInstruction(storeInst, pass);
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -419,13 +396,11 @@ broadenSingleElementStores(StoreInst *storeInst,
 /// copy. The only way to guarantee the lifetime of a variable is to use a
 /// borrow scope--copy/destroy is insufficient by itself.
 ///
-/// FIXME: Technically this should be guarded by a compiler flag like
-/// -enable-copy-propagation until SILGen protects scoped variables by borrow
-/// scopes.
-static SILBasicBlock::iterator
-eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
-  auto next = std::next(cvi->getIterator());
-
+/// FIXME: This assumes that destroy_value cannot observe side effects.  It
+/// should be guarded by a compiler flag like -enable-copy-propagation until
+/// SILGen protects scoped variables by lexical borrow scopes.
+static bool eliminateSimpleCopies(CopyValueInst *cvi,
+                                  CanonicalizeInstruction &pass) {
   // Eliminate copies that only have destroy_value uses.
   SmallVector<DestroyValueInst *, 8> destroys;
   for (auto *use : getNonDebugUses(cvi)) {
@@ -433,27 +408,25 @@ eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
       destroys.push_back(dvi);
       continue;
     }
-    return next;
+    return false;
   }
 
   while (!destroys.empty()) {
-    next = killInstruction(destroys.pop_back_val(), next, pass);
+    killInstruction(destroys.pop_back_val(), pass);
   }
 
-  next = killInstAndIncidentalUses(cvi, next, pass);
-  return next;
+  killInstruction(cvi, pass);
+  return true;
 }
 
 /// Unlike dead copy elimination, dead borrows can be safely removed because the
 /// semantics of a borrow scope
-static SILBasicBlock::iterator
-eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
-  auto next = std::next(bbi->getIterator());
-
+static bool eliminateSimpleBorrows(BeginBorrowInst *bbi,
+                                   CanonicalizeInstruction &pass) {
   // Never eliminate lexical borrow scopes.  They must be kept to ensure that
   // value lifetimes aren't observably shortened.
   if (bbi->isLexical())
-    return next;
+    return false;
 
   // We know that our borrow is completely within the lifetime of its base value
   // if the borrow is never reborrowed. We check for reborrows and do not
@@ -473,79 +446,73 @@ eliminateSimpleBorrows(BeginBorrowInst *bbi, CanonicalizeInstruction &pass) {
     if (!use->isLifetimeEnding() && use->canAcceptKind(baseOwnership))
       continue;
 
-    return next;
+    return false;
   }
 
   while (!endBorrows.empty()) {
-    next = killInstruction(endBorrows.pop_back_val(), next, pass);
+    killInstruction(endBorrows.pop_back_val(), pass);
   }
+  pass.getCallbacks().notifyWillReplaceUses(bbi, base);
   bbi->replaceAllUsesWith(base);
-  pass.notifyHasNewUsers(base);
-  return killInstruction(bbi, next, pass);
+  killInstruction(bbi, pass);
+  return true;
 }
 
 /// Delete any result having forwarding instruction that only has destroy_value
 /// and debug_value uses.
-static SILBasicBlock::iterator
+static bool
 eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
                                                 CanonicalizeInstruction &pass) {
-  auto next = std::next(inst->getIterator());
-
   for (auto *use : getNonDebugUses(inst))
     if (!isa<DestroyValueInst>(use->getUser()))
-      return next;
-  deleteAllDebugUses(inst, pass.callbacks);
+      return false;
+  deleteAllDebugUses(inst, pass.getCallbacks());
   SILValue op = inst->getOperand(0);
+  pass.getCallbacks().notifyWillReplaceUses(inst, op);
   inst->replaceAllUsesWith(op);
-  pass.notifyHasNewUsers(op);
-  return killInstruction(inst, next, pass);
+  killInstruction(inst, pass);
+  return true;
 }
 
-static Optional<SILBasicBlock::iterator>
-tryEliminateUnneededForwardingInst(SILInstruction *i,
-                                   CanonicalizeInstruction &pass) {
+static bool tryEliminateUnneededForwardingInst(SILInstruction *i,
+                                               CanonicalizeInstruction &pass) {
   assert(OwnershipForwardingMixin::isa(i) &&
          "Must be an ownership forwarding inst");
-  if (auto *svi = dyn_cast<SingleValueInstruction>(i))
-    if (svi->getNumOperands() == 1)
+  if (auto *svi = dyn_cast<SingleValueInstruction>(i)) {
+    if (svi->getNumOperands() == 1) {
       return eliminateUnneededForwardingUnarySingleValueInst(svi, pass);
-
-  return None;
+    }
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
 //                            Top-Level Entry Point
 //===----------------------------------------------------------------------===//
 
-SILBasicBlock::iterator
-CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
-  if (auto nextII = simplifyAndReplace(inst, *this))
-    return nextII.getValue();
+bool CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
+  if (simplifyAndReplace(inst, *this))
+    return true;
 
   if (auto li = LoadOperation(inst)) {
     return splitAggregateLoad(li, *this);
   }
-
   if (auto *storeInst = dyn_cast<StoreInst>(inst)) {
     return broadenSingleElementStores(storeInst, *this);
   }
-
-  if (auto *cvi = dyn_cast<CopyValueInst>(inst))
+  if (auto *cvi = dyn_cast<CopyValueInst>(inst)) {
     return eliminateSimpleCopies(cvi, *this);
-
-  if (auto *bbi = dyn_cast<BeginBorrowInst>(inst))
+  }
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(inst)) {
     return eliminateSimpleBorrows(bbi, *this);
-
+  }
   // If we have ownership and are not in raw SIL, eliminate unneeded forwarding
   // insts. We don't do this in raw SIL as not to disturb the codegen read by
   // diagnostics.
   auto *fn = inst->getFunction();
   if (fn->hasOwnership() && fn->getModule().getStage() != SILStage::Raw) {
     if (OwnershipForwardingMixin::isa(inst))
-      if (auto newNext = tryEliminateUnneededForwardingInst(inst, *this))
-        return *newNext;
+      return tryEliminateUnneededForwardingInst(inst, *this);
   }
-
-  // Skip ahead.
-  return std::next(inst->getIterator());
+  return false;
 }

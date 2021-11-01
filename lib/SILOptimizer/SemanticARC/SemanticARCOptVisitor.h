@@ -55,10 +55,15 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
             InstModCallbacks()
                 .onDelete(
                     [this](SILInstruction *inst) { eraseInstruction(inst); })
-                .onSetUseValue([this](Operand *use, SILValue newValue) {
-                  use->set(newValue);
-                  worklist.insert(newValue);
-                })) {}
+                .onCreateNewInst([this](SILInstruction *newlyCreatedInst) {
+                  for (auto result : newlyCreatedInst->getResults()) {
+                    worklist.insert(result);
+                  }
+                })
+                .onNotifyWillReplaceUses(
+                    [this](SILValue oldValue, SILValue newValue) {
+                      worklist.insert(newValue);
+                    })) {}
 
   void reset() {
     ctx.reset();

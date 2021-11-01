@@ -1232,13 +1232,13 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
   if (auto NewAI = dyn_cast<ApplyInst>(NewApply))
     replaceInstUsesWith(*cast<ApplyInst>(Apply.getInstruction()), NewAI);
 
-  auto nextI = std::next(NewApply.getInstruction()->getIterator());
-  eraseInstFromFunction(*Apply.getInstruction(), nextI);
+  auto nextI = deleter.makeIterator(NewApply.getInstruction());
+  eraseInstFromFunction(*Apply.getInstruction());
 
   // cleanup immediately after the call on all paths reachable from the call.
   SmallVector<SILInstruction *, 2> cleanupPositions;
   if (nextI != NewApply.getParent()->end())
-    cleanupPositions.push_back(&*nextI);
+    cleanupPositions.push_back(*nextI);
   else {
     for (auto &succ : NewApply.getParent()->getSuccessors())
       cleanupPositions.push_back(&*succ.getBB()->begin());

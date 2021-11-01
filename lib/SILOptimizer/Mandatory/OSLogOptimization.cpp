@@ -1250,7 +1250,7 @@ static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
         }
         (void)deletedInstructions.insert(deadInst);
       });
-  InstructionDeleter deleter(callbacks);
+  InstructionDeleter deleter(std::move(callbacks));
 
   unsigned startIndex = 0;
   while (startIndex < worklist.size()) {

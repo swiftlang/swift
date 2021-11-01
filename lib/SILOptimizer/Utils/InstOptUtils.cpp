@@ -299,6 +299,56 @@ void swift::eraseUsesOfValue(SILValue v) {
   }
 }
 
+/// Fix OSSA lifetime before the caller drops or replaces \p operand.
+///
+/// Return the new destroy_value or end_borrow or nullptr.
+static SILInstruction *prepareToRemoveOSSAOperand(Operand *operand) {
+  if (!operand->isLifetimeEnding()) {
+    return nullptr;
+  }
+
+  SILValue operandValue = operand->get();
+  auto *user = operand->getUser();
+
+  SILBuilderWithScope builder(user);
+  if (operandValue.getOwnershipKind() == OwnershipKind::Owned) {
+    return builder.createDestroyValue(user->getLoc(), operandValue);
+  } else {
+    assert(operandValue.getOwnershipKind() == OwnershipKind::Guaranteed);
+    return builder.createEndBorrow(user->getLoc(), operandValue);
+  }
+}
+
+SILInstruction *swift::dropOSSAOperand(Operand *operand) {
+  auto *newInst = prepareToRemoveOSSAOperand(operand);
+  operand->drop();
+  return newInst;
+}
+
+void swift::dropOSSAOperands(SILInstruction *inst,
+                             InstModCallbacks &callbacks) {
+  for (Operand &operand : inst->getAllOperands()) {
+    if (auto *newInst = dropOSSAOperand(&operand)) {
+      callbacks.createdNewInst(newInst);
+    }
+  }
+}
+
+SILInstruction *swift::replaceOSSAOperand(Operand *operand, SILValue newValue) {
+  auto oldValue = operand->get();
+  assert(oldValue != newValue && "Cannot replace a value with itself");
+
+  auto *user = operand->getUser();
+
+  // If we have an end of scope marker, just return next. We are done.
+  if (isEndOfScopeMarker(user))
+    return nullptr;
+
+  auto *newInst = prepareToRemoveOSSAOperand(operand);
+  operand->set(newValue);
+  return newInst;
+}
+
 SILValue swift::
 getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
                                   SILInstruction *ignoreUser) {
@@ -1110,7 +1160,7 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
 
 bool swift::simplifyUsers(SingleValueInstruction *inst) {
   bool changed = false;
-  InstModCallbacks callbacks;
+  InstructionDeleter deleter;
 
   for (auto ui = inst->use_begin(), ue = inst->use_end(); ui != ue;) {
     SILInstruction *user = ui->getUser();
@@ -1120,9 +1170,9 @@ bool swift::simplifyUsers(SingleValueInstruction *inst) {
     if (!svi)
       continue;
 
-    callbacks.resetHadCallbackInvocation();
-    simplifyAndReplaceAllSimplifiedUsesAndErase(svi, callbacks);
-    changed |= callbacks.hadCallbackInvocation();
+    deleter.getCallbacks().resetHadCallbackInvocation();
+    simplifyAndReplaceAllSimplifiedUsesAndErase(svi, deleter);
+    changed |= deleter.getCallbacks().hadCallbackInvocation();
   }
 
   return changed;
@@ -1547,153 +1597,21 @@ swift::cloneFullApplySiteReplacingCallee(FullApplySite applySite,
   llvm_unreachable("Unhandled case?!");
 }
 
-// FIXME: For any situation where this may be called on an unbounded number of
-// uses, it should perform a single callback invocation to notify the client
-// that newValue has new uses rather than a callback for every new use.
-//
-// FIXME: This should almost certainly replace end_lifetime uses rather than
-// deleting them.
-SILBasicBlock::iterator swift::replaceAllUses(SILValue oldValue,
-                                              SILValue newValue,
-                                              SILBasicBlock::iterator nextii,
-                                              InstModCallbacks &callbacks) {
+void swift::replaceAllUses(SILValue oldValue, SILValue newValue,
+                           InstructionDeleter &deleter) {
   assert(oldValue != newValue && "Cannot RAUW a value with itself");
+
+  deleter.getCallbacks().notifyWillReplaceUses(oldValue, newValue);
+
   while (!oldValue->use_empty()) {
     Operand *use = *oldValue->use_begin();
     SILInstruction *user = use->getUser();
-    // Erase the end of scope marker.
     if (isEndOfScopeMarker(user)) {
-      if (&*nextii == user)
-        ++nextii;
-      callbacks.deleteInst(user);
+      deleter.forceDelete(user);
       continue;
     }
-    callbacks.setUseValue(use, newValue);
+    use->set(newValue);
   }
-  return nextii;
-}
-
-SILBasicBlock::iterator
-swift::replaceAllUsesAndErase(SingleValueInstruction *svi, SILValue newValue,
-                              InstModCallbacks &callbacks) {
-  SILBasicBlock::iterator nextii = replaceAllUses(
-      svi, newValue, std::next(svi->getIterator()), callbacks);
-
-  callbacks.deleteInst(svi);
-
-  return nextii;
-}
-
-SILBasicBlock::iterator
-swift::replaceAllUsesAndErase(MultipleValueInstruction *mvi,
-                              ArrayRef<SILValue> newValues,
-                              InstModCallbacks &callbacks) {
-  SILBasicBlock::iterator nextii = std::next(mvi->getIterator());
-  for (unsigned idx = 0, end = newValues.size(); idx < end; ++idx) {
-    nextii =
-        replaceAllUses(mvi->getResult(idx), newValues[idx], nextii, callbacks);
-  }
-  callbacks.deleteInst(mvi);
-
-  return nextii;
-}
-
-SILBasicBlock::iterator
-swift::replaceAllUsesAndErase(SILValue oldValue, SILValue newValue,
-                              InstModCallbacks &callbacks) {
-  if (auto *svi = dyn_cast<SingleValueInstruction>(oldValue)) {
-    return replaceAllUsesAndErase(cast<SingleValueInstruction>(oldValue),
-                                  newValue, callbacks);
-  } else if (auto *mvi = dyn_cast<MultipleValueInstruction>(oldValue)) {
-    return replaceAllUsesAndErase(cast<MultipleValueInstruction>(oldValue),
-                                  newValue, callbacks);
-  }
-  llvm_unreachable("Untested");
-#if 0 // FIXME: to be enabled in a following commit
-  auto *blockArg = cast<SILPhiArgument>(oldValue);
-  TermInst *oldTerm = blockArg->getTerminatorForResult();
-  assert(oldTerm && "can only replace and erase terminators, not phis");
-
-  // Before:
-  //     oldTerm bb1, bb2
-  //   bb1(%oldValue):
-  //     use %oldValue
-  //   bb2:
-  //
-  // After:
-  //     br bb1
-  //   bb1:
-  //     use %newValue
-  //   bb2:
-
-  auto nextii = replaceAllUses(blockArg, newValue,
-                               oldTerm->getParent()->end(), callbacks);
-  // Now that oldValue is replaced, the terminator should have no uses
-  // left. The caller should have removed uses from other results.
-  for (auto *succBB : oldTerm->getSuccessorBlocks()) {
-    assert(succBB->getNumArguments() == 1 && "expected terminator result");
-    succBB->eraseArgument(0);
-  }
-  auto *newBr = SILBuilderWithScope(oldTerm).createBranch(
-    oldTerm->getLoc(), blockArg->getParent());
-  callbacks.createdNewInst(newBr);
-  callbacks.deleteInst(oldTerm);
-  return nextii;
-#endif
-}
-
-/// Given that we are going to replace use's underlying value, if the use is a
-/// lifetime ending use, insert an end scope scope use for the underlying value
-/// before we RAUW.
-static void cleanupUseOldValueBeforeRAUW(Operand *use, SILBuilder &builder,
-                                         SILLocation loc,
-                                         InstModCallbacks &callbacks) {
-  if (!use->isLifetimeEnding()) {
-    return;
-  }
-
-  switch (use->get().getOwnershipKind()) {
-  case OwnershipKind::Any:
-    llvm_unreachable("Invalid ownership for value");
-  case OwnershipKind::Owned: {
-    auto *dvi = builder.createDestroyValue(loc, use->get());
-    callbacks.createdNewInst(dvi);
-    return;
-  }
-  case OwnershipKind::Guaranteed: {
-    // Should only happen once we model destructures as true reborrows.
-    auto *ebi = builder.createEndBorrow(loc, use->get());
-    callbacks.createdNewInst(ebi);
-    return;
-  }
-  case OwnershipKind::None:
-    return;
-  case OwnershipKind::Unowned:
-    llvm_unreachable("Unowned object can never be consumed?!");
-  }
-  llvm_unreachable("Covered switch isn't covered");
-}
-
-SILBasicBlock::iterator swift::replaceSingleUse(Operand *use, SILValue newValue,
-                                                InstModCallbacks &callbacks) {
-  auto oldValue = use->get();
-  assert(oldValue != newValue && "Cannot RAUW a value with itself");
-
-  auto *user = use->getUser();
-  auto nextII = std::next(user->getIterator());
-
-  // If we have an end of scope marker, just return next. We are done.
-  if (isEndOfScopeMarker(user)) {
-    return nextII;
-  }
-
-  // Otherwise, first insert clean up our use's value if we need to and then set
-  // use to have a new value.
-  SILBuilderWithScope builder(user);
-  cleanupUseOldValueBeforeRAUW(use, builder, user->getLoc(), callbacks);
-  callbacks.setUseValue(use, newValue);
-
-  return nextII;
 }
 
 SILValue swift::makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock) {
@@ -1778,6 +1696,7 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
   // Now that we know we can perform our transform, set all uses of
   // forwardingInst to be used of its operand and then delete \p forwardingInst.
   auto newValue = forwardingInst->getOperand(0);
+  callbacks.notifyWillReplaceUses(forwardingInst, newValue);
   while (!forwardingInst->use_empty()) {
     auto *use = *(forwardingInst->use_begin());
     use->set(newValue);

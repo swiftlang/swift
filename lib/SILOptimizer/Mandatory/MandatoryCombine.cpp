@@ -58,55 +58,6 @@ static bool areAllValuesTrivial(Values values, SILFunction &function) {
 }
 
 //===----------------------------------------------------------------------===//
-//      CanonicalizeInstruction subclass for use in Mandatory Combiner.
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-class MandatoryCombineCanonicalize final : CanonicalizeInstruction {
-public:
-  using Worklist = SmallSILInstructionWorklist<256>;
-
-private:
-  Worklist &worklist;
-  bool changed = false;
-
-public:
-  MandatoryCombineCanonicalize(Worklist &worklist, DeadEndBlocks &deadEndBlocks)
-      : CanonicalizeInstruction(DEBUG_TYPE, deadEndBlocks), worklist(worklist) {
-  }
-
-  void notifyNewInstruction(SILInstruction *inst) override {
-    worklist.add(inst);
-    worklist.addUsersOfAllResultsToWorklist(inst);
-    changed = true;
-  }
-
-  // Just delete the given 'inst' and record its operands. The callback isn't
-  // allowed to mutate any other instructions.
-  void killInstruction(SILInstruction *inst) override {
-    worklist.eraseSingleInstFromFunction(*inst,
-                                         /*AddOperandsToWorklist*/ true);
-    changed = true;
-  }
-
-  void notifyHasNewUsers(SILValue value) override {
-    if (worklist.size() < 10000) {
-      worklist.addUsersToWorklist(value);
-    }
-    changed = true;
-  }
-
-  bool tryCanonicalize(SILInstruction *inst) {
-    changed = false;
-    canonicalize(inst);
-    return changed;
-  }
-};
-
-} // anonymous namespace
-
-//===----------------------------------------------------------------------===//
 //                        MandatoryCombiner Interface
 //===----------------------------------------------------------------------===//
 
@@ -122,8 +73,8 @@ class MandatoryCombiner final
   /// The list of instructions remaining to visit, perhaps to combine.
   Worklist worklist;
 
-  /// Whether any changes have been made.
-  bool madeChange;
+  /// Utility for dead code removal and owner of current InstModCallbacks.
+  InstructionDeleter deleter;
 
   /// Set to true if some alloc/dealloc_stack instruction are inserted and at
   /// the end of the run stack nesting needs to be corrected.
@@ -134,31 +85,16 @@ class MandatoryCombiner final
 
   InstModCallbacks instModCallbacks;
   SmallVectorImpl<SILInstruction *> &createdInstructions;
-  SmallVector<SILInstruction *, 16> instructionsPendingDeletion;
   DeadEndBlocks &deadEndBlocks;
 
 public:
   MandatoryCombiner(bool optimized,
                     SmallVectorImpl<SILInstruction *> &createdInstructions,
                     DeadEndBlocks &deadEndBlocks)
-      : compilingWithOptimization(optimized), worklist("MC"), madeChange(false),
-        iteration(0),
-        instModCallbacks(),
-        createdInstructions(createdInstructions),
-        deadEndBlocks(deadEndBlocks) {
-    instModCallbacks = InstModCallbacks()
-      .onDelete([&](SILInstruction *instruction) {
-        worklist.erase(instruction);
-        instructionsPendingDeletion.push_back(instruction);
-      })
-      .onCreateNewInst([&](SILInstruction *instruction) {
-        worklist.add(instruction);
-      })
-      .onSetUseValue([this](Operand *use, SILValue newValue) {
-        use->set(newValue);
-        worklist.add(use->getUser());
-      });
-  };
+      : compilingWithOptimization(optimized), worklist("MC"),
+        deleter(worklist.createCallbacks()), iteration(0), instModCallbacks(),
+        createdInstructions(createdInstructions), deadEndBlocks(deadEndBlocks) {
+  }
 
   void addReachableCodeToWorklist(SILFunction &function);
 
@@ -168,7 +104,6 @@ public:
   void clear() {
     iteration = 0;
     worklist.resetChecked();
-    madeChange = false;
   }
 
   /// Applies the MandatoryCombiner to the provided function.
@@ -241,10 +176,8 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
 
 bool MandatoryCombiner::doOneIteration(SILFunction &function,
                                        unsigned iteration) {
-  madeChange = false;
-
   addReachableCodeToWorklist(function);
-  MandatoryCombineCanonicalize mcCanonicialize(worklist, deadEndBlocks);
+  CanonicalizeInstruction mcCanonicialize(DEBUG_TYPE, deadEndBlocks, deleter);
 
   while (!worklist.isEmpty()) {
     auto *instruction = worklist.pop_back_val();
@@ -254,17 +187,12 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
 
     if (EnableCanonicalizationAndTrivialDCE) {
       if (compilingWithOptimization) {
-        if (isInstructionTriviallyDead(instruction)) {
-          worklist.eraseInstFromFunction(*instruction);
-          madeChange = true;
+        if (deleter.deleteIfDead(instruction)) {
           continue;
         }
       }
-
-      if (mcCanonicialize.tryCanonicalize(instruction)) {
-        madeChange = true;
+      if (mcCanonicialize.canonicalize(instruction))
         continue;
-      }
     }
 
 #ifndef NDEBUG
@@ -282,14 +210,7 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
                                                  instructionDescription
 #endif
       );
-      madeChange = true;
     }
-
-    for (SILInstruction *instruction : instructionsPendingDeletion) {
-      worklist.eraseInstFromFunction(*instruction);
-      madeChange = true;
-    }
-    instructionsPendingDeletion.clear();
 
     // Our tracking list has been accumulating instructions created by the
     // SILBuilder during this iteration. Go through the tracking list and add
@@ -302,12 +223,13 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
       LLVM_DEBUG(llvm::dbgs() << "MC: add " << *instruction
                               << " from tracking list to worklist\n");
       worklist.add(instruction);
-      madeChange = true;
     }
     createdInstructions.clear();
   }
-
+  bool madeChange =
+      worklist.changed() || deleter.getCallbacks().hadCallbackInvocation();
   worklist.resetChecked();
+  deleter.getCallbacks().resetHadCallbackInvocation();
   return madeChange;
 }
 

@@ -594,6 +594,7 @@ protected:
     scope.recordOuterCopy(copy);
 
     ++NumCopiesGenerated;
+    ++NumOuterCopies;
     LLVM_DEBUG(llvm::dbgs() << "  Outer copy " << *copy);
 
     return copy;

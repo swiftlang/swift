@@ -80,7 +80,6 @@ llvm::Statistic swift::NumCopiesGenerated = {
 STATISTIC(NumDestroysEliminated,
           "number of destroy_value instructions removed");
 STATISTIC(NumDestroysGenerated, "number of destroy_value instructions created");
-STATISTIC(NumUnknownUsers, "number of functions with unknown users");
 
 //===----------------------------------------------------------------------===//
 //                           MARK: General utilities
@@ -778,19 +777,18 @@ bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
 
   LLVM_DEBUG(llvm::dbgs() << "  Canonicalizing: " << def);
 
-  // Note: There is no need to register callbacks with this utility. 'onDelete'
-  // is the only one in use to handle dangling pointers, which could be done
-  // instead be registering a temporary handler with the pass. Canonicalization
-  // is only allowed to create and delete instructions that are associated with
-  // this canonical def (copies and destroys). Each canonical def has a disjoint
-  // extended lifetime. Any pass calling this utility should work at the level
-  // canonical defs, not individual instructions.
+  // Canonicalization is only allowed to create and delete instructions that are
+  // associated with this canonical def (copies and destroys). Each canonical
+  // def has a disjoint extended lifetime. Any pass calling this utility should
+  // work at the level canonical defs, not individual instructions.
   //
-  // NotifyWillBeDeleted will not work because copy rewriting removes operands
-  // before deleting instructions. Also prohibit setUse callbacks just because
-  // that would simply be insane.
-  assert(!getCallbacks().notifyWillBeDeletedFunc
-         && !getCallbacks().setUseValueFunc && "unsupported");
+  // Consequently, there is no need for any callbacks to be registered
+  // here. 'onDelete' is the only callback that may be in use, because
+  // InstructionDeleter uses it for iterator update.
+  //
+  // onNotifyWillBeDeleted will in fact break because copy rewriting removes
+  // operands before deleting instructions.
+  assert(!getCallbacks().notifyWillBeDeletedFunc && "unsupported");
 
   initDef(def);
   // Step 1: compute liveness

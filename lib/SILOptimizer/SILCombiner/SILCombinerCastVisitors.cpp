@@ -64,7 +64,10 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *rrpi) {
     if (urci->getOperand()->getType().isAnyClassReferenceType()) {
       rrpi->setOperand(urci->getOperand());
       rrpi->moveBefore(urci);
-      return urci->use_empty() ? eraseInstFromFunction(*urci) : nullptr;
+      if (urci->use_empty()) {
+        eraseInstFromFunction(*urci);
+      }
+      return nullptr;
     }
 
     // Otherwise, we ened to use an unchecked_trivial_bit_cast insert it at
@@ -78,7 +81,10 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *rrpi) {
     });
     rrpi->replaceAllUsesWith(utbi);
     eraseInstFromFunction(*rrpi);
-    return urci->use_empty() ? eraseInstFromFunction(*urci) : nullptr;
+    if (urci->use_empty()) {
+      eraseInstFromFunction(*urci);
+    }
+    return nullptr;
   }
 
   // (ref_to_raw_pointer (open_existential_ref (init_existential_ref x))) ->
@@ -92,7 +98,8 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *rrpi) {
         return b.createRefToRawPointer(l, ieri->getOperand(), rrpi->getType());
       });
       rrpi->replaceAllUsesWith(utbi);
-      return eraseInstFromFunction(*rrpi);
+      eraseInstFromFunction(*rrpi);
+      return nullptr;
     }
   }
 
@@ -204,9 +211,10 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *uci) {
   if (auto *operandAsUpcast = dyn_cast<UpcastInst>(operand)) {
     if (operand.getOwnershipKind() != OwnershipKind::Owned) {
       uci->setOperand(operandAsUpcast->getOperand());
-      return operandAsUpcast->use_empty()
-                 ? eraseInstFromFunction(*operandAsUpcast)
-                 : nullptr;
+      if (operandAsUpcast->use_empty()) {
+        eraseInstFromFunction(*operandAsUpcast);
+      }
+      return nullptr;
     }
     SingleBlockOwnedForwardingInstFolder folder(*this, uci);
     if (folder.add(operandAsUpcast)) {
@@ -510,7 +518,8 @@ SILInstruction *SILCombiner::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
   ECM->replaceAllUsesWith(refCast);
   refCast->setOperand(0, newECM);
   refCast->moveAfter(newECM);
-  return eraseInstFromFunction(*ECM);
+  eraseInstFromFunction(*ECM);
+  return nullptr;
 }
 
 SILInstruction *
@@ -571,7 +580,8 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *urci) {
   Builder.emitStoreValueOperation(loc, cast, urci->getDest(),
                                   StoreOwnershipQualifier::Init);
 
-  return eraseInstFromFunction(*urci);
+  eraseInstFromFunction(*urci);
+  return nullptr;
 }
 
 template <class CastInst>
@@ -668,12 +678,12 @@ SILInstruction *SILCombiner::visitUnconditionalCheckedCastAddrInst(
     builder.createDestroyAddr(loc, uccai->getSrc());
     builder.emitStoreValueOperation(loc, val, uccai->getDest(),
                                     StoreOwnershipQualifier::Init);
-    return eraseInstFromFunction(*uccai);
+    eraseInstFromFunction(*uccai);
+    return nullptr;
   }
 
   // Perform the purly type-based cast optimization.
-  if (CastOpt.optimizeUnconditionalCheckedCastAddrInst(uccai))
-    MadeChange = true;
+  CastOpt.optimizeUnconditionalCheckedCastAddrInst(uccai);
 
   return nullptr;
 }
@@ -682,7 +692,6 @@ SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   if (CastOpt.optimizeUnconditionalCheckedCastInst(UCCI)) {
-    MadeChange = true;
     return nullptr;
   }
   // FIXME: rename from RemoveCondFails to RemoveRuntimeAsserts.
@@ -844,7 +853,8 @@ SILInstruction *
 SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   if (auto *OCTTMI = dyn_cast<ObjCToThickMetatypeInst>(TTOCMI->getOperand())) {
     TTOCMI->replaceAllUsesWith(OCTTMI->getOperand());
-    return eraseInstFromFunction(*TTOCMI);
+    eraseInstFromFunction(*TTOCMI);
+    return nullptr;
   }
 
   // Perform the following transformations:
@@ -856,8 +866,7 @@ SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   //
   // (thick_to_objc_metatype (existential_metatype @thick)) ->
   // (existential_metatype @objc_metatype)
-  if (CastOpt.optimizeMetatypeConversion(TTOCMI, MetatypeRepresentation::Thick))
-    MadeChange = true;
+  CastOpt.optimizeMetatypeConversion(TTOCMI, MetatypeRepresentation::Thick);
 
   return nullptr;
 }
@@ -866,7 +875,8 @@ SILInstruction *
 SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   if (auto *TTOCMI = dyn_cast<ThickToObjCMetatypeInst>(OCTTMI->getOperand())) {
     OCTTMI->replaceAllUsesWith(TTOCMI->getOperand());
-    return eraseInstFromFunction(*OCTTMI);
+    eraseInstFromFunction(*OCTTMI);
+    return nullptr;
   }
 
   // Perform the following transformations:
@@ -878,16 +888,14 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   //
   // (objc_to_thick_metatype (existential_metatype @objc_metatype)) ->
   // (existential_metatype @thick)
-  if (CastOpt.optimizeMetatypeConversion(OCTTMI, MetatypeRepresentation::ObjC))
-    MadeChange = true;
+  CastOpt.optimizeMetatypeConversion(OCTTMI, MetatypeRepresentation::ObjC);
 
   return nullptr;
 }
 
 SILInstruction *
 SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
-  if (CastOpt.optimizeCheckedCastBranchInst(CBI))
-    MadeChange = true;
+  CastOpt.optimizeCheckedCastBranchInst(CBI);
 
   return nullptr;
 }
@@ -958,12 +966,12 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
     auto *trueVal = builder.createIntegerLiteral(loc, boolTy, 1);
     builder.createCondBranch(loc, trueVal, CCABI->getSuccessBB(),
                              CCABI->getFailureBB());
-    return eraseInstFromFunction(*CCABI);
+    eraseInstFromFunction(*CCABI);
+    return nullptr;
   }
 
   // Perform the purly type-based cast optimization.
-  if (CastOpt.optimizeCheckedCastAddrBranchInst(CCABI))
-    MadeChange = true;
+  CastOpt.optimizeCheckedCastAddrBranchInst(CCABI);
 
   return nullptr;
 }
@@ -1020,7 +1028,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
         SILValue newValue = cfi->getConverted();
         if (newValue.getOwnershipKind() != OwnershipKind::Owned &&
             newValue.getOwnershipKind() != OwnershipKind::Guaranteed) {
-          getInstModCallbacks().setUseValue(use, newValue);
+          setUseValue(use, newValue);
           fas.setSubstCalleeType(newValue->getType().castTo<SILFunctionType>());
           continue;
         }

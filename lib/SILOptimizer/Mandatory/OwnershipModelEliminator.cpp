@@ -547,8 +547,9 @@ static bool stripOwnership(SILFunction &func) {
         InstModCallbacks().onDelete([&](SILInstruction *instToErase) {
           visitor.eraseInstruction(instToErase);
         });
+    InstructionDeleter deleter(std::move(callbacks));
     // We are no longer in OSSA, so we don't need to pass in a deBlocks.
-    simplifyAndReplaceAllSimplifiedUsesAndErase(*value, callbacks);
+    simplifyAndReplaceAllSimplifiedUsesAndErase(*value, deleter);
     madeChange |= callbacks.hadCallbackInvocation();
   }
 

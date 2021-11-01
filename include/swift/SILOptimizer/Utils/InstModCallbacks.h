@@ -74,25 +74,12 @@ struct InstModCallbacks {
   /// Default implementation is a no-op, but we still mark madeChange.
   std::function<void(SILInstruction *newlyCreatedInst)> createdNewInstFunc;
 
-  /// A function sets the value in \p use to be \p newValue.
-  ///
-  /// Default implementation just calls use->set(newValue).
-  ///
-  /// NOTE: It is assumed that this operation will never invalidate instruction
-  /// iterators.
-  ///
-  /// This can have compile-time implications and should be avoided
-  /// whenever possible in favor of more structured optimization passes.
-  std::function<void(Operand *use, SILValue newValue)> setUseValueFunc;
-
   /// A function that takes in an instruction and deletes the inst.
   ///
   /// This is used to invalidate dangling instruction pointers. The SIL will be
   /// invalid when it is invoked. The callback is only allowed to inspect the
   /// inline fields of \p instToDelete and iterate over the results. It is not
   /// allowed to dereference operands or iterate uses.
-  ///
-  /// See comments for notifyWillBeDeletedFunc.
   ///
   /// The default implementation is:
   ///
@@ -132,12 +119,26 @@ struct InstModCallbacks {
   std::function<void(SILInstruction *instThatWillBeDeleted)>
       notifyWillBeDeletedFunc;
 
+  /// If non-null, called before \p oldValue's uses are replaced with \p
+  /// newValue.
+  ///
+  /// Note that not all uses, such as scope-ending and debug uses will
+  /// necessarily be directly replaced.
+  std::function<void(SILValue oldValue, SILValue newValue)>
+      notifyWillReplaceUsesFunc;
+
   /// A boolean that tracks if any of our callbacks were ever called.
   bool wereAnyCallbacksInvoked = false;
 
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;
+
+  bool hadCallbackInvocation() const { return wereAnyCallbacksInvoked; }
+
+  /// Set \p wereAnyCallbacksInvoked to false. Useful if one wants to reuse an
+  /// InstModCallback in between iterations.
+  void resetHadCallbackInvocation() { wereAnyCallbacksInvoked = false; }
 
   /// Return a copy of self with deleteInstFunc set to \p newDeleteInstFunc.
   LLVM_ATTRIBUTE_UNUSED InstModCallbacks
@@ -156,14 +157,6 @@ struct InstModCallbacks {
     return result;
   }
 
-  /// Return a copy of self with setUseValueFunc set to \p newSetUseValueFunc.
-  LLVM_ATTRIBUTE_UNUSED InstModCallbacks
-  onSetUseValue(decltype(setUseValueFunc) newSetUseValueFunc) const {
-    InstModCallbacks result = *this;
-    result.setUseValueFunc = newSetUseValueFunc;
-    return result;
-  }
-
   /// Return a copy of self with notifyWillBeDeletedFunc set to \p
   /// newNotifyWillBeDeletedFunc.
   LLVM_ATTRIBUTE_UNUSED
@@ -171,6 +164,16 @@ struct InstModCallbacks {
       decltype(notifyWillBeDeletedFunc) newNotifyWillBeDeletedFunc) const {
     InstModCallbacks result = *this;
     result.notifyWillBeDeletedFunc = newNotifyWillBeDeletedFunc;
+    return result;
+  }
+
+  /// Return a copy of self with notifyWillReplaceUsesFunc set to \p
+  /// newNotifyWillReplaceUsesFunc.
+  LLVM_ATTRIBUTE_UNUSED
+  InstModCallbacks onNotifyWillReplaceUses(
+      decltype(notifyWillReplaceUsesFunc) newNotifyWillReplaceUsesFunc) const {
+    InstModCallbacks result = *this;
+    result.notifyWillReplaceUsesFunc = newNotifyWillReplaceUsesFunc;
     return result;
   }
 
@@ -190,11 +193,10 @@ struct InstModCallbacks {
       createdNewInstFunc(newlyCreatedInst);
   }
 
-  void setUseValue(Operand *use, SILValue newValue) {
+  void notifyWillReplaceUses(SILValue oldValue, SILValue newValue) {
     wereAnyCallbacksInvoked = true;
-    if (setUseValueFunc)
-      return setUseValueFunc(use, newValue);
-    use->set(newValue);
+    if (notifyWillReplaceUsesFunc)
+      return notifyWillReplaceUsesFunc(oldValue, newValue);
   }
 
   /// Notify via our callbacks that an instruction will be deleted/have its
@@ -213,33 +215,17 @@ struct InstModCallbacks {
   void replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
     wereAnyCallbacksInvoked = true;
 
-    // If setUseValueFunc is not set, just call RAUW directly. RAUW in this case
-    // is equivalent to what we do below. We just enable better
-    // performance. This ensures that the default InstModCallback is really
-    // fast.
-    if (!setUseValueFunc)
-      return oldValue->replaceAllUsesWith(newValue);
-
-    while (!oldValue->use_empty()) {
-      auto *use = *oldValue->use_begin();
-      setUseValue(use, newValue);
-    }
+    notifyWillReplaceUses(oldValue, newValue);
+    return oldValue->replaceAllUsesWith(newValue);
   }
 
   /// Replace all uses of the results of \p oldInst pairwise with new uses of
   /// the results of \p newInst.
-  ///
-  /// If \p setUseValueFunc is not set to a value, we just call inline
-  /// SILInstruction::replaceAllUsesPairwiseWith(...) to ensure we only pay a
-  /// cost if we actually set setUseValueFunc.
-  void replaceAllInstUsesPairwiseWith(SILInstruction *oldInst, SILInstruction *newInst) {
+  void replaceAllInstUsesPairwiseWith(SILInstruction *oldInst,
+                                      SILInstruction *newInst) {
     wereAnyCallbacksInvoked = true;
 
-    // If setUseValueFunc is not set, just call RAUW directly. RAUW in this case
-    // is equivalent to what we do below. We just enable better
-    // performance. This ensures that the default InstModCallback is really
-    // fast.
-    if (!setUseValueFunc)
+    if (!notifyWillBeDeletedFunc)
       return oldInst->replaceAllUsesPairwiseWith(newInst);
 
     auto results = oldInst->getResults();
@@ -265,12 +251,6 @@ struct InstModCallbacks {
     replaceValueUsesWith(oldInst, newValue);
     deleteInst(oldInst);
   }
-
-  bool hadCallbackInvocation() const { return wereAnyCallbacksInvoked; }
-
-  /// Set \p wereAnyCallbacksInvoked to false. Useful if one wants to reuse an
-  /// InstModCallback in between iterations.
-  void resetHadCallbackInvocation() { wereAnyCallbacksInvoked = false; }
 };
 
 } // end namespace swift

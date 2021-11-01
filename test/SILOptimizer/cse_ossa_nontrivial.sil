@@ -410,8 +410,7 @@ struct KlassPair {
 
 // Support destructure_struct in CSE after introducing support for MultipleValueInstruction is OSSA's rauw utility
 // CHECK-LABEL: sil [ossa] @destructure_struct_test1 :
-// CHECK:       destructure_struct
-// TODOCHECK-NOT:   destructure_struct
+// CHECK-NOT:   destructure_struct
 // CHECK-LABEL: } // end sil function 'destructure_struct_test1'
 sil [ossa] @destructure_struct_test1 : $@convention(thin) (@owned KlassPair) -> () {
 bb0(%0 : @owned $KlassPair):
@@ -426,10 +425,14 @@ bb0(%0 : @owned $KlassPair):
   return %res : $()
 }
 
-// Support destructure_struct in CSE after introducing support for MultipleValueInstruction is OSSA's rauw utility
+// Support destructure_struct in CSE after introducing support for
+// MultipleValueInstruction is OSSA's rauw utility
+//
+// FIXME: handle multi-value cse.
+//
 // CHECK-LABEL: sil [ossa] @destructure_struct_test2 :
-// CHECK:       destructure_struct
-// TODOCHECK-NOT:   destructure_struct
+// CHECK:         destructure_struct
+// CHECK:         destructure_struct
 // CHECK-LABEL: } // end sil function 'destructure_struct_test2'
 sil [ossa] @destructure_struct_test2 : $@convention(thin) (@guaranteed KlassPair) -> () {
 bb0(%0 : @guaranteed $KlassPair):
@@ -442,10 +445,10 @@ bb0(%0 : @guaranteed $KlassPair):
   return %res : $()
 }
 
-// Support destructure_tuple in CSE after introducing support for MultipleValueInstruction is OSSA's rauw utility
+// Canonicalization removes owned destructure_tuples without CSE.
+//
 // CHECK-LABEL: sil [ossa] @destructure_tuple_test1 :
-// CHECK:       destructure_tuple
-// TODOCHECK-NOT:   destructure_tuple
+// CHECK-NOT:         destructure_tuple
 // CHECK-LABEL: } // end sil function 'destructure_tuple_test1'
 sil [ossa] @destructure_tuple_test1 : $@convention(thin) (@owned (Klass, Klass)) -> () {
 bb0(%0 : @owned $(Klass, Klass)):
@@ -460,10 +463,14 @@ bb0(%0 : @owned $(Klass, Klass)):
   return %res : $()
 }
 
-// Support destructure_tuple in CSE after introducing support for MultipleValueInstruction is OSSA's rauw utility
+// Support destructure_tuple in CSE after introducing support for
+// MultipleValueInstruction is OSSA's rauw utility
+//
+// FIXME: handle multi-value cse.
+//
 // CHECK-LABEL: sil [ossa] @destructure_tuple_test2 :
-// CHECK:       destructure_tuple
-// TODOCHECK-NOT:   destructure_tuple
+// CHECK:         destructure_tuple
+// CHECK:         destructure_tuple
 // CHECK-LABEL: } // end sil function 'destructure_tuple_test2'
 sil [ossa] @destructure_tuple_test2 : $@convention(thin) (@guaranteed (Klass, Klass)) -> () {
 bb0(%0 : @guaranteed $(Klass, Klass)):

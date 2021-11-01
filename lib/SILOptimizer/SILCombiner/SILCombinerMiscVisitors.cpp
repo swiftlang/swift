@@ -177,7 +177,8 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
       assert(Dest->getNumArguments() == 0 &&
              "didn't expect a payload argument");
       Builder.createBranch(SEAI->getLoc(), Dest);
-      return eraseInstFromFunction(*SEAI);
+      eraseInstFromFunction(*SEAI);
+      return nullptr;
     }
   }
 
@@ -222,7 +223,8 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
     }
   }
 
-  return eraseInstFromFunction(*SEAI);
+  eraseInstFromFunction(*SEAI);
+  return nullptr;
 }
 
 SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *seai) {
@@ -268,7 +270,8 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *seai) {
                                           seai->getType(), defaultCase, cases);
   Builder.emitEndBorrowOperation(seai->getLoc(), enumVal);
   replaceInstUsesWith(*seai, result);
-  return eraseInstFromFunction(*seai);
+  eraseInstFromFunction(*seai);
+  return nullptr;
 }
 
 SILInstruction *SILCombiner::visitSwitchValueInst(SwitchValueInst *svi) {
@@ -663,7 +666,8 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
       eraseInstFromFunction(*DS);
     }
 
-    return eraseInstFromFunction(*AS);
+    eraseInstFromFunction(*AS);
+    return nullptr;
   }
 
   // If we have a live 'live range' or a live range that we have not sen a copy
@@ -723,7 +727,8 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     Inst->replaceAllUsesOfAllResultsWithUndef();
     eraseInstFromFunction(*Inst);
   }
-  return eraseInstFromFunction(*AS);
+  eraseInstFromFunction(*AS);
+  return nullptr;
 }
 
 SILInstruction *SILCombiner::visitAllocRefInst(AllocRefInst *AR) {
@@ -907,7 +912,8 @@ SILInstruction *SILCombiner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
     }
     auto *uci = Builder.createUpcast(lbi->getLoc(), newLBI, lbi->getType());
     replaceInstUsesWith(*lbi, uci);
-    return eraseInstFromFunction(*lbi);
+    eraseInstFromFunction(*lbi);
+    return nullptr;
   }
 
   // Constant-propagate the 0 value when loading "count" or "capacity" from the
@@ -1041,10 +1047,11 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
 
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
-    if (!EI->hasOperand() ||
-        EI->getOperand()->getType().isTrivial(*EI->getFunction()))
-      return eraseInstFromFunction(*RVI);
-
+    if (!EI->hasOperand()
+        || EI->getOperand()->getType().isTrivial(*EI->getFunction())) {
+      eraseInstFromFunction(*RVI);
+      return nullptr;
+    }
     // retain_value of an enum_inst where we know that it has a payload can be
     // reduced to a retain_value on the payload.
     if (EI->hasOperand()) {
@@ -1067,9 +1074,10 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
                                        RVI->getAtomicity());
 
   // ReleaseValueInst of a trivial type is a no-op.
-  if (isTrivial(Operand, RVI->getFunction()))
-    return eraseInstFromFunction(*RVI);
-
+  if (isTrivial(Operand, RVI->getFunction())) {
+    eraseInstFromFunction(*RVI);
+    return nullptr;
+  }
   // Do nothing for non-trivial non-reference types.
   return nullptr;
 }
@@ -1085,7 +1093,8 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
         EI->getOperand()->getType().isTrivial(*RVI->getFunction())) {
-      return eraseInstFromFunction(*RVI);
+      eraseInstFromFunction(*RVI);
+      return nullptr;
     }
 
     // retain_value of an enum_inst where we know that it has a payload can be
@@ -1112,7 +1121,8 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
 
   // RetainValueInst of a trivial type is a no-op + use propagation.
   if (OperandTy.isTrivial(*RVI->getFunction())) {
-    return eraseInstFromFunction(*RVI);
+    eraseInstFromFunction(*RVI);
+    return nullptr;
   }
 
   // Sometimes in the stdlib due to hand offs, we will see code like:
@@ -1139,7 +1149,8 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
       // Remove them...
       if (Release->getOperand() == RVI->getOperand()) {
         eraseInstFromFunction(*Release);
-        return eraseInstFromFunction(*RVI);
+        eraseInstFromFunction(*RVI);
+        return nullptr;
       }
   }
 
@@ -1148,16 +1159,19 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
 
 SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   // Remove runtime asserts such as overflow checks and bounds checks.
-  if (RemoveCondFails)
-    return eraseInstFromFunction(*CFI);
-
+  if (RemoveCondFails) {
+    eraseInstFromFunction(*CFI);
+    return nullptr;
+  }
   auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand());
   if (!I)
     return nullptr;
 
   // Erase. (cond_fail 0)
-  if (!I->getValue().getBoolValue())
-    return eraseInstFromFunction(*CFI);
+  if (!I->getValue().getBoolValue()) {
+    eraseInstFromFunction(*CFI);
+    return nullptr;
+  }
 
   // Remove any code that follows a (cond_fail 1) and set the block's
   // terminator to unreachable.
@@ -1193,7 +1207,7 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *cvi) {
   // copy_value's operand since it is a no-op.
   if (cvi->getOperand().getOwnershipKind() == OwnershipKind::None) {
     replaceInstUsesWith(*cvi, cvi->getOperand());
-    return eraseInstFromFunction(*cvi);
+    eraseInstFromFunction(*cvi);
   }
 
   return nullptr;
@@ -1223,19 +1237,22 @@ SILInstruction *SILCombiner::legacyVisitStrongRetainInst(StrongRetainInst *SRI) 
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(funcOper))
     funcOper = CFI->getOperand();
 
-  if (isa<ThinToThickFunctionInst>(funcOper))
-    return eraseInstFromFunction(*SRI);
-
-  if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand()) ||
-      isa<ObjCMetatypeToObjectInst>(SRI->getOperand()))
-    return eraseInstFromFunction(*SRI);
-
+  if (isa<ThinToThickFunctionInst>(funcOper)) {
+    eraseInstFromFunction(*SRI);
+    return nullptr;
+  }
+  if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand())
+      || isa<ObjCMetatypeToObjectInst>(SRI->getOperand())) {
+    eraseInstFromFunction(*SRI);
+    return nullptr;
+  }
   // Retain and Release of tagged strings is a no-op.
   // The builtin code pattern to find tagged strings is:
   // builtin "stringObjectOr_Int64" (or to tag the string)
   // value_to_bridge_object (cast the UInt to bridge object)
   if (isa<ValueToBridgeObjectInst>(SRI->getOperand())) {
-    return eraseInstFromFunction(*SRI);
+    eraseInstFromFunction(*SRI);
+    return nullptr;
   }
 
   // Sometimes in the stdlib due to hand offs, we will see code like:
@@ -1262,7 +1279,8 @@ SILInstruction *SILCombiner::legacyVisitStrongRetainInst(StrongRetainInst *SRI) 
       // Remove them...
       if (Release->getOperand() == SRI->getOperand()) {
         eraseInstFromFunction(*Release);
-        return eraseInstFromFunction(*SRI);
+        eraseInstFromFunction(*SRI);
+        return nullptr;
       }
   }
 
@@ -1468,9 +1486,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
       B.createSwitchValue(SEI->getLoc(), SILValue(SEAI), DefaultBB, CaseBBs);
 
-      return eraseInstFromFunction(*SEI);
+      eraseInstFromFunction(*SEI);
     }
-
     return nullptr;
   }
 
@@ -1482,7 +1499,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
                           IEAI->getOperand()->getType().getObjectType());
     Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand(),
                         StoreOwnershipQualifier::Unqualified);
-    return eraseInstFromFunction(*IEAI);
+    eraseInstFromFunction(*IEAI);
+    return nullptr;
   }
 
   // Ok, we have a payload enum, make sure that we have a store previous to
@@ -1658,7 +1676,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
                       StoreOwnershipQualifier::Unqualified);
   Builder.createDeallocStack(DataAddrInst->getLoc(), AllocStack);
   eraseInstFromFunction(*DataAddrInst);
-  return eraseInstFromFunction(*IEAI);
+  eraseInstFromFunction(*IEAI);
+  return nullptr;
 }
 
 SILInstruction *
@@ -1735,7 +1754,8 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
         eraseInstFromFunction(*user);
       }
     }
-    return eraseInstFromFunction(*tedai);
+    eraseInstFromFunction(*tedai);
+    return nullptr;
   }
 
   if (!onlyLoads)
@@ -1820,26 +1840,30 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
     eraseInstFromFunction(*svi);
   }
 
-  return eraseInstFromFunction(*tedai);
+  eraseInstFromFunction(*tedai);
+  return nullptr;
 }
 
 SILInstruction *SILCombiner::legacyVisitStrongReleaseInst(StrongReleaseInst *SRI) {
   assert(!SRI->getFunction()->hasOwnership());
 
   // Release of ThinToThickFunction is a no-op.
-  if (isa<ThinToThickFunctionInst>(SRI->getOperand()))
-    return eraseInstFromFunction(*SRI);
-
-  if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand()) ||
-      isa<ObjCMetatypeToObjectInst>(SRI->getOperand()))
-    return eraseInstFromFunction(*SRI);
-
+  if (isa<ThinToThickFunctionInst>(SRI->getOperand())) {
+    eraseInstFromFunction(*SRI);
+    return nullptr;
+  }
+  if (isa<ObjCExistentialMetatypeToObjectInst>(SRI->getOperand())
+      || isa<ObjCMetatypeToObjectInst>(SRI->getOperand())) {
+    eraseInstFromFunction(*SRI);
+    return nullptr;
+  }
   // Retain and Release of tagged strings is a no-op.
   // The builtin code pattern to find tagged strings is:
   // builtin "stringObjectOr_Int64" (or to tag the string)
   // value_to_bridge_object (cast the UInt to bridge object)
   if (isa<ValueToBridgeObjectInst>(SRI->getOperand())) {
-    return eraseInstFromFunction(*SRI);
+    eraseInstFromFunction(*SRI);
+    return nullptr;
   }
 
   // Release of a classbound existential converted from a class is just a
@@ -2110,7 +2134,8 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *fli) {
       Builder.createFixLifetime(fli->getLoc(), load);
       // no-op when ossa is disabled
       Builder.emitEndBorrowOperation(fli->getLoc(), load);
-      return eraseInstFromFunction(*fli);
+      eraseInstFromFunction(*fli);
+      return nullptr;
     }
   }
   return nullptr;
@@ -2256,7 +2281,8 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
           baseType.isTrivial(*mdi->getFunction())) {
         SILValue value = mdi->getValue();
         replaceInstUsesWith(*mdi, value);
-        return eraseInstFromFunction(*mdi);
+        eraseInstFromFunction(*mdi);
+        return nullptr;
       }
     }
   }
@@ -2266,7 +2292,8 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
     // This pattern can occur after StringOptimization when a utf8CString of
     // a literal is replace by the string_literal itself.
     replaceInstUsesWith(*mdi, mdi->getValue());
-    return eraseInstFromFunction(*mdi);
+    eraseInstFromFunction(*mdi);
+    return nullptr;
   }
 
   return nullptr;

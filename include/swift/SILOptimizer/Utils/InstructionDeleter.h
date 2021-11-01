@@ -109,6 +109,7 @@ namespace swift {
 ///   deleter.deleteIfDead(instruction);
 ///   deleter.cleanupDeadInstructions();
 ///
+/// TODO: Add tracing based on the client's DEBUG_TYPE (e.g. sil-combine).
 class InstructionDeleter {
   /// A set vector of instructions that are found to be dead. The ordering of
   /// instructions in this set is important as when a dead instruction is
@@ -138,6 +139,10 @@ public:
   llvm::iterator_range<UpdatingReverseInstructionIterator>
   updatingReverseRange(SILBasicBlock *bb) {
     return iteratorRegistry.makeReverseIteratorRange(bb);
+  }
+
+  UpdatingInstructionIterator makeIterator(SILInstruction *inst) {
+    return iteratorRegistry.makeIterator(inst);
   }
 
   bool hadCallbackInvocation() const {

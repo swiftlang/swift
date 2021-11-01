@@ -72,16 +72,13 @@ class SILCombiner :
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
 
-  /// Utility for dead code removal.
+  /// Utility for dead code removal and owner of current InstModCallbacks.
   InstructionDeleter deleter;
 
   /// A cache of "dead end blocks" through which all paths it is known that the
   /// program will terminate. This means that we are allowed to leak
   /// objects.
   DeadEndBlocks deadEndBlocks;
-
-  /// Variable to track if the SILCombiner made any changes.
-  bool MadeChange;
 
   /// If set to true then the optimizer is free to erase cond_fail instructions.
   bool RemoveCondFails;
@@ -120,29 +117,8 @@ public:
               NonLocalAccessBlockAnalysis *NLABA, bool removeCondFails,
               bool enableCopyPropagation)
       : parentTransform(parentTransform), AA(AA), DA(DA), PCA(PCA), CHA(CHA),
-        NLABA(NLABA), Worklist("SC"),
-        deleter(InstModCallbacks()
-                    .onDelete([&](SILInstruction *instToDelete) {
-                      // We allow for users in SILCombine to perform 2 stage
-                      // deletion, so we need to split the erasing of
-                      // instructions from adding operands to the worklist.
-                      eraseInstFromFunction(*instToDelete,
-                                            false /* don't add operands */);
-                    })
-                    .onNotifyWillBeDeleted(
-                        [&](SILInstruction *instThatWillBeDeleted) {
-                          Worklist.addOperandsToWorklist(
-                            *instThatWillBeDeleted);
-                        })
-                    .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
-                      Worklist.add(newlyCreatedInst);
-                    })
-                    .onSetUseValue([&](Operand *use, SILValue newValue) {
-                      use->set(newValue);
-                      Worklist.add(use->getUser());
-                    })),
-        deadEndBlocks(&B.getFunction()), MadeChange(false),
-        RemoveCondFails(removeCondFails),
+        NLABA(NLABA), Worklist("SC"), deleter(Worklist.createCallbacks()),
+        deadEndBlocks(&B.getFunction()), RemoveCondFails(removeCondFails),
         enableCopyPropagation(enableCopyPropagation), Iteration(0), Builder(B),
         CastOpt(
             FuncBuilder, nullptr /*SILBuilderContext*/,
@@ -156,8 +132,7 @@ public:
             },
             /* EraseAction */
             [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
-        deBlocks(&B.getFunction()),
-        ownershipFixupContext(getInstModCallbacks(), deBlocks),
+        deBlocks(&B.getFunction()), ownershipFixupContext(deleter, deBlocks),
         libswiftPassInvocation(parentTransform->getPassManager(),
                                parentTransform->getFunction(), this) {}
 
@@ -166,7 +141,6 @@ public:
   void clear() {
     Iteration = 0;
     Worklist.resetChecked();
-    MadeChange = false;
   }
 
   /// A "syntactic" high level function that combines our insertPt with the main
@@ -237,30 +211,13 @@ public:
     Worklist.replaceInstUsesPairwiseWith(oldI, newI);
   }
 
-  // Some instructions can never be "trivially dead" due to side effects or
-  // producing a void value. In those cases, since we cannot rely on
-  // SILCombines trivially dead instruction DCE in order to delete the
-  // instruction, visit methods should use this method to delete the given
-  // instruction and upon completion of their peephole return the value returned
-  // by this method.
-  SILInstruction *eraseInstFromFunction(SILInstruction &I,
-                                        SILBasicBlock::iterator &InstIter,
-                                        bool AddOperandsToWorklist = true) {
-    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist);
-    MadeChange = true;
-    // Dummy return, so the caller doesn't need to explicitly return nullptr.
-    return nullptr;
+  void eraseInstFromFunction(SILInstruction &inst) {
+    deleter.forceDelete(&inst);
   }
 
   // Erases \p inst and all of its users, recursively.
   // The caller has to make sure that all users are removable (e.g. dead).
   void eraseInstIncludingUsers(SILInstruction *inst);
-
-  SILInstruction *eraseInstFromFunction(SILInstruction &I,
-                                        bool AddOperandsToWorklist = true) {
-    SILBasicBlock::iterator nullIter;
-    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist);
-  }
 
   void addInitialGroup(ArrayRef<SILInstruction *> List) {
     Worklist.addInitialGroup(List);

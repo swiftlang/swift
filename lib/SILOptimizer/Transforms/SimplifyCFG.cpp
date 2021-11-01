@@ -1208,23 +1208,16 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 /// simplifyBranchOperands - Simplify operands of branches, since it can
 /// result in exposing opportunities for CFG simplification.
 bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
-  InstModCallbacks callbacks;
-#ifndef NDEBUG
-  callbacks = callbacks.onDelete(
-    [](SILInstruction *instToKill) {
-      LLVM_DEBUG(llvm::dbgs() << "simplify and erase " << *instToKill);
-      instToKill->eraseFromParent();
-    });
-#endif
+  InstructionDeleter deleter;
 
   for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O) {
     // All of our interesting simplifications are on single-value instructions
     // for now.
     if (auto *I = dyn_cast<SingleValueInstruction>(*O)) {
-      simplifyAndReplaceAllSimplifiedUsesAndErase(I, callbacks, deBlocks);
+      simplifyAndReplaceAllSimplifiedUsesAndErase(I, deleter, deBlocks);
     }
   }
-  return callbacks.hadCallbackInvocation();
+  return deleter.getCallbacks().hadCallbackInvocation();
 }
 
 static bool onlyHasTerminatorAndDebugInsts(SILBasicBlock *BB) {

@@ -596,17 +596,13 @@ public:
 
   DeadEndBlocks &DeadEndBBs;
 
-  OwnershipFixupContext &RAUWFixupContext;
-
   /// The set of calls to lazy property getters which can be replace by a direct
   /// load of the property value.
   llvm::SmallVector<ApplyInst *, 8> lazyPropertyGetters;
 
   CSE(bool RunsOnHighLevelSil, SideEffectAnalysis *SEA,
-      SILOptFunctionBuilder &FuncBuilder, DeadEndBlocks &DeadEndBBs,
-      OwnershipFixupContext &RAUWFixupContext)
+      SILOptFunctionBuilder &FuncBuilder, DeadEndBlocks &DeadEndBBs)
       : SEA(SEA), FuncBuilder(FuncBuilder), DeadEndBBs(DeadEndBBs),
-        RAUWFixupContext(RAUWFixupContext),
         RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
@@ -956,17 +952,14 @@ bool CSE::processNode(DominanceInfoNode *Node) {
   // See if any instructions in the block can be eliminated.  If so, do it.  If
   // not, add them to AvailableValues. Assume the block terminator can't be
   // erased.
-  for (SILBasicBlock::iterator nextI = BB->begin(), E = BB->end();
-       nextI != E;) {
-    SILInstruction *Inst = &*nextI;
-    ++nextI;
-
-    LLVM_DEBUG(llvm::dbgs() << "SILCSE VISITING: " << *Inst << "\n");
+  InstructionDeleter deleter;
+  OwnershipFixupContext RAUWFixupCtx{deleter, DeadEndBBs};
+  for (auto *inst : deleter.updatingRange(BB)) {
+    LLVM_DEBUG(llvm::dbgs() << "SILCSE VISITING: " << *inst << "\n");
 
     // Dead instructions should just be removed.
-    if (isInstructionTriviallyDead(Inst)) {
-      LLVM_DEBUG(llvm::dbgs() << "SILCSE DCE: " << *Inst << '\n');
-      nextI = eraseFromParentWithDebugInsts(Inst);
+    if (deleter.deleteIfDead(inst)) {
+      LLVM_DEBUG(llvm::dbgs() << "SILCSE DCE: " << *inst << '\n');
       Changed = true;
       ++NumSimplify;
       continue;
@@ -974,34 +967,33 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
     // If the instruction can be simplified (e.g. X+0 = X) then replace it with
     // its simpler value.
-    InstModCallbacks callbacks;
-    nextI = simplifyAndReplaceAllSimplifiedUsesAndErase(Inst, callbacks,
-                                                        &DeadEndBBs);
-    if (callbacks.hadCallbackInvocation()) {
+    deleter.getCallbacks().resetHadCallbackInvocation();
+    simplifyAndReplaceAllSimplifiedUsesAndErase(inst, deleter, &DeadEndBBs);
+    if (deleter.getCallbacks().hadCallbackInvocation()) {
       ++NumSimplify;
       Changed = true;
       continue;
     }
 
     // If this is not a simple instruction that we can value number, skip it.
-    if (!canHandle(Inst))
+    if (!canHandle(inst))
       continue;
 
     // If an instruction can be handled here, then it must also be handled
     // in isIdenticalTo, otherwise looking up a key in the map with fail to
     // match itself.
-    assert(Inst->isIdenticalTo(Inst) &&
-           "Inst must match itself for map to work");
-    assert(llvm::DenseMapInfo<SimpleValue>::isEqual(Inst, Inst) &&
-           "Inst must match itself for map to work");
+    assert(inst->isIdenticalTo(inst)
+           && "Inst must match itself for map to work");
+    assert(llvm::DenseMapInfo<SimpleValue>::isEqual(inst, inst)
+           && "Inst must match itself for map to work");
 
     // Now that we know we have an instruction we understand see if the
     // instruction has an available value.  If so, use it.
-    if (SILInstruction *AvailInst = AvailableValues->lookup(Inst)) {
-      LLVM_DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: "
-                              << *AvailInst << '\n');
+    if (SILInstruction *AvailInst = AvailableValues->lookup(inst)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "SILCSE CSE: " << *inst << "  to: " << *AvailInst << '\n');
 
-      auto *AI = dyn_cast<ApplyInst>(Inst);
+      auto *AI = dyn_cast<ApplyInst>(inst);
       if (AI && isLazyPropertyGetter(AI)) {
         // We do the actual transformation for lazy property getters later. It
         // changes the CFG and we don't want to disturb the dominator tree walk
@@ -1009,31 +1001,33 @@ bool CSE::processNode(DominanceInfoNode *Node) {
         lazyPropertyGetters.push_back(AI);
         continue;
       }
-      if (!isa<OpenExistentialRefInst>(Inst) ||
-          processOpenExistentialRef(cast<OpenExistentialRefInst>(Inst),
-                                    cast<OpenExistentialRefInst>(AvailInst))) {
-        if (Inst->getResults().empty()) {
-          nextI = std::next(Inst->getIterator());
-          Inst->eraseFromParent();
+      if (!isa<OpenExistentialRefInst>(inst)
+          || processOpenExistentialRef(
+              cast<OpenExistentialRefInst>(inst),
+              cast<OpenExistentialRefInst>(AvailInst))) {
+        if (inst->getResults().empty()) {
+          deleter.forceDelete(inst);
           Changed = true;
           ++NumCSE;
           continue;
         }
-        if (!Inst->getFunction()->hasOwnership()) {
-          Inst->replaceAllUsesPairwiseWith(AvailInst);
-          nextI = std::next(Inst->getIterator());
-          Inst->eraseFromParent();
+        if (!inst->getFunction()->hasOwnership()) {
+          inst->replaceAllUsesPairwiseWith(AvailInst);
+          deleter.forceDelete(inst);
           Changed = true;
           ++NumCSE;
           continue;
         }
         // TODO: Support MultipleValueInstructionResult in OSSA RAUW utility and
-        // extend it here as well
-        if (!isa<SingleValueInstruction>(Inst))
+        // extend it here as well. Note that CanonicalizeInstruction already
+        // handles multi-value OSSA replacement. See
+        // simplifyAndReplaceAllSimplifiedUsesAndErase in
+        // SimplifyInstruction.cpp
+        if (!isa<SingleValueInstruction>(inst))
           continue;
 
-        OwnershipRAUWHelper helper(RAUWFixupContext,
-                                   cast<SingleValueInstruction>(Inst),
+        OwnershipRAUWHelper helper(RAUWFixupCtx,
+                                   cast<SingleValueInstruction>(inst),
                                    cast<SingleValueInstruction>(AvailInst));
         // If RAUW requires cloning the original, then there's no point. If it
         // also requires introducing a copy and new borrow scope, then it's a
@@ -1041,7 +1035,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
         if (!helper.isValid() || helper.requiresCopyBorrowAndClone())
           continue;
         // Replace SingleValueInstruction using OSSA RAUW here
-        nextI = helper.perform();
+        helper.perform();
         Changed = true;
         ++NumCSE;
         continue;
@@ -1049,9 +1043,9 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     }
 
     // Otherwise, just remember that this value is available.
-    AvailableValues->insert(Inst, Inst);
-    LLVM_DEBUG(llvm::dbgs() << "SILCSE Adding to value table: " << *Inst
-                            << " -> " << *Inst << "\n");
+    AvailableValues->insert(inst, inst);
+    LLVM_DEBUG(llvm::dbgs() << "SILCSE Adding to value table: " << *inst
+                            << " -> " << *inst << "\n");
   }
 
   return Changed;
@@ -1409,9 +1403,7 @@ class SILCSE : public SILFunctionTransform {
 
     auto *Fn = getFunction();
     DeadEndBlocks DeadEndBBs(Fn);
-    InstModCallbacks callbacks;
-    OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs};
-    CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, FixupCtx);
+    CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs);
     bool Changed = false;
 
     // Perform the traditional CSE.

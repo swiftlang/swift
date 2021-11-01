@@ -21,22 +21,12 @@
 
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 
 namespace swift {
 
 class SILInstruction;
 struct InstModCallbacks;
-
-/// Replace an instruction with a simplified result and erase it. If the
-/// instruction initiates a scope, do not replace the end of its scope; it will
-/// be deleted along with its parent.
-///
-/// NOTE: When OSSA is enabled this API assumes OSSA is properly formed and will
-/// insert compensating instructions.
-SILBasicBlock::iterator
-replaceAllSimplifiedUsesAndErase(SILInstruction *I, SILValue result,
-                                 InstModCallbacks &callbacks,
-                                 DeadEndBlocks *deadEndBlocks = nullptr);
 
 /// Attempt to map \p inst to a simplified result. Upon success, replace \p inst
 /// with this simplified result and erase \p inst. If the instruction initiates
@@ -45,10 +35,11 @@ replaceAllSimplifiedUsesAndErase(SILInstruction *I, SILValue result,
 ///
 /// NOTE: When OSSA is enabled this API assumes OSSA is properly formed and will
 /// insert compensating instructions.
+///
 /// NOTE: When \p I is in an OSSA function, this fails to optimize if \p
 /// deadEndBlocks is null.
-SILBasicBlock::iterator simplifyAndReplaceAllSimplifiedUsesAndErase(
-    SILInstruction *I, InstModCallbacks &callbacks,
+bool simplifyAndReplaceAllSimplifiedUsesAndErase(
+    SILInstruction *I, InstructionDeleter &deleter,
     DeadEndBlocks *deadEndBlocks = nullptr);
 
 // Simplify invocations of builtin operations that may overflow.

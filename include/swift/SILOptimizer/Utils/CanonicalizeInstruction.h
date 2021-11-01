@@ -41,65 +41,39 @@ struct CanonicalizeInstruction {
   static constexpr const char *defaultDebugType = "sil-canonicalize";
   const char *debugType = defaultDebugType;
   DeadEndBlocks &deadEndBlocks;
-  InstModCallbacks callbacks;
+  InstructionDeleter &deleter;
+  bool changed = false;
 
   CanonicalizeInstruction(const char *passDebugType,
-                          DeadEndBlocks &deadEndBlocks)
-      : deadEndBlocks(deadEndBlocks),
-        callbacks() {
+                          DeadEndBlocks &deadEndBlocks,
+                          InstructionDeleter &deleter)
+      : deadEndBlocks(deadEndBlocks), deleter(deleter) {
 #ifndef NDEBUG
     if (llvm::DebugFlag && !llvm::isCurrentDebugType(debugType))
       debugType = passDebugType;
 #endif
-    callbacks = InstModCallbacks()
-      .onDelete([&](SILInstruction *toDelete) {
-        killInstruction(toDelete);
-      })
-      .onCreateNewInst([&](SILInstruction *newInst) {
-        notifyNewInstruction(newInst);
-      })
-      .onSetUseValue([&](Operand *use, SILValue newValue) {
-        use->set(newValue);
-        notifyHasNewUsers(newValue);
-      });
   }
 
-  virtual ~CanonicalizeInstruction();
-
   const SILFunction *getFunction() const { return deadEndBlocks.getFunction(); }
+
+  InstModCallbacks &getCallbacks() { return deleter.getCallbacks(); }
+
+  void killInstruction(SILInstruction *inst) {
+    deleter.getCallbacks().deleteInst(inst);
+  }
 
   /// Rewrite this instruction, based on its operands and uses, into a more
   /// canonical representation.
   ///
-  /// Return an iterator to the next instruction or to the end of the block.
-  /// The returned iterator will follow any newly added or to-be-deleted
-  /// instructions, regardless of whether the pass immediately deletes the
-  /// instructions or simply records them for later deletion.
+  /// Returns true if canonicalization changed, added, or deleted instructions.
   ///
-  /// To (re)visit new instructions, override notifyNewInstruction().
-  ///
-  /// To determine if any transformation at all occurred, override
-  /// notifyNewInstruction(), killInstruction(), and notifyNewUsers().
-  ///
-  /// Warning: If the \p inst argument is killed and the client immediately
-  /// erases \p inst, then it may be an invalid pointer upon return.
-  SILBasicBlock::iterator canonicalize(SILInstruction *inst);
+  /// Warning: \p inst may already be deleted upon return.
+  bool canonicalize(SILInstruction *inst);
 
   /// Record a newly generated instruction.
-  virtual void notifyNewInstruction(SILInstruction *inst) = 0;
-
-  /// Kill an instruction that no longer has uses, or whose side effect is now
-  /// represented by a different instruction. The client can defer erasing the
-  /// instruction but must eventually erase all killed instructions to restore
-  /// valid SIL.
-  ///
-  /// This callback should not mutate any other instructions. It may only delete
-  /// the given argument. It will be called separately for each end-of-scope and
-  /// debug use before being called on the instruction they use.
-  virtual void killInstruction(SILInstruction *inst) = 0;
-
-  /// Record a SIL value that has acquired new users.
-  virtual void notifyHasNewUsers(SILValue value) = 0;
+  void notifyNewInstruction(SILInstruction *inst) {
+    deleter.getCallbacks().createdNewInst(inst);
+  }
 };
 
 } // end namespace swift

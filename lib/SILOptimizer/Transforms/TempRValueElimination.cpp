@@ -827,6 +827,7 @@ void TempRValueOptPass::run() {
       instToKill->eraseFromParent();
     }
   );
+  InstructionDeleter deleter(std::move(callbacks));
 
   DeadEndBlocks deBlocks(getFunction());
   for (auto *deadCopy : deadCopies) {
@@ -835,7 +836,7 @@ void TempRValueOptPass::run() {
     // Simplify any access scope markers that were only used by the dead
     // copy_addr and other potentially unused addresses.
     if (srcInst) {
-      simplifyAndReplaceAllSimplifiedUsesAndErase(srcInst, callbacks, &deBlocks);
+      simplifyAndReplaceAllSimplifiedUsesAndErase(srcInst, deleter, &deBlocks);
     }
   }
   if (!deadCopies.empty()) {

@@ -282,6 +282,16 @@ bool swift::isEndOfScopeMarker(SILInstruction *user) {
   }
 }
 
+// FIXME: fix_lifetime is *not* an incidental use. It can observe side effects
+// beyond simply reading its operand value. It forces its operand to be alive
+// even if there are no other uses.
+//
+// FIXME: destroy_value should probably be added as an incidental use. Unlike
+// destroy_addr or strong_release, it cannot observe side effects apart from its
+// operand value. destroy_value is unique in that it does produce
+// deinitialization side effects, but it does not keep its operand alive. If
+// it's operand can be deleted, then the deinitialization side-effects will be
+// modeled by a different consuming operation.
 bool swift::isIncidentalUse(SILInstruction *user) {
   return isEndOfScopeMarker(user) || user->isDebugInstruction() ||
          isa<FixLifetimeInst>(user) || isa<EndLifetimeInst>(user);

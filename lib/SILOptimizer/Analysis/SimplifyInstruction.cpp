@@ -812,31 +812,6 @@ ArrayRef<SILValue> MultiValueInstSimplifier::visitDestructureTupleInst(
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-/// Replace an instruction with a simplified result, including any debug uses,
-/// and erase the instruction. If the instruction initiates a scope, do not
-/// replace the end of its scope; it will be deleted along with its parent.
-///
-/// This is a simple transform based on the above analysis.
-///
-/// We assume that when ownership is enabled that the IR is in valid OSSA form
-/// before this is called. It will perform fixups as necessary to preserve OSSA.
-///
-/// Return an iterator to the next (nondeleted) instruction.
-SILBasicBlock::iterator
-swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
-                                        InstModCallbacks &callbacks,
-                                        DeadEndBlocks *deadEndBlocks) {
-  auto *svi = cast<SingleValueInstruction>(i);
-  assert(svi != result && "Cannot RAUW a value with itself");
-
-  if (svi->getFunction()->hasOwnership()) {
-    OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
-    OwnershipRAUWHelper helper(ctx, svi, result);
-    return helper.perform();
-  }
-  return replaceAllUsesAndErase(svi, result, callbacks);
-}
-
 /// Simplify invocations of builtin operations that may overflow.
 /// All such operations return a tuple (result, overflow_flag).
 /// This function try to simplify such operations, but returns only a
@@ -849,90 +824,100 @@ SILValue swift::simplifyOverflowBuiltinInstruction(BuiltinInst *BI) {
   return InstSimplifier().simplifyOverflowBuiltin(BI);
 }
 
-static SILBasicBlock::iterator
-replaceSingleOSSAValueAndErase(SingleValueInstruction *svi, SILValue newValue,
-                               InstModCallbacks &callbacks,
-                               DeadEndBlocks *deadEndBlocks) {
-  SILBasicBlock::iterator nextII = std::next(svi->getIterator());
-
+static bool replaceSingleOSSAValueAndErase(SingleValueInstruction *svi,
+                                           SILValue newValue,
+                                           InstructionDeleter &deleter,
+                                           DeadEndBlocks *deadEndBlocks) {
   // If we weren't passed a dead end blocks, we can't optimize without ownership
   // enabled.
   if (!deadEndBlocks)
-    return nextII;
+    return false;
 
-  OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
+  OwnershipFixupContext ctx{deleter, *deadEndBlocks};
   OwnershipRAUWHelper helper(ctx, svi, newValue);
 
   // If our RAUW helper is invalid, we do not support RAUWing this case, so
   // just return next.
   if (!helper.isValid())
-    return nextII;
-  return helper.perform();
+    return false;
+
+  helper.perform();
+  return true;
 }
 
-static SILBasicBlock::iterator replaceMultipleOSSAValuesAndErase(
-    MultipleValueInstruction *mvi, ArrayRef<SILValue> newValues,
-    InstModCallbacks &callbacks, DeadEndBlocks *deadEndBlocks) {
-
-  SILBasicBlock::iterator nextII = std::next(mvi->getIterator());
+static bool replaceMultipleOSSAValuesAndErase(MultipleValueInstruction *mvi,
+                                              ArrayRef<SILValue> newValues,
+                                              InstructionDeleter &deleter,
+                                              DeadEndBlocks *deadEndBlocks) {
 
   // If we weren't passed a dead end blocks, we can't optimize without ownership
   // enabled.
   if (!deadEndBlocks)
-    return nextII;
+    return false;
 
   assert(mvi->getNumResults() == newValues.size());
 
   // TODO: allocating vectors of contexts and "helpers" is silly. Redesign the
   // RAUW interface to allow multiple values.
   std::vector<OwnershipFixupContext> rauwContexts(newValues.size(),
-                                                  {callbacks, *deadEndBlocks});
+                                                  {deleter, *deadEndBlocks});
 
   SmallVector<OwnershipRAUWHelper> helpers;
   for (unsigned idx = 0, end = newValues.size(); idx < end; ++idx) {
     helpers.emplace_back(rauwContexts[idx], mvi->getResult(idx),
                          newValues[idx]);
     if (!helpers.back().isValid())
-      return nextII;
+      return false;
   }
   SmallVector<SILValue> replacements;
   for (auto &helper : helpers) {
     replacements.push_back(helper.prepareReplacement());
   }
-  return replaceAllUsesAndErase(mvi, replacements, callbacks);
+  for (unsigned idx = 0, end = newValues.size(); idx < end; ++idx) {
+    replaceAllUses(mvi->getResult(idx), replacements[idx], deleter);
+  }
+  deleter.forceDeleteAndFixLifetimes(mvi);
+  return true;
 }
 
-SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
-    SILInstruction *i, InstModCallbacks &callbacks,
+// TODO: this should inherit the debug-type from the parent pass. Potentially
+// via the deleter argument.
+bool swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
+    SILInstruction *i, InstructionDeleter &deleter,
     DeadEndBlocks *deadEndBlocks) {
 
-  auto nextII = std::next(i->getIterator());
   // Block terminators cannot be simplified because they cannot be erased
   // without replacement.
   if (auto *svi = dyn_cast<SingleValueInstruction>(i)) {
     SILValue result = InstSimplifier().visit(i);
 
     // If we fail to simplify or the simplified value returned is our passed in
-    // value, just return std::next since we can't simplify.
+    // value, just return since we can't simplify.
     if (!result || svi == result)
-      return nextII;
+      return false;
 
-    if (!i->getFunction()->hasOwnership())
-      return replaceAllUsesAndErase(svi, result, callbacks);
-
-    return replaceSingleOSSAValueAndErase(svi, result, callbacks,
-                                          deadEndBlocks);
+    if (i->getFunction()->hasOwnership()) {
+      return replaceSingleOSSAValueAndErase(svi, result, deleter,
+                                            deadEndBlocks);
+    }
+    replaceAllUses(svi, result, deleter);
+    deleter.forceDelete(svi);
+    return true;
   } else if (auto *mvi = dyn_cast<MultipleValueInstruction>(i)) {
     MultiValueInstSimplifier simplifier;
     auto newValues = simplifier.visit(mvi);
     if (newValues.empty())
-      return nextII;
+      return false;
 
-    if (!mvi->getFunction()->hasOwnership())
-      return replaceAllUsesAndErase(mvi, newValues, callbacks);
-
-    return replaceMultipleOSSAValuesAndErase(mvi, newValues, callbacks,
-                                             deadEndBlocks);
+    if (mvi->getFunction()->hasOwnership()) {
+      return replaceMultipleOSSAValuesAndErase(mvi, newValues, deleter,
+                                               deadEndBlocks);
+    }
+    for (unsigned idx = 0, end = newValues.size(); idx < end; ++idx) {
+      replaceAllUses(mvi->getResult(idx), newValues[idx], deleter);
+    }
+    deleter.forceDelete(mvi);
+    return true;
   }
-  return nextII;
+  return false;
 }

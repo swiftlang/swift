@@ -50,7 +50,8 @@ SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
                 BI->getLoc(), "xor", BI->getType(), BI->getType(),
                 {Inverted, One});
             replaceInstUsesWith(*BI, Xor);
-            return eraseInstFromFunction(*BI);
+            eraseInstFromFunction(*BI);
+            return nullptr;
           }
       }
   IsZeroKind LHS = isZeroValue(BI->getArguments()[0]);
@@ -68,7 +69,8 @@ SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
         Builder.createBuiltin(BI->getLoc(), BI->getName(), BI->getType(), {},
                               {BI->getArguments()[1], BI->getArguments()[0]});
     replaceInstUsesWith(*BI, CanonI);
-    return eraseInstFromFunction(*BI);
+    eraseInstFromFunction(*BI);
+    return nullptr;
   }
 
   // Can't handle non-zero ptr values.
@@ -221,7 +223,8 @@ SILCombiner::optimizeBuiltinCOWBufferForReadingNonOSSA(BuiltinInst *bi) {
 
   // If there are unknown users, keep the builtin, and IRGen will handle it.
   if (bi->use_empty())
-    return eraseInstFromFunction(*bi);
+    eraseInstFromFunction(*bi);
+
   return nullptr;
 }
 
@@ -271,7 +274,7 @@ SILInstruction *SILCombiner::optimizeBuiltinTruncOrBitCast(BuiltinInst *I) {
         I->getLoc(), "zextOrBitCast", Source->getType(), ResultType, ResultType,
         Source);
     replaceInstUsesWith(*I, NI);
-    return eraseInstFromFunction(*I);
+    eraseInstFromFunction(*I);
   }
   return nullptr;
 }
@@ -289,7 +292,8 @@ SILInstruction *SILCombiner::optimizeBuiltinZextOrBitCast(BuiltinInst *I) {
         I->getLoc(), "zextOrBitCast", Source->getType(), ResultType, ResultType,
         Source);
     replaceInstUsesWith(*I, NI);
-    return eraseInstFromFunction(*I);
+    eraseInstFromFunction(*I);
+    return nullptr;
   }
   // Optimize a sequence of conversion of an builtin integer to and from
   // BridgeObject. This sequence appears in the String implementation.
@@ -298,7 +302,8 @@ SILInstruction *SILCombiner::optimizeBuiltinZextOrBitCast(BuiltinInst *I) {
       if (auto *SI = dyn_cast<StructInst>(V2BO->getOperand())) {
         if (SI->getNumOperands() == 1 && SI->getOperand(0)->getType() == I->getType()) {
           replaceInstUsesWith(*I, SI->getOperand(0));
-          return eraseInstFromFunction(*I);
+          eraseInstFromFunction(*I);
+          return nullptr;
         }
       }
     }
@@ -696,7 +701,8 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
       if (ILOp->getValue().isMaxValue()) {
         auto *Zero = Builder.createIntegerLiteral(I->getLoc(), I->getType(), 0);
         replaceInstUsesWith(*I, Zero);
-        return eraseInstFromFunction(*I);
+        eraseInstFromFunction(*I);
+        return nullptr;
       }
     }
   }
@@ -721,7 +727,8 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
 
       I->replaceAllUsesWith(NewCmp);
       replaceInstUsesWith(*I, NewCmp);
-      return eraseInstFromFunction(*I);
+      eraseInstFromFunction(*I);
+      return nullptr;
     }
     break;
   }
@@ -753,8 +760,10 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
       Type ElemType = Substs.getReplacementTypes()[0];
       auto &SILElemTy = I->getFunction()->getTypeLowering(ElemType);
       // Destroying an array of trivial types is a no-op.
-      if (SILElemTy.isTrivial())
-        return eraseInstFromFunction(*I);
+      if (SILElemTy.isTrivial()) {
+        eraseInstFromFunction(*I);
+        return nullptr;
+      }
     }
     break;
   }
@@ -790,7 +799,8 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
       if (Indexraw->getOperand(0) == Bytes2->getOperand(0) &&
           Indexraw->getOperand(1)->getType() == I->getType()) {
         replaceInstUsesWith(*I, Indexraw->getOperand(1));
-        return eraseInstFromFunction(*I);
+        eraseInstFromFunction(*I);
+        return nullptr;
       }
     }
   }
