@@ -826,7 +826,8 @@ bool TypeBase::isCGFloatType() {
   // On macOS `CGFloat` is part of a `CoreGraphics` module,
   // but on Linux it could be found in `Foundation`.
   return (module->getName().is("CoreGraphics") ||
-          module->getName().is("Foundation")) &&
+          module->getName().is("Foundation")   ||
+          module->getName().is("CoreFoundation")) &&
          NTD->getName().is("CGFloat");
 }
 
