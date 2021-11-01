@@ -49,7 +49,7 @@ var ${Scalar}x${n}_TestSuite = TestSuite("${Scalar}x${n}")
 %  end
 ${Scalar}x${n}_TestSuite.test("comparisons") {
 %  if bits == 16:
-  if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  if #available(SwiftStdlib 5.3, *) {
 %  end
   let a = ${Vector}.random(in: -1 ..< 1)
   let ap1 = a + ${Vector}(repeating: 1)

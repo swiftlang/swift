@@ -5371,6 +5371,10 @@ public:
     Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
   }
 
+  bool isNoImplicitCopy() const {
+    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
+  }
+
   /// Whether this parameter has a default argument expression available.
   ///
   /// Note that this will return false for deserialized declarations, which only
