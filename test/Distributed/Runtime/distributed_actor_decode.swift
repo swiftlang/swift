@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -9,7 +9,6 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.6, *)
 distributed actor DA: CustomStringConvertible {
   nonisolated var description: String {
     "DA(\(self.id))"
@@ -18,7 +17,6 @@ distributed actor DA: CustomStringConvertible {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address : String) {
@@ -39,7 +37,6 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 struct FakeTransport: ActorTransport {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     print("FakeTransport.decodeIdentity from:\(decoder)")
@@ -71,7 +68,6 @@ struct FakeTransport: ActorTransport {
 
 // ==== Test Coding ------------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
 class TestEncoder: Encoder {
   var codingPath: [CodingKey]
   var userInfo: [CodingUserInfoKey: Any]
@@ -135,7 +131,6 @@ class TestEncoder: Encoder {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 class TestDecoder: Decoder {
   let encoder: TestEncoder
   let data: String
@@ -190,7 +185,6 @@ class TestDecoder: Decoder {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
 func test() {
   let transport = FakeTransport()
 
@@ -210,7 +204,6 @@ func test() {
   print("decoded da2: \(da2)")
 }
 
-@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     test()
