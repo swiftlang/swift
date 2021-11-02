@@ -378,13 +378,18 @@ findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
                  RewritePath &replacementPath) {
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
   for (unsigned loopID : indices(Loops)) {
-    const auto &loop = Loops[loopID];
+    auto &loop = Loops[loopID];
     if (loop.isDeleted())
       continue;
 
+    bool foundAny = false;
     for (unsigned ruleID : loop.findRulesAppearingOnceInEmptyContext(*this)) {
       redundancyCandidates.emplace_back(loopID, ruleID);
+      foundAny = true;
     }
+
+    if (!foundAny)
+      loop.markDeleted();
   }
 
   Optional<std::pair<unsigned, unsigned>> found;
