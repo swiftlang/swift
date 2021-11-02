@@ -657,4 +657,38 @@ extension _NativeSet {
       return true
     }
   }
+
+  @_alwaysEmitIntoClient
+  internal __consuming func subtracting<S: Sequence>(_ other: S) -> _NativeSet
+  where S.Element == Element {
+    guard count > 0 else { return _NativeSet() }
+    // Rather than directly creating a new set, calculate the difference in a
+    // bitset first. This ensures we hash each element (in both sets) only once,
+    // and that we'll have an exact count for the result set, preventing
+    // rehashings during insertions.
+    return _UnsafeBitset.withTemporaryCopy(of: hashTable.bitset) { difference in
+      var remainingCount = self.count
+      for element in other {
+        let (bucket, found) = find(element)
+        if found {
+          if difference.uncheckedRemove(bucket.offset) {
+            remainingCount -= 1
+            if remainingCount == 0 { return _NativeSet() }
+          }
+        }
+      }
+      _internalInvariant(remainingCount > 0)
+      if remainingCount == self.count { return self }
+      let result = _NativeSet(capacity: remainingCount)
+      for offset in difference {
+        result._unsafeInsertNew(
+          self.uncheckedElement(at: Bucket(offset: offset)))
+        // The hash table can have set bits after the end of the bitmap.
+        // Ignore them.
+        remainingCount -= 1
+        if remainingCount == 0 { break }
+      }
+      return result
+    }
+  }
 }

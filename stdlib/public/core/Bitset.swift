@@ -369,3 +369,19 @@ extension _UnsafeBitset {
     }
   }
 }
+
+extension _UnsafeBitset {
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal static func withTemporaryCopy<R>(
+    of original: _UnsafeBitset,
+    body: (_UnsafeBitset) throws -> R
+  ) rethrows -> R {
+    try _withTemporaryUninitializedBitset(
+      wordCount: original.wordCount
+    ) { bitset in
+      bitset.words.initialize(from: original.words, count: original.wordCount)
+      return try body(bitset)
+    }
+  }
+}
