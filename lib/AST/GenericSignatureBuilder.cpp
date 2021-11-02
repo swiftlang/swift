@@ -54,8 +54,12 @@
 using namespace swift;
 using llvm::DenseMap;
 
-/// Define this to 1 to enable expensive assertions.
-#define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
+#define DEBUG_TYPE "Serialization"
+
+STATISTIC(NumLazyRequirementSignaturesLoaded,
+          "# of lazily-deserialized requirement signatures loaded");
+
+#undef DEBUG_TYPE
 
 namespace {
   typedef GenericSignatureBuilder::RequirementSource RequirementSource;
@@ -8701,4 +8705,93 @@ InferredGenericSignatureRequest::evaluate(
   auto result = std::move(builder).computeGenericSignature(
       allowConcreteGenericParams);
   return GenericSignatureWithError(result, hadError);
+}
+
+ArrayRef<Requirement>
+RequirementSignatureRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *proto) const {
+  ASTContext &ctx = proto->getASTContext();
+
+  // First check if we have a deserializable requirement signature.
+  if (proto->hasLazyRequirementSignature()) {
+    ++NumLazyRequirementSignaturesLoaded;
+    // FIXME: (transitional) increment the redundant "always-on" counter.
+    if (ctx.Stats)
+      ++ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded;
+
+    auto contextData = static_cast<LazyProtocolData *>(
+        ctx.getOrCreateLazyContextData(proto, nullptr));
+
+    SmallVector<Requirement, 8> requirements;
+    contextData->loader->loadRequirementSignature(
+        proto, contextData->requirementSignatureData, requirements);
+    if (requirements.empty())
+      return None;
+    return ctx.AllocateCopy(requirements);
+  }
+
+  auto buildViaGSB = [&]() {
+    GenericSignatureBuilder builder(proto->getASTContext());
+
+    // Add all of the generic parameters.
+    for (auto gp : *proto->getGenericParams())
+      builder.addGenericParameter(gp);
+
+    // Add the conformance of 'self' to the protocol.
+    auto selfType =
+      proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+    auto requirement =
+      Requirement(RequirementKind::Conformance, selfType,
+                  proto->getDeclaredInterfaceType());
+
+    builder.addRequirement(
+            requirement,
+            GenericSignatureBuilder::RequirementSource::forRequirementSignature(
+                                                        builder, selfType, proto),
+            nullptr);
+
+    auto reqSignature = std::move(builder).computeGenericSignature(
+                          /*allowConcreteGenericParams=*/false,
+                          /*requirementSignatureSelfProto=*/proto);
+    return reqSignature.getRequirements();
+  };
+
+  auto buildViaRQM = [&]() {
+    return evaluateOrDefault(
+        ctx.evaluator,
+        RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(proto)},
+        ArrayRef<Requirement>());
+  };
+
+  switch (ctx.LangOpts.RequirementMachineProtocolSignatures) {
+  case RequirementMachineMode::Disabled:
+    return buildViaGSB();
+
+  case RequirementMachineMode::Enabled:
+    return buildViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = buildViaRQM();
+    auto gsbResult = buildViaGSB();
+
+    if (rqmResult.size() != gsbResult.size() ||
+        !std::equal(rqmResult.begin(), rqmResult.end(),
+                    gsbResult.begin())) {
+      llvm::errs() << "RequirementMachine protocol signature minimization is broken:\n";
+      llvm::errs() << "Protocol: " << proto->getName() << "\n";
+
+      auto rqmSig = GenericSignature::get(
+          proto->getGenericSignature().getGenericParams(), rqmResult);
+      llvm::errs() << "RequirementMachine says:      " << rqmSig << "\n";
+
+      auto gsbSig = GenericSignature::get(
+          proto->getGenericSignature().getGenericParams(), gsbResult);
+      llvm::errs() << "GenericSignatureBuilder says: " << gsbSig << "\n";
+
+      abort();
+    }
+
+    return gsbResult;
+  }
+  }
 }

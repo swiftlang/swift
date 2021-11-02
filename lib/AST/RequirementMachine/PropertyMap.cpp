@@ -296,15 +296,6 @@ void PropertyMap::addProperty(
   props->addProperty(property, Context,
                      inducedRules, Debug.contains(DebugFlags::ConcreteUnification));
 }
-void PropertyMap::dump(llvm::raw_ostream &out) const {
-  out << "Property map: {\n";
-  for (const auto &props : Entries) {
-    out << "  ";
-    props->dump(out);
-    out << "\n";
-  }
-  out << "}\n";
-}
 
 /// Build the property map from all rules of the form T.[p] => T, where
 /// [p] is a property symbol.
@@ -318,11 +309,10 @@ void PropertyMap::dump(llvm::raw_ostream &out) const {
 /// left hand side has a length exceeding \p maxDepth.
 ///
 /// Otherwise, the status is CompletionResult::Success.
-std::pair<RewriteSystem::CompletionResult, unsigned>
-RewriteSystem::buildPropertyMap(PropertyMap &map,
-                                unsigned maxIterations,
-                                unsigned maxDepth) {
-  map.clear();
+std::pair<CompletionResult, unsigned>
+PropertyMap::buildPropertyMap(unsigned maxIterations,
+                              unsigned maxDepth) {
+  clear();
 
   // PropertyMap::addRule() requires that shorter rules are added
   // before longer rules, so that it can perform lookups on suffixes and call
@@ -330,7 +320,7 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
   // full sort by term order here; a bucket sort by term length suffices.
   SmallVector<std::vector<std::pair<Term, Symbol>>, 4> properties;
 
-  for (const auto &rule : Rules) {
+  for (const auto &rule : System.getRules()) {
     if (rule.isSimplified())
       continue;
 
@@ -355,34 +345,44 @@ RewriteSystem::buildPropertyMap(PropertyMap &map,
 
   for (const auto &bucket : properties) {
     for (auto pair : bucket) {
-      map.addProperty(pair.first, pair.second, inducedRules);
+      addProperty(pair.first, pair.second, inducedRules);
     }
   }
 
   // We collect terms with fully concrete types so that we can re-use them
   // to tie off recursion in the next step.
-  map.computeConcreteTypeInDomainMap();
+  computeConcreteTypeInDomainMap();
 
   // Now, we merge concrete type rules with conformance rules, by adding
   // relations between associated type members of type parameters with
   // the concrete type witnesses in the concrete type's conformance.
-  map.concretizeNestedTypesFromConcreteParents(inducedRules);
+  concretizeNestedTypesFromConcreteParents(inducedRules);
 
   // Some of the induced rules might be trivial; only count the induced rules
   // where the left hand side is not already equivalent to the right hand side.
   unsigned addedNewRules = 0;
   for (auto pair : inducedRules) {
-    if (addRule(pair.first, pair.second)) {
+    if (System.addRule(pair.first, pair.second)) {
       ++addedNewRules;
 
-      const auto &newRule = Rules.back();
-      if (newRule.getLHS().size() > maxDepth)
+      const auto &newRule = System.getRules().back();
+      if (newRule.getDepth() > maxDepth)
         return std::make_pair(CompletionResult::MaxDepth, addedNewRules);
     }
   }
 
-  if (Rules.size() > maxIterations)
+  if (System.getRules().size() > maxIterations)
     return std::make_pair(CompletionResult::MaxIterations, addedNewRules);
 
   return std::make_pair(CompletionResult::Success, addedNewRules);
+}
+
+void PropertyMap::dump(llvm::raw_ostream &out) const {
+  out << "Property map: {\n";
+  for (const auto &props : Entries) {
+    out << "  ";
+    props->dump(out);
+    out << "\n";
+  }
+  out << "}\n";
 }

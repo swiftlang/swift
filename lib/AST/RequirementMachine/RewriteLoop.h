@@ -130,6 +130,9 @@ struct RewriteStep {
 
   /// If Kind is ApplyRewriteRule, the index of the rule in the rewrite system.
   ///
+  /// If Kind is AdjustConcreteType, the length of the prefix to add or remove
+  /// at the beginning of each concrete substitution.
+  ///
   /// If Kind is Concrete, the number of substitutions to push or pop.
   unsigned RuleID : 15;
 
@@ -156,8 +159,8 @@ struct RewriteStep {
   }
 
   static RewriteStep forAdjustment(unsigned offset, bool inverse) {
-    return RewriteStep(AdjustConcreteType, offset, /*endOffset=*/0,
-                       /*ruleID=*/0, inverse);
+    return RewriteStep(AdjustConcreteType, /*startOffset=*/0, /*endOffset=*/0,
+                       /*ruleID=*/offset, inverse);
   }
 
   static RewriteStep forShift(bool inverse) {
