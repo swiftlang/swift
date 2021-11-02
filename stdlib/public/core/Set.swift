@@ -820,6 +820,9 @@ extension Set: SetAlgebra {
   @inlinable
   public func isDisjoint<S: Sequence>(with other: S) -> Bool
   where S.Element == Element {
+    if let s = other as? Set<Element> {
+      return isDisjoint(with: s)
+    }
     return _isDisjoint(with: other)
   }
 
@@ -1142,7 +1145,7 @@ extension Set {
     }
     return true
   }
-    
+
   @inlinable
   internal func _isDisjoint<S: Sequence>(with other: S) -> Bool
   where S.Element == Element {
