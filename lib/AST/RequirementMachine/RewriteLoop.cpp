@@ -105,27 +105,27 @@ MutableTerm RewriteStep::applyAdjustment(RewritePathEvaluator &evaluator,
   auto &term = evaluator.getCurrentTerm();
 
   assert(Kind == AdjustConcreteType);
-  assert(EndOffset == 0);
-  assert(RuleID == 0);
 
   auto &ctx = system.getRewriteContext();
-  MutableTerm prefix(term.begin(), term.begin() + StartOffset);
+  MutableTerm prefix(term.begin() + StartOffset,
+                     term.begin() + StartOffset + RuleID);
 
   // We're either adding or removing the prefix to each concrete substitution.
   term.back() = term.back().transformConcreteSubstitutions(
     [&](Term t) -> Term {
       if (Inverse) {
         if (!std::equal(t.begin(),
-                        t.begin() + StartOffset,
+                        t.begin() + RuleID,
                         prefix.begin())) {
           llvm::errs() << "Invalid rewrite path\n";
           llvm::errs() << "- Term: " << term << "\n";
+          llvm::errs() << "- Substitution: " << t << "\n";
           llvm::errs() << "- Start offset: " << StartOffset << "\n";
           llvm::errs() << "- Expected subterm: " << prefix << "\n";
           abort();
         }
 
-        MutableTerm mutTerm(t.begin() + StartOffset, t.end());
+        MutableTerm mutTerm(t.begin() + RuleID, t.end());
         return Term::get(mutTerm, ctx);
       } else {
         MutableTerm mutTerm(prefix);
@@ -160,7 +160,6 @@ void RewriteStep::applyShift(RewritePathEvaluator &evaluator,
 void RewriteStep::applyDecompose(RewritePathEvaluator &evaluator,
                                  const RewriteSystem &system) const {
   assert(Kind == Decompose);
-  assert(StartOffset == 0);
   assert(EndOffset == 0);
 
   auto &ctx = system.getRewriteContext();
@@ -332,4 +331,3 @@ void RewriteLoop::dump(llvm::raw_ostream &out,
   if (isDeleted())
     out << " [deleted]";
 }
-
