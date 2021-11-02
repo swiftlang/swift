@@ -6601,6 +6601,8 @@ TypeChecker::deriveTypeWitness(DeclContext *DC,
     return std::make_pair(derived.deriveCaseIterable(AssocType), nullptr);
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
+  case KnownProtocolKind::DistributedActor:
+    return derived.deriveDistributedActor(AssocType);
   default:
     return std::make_pair(nullptr, nullptr);
   }

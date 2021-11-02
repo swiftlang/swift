@@ -65,11 +65,14 @@ final class FakeTransport: ActorTransport {
   }
 }
 
+@available(SwiftStdlib 5.6, *)
+typealias DefaultActorTransport = FakeTransport
+
 // ==== Execute ----------------------------------------------------------------
 
 func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
-  var transport: ActorTransport? = FakeTransport()
+  var transport: FakeTransport? = FakeTransport()
 
   let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport!)
 

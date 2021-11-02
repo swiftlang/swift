@@ -13,7 +13,7 @@ distributed actor Capybara { }
 //distributed actor GuineaPing: Wheeker { }
 
 @available(SwiftStdlib 5.6, *)
-func test(identity: AnyActorIdentity, transport: ActorTransport) async throws {
+func test(identity: AnyActorIdentity, transport: AnyActorTransport) async throws {
   let _: Capybara = try Capybara.resolve(identity, using: transport)
 
 // TODO: implement resolve being able to be called on a distributed actor protocol

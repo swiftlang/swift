@@ -45,6 +45,21 @@ static VarDecl* lookupProperty(NominalTypeDecl *ty, DeclName name) {
   return dyn_cast<VarDecl>(refs.front());
 }
 
+/// Emit a reference to a specific stored property of the actor.
+static SILValue emitActorPropertyReference(
+    SILGenFunction &SGF, SILLocation loc, SILValue actorSelf,
+    VarDecl *property) {
+  Type formalType = SGF.F.mapTypeIntoContext(property->getInterfaceType());
+  SILType loweredType = SGF.getLoweredType(formalType).getAddressType();
+#if false
+  if (!loweredType.isAddress()) {
+    loweredType = SILType::getPrimitiveAddressType(
+        formalType->getCanonicalType());
+  }
+#endif
+  return SGF.B.createRefElementAddr(loc, actorSelf, property, loweredType);
+}
+
 /// Perform an initializing store to the given property using the value
 /// \param actorSelf the value representing `self` for the actor instance.
 /// \param prop the property to be initialized.
@@ -52,15 +67,23 @@ static VarDecl* lookupProperty(NominalTypeDecl *ty, DeclName name) {
 static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
                                SILValue actorSelf,
                                VarDecl* prop, SILValue value) {
-  CanType propType = SGF.F.mapTypeIntoContext(prop->getInterfaceType())
-      ->getCanonicalType();
-  SILType loweredPropType = SGF.getLoweredType(propType);
-  auto fieldAddr = SGF.B.createRefElementAddr(loc, actorSelf, prop, loweredPropType);
+  Type formalType = SGF.F.mapTypeIntoContext(prop->getInterfaceType());
+  SILType loweredType = SGF.getLoweredType(formalType);
 
-  if (fieldAddr->getType().isAddress())
+  auto fieldAddr = emitActorPropertyReference(SGF, loc, actorSelf, prop);
+
+  if (loweredType.isAddressOnly(SGF.F)) {
     SGF.B.createCopyAddr(loc, value, fieldAddr, IsNotTake, IsInitialization);
-  else
-    SGF.B.emitStoreValueOperation(loc, value, fieldAddr, StoreOwnershipQualifier::Init);
+  } else {
+    if (value->getType().isAddress()) {
+      value = SGF.B.createTrivialLoadOr(
+          loc, value, LoadOwnershipQualifier::Copy);
+    }
+
+    value = SGF.B.emitCopyValueOperation(loc, value);
+    SGF.B.emitStoreValueOperation(
+        loc, value, fieldAddr, StoreOwnershipQualifier::Init);
+  }
 }
 
 /******************************************************************************/
@@ -355,26 +378,20 @@ void SILGenFunction::emitResignIdentityCall(SILLocation loc,
   FormalEvaluationScope scope(*this);
 
   // ==== locate: self.id
-  auto *idVarDeclRef = lookupProperty(actorDecl, ctx.Id_id);
-  CanType idType = F.mapTypeIntoContext(
-      idVarDeclRef->getInterfaceType())->getCanonicalType();
-  auto idRef = B.createRefElementAddr(loc, actorSelf, idVarDeclRef,
-                                      getLoweredType(idType));
+  auto idRef = emitActorPropertyReference(
+      *this, loc, actorSelf.getValue(), lookupProperty(actorDecl, ctx.Id_id));
 
   // ==== locate: self.actorTransport
-  auto transportVarDeclRef = lookupProperty(actorDecl, ctx.Id_actorTransport);
-  CanType transportType = F.mapTypeIntoContext(
-      transportVarDeclRef->getInterfaceType())->getCanonicalType();
-  auto transportRef =
-    B.createRefElementAddr(loc, actorSelf, transportVarDeclRef,
-                           getLoweredType(transportType));
+  auto transportRef = emitActorPropertyReference(
+      *this, loc, actorSelf.getValue(),
+      lookupProperty(actorDecl, ctx.Id_actorTransport));
 
   // Perform the call.
   emitActorTransportWitnessCall(
       B, loc, ctx.Id_resignIdentity,
-      transportRef.getValue(),
+      transportRef,
       SILType(),
-      { idRef.getValue() });
+      { idRef });
 }
 
 void
