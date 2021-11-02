@@ -175,12 +175,6 @@ protected:
     IsSingleExtendedGraphemeCluster : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(InterpolatedStringLiteralExpr, LiteralExpr, 32+20,
-    : NumPadBits,
-    InterpolationCount : 20,
-    LiteralCapacity : 32
-  );
-
   SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2+1+1,
     Semantics : 2, // an AccessSemantics
     FunctionRefKind : 2,
@@ -879,56 +873,12 @@ class InterpolatedStringLiteralExpr : public LiteralExpr {
   SourceLoc TrailingQuoteLoc;
   TapExpr *AppendingExpr;
 
-  // Set by Sema:
-  OpaqueValueExpr *interpolationExpr = nullptr;
-  ConcreteDeclRef builderInit;
-  Expr *interpolationCountExpr = nullptr;
-  Expr *literalCapacityExpr = nullptr;
-
 public:
-  InterpolatedStringLiteralExpr(SourceLoc Loc,
-                                SourceLoc TrailingQuoteLoc,
-                                unsigned LiteralCapacity,
-                                unsigned InterpolationCount,
+  InterpolatedStringLiteralExpr(SourceLoc Loc, SourceLoc TrailingQuoteLoc,
                                 TapExpr *AppendingExpr)
       : LiteralExpr(ExprKind::InterpolatedStringLiteral, /*Implicit=*/false),
-        Loc(Loc),
-        TrailingQuoteLoc(TrailingQuoteLoc),
-        AppendingExpr(AppendingExpr) {
-    Bits.InterpolatedStringLiteralExpr.InterpolationCount = InterpolationCount;
-    Bits.InterpolatedStringLiteralExpr.LiteralCapacity = LiteralCapacity;
-  }
-
-  // Sets the constructor for the interpolation type.
-  void setBuilderInit(ConcreteDeclRef decl) { builderInit = decl; }
-  ConcreteDeclRef getBuilderInit() const { return builderInit; }
-
-  /// Sets the OpaqueValueExpr that is passed into AppendingExpr as the SubExpr
-  /// that the tap operates on.
-  void setInterpolationExpr(OpaqueValueExpr *expr) { interpolationExpr = expr; }
-  OpaqueValueExpr *getInterpolationExpr() const { return interpolationExpr; }
-
-  /// Store a builtin integer literal expr wrapping getInterpolationCount().
-  /// This is an arg to builderInit.
-  void setInterpolationCountExpr(Expr *expr) { interpolationCountExpr = expr; }
-  Expr *getInterpolationCountExpr() const { return interpolationCountExpr; }
-
-  /// Store a builtin integer literal expr wrapping getLiteralCapacity().
-  /// This is an arg to builderInit.
-  void setLiteralCapacityExpr(Expr *expr) { literalCapacityExpr = expr; }
-  Expr *getLiteralCapacityExpr() const { return literalCapacityExpr; }
-
-  /// Retrieve the value of the literalCapacity parameter to the
-  /// initializer.
-  unsigned getLiteralCapacity() const {
-    return Bits.InterpolatedStringLiteralExpr.LiteralCapacity;
-  }
-
-  /// Retrieve the value of the interpolationCount parameter to the
-  /// initializer.
-  unsigned getInterpolationCount() const {
-    return Bits.InterpolatedStringLiteralExpr.InterpolationCount;
-  }
+        Loc(Loc), TrailingQuoteLoc(TrailingQuoteLoc),
+        AppendingExpr(AppendingExpr) {}
 
   /// A block containing expressions which call
   /// \c StringInterpolationProtocol methods to append segments to the

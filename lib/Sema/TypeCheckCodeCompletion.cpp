@@ -147,16 +147,6 @@ public:
         return { false, OOE->getSubExpr()->walk(*this) };
       }
 
-      // Hacky, this behaves just like an OpenedExistential in that it changes
-      // the expr tree.
-      if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
-        if (auto subExpr = ISLE->getAppendingExpr()->getSubExpr()) {
-          if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(subExpr)) {
-            ISLE->getAppendingExpr()->setSubExpr(nullptr);
-          }
-        }
-      }
-
       // Substitute OpaqueValue with its representing existental.
       if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
         auto value = OpenExistentials.find(OVE);

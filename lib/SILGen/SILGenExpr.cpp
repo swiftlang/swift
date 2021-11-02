@@ -2470,52 +2470,7 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
 RValue RValueEmitter::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {
-  RValue interpolation;
-  {
-    TapExpr *ETap = E->getAppendingExpr();
-    // Inlined from TapExpr:
-    // TODO: This is only necessary because constant evaluation requires that
-    // the box for the var gets defined before the initializer happens.
-    auto Var = ETap->getVar();
-    auto VarType = ETap->getType()->getCanonicalType();
-
-    Scope outerScope(SGF, CleanupLocation(ETap));
-
-    // Initialize the var with our SubExpr.
-    auto VarInit =
-        SGF.emitInitializationForVarDecl(Var, /*forceImmutable=*/false);
-    {
-      // Modified from TapExpr to evaluate the SubExpr directly rather than
-      // indirectly through the OpaqueValue system.
-      PreparedArguments builderInitArgs;
-      RValue literalCapacity = visit(E->getLiteralCapacityExpr(), SGFContext());
-      RValue interpolationCount =
-          visit(E->getInterpolationCountExpr(), SGFContext());
-      builderInitArgs.emplace(
-          {AnyFunctionType::Param(literalCapacity.getType()),
-           AnyFunctionType::Param(interpolationCount.getType())});
-      builderInitArgs.add(E, std::move(literalCapacity));
-      builderInitArgs.add(E, std::move(interpolationCount));
-      RValue subexpr_result = SGF.emitApplyAllocatingInitializer(
-          E, E->getBuilderInit(), std::move(builderInitArgs), Type(),
-          SGFContext(VarInit.get()));
-      if (!subexpr_result.isInContext()) {
-        ArgumentSource(
-            SILLocation(E),
-            std::move(subexpr_result).ensurePlusOne(SGF, SILLocation(E)))
-            .forwardInto(SGF, VarInit.get());
-      }
-    }
-
-    // Emit the body and let it mutate the var if it chooses.
-    SGF.emitStmt(ETap->getBody());
-
-    // Retrieve and return the var, making it +1 so it survives the scope.
-    auto result = SGF.emitRValueForDecl(SILLocation(ETap), Var, VarType,
-                                        AccessSemantics::Ordinary, SGFContext());
-    result = std::move(result).ensurePlusOne(SGF, SILLocation(ETap));
-    interpolation = outerScope.popPreservingValue(std::move(result));
-  }
+  RValue interpolation = SGF.emitRValue(E->getAppendingExpr());
 
   PreparedArguments resultInitArgs;
   resultInitArgs.emplace(AnyFunctionType::Param(interpolation.getType()));

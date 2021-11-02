@@ -2055,7 +2055,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     // so that parseDeclPoundDiagnostic() can figure out why this string
     // literal was bad.
     return makeParserErrorResult(new (Context) InterpolatedStringLiteralExpr(
-        Loc, Loc.getAdvancedLoc(CloseQuoteBegin), 0, 0, nullptr));
+        Loc, Loc.getAdvancedLoc(CloseQuoteBegin), /*appendingExpr*/ nullptr));
   }
 
   unsigned LiteralCapacity = 0;
@@ -2085,7 +2085,28 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
     auto Body = BraceStmt::create(Context, Loc, Stmts, /*endLoc=*/Loc,
                                   /*implicit=*/true);
-    AppendingExpr = new (Context) TapExpr(nullptr, Body);
+
+    // Form an implicit initialization of the builder type:
+    // .init(literalCapacity: <capacity>, interpolationCount: <count>)
+
+    // Give the implicit '.init' reference the source location for the start of
+    // the string literal. This allows the TapExpr to inherit the location info,
+    // which is needed for SILGen to emit useful location info.
+    auto *DotInit = new (Context) UnresolvedMemberExpr(
+        Loc, DeclNameLoc(Loc), DeclNameRef(DeclBaseName::createConstructor()),
+        /*implicit*/ true);
+
+    Argument CapacityArg(
+        SourceLoc(), Context.Id_literalCapacity,
+        IntegerLiteralExpr::createFromUnsigned(Context, LiteralCapacity));
+    Argument CountArg(
+        SourceLoc(), Context.Id_interpolationCount,
+        IntegerLiteralExpr::createFromUnsigned(Context, InterpolationCount));
+
+    auto *Args = ArgumentList::createImplicit(Context, {CapacityArg, CountArg});
+    auto *InitExpr = CallExpr::createImplicit(Context, DotInit, Args);
+
+    AppendingExpr = new (Context) TapExpr(InitExpr, Body);
   }
 
   if (HasCustomDelimiter) {
@@ -2106,7 +2127,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(
                                       Loc, Loc.getAdvancedLoc(CloseQuoteBegin),
-                                      LiteralCapacity, InterpolationCount,
                                       AppendingExpr));
 }
 

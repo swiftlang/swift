@@ -1875,12 +1875,6 @@ public:
                   Ctx.SourceMgr);
       }
     }
-    PrintWithColorRAII(OS, LiteralValueColor)
-      << " literal_capacity="
-      << E->getLiteralCapacity() << " interpolation_count="
-      << E->getInterpolationCount();
-    PrintWithColorRAII(OS, LiteralValueColor) << " builder_init=";
-    E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
     E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     OS << "\n";

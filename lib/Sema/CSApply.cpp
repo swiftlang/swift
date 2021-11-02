@@ -2758,83 +2758,43 @@ namespace {
       return handleStringLiteralExpr(expr);
     }
 
+    ConcreteDeclRef fetchProtocolInitWitness(KnownProtocolKind protocolKind,
+                                             Type type,
+                                             ArrayRef<Identifier> argLabels,
+                                             SourceLoc loc) {
+      auto &ctx = cs.getASTContext();
+      auto *proto = TypeChecker::getProtocol(ctx, loc, protocolKind);
+      assert(proto && "Missing protocol?");
+
+      auto conformance = TypeChecker::conformsToProtocol(
+          type, proto, cs.DC->getParentModule());
+      assert(conformance && "Type doesn't conform to protocol?");
+
+      DeclName constrName(ctx, DeclBaseName::createConstructor(), argLabels);
+
+      ConcreteDeclRef witness =
+          conformance.getWitnessByName(type->getRValueType(), constrName);
+      if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
+        return nullptr;
+      return witness;
+    }
+
     Expr *
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
-      // Figure out the string type we're converting to.
-      auto openedType = cs.getType(expr);
-      auto type = simplifyType(openedType);
-      cs.setType(expr, type);
-
       auto &ctx = cs.getASTContext();
-      auto loc = expr->getStartLoc();
 
-      auto fetchProtocolInitWitness =
-          [&](KnownProtocolKind protocolKind, Type type,
-              ArrayRef<Identifier> argLabels) -> ConcreteDeclRef {
-        auto proto = TypeChecker::getProtocol(ctx, loc, protocolKind);
-        assert(proto && "Missing string interpolation protocol?");
+      // Figure out the string type we're converting to.
+      auto ty = simplifyType(cs.getType(expr));
+      cs.setType(expr, ty);
 
-        auto conformance =
-          TypeChecker::conformsToProtocol(type, proto, cs.DC->getParentModule());
-        assert(conformance && "string interpolation type conforms to protocol");
-
-        DeclName constrName(ctx, DeclBaseName::createConstructor(), argLabels);
-
-        ConcreteDeclRef witness =
-            conformance.getWitnessByName(type->getRValueType(), constrName);
-        if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
-          return nullptr;
-        return witness;
-      };
-
-      auto *interpolationProto = TypeChecker::getProtocol(
-          cs.getASTContext(), expr->getLoc(),
-          KnownProtocolKind::ExpressibleByStringInterpolation);
-      auto associatedTypeDecl =
-          interpolationProto->getAssociatedType(ctx.Id_StringInterpolation);
-      if (associatedTypeDecl == nullptr) {
-        ctx.Diags.diagnose(expr->getStartLoc(),
-                           diag::interpolation_broken_proto);
-        return nullptr;
-      }
-      auto interpolationType =
-        simplifyType(DependentMemberType::get(openedType, associatedTypeDecl));
-
-      // Fetch needed witnesses.
-      ConcreteDeclRef builderInit = fetchProtocolInitWitness(
-          KnownProtocolKind::StringInterpolationProtocol, interpolationType,
-          {ctx.Id_literalCapacity, ctx.Id_interpolationCount});
-      if (!builderInit) return nullptr;
-      expr->setBuilderInit(builderInit);
-
+      // Fetch the needed witness for the init(stringInterpolation:) call.
       ConcreteDeclRef resultInit = fetchProtocolInitWitness(
-          KnownProtocolKind::ExpressibleByStringInterpolation, type,
-          {ctx.Id_stringInterpolation});
-      if (!resultInit) return nullptr;
+          KnownProtocolKind::ExpressibleByStringInterpolation, ty,
+          {ctx.Id_stringInterpolation}, expr->getStartLoc());
+      if (!resultInit)
+        return nullptr;
+
       expr->setInitializer(resultInit);
-
-      // Make the integer literals for the parameters.
-      auto buildExprFromUnsigned = [&](unsigned value) {
-        LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
-        cs.setType(expr, ctx.getIntType());
-        return handleIntegerLiteralExpr(expr);
-      };
-
-      expr->setLiteralCapacityExpr(
-          buildExprFromUnsigned(expr->getLiteralCapacity()));
-      expr->setInterpolationCountExpr(
-          buildExprFromUnsigned(expr->getInterpolationCount()));
-
-      // This OpaqueValueExpr represents the result of builderInit above in
-      // silgen.
-      OpaqueValueExpr *interpolationExpr =
-          new (ctx) OpaqueValueExpr(expr->getSourceRange(), interpolationType);
-      cs.setType(interpolationExpr, interpolationType);
-      expr->setInterpolationExpr(interpolationExpr);
-
-      auto appendingExpr = expr->getAppendingExpr();
-      appendingExpr->setSubExpr(interpolationExpr);
-
       return expr;
     }
     
