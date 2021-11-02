@@ -796,8 +796,11 @@ extension Set: SetAlgebra {
   @inlinable
   public func isStrictSuperset<S: Sequence>(of possibleStrictSubset: S) -> Bool
   where S.Element == Element {
-    let other = Set(possibleStrictSubset)
-    return other.isStrictSubset(of: self)
+    if isEmpty { return false }
+    if let s = possibleStrictSubset as? Set<Element> {
+      return isStrictSuperset(of: s)
+    }
+    return _variant.convertedToNative.isStrictSuperset(of: possibleStrictSubset)
   }
 
   /// Returns a Boolean value that indicates whether the set has no members in
@@ -1191,7 +1194,7 @@ extension Set {
   ///   `other`; otherwise, `false`.
   @inlinable
   public func isStrictSuperset(of other: Set<Element>) -> Bool {
-    return self.isSuperset(of: other) && self != other
+    return self.count > other.count && other.isSubset(of: self)
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict subset
