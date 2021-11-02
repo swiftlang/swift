@@ -1087,7 +1087,6 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
     Type patternType = TypeChecker::typeCheckPattern(pattern);
-    bool hadError = false;
     if (!patternType->hasError()) {
       if (!type->isEqual(patternType) && !type->hasError()) {
         if (options & TypeResolutionFlags::OverrideType) {
@@ -1101,11 +1100,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
         } else {
           diags.diagnose(P->getLoc(), diag::pattern_type_mismatch_context,
                          type);
-          hadError = true;
         }
       }
-    } else {
-      hadError = true;
     }
 
     Pattern *sub = TP->getSubPattern();
