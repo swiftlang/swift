@@ -8770,7 +8770,28 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   case RequirementMachineMode::Enabled:
     return buildViaRQM();
 
-  case RequirementMachineMode::Verify:
-    abort();
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = buildViaRQM();
+    auto gsbResult = buildViaGSB();
+
+    if (rqmResult.size() != gsbResult.size() ||
+        !std::equal(rqmResult.begin(), rqmResult.end(),
+                    gsbResult.begin())) {
+      llvm::errs() << "RequirementMachine protocol signature minimization is broken:\n";
+      llvm::errs() << "Protocol: " << proto->getName() << "\n";
+
+      auto rqmSig = GenericSignature::get(
+          proto->getGenericSignature().getGenericParams(), rqmResult);
+      llvm::errs() << "RequirementMachine says:      " << rqmSig << "\n";
+
+      auto gsbSig = GenericSignature::get(
+          proto->getGenericSignature().getGenericParams(), gsbResult);
+      llvm::errs() << "GenericSignatureBuilder says: " << gsbSig << "\n";
+
+      abort();
+    }
+
+    return gsbResult;
+  }
   }
 }
