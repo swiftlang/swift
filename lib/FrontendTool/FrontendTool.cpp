@@ -2065,6 +2065,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
       FrontendOptions::ActionType::Immediate) {
     llvm::setBugReportMsg(nullptr);
   }
+  
+  /// Enable leaks checking because this SILModule is the only one in the process
+  /// (leaks checking is not thread safe).
+  Invocation.getSILOptions().checkSILModuleLeaks = true;
 
   PrettyStackTraceFrontend frontendTrace(Invocation.getLangOptions());
 

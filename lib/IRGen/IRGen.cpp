@@ -1145,8 +1145,10 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the embedding of bitcode.
   auto SILModuleRelease = [&SILMod]() {
+    bool checkForLeaks = SILMod->getOptions().checkSILModuleLeaks;
     SILMod.reset(nullptr);
-    SILModule::checkForLeaksAfterDestruction();
+    if (checkForLeaks)
+      SILModule::checkForLeaksAfterDestruction();
   };
   auto Thread = std::thread(SILModuleRelease);
   // Wait for the thread to terminate.
@@ -1447,8 +1449,10 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the LLVM compilation.
   auto SILModuleRelease = [&SILMod]() {
+    bool checkForLeaks = SILMod->getOptions().checkSILModuleLeaks;
     SILMod.reset(nullptr);
-    SILModule::checkForLeaksAfterDestruction();
+    if (checkForLeaks)
+      SILModule::checkForLeaksAfterDestruction();
   };
   auto releaseModuleThread = std::thread(SILModuleRelease);
 
