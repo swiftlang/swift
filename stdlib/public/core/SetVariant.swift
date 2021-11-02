@@ -376,3 +376,24 @@ extension Set._Variant {
   }
 }
 
+extension Set._Variant {
+  @_alwaysEmitIntoClient
+  internal __consuming func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> _NativeSet<Element> {
+#if _runtime(_ObjC)
+    guard isNative else {
+      var result = _NativeSet<Element>()
+      for cocoaElement in asCocoa {
+        let nativeElement = _forceBridgeFromObjectiveC(
+          cocoaElement, Element.self)
+        if try isIncluded(nativeElement) {
+          result.insertNew(nativeElement, isUnique: true)
+        }
+      }
+      return result
+    }
+#endif
+    return try asNative.filter(isIncluded)
+  }
+}

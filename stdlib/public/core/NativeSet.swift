@@ -659,6 +659,25 @@ extension _NativeSet {
   }
 
   @_alwaysEmitIntoClient
+  internal __consuming func extractSubset(
+    using bitset: _UnsafeBitset,
+    count: Int
+  ) -> _NativeSet {
+    var count = count
+    if count == 0 { return _NativeSet() }
+    if count == self.count { return self }
+    let result = _NativeSet(capacity: count)
+    for offset in bitset {
+      result._unsafeInsertNew(self.uncheckedElement(at: Bucket(offset: offset)))
+      // The hash table can have set bits after the end of the bitmap.
+      // Ignore them.
+      count -= 1
+      if count == 0 { break }
+    }
+    return result
+  }
+
+  @_alwaysEmitIntoClient
   internal __consuming func subtracting<S: Sequence>(_ other: S) -> _NativeSet
   where S.Element == Element {
     guard count > 0 else { return _NativeSet() }
@@ -677,18 +696,24 @@ extension _NativeSet {
           }
         }
       }
-      _internalInvariant(remainingCount > 0)
-      if remainingCount == self.count { return self }
-      let result = _NativeSet(capacity: remainingCount)
-      for offset in difference {
-        result._unsafeInsertNew(
-          self.uncheckedElement(at: Bucket(offset: offset)))
-        // The hash table can have set bits after the end of the bitmap.
-        // Ignore them.
-        remainingCount -= 1
-        if remainingCount == 0 { break }
+      _internalInvariant(difference.count > 0)
+      return extractSubset(using: difference, count: remainingCount)
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  internal __consuming func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> _NativeSet<Element> {
+    try _UnsafeBitset.withTemporaryBitset(capacity: bucketCount) { bitset in
+      var count = 0
+      for bucket in hashTable {
+        if try isIncluded(uncheckedElement(at: bucket)) {
+          bitset.uncheckedInsert(bucket.offset)
+          count += 1
+        }
       }
-      return result
+      return extractSubset(using: bitset, count: count)
     }
   }
 }

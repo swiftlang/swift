@@ -42,7 +42,7 @@ internal struct _HashTable {
   @inlinable
   internal var bucketCount: Int {
     @inline(__always) get {
-      return bucketMask &+ 1
+      return _assumeNonNegative(bucketMask &+ 1)
     }
   }
 
