@@ -1141,9 +1141,7 @@ namespace {
         auto appendingExprType = CS.getType(appendingExpr);
         auto appendingLocator = CS.getConstraintLocator(appendingExpr);
 
-        // Must be Conversion; if it's Equal, then in semi-rare cases, the 
-        // interpolation temporary variable cannot be @lvalue.
-        CS.addConstraint(ConstraintKind::Conversion, appendingExprType,
+        CS.addConstraint(ConstraintKind::Bind, appendingExprType,
                          interpolationTV, appendingLocator);
       }
 
