@@ -608,4 +608,32 @@ extension _NativeSet {
       return false
     }
   }
+
+  @_alwaysEmitIntoClient
+  internal func isStrictSubset<S: Sequence>(of possibleSuperset: S) -> Bool
+  where S.Element == Element {
+    _UnsafeBitset.withTemporaryBitset(capacity: self.bucketCount) { seen in
+      // Mark elements in self that we've seen in `possibleSuperset`.
+      var seenCount = 0
+      var isStrict = false
+      for element in possibleSuperset {
+        let (bucket, found) = find(element)
+        guard found else {
+          if !isStrict {
+            isStrict = true
+            if seenCount == self.count { return true }
+          }
+          continue
+        }
+        let inserted = seen.uncheckedInsert(bucket.offset)
+        if inserted {
+          seenCount += 1
+          if seenCount == self.count, isStrict {
+            return true
+          }
+        }
+      }
+      return false
+    }
+  }
 }
