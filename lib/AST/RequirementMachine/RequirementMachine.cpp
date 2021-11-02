@@ -197,29 +197,51 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     //
     // Together with a rewrite rule
     //
-    //   T.[layout: L] => T
+    //   [superclass: C<X, Y>].[layout: L] => [superclass: C<X, Y>]
     //
     // Where 'L' is either AnyObject or _NativeObject, depending on the
     // ancestry of C.
+    //
+    // The second rule is marked permanent. Completion will derive a new
+    // rule as a consequence of these two rules:
+    //
+    //   T.[layout: L] => T
+    //
+    // The new rule will be marked redundant by homotopy reduction since
+    // it is a consequence of the other two rules.
     auto otherType = CanType(req.getSecondType());
 
+    // Build the symbol [superclass: C<X, Y>].
     SmallVector<Term, 1> substitutions;
     otherType = getConcreteSubstitutionSchema(otherType, proto,
                                               substitutions);
+    auto superclassSymbol = Symbol::forSuperclass(otherType, substitutions,
+                                                  Context);
 
-    constraintTerm = subjectTerm;
-    constraintTerm.add(Symbol::forSuperclass(otherType, substitutions,
-                                             Context));
-    RequirementRules.emplace_back(subjectTerm, constraintTerm);
+    {
+      // Build the symbol [layout: L].
+      auto layout =
+        LayoutConstraint::getLayoutConstraint(
+          otherType->getClassOrBoundGenericClass()->usesObjCObjectModel()
+            ? LayoutConstraintKind::Class
+            : LayoutConstraintKind::NativeClass,
+          Context.getASTContext());
+      auto layoutSymbol = Symbol::forLayout(layout, Context);
 
+      MutableTerm layoutSubjectTerm;
+      layoutSubjectTerm.add(superclassSymbol);
+
+      MutableTerm layoutConstraintTerm = layoutSubjectTerm;
+      layoutConstraintTerm.add(layoutSymbol);
+
+      // Add the rule [superclass: C<X, Y>].[layout: L] => [superclass: C<X, Y>].
+      PermanentRules.emplace_back(layoutConstraintTerm,
+                                  layoutSubjectTerm);
+    }
+
+    // Build the term T.[superclass: C<X, Y>].
     constraintTerm = subjectTerm;
-    auto layout =
-      LayoutConstraint::getLayoutConstraint(
-        otherType->getClassOrBoundGenericClass()->usesObjCObjectModel()
-          ? LayoutConstraintKind::Class
-          : LayoutConstraintKind::NativeClass,
-        Context.getASTContext());
-    constraintTerm.add(Symbol::forLayout(layout, Context));
+    constraintTerm.add(superclassSymbol);
     break;
   }
 

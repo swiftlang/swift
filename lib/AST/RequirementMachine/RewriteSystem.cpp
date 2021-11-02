@@ -521,7 +521,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
   }
 
   for (const auto &rule : Rules) {
-    if (rule.isSimplified())
+    if (rule.isSimplified() || rule.isPermanent())
       continue;
 
     const auto &lhs = rule.getLHS();
