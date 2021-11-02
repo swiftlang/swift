@@ -1105,6 +1105,7 @@ private:
                                            LinkEntity entity);
                                            
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
+  llvm::DenseMap<LinkEntity, llvm::Constant*> IndirectAsyncFunctionPointers;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;

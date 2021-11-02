@@ -177,6 +177,7 @@ set(SWIFTLIB_ESSENTIAL
   UnavailableStringAPIs.swift
   UnicodeData.swift
   UnicodeEncoding.swift
+  UnicodeGraphemeBreakProperty.swift
   UnicodeHelpers.swift
   UnicodeParser.swift
   UnicodeScalarProperties.swift

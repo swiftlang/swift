@@ -311,6 +311,7 @@ public:
   /// Used on Windows to avoid cross-module references.
   unsigned LazyInitializeClassMetadata : 1;
   unsigned LazyInitializeProtocolConformances : 1;
+  unsigned IndirectAsyncFunctionPointer : 1;
 
   /// Normally if the -read-legacy-type-info flag is not specified, we look for
   /// a file named "legacy-<arch>.yaml" in SearchPathOpts.RuntimeLibraryPath.
@@ -417,7 +418,8 @@ public:
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
-        LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
+        LazyInitializeProtocolConformances(false),
+        IndirectAsyncFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),

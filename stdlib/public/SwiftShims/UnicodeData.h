@@ -40,6 +40,9 @@ __swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
                                          const __swift_uint16_t * const *ranks,
                                          const __swift_uint16_t * const sizes);
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
