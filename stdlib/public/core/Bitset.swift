@@ -337,3 +337,35 @@ extension _UnsafeBitset.Word: Sequence, IteratorProtocol {
     return bit
   }
 }
+
+extension _UnsafeBitset {
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal static func _withTemporaryUninitializedBitset<R>(
+    wordCount: Int,
+    body: (_UnsafeBitset) throws -> R
+  ) rethrows -> R {
+    try withUnsafeTemporaryAllocation(
+      of: _UnsafeBitset.Word.self, capacity: wordCount
+    ) { buffer in
+      let bitset = _UnsafeBitset(
+        words: buffer.baseAddress!, wordCount: buffer.count)
+      return try body(bitset)
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal static func withTemporaryBitset<R>(
+    capacity: Int,
+    body: (_UnsafeBitset) throws -> R
+  ) rethrows -> R {
+    let wordCount = Swift.max(1, Self.wordCount(forCapacity: capacity))
+    return try _withTemporaryUninitializedBitset(
+      wordCount: wordCount
+    ) { bitset in
+      bitset.clear()
+      return try body(bitset)
+    }
+  }
+}
