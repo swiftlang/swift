@@ -231,11 +231,15 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
         llvm::createAlwaysInlinerLegacyPass(/*insertlifetime*/false);
   }
 
-  // LLVM MergeFunctions doesn't understand the string in the metadata on calls
-  // in @llvm.type.checked.load intrinsics is important, and mis-compiles
-  // (mis-merge) unrelated functions.
-  if (Opts.VirtualFunctionElimination || Opts.WitnessMethodElimination)
+  bool RunSwiftMergeFunctions = true;
+
+  // LLVM MergeFunctions and SwiftMergeFunctions don't understand that the
+  // string in the metadata on calls in @llvm.type.checked.load intrinsics is
+  // semantically meaningful, and mis-compile (mis-merge) unrelated functions.
+  if (Opts.VirtualFunctionElimination || Opts.WitnessMethodElimination) {
     PMBuilder.MergeFunctions = false;
+    RunSwiftMergeFunctions = false;
+  }
 
   bool RunSwiftSpecificLLVMOptzns =
       !Opts.DisableSwiftSpecificLLVMOptzns && !Opts.DisableLLVMOptzns;
@@ -274,7 +278,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addSanitizerCoveragePass);
   }
-  if (RunSwiftSpecificLLVMOptzns) {
+  if (RunSwiftSpecificLLVMOptzns && RunSwiftMergeFunctions) {
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
       [&](const PassManagerBuilder &Builder, PassManagerBase &PM) {
         if (Builder.OptLevel > 0) {
