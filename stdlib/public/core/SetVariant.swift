@@ -108,6 +108,14 @@ extension Set._Variant {
   }
 #endif
 
+  @_alwaysEmitIntoClient
+  internal var convertedToNative: _NativeSet<Element> {
+#if _runtime(_ObjC)
+    guard isNative else {  return _NativeSet<Element>(asCocoa) }
+#endif
+    return asNative
+  }
+
   /// Reserves enough space for the specified number of elements to be stored
   /// without reallocating additional storage.
   internal mutating func reserveCapacity(_ capacity: Int) {
