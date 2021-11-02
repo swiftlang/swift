@@ -193,6 +193,12 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
 
   SmallVector<RewriteStep, 4> newSteps;
 
+  // Keep track of Decompose/Compose pairs. Any rewrite steps in
+  // between do not need to be re-contextualized, since they
+  // operate on new terms that were pushed on the stack by the
+  // Compose operation.
+  unsigned decomposeCount = 0;
+
   for (const auto &step : Steps) {
     switch (step.Kind) {
     case RewriteStep::ApplyRewriteRule: {
@@ -202,13 +208,24 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
       }
 
       auto adjustStep = [&](RewriteStep newStep) {
-        newStep.StartOffset += step.StartOffset;
+        bool inverse = newStep.Inverse ^ step.Inverse;
 
-        if (newStep.Kind == RewriteStep::ApplyRewriteRule)
+        if (newStep.Kind == RewriteStep::Decompose && inverse) {
+          assert(decomposeCount > 0);
+          --decomposeCount;
+        }
+
+        if (decomposeCount == 0) {
+          newStep.StartOffset += step.StartOffset;
           newStep.EndOffset += step.EndOffset;
+        }
 
-        newStep.Inverse ^= step.Inverse;
+        newStep.Inverse = inverse;
         newSteps.push_back(newStep);
+
+        if (newStep.Kind == RewriteStep::Decompose && !inverse) {
+          ++decomposeCount;
+        }
       };
 
       if (step.Inverse) {
