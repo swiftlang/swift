@@ -1709,7 +1709,8 @@ bool TypeVarBindingProducer::computeNext() {
     if (NumTries == 0 && binding.hasDefaultedLiteralProtocol()) {
       auto knownKind =
           *(binding.getDefaultedLiteralProtocol()->getKnownProtocolKind());
-      for (auto altType : CS.getAlternativeLiteralTypes(knownKind)) {
+      SmallVector<Type, 2> scratch;
+      for (auto altType : CS.getAlternativeLiteralTypes(knownKind, scratch)) {
         addNewBinding(binding.withSameSource(altType, BindingKind::Subtypes));
       }
     }
