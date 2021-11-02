@@ -3376,8 +3376,11 @@ namespace {
       if (alreadyImportedResult != Impl.ImportedDecls.end())
         return alreadyImportedResult->second;
       result = Impl.createDeclWithClangNode<StructDecl>(
-          decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
-          name, Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
+          decl, AccessLevel::Public,
+          SourceLoc(), // FIXME: Impl.importSourceLoc(decl->getBeginLoc()) results in a bad import: SR-15440
+          name,
+          SourceLoc(), // FIXME: Impl.importSourceLoc(decl->getLocation()) result in a bad import: SR-15440
+          None, nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -4215,7 +4218,7 @@ namespace {
         Impl.createDeclWithClangNode<VarDecl>(decl, AccessLevel::Public,
                               /*IsStatic*/ false,
                               VarDecl::Introducer::Var,
-                              Impl.importSourceLoc(decl->getLocation()),
+                              SourceLoc(), // FIXME: Impl.importSourceLoc(decl->getLocation()) result in a bad import: SR-15440
                               name, dc);
       if (decl->getType().isConstQualified()) {
         // Note that in C++ there are ways to change the values of const
@@ -6937,7 +6940,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   assert(!importedName.getAsyncInfo());
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       objcMethod, AccessLevel::Public, importedName.getDeclName(),
-      /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
+      /*NameLoc=*/Impl.importSourceLoc(objcMethod->getBeginLoc()), failability, /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
       /*ThrowsLoc=*/SourceLoc(), bodyParams,
