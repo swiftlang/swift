@@ -710,9 +710,11 @@ extension Set: SetAlgebra {
   public func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
   where S.Element == Element {
     guard !isEmpty else { return true }
-    
-    let other = Set(possibleSuperset)
-    return isSubset(of: other)
+    if self.count == 1 { return possibleSuperset.contains(self.first!) }
+    if let s = possibleSuperset as? Set<Element> {
+      return isSubset(of: s)
+    }
+    return _variant.convertedToNative.isSubset(of: possibleSuperset)
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict subset
@@ -1081,7 +1083,7 @@ extension Set {
   public func isSubset(of other: Set<Element>) -> Bool {
     guard self.count <= other.count else { return false }
     for member in self {
-      if !other.contains(member) {
+      guard other.contains(member) else {
         return false
       }
     }
