@@ -57,6 +57,10 @@ protected:
   bool AllowSymbolicReferences = false;
 
   /// If enabled, allows the use of standard substitutions for types in the
+  /// standard library.
+  bool AllowStandardSubstitutions = true;
+
+  /// If enabled, allows the use of standard substitutions for types in the
   /// concurrency library.
   bool AllowConcurrencyStandardSubstitutions = true;
 

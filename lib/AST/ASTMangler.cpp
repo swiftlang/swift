@@ -3023,6 +3023,9 @@ bool ASTMangler::tryAppendStandardSubstitution(const GenericTypeDecl *decl) {
       !dc->getParentModule()->hasStandardSubstitutions())
     return false;
 
+  if (!AllowStandardSubstitutions)
+    return false;
+
   if (isa<NominalTypeDecl>(decl)) {
     if (auto Subst = getStandardTypeSubst(
             decl->getName().str(), AllowConcurrencyStandardSubstitutions)) {
