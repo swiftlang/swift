@@ -49,7 +49,15 @@ struct RewriteSystemBuilder {
   llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
   std::vector<const ProtocolDecl *> Protocols;
 
-  std::vector<std::pair<MutableTerm, MutableTerm>> AssociatedTypeRules;
+  /// New rules to add which will be marked 'permanent'. These are rules for
+  /// introducing associated types, and relationships between layout,
+  /// superclass and concrete type symbols. They are not eliminated by
+  /// homotopy reduction, since they are always added when the rewrite system
+  /// is built.
+  std::vector<std::pair<MutableTerm, MutableTerm>> PermanentRules;
+
+  /// New rules derived from requirements written by the user, which can be
+  /// eliminated by homotopy reduction.
   std::vector<std::pair<MutableTerm, MutableTerm>> RequirementRules;
 
   CanType getConcreteSubstitutionSchema(CanType concreteType,
@@ -141,7 +149,7 @@ void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
   MutableTerm rhs;
   rhs.add(Symbol::forAssociatedType(proto, type->getName(), Context));
 
-  AssociatedTypeRules.emplace_back(lhs, rhs);
+  PermanentRules.emplace_back(lhs, rhs);
 }
 
 /// Lowers a generic requirement to a rewrite rule.
@@ -283,7 +291,7 @@ void RewriteSystemBuilder::processProtocolDependencies() {
     MutableTerm rhs;
     rhs.add(Symbol::forProtocol(proto, Context));
 
-    AssociatedTypeRules.emplace_back(lhs, rhs);
+    PermanentRules.emplace_back(lhs, rhs);
 
     for (auto *assocType : proto->getAssociatedTypeMembers())
       addAssociatedType(assocType, proto);
@@ -457,10 +465,9 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   RewriteSystemBuilder builder(Context, Dump);
   builder.addGenericSignature(sig);
 
-  // Add the initial set of rewrite rules to the rewrite system, also
-  // providing the protocol graph to use for the linear order on terms.
+  // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
-                    std::move(builder.AssociatedTypeRules),
+                    std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
   computeCompletion(RewriteSystem::DisallowInvalidRequirements);
@@ -498,10 +505,9 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
   RewriteSystemBuilder builder(Context, Dump);
   builder.addProtocols(protos);
 
-  // Add the initial set of rewrite rules to the rewrite system, also
-  // providing the protocol graph to use for the linear order on terms.
+  // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
-                    std::move(builder.AssociatedTypeRules),
+                    std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
   // FIXME: Only if the protocols were written in source, though.

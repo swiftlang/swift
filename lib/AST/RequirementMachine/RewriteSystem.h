@@ -230,7 +230,7 @@ public:
   RewriteContext &getRewriteContext() const { return Context; }
 
   void initialize(bool recordLoops,
-                  std::vector<std::pair<MutableTerm, MutableTerm>> &&assocaitedTypeRules,
+                  std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   unsigned getRuleID(const Rule &rule) const {
@@ -252,6 +252,8 @@ public:
 
   bool addRule(MutableTerm lhs, MutableTerm rhs,
                const RewritePath *path=nullptr);
+
+  bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 

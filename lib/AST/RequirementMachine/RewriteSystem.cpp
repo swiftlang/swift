@@ -122,18 +122,15 @@ RewriteSystem::~RewriteSystem() {
 
 void RewriteSystem::initialize(
     bool recordLoops,
-    std::vector<std::pair<MutableTerm, MutableTerm>> &&associatedTypeRules,
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
   RecordLoops = recordLoops;
 
-  for (const auto &rule : associatedTypeRules) {
-    bool added = addRule(rule.first, rule.second);
-    if (added)
-      Rules.back().markPermanent();
-  }
+  for (const auto &rule : permanentRules)
+    addPermanentRule(rule.first, rule.second);
 
   for (const auto &rule : requirementRules)
     addRule(rule.first, rule.second);
@@ -404,6 +401,15 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   // Tell the caller that we added a new rule.
   return true;
+}
+
+/// Add a new rule, marking it permanent.
+bool RewriteSystem::addPermanentRule(MutableTerm lhs, MutableTerm rhs) {
+  bool added = addRule(std::move(lhs), std::move(rhs));
+  if (added)
+    Rules.back().markPermanent();
+
+  return added;
 }
 
 /// Delete any rules whose left hand sides can be reduced by other rules,
