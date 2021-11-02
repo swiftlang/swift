@@ -70,7 +70,7 @@ endforeach()
 # Put the output dir itself last so that it isn't considered the primary output.
 list(APPEND outputs "${output_dir}")
 
-add_custom_target("copy_shim_headers"
+add_custom_target("copy_shim_headers" ALL
     DEPENDS "${outputs}"
     COMMENT "Copying SwiftShims module to ${output_dir}")
 
