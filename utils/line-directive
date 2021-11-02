@@ -224,7 +224,7 @@ def expand_response_files(files):
     expanded_files = []
     for file_path in files:
         # Read a list of files from a response file.
-        if file_path[0] == '@':
+        if file_path and file_path[0] == '@':
             expanded_files.extend(read_response_file(file_path[1:]))
         else:
             expanded_files.append(file_path)
