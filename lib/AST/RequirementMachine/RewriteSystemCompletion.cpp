@@ -490,7 +490,7 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
 /// left hand side has a length exceeding \p maxDepth.
 ///
 /// Otherwise, the status is CompletionResult::Success.
-std::pair<RewriteSystem::CompletionResult, unsigned>
+std::pair<CompletionResult, unsigned>
 RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
                                           unsigned maxDepth) {
   assert(Initialized);
