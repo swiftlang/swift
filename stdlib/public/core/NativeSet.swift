@@ -674,7 +674,6 @@ extension _NativeSet {
       count -= 1
       if count == 0 { break }
     }
-    _internalInvariant(result.count == bitset.count)
     return result
   }
 
