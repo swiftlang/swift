@@ -303,80 +303,19 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name) {
   return *result;
 }
 
-ArrayRef<Type> ConstraintSystem::
-getAlternativeLiteralTypes(KnownProtocolKind kind) {
-  unsigned index;
-
-  switch (kind) {
-#define PROTOCOL_WITH_NAME(Id, Name) \
-  case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, __, ___)
-#include "swift/AST/KnownProtocols.def"
-
-  case KnownProtocolKind::ExpressibleByArrayLiteral:     index = 0; break;
-  case KnownProtocolKind::ExpressibleByDictionaryLiteral:index = 1; break;
-  case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral: index = 2;
-    break;
-  case KnownProtocolKind::ExpressibleByFloatLiteral: index = 3; break;
-  case KnownProtocolKind::ExpressibleByIntegerLiteral: index = 4; break;
-  case KnownProtocolKind::ExpressibleByStringInterpolation: index = 5; break;
-  case KnownProtocolKind::ExpressibleByStringLiteral: index = 6; break;
-  case KnownProtocolKind::ExpressibleByNilLiteral: index = 7; break;
-  case KnownProtocolKind::ExpressibleByBooleanLiteral: index = 8; break;
-  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral: index = 9; break;
-  case KnownProtocolKind::ExpressibleByColorLiteral: index = 10; break;
-  case KnownProtocolKind::ExpressibleByImageLiteral: index = 11; break;
-  case KnownProtocolKind::ExpressibleByFileReferenceLiteral: index = 12; break;
-  }
-  static_assert(NumAlternativeLiteralTypes == 13, "Wrong # of literal types");
-
-  // If we already looked for alternative literal types, return those results.
-  if (AlternativeLiteralTypes[index])
-    return *AlternativeLiteralTypes[index];
-
-  SmallVector<Type, 4> types;
-
-  // Some literal kinds are related.
-  switch (kind) {
-#define PROTOCOL_WITH_NAME(Id, Name) \
-  case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, __, ___)
-#include "swift/AST/KnownProtocols.def"
-
-  case KnownProtocolKind::ExpressibleByArrayLiteral:
-  case KnownProtocolKind::ExpressibleByDictionaryLiteral:
-    break;
-
-  case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral:
-  case KnownProtocolKind::ExpressibleByStringInterpolation:
-  case KnownProtocolKind::ExpressibleByStringLiteral:
-  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
-    break;
-
-  case KnownProtocolKind::ExpressibleByIntegerLiteral:
+ArrayRef<Type>
+ConstraintSystem::getAlternativeLiteralTypes(KnownProtocolKind kind,
+                                             SmallVectorImpl<Type> &scratch) {
+  assert(scratch.empty());
+  if (kind == KnownProtocolKind::ExpressibleByIntegerLiteral) {
     // Integer literals can be treated as floating point literals.
     if (auto floatProto = getASTContext().getProtocol(
                             KnownProtocolKind::ExpressibleByFloatLiteral)) {
-      if (auto defaultType = TypeChecker::getDefaultType(floatProto, DC)) {
-        types.push_back(defaultType);
-      }
+      if (auto defaultType = TypeChecker::getDefaultType(floatProto, DC))
+        scratch.push_back(defaultType);
     }
-    break;
-
-  case KnownProtocolKind::ExpressibleByFloatLiteral:
-    break;
-
-  case KnownProtocolKind::ExpressibleByNilLiteral:
-  case KnownProtocolKind::ExpressibleByBooleanLiteral:
-    break;
-  case KnownProtocolKind::ExpressibleByColorLiteral:
-  case KnownProtocolKind::ExpressibleByImageLiteral:
-  case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
-    break;
   }
-
-  AlternativeLiteralTypes[index] = allocateCopy(types);
-  return *AlternativeLiteralTypes[index];
+  return scratch;
 }
 
 bool ConstraintSystem::containsCodeCompletionLoc(Expr *expr) const {
