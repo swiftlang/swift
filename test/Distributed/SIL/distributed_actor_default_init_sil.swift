@@ -22,7 +22,7 @@ distributed actor MyDistActor {
                 // *** obtain an identity ***
 // CHECK:    [[SELF_METATYPE:%[0-9]+]] = metatype $@thick MyDistActor.Type
 // CHECK:    [[ID_STACK:%[0-9+]+]] = alloc_stack $AnyActorIdentity
-// CHECK:    [[ASSIGN_ID_FN:%[0-9]+]] = witness_method $AnyActorTransport, #ActorTransport.assignIdentity : <Self where Self : ActorTransport><Act where Act : DistributedActor> (Self) -> (Act.Type) -> AnyActorIdentity
+// CHECK:    [[ASSIGN_ID_FN:%[0-9]+]] = witness_method $AnyActorTransport, #ActorTransport.assignIdentity : <Self where Self : ActorTransport><Act where Act : DistributedActor> (Self) -> (Act.Type) -> Self.Identity
 // CHECK:    = apply [[ASSIGN_ID_FN]]<AnyActorTransport, MyDistActor>([[ID_STACK]], [[SELF_METATYPE]], [[TPORT]])
                 // *** save identity ***
 // CHECK:    [[ID_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id

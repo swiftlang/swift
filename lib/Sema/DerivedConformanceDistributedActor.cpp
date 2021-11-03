@@ -61,10 +61,10 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
     return param;
   };
 
-  auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+  auto addressType = getDistributedActorIdentityType(decl);
   auto transportType = getDistributedActorTransportType(decl);
 
-  // (_ identity: AnyActorIdentity, using transport: ActorTransport)
+  // (_ identity: Identity, using transport: ActorTransport)
   auto *params = ParameterList::create(
       C,
       /*LParenLoc=*/SourceLoc(),
@@ -77,7 +77,7 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
   // Func name: resolve(_:using:)
   DeclName name(C, C.Id_resolve, params);
 
-  // Expected type: (Self) -> (AnyActorIdentity, ActorTransport) throws -> (Self)
+  // Expected type: (Self) -> (Identity, ActorTransport) throws -> (Self)
   auto *factoryDecl =
       FuncDecl::createImplicit(C, StaticSpellingKind::KeywordStatic,
                                name, SourceLoc(),
@@ -105,9 +105,9 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
 
   // ```
   // nonisolated
-  // let id: AnyActorIdentity
+  // let id: Identity
   // ```
-  auto propertyType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+  auto propertyType = getDistributedActorIdentityType(derived.Nominal);
 
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
