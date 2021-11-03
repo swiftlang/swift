@@ -868,7 +868,7 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
 
 Optional<AbstractTypeWitness>
 AssociatedTypeInference::computeDefaultTypeWitness(
-    AssociatedTypeDecl *assocType) {
+    AssociatedTypeDecl *assocType) const {
   // Go find a default definition.
   auto *const defaultedAssocType = findDefaultedAssociatedType(assocType);
   if (!defaultedAssocType)
@@ -935,6 +935,57 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   }
 
   return None;
+}
+
+void AssociatedTypeInference::collectAbstractTypeWitnesses(
+    TypeWitnessSystem &system,
+    ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const {
+  // First, look at all the protocols the adoptee conforms to and feed the
+  // same-type constraints in their requirement signatures to the system.
+  for (auto *const conformedProto :
+       adoptee->getAnyNominal()->getAllProtocols(/*sorted=*/true)) {
+    // FIXME: The RequirementMachine will assert on re-entrant construction.
+    // We should find a more principled way of breaking this cycle.
+    if (ctx.isRecursivelyConstructingRequirementMachine(
+            conformedProto->getGenericSignature().getCanonicalSignature()) ||
+        ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
+        conformedProto->isComputingRequirementSignature())
+      continue;
+
+    for (const auto &req :
+         conformedProto->getRequirementSignature().getRequirements()) {
+      if (req.getKind() != RequirementKind::SameType) {
+        continue;
+      }
+
+      system.addSameTypeRequirement(req);
+    }
+  }
+
+  // If the same-type constraints weren't enough to resolve an associated type,
+  // look for more options.
+  for (auto *const assocType : unresolvedAssocTypes) {
+    if (system.hasResolvedTypeWitness(assocType->getName())) {
+      continue;
+    }
+
+    // If we find a default type definition, feed it to the system.
+    if (const auto &typeWitness = computeDefaultTypeWitness(assocType)) {
+      system.addDefaultTypeWitness(typeWitness->getType(),
+                                   typeWitness->getDefaultedAssocType());
+    } else {
+      // As a last resort, look for a generic parameter that matches the name
+      // of the associated type.
+      if (auto genericSig = dc->getGenericSignatureOfContext()) {
+        for (auto *gp : genericSig.getInnermostGenericParams()) {
+          if (gp->getName() == assocType->getName()) {
+            system.addTypeWitness(assocType->getName(),
+                                  dc->mapTypeIntoContext(gp));
+          }
+        }
+      }
+    }
+  }
 }
 
 Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {

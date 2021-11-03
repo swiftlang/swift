@@ -1107,7 +1107,7 @@ private:
   /// Compute the default type witness from an associated type default,
   /// if there is one.
   Optional<AbstractTypeWitness>
-  computeDefaultTypeWitness(AssociatedTypeDecl *assocType);
+  computeDefaultTypeWitness(AssociatedTypeDecl *assocType) const;
 
   /// Compute the "derived" type witness for an associated type that is
   /// known to the compiler.
@@ -1117,6 +1117,11 @@ private:
   /// Compute a type witness without using a specific potential witness.
   Optional<AbstractTypeWitness>
   computeAbstractTypeWitness(AssociatedTypeDecl *assocType);
+
+  /// Collect abstract type witnesses and feed them to the given system.
+  void collectAbstractTypeWitnesses(
+      TypeWitnessSystem &system,
+      ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const;
 
   /// Substitute the current type witnesses into the given interface type.
   Type substCurrentTypeWitnesses(Type type);
