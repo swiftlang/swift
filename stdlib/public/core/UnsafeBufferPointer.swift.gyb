@@ -472,7 +472,7 @@ extension Unsafe${Mutable}BufferPointer {
     let (oldBase, oldCount) = (self.baseAddress, self.count)
     defer { 
       _debugPrecondition((oldBase, oldCount) == (self.baseAddress, self.count),
-      "UnsafeMutableBufferPointer.withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+      "UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable: replacing the buffer is not allowed")
     } 
     return try body(&self)
   }
