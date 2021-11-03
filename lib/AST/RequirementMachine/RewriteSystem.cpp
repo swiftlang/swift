@@ -67,12 +67,28 @@ bool Rule::isIdentityConformanceRule() const {
 /// If this is a rule of the form [P].[Q] => [P] where [P] and [Q] are
 /// protocol symbols, return true, otherwise return false.
 bool Rule::isProtocolRefinementRule() const {
-  return (LHS.size() == 2 &&
-          RHS.size() == 1 &&
-          LHS[0] == RHS[0] &&
-          LHS[0].getKind() == Symbol::Kind::Protocol &&
-          LHS[1].getKind() == Symbol::Kind::Protocol &&
-          LHS[0] != LHS[1]);
+  if (LHS.size() == 2 &&
+      RHS.size() == 1 &&
+      LHS[0] == RHS[0] &&
+      LHS[0].getKind() == Symbol::Kind::Protocol &&
+      LHS[1].getKind() == Symbol::Kind::Protocol &&
+      LHS[0] != LHS[1]) {
+
+    // A protocol refinement rule only if it comes from a directly-stated
+    // inheritance clause entry. It can only become redundant if it is
+    // written in terms of other protocol refinement rules; otherwise, it
+    // must appear in the protocol's requirement signature.
+    //
+    // See RewriteSystem::isValidRefinementPath().
+    auto *proto = LHS[0].getProtocol();
+    auto *otherProto = LHS[1].getProtocol();
+
+    auto inherited = proto->getInheritedProtocols();
+    return (std::find(inherited.begin(), inherited.end(), otherProto)
+            != inherited.end());
+  }
+
+  return false;
 }
 
 /// Returns the length of the left hand side.
