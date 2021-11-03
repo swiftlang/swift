@@ -121,7 +121,7 @@ namespace irgen {
       }
       llvm_unreachable("unhandled case");
     }
-    bool getCorrespondingDataKey() const {
+    unsigned getCorrespondingDataKey() const {
       assert(hasCodeKey());
       switch (getKey()) {
       case (unsigned)PointerAuthSchema::ARM8_3Key::ASIA:
