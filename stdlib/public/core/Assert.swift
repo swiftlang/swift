@@ -311,7 +311,8 @@ internal func _internalInvariant_5_1(
   // FIXME: The below won't run the assert on 5.1 stdlib if testing on older
   // OSes, which means that testing may not test the assertion. We need a real
   // solution to this.
-  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else { return }
+  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) //SwiftStdlib 5.1
+  else { return }
   _internalInvariant(condition(), message, file: file, line: line)
 #endif
 }

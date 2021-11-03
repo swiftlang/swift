@@ -143,8 +143,12 @@ option(SWIFT_FREESTANDING_FLAVOR
        "When building the FREESTANDING stdlib, which build style to use (options: apple, linux)")
 
 option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
-       "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on "
+       "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on Linux."
        "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
+
+option(SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK
+       "Should stdlib be built with -experimental-hermetic-seal-at-link"
+       FALSE)
 
 set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
     must specify the form of LTO by setting this to one of: 'full', 'thin'. This

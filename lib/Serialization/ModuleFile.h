@@ -344,9 +344,12 @@ public:
     fatal(expected.takeError());
   }
 
+  /// Report an unexpected format error that could happen only from a memory-level
+  /// inconsistency. Please prefer passing an error to `fatal(llvm::Error error)` when possible.
   [[noreturn]] void fatal() const {
     fatal(llvm::make_error<llvm::StringError>(
-        "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
+        "Memory corruption or serialization format inconsistency.",
+        llvm::inconvertibleErrorCode()));
   }
 
   /// Outputs information useful for diagnostics to \p out

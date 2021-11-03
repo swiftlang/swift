@@ -9,13 +9,13 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 enum TL {
   @TaskLocal
   static var number = 0
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @discardableResult
 func printTaskLocal<V>(
     _ key: TaskLocal<V>,
@@ -33,7 +33,7 @@ func printTaskLocal<V>(
 
 // ==== ------------------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func groups() async {
   // no value
   _ = await withTaskGroup(of: Int.self) { group in
@@ -79,7 +79,7 @@ func groups() async {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func taskInsideGroup() async {
   Task {
     print("outside") // CHECK: outside
@@ -108,7 +108,7 @@ func taskInsideGroup() async {
 //  await t.value
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await groups()

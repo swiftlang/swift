@@ -46,7 +46,7 @@ public func debugLog(_ s: String) {
 #endif
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main
 struct Runner {
     @MainActor

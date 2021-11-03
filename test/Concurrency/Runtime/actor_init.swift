@@ -7,7 +7,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Number {
     var val: Int
     var task: Task<Void, Never>?
@@ -52,7 +52,7 @@ actor Number {
     }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
     static func main() async {
 

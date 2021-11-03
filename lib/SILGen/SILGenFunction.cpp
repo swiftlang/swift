@@ -927,7 +927,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   if (!getMainExecutorFuncDecl) {
     // If it doesn't exist due to an SDK-compiler mismatch, we can conjure one
     // up instead of crashing:
-    // @available(SwiftStdlib 5.5, *)
+    // @available(SwiftStdlib 5.1, *)
     // @_silgen_name("swift_task_getMainExecutor")
     // internal func _getMainExecutor() -> Builtin.Executor
 

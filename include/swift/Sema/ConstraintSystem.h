@@ -2290,10 +2290,6 @@ private:
   llvm::DenseMap<std::pair<Type, DeclNameRef>, Optional<LookupResult>>
     MemberLookups;
 
-  /// Cached sets of "alternative" literal types.
-  static const unsigned NumAlternativeLiteralTypes = 13;
-  Optional<ArrayRef<Type>> AlternativeLiteralTypes[NumAlternativeLiteralTypes];
-
   /// Folding set containing all of the locators used in this
   /// constraint system.
   llvm::FoldingSetVector<ConstraintLocator> ConstraintLocators;
@@ -3059,7 +3055,8 @@ public:
 
   /// Retrieve the set of "alternative" literal types that we'll explore
   /// for a given literal protocol kind.
-  ArrayRef<Type> getAlternativeLiteralTypes(KnownProtocolKind kind);
+  ArrayRef<Type> getAlternativeLiteralTypes(KnownProtocolKind kind,
+                                            SmallVectorImpl<Type> &scratch);
 
   /// Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,

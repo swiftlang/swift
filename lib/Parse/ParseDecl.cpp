@@ -1632,6 +1632,9 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   if (NameMatch == Map.end())
     return makeParserSuccess(); // No match, it could be a standard platform.
 
+  SyntaxParsingContext VersionRestrictionContext(
+      SyntaxContext, SyntaxKind::AvailabilityVersionRestriction);
+
   consumeToken();
 
   llvm::VersionTuple Version;
@@ -4816,6 +4819,20 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 
   if (Kind != ImportKind::Module && importPath.size() == 1) {
     diagnose(importPath.front().Loc, diag::decl_expected_module_name);
+    return nullptr;
+  }
+
+  // Look up if the imported module is being aliased via -module-alias,
+  // and check that the module alias appeared in source files instead of
+  // its corresponding real name
+  auto parsedModuleID = importPath.get().front().Item;
+  if (Context.getRealModuleName(parsedModuleID, /*alwaysReturnRealName=*/false).empty()) {
+    // If reached here, it means the parsed module name is a real module name
+    // which appeared in the source file; only a module alias should be allowed
+    auto aliasName = Context.getRealModuleName(parsedModuleID, /*alwaysReturnRealName=*/false, /*lookupAliasFromReal=*/true);
+    diagnose(importPath.front().Loc, diag::expected_module_alias,
+                     parsedModuleID, aliasName)
+      .fixItReplace(importPath.front().Loc, aliasName.str());
     return nullptr;
   }
 

@@ -46,9 +46,9 @@ distributed actor DistributedActor_1 {
 
   distributed static func distributedStatic() {} // expected-error{{'distributed' functions cannot be 'static'}}
 
-  func hello() {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
-  func helloAsync() async {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
-  func helloAsyncThrows() async throws {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
+  func hello() {} // expected-note{{distributed actor-isolated instance method 'hello()' declared here}}
+  func helloAsync() async {} // expected-note{{distributed actor-isolated instance method 'helloAsync()' declared here}}
+  func helloAsyncThrows() async throws {} // expected-note{{distributed actor-isolated instance method 'helloAsyncThrows()' declared here}}
 
   distributed func distHello() { } // ok
   distributed func distHelloAsync() async { } // ok
@@ -143,9 +143,9 @@ func test_outside(
   _ = DistributedActor_1.staticFunc()
 
   // ==== non-distributed functions
-  distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
-  _ = await distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
-  _ = try await distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  distributed.hello() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
+  _ = await distributed.helloAsync() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
+  _ = try await distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
 }
 
 // ==== Protocols and static (non isolated functions)

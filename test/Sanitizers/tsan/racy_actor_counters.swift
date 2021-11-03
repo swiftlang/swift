@@ -17,7 +17,7 @@
 
 var globalCounterValue = 0
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Counter {
   func next() -> Int {
     let current = globalCounterValue
@@ -26,7 +26,7 @@ actor Counter {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func worker(identity: Int, counters: [Counter], numIterations: Int) async {
   for _ in 0..<numIterations {
     let counterIndex = Int.random(in: 0 ..< counters.count)
@@ -36,7 +36,7 @@ func worker(identity: Int, counters: [Counter], numIterations: Int) async {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   // Create counter actors.
   var counters: [Counter] = []
@@ -62,7 +62,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   print("DONE!")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     // Useful for debugging: specify counter/worker/iteration counts

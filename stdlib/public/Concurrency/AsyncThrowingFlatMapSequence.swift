@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Creates an asynchronous sequence that concatenates the results of calling
   /// the given error-throwing transformation with each element of this
@@ -63,7 +63,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence that concatenates the results of calling a given
 /// error-throwing transformation with each element of this sequence.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncThrowingFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -81,7 +81,7 @@ public struct AsyncThrowingFlatMapSequence<Base: AsyncSequence, SegmentOfResult:
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingFlatMapSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///

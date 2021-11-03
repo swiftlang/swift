@@ -12,7 +12,7 @@ private struct TransformResult<T> {
 }
 
 public extension Collection {
-    @available(SwiftStdlib 5.5, *)
+    @available(SwiftStdlib 5.1, *)
     private func f<T>(_ transform: @escaping (Element) async throws -> T) async throws -> [T] {
         return try await withThrowingTaskGroup(of: TransformResult<T>.self) { group in
           return []

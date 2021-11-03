@@ -132,6 +132,20 @@ public:
   }
 };
 
+/// Result type for RewriteSystem::computeConfluentCompletion() and
+/// PropertyMap::buildPropertyMap().
+enum class CompletionResult {
+  /// Confluent completion was computed successfully.
+  Success,
+
+  /// Maximum number of iterations reached.
+  MaxIterations,
+
+  /// Completion produced a rewrite rule whose left hand side has a length
+  /// exceeding the limit.
+  MaxDepth
+};
+
 /// A term rewrite system for working with types in a generic signature.
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
@@ -248,18 +262,6 @@ public:
   /// Completion
   ///
   //////////////////////////////////////////////////////////////////////////////
-
-  enum class CompletionResult {
-    /// Confluent completion was computed successfully.
-    Success,
-
-    /// Maximum number of iterations reached.
-    MaxIterations,
-
-    /// Completion produced a rewrite rule whose left hand side has a length
-    /// exceeding the limit.
-    MaxDepth
-  };
 
   std::pair<CompletionResult, unsigned>
   computeConfluentCompletion(unsigned maxIterations,
@@ -384,17 +386,6 @@ public:
 
   void computeGeneratingConformances(
       llvm::DenseSet<unsigned> &redundantConformances);
-
-  //////////////////////////////////////////////////////////////////////////////
-  ///
-  /// Property map
-  ///
-  //////////////////////////////////////////////////////////////////////////////
-
-  std::pair<CompletionResult, unsigned>
-  buildPropertyMap(PropertyMap &map,
-                   unsigned maxIterations,
-                   unsigned maxDepth);
 
   void dump(llvm::raw_ostream &out) const;
 };

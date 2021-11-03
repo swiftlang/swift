@@ -510,6 +510,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-disable-objc-interop")
   endif()
 
+  if(SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK)
+    list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
+  endif()
+
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
 
   if(SWIFTFILE_OPT_FLAGS)

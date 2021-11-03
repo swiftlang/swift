@@ -28,7 +28,7 @@ public func onMyProjectV2_5() {}
 // CHECK: @available(macOS 10.12, *)
 // CHECK-NEXT: public func onMyProjectV2_5
 
-@_specialize(exported: true, availability: SwiftStdlib 5.5, *; where T == Int)
+@_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
 public func testSemanticsAvailability<T>(_ t: T) {}
 // CHECK: @_specialize(exported: true, kind: full, availability: macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *; where T == Swift.Int)
 // CHECK-NEXT: public func testSemanticsAvailability

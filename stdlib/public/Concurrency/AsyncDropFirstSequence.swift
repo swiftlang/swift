@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Omits a specified number of elements from the base asynchronous sequence,
   /// then passes through all remaining elements.
@@ -48,7 +48,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence which omits a specified number of elements from the
 /// base asynchronous sequence, then passes through all remaining elements.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncDropFirstSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -63,7 +63,7 @@ public struct AsyncDropFirstSequence<Base: AsyncSequence> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncDropFirstSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///
@@ -116,7 +116,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncDropFirstSequence {
   /// Omits a specified number of elements from the base asynchronous sequence,
   /// then passes through all remaining elements.

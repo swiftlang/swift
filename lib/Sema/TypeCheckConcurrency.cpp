@@ -1604,7 +1604,9 @@ namespace {
           decl->diagnose(diag::distributed_actor_isolated_property);
         } else {
           // it's a function or subscript
-          decl->diagnose(diag::distributed_actor_isolated_method_note);
+          decl->diagnose(diag::note_distributed_actor_isolated_method,
+                         decl->getDescriptiveKind(),
+                         decl->getName());
         }
       } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         func->diagnose(diag::actor_isolated_sync_func,

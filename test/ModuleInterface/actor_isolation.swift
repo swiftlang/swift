@@ -12,14 +12,14 @@
 
 // CHECK: public actor SomeActor
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public actor SomeActor {
   nonisolated func maine() { }
 }
 
 // CHECK: @globalActor public struct SomeGlobalActor
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @globalActor
 public struct SomeGlobalActor {
   public static let shared = SomeActor()
@@ -28,7 +28,7 @@ public struct SomeGlobalActor {
 // CHECK: @{{(Test.)?}}SomeGlobalActor public protocol P1
 // CHECK-NEXT: @{{(Test.)?}}SomeGlobalActor func method()
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @SomeGlobalActor
 public protocol P1 {
   func method()
@@ -37,58 +37,58 @@ public protocol P1 {
 // CHECK: class C1
 // CHECK-NEXT: @{{(Test.)?}}SomeGlobalActor public func method()
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public class C1: P1 {
   public func method() { }
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @SomeGlobalActor
 public class C2 { }
 
 // CHECK: @{{(Test.)?}}SomeGlobalActor public class C2
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public class C3: C2 { }
 
 // CHECK: public class C4 : Swift.UnsafeSendable
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public class C4: UnsafeSendable { }
 
 // CHECK: public class C5 : @unchecked Swift.Sendable
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public class C5: @unchecked Sendable { }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public class C6 { }
 
 // CHECK: extension {{(Test.)?}}C6 : @unchecked Swift.Sendable
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension C6: @unchecked Sendable { }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public class C7 { }
 
 // CHECK: extension {{(Test.)?}}C7 : Swift.UnsafeSendable
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension C7: UnsafeSendable { }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol P2 {
   @SomeGlobalActor func method()
 }
 
 
 // CHECK: class {{(Test.)?}}C8 : {{(Test.)?}}P2 {
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public class C8 : P2 {
   // CHECK: @{{(Test.)?}}SomeGlobalActor public func method()
   public func method() {}

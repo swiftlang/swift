@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -283,30 +284,44 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
   }
 
   auto *dc = D->getDeclContext();
+
+  // If we have a param decl that is marked as no implicit copy, change our
+  // default specifier to be owned.
+  if (auto *paramDecl = dyn_cast<ParamDecl>(D)) {
+    // We only handle non-lvalue arguments today.
+    if (paramDecl->getSpecifier() == ParamDecl::Specifier::InOut) {
+      auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+      diagnoseAndRemoveAttr(attr, error);
+      return;
+    }
+    return;
+  }
+
   auto *vd = dyn_cast<VarDecl>(D);
   if (!vd) {
-    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let;
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
     diagnoseAndRemoveAttr(attr, error);
     return;
   }
 
-  // If we have a 'var' instead of a 'let', bail. We only support on local lets.
+  // If we have a 'var' instead of a 'let', bail. We only support on local
+  // lets.
   if (!vd->isLet()) {
-    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let;
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
     diagnoseAndRemoveAttr(attr, error);
     return;
   }
 
   // We only support local lets.
   if (!dc->isLocalContext()) {
-    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let;
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
     diagnoseAndRemoveAttr(attr, error);
     return;
   }
 
   // We do not support static vars either yet.
   if (dc->isTypeContext() && vd->isStatic()) {
-    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let;
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
     diagnoseAndRemoveAttr(attr, error);
     return;
   }
@@ -5453,9 +5468,10 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       return;
     } else if (auto protoDecl = dc->getSelfProtocolDecl()){
       if (!protoDecl->inheritsFromDistributedActor()) {
-        // TODO: could suggest adding `: DistributedActor` to the protocol as well
-        diagnoseAndRemoveAttr(
+        auto diag = diagnoseAndRemoveAttr(
             attr, diag::distributed_actor_func_not_in_distributed_actor);
+        diagnoseDistributedFunctionInNonDistributedActorProtocol(
+            protoDecl, diag);
         return;
       }
     } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {

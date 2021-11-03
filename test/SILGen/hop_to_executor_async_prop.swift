@@ -635,7 +635,7 @@ struct Blah {
     // CHECK:       end_access [[VAL_ACCESS]] : $*Optional<Int>
     // CHECK:       hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
     // CHECK: } // end sil function '$s4test4BlahVAAyyFyyYaYbcfU_'
-    @available(SwiftStdlib 5.5, *)
+    @available(SwiftStdlib 5.1, *)
     func test() {
         Task.detached {
             if await coordinator.someValue == nil {

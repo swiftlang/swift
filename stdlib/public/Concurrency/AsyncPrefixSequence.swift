@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Returns an asynchronous sequence, up to the specified maximum length,
   /// containing the initial elements of the base asynchronous sequence.
@@ -48,7 +48,7 @@ extension AsyncSequence {
 
 /// An asynchronous sequence, up to a specified maximum length,
 /// containing the initial elements of a base asynchronous sequence.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncPrefixSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -63,7 +63,7 @@ public struct AsyncPrefixSequence<Base: AsyncSequence> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncPrefixSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///

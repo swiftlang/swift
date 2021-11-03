@@ -198,6 +198,12 @@ public:
   /// Are we parsing the stdlib, i.e. -parse-stdlib?
   bool ParseStdlib = false;
 
+  /// If true, check for leaking instructions when the SILModule is destructed.
+  ///
+  /// Warning: this is not thread safe. It can only be enabled in case there
+  /// is a single SILModule in a single thread.
+  bool checkSILModuleLeaks = false;
+
   /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;

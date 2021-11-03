@@ -3252,6 +3252,27 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     }
   }
 
+  // Handle protocol requirements specially.
+  if (isa<ProtocolDecl>(storage->getDeclContext())) {
+    ReadImplKind readImpl = ReadImplKind::Stored;
+    // By default, treat the requirement as not having a setter.
+    WriteImplKind writeImpl = WriteImplKind::Immutable;
+    ReadWriteImplKind readWriteImpl = ReadWriteImplKind::Immutable;
+
+    if (storage->getParsedAccessor(AccessorKind::Set)) {
+      readImpl = ReadImplKind::Get;
+      writeImpl = WriteImplKind::Set;
+      readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+    } else if (storage->getParsedAccessor(AccessorKind::Get)) {
+      readImpl = ReadImplKind::Get;
+    }
+
+    StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
+    finishStorageImplInfo(storage, info);
+
+    return info;
+  }
+
   bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
   bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);
   bool hasSetter = storage->getParsedAccessor(AccessorKind::Set);

@@ -1726,6 +1726,11 @@ function(add_swift_target_library name)
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
 
+  # Define availability macros.
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}") 
+  endforeach()
+  
   # In the standard library and overlays, warn about implicit overrides
   # as a reminder to consider when inherited protocols need different
   # behavior for their requirements.

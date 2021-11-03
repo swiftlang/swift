@@ -350,8 +350,14 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
-  /// Mapping between aliases and real (physical) names of imported or referenced modules.
-  mutable llvm::DenseMap<Identifier, Identifier> ModuleAliasMap;
+  /// Set if a `-module-alias` was passed. Used to store mapping between module aliases and
+  /// their corresponding real names, and vice versa for a reverse lookup, which is needed to check
+  /// if the module names appearing in source files are aliases or real names.
+  /// \see ASTContext::getRealModuleName.
+  ///
+  /// The boolean in the value indicates whether or not the entry is keyed by an alias vs real name,
+  /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
+  mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
 
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
@@ -483,9 +489,23 @@ public:
   /// are the real (physical) module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
 
-  /// Retrieve the actual module name if a module alias is used via '-module-alias Foo=X', where Foo is
-  /// a module alias and X is the real (physical) name. Returns \p key if no aliasing is used.
-  Identifier getRealModuleName(Identifier key) const;
+  /// Look up the module alias map by the given \p key.
+  ///
+  /// \param key A module alias or real name to look up the map by
+  /// \param alwaysReturnRealName Indicates whether it should always retrieve the real module name
+  ///        given \p key. Defaults to true. This takes a higher precedence than
+  ///        \p lookupAliasFromReal.
+  /// \param lookupAliasFromReal Indicates whether to look up an alias by treating \p key
+  ///        as a real name. Defaults to false.
+  /// \return The real name or alias mapped to the key.
+  ///         If \p alwaysReturnRealName is true, return the real module name if \p key is an alias
+  ///         or the key itself since that's the real name.
+  ///         If \p lookupAliasFromReal is true, and \p alwaysReturnRealName is false, return
+  ///         only if \p key is a real name, else an empty Identifier.
+  ///         If no aliasing is used, return \p key.
+  Identifier getRealModuleName(Identifier key,
+                               bool alwaysReturnRealName = true,
+                               bool lookupAliasFromReal = false) const;
 
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,

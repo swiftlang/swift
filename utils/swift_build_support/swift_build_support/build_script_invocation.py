@@ -605,6 +605,10 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_swift_inspect)
         builder.add_product(products.TSanLibDispatch,
                             is_enabled=self.args.tsan_libdispatch_test)
+        builder.add_product(products.SwiftDocC,
+                            is_enabled=self.args.build_swiftdocc)
+        builder.add_product(products.SwiftDocCRender,
+                            is_enabled=self.args.install_swiftdocc)                  
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully

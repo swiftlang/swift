@@ -302,6 +302,9 @@ ERROR(getset_cannot_be_implied,none,
 // Import
 ERROR(decl_expected_module_name,none,
       "expected module name in import declaration", ())
+ERROR(expected_module_alias,none,
+      "cannot refer to module as %0 because it has been aliased; use %1 "
+      "instead", (Identifier, Identifier))
 
 // Extension
 ERROR(expected_lbrace_extension,PointsToFirstBadToken,
