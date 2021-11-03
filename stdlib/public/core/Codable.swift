@@ -3635,91 +3635,91 @@ internal final class _KeyedEncodingContainerBox<
   }
 
   override internal func encodeNil<K: CodingKey>(forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeNil(forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: Bool, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: String, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: Double, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: Float, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: Int, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: Int8, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: Int16, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: Int32, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: Int64, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: UInt, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: UInt8, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: UInt16, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: UInt32, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
 
   override internal func encode<K: CodingKey>(_ value: UInt64, forKey key: K) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
@@ -3728,7 +3728,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: T,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
@@ -3737,7 +3737,7 @@ internal final class _KeyedEncodingContainerBox<
     _ object: T,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeConditional(object, forKey: key)
   }
@@ -3746,7 +3746,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: Bool?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3755,7 +3755,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: String?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3764,7 +3764,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: Double?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3773,7 +3773,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: Float?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3782,7 +3782,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: Int?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3791,7 +3791,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: Int8?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3800,7 +3800,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: Int16?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3809,7 +3809,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: Int32?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3818,7 +3818,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: Int64?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3827,7 +3827,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: UInt?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3836,7 +3836,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: UInt8?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3845,7 +3845,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: UInt16?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3854,7 +3854,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: UInt32?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3863,7 +3863,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: UInt64?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3872,7 +3872,7 @@ internal final class _KeyedEncodingContainerBox<
     _ value: T?,
     forKey key: K
   ) throws {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
@@ -3881,7 +3881,7 @@ internal final class _KeyedEncodingContainerBox<
     keyedBy keyType: NestedKey.Type,
     forKey key: K
   ) -> KeyedEncodingContainer<NestedKey> {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return concrete.nestedContainer(keyedBy: NestedKey.self, forKey: key)
   }
@@ -3889,7 +3889,7 @@ internal final class _KeyedEncodingContainerBox<
   override internal func nestedUnkeyedContainer<K: CodingKey>(
     forKey key: K
   ) -> UnkeyedEncodingContainer {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return concrete.nestedUnkeyedContainer(forKey: key)
   }
@@ -3899,7 +3899,7 @@ internal final class _KeyedEncodingContainerBox<
   }
 
   override internal func superEncoder<K: CodingKey>(forKey key: K) -> Encoder {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return concrete.superEncoder(forKey: key)
   }
@@ -4178,13 +4178,13 @@ internal final class _KeyedDecodingContainerBox<
   }
 
   override internal func contains<K: CodingKey>(_ key: K) -> Bool {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return concrete.contains(key)
   }
 
   override internal func decodeNil<K: CodingKey>(forKey key: K) throws -> Bool {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeNil(forKey: key)
   }
@@ -4193,7 +4193,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Bool.Type,
     forKey key: K
   ) throws -> Bool {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(Bool.self, forKey: key)
   }
@@ -4202,7 +4202,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: String.Type,
     forKey key: K
   ) throws -> String {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(String.self, forKey: key)
   }
@@ -4211,7 +4211,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Double.Type,
     forKey key: K
   ) throws -> Double {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(Double.self, forKey: key)
   }
@@ -4220,7 +4220,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Float.Type,
     forKey key: K
   ) throws -> Float {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(Float.self, forKey: key)
   }
@@ -4229,7 +4229,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Int.Type,
     forKey key: K
   ) throws -> Int {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(Int.self, forKey: key)
   }
@@ -4238,7 +4238,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Int8.Type,
     forKey key: K
   ) throws -> Int8 {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(Int8.self, forKey: key)
   }
@@ -4247,7 +4247,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Int16.Type,
     forKey key: K
   ) throws -> Int16 {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(Int16.self, forKey: key)
   }
@@ -4256,7 +4256,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Int32.Type,
     forKey key: K
   ) throws -> Int32 {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(Int32.self, forKey: key)
   }
@@ -4265,7 +4265,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Int64.Type,
     forKey key: K
   ) throws -> Int64 {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(Int64.self, forKey: key)
   }
@@ -4274,7 +4274,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: UInt.Type,
     forKey key: K
   ) throws -> UInt {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(UInt.self, forKey: key)
   }
@@ -4283,7 +4283,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: UInt8.Type,
     forKey key: K
   ) throws -> UInt8 {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(UInt8.self, forKey: key)
   }
@@ -4292,7 +4292,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: UInt16.Type,
     forKey key: K
   ) throws -> UInt16 {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(UInt16.self, forKey: key)
   }
@@ -4301,7 +4301,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: UInt32.Type,
     forKey key: K
   ) throws -> UInt32 {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(UInt32.self, forKey: key)
   }
@@ -4310,7 +4310,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: UInt64.Type,
     forKey key: K
   ) throws -> UInt64 {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(UInt64.self, forKey: key)
   }
@@ -4319,7 +4319,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: T.Type,
     forKey key: K
   ) throws -> T {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(T.self, forKey: key)
   }
@@ -4328,7 +4328,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Bool.Type,
     forKey key: K
   ) throws -> Bool? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(Bool.self, forKey: key)
   }
@@ -4337,7 +4337,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: String.Type,
     forKey key: K
   ) throws -> String? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(String.self, forKey: key)
   }
@@ -4346,7 +4346,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Double.Type,
     forKey key: K
   ) throws -> Double? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(Double.self, forKey: key)
   }
@@ -4355,7 +4355,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Float.Type,
     forKey key: K
   ) throws -> Float? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(Float.self, forKey: key)
   }
@@ -4364,7 +4364,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Int.Type,
     forKey key: K
   ) throws -> Int? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(Int.self, forKey: key)
   }
@@ -4373,7 +4373,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Int8.Type,
     forKey key: K
   ) throws -> Int8? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(Int8.self, forKey: key)
   }
@@ -4382,7 +4382,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Int16.Type,
     forKey key: K
   ) throws -> Int16? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(Int16.self, forKey: key)
   }
@@ -4391,7 +4391,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Int32.Type,
     forKey key: K
   ) throws -> Int32? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(Int32.self, forKey: key)
   }
@@ -4400,7 +4400,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: Int64.Type,
     forKey key: K
   ) throws -> Int64? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(Int64.self, forKey: key)
   }
@@ -4409,7 +4409,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: UInt.Type,
     forKey key: K
   ) throws -> UInt? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(UInt.self, forKey: key)
   }
@@ -4418,7 +4418,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: UInt8.Type,
     forKey key: K
   ) throws -> UInt8? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(UInt8.self, forKey: key)
   }
@@ -4427,7 +4427,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: UInt16.Type,
     forKey key: K
   ) throws -> UInt16? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(UInt16.self, forKey: key)
   }
@@ -4436,7 +4436,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: UInt32.Type,
     forKey key: K
   ) throws -> UInt32? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(UInt32.self, forKey: key)
   }
@@ -4445,7 +4445,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: UInt64.Type,
     forKey key: K
   ) throws -> UInt64? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(UInt64.self, forKey: key)
   }
@@ -4454,7 +4454,7 @@ internal final class _KeyedDecodingContainerBox<
     _ type: T.Type,
     forKey key: K
   ) throws -> T? {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(T.self, forKey: key)
   }
@@ -4463,7 +4463,7 @@ internal final class _KeyedDecodingContainerBox<
     keyedBy type: NestedKey.Type,
     forKey key: K
   ) throws -> KeyedDecodingContainer<NestedKey> {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.nestedContainer(keyedBy: NestedKey.self, forKey: key)
   }
@@ -4471,7 +4471,7 @@ internal final class _KeyedDecodingContainerBox<
   override internal func nestedUnkeyedContainer<K: CodingKey>(
     forKey key: K
   ) throws -> UnkeyedDecodingContainer {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.nestedUnkeyedContainer(forKey: key)
   }
@@ -4481,7 +4481,7 @@ internal final class _KeyedDecodingContainerBox<
   }
 
   override internal func superDecoder<K: CodingKey>(forKey key: K) throws -> Decoder {
-    assert(K.self == Key.self)
+    _internalInvariant(K.self == Key.self)
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.superDecoder(forKey: key)
   }

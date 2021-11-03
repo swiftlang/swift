@@ -423,8 +423,8 @@ extension MutableCollection {
   internal mutating func _swapNonemptySubrangePrefixes(
     _ lhs: Range<Index>, _ rhs: Range<Index>
   ) -> (Index, Index) {
-    assert(!lhs.isEmpty)
-    assert(!rhs.isEmpty)
+    _internalInvariant(!lhs.isEmpty)
+    _internalInvariant(!rhs.isEmpty)
     
     var p = lhs.lowerBound
     var q = rhs.lowerBound
