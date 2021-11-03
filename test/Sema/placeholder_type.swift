@@ -8,7 +8,7 @@ let dict2: [Character: _] = ["h": 0]
 let arr = [_](repeating: "hi", count: 3)
 
 func foo(_ arr: [_] = [0]) {} // expected-error {{type placeholder may not appear in top-level parameter}}
-// expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
+// expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
 
 let foo = _.foo // expected-error {{could not infer type for placeholder}}
 let zero: _ = .zero // expected-error {{cannot infer contextual base in reference to member 'zero'}}
@@ -76,32 +76,32 @@ where T: ExpressibleByIntegerLiteral, U: ExpressibleByIntegerLiteral {
 
 extension Bar {
   func frobnicate2() -> Bar<_, _> { // expected-error {{type placeholder may not appear in function return type}}
-    // expected-note@-1 {{replace the placeholder with the correct type 'T'}}
-    // expected-note@-2 {{replace the placeholder with the correct type 'U'}}
+    // expected-note@-1 {{replace the placeholder with the inferred type 'T'}}
+    // expected-note@-2 {{replace the placeholder with the inferred type 'U'}}
     return Bar(t: 42, u: 42)
   }
   func frobnicate3() -> Bar {
     return Bar<_, _>(t: 42, u: 42)
   }
   func frobnicate4() -> Bar<_, _> { // expected-error {{type placeholder may not appear in function return type}}
-    // expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
-    // expected-note@-2 {{replace the placeholder with the correct type 'Int'}}
+    // expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
+    // expected-note@-2 {{replace the placeholder with the inferred type 'Int'}}
     return Bar<_, _>(t: 42, u: 42)
   }
   func frobnicate5() -> Bar<_, U> { // expected-error {{type placeholder may not appear in function return type}}
-    // expected-note@-1 {{replace the placeholder with the correct type 'T'}}
+    // expected-note@-1 {{replace the placeholder with the inferred type 'T'}}
     return Bar(t: 42, u: 42)
   }
   func frobnicate6() -> Bar {
     return Bar<_, U>(t: 42, u: 42)
   }
   func frobnicate7() -> Bar<_, _> { // expected-error {{type placeholder may not appear in function return type}}
-    // expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
-    // expected-note@-2 {{replace the placeholder with the correct type 'U'}}
+    // expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
+    // expected-note@-2 {{replace the placeholder with the inferred type 'U'}}
     return Bar<_, U>(t: 42, u: 42)
   }
   func frobnicate8() -> Bar<_, U> { // expected-error {{type placeholder may not appear in function return type}}
-    // expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
+    // expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
     return Bar<_, _>(t: 42, u: 42)
   }
 }
@@ -235,9 +235,9 @@ func mismatchedDefault<T>(_ x: [_] = [String: T]()) {} // expected-error {{type 
 
 func mismatchedReturnTypes() -> _ { // expected-error {{type placeholder may not appear in function return type}}
   if true {
-    return "" // expected-note@-2 {{replace the placeholder with the correct type 'String'}}
+    return "" // expected-note@-2 {{replace the placeholder with the inferred type 'String'}}
   } else {
-    return 0.5 // expected-note@-4 {{replace the placeholder with the correct type 'Double'}}
+    return 0.5 // expected-note@-4 {{replace the placeholder with the inferred type 'Double'}}
   }
 }
 
@@ -251,6 +251,6 @@ func opaque() -> some _ { // expected-error {{type placeholder not allowed here}
 enum EnumWithPlaceholders {
   case topLevelPlaceholder(x: _) // expected-error {{type placeholder may not appear in top-level parameter}}
   case placeholderWithDefault(x: _ = 5) // expected-error {{type placeholder may not appear in top-level parameter}}
-  // expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
+  // expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
 }
 

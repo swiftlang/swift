@@ -3708,7 +3708,7 @@ ERROR(placeholder_type_not_allowed_in_return_type,none,
 ERROR(placeholder_type_not_allowed_in_parameter,none,
       "type placeholder may not appear in top-level parameter", ())
 NOTE(replace_placeholder_with_inferred_type,none,
-     "replace the placeholder with the correct type %0", (Type))
+     "replace the placeholder with the inferred type %0", (Type))
 
 WARNING(use_of_void_pointer,none,
 "Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
