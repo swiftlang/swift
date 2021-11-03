@@ -1019,13 +1019,11 @@ static void checkDefaultArguments(ParameterList *params) {
     // Placeholder types are banned for all parameter decls. We try to use the
     // freshly-checked default expression's contextual type to suggest a
     // reasonable type to insert.
+    param->diagnose(diag::placeholder_type_not_allowed_in_parameter)
+        .highlight(param->getSourceRange());
     if (expr && !expr->getType()->hasError()) {
-      param->diagnose(diag::placeholder_type_not_allowed_in_parameter)
-          .highlight(param->getSourceRange());
       TypeChecker::notePlaceholderReplacementTypes(
           ifacety, expr->getType()->mapTypeOutOfContext());
-    } else {
-      param->diagnose(diag::placeholder_type_not_allowed);
     }
   }
 }

@@ -249,7 +249,7 @@ func opaque() -> some _ { // expected-error {{type placeholder not allowed here}
 }
 
 enum EnumWithPlaceholders {
-  case topLevelPlaceholder(x: _) // expected-error {{type placeholder not allowed here}}
+  case topLevelPlaceholder(x: _) // expected-error {{type placeholder may not appear in top-level parameter}}
   case placeholderWithDefault(x: _ = 5) // expected-error {{type placeholder may not appear in top-level parameter}}
   // expected-note@-1 {{replace the placeholder with the correct type 'Int'}}
 }
