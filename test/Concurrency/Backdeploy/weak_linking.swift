@@ -16,7 +16,7 @@
 // OLD: declare extern_weak swiftcc i8 @"$sScP8rawValues5UInt8Vvg"
 
 // OPTIMIZED: @swift_async_extendedFramePointerFlags = extern_weak global i8*
-// OPTIMIZED: @_swift_async_extendedFramePointerFlagsUser = private global i8** @swift_async_extendedFramePointerFlags
+// OPTIMIZED: @_swift_async_extendedFramePointerFlagsUser = linkonce_odr hidden global i8** @swift_async_extendedFramePointerFlags
 // OPTIMIZED: @llvm.used =
 // OPTIMIZED-SAME: (i8*** @_swift_async_extendedFramePointerFlagsUser to i8*)
 
