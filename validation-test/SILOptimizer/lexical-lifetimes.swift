@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift -Xfrontend -enable-experimental-lexical-lifetimes -O -Xfrontend -enable-copy-propagation | %FileCheck %s
 
+// REQUIRES: rdar84984903
+
 // =============================================================================
 // = Declarations                                                           {{ =
 // =============================================================================
