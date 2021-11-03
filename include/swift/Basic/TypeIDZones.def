@@ -1,37 +1,39 @@
 //===--- TypeIDZones.def - List of TypeID Zones -----------------*- C++ -*-===//
- //
- // This source file is part of the Swift.org open source project
- //
- // Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
- // Licensed under Apache License v2.0 with Runtime Library Exception
- //
- // See https://swift.org/LICENSE.txt for license information
- // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
- //
- //===----------------------------------------------------------------------===//
- //
- //  This definition file describes the zones for TypeID.
- //
- //===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This definition file describes the zones for TypeID.
+//
+//===----------------------------------------------------------------------===//
 
- SWIFT_TYPEID_ZONE(C, 0)
- SWIFT_TYPEID_ZONE(AST, 1)
+SWIFT_TYPEID_ZONE(C, 0)
+SWIFT_TYPEID_ZONE(AST, 1)
 
- SWIFT_TYPEID_ZONE(Parse, 8)
- SWIFT_TYPEID_ZONE(NameLookup, 9)
+SWIFT_TYPEID_ZONE(Parse, 8)
+SWIFT_TYPEID_ZONE(NameLookup, 9)
 
- SWIFT_TYPEID_ZONE(TypeChecker, 10)
- SWIFT_TYPEID_ZONE(AccessControl, 11)
- SWIFT_TYPEID_ZONE(SILGen, 12)
- SWIFT_TYPEID_ZONE(SILOptimizer, 13)
- SWIFT_TYPEID_ZONE(TBDGen, 14)
+SWIFT_TYPEID_ZONE(TypeChecker, 10)
+SWIFT_TYPEID_ZONE(AccessControl, 11)
+SWIFT_TYPEID_ZONE(SILGen, 12)
+SWIFT_TYPEID_ZONE(SILOptimizer, 13)
+SWIFT_TYPEID_ZONE(TBDGen, 14)
 
- SWIFT_TYPEID_ZONE(IRGen, 20)
+SWIFT_TYPEID_ZONE(IRGen, 20)
 
- SWIFT_TYPEID_ZONE(IDETypeChecking, 97)
+SWIFT_TYPEID_ZONE(IDETypeChecking, 97)
 
- SWIFT_TYPEID_ZONE(IDETypes, 136)
- SWIFT_TYPEID_ZONE(IDE, 137)
+SWIFT_TYPEID_ZONE(IDETypes, 136)
+SWIFT_TYPEID_ZONE(IDE, 137)
 
- // N.B. This is not a formal zone and exists solely to support the unit tests.
- SWIFT_TYPEID_ZONE(ArithmeticEvaluator, 255)
+SWIFT_TYPEID_ZONE(ClangImporter, 139)
+
+// N.B. This is not a formal zone and exists solely to support the unit tests.
+SWIFT_TYPEID_ZONE(ArithmeticEvaluator, 255)

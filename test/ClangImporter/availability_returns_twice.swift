@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 // UNSUPPORTED: OS=windows-msvc
+// `setjmp` is not available on WebAssembly/WASI
+// UNSUPPORTED: OS=wasi
 // In Android jmp_buf is int[16], which doesn't convert to &Int (SR-9136)
 // XFAIL: OS=linux-androideabi
 // XFAIL: OS=linux-android

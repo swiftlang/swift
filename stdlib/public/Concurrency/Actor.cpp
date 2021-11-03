@@ -34,12 +34,19 @@
 #include "swift/Runtime/ThreadLocalStorage.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
+#ifndef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
 #include "llvm/Config/config.h"
+#else
+// All platforms where we care about back deployment have a known
+// configurations.
+#define HAVE_PTHREAD_H 1
+#define SWIFT_OBJC_INTEROP 1
+#endif
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
 #include "VoucherSupport.h"
 
-#if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+#if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
 #endif
 
@@ -1623,7 +1630,7 @@ void DefaultActorImpl::enqueue(Job *job) {
     auto oldStatus = oldState.Flags.getStatus();
     bool wasIdle = oldStatus == Status::Idle;
 
-    // Update the priority: the prriority of the job we're adding
+    // Update the priority: the priority of the job we're adding
     // if the actor was idle, or the max if not.  Only the running
     // thread can decrease the actor's priority once it's non-idle.
     // (But note that the job we enqueue can still observe a
@@ -1972,11 +1979,6 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
   assert(actor->isDistributedRemote());
 
   return reinterpret_cast<OpaqueValue*>(actor);
-}
-
-void swift::swift_distributedActor_destroy(DefaultActor *_actor) {
-  // FIXME(distributed): if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
-  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
 }
 
 bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {

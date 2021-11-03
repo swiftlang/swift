@@ -176,6 +176,33 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
     VersionRange::allGTE(bestAvailAttr->Introduced.getValue())};
 }
 
+AvailabilityContext
+AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr,
+                                                      ASTContext &ctx) {
+
+  const AvailableAttr *bestAvailAttr = nullptr;
+
+  for (auto *availAttr : attr->getAvailabeAttrs()) {
+    if (availAttr == nullptr || !availAttr->Introduced.hasValue() ||
+        !availAttr->isActivePlatform(ctx) ||
+        availAttr->isLanguageVersionSpecific() ||
+        availAttr->isPackageDescriptionVersionSpecific()) {
+      continue;
+    }
+
+    if (isBetterThan(availAttr, bestAvailAttr))
+      bestAvailAttr = availAttr;
+  }
+
+  if (bestAvailAttr) {
+    return AvailabilityContext{
+      VersionRange::allGTE(bestAvailAttr->Introduced.getValue())
+    };
+  }
+
+  return AvailabilityContext::alwaysAvailable();
+}
+
 AvailabilityContext AvailabilityInference::availableRange(const Decl *D,
                                                           ASTContext &Ctx) {
   Optional<AvailabilityContext> AnnotatedRange =
@@ -259,7 +286,7 @@ AvailabilityContext ASTContext::getSwift50Availability() {
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(12,2)));
   } else if (target.isWatchOS()) {
-    if (target.getArch() == llvm::Triple::ArchType::x86_64)
+    if (target.isArch64Bit())
       return AvailabilityContext::alwaysAvailable();
 
     return AvailabilityContext(
@@ -297,6 +324,9 @@ AvailabilityContext ASTContext::getSwift51Availability() {
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(13,0,0)));
   } else if (target.isWatchOS()) {
+    if (target.isArch64Bit())
+      return AvailabilityContext::alwaysAvailable();
+
     return AvailabilityContext(
                             VersionRange::allGTE(llvm::VersionTuple(6,0,0)));
   } else {

@@ -17,10 +17,8 @@ func simple(_ placeholder: Int64) throws -> () {
   // CHECK-SAME: %swift.error** noalias nocapture dereferenceable(4)
   // CHECK: call void @llvm.dbg.declare
   // CHECK: call void @llvm.dbg.declare({{.*}}, metadata ![[ERROR:[0-9]+]], metadata !DIExpression(DW_OP_deref))
-  // CHECK: ![[ERRTY:.*]] = !DICompositeType({{.*}}identifier: "$ss5Error_pD"
-  // CHECK: ![[ERROR]] = !DILocalVariable(name: "$error", arg: 2,
-  // CHECK-SAME:                          type: ![[ERRTY]],
-  // CHECK-SAME:                          flags: DIFlagArtificial)
+  // CHECK-DAG: ![[ERRTY:.*]] = !DICompositeType({{.*}}identifier: "$ss5Error_pD"
+  // CHECK-DAG: ![[ERROR]] = !DILocalVariable(name: "$error", arg: 2, {{.*}}, type: ![[ERRTY]], flags: DIFlagArtificial)
   throw MyError.Simple
 }
 

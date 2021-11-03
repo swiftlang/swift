@@ -288,15 +288,16 @@ class ThisDerived1 : ThisBase1 {
     self.Type // expected-error {{type 'ThisDerived1' has no member 'Type'}}
   }
 
+  // FIXME(SR-15250): Partial application diagnostic is applied incorrectly for some test cases.
   class func staticTestSuper1() {
     super.baseInstanceVar = 42 // expected-error {{member 'baseInstanceVar' cannot be used on type 'ThisBase1'}}
     super.baseProp = 42 // expected-error {{member 'baseProp' cannot be used on type 'ThisBase1'}}
     super.baseFunc0() // expected-error {{instance member 'baseFunc0' cannot be used on type 'ThisBase1'}}
-    // expected-error@-1 {{partial application of 'super' instance method with metatype base is not allowed}}
-    super.baseFunc0(ThisBase1())() // expected-error {{partial application of 'super' instance method with metatype base is not allowed}}
+    // expected-error@-1 {{cannot reference 'super' instance method with metatype base as function value}}
+    super.baseFunc0(ThisBase1())() // expected-error {{cannot reference 'super' instance method with metatype base as function value}}
     super.baseFunc1(42) // expected-error {{instance member 'baseFunc1' cannot be used on type 'ThisBase1'}}
-    // expected-error@-1 {{partial application of 'super' instance method with metatype base is not allowed}}
-    super.baseFunc1(ThisBase1())(42) // expected-error {{partial application of 'super' instance method with metatype base is not allowed}}
+    // expected-error@-1 {{cannot reference 'super' instance method with metatype base as function value}}
+    super.baseFunc1(ThisBase1())(42) // expected-error {{cannot reference 'super' instance method with metatype base as function value}}
     super[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisBase1'}}
     super.baseStaticVar = 42
     super.baseStaticProp = 42
@@ -304,7 +305,7 @@ class ThisDerived1 : ThisBase1 {
 
     super.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisBase1'}}
     super.baseExtFunc0() // expected-error {{instance member 'baseExtFunc0' cannot be used on type 'ThisBase1'}}
-    // expected-error@-1 {{partial application of 'super' instance method with metatype base is not allowed}}
+    // expected-error@-1 {{cannot reference 'super' instance method with metatype base as function value}}
     super.baseExtStaticVar = 42 // expected-error {{instance member 'baseExtStaticVar' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticFunc0()

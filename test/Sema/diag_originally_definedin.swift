@@ -6,11 +6,15 @@
 public func foo() {}
 
 @available(macOS 10.13, *)
-@_originallyDefinedIn(module: "original", OSX 10.12) // expected-error {{moved version from @_originallyDefinedIn must after introduced OS version}}
+@_originallyDefinedIn(module: "original", OSX 10.12) // expected-error {{symbols are moved to the current module before they were available in the OSs}}
 public class C {
   @_originallyDefinedIn(module: "original", OSX 10.13) // expected-error {{@_originallyDefinedIn is only applicable to top-level decl}}
   public func foo() {}
 }
+
+@available(macOS 10.13, *)
+@_originallyDefinedIn(module: "original", OSX 10.13)
+public class D {}
 
 @available(macOS 10.9, *)
 @_originallyDefinedIn(module: "original", _myProject 2.0) // expected-error {{expected at least one platform version in @_originallyDefinedIn}}

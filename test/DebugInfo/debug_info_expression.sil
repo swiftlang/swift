@@ -14,7 +14,7 @@ struct SmallStruct {
 
 sil_scope 1 { loc "file.swift":7:6 parent @test_fragment : $@convention(thin) () -> () }
 
-// Testing op_fragment w/ debug_value_addr
+// Testing op_fragment w/ debug_value
 sil hidden @test_fragment : $@convention(thin) () -> () {
 bb0:
   %2 = alloc_stack $MyStruct, var, name "my_struct", loc "file.swift":8:9, scope 1
@@ -67,3 +67,26 @@ bb0:
   %r = tuple()
   return %r : $()
 }
+
+sil_scope 3 { loc "file.swift":16:7 parent @test_op_const : $@convention(thin) (Int64, Int64) -> () }
+
+// Testing op_constu and op_consts
+sil hidden @test_op_const : $@convention(thin) (Int64, Int64) -> () {
+bb0(%arg : $Int64, %arg2 : $Int64):
+  debug_value %arg : $Int64, let, name "the_arg", argno 1, expr op_constu:77, loc "file.swift":17:2, scope 3
+  debug_value %arg2 : $Int64, let, name "the_2nd_arg", argno 2, expr op_consts:-87, loc "file.swift":17:4, scope 3
+  %r = tuple()
+  return %r : $()
+}
+
+sil_scope 4 { loc "file.swift":18:8 parent @test_arithmetic : $@convention(thin) (Int64, Int64) -> () }
+
+// Testing basic arithmetic operators like op_plus and op_minus
+sil hidden @test_arithmetic : $@convention(thin) (Int64, Int64) -> () {
+bb0(%arg : $Int64, %arg2 : $Int64):
+  debug_value %arg : $Int64, let, name "the_arg", argno 1, expr op_constu:3:op_plus, loc "file.swift":19:2, scope 4
+  debug_value %arg2 : $Int64, let, name "the_2nd_arg", argno 2, expr op_constu:5:op_minus, loc "file.swift":19:4, scope 4
+  %r = tuple()
+  return %r : $()
+}
+

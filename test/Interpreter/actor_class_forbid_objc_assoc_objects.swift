@@ -17,11 +17,11 @@ defer { runAllTests() }
 
 var Tests = TestSuite("Actor.AssocObject")
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 final actor Actor {
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("final class crash when set assoc object")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
@@ -31,11 +31,11 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   }
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 actor Actor2 {
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("non-final class crash when set assoc object")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
@@ -45,13 +45,13 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   }
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 actor Actor5<T> {
   var state: T
   init(state: T) { self.state = state }
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("base generic class crash when set assoc object")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
@@ -69,10 +69,10 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   }
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 actor ActorNSObjectSubKlass : NSObject {}
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("no crash when inherit from nsobject")
   .code {
     let x = ActorNSObjectSubKlass()
@@ -80,13 +80,13 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   }
 }
 
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
+@available(SwiftStdlib 5.0, *)
 actor ActorNSObjectSubKlassGeneric<T> : NSObject {
   var state: T
   init(state: T) { self.state = state }
 }
 
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
+if #available(SwiftStdlib 5.0, *) {
   Tests.test("no crash when generic inherit from nsobject")
   .code {
     let x = ActorNSObjectSubKlassGeneric(state: 5)

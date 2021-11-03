@@ -283,7 +283,7 @@ int main(int argc, char **argv) {
 
   std::error_code EC;
   Out.reset(
-      new llvm::ToolOutputFile(OutputFilename, EC, llvm::sys::fs::F_None));
+      new llvm::ToolOutputFile(OutputFilename, EC, llvm::sys::fs::OF_None));
   if (EC) {
     llvm::errs() << EC.message() << '\n';
     return 1;

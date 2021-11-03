@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,13 +12,14 @@
 
 import TestsUtils
 
-public let ClassArrayGetter = BenchmarkInfo(
-  name: "ClassArrayGetter2",
-  runFunction: run_ClassArrayGetter,
-  tags: [.validation, .api, .Array],
-  setUpFunction: { blackHole(inputArray) },
-  tearDownFunction: { inputArray = nil },
-  legacyFactor: 10)
+public let benchmarks =
+  BenchmarkInfo(
+    name: "ClassArrayGetter2",
+    runFunction: run_ClassArrayGetter,
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(inputArray) },
+    tearDownFunction: { inputArray = nil },
+    legacyFactor: 10)
 
 class Box {
   var v: Int
@@ -44,9 +45,9 @@ var inputArray: [Box]! = {
   return a
 }()
 
-public func run_ClassArrayGetter(_ N: Int) {
+public func run_ClassArrayGetter(_ n: Int) {
   let a: [Box] = inputArray
-  for _ in 1...N {
+  for _ in 1...n {
     _ = sumArray(a)
   }
 }

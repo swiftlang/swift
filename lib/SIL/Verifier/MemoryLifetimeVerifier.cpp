@@ -31,11 +31,8 @@ namespace {
 /// A utility for verifying memory lifetime.
 ///
 /// The MemoryLifetime utility checks the lifetime of memory locations.
-/// This is limited to memory locations which are guaranteed to be not aliased,
-/// like @in or @inout parameters. Also, alloc_stack locations are handled.
-///
-/// In addition to verification, the MemoryLifetime class can be used as utility
-/// (e.g. base class) for optimizations, which need to compute memory lifetime.
+/// This is limited to memory locations which can be handled by
+/// `MemoryLocations`.
 class MemoryLifetimeVerifier {
 
   using Bits = MemoryLocations::Bits;
@@ -176,6 +173,16 @@ static bool isTrivialEnumElem(EnumElementDecl *elem, SILType enumType,
                               SILFunction *function) {
   return !elem->hasAssociatedValues() ||
         enumType.getEnumElementType(elem, function).isTrivial(*function);
+}
+
+static bool injectsNoPayloadCase(InjectEnumAddrInst *IEAI) {
+  if (!IEAI->getElement()->hasAssociatedValues())
+    return true;
+  SILType enumType = IEAI->getOperand()->getType();
+  SILFunction *function = IEAI->getFunction();
+  SILType elemType = enumType.getEnumElementType(IEAI->getElement(), function);
+  // Handle empty types (e.g. the empty tuple) as no-payload.
+  return elemType.isEmpty(*function);
 }
 
 static bool isOrHasEnum(SILType type) {
@@ -349,7 +356,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       case SILInstructionKind::InjectEnumAddrInst: {
         auto *IEAI = cast<InjectEnumAddrInst>(&I);
         int enumIdx = locations.getLocationIdx(IEAI->getOperand());
-        if (enumIdx >= 0 && !IEAI->getElement()->hasAssociatedValues()) {
+        if (enumIdx >= 0 && injectsNoPayloadCase(IEAI)) {
           // This is a bit tricky: an injected no-payload case means that the
           // "full" enum is initialized. So, for the purpose of dataflow, we
           // treat it like a full initialization of the payload data.
@@ -588,7 +595,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::InjectEnumAddrInst: {
         auto *IEAI = cast<InjectEnumAddrInst>(&I);
         int enumIdx = locations.getLocationIdx(IEAI->getOperand());
-        if (enumIdx >= 0 && !IEAI->getElement()->hasAssociatedValues()) {
+        if (enumIdx >= 0 && injectsNoPayloadCase(IEAI)) {
           // Again, an injected no-payload case is treated like a "full"
           // initialization. See initDataflowInBlock().
           requireBitsClear(bits & nonTrivialLocations, IEAI->getOperand(), &I);

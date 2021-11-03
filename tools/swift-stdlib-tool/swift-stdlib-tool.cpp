@@ -888,18 +888,17 @@ std::string uuidString(const uuid_t uuid) {
 }
 
 void copyLibraries(
-    std::string src_dir, std::string dst_dir,
+    std::string dst_dir,
     const std::unordered_map<std::string, std::unordered_set<std::string>>
         &libs,
     bool stripBitcode) {
   mkpath_np(dst_dir.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
 
   for (const auto &pair : libs) {
-    const auto &lib = pair.first;
+    const auto &src = pair.first;
     const auto &srcUUIDs = pair.second;
 
-    std::string src = src_dir + "/" + lib;
-    std::string dst = dst_dir + "/" + lib;
+    std::string dst = dst_dir + "/" + filename(src);
 
     // Compare UUIDs of src and dst and don't copy if they're the same.
     // Do not use mod times for this task: the dst copy gets code-signed
@@ -927,14 +926,13 @@ void copyLibraries(
     log_vv("Destination UUIDs %s: %s", dst.c_str(), dstUUIDsString.c_str());
 
     if (srcUUIDs == dstUUIDs) {
-      log_v("%s is up to date at %s", lib.c_str(), dst.c_str());
+      log_v("%s is up to date at %s", src.c_str(), dst.c_str());
       continue;
     }
 
     // Perform the copy.
 
-    log_v("Copying %s from %s to %s", lib.c_str(), src_dir.c_str(),
-          dst_dir.c_str());
+    log_v("Copying %s to %s", src.c_str(), dst_dir.c_str());
 
     unlink(dst.c_str());
     copyFile(src, dst, stripBitcode);
@@ -998,7 +996,7 @@ int main(int argc, const char *argv[]) {
   // Copy source.
   // --source-libraries
   // or /path/to/swift-stdlib-tool/../../lib/swift/<--platform>
-  std::string src_dir;
+  std::vector<std::string> src_dirs;
 
   // Copy destinations, signed and unsigned.
   // --destination and --unsigned-destination
@@ -1041,7 +1039,7 @@ int main(int argc, const char *argv[]) {
       embedDirs.emplace_back(argv[++i]);
     }
     if (0 == strcmp(argv[i], "--source-libraries")) {
-      src_dir = std::string(argv[++i]);
+      src_dirs.emplace_back(argv[++i]);
     }
     if (0 == strcmp(argv[i], "--platform")) {
       platform = std::string(argv[++i]);
@@ -1076,20 +1074,31 @@ int main(int argc, const char *argv[]) {
     }
   }
 
-  // Fix up src_dir and platform values.
-  if (src_dir.empty() && platform.empty()) {
-    // Neither src_dir nor platform is set. Die.
+  // Fix up src_dirs and platform values.
+  if (src_dirs.empty() && platform.empty()) {
+    // Neither src_dirs nor platform is set. Die.
     fail_usage("At least one of --source-libraries and --platform "
                "must be set.");
-  } else if (src_dir.empty()) {
-    // platform is set but src_dir is not.
-    // Use platform to set src_dir relative to us.
-    src_dir = parentPath(parentPath(self_executable)) + "/" + "lib" +
-              "swift-5.0" + "/" + platform;
+  } else if (src_dirs.empty()) {
+    // platform is set but src_dirs is not.
+    // Use platform to set src_dirs relative to us.
+    std::string root_path =
+        parentPath(parentPath(self_executable)) + "/" + "lib";
+
+    enumerateDirectory(root_path, [&](std::string entry) {
+      if (filename(entry).compare(0, strlen("swift-"), "swift-") == 0) {
+        src_dirs.push_back(entry + "/" + platform);
+      }
+    });
+
+    if (src_dirs.empty()) {
+      fail("Couldn't discover Swift library directories in: %s",
+           root_path.c_str());
+    }
   } else if (platform.empty()) {
-    // src_dir is set but platform is not.
-    // Pick platform from src_dir's name.
-    platform = src_dir;
+    // src_dirs is set but platform is not.
+    // Pick platform from any src_dirs's name.
+    platform = filename(src_dirs.front());
   }
 
   // Add the platform to unsigned_dst_dir if it is not already present.
@@ -1120,7 +1129,7 @@ int main(int argc, const char *argv[]) {
   }
 
   // Collect Swift library names from the input files.
-  // If the library does not exist in src_dir then assume the user wrote
+  // If the library does not exist in src_dirs then assume the user wrote
   // their own library named libswift* and is handling it elsewhere.
   __block std::unordered_map<std::string, std::unordered_set<std::string>>
       swiftLibs;
@@ -1128,9 +1137,12 @@ int main(int argc, const char *argv[]) {
     process(
         path,
         ^(const std::string &linkedLib) {
-          const auto linkedSrc = src_dir + "/" + linkedLib;
-          if (access(linkedSrc.c_str(), F_OK) == 0) {
-            swiftLibs[linkedLib] = std::unordered_set<std::string>();
+          for (const auto &src_dir : src_dirs) {
+            const auto linkedSrc = src_dir + "/" + linkedLib;
+            if (access(linkedSrc.c_str(), F_OK) == 0) {
+              swiftLibs[linkedSrc] = std::unordered_set<std::string>();
+              break;
+            }
           }
         },
         NULL);
@@ -1144,21 +1156,23 @@ int main(int argc, const char *argv[]) {
     worklist.push_back(pair.first);
   }
   while (worklist.size()) {
-    const auto lib = worklist.back();
+    const auto path = worklist.back();
     worklist.pop_back();
-    const auto path = src_dir + "/" + lib;
     process(
         path,
         ^(const std::string &linkedLib) {
-          const auto linkedSrc = src_dir + "/" + linkedLib;
-          if (swiftLibs.count(linkedLib) == 0 &&
-              access(linkedSrc.c_str(), F_OK) == 0) {
-            swiftLibs[linkedLib] = std::unordered_set<std::string>();
-            worklist.push_back(linkedLib);
+          for (const auto &src_dir : src_dirs) {
+            const auto linkedSrc = src_dir + "/" + linkedLib;
+            if (swiftLibs.count(linkedSrc) == 0 &&
+                access(linkedSrc.c_str(), F_OK) == 0) {
+              swiftLibs[linkedSrc] = std::unordered_set<std::string>();
+              worklist.push_back(linkedSrc);
+              break;
+            }
           }
         },
         ^(const uuid_t uuid) {
-          swiftLibs[lib].insert(uuidString(uuid));
+          swiftLibs[path].insert(uuidString(uuid));
         });
   }
 
@@ -1167,9 +1181,11 @@ int main(int argc, const char *argv[]) {
   __block std::unordered_map<std::string, std::unordered_set<std::string>>
       swiftLibsForResources;
   for (const auto &lib : resourceLibraries) {
-    const auto libSrc = src_dir + "/" + lib;
-    if (access(libSrc.c_str(), F_OK) == 0) {
-      swiftLibsForResources[lib] = std::unordered_set<std::string>();
+    for (const auto &src_dir : src_dirs) {
+      const auto libSrc = src_dir + "/" + lib;
+      if (access(libSrc.c_str(), F_OK) == 0) {
+        swiftLibsForResources[libSrc] = std::unordered_set<std::string>();
+      }
     }
   }
 
@@ -1179,47 +1195,48 @@ int main(int argc, const char *argv[]) {
     worklist.push_back(pair.first);
   }
   while (worklist.size()) {
-    const auto lib = worklist.back();
+    const auto path = worklist.back();
     worklist.pop_back();
-    const auto path = src_dir + "/" + lib;
     process(
         path,
         ^(const std::string &linkedLib) {
-          const auto linkedSrc = src_dir + "/" + linkedLib;
-          if (swiftLibsForResources.count(linkedLib) == 0 &&
-              access(linkedSrc.c_str(), F_OK) == 0) {
-            swiftLibsForResources[linkedLib] =
-                std::unordered_set<std::string>();
-            worklist.push_back(linkedLib);
+          for (const auto &src_dir : src_dirs) {
+            const auto linkedSrc = src_dir + "/" + linkedLib;
+            if (swiftLibsForResources.count(linkedSrc) == 0 &&
+                access(linkedSrc.c_str(), F_OK) == 0) {
+              swiftLibsForResources[linkedSrc] =
+                  std::unordered_set<std::string>();
+              worklist.push_back(linkedSrc);
+            }
           }
         },
         ^(const uuid_t uuid) {
-          swiftLibsForResources[lib].insert(uuidString(uuid));
+          swiftLibsForResources[path].insert(uuidString(uuid));
         });
   }
 
   // Print the Swift libraries (full path to toolchain's copy)
   if (print) {
     for (const auto &lib : swiftLibs) {
-      printf("%s\n", (src_dir + "/" + lib.first).c_str());
+      printf("%s\n", lib.first.c_str());
     }
   }
 
   // Copy the Swift libraries to $build_dir/$frameworks
   // and $build_dir/$unsigned_frameworks
   if (copy) {
-    copyLibraries(src_dir, dst_dir, swiftLibs, stripBitcode);
+    copyLibraries(dst_dir, swiftLibs, stripBitcode);
     if (unsigned_dst_dir.empty()) {
       // Never strip bitcode from the unsigned libraries.
       // Their existing signatures must be preserved.
-      copyLibraries(src_dir, unsigned_dst_dir, swiftLibs, false);
+      copyLibraries(unsigned_dst_dir, swiftLibs, false);
     }
 
     if (resource_dst_dir.empty()) {
       // Never strip bitcode from resources libraries, for
       // the same reason as the libraries copied to
       // unsigned_dst_dir.
-      copyLibraries(src_dir, resource_dst_dir, swiftLibsForResources, false);
+      copyLibraries(resource_dst_dir, swiftLibsForResources, false);
     }
   }
 
@@ -1302,13 +1319,15 @@ int main(int argc, const char *argv[]) {
         const auto newSignatureData = query_code_signature(dst);
 
 #if 0
-                // For Debugging.
-                fprintf(stdout, "oldSignature (%lu bytes)\n", (unsigned long)oldSignatureData.size());
-                fwrite(oldSignatureData.data(), oldSignatureData.size(), 1, stdout);
-                fprintf(stdout, "\nnewSignature (%lu bytes)\n", (unsigned long)newSignatureData.size());
-                fwrite(newSignatureData.data(), newSignatureData.size(), 1, stdout);
-                fprintf(stdout, "\n");
-                fflush(stdout);
+        // For Debugging.
+        fprintf(stdout, "oldSignature (%lu bytes)\n",
+                (unsigned long)oldSignatureData.size());
+        fwrite(oldSignatureData.data(), oldSignatureData.size(), 1, stdout);
+        fprintf(stdout, "\nnewSignature (%lu bytes)\n",
+                (unsigned long)newSignatureData.size());
+        fwrite(newSignatureData.data(), newSignatureData.size(), 1, stdout);
+        fprintf(stdout, "\n");
+        fflush(stdout);
 #endif
 
         const auto newLength = newSignatureData.size();

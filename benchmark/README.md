@@ -199,7 +199,30 @@ benchmarks will be compiled with -Onone!**
 * `$ ./Benchmark_O --tags=Dictionary`
 * `$ ./Benchmark_O --skip-tags=unstable,skip,validation`
 
-### Note
+### Deterministic Hashing Requirement
+
+To run benchmarks, you'll need to disable randomized hash seeding by setting the
+`SWIFT_DETERMINISTIC_HASHING` environment variable to `1`. (You only need to do
+this when running the benchmark executables directly -- the driver script does
+this for you automatically.)
+
+* `$ env SWIFT_DETERMINISTIC_HASHING=1 ./Benchmark_O --num-iters=1 --num-samples=1`
+
+This makes for more stable results, by preventing random hash collision changes
+from affecting benchmark measurements. Benchmark measurements start by checking
+that deterministic hashing is enabled and they fail with a runtime trap when it
+isn't.
+
+If for some reason you want to run the benchmarks using standard randomized
+hashing, you can disable this check by passing the
+`--allow-nondeterministic-hashing` option to the executable.
+
+* `$ ./Benchmark_O --num-iters=1 --num-samples=1 --allow-nondeterministic-hashing`
+
+This will affect the reliability of measurements, so this is not recommended.
+
+### Benchmarking by Numbers
+
 As a shortcut, you can also refer to benchmarks by their ordinal numbers.
 These are printed out together with benchmark names and tags using the
 `--list` parameter. For a complete list of all available performance tests run
@@ -290,16 +313,18 @@ If needed you can multiply N by a fixed amount (e.g. `1...100*N`) to achieve thi
 // rdar://problem/00000000
 import TestsUtils
 
-public let YourTestName = BenchmarkInfo(
-  name: "YourTestName",
-  runFunction: run_YourTestName,
-  tags: [.regression])
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "YourTestName",
+    runFunction: run_YourTestName,
+    tags: [.regression])
+]
 
 @inline(never)
-public func run_YourTestName(N: Int) {
+public func run_YourTestName(n: Int) {
     # Declare variables
 
-    for i in 1...N {
+    for i in 1...n {
         # Perform work
 
         # Verify work was done; break otherwise

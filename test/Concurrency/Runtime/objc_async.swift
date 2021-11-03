@@ -8,7 +8,7 @@
 // REQUIRES: objc_interop
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 // Disable this test because it's flaky without a proper way to make the main

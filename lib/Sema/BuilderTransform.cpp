@@ -1462,6 +1462,14 @@ public:
         return nullptr;
     }
 
+    // Setup the types of our case body var decls.
+    for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+      assert(expected->hasName());
+      auto prev = expected->getParentVarDecl();
+      auto type = solution.resolveInterfaceType(solution.getType(prev));
+      expected->setInterfaceType(type);
+    }
+
     // Transform the body of the case.
     auto body = cast<BraceStmt>(caseStmt->getBody());
     auto captured = takeCapturedStmt(body);
@@ -1661,6 +1669,14 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   // Build a constraint system in which we can check the body of the function.
   ConstraintSystem cs(func, options);
 
+  if (cs.isDebugMode()) {
+    auto &log = llvm::errs();
+
+    log << "--- Applying result builder to function ---\n";
+    func->dump(log);
+    log << '\n';
+  }
+
   if (auto result = cs.matchResultBuilder(
           func, builderType, resultContextType, resultConstraintKind,
           cs.getConstraintLocator(func->getBody()))) {
@@ -1713,7 +1729,16 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
           solutions.front(),
           SolutionApplicationTarget(func))) {
     performSyntacticDiagnosticsForTarget(*result, /*isExprStmt*/ false);
-    return result->getFunctionBody();
+    auto *body = result->getFunctionBody();
+
+    if (cs.isDebugMode()) {
+      auto &log = llvm::errs();
+      log << "--- Type-checked function body ---\n";
+      body->dump(log);
+      log << '\n';
+    }
+
+    return body;
   }
 
   return nullptr;
@@ -1834,8 +1859,7 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
         return elt.first == fn;
       }) == resultBuilderTransformed.end() &&
          "already transformed this body along this path!?!");
-  resultBuilderTransformed.push_back(
-      std::make_pair(fn, std::move(*applied)));
+  resultBuilderTransformed.insert(std::make_pair(fn, std::move(*applied)));
 
   // If builder is applied to the closure expression then
   // `closure body` to `closure result` matching should
@@ -1945,7 +1969,7 @@ public:
         return nullptr;
 
       if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
-        if (shouldTypeCheckInEnclosingExpression(closure)) {
+        if (closure->hasSingleExpressionBody()) {
           hasError |= containsErrorExpr(closure->getSingleExpressionBody());
           return hasError ? nullptr : expr;
         }

@@ -27,8 +27,9 @@
 
 using llvm::cast;
 
+#include <cerrno>
 #include <climits>
-#include <iostream>
+#include <string>
 
 namespace swift {
 namespace reflection {

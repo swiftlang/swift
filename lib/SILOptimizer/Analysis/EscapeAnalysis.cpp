@@ -250,6 +250,14 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) {
     }
     return pointerOperand;
   }
+  case ValueKind::MultipleValueInstructionResult: {
+    if (auto *dt = dyn_cast<DestructureTupleInst>(value)) {
+      if (canOptimizeArrayUninitializedResult(dt))
+        return SILValue();
+      return dt->getOperand();
+    }
+    return SILValue();
+  }
   default:
     return SILValue();
   }
@@ -1939,6 +1947,11 @@ EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
         continue;
       }
     }
+    if (auto *dt = dyn_cast<DestructureTupleInst>(use->getUser())) {
+      call.arrayStruct = dt->getResult(0);
+      call.arrayElementPtr = dt->getResult(1);
+      continue;
+    }
     // If there are any other uses, such as a release_value, erase the previous
     // call info and bail out.
     call.arrayStruct = nullptr;
@@ -1957,8 +1970,9 @@ EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai) {
 }
 
 bool EscapeAnalysis::canOptimizeArrayUninitializedResult(
-    TupleExtractInst *tei) {
-  ApplyInst *ai = dyn_cast<ApplyInst>(tei->getOperand());
+    SILInstruction *extract) {
+  assert(isa<TupleExtractInst>(extract) || isa<DestructureTupleInst>(extract));
+  ApplyInst *ai = dyn_cast<ApplyInst>(extract->getOperand(0));
   if (!ai)
     return false;
 
@@ -2097,12 +2111,13 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     }
   }
 
-  if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) {
+  if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I) ||
+      isa<DestroyValueInst>(I)) {
     // Treat the release instruction as if it is the invocation
     // of a deinit function.
     if (RecursionDepth < MaxRecursionDepth) {
       // Check if the destructor is known.
-      auto OpV = cast<RefCountingInst>(I)->getOperand(0);
+      auto OpV = I->getOperand(0);
       if (buildConnectionGraphForDestructor(OpV, I, FInfo, BottomUpOrder,
                                             RecursionDepth))
         return;
@@ -2157,10 +2172,21 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return isPointer(result);
       }));
       return;
-
+    case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::CopyValueInst: {
+      auto svi = cast<SingleValueInstruction>(I);
+      CGNode *resultNode = ConGraph->getNode(svi);
+      if (CGNode *opNode = ConGraph->getNode(svi->getOperand(0))) {
+        ConGraph->defer(resultNode, opNode);
+        return;
+      }
+      ConGraph->setEscapesGlobal(svi);
+      return;
+    }
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     case SILInstructionKind::Name##ReleaseInst:
 #include "swift/AST/ReferenceStorage.def"
+    case SILInstructionKind::DestroyValueInst:
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::ReleaseValueInst: {
       // A release instruction may deallocate the pointer operand. This may
@@ -2350,9 +2376,15 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       // This is a tuple_extract which extracts the second result of an
       // array.uninitialized call (otherwise getPointerBase should have already
       // looked through it).
-      auto *TEI = cast<TupleExtractInst>(I);
-      assert(canOptimizeArrayUninitializedResult(TEI)
+      assert(canOptimizeArrayUninitializedResult(I)
              && "tuple_extract should be handled as projection");
+      return;
+    }
+    case SILInstructionKind::DestructureTupleInst: {
+      if (canOptimizeArrayUninitializedResult(I)) {
+        return;
+      }
+      setAllEscaping(I, ConGraph);
       return;
     }
     case SILInstructionKind::UncheckedRefCastAddrInst: {

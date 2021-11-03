@@ -165,11 +165,10 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
   return true;
 }
 
-static ValidationInfo
-validateControlBlock(llvm::BitstreamCursor &cursor,
-                     SmallVectorImpl<uint64_t> &scratch,
-                     std::pair<uint16_t, uint16_t> expectedVersion,
-                     ExtendedValidationInfo *extendedInfo) {
+static ValidationInfo validateControlBlock(
+    llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
+    std::pair<uint16_t, uint16_t> expectedVersion, bool requiresOSSAModules,
+    ExtendedValidationInfo *extendedInfo) {
   // The control block is malformed until we've at least read a major version
   // number.
   ValidationInfo result;
@@ -299,6 +298,45 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
     case control_block::TARGET:
       result.targetTriple = blobData;
       break;
+    case control_block::SDK_NAME: {
+      result.sdkName = blobData;
+      break;
+    }
+    case control_block::REVISION: {
+      // Tagged compilers should load only resilient modules if they were
+      // produced by the exact same version.
+
+      // Disable this restriction for compiler testing by setting this
+      // env var to any value.
+      static const char* ignoreRevision =
+        ::getenv("SWIFT_DEBUG_IGNORE_SWIFTMODULE_REVISION");
+      if (ignoreRevision)
+        break;
+
+      // Override this env var for testing, forcing the behavior of a tagged
+      // compiler and using the env var value to override this compiler's
+      // revision.
+      static const char* forcedDebugRevision =
+        ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
+
+      bool isCompilerTagged = forcedDebugRevision ||
+        !version::Version::getCurrentCompilerVersion().empty();
+
+      StringRef moduleRevision = blobData;
+      if (isCompilerTagged && !moduleRevision.empty()) {
+        StringRef compilerRevision = forcedDebugRevision ?
+          forcedDebugRevision : version::getSwiftRevision();
+        if (moduleRevision != compilerRevision)
+          result.status = Status::RevisionIncompatible;
+      }
+      break;
+    }
+    case control_block::IS_OSSA: {
+      auto isModuleInOSSA = scratch[0];
+      if (requiresOSSAModules && !isModuleInOSSA)
+        result.status = Status::NotInOSSA;
+      break;
+    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -385,7 +423,7 @@ bool serialization::isSerializedAST(StringRef data) {
 }
 
 ValidationInfo serialization::validateSerializedAST(
-    StringRef data,
+    StringRef data, bool requiresOSSAModules,
     ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies) {
   ValidationInfo result;
@@ -424,10 +462,10 @@ ValidationInfo serialization::validateSerializedAST(
         result.status = Status::Malformed;
         return result;
       }
-      result = validateControlBlock(cursor, scratch,
-                                    {SWIFTMODULE_VERSION_MAJOR,
-                                     SWIFTMODULE_VERSION_MINOR},
-                                    extendedInfo);
+      result = validateControlBlock(
+          cursor, scratch,
+          {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
+          requiresOSSAModules, extendedInfo);
       if (result.status == Status::Malformed)
         return result;
     } else if (dependencies &&
@@ -933,10 +971,10 @@ bool ModuleFileSharedCore::readModuleDocIfPresent() {
         return false;
       }
 
-      info = validateControlBlock(docCursor, scratch,
-                                  {SWIFTDOC_VERSION_MAJOR,
-                                   SWIFTDOC_VERSION_MINOR},
-                                  /*extendedInfo*/nullptr);
+      info = validateControlBlock(
+          docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
+          RequiresOSSAModules,
+          /*extendedInfo*/ nullptr);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftdoc is actually for this module.
@@ -1076,10 +1114,11 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent() {
         consumeError(std::move(Err));
         return false;
       }
-      info = validateControlBlock(infoCursor, scratch,
-                                  {SWIFTSOURCEINFO_VERSION_MAJOR,
-                                   SWIFTSOURCEINFO_VERSION_MINOR},
-                                  /*extendedInfo*/nullptr);
+      info = validateControlBlock(
+          infoCursor, scratch,
+          {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
+          RequiresOSSAModules,
+          /*extendedInfo*/ nullptr);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftsourceinfo is actually for this module.
@@ -1153,10 +1192,12 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-    bool isFramework, serialization::ValidationInfo &info)
+    bool isFramework, bool requiresOSSAModules,
+    serialization::ValidationInfo &info)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
-      ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)) {
+      ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)),
+      RequiresOSSAModules(requiresOSSAModules) {
   assert(!hasError());
   Bits.IsFramework = isFramework;
 
@@ -1200,16 +1241,17 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       }
 
       ExtendedValidationInfo extInfo;
-      info = validateControlBlock(cursor, scratch,
-                                  {SWIFTMODULE_VERSION_MAJOR,
-                                   SWIFTMODULE_VERSION_MINOR},
-                                  &extInfo);
+      info = validateControlBlock(
+          cursor, scratch,
+          {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
+          RequiresOSSAModules, &extInfo);
       if (info.status != Status::Valid) {
         error(info.status);
         return;
       }
       Name = info.name;
       TargetTriple = info.targetTriple;
+      SDKName = info.sdkName;
       CompatibilityVersion = info.compatibilityVersion;
       UserModuleVersion = info.userModuleVersion;
       Bits.ArePrivateImportsEnabled = extInfo.arePrivateImportsEnabled();

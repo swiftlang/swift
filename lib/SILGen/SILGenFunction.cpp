@@ -19,6 +19,7 @@
 #include "RValue.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
@@ -141,6 +142,7 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::EnumElement:
     return getMagicFunctionName(cast<EnumElementDecl>(ref.getDecl())
                                   ->getDeclContext());
+  case SILDeclRef::Kind::AsyncEntryPoint:
   case SILDeclRef::Kind::EntryPoint:
     auto *file = ref.getDecl()->getDeclContext()->getParentSourceFile();
     return getMagicFunctionName(file);
@@ -429,7 +431,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  CanType expectedType,
-                                 SubstitutionMap subs) {
+                                 SubstitutionMap subs,
+                                 bool alreadyConverted) {
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(constant);
 
   auto constantInfo = getConstantInfo(getTypeExpansionContext(), constant);
@@ -469,12 +472,14 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(
         loc, captureInfo);
   }
-
+  
   if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized) {
     auto result = ManagedValue::forUnmanaged(functionRef);
-    return emitOrigToSubstValue(loc, result,
-                                AbstractionPattern(expectedType),
-                                expectedType);
+    if (!alreadyConverted)
+      result = emitOrigToSubstValue(loc, result,
+                                    AbstractionPattern(expectedType),
+                                    expectedType);
+    return result;
   }
 
   SmallVector<ManagedValue, 4> capturedArgs;
@@ -501,8 +506,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   auto substFormalType = expectedType;
 
   // Generalize if necessary.
-  result = emitOrigToSubstValue(loc, result, origFormalType,
-                                substFormalType);
+  if (!alreadyConverted)
+    result = emitOrigToSubstValue(loc, result, origFormalType,
+                                  substFormalType);
 
   return result;
 }
@@ -519,7 +525,8 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     // Synthesize the factory function body
     emitDistributedActorFactory(fd);
   } else {
-    prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
+    prepareEpilog(fd->getResultInterfaceType(),
+                  fd->hasThrows(), CleanupLocation(fd));
     
     // Emit the actual function body as usual
     emitStmt(fd->getTypecheckedBody());
@@ -532,14 +539,16 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
-
+  OrigFnType = SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace));
+  
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
     SILDeclRef(ace));
   emitProfilerIncrement(ace);
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
-             ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc());
-  prepareEpilog(true, ace->isBodyThrowing(), CleanupLocation(ace));
+             ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc(),
+             SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace)));
+  prepareEpilog(resultIfaceTy, ace->isBodyThrowing(), CleanupLocation(ace));
 
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitStmt(ce->getBody());
@@ -555,14 +564,26 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitEpilog(ace);
 }
 
+ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
+                                        SubstitutionMap subs,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C);
+
 void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
   // Create the argc and argv arguments.
   auto entry = B.getInsertionBB();
   auto paramTypeIter = F.getConventions()
                            .getParameterSILTypes(getTypeExpansionContext())
                            .begin();
-  SILValue argc = entry->createFunctionArgument(*paramTypeIter);
-  SILValue argv = entry->createFunctionArgument(*std::next(paramTypeIter));
+
+  SILValue argc;
+  SILValue argv;
+  const bool isAsyncFunc =
+      isa<FuncDecl>(mainDecl) && static_cast<FuncDecl *>(mainDecl)->hasAsync();
+  if (!isAsyncFunc) {
+    argc = entry->createFunctionArgument(*paramTypeIter);
+    argv = entry->createFunctionArgument(*std::next(paramTypeIter));
+  }
 
   switch (mainDecl->getArtificialMainKind()) {
   case ArtificialMainKind::UIApplicationMain: {
@@ -769,13 +790,32 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     auto builtinInt32Type = SILType::getBuiltinIntegerType(32, getASTContext());
 
     auto *exitBlock = createBasicBlock();
-    B.setInsertionPoint(exitBlock);
     SILValue exitCode =
         exitBlock->createPhiArgument(builtinInt32Type, OwnershipKind::None);
-    auto returnType = F.getConventions().getSingleSILResultType(B.getTypeExpansionContext());
-    if (exitCode->getType() != returnType)
-      exitCode = B.createStruct(moduleLoc, returnType, exitCode);
-    B.createReturn(moduleLoc, exitCode);
+    B.setInsertionPoint(exitBlock);
+
+    if (!mainFunc->hasAsync()) {
+      auto returnType = F.getConventions().getSingleSILResultType(
+          B.getTypeExpansionContext());
+      if (exitCode->getType() != returnType)
+        exitCode = B.createStruct(moduleLoc, returnType, exitCode);
+      B.createReturn(moduleLoc, exitCode);
+    } else {
+      FuncDecl *exitFuncDecl = SGM.getExit();
+      assert(exitFuncDecl && "Failed to find exit function declaration");
+      SILFunction *exitSILFunc = SGM.getFunction(
+          SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func, /*isForeign*/ true),
+          NotForDefinition);
+
+      SILFunctionType &funcType =
+          *exitSILFunc->getLoweredType().getAs<SILFunctionType>();
+      SILType retType = SILType::getPrimitiveObjectType(
+          funcType.getParameters().front().getInterfaceType());
+      exitCode = B.createStruct(moduleLoc, retType, exitCode);
+      SILValue exitCall = B.createFunctionRef(moduleLoc, exitSILFunc);
+      B.createApply(moduleLoc, exitCall, {}, {exitCode});
+      B.createUnreachable(moduleLoc);
+    }
 
     if (mainFunc->hasThrows()) {
       auto *successBlock = createBasicBlock();
@@ -811,6 +851,121 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     return;
   }
   }
+}
+
+void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
+  auto moduleLoc = RegularLocation::getModuleLocation();
+  auto *entryBlock = B.getInsertionBB();
+  auto paramTypeIter = F.getConventions()
+                           .getParameterSILTypes(getTypeExpansionContext())
+                           .begin();
+
+  entryBlock->createFunctionArgument(*paramTypeIter);            // argc
+  entryBlock->createFunctionArgument(*std::next(paramTypeIter)); // argv
+
+  // Lookup necessary functions
+  swift::ASTContext &ctx = entryPoint.getDecl()->getASTContext();
+
+  B.setInsertionPoint(entryBlock);
+
+  auto wrapCallArgs = [this, &moduleLoc](SILValue originalValue, FuncDecl *fd,
+                            uint32_t paramIndex) -> SILValue {
+    Type parameterType = fd->getParameters()->get(paramIndex)->getType();
+    SILType paramSILType = SILType::getPrimitiveObjectType(parameterType->getCanonicalType());
+    // If the types are the same, we don't need to do anything!
+    if (paramSILType == originalValue->getType())
+      return originalValue;
+    return this->B.createStruct(moduleLoc, paramSILType, originalValue);
+  };
+
+  // Call CreateAsyncTask
+  FuncDecl *builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(
+      getASTContext(),
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask))));
+  auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
+                                   {TupleType::getEmpty(ctx)},
+                                   ArrayRef<ProtocolConformanceRef>{});
+
+  SILValue mainFunctionRef = emitGlobalFunctionRef(moduleLoc, entryPoint);
+
+  // Emit the CreateAsyncTask builtin
+  TaskCreateFlags taskCreationFlagMask(0);
+  taskCreationFlagMask.setInheritContext(true);
+  SILValue taskFlags =
+      emitWrapIntegerLiteral(moduleLoc, getLoweredType(ctx.getIntType()),
+                             taskCreationFlagMask.getOpaqueValue());
+
+  SILValue task =
+      emitBuiltinCreateAsyncTask(*this, moduleLoc, subs,
+                                 {ManagedValue::forUnmanaged(taskFlags),
+                                  ManagedValue::forUnmanaged(mainFunctionRef)},
+                                 {})
+          .forward(*this);
+  DestructureTupleInst *structure = B.createDestructureTuple(moduleLoc, task);
+  task = structure->getResult(0);
+
+  // Get swiftJobRun
+  FuncDecl *swiftJobRunFuncDecl = SGM.getSwiftJobRun();
+  assert(swiftJobRunFuncDecl && "Failed to find swift_job_run function decl");
+  SILFunction *swiftJobRunSILFunc =
+      SGM.getFunction(SILDeclRef(swiftJobRunFuncDecl, SILDeclRef::Kind::Func),
+                      NotForDefinition);
+  SILValue swiftJobRunFunc =
+      B.createFunctionRefFor(moduleLoc, swiftJobRunSILFunc);
+
+  // Convert task to job
+  SILType JobType = SILType::getPrimitiveObjectType(
+      getBuiltinType(ctx, "Job")->getCanonicalType());
+  SILValue jobResult = B.createBuiltin(
+      moduleLoc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::ConvertTaskToJob)),
+      JobType, {}, {task});
+  jobResult = wrapCallArgs(jobResult, swiftJobRunFuncDecl, 0);
+
+  // Get main executor
+  FuncDecl *getMainExecutorFuncDecl = SGM.getGetMainExecutor();
+  if (!getMainExecutorFuncDecl) {
+    // If it doesn't exist due to an SDK-compiler mismatch, we can conjure one
+    // up instead of crashing:
+    // @available(SwiftStdlib 5.1, *)
+    // @_silgen_name("swift_task_getMainExecutor")
+    // internal func _getMainExecutor() -> Builtin.Executor
+
+    ParameterList *emptyParams = ParameterList::createEmpty(getASTContext());
+    getMainExecutorFuncDecl = FuncDecl::createImplicit(
+        getASTContext(), StaticSpellingKind::None,
+        DeclName(
+            getASTContext(),
+            DeclBaseName(getASTContext().getIdentifier("_getMainExecutor")),
+            /*Arguments*/ emptyParams),
+        {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
+        getASTContext().TheExecutorType,
+        entryPoint.getDecl()->getModuleContext());
+    getMainExecutorFuncDecl->getAttrs().add(
+        new (getASTContext())
+            SILGenNameAttr("swift_task_getMainExecutor", /*implicit*/ true));
+  }
+
+  SILFunction *getMainExeutorSILFunc = SGM.getFunction(
+      SILDeclRef(getMainExecutorFuncDecl, SILDeclRef::Kind::Func),
+      NotForDefinition);
+  SILValue getMainExeutorFunc =
+      B.createFunctionRefFor(moduleLoc, getMainExeutorSILFunc);
+  SILValue mainExecutor = B.createApply(moduleLoc, getMainExeutorFunc, {}, {});
+  mainExecutor = wrapCallArgs(mainExecutor, swiftJobRunFuncDecl, 1);
+
+  // Run first part synchronously
+  B.createApply(moduleLoc, swiftJobRunFunc, {}, {jobResult, mainExecutor});
+
+  // Start Main loop!
+  FuncDecl *drainQueueFuncDecl = SGM.getAsyncMainDrainQueue();
+  SILFunction *drainQueueSILFunc = SGM.getFunction(
+      SILDeclRef(drainQueueFuncDecl, SILDeclRef::Kind::Func), NotForDefinition);
+  SILValue drainQueueFunc =
+      B.createFunctionRefFor(moduleLoc, drainQueueSILFunc);
+  B.createApply(moduleLoc, drainQueueFunc, {}, {});
+  B.createUnreachable(moduleLoc);
+  return;
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
@@ -870,7 +1025,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
              dc, interfaceType, /*throws=*/false, SourceLoc());
   if (EmitProfilerIncrement)
     emitProfilerIncrement(value);
-  prepareEpilog(true, false, CleanupLocation(Loc));
+  prepareEpilog(interfaceType, false, CleanupLocation(Loc));
 
   {
     llvm::Optional<SILGenFunction::OpaqueValueRAII> opaqueValue;
@@ -932,7 +1087,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
 
   emitBasicProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr,
                   interfaceType, dc, /*throws=*/ false,SourceLoc());
-  prepareEpilog(true, false, CleanupLocation(loc));
+  prepareEpilog(interfaceType, false, CleanupLocation(loc));
 
   auto pbd = var->getParentPatternBinding();
   const auto i = pbd->getPatternEntryIndexForVarDecl(var);
@@ -948,7 +1103,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     Scope scope(Cleanups, CleanupLocation(var));
 
     SmallVector<CleanupHandle, 4> cleanups;
-    auto init = prepareIndirectResultInit(resultType, directResults, cleanups);
+    auto init = prepareIndirectResultInit(AbstractionPattern(resultType),
+                                          resultType, directResults, cleanups);
 
     emitApplyOfStoredPropertyInitializer(loc, anchorVar, subs, resultType,
                                          origResultType,

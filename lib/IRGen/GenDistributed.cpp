@@ -53,13 +53,3 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
 
   return result;
 }
-
-void irgen::emitDistributedActorDestroy(IRGenFunction &IGF,
-                                                 llvm::Value *actor) {
-  auto fn = IGF.IGM.getDistributedActorDestroyFn();
-  actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
-
-  auto call = IGF.Builder.CreateCall(fn, {actor});
-  call->setCallingConv(IGF.IGM.SwiftCC);
-  call->setDoesNotThrow();
-}

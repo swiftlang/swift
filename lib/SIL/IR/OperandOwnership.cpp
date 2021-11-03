@@ -167,10 +167,8 @@ OPERAND_OWNERSHIP(TrivialUse, OpenExistentialMetatype)
 OPERAND_OWNERSHIP(TrivialUse, PointerToAddress)
 OPERAND_OWNERSHIP(TrivialUse, PointerToThinFunction)
 OPERAND_OWNERSHIP(TrivialUse, ProjectBlockStorage)
-OPERAND_OWNERSHIP(TrivialUse, ProjectValueBuffer)
 OPERAND_OWNERSHIP(TrivialUse, RawPointerToRef)
 OPERAND_OWNERSHIP(TrivialUse, SelectEnumAddr)
-OPERAND_OWNERSHIP(TrivialUse, SelectValue)
 OPERAND_OWNERSHIP(TrivialUse, StructElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, SwitchValue)
@@ -183,8 +181,6 @@ OPERAND_OWNERSHIP(TrivialUse, UncheckedAddrCast)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedRefCastAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedTakeEnumDataAddr)
 OPERAND_OWNERSHIP(TrivialUse, UnconditionalCheckedCastAddr)
-OPERAND_OWNERSHIP(TrivialUse, AllocValueBuffer)
-OPERAND_OWNERSHIP(TrivialUse, DeallocValueBuffer)
 
 // Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
@@ -207,6 +203,7 @@ OPERAND_OWNERSHIP(InstantaneousUse, SetDeallocating)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, DebugValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyBlock)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyValue)
+OPERAND_OWNERSHIP(UnownedInstantaneousUse, ExplicitCopyValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCMethod)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCSuperMethod)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedRetainValue)
@@ -248,6 +245,9 @@ OPERAND_OWNERSHIP(DestroyingConsume, DestroyValue)
 OPERAND_OWNERSHIP(DestroyingConsume, EndLifetime)
 OPERAND_OWNERSHIP(DestroyingConsume, BeginCOWMutation)
 OPERAND_OWNERSHIP(DestroyingConsume, EndCOWMutation)
+
+// TODO: Should this be a forwarding consume.
+OPERAND_OWNERSHIP(DestroyingConsume, MoveValue)
 
 // Instructions that move an owned value.
 OPERAND_OWNERSHIP(ForwardingConsume, CheckedCastValueBranch)
@@ -383,6 +383,23 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
   }
   return getOwnershipKind().getForwardingOperandOwnership(
     /*allowUnowned*/true);
+}
+
+OperandOwnership
+OperandOwnershipClassifier::visitSelectValueInst(SelectValueInst *i) {
+  if (getValue() == i->getDefaultResult())
+    return OperandOwnership::ForwardingBorrow;
+
+  for (unsigned idx = 0, endIdx = i->getNumCases(); idx < endIdx; ++idx) {
+    SILValue casevalue;
+    SILValue result;
+    std::tie(casevalue, result) = i->getCase(idx);
+
+    if (getValue() == casevalue) {
+      return OperandOwnership::ForwardingBorrow;
+    }
+  }
+  return OperandOwnership::TrivialUse;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
@@ -677,6 +694,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFRem)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FSub)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericFSub)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Fence)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Ifdef)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetObjCTypeEncoding)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ICMP_EQ)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ICMP_NE)
@@ -716,6 +734,8 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SMulOver)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SRem)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericSRem)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SSubOver)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StackAlloc)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StackDealloc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SToSCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SToUCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Expect)
@@ -756,6 +776,8 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntInstrprofIncrement)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Move)
+BUILTIN_OPERAND_OWNERSHIP(UnownedInstantaneousUse, Copy)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLetWithLocalBuffer)
@@ -829,7 +851,6 @@ BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedRemoteActor)
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDistributedActor)
 
 // FIXME: Why do these reqiuire a borrowed value at all?
 BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffAllocateSubcontext)

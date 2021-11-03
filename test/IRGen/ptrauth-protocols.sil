@@ -70,10 +70,10 @@ bb0:
 }
 // CHECK-LABEL: define swiftcc void @test_accesses(%swift.type* %T, i8** %T.Q)
 //   Fetch T.Assoc.
-// CHECK:    %T.Assoc = extractvalue %swift.metadata_response [[TMP:%.*]], 0
+// CHECK:    [[T_ASSOC:%.*]] = extractvalue %swift.metadata_response [[TMP:%.*]], 0
 // CHECK-NEXT:    {{%.*}} = extractvalue %swift.metadata_response [[TMP]], 1
 //   Fetch T.Assoc : P.
-// CHECK-NEXT:    %T.Assoc.P = call swiftcc i8** @swift_getAssociatedConformanceWitness(i8** %T.Q, %swift.type* %T, %swift.type* %T.Assoc
+// CHECK-NEXT:    %T.Assoc.P = call swiftcc i8** @swift_getAssociatedConformanceWitness(i8** %T.Q, %swift.type* %T, %swift.type* [[T_ASSOC]]
 //   Fetch T.Assoc.foo
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.Assoc.P, i32 1
 // CHECK-NEXT:    [[T1:%.*]] = load i8*, i8** [[T0]], align 8
@@ -81,7 +81,7 @@ bb0:
 // CHECK-NEXT:    [[T1:%.*]] = ptrtoint i8** [[T0]] to i64
 // CHECK-NEXT:    [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T1]], i64 53700)
 //   TODO: be smart about this and do a complete-metadata fetch in the first place
-// CHECK-NEXT:    [[ASSOC_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 0, %swift.type* %T.Assoc)
+// CHECK-NEXT:    [[ASSOC_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 0, %swift.type* [[T_ASSOC]])
 // CHECK-NEXT:    [[ASSOC:%.*]] = extractvalue %swift.metadata_response [[ASSOC_RESPONSE]], 0
 // CHECK-NEXT:    call swiftcc void [[FOO]](%swift.type* swiftself [[ASSOC]], %swift.type* [[ASSOC]], i8** %T.Assoc.P) [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT:    ret void

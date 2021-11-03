@@ -1239,11 +1239,11 @@ namespace {
       // # of entries
       uint32_t dataLength =
         sizeof(uint16_t) + sizeof(uint64_t) * data.size();
-      assert(dataLength == static_cast<uint16_t>(dataLength));
+      assert(dataLength == static_cast<uint32_t>(dataLength));
 
       endian::Writer writer(out, little);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -1513,7 +1513,7 @@ namespace {
     static std::pair<unsigned, unsigned>
     ReadKeyDataLength(const uint8_t *&data) {
       unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-      unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
       return { keyLength, dataLength };
     }
 

@@ -1118,6 +1118,7 @@ extension ArraySlice: RangeReplaceableCollection {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension ArraySlice: CustomReflectable {
   /// A mirror that reflects the array.
   public var customMirror: Mirror {
@@ -1127,6 +1128,7 @@ extension ArraySlice: CustomReflectable {
       displayStyle: .collection)
   }
 }
+#endif
 
 extension ArraySlice: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.

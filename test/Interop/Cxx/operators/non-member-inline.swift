@@ -43,6 +43,15 @@ OperatorsTestSuite.test("slash (/)") {
   expectEqual(1, result.value)
 }
 
+OperatorsTestSuite.test("caret (^)") {
+  let lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 23)
+
+  let result = lhs ^ rhs
+
+  expectEqual(61, result.value)
+}
+
 OperatorsTestSuite.test("percent (%)") {
   let lhs = LoadableIntWrapper(value: 11)
   let rhs = LoadableIntWrapper(value: 2)

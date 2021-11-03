@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/Dominance.h"
@@ -521,3 +522,38 @@ void swift::findJointPostDominatingSet(
     }
   }
 }
+
+//===----------------------------------------------------------------------===//
+//                          checkReachingBlockDominance
+//===----------------------------------------------------------------------===//
+
+#ifndef NDEBUG
+/// Check that \p sourceBlock dominates \p destBlock.
+///
+/// Useful for *temporary* assertions when Dominance is unavailable. This is
+/// worst case O(numberOfBlocksInFunction). It should only be used when \p
+/// sourceBlock is expected to be "close to" \p destBlock in almost all
+/// cases. Because of the potential for quadratic behavior, it should only be
+/// used during feature development, never as a permanent check.  If a dominance
+/// check is required for correctness, then DominanceInfo should be passed down
+/// to the utility function that needs this check.
+bool
+swift::checkDominates(SILBasicBlock *sourceBlock, SILBasicBlock *destBlock) {
+  SILBasicBlock *entryBlock = sourceBlock->getParent()->getEntryBlock();
+  BasicBlockWorklist worklist(destBlock);
+  bool reaches = false;
+  while (SILBasicBlock *block = worklist.pop()) {
+    if (block == sourceBlock) {
+      reaches = true;
+      continue;
+    }
+    if (block == entryBlock) {
+      return false; // does not dominate
+    }
+    for (auto *predBlock : block->getPredecessorBlocks()) {
+      worklist.pushIfNotVisited(predBlock);
+    }
+  }
+  return reaches;
+}
+#endif

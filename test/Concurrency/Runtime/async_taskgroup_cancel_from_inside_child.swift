@@ -5,12 +5,12 @@
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_cancel_from_inside_child() async {
   let one = try! await withTaskGroup(of: Int.self, returning: Int.self) { group in
     await group.next()
@@ -45,7 +45,7 @@ func test_taskGroup_cancel_from_inside_child() async {
 
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancel_from_inside_child()

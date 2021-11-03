@@ -30,7 +30,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
-#include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
@@ -65,6 +65,7 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
@@ -80,6 +81,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/FileSystem.h"
 
 #if __has_include(<unistd.h>)
 #include <unistd.h>
@@ -127,7 +129,7 @@ static std::unique_ptr<llvm::raw_fd_ostream>
 getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
   std::error_code errorCode;
   auto os = std::make_unique<llvm::raw_fd_ostream>(
-              OutputFilename, errorCode, llvm::sys::fs::F_None);
+              OutputFilename, errorCode, llvm::sys::fs::OF_None);
   if (errorCode) {
     Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
                        OutputFilename, errorCode.message());
@@ -247,7 +249,7 @@ private:
     std::unique_ptr<llvm::raw_fd_ostream> OS;
     OS.reset(new llvm::raw_fd_ostream(FixitsOutputPath,
                                       EC,
-                                      llvm::sys::fs::F_None));
+                                      llvm::sys::fs::OF_None));
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
       SourceManager dummyMgr;
@@ -467,7 +469,7 @@ static void verifyGenericSignaturesIfNeeded(const FrontendOptions &opts,
   if (verifyGenericSignaturesInModule.empty())
     return;
   if (auto module = Context.getModuleByName(verifyGenericSignaturesInModule))
-    GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
+    swift::validateGenericSignaturesInModule(module);
 }
 
 static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,
@@ -660,6 +662,22 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   }
 }
 
+static bool writeModuleSemanticInfoIfNeeded(CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (!frontendOpts.InputsAndOutputs.hasModuleSemanticInfoOutputPath())
+    return false;
+  std::error_code EC;
+  assert(frontendOpts.InputsAndOutputs.isWholeModule() &&
+         "TBDPath only makes sense when the whole module can be seen");
+  auto ModuleSemanticPath = frontendOpts.InputsAndOutputs
+    .getPrimarySpecificPathsForAtMostOnePrimary().SupplementaryOutputs
+    .ModuleSemanticInfoOutputPath;
+  llvm::raw_fd_ostream OS(ModuleSemanticPath, EC, llvm::sys::fs::OF_None);
+  OS << "{}\n";
+  return false;
+}
+
 static bool writeTBDIfNeeded(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &frontendOpts = Invocation.getFrontendOptions();
@@ -842,6 +860,9 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     hadAnyError |= writeTBDIfNeeded(Instance);
   }
 
+  {
+    hadAnyError |= writeModuleSemanticInfoIfNeeded(Instance);
+  }
   return hadAnyError;
 }
 
@@ -1021,7 +1042,7 @@ static bool printSwiftFeature(CompilerInstance &instance) {
   const FrontendOptions &opts = invocation.getFrontendOptions();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::OF_None);
 
   if (out.has_error() || EC) {
     context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
@@ -1281,7 +1302,9 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   serializationOpts.SerializeAllSIL = true;
   serializationOpts.IsSIB = true;
 
-  serialize(MSF, serializationOpts, SM);
+  symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
+
+  serialize(MSF, serializationOpts, symbolGraphOptions, SM);
   return Context.hadError();
 }
 
@@ -1534,11 +1557,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       fine_grained_dependencies::withReferenceDependencies(
           Mod, *Instance.getDependencyTracker(), Mod->getModuleFilename(),
           alsoEmitDotFile, [&](SourceFileDepGraph &&g) {
-            serialize(MSF, serializationOpts, SM.get(), &g);
+            serialize(MSF, serializationOpts, Invocation.getSymbolGraphOptions(), SM.get(), &g);
             return false;
           });
     } else {
-      serialize(MSF, serializationOpts, SM.get());
+      serialize(MSF, serializationOpts, Invocation.getSymbolGraphOptions(), SM.get());
     }
   };
 
@@ -2034,6 +2057,19 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
+  // Don't ask clients to report bugs when running a script in immediate mode.
+  // When a script asserts the compiler reports the error with the same
+  // stacktrace as a compiler crash. From here we can't tell which is which,
+  // for now let's not explicitly ask for bug reports.
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::Immediate) {
+    llvm::setBugReportMsg(nullptr);
+  }
+  
+  /// Enable leaks checking because this SILModule is the only one in the process
+  /// (leaks checking is not thread safe).
+  Invocation.getSILOptions().checkSILModuleLeaks = true;
+
   PrettyStackTraceFrontend frontendTrace(Invocation.getLangOptions());
 
   // Make an array of PrettyStackTrace objects to dump the configuration files
@@ -2072,7 +2108,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
       Invocation.getFrontendOptions().PrintHelpHidden ? 0 :
                                                         llvm::opt::HelpHidden;
     std::unique_ptr<llvm::opt::OptTable> Options(createSwiftOptTable());
-    Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
+    Options->printHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
                        ExcludedFlagsBitmask, /*ShowAllAliases*/false);
     return finishDiagProcessing(0, /*verifierEnabled*/ false);

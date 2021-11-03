@@ -269,7 +269,8 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
       return addr;
 
     auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
-    return llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+    return llvm::ConstantExpr::getGetElementPtr(
+      addr->getType()->getPointerElementType(), addr, bitConstant);
   };
 
   // Check whether we already have an entry with this name.
@@ -1114,7 +1115,8 @@ static llvm::Constant *emitEmptyTupleTypeMetadataRef(IRGenModule &IGM) {
     llvm::ConstantInt::get(IGM.Int32Ty, 1)
   };
   return llvm::ConstantExpr::getInBoundsGetElementPtr(
-        /*Ty=*/nullptr, fullMetadata, indices);
+        fullMetadata->getType()->getPointerElementType(), fullMetadata,
+        indices);
 }
 
 using GetElementMetadataFn =
@@ -1591,7 +1593,9 @@ namespace {
         }
 
         auto *getMetadataFn = type->getGlobalActor()
-            ? IGF.IGM.getGetFunctionMetadataGlobalActorFn()
+            ? (IGF.IGM.isConcurrencyAvailable()
+               ? IGF.IGM.getGetFunctionMetadataGlobalActorFn()
+               : IGF.IGM.getGetFunctionMetadataGlobalActorBackDeployFn())
             : type->isDifferentiable()
               ? IGF.IGM.getGetFunctionMetadataDifferentiableFn()
               : IGF.IGM.getGetFunctionMetadataFn();
@@ -1661,7 +1665,8 @@ namespace {
         };
         return MetadataResponse::forComplete(
           llvm::ConstantExpr::getInBoundsGetElementPtr(
-            /*Ty=*/nullptr, singletonMetadata, indices));
+            singletonMetadata->getType()->getPointerElementType(),
+            singletonMetadata, indices));
       }
 
       auto layout = type.getExistentialLayout();
@@ -2475,7 +2480,11 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
   // Never access by mangled name if we've been asked not to.
   if (IGM.getOptions().DisableConcreteTypeMetadataMangledNameAccessors)
     return false;
-  
+
+  // Do not access by mangled name if the runtime won't understand it.
+  if (mangledNameIsUnknownToDeployTarget(IGM, type))
+    return false;
+
   // A nongeneric nominal type with nontrivial metadata has an accessor
   // already we can just call.
   if (auto nom = dyn_cast<NominalType>(type)) {
@@ -2485,14 +2494,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
       return false;
     }
   }
-  
-  // The Swift 5.1 runtime fails to demangle associated types of opaque types.
-  if (auto minimumSwiftVersion =
-          getRuntimeVersionThatSupportsDemanglingType(type)) {
-    return IGM.getAvailabilityContext().isContainedIn(
-        IGM.Context.getSwift5PlusAvailability(*minimumSwiftVersion));
-  }
-  
+
   return true;
 
 // The visitor below can be used to fine-tune a heuristic to decide whether

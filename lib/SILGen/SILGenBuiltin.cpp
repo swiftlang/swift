@@ -1402,9 +1402,10 @@ emitFunctionArgumentForAsyncTaskEntryPoint(SILGenFunction &SGF,
 }
 
 // Emit SIL for the named builtin: createAsyncTask.
-static ManagedValue emitBuiltinCreateAsyncTask(
-    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
-    ArrayRef<ManagedValue> args, SGFContext C) {
+ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
+                                        SubstitutionMap subs,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
   ASTContext &ctx = SGF.getASTContext();
   auto flags = args[0].forward(SGF);
 
@@ -1533,8 +1534,8 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
 
     auto errorTy = SGF.getASTContext().getErrorDecl()->getDeclaredType()
       ->getCanonicalType();
-    auto errorVal
-      = SGF.B.createOwnedPhiArgument(SILType::getPrimitiveObjectType(errorTy));
+    auto errorVal = SGF.B.createTermResult(
+        SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
 
     SGF.emitThrow(loc, errorVal, true);
   }

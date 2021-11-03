@@ -1123,7 +1123,15 @@ extension Set {
   ///   otherwise, `false`.
   @inlinable
   public func isDisjoint(with other: Set<Element>) -> Bool {
-    return _isDisjoint(with: other)
+    guard !isEmpty && !other.isEmpty else { return true }
+    let (smaller, larger) =
+      count < other.count ? (self, other) : (other, self)
+    for member in smaller {
+      if larger.contains(member) {
+        return false
+      }
+    }
+    return true
   }
     
   @inlinable
@@ -1572,6 +1580,7 @@ extension Set.Iterator: IteratorProtocol {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension Set.Iterator: CustomReflectable {
   /// A mirror that reflects the iterator.
   public var customMirror: Mirror {
@@ -1588,6 +1597,7 @@ extension Set: CustomReflectable {
     return Mirror(self, unlabeledChildren: self, displayStyle: style)
   }
 }
+#endif
 
 extension Set {
   /// Removes and returns the first element of the set.

@@ -3,14 +3,17 @@
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 
-// REQUIRES: rdar82734785
-
 // rdar://76038845
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
+
+// Crash expectations can't be implemented on WASI/WebAssembly.
+// UNSUPPORTED: OS=wasi
 
 // Disabled until test hang can be looked at.
 // UNSUPPORTED: OS=windows-msvc
+
+// UNSUPPORTED: use_os_stdlib
 
 // This test makes sure that we properly save/restore access when we
 // synchronously launch a task from a serial executor. The access from the task
@@ -47,7 +50,7 @@ public func withExclusiveAccess<T, U>(to x: inout T, f: (inout T) -> U) -> U {
     return f(&x)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @MainActor @inline(never)
 func withExclusiveAccessAsync<T, U>(to x: inout T, f: (inout T) async -> U) async -> U {
     debugLog("==> Enter 'withExclusiveAccessAsync'")
@@ -55,7 +58,7 @@ func withExclusiveAccessAsync<T, U>(to x: inout T, f: (inout T) async -> U) asyn
     return await f(&x)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public final class MySerialExecutor : SerialExecutor {
     public init() {
         debugLog("==> MySerialExecutor: Creating MySerialExecutor!")
@@ -90,7 +93,7 @@ public final class MySerialExecutor : SerialExecutor {
 
 /// A singleton actor whose executor is equivalent to the main
 /// dispatch queue.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @globalActor public final actor MyMainActor: Executor {
     public static let shared = MyMainActor()
     public let executor = MySerialExecutor()
@@ -117,7 +120,7 @@ public final class MySerialExecutor : SerialExecutor {
 /// An actor that we use to test that after eliminating the synchronous
 /// accesses, we properly deserialize the task access set causing a crash in
 /// unownedExecutor.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @globalActor public final actor MyMainActorWithAccessInUnownedExecAccessor: Executor {
     public static let shared = MyMainActorWithAccessInUnownedExecAccessor()
     public let executor = MySerialExecutor()
@@ -142,7 +145,7 @@ public final class MySerialExecutor : SerialExecutor {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Custom {
   var count = 0
 
@@ -152,7 +155,7 @@ actor Custom {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @globalActor
 struct CustomActor {
     static var shared: Custom {
@@ -166,7 +169,7 @@ public var global2: Int = 6
 public var global3: Int = 7
 public var global4: Int = 8
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main
 struct Runner {
     @MainActor static func main() async {

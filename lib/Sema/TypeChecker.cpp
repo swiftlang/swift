@@ -252,9 +252,6 @@ static void typeCheckDelayedFunctions(SourceFile &SF) {
   while (currentFunctionIdx < SF.DelayedFunctions.size()) {
     auto *AFD = SF.DelayedFunctions[currentFunctionIdx];
     assert(!AFD->getDeclContext()->isLocalContext());
-
-    TypeChecker::buildTypeRefinementContextHierarchyDelayed(SF, AFD);
-
     (void) AFD->getTypecheckedBody();
     ++currentFunctionIdx;
   }
@@ -440,10 +437,14 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->walk(walker);
   }
 
-  return TypeChecker::checkGenericSignature(nestedList.back(), DC,
-                                         /*parentSig=*/nullptr,
-                                         /*allowConcreteGenericParams=*/true)
-    .getGenericEnvironment();
+  auto request = InferredGenericSignatureRequest{
+      DC->getParentModule(), /*parentSig=*/nullptr,
+      nestedList.back(), WhereClauseOwner(),
+      {}, {}, /*allowConcreteGenericParams=*/true};
+  auto sig = evaluateOrDefault(DC->getASTContext().evaluator, request,
+                               GenericSignatureWithError()).getPointer();
+
+  return sig.getGenericEnvironment();
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,

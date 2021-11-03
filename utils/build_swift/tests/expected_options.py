@@ -96,6 +96,7 @@ EXPECTED_DEFAULTS = {
     'build_skstresstester': False,
     'build_swiftformat': False,
     'build_swiftevolve': False,
+    'build_swiftdocc': False,
     'build_indexstoredb': False,
     'test_indexstoredb_sanitize_all': False,
     'test_sourcekitlsp_sanitize_all': False,
@@ -103,6 +104,7 @@ EXPECTED_DEFAULTS = {
     'install_swiftpm': False,
     'install_swiftsyntax': False,
     'install_swift_driver': False,
+    'install_swiftdocc': False,
     'swiftsyntax_verify_generated_files': False,
     'install_playgroundsupport': False,
     'install_sourcekitlsp': False,
@@ -179,6 +181,7 @@ EXPECTED_DEFAULTS = {
     'legacy_impl': False,
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
+    'libswift_mode': None,
     'lit_args': '-sv',
     'llbuild_assertions': True,
     'lldb_assertions': True,
@@ -261,6 +264,7 @@ EXPECTED_DEFAULTS = {
     'test_skstresstester': False,
     'test_swiftformat': False,
     'test_swiftevolve': False,
+    'test_swiftdocc': False,
     'test_toolchainbenchmarks': False,
     'tvos': False,
     'tvos_all': False,
@@ -508,6 +512,7 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--skstresstester', dest='build_skstresstester'),
     SetTrueOption('--swiftformat', dest='build_swiftformat'),
     SetTrueOption('--swiftevolve', dest='build_swiftevolve'),
+    SetTrueOption('--swiftdocc', dest='build_swiftdocc'),
     SetTrueOption('-B', dest='benchmark'),
     SetTrueOption('-S', dest='skip_build'),
     SetTrueOption('-b', dest='build_llbuild'),
@@ -562,6 +567,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--install-sourcekit-lsp', dest='install_sourcekitlsp'),
     EnableOption('--install-skstresstester', dest='install_skstresstester'),
     EnableOption('--install-swiftevolve', dest='install_swiftevolve'),
+    EnableOption('--install-swiftdocc', dest='install_swiftdocc'),
     EnableOption('--toolchain-benchmarks', dest='build_toolchainbenchmarks'),
     EnableOption('--swift-inspect', dest='build_swift_inspect'),
     EnableOption('--tsan-libdispatch-test'),
@@ -643,6 +649,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-skstresstester', dest='test_skstresstester'),
     DisableOption('--skip-test-swiftformat', dest='test_swiftformat'),
     DisableOption('--skip-test-swiftevolve', dest='test_swiftevolve'),
+    DisableOption('--skip-test-swiftdocc', dest='test_swiftdocc'),
     DisableOption('--skip-test-toolchain-benchmarks',
                   dest='test_toolchainbenchmarks'),
     DisableOption('--skip-test-swift-inspect',
@@ -732,6 +739,11 @@ EXPECTED_OPTIONS = [
     # valid choices
     SetOption('--lto', dest='lto_type'),
     ChoicesOption('--lto', dest='lto_type', choices=['thin', 'full']),
+
+    SetOption('--libswift', dest='libswift_mode'),
+    ChoicesOption('--libswift', dest='libswift_mode',
+                  choices=['off', 'hosttools', 'bootstrapping',
+                           'bootstrapping-with-hostlibs']),
 
     # NOTE: We'll need to manually test the behavior of these since they
     # validate compiler version strings.

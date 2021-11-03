@@ -15,6 +15,8 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILBuilder.h"
 
+#include <string>
+
 using namespace swift;
 
 namespace {
@@ -146,6 +148,10 @@ void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype) {
 //                            Bridging C functions
 //===----------------------------------------------------------------------===//
 
+void OStream_write(BridgedOStream os, BridgedStringRef str) {
+  static_cast<raw_ostream *>(os.streamAddr)->write((const char*)(str.data), str.length);
+}
+
 /// Frees a string which was allocated by getCopiedBridgedStringRef.
 void freeBridgedStringRef(BridgedStringRef str) {
   llvm::MallocAllocator().Deallocate(str.data, str.length);
@@ -159,11 +165,12 @@ BridgedStringRef SILFunction_getName(BridgedFunction function) {
   return getBridgedStringRef(castToFunction(function)->getName());
 }
 
-BridgedStringRef SILFunction_debugDescription(BridgedFunction function) {
+std::string SILFunction_debugDescription(BridgedFunction function) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToFunction(function)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function) {
@@ -178,6 +185,18 @@ OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function) {
   if (f->empty())
     return {nullptr};
   return {&*f->rbegin()};
+}
+
+SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function) {
+  return castToFunction(function)->getLoweredFunctionType()->
+          getNumIndirectFormalResults();
+}
+
+SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function) {
+  CanSILFunctionType fTy = castToFunction(function)->getLoweredFunctionType();
+  if (!fTy->hasSelfParam())
+    return -1;
+  return fTy->getNumParameters() + fTy->getNumIndirectFormalResults() - 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -207,11 +226,12 @@ BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block) {
   return {castToBasicBlock(block)->getParent()};
 }
 
-BridgedStringRef SILBasicBlock_debugDescription(BridgedBasicBlock block) {
+std::string SILBasicBlock_debugDescription(BridgedBasicBlock block) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToBasicBlock(block)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block) {
@@ -271,11 +291,12 @@ BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
 static_assert(BridgedOperandSize == sizeof(Operand),
               "wrong bridged Operand size");
 
-BridgedStringRef SILNode_debugDescription(BridgedNode node) {
+std::string SILNode_debugDescription(BridgedNode node) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToSILNode(node)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 static Operand *castToOperand(BridgedOperand operand) {
@@ -294,6 +315,10 @@ BridgedInstruction Operand_getUser(BridgedOperand operand) {
   return {castToOperand(operand)->getUser()->asSILNode()};
 }
 
+SwiftInt Operand_isTypeDependent(BridgedOperand operand) {
+  return castToOperand(operand)->isTypeDependent() ? 1 : 0;
+}
+
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value) {
   return {*castToSILValue(value)->use_begin()};
 }
@@ -310,6 +335,10 @@ SwiftInt SILType_isAddress(BridgedType type) {
   return castToSILType(type).isAddress();
 }
 
+SwiftInt SILType_isTrivial(BridgedType type, BridgedFunction function) {
+  return castToSILType(type).isTrivial(*castToFunction(function));
+}
+
 //===----------------------------------------------------------------------===//
 //                            SILGlobalVariable
 //===----------------------------------------------------------------------===//
@@ -318,11 +347,12 @@ BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global) {
   return getBridgedStringRef(castToGlobal(global)->getName());
 }
 
-BridgedStringRef SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
+std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToGlobal(global)->print(os);
-  return getCopiedBridgedStringRef(str, /*removeTrailingNewline*/ true);
+  str.pop_back(); // Remove trailing newline.
+  return str;
 }
 
 //===----------------------------------------------------------------------===//
@@ -455,6 +485,11 @@ SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se) {
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx) {
   return getCaseIndex(castToInst<SwitchEnumInst>(se)->getCase(idx).first);
 }
+
+SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store) {
+  return (SwiftInt)castToInst<StoreInst>(store)->getOwnershipQualifier();
+}
+
 
 //===----------------------------------------------------------------------===//
 //                                SILBuilder

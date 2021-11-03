@@ -1167,7 +1167,7 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
     // Pass accessors.
     if (auto StoreD = dyn_cast<AbstractStorageDecl>(D)) {
       bool usedPseudoAccessors = false;
-      if (isa<VarDecl>(D) &&
+      if (isa<VarDecl>(D) && !isa<ParamDecl>(D) &&
           !StoreD->getParsedAccessor(AccessorKind::Get) &&
           !StoreD->getParsedAccessor(AccessorKind::Set)) {
         usedPseudoAccessors = true;
@@ -1256,17 +1256,19 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
 
   // Report the accessors that were utilized.
   if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
-    bool UsesGetter = Info.roles & (SymbolRoleSet)SymbolRole::Read;
-    bool UsesSetter = Info.roles & (SymbolRoleSet)SymbolRole::Write;
+    if (!isa<ParamDecl>(D)) {
+      bool UsesGetter = Info.roles & (SymbolRoleSet)SymbolRole::Read;
+      bool UsesSetter = Info.roles & (SymbolRoleSet)SymbolRole::Write;
 
-    if (UsesGetter)
-      if (!reportPseudoAccessor(ASD, AccessorKind::Get, /*IsRef=*/true,
-                                Loc))
-        return false;
-    if (UsesSetter)
-      if (!reportPseudoAccessor(ASD, AccessorKind::Set, /*IsRef=*/true,
-                                Loc))
-        return false;
+      if (UsesGetter)
+        if (!reportPseudoAccessor(ASD, AccessorKind::Get, /*IsRef=*/true,
+                                  Loc))
+          return false;
+      if (UsesSetter)
+        if (!reportPseudoAccessor(ASD, AccessorKind::Set, /*IsRef=*/true,
+                                  Loc))
+          return false;
+    }
   }
 
   return finishCurrentEntity();

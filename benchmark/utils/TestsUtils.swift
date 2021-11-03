@@ -211,14 +211,17 @@ extension BenchmarkInfo : Hashable {
 // This is just to drive benchmarks. I don't make any claim about its
 // strength. According to Wikipedia, it has the maximal period for a
 // 32-bit register.
-struct LFSR {
+public struct LFSR {
   // Set the register to some seed that I pulled out of a hat.
-  var lfsr : UInt32 = 0xb78978e7
+  var lfsr: UInt32 = 0xb78978e7
+
+  public init() {}
 
   mutating func shift() {
     lfsr = (lfsr >> 1) ^ (UInt32(bitPattern: -Int32((lfsr & 1))) & 0xD0000001)
   }
-  mutating func randInt() -> Int64 {
+
+  public mutating func next() -> Int64 {
     var result : UInt32 = 0
     for _ in 0..<32 {
       result = (result << 1) | (lfsr & 1)
@@ -231,12 +234,14 @@ struct LFSR {
 var lfsrRandomGenerator = LFSR()
 
 // Start the generator from the beginning
+@available(*, deprecated, renamed: "LFSR.init()")
 public func SRand() {
   lfsrRandomGenerator = LFSR()
 }
 
+@available(*, deprecated, renamed: "LFSR.next()")
 public func Random() -> Int64 {
-  return lfsrRandomGenerator.randInt()
+  return lfsrRandomGenerator.next()
 }
 
 // This is a fixed-increment version of Java 8's SplittableRandom generator.
@@ -262,18 +267,31 @@ public struct SplitMix64: RandomNumberGenerator {
     }
 }
 
-@inlinable // FIXME(inline-always)
+/// Like `precondition`, but also checked in unchecked builds.
+@inlinable
+@inline(__always)
+public func check(
+  _ resultsMatch: Bool,
+  file: StaticString = #file,
+  function: StaticString = #function,
+  line: Int = #line
+) {
+  guard _fastPath(resultsMatch) else {
+    print("Incorrect result in \(function), \(file):\(line)")
+    abort()
+  }
+}
+
+@available(*, deprecated, renamed: "check")
+@inlinable
 @inline(__always)
 public func CheckResults(
-    _ resultsMatch: Bool,
-    file: StaticString = #file,
-    function: StaticString = #function,
-    line: Int = #line
-    ) {
-    guard _fastPath(resultsMatch) else {
-        print("Incorrect result in \(function), \(file):\(line)")
-        abort()
-    }
+  _ resultsMatch: Bool,
+  file: StaticString = #file,
+  function: StaticString = #function,
+  line: Int = #line
+) {
+  check(resultsMatch, file: file, function: function, line: line)
 }
 
 #if !_runtime(_ObjC)
@@ -289,6 +307,9 @@ public func autoreleasepool<Result>(
 }
 #endif
 
+public func getFalse() -> Bool { return false }
+
+@available(*, deprecated, renamed: "getFalse()")
 public func False() -> Bool { return false }
 
 /// This is a dummy protocol to test the speed of our protocol dispatch.

@@ -70,7 +70,7 @@ public:
   const TBDGenOptions &getOptions() const { return Opts; }
   TBDGenOptions &getOptions() { return Opts; }
 
-  const llvm::DataLayout &getDataLayout() const;
+  const StringRef getDataLayoutString() const;
   const llvm::Triple &getTarget() const;
 
   bool operator==(const TBDGenDescriptor &other) const;

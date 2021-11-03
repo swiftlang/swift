@@ -126,7 +126,7 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
 
   std::string srcTypeName = nameForMetadata(srcType);
   std::string destTypeName = nameForMetadata(destType);
-  const char *msg = "Found unexpected null pointer value"
+  const char * const msg = "Found unexpected null pointer value"
                     " while trying to cast value of type '%s' (%p)"
                     " to '%s' (%p)%s\n";
   if (runtime::bincompat::unexpectedObjCNullWhileCastingIsFatal()) {

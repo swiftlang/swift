@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/ASTContext.h"
 
@@ -121,10 +122,12 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
 
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
-                            Identifier FnId, SILType resultType,
-                            ArrayRef<SILType> argTypes,
-                            Explosion &args, Explosion &out,
-                            SubstitutionMap substitutions) {
+                            BuiltinInst *Inst, ArrayRef<SILType> argTypes,
+                            Explosion &args, Explosion &out) {
+  Identifier FnId = Inst->getName();
+  SILType resultType = Inst->getType();
+  SubstitutionMap substitutions = Inst->getSubstitutions();
+
   if (Builtin.ID == BuiltinValueKind::COWBufferForReading) {
     // Just forward the incoming argument.
     assert(args.size() == 1 && "Expecting one incoming argument");
@@ -391,12 +394,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
     auto actorMetatype = args.claimNext();
     emitDistributedActorInitializeRemote(IGF, resultType, actorMetatype, out);
-    return;
-  }
-
-  if (Builtin.ID == BuiltinValueKind::DestroyDistributedActor) {
-    auto actor = args.claimNext();
-    emitDistributedActorDestroy(IGF, actor);
     return;
   }
 
@@ -711,7 +708,15 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
-  
+  if (Builtin.ID == BuiltinValueKind::Ifdef) {
+    // Ifdef not constant folded, which means it was not @_alwaysEmitIntoClient
+    IGF.IGM.error(
+        Inst->getLoc().getSourceLoc(),
+        "Builtin.ifdef can only be used in @_alwaysEmitIntoClient functions");
+    out.add(IGF.Builder.getInt32(0));
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::CmpXChg) {
     SmallVector<Type, 4> Types;
     StringRef BuiltinName =
@@ -757,7 +762,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(cmp->getType()));
     llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(
-        pointer, cmp, newval, successOrdering, failureOrdering,
+        pointer, cmp, newval, llvm::MaybeAlign(),
+        successOrdering, failureOrdering,
         isSingleThread ? llvm::SyncScope::SingleThread
                        : llvm::SyncScope::System);
     cast<llvm::AtomicCmpXchgInst>(value)->setVolatile(isVolatile);
@@ -825,7 +831,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(val->getType()));
     llvm::Value *value = IGF.Builder.CreateAtomicRMW(
-        SubOpcode, pointer, val, ordering,
+        SubOpcode, pointer, val, llvm::MaybeAlign(), ordering,
         isSingleThread ? llvm::SyncScope::SingleThread
                        : llvm::SyncScope::System);
     cast<AtomicRMWInst>(value)->setVolatile(isVolatile);
@@ -1299,6 +1305,28 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     auto size = args.claimNext();
     out.add(
         emitAutoDiffAllocateSubcontext(IGF, allocatorAddr, size).getAddress());
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::Move) {
+    auto input = args.claimNext();
+    auto result = args.claimNext();
+    SILType addrTy = argTypes[0];
+    const TypeInfo &addrTI = IGF.getTypeInfo(addrTy);
+    Address inputAttr = addrTI.getAddressForPointer(input);
+    Address resultAttr = addrTI.getAddressForPointer(result);
+    addrTI.initializeWithTake(IGF, resultAttr, inputAttr, addrTy, false);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::Copy) {
+    auto input = args.claimNext();
+    auto result = args.claimNext();
+    SILType addrTy = argTypes[0];
+    const TypeInfo &addrTI = IGF.getTypeInfo(addrTy);
+    Address inputAttr = addrTI.getAddressForPointer(input);
+    Address resultAttr = addrTI.getAddressForPointer(result);
+    addrTI.initializeWithCopy(IGF, resultAttr, inputAttr, addrTy, false);
     return;
   }
 

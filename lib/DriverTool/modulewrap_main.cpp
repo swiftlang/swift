@@ -96,7 +96,7 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName =
           llvm::sys::path::stem(MainExecutablePath).str();
-      Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
+      Table->printHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Module Wrapper", options::ModuleWrapOption, 0,
                        /*ShowAllAliases*/false);
       return 1;
@@ -175,20 +175,20 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SearchPathOpts.RuntimeResourcePath = std::string(RuntimeResourcePath.str());
 
   SourceManager SrcMgr;
+  SILOptions SILOpts;
   TypeCheckerOptions TypeCheckOpts;
   LangOptions LangOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   LangOpts.Target = Invocation.getTargetTriple();
-  ASTContext &ASTCtx = *ASTContext::get(LangOpts, TypeCheckOpts, SearchPathOpts,
-                                        ClangImporterOpts, SymbolGraphOpts, SrcMgr,
-                                        Instance.getDiags());
+  ASTContext &ASTCtx = *ASTContext::get(
+      LangOpts, TypeCheckOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
+      SymbolGraphOpts, SrcMgr, Instance.getDiags());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
   
   ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ""), true);
   ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
-  SILOptions SILOpts;
   std::unique_ptr<Lowering::TypeConverter> TC(new Lowering::TypeConverter(*M));
   std::unique_ptr<SILModule> SM = SILModule::createEmptyModule(M, *TC, SILOpts);
   createSwiftModuleObjectFile(*SM, (*ErrOrBuf)->getBuffer(),

@@ -161,6 +161,8 @@ public:
           std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
           bool isFramework);
 
+  bool isRequiredOSSAModules() const;
+
   /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
@@ -261,9 +263,11 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
   MemoryBufferSerializedModuleLoader(ASTContext &ctx,
                                      DependencyTracker *tracker,
                                      ModuleLoadingMode loadMode,
-                                     bool IgnoreSwiftSourceInfo)
+                                     bool IgnoreSwiftSourceInfo,
+                                     bool BypassResilience)
       : SerializedModuleLoaderBase(ctx, tracker, loadMode,
-                                   IgnoreSwiftSourceInfo) {}
+                                   IgnoreSwiftSourceInfo),
+        BypassResilience(BypassResilience) {}
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID,
@@ -279,6 +283,7 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
       StringRef moduleName,
       const SerializedModuleBaseName &BaseName) override;
 
+  bool BypassResilience;
 public:
   virtual ~MemoryBufferSerializedModuleLoader();
 
@@ -308,10 +313,10 @@ public:
   static std::unique_ptr<MemoryBufferSerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
          ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
-         bool IgnoreSwiftSourceInfo = false) {
+         bool IgnoreSwiftSourceInfo = false, bool BypassResilience = false) {
     return std::unique_ptr<MemoryBufferSerializedModuleLoader>{
-        new MemoryBufferSerializedModuleLoader(ctx, tracker, loadMode,
-                                               IgnoreSwiftSourceInfo)};
+        new MemoryBufferSerializedModuleLoader(
+            ctx, tracker, loadMode, IgnoreSwiftSourceInfo, BypassResilience)};
   }
 };
 

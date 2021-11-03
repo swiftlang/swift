@@ -558,7 +558,7 @@ llvm::raw_ostream &stats_os() {
       // Try to open the file.
       std::error_code EC;
       auto fd_stream = std::make_unique<llvm::raw_fd_ostream>(
-          SILStatsOutputFile, EC, llvm::sys::fs::OpenFlags::F_Text);
+          SILStatsOutputFile, EC, llvm::sys::fs::OpenFlags::OF_Text);
       if (!fd_stream->has_error() && !EC) {
         stats_output_stream = {fd_stream.release(),
                                [](llvm::raw_ostream *d) { delete d; }};

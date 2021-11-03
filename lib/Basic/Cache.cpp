@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #if defined(__APPLE__)
-#include "Darwin/Cache-Mac.cpp"
+#include "Darwin/Cache-Mac.inc"
 #else
 
 //  This file implements a default caching implementation that never evicts

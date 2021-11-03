@@ -39,6 +39,12 @@ enum class Status {
   /// compiler.
   FormatTooNew,
 
+  /// The precise revision version doesn't match.
+  RevisionIncompatible,
+
+  /// The module is required to be in OSSA, but is not.
+  NotInOSSA,
+
   /// The module file depends on another module that can't be loaded.
   MissingDependency,
 
@@ -66,7 +72,11 @@ enum class Status {
   TargetIncompatible,
 
   /// The module file was built for a target newer than the current target.
-  TargetTooNew
+  TargetTooNew,
+
+  /// The module file was built with a different SDK than the one in use
+  /// to build the client.
+  SDKMismatch
 };
 
 /// Returns true if the data looks like it contains a serialized AST.
@@ -80,6 +90,7 @@ struct ValidationInfo {
   StringRef miscVersion = {};
   version::Version compatibilityVersion = {};
   llvm::VersionTuple userModuleVersion;
+  StringRef sdkName = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
 };
@@ -178,13 +189,16 @@ public:
 ///
 /// \param data A buffer containing the serialized AST. Result information
 /// refers directly into this buffer.
+/// \param requiresOSSAModules If true, necessitates the module to be
+/// compiled with -enable-ossa-modules.
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, ExtendedValidationInfo *extendedInfo = nullptr,
+    StringRef data, bool requiresOSSAModules,
+    ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr);
 

@@ -47,7 +47,8 @@ endif()
 # Build any target libdispatch if needed.
 foreach(sdk ${SWIFT_SDKS})
   # Darwin targets have libdispatch available, do not build it.
-  if(NOT "${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  # Wasm/WASI doesn't support libdispatch yet. See https://bugs.swift.org/browse/SR-12097 for more details.
+  if(NOT "${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS AND NOT "${sdk}" STREQUAL WASI)
     list(APPEND DISPATCH_SDKS "${sdk}")
   endif()
 endforeach()

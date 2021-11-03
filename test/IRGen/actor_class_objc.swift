@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5  -disable-availability-checking | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -target %target-cpu-apple-macosx12.0 | %IRGenFileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 import Foundation
 

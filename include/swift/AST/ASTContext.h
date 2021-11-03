@@ -22,6 +22,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
@@ -38,8 +39,8 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/DataTypes.h"
@@ -221,11 +222,10 @@ class ASTContext final {
   void operator=(const ASTContext&) = delete;
 
   ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-             SearchPathOptions &SearchPathOpts,
+             SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
              ClangImporterOptions &ClangImporterOpts,
              symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
-             SourceManager &SourceMgr,
-             DiagnosticEngine &Diags);
+             SourceManager &SourceMgr, DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -237,7 +237,7 @@ public:
   void operator delete(void *Data) throw();
 
   static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-                         SearchPathOptions &SearchPathOpts,
+                         SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
                          ClangImporterOptions &ClangImporterOpts,
                          symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                          SourceManager &SourceMgr, DiagnosticEngine &Diags);
@@ -254,6 +254,9 @@ public:
 
   /// The type checker options.
   const TypeCheckerOptions &TypeCheckerOpts;
+
+  /// Options for SIL.
+  const SILOptions &SILOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
@@ -347,6 +350,15 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
+  /// Set if a `-module-alias` was passed. Used to store mapping between module aliases and
+  /// their corresponding real names, and vice versa for a reverse lookup, which is needed to check
+  /// if the module names appearing in source files are aliases or real names.
+  /// \see ASTContext::getRealModuleName.
+  ///
+  /// The boolean in the value indicates whether or not the entry is keyed by an alias vs real name,
+  /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
+  mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
+
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
@@ -470,6 +482,30 @@ public:
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
+
+  /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
+  /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
+  /// the names of the imported or referenced modules in source files in the main module, and X and Y
+  /// are the real (physical) module names on disk.
+  void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
+
+  /// Look up the module alias map by the given \p key.
+  ///
+  /// \param key A module alias or real name to look up the map by
+  /// \param alwaysReturnRealName Indicates whether it should always retrieve the real module name
+  ///        given \p key. Defaults to true. This takes a higher precedence than
+  ///        \p lookupAliasFromReal.
+  /// \param lookupAliasFromReal Indicates whether to look up an alias by treating \p key
+  ///        as a real name. Defaults to false.
+  /// \return The real name or alias mapped to the key.
+  ///         If \p alwaysReturnRealName is true, return the real module name if \p key is an alias
+  ///         or the key itself since that's the real name.
+  ///         If \p lookupAliasFromReal is true, and \p alwaysReturnRealName is false, return
+  ///         only if \p key is a real name, else an empty Identifier.
+  ///         If no aliasing is used, return \p key.
+  Identifier getRealModuleName(Identifier key,
+                               bool alwaysReturnRealName = true,
+                               bool lookupAliasFromReal = false) const;
 
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,
@@ -1184,6 +1220,11 @@ public:
   /// method.
   bool isRecursivelyConstructingRequirementMachine(
       CanGenericSignature sig);
+
+  /// Retrieve or create a term rewriting system for answering queries on
+  /// type parameters written against the given protocol requirement signature.
+  rewriting::RequirementMachine *getOrCreateRequirementMachine(
+      const ProtocolDecl *proto);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.

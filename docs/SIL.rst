@@ -29,8 +29,11 @@ In contrast to LLVM IR, SIL is a generally target-independent format
 representation that can be used for code distribution, but it can also express
 target-specific concepts as well as LLVM can.
 
-For more information on developing the implementation of SIL and SIL passes, see
-`SILProgrammersManual.md <SILProgrammersManual.md>`_.
+For more information on developing the implementation of SIL and SIL passes, see:
+
+- `SILProgrammersManual.md <SILProgrammersManual.md>`_.
+- `SILFunctionConventions.md <SILFunctionConventions.md>`_.
+- `SILMemoryAccess.md <SILMemoryAccess.md>`_.
 
 SIL in the Swift Compiler
 -------------------------
@@ -1104,6 +1107,15 @@ Specifies for which types specialized code should be generated.
   sil-function-attribute ::= '[clang "' identifier '"]'
 
 The clang node owner.
+::
+
+  sil-function-attribute ::= '[' performance-constraint ']'
+  performance-constraint :: 'no_locks'
+  performance-constraint :: 'no_allocation'
+
+Specifies the performance constraints for the function, which defines which type
+of runtime functions are allowed to be called from the function.
+
 
 Basic Blocks
 ~~~~~~~~~~~~
@@ -3079,7 +3091,7 @@ alloc_stack
 ```````````
 ::
 
-  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? sil-type (',' debug-var-attr)*
+  sil-instruction ::= 'alloc_stack' '[dynamic_lifetime]'? '[lexical]'? sil-type (',' debug-var-attr)*
 
   %1 = alloc_stack $T
   // %1 has type $*T
@@ -3101,6 +3113,9 @@ deallocated in last-in, first-out stack order.
 The ``dynamic_lifetime`` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time.
 This is the case, e.g. for conditionally initialized objects.
+
+The optional ``lexical`` attribute specifies that the storage corresponds to a
+local variable in the Swift source.
 
 The memory is not retainable. To allocate a retainable box for a value
 type, use ``alloc_box``.
@@ -3191,23 +3206,6 @@ count of zero destroys the contained value as if by ``destroy_addr``.
 Releasing a box is undefined behavior if the box's value is uninitialized.
 To deallocate a box whose value has not been initialized, ``dealloc_box``
 should be used.
-
-alloc_value_buffer
-``````````````````
-
-::
-
-   sil-instruction ::= 'alloc_value_buffer' sil-type 'in' sil-operand
-
-   %1 = alloc_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-   // The result has type $*(Int, T).
-
-Given the address of an unallocated value buffer, allocate space in it
-for a value of the given type.  This instruction has undefined
-behavior if the value buffer is currently allocated.
-
-The type operand must be a lowered object type.
 
 alloc_global
 ````````````
@@ -3436,44 +3434,6 @@ This does not destroy the reference type instance. The contents of the
 heap object must have been fully uninitialized or destroyed before
 ``dealloc_ref`` is applied.
 
-dealloc_value_buffer
-````````````````````
-
-::
-
-   sil-instruction ::= 'dealloc_value_buffer' sil-type 'in' sil-operand
-
-   dealloc_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-
-Given the address of a value buffer, deallocate the storage in it.
-This instruction has undefined behavior if the value buffer is not
-currently allocated, or if it was allocated with a type other than the
-type operand.
-
-The type operand must be a lowered object type.
-
-project_value_buffer
-````````````````````
-
-::
-
-   sil-instruction ::= 'project_value_buffer' sil-type 'in' sil-operand
-
-   %1 = project_value_buffer $(Int, T) in %0 : $*Builtin.UnsafeValueBuffer
-   // The operand must have the exact type shown.
-   // The result has type $*(Int, T).
-
-Given the address of a value buffer, return the address of the value
-storage in it.  This instruction has undefined behavior if the value
-buffer is not currently allocated, or if it was allocated with a type
-other than the type operand.
-
-The result is the same value as was originally returned by
-``alloc_value_buffer``.
-
-The type operand must be a lowered object type.
-
 Debug Information
 ~~~~~~~~~~~~~~~~~
 
@@ -3668,7 +3628,7 @@ begin_borrow
 
 ::
 
-   sil-instruction ::= 'begin_borrow' '[defined]'? sil-operand
+   sil-instruction ::= 'begin_borrow' '[lexical]'? sil-operand
 
    %1 = begin_borrow %0 : $T
 
@@ -3681,7 +3641,7 @@ region in between this borrow and its lifetime ending use, ``%0`` must be
 live. This makes sense semantically since ``%1`` is modeling a new value with a
 dependent lifetime on ``%0``.
 
-The optional ``defined`` attribute specifies that the operand corresponds to a
+The optional ``lexical`` attribute specifies that the operand corresponds to a
 local variable in the Swift source, so special care must be taken when moving
 the end_borrow.
 
@@ -3836,7 +3796,7 @@ mark_function_escape
 
   sil-instruction ::= 'mark_function_escape' sil-operand (',' sil-operand)
 
-  %2 = mark_function_escape %1 : $*T
+  mark_function_escape %1 : $*T
 
 Indicates that a function definition closes over a symbolic memory location.
 This instruction is variadic, and all of its operands must be addresses.
@@ -5245,6 +5205,64 @@ independent of the operand. In terms of specific types:
 In ownership qualified functions, a ``copy_value`` produces a +1 value that must
 be consumed at most once along any path through the program.
 
+explicit_copy_value
+```````````````````
+
+::
+
+   sil-instruction ::= 'explicit_copy_value' sil-operand
+
+   %1 = explicit_copy_value %0 : $A
+
+Performs a copy of a loadable value as if by the value's type lowering and
+returns the copy. The returned copy semantically is a value that is completely
+independent of the operand. In terms of specific types:
+
+1. For trivial types, this is equivalent to just propagating through the trivial
+   value.
+2. For reference types, this is equivalent to performing a ``strong_retain``
+   operation and returning the reference.
+3. For ``@unowned`` types, this is equivalent to performing an
+   ``unowned_retain`` and returning the operand.
+4. For aggregate types, this is equivalent to recursively performing a
+   ``copy_value`` on its components, forming a new aggregate from the copied
+   components, and then returning the new aggregate.
+
+In ownership qualified functions, a ``explicit_copy_value`` produces a +1 value
+that must be consumed at most once along any path through the program.
+
+When move only variable checking is performed, ``explicit_copy_value`` is
+treated as an explicit copy asked for by the user that should not be rewritten
+and should be treated as a non-consuming use.
+
+move_value
+``````````
+
+::
+
+   sil-instruction ::= 'move_value' sil-operand
+
+   %1 = move_value %0 : $@_moveOnly A
+
+Performs a move of the operand, ending its lifetime. When ownership is enabled,
+it always takes in an `@owned T` and produces a new `@owned @_moveOnly T`. 
+
+1. For trivial types, this is equivalent to just propagating through the trivial
+   value.
+2. For reference types, this is equivalent to ending the lifetime of the
+   operand, beginning a new lifetime for the result and setting the result to
+   the value of the operand.
+3. For aggregates, the operation is equivalent to performing a move_value on
+   each of its fields recursively.
+
+After ownership is lowered, we leave in the move_value to provide a place for
+IRGenSIL to know to store a potentially new variable (in case the move was
+associated with a let binding).
+
+NOTE: This instruction is used in an experimental feature called 'move only
+values'. A move_value instruction is an instruction that introduces (or injects)
+a type `T` into the move only value space.
+
 release_value
 `````````````
 
@@ -6166,7 +6184,8 @@ pointer_to_address
 ``````````````````
 ::
 
-  sil-instruction ::= 'pointer_to_address' sil-operand 'to' ('[' 'strict' ']')? sil-type
+  sil-instruction ::= 'pointer_to_address' sil-operand 'to' ('[' 'strict' ']')? ('[' 'invariant' ']')? ('[' 'alignment' '=' alignment ']')? sil-type
+  alignment ::= [0-9]+
 
   %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
   // %1 will be of type $*T
@@ -6186,6 +6205,12 @@ type. A memory access from an address that is not strict cannot have
 its address substituted with a strict address, even if other nearby
 memory accesses at the same location are strict.
 
+The ``invariant`` flag is set if loading from the returned address
+always produces the same value.
+
+The ``alignment`` integer value specifies the byte alignment of the
+address. ``alignment=0`` is the default, indicating the natural
+alignment of ``T``.
 
 unchecked_ref_cast
 ``````````````````

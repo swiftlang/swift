@@ -448,8 +448,8 @@ func guardTreeB<T>(_ tree: TreeB<T>) {
     // CHECK:   [[TUPLE_ADDR:%.*]] = project_box [[BOX]]
     // CHECK:   copy_addr [[TUPLE_ADDR]] to [initialization] [[TUPLE_COPY:%.*]] :
     // CHECK:   [[L_COPY:%.*]] = tuple_element_addr [[TUPLE_COPY]]
-    // CHECK:   copy_addr [take] [[L_COPY]] to [initialization] [[L]]
     // CHECK:   [[R_COPY:%.*]] = tuple_element_addr [[TUPLE_COPY]]
+    // CHECK:   copy_addr [take] [[L_COPY]] to [initialization] [[L]]
     // CHECK:   copy_addr [take] [[R_COPY]] to [initialization] [[R]]
     // CHECK:   destroy_value [[BOX]]
     guard case .Branch(left: let l, right: let r) = tree else { return }
@@ -492,8 +492,8 @@ func guardTreeB<T>(_ tree: TreeB<T>) {
     // CHECK:   [[TUPLE_ADDR:%.*]] = project_box [[BOX]]
     // CHECK:   copy_addr [[TUPLE_ADDR]] to [initialization] [[TUPLE_COPY:%.*]] :
     // CHECK:   [[L_COPY:%.*]] = tuple_element_addr [[TUPLE_COPY]]
-    // CHECK:   copy_addr [take] [[L_COPY]] to [initialization] [[L]]
     // CHECK:   [[R_COPY:%.*]] = tuple_element_addr [[TUPLE_COPY]]
+    // CHECK:   copy_addr [take] [[L_COPY]] to [initialization] [[L]]
     // CHECK:   copy_addr [take] [[R_COPY]] to [initialization] [[R]]
     // CHECK:   destroy_value [[BOX]]
     // CHECK:   destroy_addr [[R]]

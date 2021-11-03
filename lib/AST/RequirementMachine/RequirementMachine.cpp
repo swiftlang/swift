@@ -32,8 +32,25 @@ struct RewriteSystemBuilder {
   RewriteContext &Context;
   bool Dump;
 
-  ProtocolGraph Protocols;
-  std::vector<std::pair<MutableTerm, MutableTerm>> Rules;
+  /// The keys are the unique protocols we've added so far. The value indicates
+  /// whether the protocol's SCC is an initial component for the rewrite system.
+  ///
+  /// A rewrite system built from a generic signature does not have any initial
+  /// protocols.
+  ///
+  /// A rewrite system built from a protocol SCC has the protocols of the SCC
+  /// itself as initial protocols.
+  ///
+  /// If a protocol is an initial protocol, we use its structural requirements
+  /// instead of its requirement signature as the basis of its rewrite rules.
+  ///
+  /// This is what breaks the cycle in requirement signature computation for a
+  /// group of interdependent protocols.
+  llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
+  std::vector<const ProtocolDecl *> Protocols;
+
+  std::vector<std::pair<MutableTerm, MutableTerm>> AssociatedTypeRules;
+  std::vector<std::pair<MutableTerm, MutableTerm>> RequirementRules;
 
   CanType getConcreteSubstitutionSchema(CanType concreteType,
                                         const ProtocolDecl *proto,
@@ -42,10 +59,14 @@ struct RewriteSystemBuilder {
   RewriteSystemBuilder(RewriteContext &ctx, bool dump)
     : Context(ctx), Dump(dump) {}
   void addGenericSignature(CanGenericSignature sig);
+  void addProtocols(ArrayRef<const ProtocolDecl *> proto);
+  void addProtocol(const ProtocolDecl *proto,
+                   bool initialComponent);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
                       const ProtocolDecl *proto);
+  void processProtocolDependencies();
 };
 
 } // end namespace
@@ -81,34 +102,27 @@ RewriteSystemBuilder::getConcreteSubstitutionSchema(CanType concreteType,
 void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
   // Collect all protocols transitively referenced from the generic signature's
   // requirements.
-  Protocols.visitRequirements(sig.getRequirements());
-  Protocols.compute();
-
-  // Add rewrite rules for each protocol.
-  for (auto *proto : Protocols.getProtocols()) {
-    if (Dump) {
-      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
-    }
-
-    const auto &info = Protocols.getProtocolInfo(proto);
-
-    for (auto *assocType : info.AssociatedTypes)
-      addAssociatedType(assocType, proto);
-
-    for (auto *assocType : info.InheritedAssociatedTypes)
-      addAssociatedType(assocType, proto);
-
-    for (auto req : info.Requirements)
-      addRequirement(req.getCanonical(), proto);
-
-    if (Dump) {
-      llvm::dbgs() << "}\n";
+  for (auto req : sig.getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      addProtocol(req.getProtocolDecl(), /*initialComponent=*/false);
     }
   }
+
+  processProtocolDependencies();
 
   // Add rewrite rules for all requirements in the top-level signature.
   for (const auto &req : sig.getRequirements())
     addRequirement(req, /*proto=*/nullptr);
+}
+
+void RewriteSystemBuilder::addProtocols(ArrayRef<const ProtocolDecl *> protos) {
+  // Collect all protocols transitively referenced from this connected component
+  // of the protocol dependency graph.
+  for (auto proto : protos) {
+    addProtocol(proto, /*initialComponent=*/true);
+  }
+
+  processProtocolDependencies();
 }
 
 /// For an associated type T in a protocol P, we add a rewrite rule:
@@ -126,7 +140,7 @@ void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
   MutableTerm rhs;
   rhs.add(Symbol::forAssociatedType(proto, type->getName(), Context));
 
-  Rules.emplace_back(lhs, rhs);
+  AssociatedTypeRules.emplace_back(lhs, rhs);
 }
 
 /// Lowers a generic requirement to a rewrite rule.
@@ -187,7 +201,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     constraintTerm = subjectTerm;
     constraintTerm.add(Symbol::forSuperclass(otherType, substitutions,
                                              Context));
-    Rules.emplace_back(subjectTerm, constraintTerm);
+    RequirementRules.emplace_back(subjectTerm, constraintTerm);
 
     constraintTerm = subjectTerm;
     auto layout =
@@ -233,7 +247,70 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   }
   }
 
-  Rules.emplace_back(subjectTerm, constraintTerm);
+  RequirementRules.emplace_back(subjectTerm, constraintTerm);
+}
+
+/// Record information about a protocol if we have no seen it yet.
+void RewriteSystemBuilder::addProtocol(const ProtocolDecl *proto,
+                                       bool initialComponent) {
+  if (ProtocolMap.count(proto) > 0)
+    return;
+
+  ProtocolMap[proto] = initialComponent;
+  Protocols.push_back(proto);
+}
+
+void RewriteSystemBuilder::processProtocolDependencies() {
+  unsigned i = 0;
+  while (i < Protocols.size()) {
+    auto *proto = Protocols[i++];
+    for (auto *depProto : proto->getProtocolDependencies()) {
+      addProtocol(depProto, /*initialComponent=*/false);
+    }
+  }
+
+  // Add rewrite rules for each protocol.
+  for (auto *proto : Protocols) {
+    if (Dump) {
+      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
+    }
+
+    MutableTerm lhs;
+    lhs.add(Symbol::forProtocol(proto, Context));
+    lhs.add(Symbol::forProtocol(proto, Context));
+
+    MutableTerm rhs;
+    rhs.add(Symbol::forProtocol(proto, Context));
+
+    AssociatedTypeRules.emplace_back(lhs, rhs);
+
+    for (auto *assocType : proto->getAssociatedTypeMembers())
+      addAssociatedType(assocType, proto);
+
+    for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+      for (auto *assocType : inheritedProto->getAssociatedTypeMembers())
+        addAssociatedType(assocType, proto);
+    }
+
+    // If this protocol is part of the initial connected component, we're
+    // building requirement signatures for all protocols in this component,
+    // and so we must start with the structural requirements.
+    //
+    // Otherwise, we should either already have a requirement signature, or
+    // we can trigger the computation of the requirement signatures of the
+    // next component recursively.
+    if (ProtocolMap[proto]) {
+      for (auto req : proto->getStructuralRequirements())
+        addRequirement(req.req.getCanonical(), proto);
+    } else {
+      for (auto req : proto->getRequirementSignature())
+        addRequirement(req.getCanonical(), proto);
+    }
+
+    if (Dump) {
+      llvm::dbgs() << "}\n";
+    }
+  }
 }
 
 void RequirementMachine::verify(const MutableTerm &term) const {
@@ -317,21 +394,33 @@ void RequirementMachine::verify(const MutableTerm &term) const {
 }
 
 void RequirementMachine::dump(llvm::raw_ostream &out) const {
-  out << "Requirement machine for " << Sig << "\n";
+  out << "Requirement machine for ";
+  if (Sig)
+    out << Sig;
+  else {
+    out << "[";
+    for (auto *proto : Protos) {
+      out << " " << proto->getName();
+    }
+    out << " ]";
+  }
+  out << "\n";
+
   System.dump(out);
   Map.dump(out);
 
-  out << "\nConformance access paths:\n";
+  out << "Conformance access paths: {\n";
   for (auto pair : ConformanceAccessPaths) {
     out << "- " << pair.first.first << " : ";
     out << pair.first.second->getName() << " => ";
     pair.second.print(out);
     out << "\n";
   }
+  out << "}\n";
 }
 
 RequirementMachine::RequirementMachine(RewriteContext &ctx)
-    : Context(ctx), System(ctx), Map(ctx, System.getProtocols()) {
+    : Context(ctx), System(ctx), Map(System) {
   auto &langOpts = ctx.getASTContext().LangOpts;
   Dump = langOpts.DumpRequirementMachine;
   RequirementMachineStepLimit = langOpts.RequirementMachineStepLimit;
@@ -341,7 +430,11 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
 
 RequirementMachine::~RequirementMachine() {}
 
-void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
+/// Build a requirement machine for the requirements of a generic signature.
+///
+/// This must only be called exactly once, before any other operations are
+/// performed on this requirement machine.
+void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   Sig = sig;
 
   PrettyStackTraceGenericSignature debugStack("building rewrite system for", sig);
@@ -358,7 +451,6 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
     llvm::dbgs() << "Adding generic signature " << sig << " {\n";
   }
 
-
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
   RewriteSystemBuilder builder(Context, Dump);
@@ -366,10 +458,53 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 
   // Add the initial set of rewrite rules to the rewrite system, also
   // providing the protocol graph to use for the linear order on terms.
-  System.initialize(std::move(builder.Rules),
-                    std::move(builder.Protocols));
+  System.initialize(/*recordLoops=*/false,
+                    std::move(builder.AssociatedTypeRules),
+                    std::move(builder.RequirementRules));
 
-  computeCompletion();
+  computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+
+  if (Dump) {
+    llvm::dbgs() << "}\n";
+  }
+}
+
+/// Build a requirement machine for the structural requirements of a set
+/// of protocols, which are understood to form a strongly-connected component
+/// (SCC) of the protocol dependency graph.
+///
+/// This must only be called exactly once, before any other operations are
+/// performed on this requirement machine.
+void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
+  Protos = protos;
+
+  auto &ctx = Context.getASTContext();
+  auto *Stats = ctx.Stats;
+
+  if (Stats)
+    ++Stats->getFrontendCounters().NumRequirementMachines;
+
+  FrontendStatsTracer tracer(Stats, "build-rewrite-system");
+
+  if (Dump) {
+    llvm::dbgs() << "Adding protocols";
+    for (auto *proto : protos) {
+      llvm::dbgs() << " " << proto->getName();
+    }
+    llvm::dbgs() << " {\n";
+  }
+
+  RewriteSystemBuilder builder(Context, Dump);
+  builder.addProtocols(protos);
+
+  // Add the initial set of rewrite rules to the rewrite system, also
+  // providing the protocol graph to use for the linear order on terms.
+  System.initialize(/*recordLoops=*/true,
+                    std::move(builder.AssociatedTypeRules),
+                    std::move(builder.RequirementRules));
+
+  // FIXME: Only if the protocols were written in source, though.
+  computeCompletion(RewriteSystem::AllowInvalidRequirements);
 
   if (Dump) {
     llvm::dbgs() << "}\n";
@@ -378,7 +513,7 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 
 /// Attempt to obtain a confluent rewrite system using the completion
 /// procedure.
-void RequirementMachine::computeCompletion() {
+void RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
   while (true) {
     // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
     auto result = System.computeConfluentCompletion(
@@ -393,16 +528,16 @@ void RequirementMachine::computeCompletion() {
     // Check for failure.
     auto checkCompletionResult = [&]() {
       switch (result.first) {
-      case RewriteSystem::CompletionResult::Success:
+      case CompletionResult::Success:
         break;
 
-      case RewriteSystem::CompletionResult::MaxIterations:
+      case CompletionResult::MaxIterations:
         llvm::errs() << "Generic signature " << Sig
                      << " exceeds maximum completion step count\n";
         System.dump(llvm::errs());
         abort();
 
-      case RewriteSystem::CompletionResult::MaxDepth:
+      case CompletionResult::MaxDepth:
         llvm::errs() << "Generic signature " << Sig
                      << " exceeds maximum completion depth\n";
         System.dump(llvm::errs());
@@ -413,13 +548,12 @@ void RequirementMachine::computeCompletion() {
     checkCompletionResult();
 
     // Check invariants.
-    System.verify();
+    System.verifyRewriteRules(policy);
 
     // Build the property map, which also performs concrete term
     // unification; if this added any new rules, run the completion
     // procedure again.
-    result = System.buildPropertyMap(
-        Map,
+    result = Map.buildPropertyMap(
         RequirementMachineStepLimit,
         RequirementMachineDepthLimit);
 

@@ -36,6 +36,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -356,7 +357,9 @@ int main(int argc, char **argv) {
     serializationOpts.SerializeAllSIL = true;
     serializationOpts.IsSIB = true;
 
-    serialize(CI.getMainModule(), serializationOpts, SILMod.get());
+    symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
+
+    serialize(CI.getMainModule(), serializationOpts, symbolGraphOpts, SILMod.get());
   } else {
     const StringRef OutputFile =
         OutputFilename.size() ? StringRef(OutputFilename) : "-";
@@ -369,7 +372,7 @@ int main(int argc, char **argv) {
       SILMod->print(llvm::outs(), CI.getMainModule(), SILOpts, !DisableASTDump);
     } else {
       std::error_code EC;
-      llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
+      llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::OF_None);
       if (EC) {
         llvm::errs() << "while opening '" << OutputFile << "': " << EC.message()
                      << '\n';

@@ -137,6 +137,13 @@ Globals
   global ::= type assoc-type-list 'MXA'  // generic parameter ref (HISTORICAL)
   global ::= protocol 'Mp'               // protocol descriptor
 
+  global ::= protocol 'Hr'               // protocol descriptor runtime record
+  global ::= nominal-type 'Hn'           // nominal type descriptor runtime record
+  #if SWIFT_RUNTIME_VERSION >= 5.1
+    global ::= opaque-type 'Ho'          // opaque type descriptor runtime record
+  #endif
+  global ::= protocol-conformance 'Hc'   // protocol conformance runtime record
+
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
 
   global ::= type 'MF'                   // metadata for remote mirrors: field descriptor
@@ -210,6 +217,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'To'                 // swift-as-ObjC thunk
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
+  global ::= global 'TE'                 // distributed actor thunk
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
   global ::= global 'Tu'                 // async function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function

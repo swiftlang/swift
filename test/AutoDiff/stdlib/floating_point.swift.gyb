@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swiftgyb(-Xfrontend -enable-experimental-forward-mode-differentiation -Xfrontend -requirement-machine=off)
+// RUN: %target-run-simple-swiftgyb(-Xfrontend -enable-experimental-forward-mode-differentiation)
 // REQUIRES: executable_test
 
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))

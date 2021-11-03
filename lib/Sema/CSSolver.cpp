@@ -109,11 +109,13 @@ Solution ConstraintSystem::finalize() {
   // For each of the constraint restrictions, record it with simplified,
   // canonical types.
   if (solverState) {
-    for (auto &restriction : ConstraintRestrictions) {
-      using std::get;
-      CanType first = simplifyType(get<0>(restriction))->getCanonicalType();
-      CanType second = simplifyType(get<1>(restriction))->getCanonicalType();
-      solution.ConstraintRestrictions[{first, second}] = get<2>(restriction);
+    for (const auto &entry : ConstraintRestrictions) {
+      const auto &types = entry.first;
+      auto restriction = entry.second;
+
+      CanType first = simplifyType(types.first)->getCanonicalType();
+      CanType second = simplifyType(types.second)->getCanonicalType();
+      solution.ConstraintRestrictions[{first, second}] = restriction;
     }
   }
 
@@ -127,13 +129,6 @@ Solution ConstraintSystem::finalize() {
 
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
-    // We shouldn't ever register disjunction choices multiple times,
-    // but saving and re-applying solutions can cause us to get
-    // multiple entries.  We should use an optimized PartialSolution
-    // structure for that use case, which would optimize a lot of
-    // stuff here.
-    assert(!solution.DisjunctionChoices.count(choice.first) ||
-           solution.DisjunctionChoices[choice.first] == choice.second);
     solution.DisjunctionChoices.insert(choice);
   }
 
@@ -180,11 +175,13 @@ Solution ConstraintSystem::finalize() {
   }
 
   // Remember contextual types.
-  solution.contextualTypes.assign(
-      contextualTypes.begin(), contextualTypes.end());
+  for (auto &entry : contextualTypes) {
+    solution.contextualTypes.push_back({entry.first, entry.second.first});
+  }
 
   solution.solutionApplicationTargets = solutionApplicationTargets;
   solution.caseLabelItems = caseLabelItems;
+  solution.isolatedParams.append(isolatedParams.begin(), isolatedParams.end());
 
   for (const auto &transformed : resultBuilderTransformed) {
     solution.resultBuilderTransformed.insert(transformed);
@@ -197,6 +194,11 @@ Solution ConstraintSystem::finalize() {
   // Remember implicit value conversions.
   for (const auto &valueConversion : ImplicitValueConversions) {
     solution.ImplicitValueConversions.push_back(valueConversion);
+  }
+
+  // Remember argument lists.
+  for (const auto &argListMapping : ArgumentLists) {
+    solution.argumentLists.insert(argListMapping);
   }
 
   return solution;
@@ -224,35 +226,35 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
-  for (auto restriction : solution.ConstraintRestrictions) {
-    ConstraintRestrictions.push_back(
-        std::make_tuple(restriction.first.first, restriction.first.second,
-                        restriction.second));
+  for ( auto &restriction : solution.ConstraintRestrictions) {
+    auto *type1 = restriction.first.first.getPointer();
+    auto *type2 = restriction.first.second.getPointer();
+
+    ConstraintRestrictions.insert({{type1, type2}, restriction.second});
   }
 
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
-    DisjunctionChoices.push_back(choice);
+    DisjunctionChoices.insert(choice);
   }
 
   // Remember all of the argument/parameter matching choices we made.
   for (auto &argumentMatch : solution.argumentMatchingChoices) {
-    argumentMatchingChoices.push_back(argumentMatch);
+    argumentMatchingChoices.insert(argumentMatch);
   }
 
   // Register the solution's opened types.
   for (const auto &opened : solution.OpenedTypes) {
-    OpenedTypes.push_back(opened);
+    OpenedTypes.insert(opened);
   }
 
   // Register the solution's opened existential types.
   for (const auto &openedExistential : solution.OpenedExistentialTypes) {
-    OpenedExistentialTypes.push_back(openedExistential);
+    OpenedExistentialTypes.insert(openedExistential);
   }
 
   // Register the defaulted type variables.
-  DefaultedConstraints.insert(DefaultedConstraints.end(),
-                              solution.DefaultedConstraints.begin(),
+  DefaultedConstraints.insert(solution.DefaultedConstraints.begin(),
                               solution.DefaultedConstraints.end());
 
   // Add the node types back.
@@ -285,8 +287,12 @@ void ConstraintSystem::applySolution(const Solution &solution) {
       setCaseLabelItemInfo(info.first, info.second);
   }
 
+  for (auto param : solution.isolatedParams) {
+    isolatedParams.insert(param);
+  }
+
   for (const auto &transformed : solution.resultBuilderTransformed) {
-    resultBuilderTransformed.push_back(transformed);
+    resultBuilderTransformed.insert(transformed);
   }
 
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
@@ -294,11 +300,16 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   for (auto &valueConversion : solution.ImplicitValueConversions) {
-    ImplicitValueConversions.push_back(valueConversion);
+    ImplicitValueConversions.insert(valueConversion);
+  }
+
+  // Register the argument lists.
+  for (auto &argListMapping : solution.argumentLists) {
+    ArgumentLists.insert(argListMapping);
   }
 
   // Register any fixes produced along this path.
-  Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
+  Fixes.insert(solution.Fixes.begin(), solution.Fixes.end());
 }
 
 /// Restore the type variable bindings to what they were before
@@ -387,6 +398,12 @@ void truncate(llvm::SmallMapVector<K, V, N> &map, unsigned newSize) {
   assert(newSize <= map.size() && "Not a truncation!");
   for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
     map.pop_back();
+}
+
+template <typename V>
+void truncate(llvm::SetVector<V> &vector, unsigned newSize) {
+  while (vector.size() > newSize)
+    vector.pop_back();
 }
 
 } // end anonymous namespace
@@ -509,7 +526,9 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numContextualTypes = cs.contextualTypes.size();
   numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
+  numIsolatedParams = cs.isolatedParams.size();
   numImplicitValueConversions = cs.ImplicitValueConversions.size();
+  numArgumentLists = cs.ArgumentLists.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -523,8 +542,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
     return;
 
   // Erase the end of various lists.
-  while (cs.TypeVariables.size() > numTypeVariables)
-    cs.TypeVariables.pop_back();
+  truncate(cs.TypeVariables, numTypeVariables);
 
   truncate(cs.ResolvedOverloads, numResolvedOverloads);
 
@@ -616,8 +634,14 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any case label item infos.
   truncate(cs.caseLabelItems, numCaseLabelItems);
 
+  // Remove any isolated parameters.
+  truncate(cs.isolatedParams, numIsolatedParams);
+
   // Remove any implicit value conversions.
   truncate(cs.ImplicitValueConversions, numImplicitValueConversions);
+
+  // Remove any argument lists no longer in scope.
+  truncate(cs.ArgumentLists, numArgumentLists);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1591,8 +1615,7 @@ ConstraintSystem::filterDisjunction(
     // be attempted in-place because that would also try to operate on that
     // constraint, so instead let's keep the disjunction, but disable all
     // unviable choices.
-    if (choice->getOverloadChoice().getKind() ==
-        OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+    if (choice->getOverloadChoice().isKeyPathDynamicMemberLookup()) {
       // Early simplification of the "keypath dynamic member lookup" choice
       // is impossible because it requires constraints associated with
       // subscript index expression to be present.
@@ -2181,6 +2204,18 @@ Constraint *ConstraintSystem::selectDisjunction() {
   return nullptr;
 }
 
+Constraint *ConstraintSystem::selectConjunction() {
+  for (auto &constraint : InactiveConstraints) {
+    if (constraint.isDisabled())
+      continue;
+
+    if (constraint.getKind() == ConstraintKind::Conjunction)
+      return &constraint;
+  }
+
+  return nullptr;
+}
+
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
   cs.simplifyDisjunctionChoice(Choice);
 
@@ -2284,4 +2319,18 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   if (constraints.empty())
     cs.addConstraint(ConstraintKind::Bind, typeVar, conversionType,
                      Choice->getLocator());
+}
+
+bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
+  // First, let's bring all referenced variables into scope.
+  {
+    llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+    findReferencedVariables(cs, referencedVars);
+
+    for (auto *typeVar : referencedVars)
+      cs.addTypeVariable(typeVar);
+  }
+
+  auto result = cs.simplifyConstraint(*Element);
+  return result != ConstraintSystem::SolutionKind::Error;
 }

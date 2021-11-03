@@ -917,7 +917,7 @@ namespace {
         CS.getConstraintLocator(locator,
                                 ConstraintLocator::FunctionResult);
 
-      associateArgumentList(memberLocator, argList);
+      CS.associateArgumentList(memberLocator, argList);
 
       Type outputTy;
 
@@ -1174,7 +1174,7 @@ namespace {
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       auto *exprLoc = CS.getConstraintLocator(expr);
-      associateArgumentList(exprLoc, expr->getArgs());
+      CS.associateArgumentList(exprLoc, expr->getArgs());
 
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())
@@ -1214,8 +1214,14 @@ namespace {
       auto *memberLoc =
           CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember);
 
+      auto *fnLoc =
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction);
+
+      auto *memberTypeLoc = CS.getConstraintLocator(
+          fnLoc, LocatorPathElt::ConstructorMemberType());
+
       auto *memberType =
-          CS.createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
+          CS.createTypeVariable(memberTypeLoc, TVO_CanBindToNoEscape);
 
       CS.addValueMemberConstraint(MetatypeType::get(witnessType, ctx),
                                   DeclNameRef(constrName), memberType, CurDC,
@@ -1228,10 +1234,9 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
           TVO_CanBindToNoEscape);
 
-      CS.addConstraint(
-          ConstraintKind::ApplicableFunction,
-          FunctionType::get(params, resultType), memberType,
-          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
+      CS.addConstraint(ConstraintKind::ApplicableFunction,
+                       FunctionType::get(params, resultType), memberType,
+                       fnLoc);
 
       if (constr->isFailable())
         return OptionalType::get(witnessType);
@@ -1500,25 +1505,12 @@ namespace {
         //   self.super = Super.init()
         baseTy = MetatypeType::get(baseTy, ctx);
 
-        auto methodTy = CS.createTypeVariable(
-            CS.getConstraintLocator(expr,
-                                    ConstraintLocator::ApplyFunction),
-            TVO_CanBindToNoEscape);
+        auto memberTypeLoc = CS.getConstraintLocator(
+            expr, LocatorPathElt::ConstructorMemberType(
+                      /*shortFormOrSelfDelegating*/ true));
 
-        // FIXME: Once TVO_PrefersSubtypeBinding is replaced with something
-        // better, we won't need the second type variable at all.
-        {
-          auto argTy = CS.createTypeVariable(
-              CS.getConstraintLocator(expr,
-                                      ConstraintLocator::ApplyArgument),
-              (TVO_CanBindToLValue |
-               TVO_CanBindToInOut |
-               TVO_CanBindToNoEscape |
-               TVO_PrefersSubtypeBinding));
-          CS.addConstraint(
-              ConstraintKind::FunctionInput, methodTy, argTy,
-              CS.getConstraintLocator(expr));
-        }
+        auto methodTy =
+            CS.createTypeVariable(memberTypeLoc, TVO_CanBindToNoEscape);
 
         CS.addValueMemberConstraint(
             baseTy, expr->getName(), methodTy, CurDC,
@@ -1731,9 +1723,12 @@ namespace {
       };
 
       // If a contextual type exists for this expression, apply it directly.
-      Optional<Type> arrayElementType;
-      if (contextualType &&
-          (arrayElementType = ConstraintSystem::isArrayType(contextualType))) {
+      if (contextualType && ConstraintSystem::isArrayType(contextualType)) {
+        // Now that we know we're actually going to use the type, get the
+        // version for use in a constraint.
+        contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        Optional<Type> arrayElementType =
+            ConstraintSystem::isArrayType(contextualType);
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
                          locator);
@@ -1836,14 +1831,19 @@ namespace {
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
-      auto openedType =
-          CS.openOpaqueType(contextualType, contextualPurpose, locator);
 
       // If a contextual type exists for this expression and is a dictionary
       // type, apply it directly.
-      Optional<std::pair<Type, Type>> dictionaryKeyValue;
-      if (openedType && (dictionaryKeyValue =
-                             ConstraintSystem::isDictionaryType(openedType))) {
+      if (contextualType && ConstraintSystem::isDictionaryType(contextualType)) {
+        // Now that we know we're actually going to use the type, get the
+        // version for use in a constraint.
+        contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
+        auto openedType =
+            CS.openOpaqueType(contextualType, contextualPurpose, locator);
+        openedType = CS.replaceInferableTypesWithTypeVars(
+            openedType, CS.getConstraintLocator(expr));
+        auto dictionaryKeyValue =
+            ConstraintSystem::isDictionaryType(openedType);
         Type contextualDictionaryKeyType;
         Type contextualDictionaryValueType;
         std::tie(contextualDictionaryKeyType,
@@ -2210,31 +2210,19 @@ namespace {
           oneWayVarType = CS.createTypeVariable(
               CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
 
-          // If there is an externally-imposed pattern type and the
-          // binding/capture is marked as `weak`, let's make sure
-          // that the imposed type is optional.
+          // If there is externally-imposed type, and the variable
+          // is marked as `weak`, let's fallthrough and allow the
+          // `one-way` constraint to be fixed in diagnostic mode.
           //
-          // Note that there is no need to check `varType` since
-          // it's only "externally" bound if this pattern isn't marked
-          // as `weak`.
-          if (externalPatternType &&
-              optionality == ReferenceOwnershipOptionality::Required) {
-            // If the type is not yet known, let's add a constraint
-            // to make sure that it can only be bound to an optional type.
-            if (externalPatternType->isTypeVariableOrMember()) {
-              auto objectTy = CS.createTypeVariable(
-                  CS.getConstraintLocator(locator.withPathElement(
-                      ConstraintLocator::OptionalPayload)),
-                  TVO_CanBindToLValue | TVO_CanBindToNoEscape);
-
-              CS.addConstraint(ConstraintKind::OptionalObject,
-                               externalPatternType, objectTy, locator);
-            } else if (!externalPatternType->getOptionalObjectType()) {
-              // TODO(diagnostics): A tailored fix to indiciate that `weak`
-              // should have an optional type.
-              return Type();
-            }
-          }
+          // That would make sure that type of this variable is
+          // recorded in the constraint  system, which would then
+          // be used instead of `getVarType` upon discovering a
+          // reference to this variable in subsequent expression(s).
+          //
+          // If we let constraint generation fail here, it would trigger
+          // interface type request via `var->getType()` that would
+          // attempt to validate `weak` attribute, and produce a
+          // diagnostic in the middle of the solver path.
 
           CS.addConstraint(ConstraintKind::OneWayEqual, oneWayVarType,
                            externalPatternType ? externalPatternType : varType,
@@ -2417,7 +2405,19 @@ namespace {
         Type memberType = CS.createTypeVariable(
             CS.getConstraintLocator(locator),
             TVO_CanBindToLValue | TVO_CanBindToNoEscape);
-        FunctionRefKind functionRefKind = FunctionRefKind::Compound;
+
+        // Tuple splat is still allowed for patterns (with a warning in Swift 5)
+        // so we need to start here from single-apply to make sure that e.g.
+        // `case test(x: Int, y: Int)` gets the labels preserved when matched
+        // with `case let .test(tuple)`.
+        FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
+        // If sub-pattern is a tuple we'd need to mark reference as compound,
+        // that would make sure that the labels are dropped in cases
+        // when `case` has a single tuple argument (tuple explosion) or multiple
+        // arguments (tuple-to-tuple conversion).
+        if (dyn_cast_or_null<TuplePattern>(enumPattern->getSubPattern()))
+          functionRefKind = FunctionRefKind::Compound;
+
         if (enumPattern->getParentType() || enumPattern->getParentTypeRepr()) {
           // Resolve the parent type.
           const auto parentType = [&] {
@@ -2687,7 +2687,7 @@ namespace {
     Type visitApplyExpr(ApplyExpr *expr) {
       auto fnExpr = expr->getFn();
 
-      associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
+      CS.associateArgumentList(CS.getConstraintLocator(expr), expr->getArgs());
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
         auto typeOperation = getTypeOperation(UDE, CS.getASTContext());
@@ -3442,11 +3442,6 @@ namespace {
       }
       llvm_unreachable("unhandled operation");
     }
-
-    void associateArgumentList(ConstraintLocator *locator, ArgumentList *args) {
-      assert(locator && locator->getAnchor());
-      CS.ArgumentLists[CS.getArgumentInfoLocator(locator)] = args;
-    }
   };
 
   class ConstraintWalker : public ASTWalker {
@@ -3469,7 +3464,8 @@ namespace {
       // Note that the subexpression of a #selector expression is
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
-        CG.getConstraintSystem().UnevaluatedRootExprs.insert(sel->getSubExpr());
+        auto *subExpr = sel->getSubExpr()->getSemanticsProvidingExpr();
+        CG.getConstraintSystem().UnevaluatedRootExprs.insert(subExpr);
       }
 
       // Check an objc key-path expression, which fills in its semantic
@@ -3928,13 +3924,13 @@ bool ConstraintSystem::generateConstraints(
       if (!patternType || patternType->hasError())
         return true;
 
-      if (!patternBinding->isInitialized(index) &&
-          patternBinding->isDefaultInitializable(index) &&
+      auto *init = patternBinding->getInit(index);
+
+      if (!init && patternBinding->isDefaultInitializable(index) &&
           pattern->hasStorage()) {
-        llvm_unreachable("default initialization is unsupported");
+        init = TypeChecker::buildDefaultInitializer(patternType);
       }
 
-      auto init = patternBinding->getInit(index);
       auto target = init ? SolutionApplicationTarget::forInitialization(
                                init, dc, patternType, patternBinding, index,
                                /*bindPatternVarsOneWay=*/true)

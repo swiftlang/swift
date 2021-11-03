@@ -361,15 +361,18 @@ namespace {
         return Type();
 
       // ARM SVE builtin types that don't have Swift equivalents.
-#define SVE_TYPE(Name, Id, ...) \
-      case clang::BuiltinType::Id:
+#define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
         return Type();
 
       // PPC SVE builtin types that don't have Swift equivalents.
-#define PPC_VECTOR_TYPE(Name, Id, Size) \
-      case clang::BuiltinType::Id:
+#define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/PPCTypes.def"
+        return Type();
+
+      // RISC-V V builtin types that don't have Swift equivalents.
+#define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/RISCVVTypes.def"
         return Type();
       }
 
@@ -1827,26 +1830,32 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   bool allowNSUIntegerAsInt =
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
 
+  // Only eagerly import the return type if it's not too expensive (the current
+  // huristic for that is if it's not a record type).
   ImportedType importedType;
   if (auto templateType =
           dyn_cast<clang::TemplateTypeParmType>(clangDecl->getReturnType())) {
     importedType = {findGenericTypeInGenericDecls(templateType, genericParams),
                     false};
-  } else {
+  } else if (!(isa<clang::RecordType>(clangDecl->getReturnType()) ||
+               isa<clang::TemplateSpecializationType>(clangDecl->getReturnType())) ||
+             // TODO: we currently don't lazily load operator return types, but
+             // this should be trivial to add.
+             clangDecl->isOverloadedOperator()) {
     importedType =
         importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
     if (!importedType)
       return {Type(), false};
   }
 
+  Type swiftResultTy = importedType.getType();
   ArrayRef<Identifier> argNames = name.getArgumentNames();
   parameterList = importFunctionParameterList(dc, clangDecl, params, isVariadic,
                                               allowNSUIntegerAsInt, argNames,
-                                              genericParams);
+                                              genericParams, swiftResultTy);
   if (!parameterList)
     return {Type(), false};
 
-  Type swiftResultTy = importedType.getType();
   if (clangDecl->isNoReturn())
     swiftResultTy = SwiftContext.getNeverType();
 
@@ -1857,7 +1866,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
-    ArrayRef<GenericTypeParamDecl *> genericParams) {
+    ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType) {
   // Import the parameters.
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
@@ -1910,6 +1919,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // Import the parameter type into Swift.
     Type swiftParamTy;
     bool isParamTypeImplicitlyUnwrapped = false;
+    bool isInOut = false;
 
     auto referenceType = dyn_cast<clang::ReferenceType>(paramTy);
     if (referenceType &&
@@ -1929,6 +1939,10 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       swiftParamTy =
           findGenericTypeInGenericDecls(templateParamType, genericParams);
     } else {
+      if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
+        paramTy = refType->getPointeeType();
+        isInOut = true;
+      }
       auto importedType = importType(paramTy, importKind, allowNSUIntegerAsInt,
                                      Bridgeability::Full, OptionalityOfParam);
       if (!importedType)
@@ -1960,13 +1974,58 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         param, AccessLevel::Private, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
         ImportedHeaderUnit);
-    paramInfo->setSpecifier(ParamSpecifier::Default);
+    paramInfo->setSpecifier(isInOut ? ParamSpecifier::InOut
+                                    : ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
     recordUnsafeConcurrencyForDecl(
         paramInfo, isUnsafeSendable, isUnsafeMainActor);
     parameters.push_back(paramInfo);
     ++index;
+  }
+
+  auto genericParamTypeUsedInSignature =
+      [params, resultType](GenericTypeParamDecl *genericParam,
+                           bool shouldCheckResultType) -> bool {
+    auto paramDecl = genericParam->getClangDecl();
+    auto templateTypeParam = cast<clang::TemplateTypeParmDecl>(paramDecl);
+    // TODO(SR-13809): This won't work when we support importing dependent types.
+    // We'll have to change this logic to traverse the type tree of the imported
+    // Swift type (basically whatever ends up in the parameters variable).
+    // Check if genericParam's corresponding clang template type is used by
+    // the clang function's parameters.
+    for (auto param : params) {
+      if (hasSameUnderlyingType(param->getType().getTypePtr(),
+                                templateTypeParam)) {
+        return true;
+      }
+    }
+
+    // Check if genericParam is used as a type parameter in the result type.
+    return shouldCheckResultType &&
+        resultType.findIf([genericParam](Type typePart) -> bool {
+          return typePart->isEqual(genericParam->getDeclaredInterfaceType());
+        });
+  };
+  
+  // Make sure all generic parameters are accounted for in the function signature.
+  for (auto genericParam : genericParams) {
+    bool shouldCheckResultType = resultType && resultType->hasTypeParameter();
+    if (genericParamTypeUsedInSignature(genericParam, shouldCheckResultType))
+      continue;
+    
+    // If this generic parameter is not used in the function signature,
+    // add a new parameter that accepts a metatype corresponding to that
+    // generic parameter.
+    Identifier name = genericParam->getName();
+    auto param = new (SwiftContext)
+        ParamDecl(SourceLoc(), SourceLoc(), name, SourceLoc(),
+                  name, dc);
+    auto metatype =
+      cast<MetatypeType>(genericParam->getInterfaceType().getPointer());
+    param->setInterfaceType(metatype);
+    param->setSpecifier(ParamSpecifier::Default);
+    parameters.push_back(param);
   }
 
   // Append an additional argument to represent varargs.

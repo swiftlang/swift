@@ -9,11 +9,12 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-// REQUIRES: rdar78290608
+// FIXME(distributed): remote functions dont seem to work on windows?
+// XFAIL: OS=windows-msvc
 
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 distributed actor SomeSpecificDistributedActor {
   distributed func hello() async throws -> String {
     "local impl"
@@ -22,7 +23,7 @@ distributed actor SomeSpecificDistributedActor {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address : String) {
@@ -30,14 +31,13 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct FakeTransport: ActorTransport {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type)
-  throws -> Act?
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor {
     return nil
   }
@@ -60,18 +60,18 @@ struct FakeTransport: ActorTransport {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 func test_remote() async {
   let address = ActorAddress(parse: "")
   let transport = FakeTransport()
 
-  let remote = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
+  let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
   _ = try! await remote.hello() // let it crash!
 
-  // CHECK: SOURCE_DIR/test/Distributed/Runtime/distributed_no_transport_boom.swift:18: Fatal error: Invoked remote placeholder function '_remote_hello' on remote distributed actor of type 'main.SomeSpecificDistributedActor'. Configure an appropriate 'ActorTransport' for this actor to resolve this error (e.g. by depending on some specific transport library).
+  // CHECK: SOURCE_DIR/test/Distributed/Runtime/distributed_no_transport_boom.swift:{{[0-9]+}}: Fatal error: Invoked remote placeholder function '_remote_hello' on remote distributed actor of type 'main.SomeSpecificDistributedActor'. Configure an appropriate 'ActorTransport' for this actor to resolve this error (e.g. by depending on some specific transport library).
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     await test_remote()

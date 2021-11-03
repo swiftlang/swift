@@ -27,7 +27,7 @@ import Swift
 /// Does not check for cancellation, and always executes the passed `operation`.
 ///
 /// This function returns instantly and will never suspend.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public func withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void
@@ -40,23 +40,17 @@ public func withTaskCancellationHandler<T>(
   return try await operation()
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task {
   /// Returns `true` if the task is cancelled, and should stop executing.
   ///
   /// - SeeAlso: `checkCancellation()`
-  public var isCancelled: Bool {
-    withUnsafeCurrentTask { task in
-      guard let task = task else {
-        return false
-      }
-
-      return _taskIsCancelled(task._task)
-    }
+  @_transparent public var isCancelled: Bool {
+    _taskIsCancelled(_task)
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
   /// Returns `true` if the task is cancelled, and should stop executing.
   ///
@@ -71,7 +65,7 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
   /// Check if the task is cancelled and throw an `CancellationError` if it was.
   ///
@@ -98,17 +92,17 @@ extension Task where Success == Never, Failure == Never {
 ///
 /// This error is also thrown automatically by `Task.checkCancellation()`,
 /// if the current task has been cancelled.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct CancellationError: Error {
   // no extra information, cancellation is intended to be light-weight
   public init() {}
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_addCancellationHandler")
 func _taskAddCancellationHandler(handler: () -> Void) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_removeCancellationHandler")
 func _taskRemoveCancellationHandler(
   record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/

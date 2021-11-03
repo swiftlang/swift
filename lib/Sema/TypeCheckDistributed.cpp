@@ -53,6 +53,24 @@ DistributedModuleIsAvailableRequest::evaluate(Evaluator &evaluator,
 
 // ==== ------------------------------------------------------------------------
 
+/// Add Fix-It text for the given protocol type to inherit DistributedActor.
+void swift::diagnoseDistributedFunctionInNonDistributedActorProtocol(
+    const ProtocolDecl *proto, InFlightDiagnostic &diag) {
+  if (proto->getInherited().empty()) {
+    SourceLoc fixItLoc = proto->getBraces().Start;
+    diag.fixItInsert(fixItLoc, ": DistributedActor");
+  } else {
+    // Similar to how Sendable FitIts do this, we insert at the end of
+    // the inherited types.
+    ASTContext &ctx = proto->getASTContext();
+    SourceLoc fixItLoc = proto->getInherited().back().getSourceRange().End;
+    fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
+    diag.fixItInsert(fixItLoc, ", DistributedActor");
+  }
+}
+
+// ==== ------------------------------------------------------------------------
+
 bool IsDistributedActorRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   // Protocols are actors if they inherit from `DistributedActor`.
@@ -63,42 +81,13 @@ bool IsDistributedActorRequest::evaluate(
             protocol->inheritsFrom(distributedActorProtocol));
   }
 
-  // Class declarations are 'distributed actors' if they are declared with 'distributed actor'
+  // Class declarations are 'distributed actors' if they are declared with
+  // 'distributed actor'
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if(!classDecl)
     return false;
 
   return classDecl->isExplicitDistributedActor();
-}
-
-AbstractFunctionDecl *GetDistributedRemoteFuncRequest::evaluate(
-    Evaluator &evaluator, AbstractFunctionDecl *func) const {
-
-  if (!func->isDistributed())
-    return nullptr;
-
-  auto &C = func->getASTContext();
-  DeclContext *DC = func->getDeclContext();
-
-  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
-  // we won't be emitting the offending decl after all.
-  if (!C.getLoadedModule(C.Id_Distributed))
-    return nullptr;
-
-  // Locate the actor decl that the member must be synthesized to.
-  // TODO(distributed): should this just be added to the extension instead when we're in one?
-  ClassDecl *decl = dyn_cast<ClassDecl>(DC);
-  if (!decl) {
-    if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
-      decl = dyn_cast<ClassDecl>(ED->getExtendedNominal());
-    }
-  }
-
-  /// A distributed func cannot be added to a non-distributed actor;
-  /// If the 'decl' was not a distributed actor we must have declared and
-  /// requested it from a illegal context, let's just ignore the synthesis.
-  assert(decl && "Can't find actor detect to add implicit _remote function to");
-  return TypeChecker::addImplicitDistributedActorRemoteFunction(decl, func);
 }
 
 // ==== ------------------------------------------------------------------------
@@ -150,7 +139,7 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   }
 
   // === Check _remote functions
-  ClassDecl *actorDecl = dyn_cast<ClassDecl>(func->getParent());
+  auto actorDecl = func->getParent()->getSelfNominalTypeDecl();
   assert(actorDecl && actorDecl->isDistributedActor());
 
   // _remote function for a distributed function must not be implemented by end-users,
@@ -252,10 +241,6 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
     // --- Check all constructors
     if (auto ctor = dyn_cast<ConstructorDecl>(member))
       checkDistributedActorConstructor(decl, ctor);
-
-    // --- synthesize _remote functions for distributed functions
-    if (auto func = dyn_cast<FuncDecl>(member))
-      (void)addImplicitDistributedActorRemoteFunction(decl, func);
   }
 
   // ==== Properties
@@ -263,3 +248,13 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
   checkDistributedActorProperties(decl);
 }
 
+Type swift::getDistributedActorTransportType(NominalTypeDecl *actor) {
+  assert(actor->isDistributedActor());
+  auto &ctx = actor->getASTContext();
+
+  auto protocol = ctx.getProtocol(KnownProtocolKind::ActorTransport);
+  if (!protocol)
+    return ErrorType::get(ctx);
+
+  return protocol->getDeclaredInterfaceType();
+}

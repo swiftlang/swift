@@ -42,9 +42,12 @@
 namespace swift {
 
 // Set to 1 to enable helpful debug spew to stderr
+// If this is enabled, tests with `swift_task_debug_log` requirement can run.
 #if 0
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
-  fprintf(stderr, "[%lu] " fmt "\n", (unsigned long)_swift_get_thread_id(),    \
+  fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
+          (unsigned long)_swift_get_thread_id(),                               \
+          __FILE__, __LINE__, __FUNCTION__,                                    \
           __VA_ARGS__)
 #else
 #define SWIFT_TASK_DEBUG_LOG(fmt, ...) (void)0
@@ -96,20 +99,6 @@ void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
-
-#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
-#define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
-#else
-#define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 0
-#endif
-
-#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
-/// Donate this thread to the global executor until either the
-/// given condition returns true or we've run out of cooperative
-/// tasks to run.
-void donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
-                                       void *context);
-#endif
 
 /// release() establishes a happens-before relation with a preceding acquire()
 /// on the same address.

@@ -1709,12 +1709,16 @@ public:
 
         auto &diags = ID->getASTContext().Diags;
         InFlightDiagnostic inFlight =
-            diags.diagnose(ID, diag::warn_public_import_of_private_module,
+            diags.diagnose(ID, diag::error_public_import_of_private_module,
                            target->getName(), importer->getName());
         if (ID->getAttrs().isEmpty()) {
            inFlight.fixItInsert(ID->getStartLoc(),
                               "@_implementationOnly ");
         }
+
+        static bool treatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
+        if (!treatAsError)
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
     }
   }
@@ -1880,8 +1884,11 @@ public:
 
     auto &Ctx = getASTContext();
     for (auto i : range(PBD->getNumPatternEntries())) {
-      const auto *entry = evaluateOrDefault(
-          Ctx.evaluator, PatternBindingEntryRequest{PBD, i}, nullptr);
+      const auto *entry =
+          PBD->isFullyValidated(i)
+              ? &PBD->getPatternList()[i]
+              : evaluateOrDefault(Ctx.evaluator,
+                                  PatternBindingEntryRequest{PBD, i}, nullptr);
       assert(entry && "No pattern binding entry?");
 
       const auto *Pat = PBD->getPattern(i);
@@ -2207,7 +2214,7 @@ public:
       visit(member);
 
     checkInheritanceClause(ED);
-
+    diagnoseMissingExplicitSendable(ED);
     checkAccessControl(ED);
 
     TypeChecker::checkPatternBindingCaptures(ED);
@@ -2257,6 +2264,7 @@ public:
     TypeChecker::checkPatternBindingCaptures(SD);
 
     checkInheritanceClause(SD);
+    diagnoseMissingExplicitSendable(SD);
 
     checkAccessControl(SD);
 
@@ -2508,6 +2516,7 @@ public:
     }
 
     checkInheritanceClause(CD);
+    diagnoseMissingExplicitSendable(CD);
 
     checkAccessControl(CD);
 

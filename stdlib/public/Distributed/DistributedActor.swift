@@ -20,7 +20,7 @@ import _Concurrency
 ///
 /// FIXME(distributed): We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
 @_marker
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public protocol AnyActor: Sendable, AnyObject {}
 
 // ==== Distributed Actor -----------------------------------------------------
@@ -33,9 +33,9 @@ public protocol AnyActor: Sendable, AnyObject {}
 ///
 /// The 'DistributedActor' protocol provides the core functionality of any
 /// distributed actor.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public protocol DistributedActor:
-    AnyActor, Identifiable, Hashable, Codable {
+    AnyActor, Sendable, Identifiable, Hashable, Codable {
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.
     ///
@@ -79,7 +79,7 @@ public protocol DistributedActor:
 
 // ==== Hashable conformance ---------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 extension DistributedActor {
   nonisolated public func hash(into hasher: inout Hasher) {
     self.id.hash(into: &hasher)
@@ -93,11 +93,11 @@ extension DistributedActor {
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
-  @available(SwiftStdlib 5.5, *)
+  @available(SwiftStdlib 5.6, *)
   public static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_transport")!
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 extension DistributedActor {
   nonisolated public init(from decoder: Decoder) throws {
     guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
@@ -116,15 +116,37 @@ extension DistributedActor {
   }
 }
 
+// ==== Local actor special handling -------------------------------------------
+
+@available(SwiftStdlib 5.6, *)
+extension DistributedActor {
+
+  /// Executes the passed 'body' only when the distributed actor is local instance.
+  ///
+  /// The `Self` passed to the the body closure is isolated, meaning that the
+  /// closure can be used to call non-distributed functions, or even access actor
+  /// state.
+  ///
+  /// When the actor is remote, the closure won't be executed and this function will return nil.
+  public nonisolated func whenLocal<T>(_ body: @Sendable (isolated Self) async throws -> T)
+    async rethrows -> T? where T: Sendable {
+    if __isLocalActor(self) {
+       return try await body(self)
+    } else {
+      return nil
+    }
+  }
+}
+
 /******************************************************************************/
 /***************************** Actor Identity *********************************/
 /******************************************************************************/
 
 /// Uniquely identifies a distributed actor, and enables sending messages and identifying remote actors.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public protocol ActorIdentity: Sendable, Hashable, Codable {}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomStringConvertible {
   public let underlying: Any
   @usableFromInline let _hashInto: (inout Hasher) -> ()
@@ -186,11 +208,11 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomString
 /******************************************************************************/
 
 /// Error protocol to which errors thrown by any `ActorTransport` should conform.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public protocol ActorTransportError: Error {
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public struct DistributedActorCodingError: ActorTransportError {
   public let message: String
 
@@ -221,10 +243,3 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 @_silgen_name("swift_distributedActor_remote_initialize")
 func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
-
-/// Called to destroy the default actor instance in an actor.
-/// The implementation will call this within the actor's deinit.
-///
-/// This will call `actorTransport.resignIdentity(self.id)`.
-@_silgen_name("swift_distributedActor_destroy")
-func _distributedActorDestroy(_ actor: AnyObject)

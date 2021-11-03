@@ -113,14 +113,6 @@ library), instead of at an arbitrary point in time.
 For more details, see the forum post on
 [dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
 
-## `@_distributedActorIndependent`
-
-Marks a specific property of a distributed actor to be available even if the
-actor is remote.
-
-This only applies to two distributed actor properties `address` and `transport`.
-It cannot be safely declared on any properties defined by ordinary Swift code.
-
 ## `@_effects(effectname)`
 
 Tells the compiler that the implementation of the defined function is limited
@@ -259,7 +251,7 @@ even when `Self` is a reference type.
 ```swift
 class C {
   func f() {}
-  func g(_: @escaping () -> Void {
+  func g(_: @escaping () -> Void) {
     g({ f() }) // error: call to method 'f' in closure requires explicit use of 'self'
   }
   func h(@_implicitSelfCapture _: @escaping () -> Void) {
@@ -383,6 +375,22 @@ override.
 
 This attribute and the corresponding `-warn-implicit-overrides` flag are
 used when compiling the standard library and overlays.
+
+## `@_nonSendable`
+
+There is no clang attribute to add a Swift conformance to an imported type, but
+there *is* a clang attribute to add a Swift attribute to an imported type. So
+`@Sendable` (which is not normally allowed on types) is used from clang headers
+to indicate that an unconstrained, fully available `Sendable` conformance should
+be added to a given type, while `@_nonSendable` indicates that an unavailable
+`Sendable` conformance should be added to it.
+
+`@_nonSendable` can have no options after it, in which case it "beats"
+`@Sendable` if both are applied to the same declaration, or it can have
+`(_assumed)` after it, in which case `@Sendable` "beats" it.
+`@_nonSendable(_assumed)` is intended to be used when mass-marking whole regions
+of a header as non-`Sendable` so that you can make spot exceptions with
+`@Sendable`.   
 
 ## `@_objc_non_lazy_realization`
 
@@ -612,3 +620,17 @@ within Swift 5 code that has adopted concurrency, but non-`@MainActor`
 
 See the forum post on [Concurrency in Swift 5 and 6](https://forums.swift.org/t/concurrency-in-swift-5-and-6/49337)
 for more details.
+
+## `@_noImplicitCopy`
+
+Marks a var decl as a variable that must be copied explicitly using the builtin
+function Builtin.copy.
+
+## `@_noAllocation`, `@_noLocks`
+
+These attributes are performance annotations. If a function is annotated with
+such an attribute, the compiler issues a diagnostic message if the function
+calls a runtime function which allocates memory or locks, respectively.
+The `@_noLocks` attribute implies `@_noAllocation` because a memory allocation
+also locks.
+

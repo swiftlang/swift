@@ -1,12 +1,14 @@
 set(swift_stubs_sources
     Assert.cpp
-    CommandLine.cpp
     GlobalObjects.cpp
     LibcShims.cpp
     Random.cpp
     Stubs.cpp
     ThreadLocalStorage.cpp
     MathStubs.cpp
+    UnicodeData.cpp
+    UnicodeGrapheme.cpp
+    UnicodeNormalization.cpp
 )
 set(swift_stubs_objc_sources
     Availability.mm
@@ -18,7 +20,7 @@ set(swift_stubs_objc_sources
 set(swift_stubs_gyb_sources
     SwiftNativeNSXXXBase.mm.gyb)
 set(swift_stubs_unicode_normalization_sources
-    UnicodeNormalization.cpp)
+    UnicodeShims.cpp)
 set(LLVM_OPTIONAL_SOURCES
     ${swift_stubs_objc_sources}
     ${swift_stubs_unicode_normalization_sources}

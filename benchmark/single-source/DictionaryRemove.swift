@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,7 +21,7 @@ let numberMap = Dictionary(uniqueKeysWithValues: zip(1...size, 1...size))
 let boxedNums = (1...size).lazy.map { Box($0) }
 let boxedNumMap = Dictionary(uniqueKeysWithValues: zip(boxedNums, boxedNums))
 
-public let DictionaryRemove = [
+public let benchmarks = [
   BenchmarkInfo(name: "DictionaryRemove",
     runFunction: remove, tags: t, legacyFactor: 10),
   BenchmarkInfo(name: "DictionaryRemoveOfObjects",
@@ -44,18 +44,18 @@ class Box<T : Hashable> : Hashable {
   }
 }
 
-func remove(N: Int) {
-  for _ in 1...100*N {
+func remove(n: Int) {
+  for _ in 1...100*n {
     var dict = numberMap
     for i in 1...size { dict.removeValue(forKey: i) }
-    CheckResults(dict.isEmpty)
+    check(dict.isEmpty)
   }
 }
 
-func removeObjects(N: Int) {
-  for _ in 1...10*N {
+func removeObjects(n: Int) {
+  for _ in 1...10*n {
     var dict = boxedNumMap
     for i in 1...size { dict.removeValue(forKey: Box(i)) }
-    CheckResults(dict.isEmpty)
+    check(dict.isEmpty)
   }
 }

@@ -114,7 +114,9 @@ class GenericSignature {
 
 public:
   /// Create a new generic signature with the given type parameters and
-  /// requirements.
+  /// requirements. The requirements must already be minimal and canonical;
+  /// to build a signature from an arbitrary set of requirements, use
+  /// swift::buildGenericSignature() instead.
   static GenericSignature get(ArrayRef<GenericTypeParamType *> params,
                               ArrayRef<Requirement> requirements,
                               bool isKnownCanonical = false);
@@ -200,6 +202,21 @@ public:
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
   GenericEnvironment *getGenericEnvironment() const;
+
+  /// Return the requirements of this generic signature that are not also
+  /// satisfied by \c otherSig.
+  ///
+  /// \param otherSig Another generic signature whose generic parameters are
+  /// equivalent to or a subset of the generic parameters in this signature.
+  SmallVector<Requirement, 4>
+  requirementsNotSatisfiedBy(GenericSignature otherSig) const;
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type) const;
+
+  /// Check invariants.
+  void verify() const;
 };
 
 /// A reference to a canonical generic signature.
@@ -249,6 +266,8 @@ class alignas(1 << TypeAlignInBits) GenericSignatureImpl final
   const unsigned NumRequirements;
 
   GenericEnvironment *GenericEnv = nullptr;
+
+  rewriting::RequirementMachine *Machine = nullptr;
 
   // Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
@@ -370,18 +389,6 @@ public:
   bool isRequirementSatisfied(
       Requirement requirement, bool allowMissing = false) const;
 
-  /// Return the requirements of this generic signature that are not also
-  /// satisfied by \c otherSig.
-  ///
-  /// \param otherSig Another generic signature whose generic parameters are
-  /// equivalent to or a subset of the generic parameters in this signature.
-  SmallVector<Requirement, 4> requirementsNotSatisfiedBy(
-                                  GenericSignature otherSig) const;
-
-  /// Return the canonical version of the given type under this generic
-  /// signature.
-  CanType getCanonicalTypeInContext(Type type) const;
-
   bool isCanonicalTypeInContext(Type type) const;
   bool isCanonicalTypeInContext(Type type,
                                 GenericSignatureBuilder &builder) const;
@@ -459,6 +466,18 @@ private:
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
   GenericEnvironment *getGenericEnvironment() const;
+
+  /// Return the requirements of this generic signature that are not also
+  /// satisfied by \c otherSig.
+  ///
+  /// \param otherSig Another generic signature whose generic parameters are
+  /// equivalent to or a subset of the generic parameters in this signature.
+  SmallVector<Requirement, 4>
+  requirementsNotSatisfiedBy(GenericSignature otherSig) const;
+
+  /// Return the canonical version of the given type under this generic
+  /// signature.
+  CanType getCanonicalTypeInContext(Type type) const;
 };
 
 void simple_display(raw_ostream &out, GenericSignature sig);
@@ -476,6 +495,31 @@ int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
                            AssociatedTypeDecl *assocType2);
 
 int compareDependentTypes(Type type1, Type type2);
+
+/// Verify the correctness of the given generic signature.
+///
+/// This routine will test that the given generic signature is both minimal
+/// and canonical, emitting errors if it is not.
+void validateGenericSignature(ASTContext &context,
+                              GenericSignature sig);
+
+/// Verify all of the generic signatures in the given module.
+void validateGenericSignaturesInModule(ModuleDecl *module);
+
+/// Build a generic signature from the given requirements, which are not
+/// required to be minimal or canonical, and may contain unresolved
+/// DependentMemberTypes.
+///
+/// If \p baseSignature is non-null, the new parameters and requirements
+/// are added on; existing requirements of the base signature might become
+/// redundant.
+///
+/// If \p baseSignature is null, build a new signature from scratch.
+GenericSignature buildGenericSignature(
+    ASTContext &ctx,
+    GenericSignature baseSignature,
+    SmallVector<GenericTypeParamType *, 2> addedParameters,
+    SmallVector<Requirement, 2> addedRequirements);
 
 } // end namespace swift
 

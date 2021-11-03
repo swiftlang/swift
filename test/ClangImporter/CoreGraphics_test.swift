@@ -24,7 +24,8 @@ public func testEnums(_ model: CGColorSpaceModel) -> Int {
   }
 // CHECK:   [[GEP:%.+]] = getelementptr inbounds [8 x i64], [8 x i64]* [[SWITCHTABLE]], i64 0, i64 %{{.*}}
 // CHECK:   [[LOAD:%.+]] = load i64, i64* [[GEP]], align 8
-// CHECK:   ret i64 [[LOAD]]
+// CHECK:   [[PHI:%.*]] = phi i64 [ [[LOAD]], %{{.*}} ], [ -1, %{{.*}} ]
+// CHECK:   ret i64 [[PHI]] 
 }
 
 // CHECK-LABEL: define swiftcc void {{.*}}rotationAround{{.*}} {

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -11,8 +11,6 @@
 // rdar://77798215
 // UNSUPPORTED: OS=windows-msvc
 
-// REQUIRES: rdar78290608
-
 import _Distributed
 import _Concurrency
 
@@ -23,7 +21,7 @@ struct Boom: Error {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 distributed actor SomeSpecificDistributedActor {
   let state: String = "hi there"
 
@@ -43,6 +41,31 @@ distributed actor SomeSpecificDistributedActor {
    "local(\(#function))"
   }
 
+  distributed func callTaskSelf_inner() async throws -> String {
+    "local(\(#function))"
+  }
+  distributed func callTaskSelf() async -> String {
+    do {
+      return try await Task {
+        let called = try await callTaskSelf_inner() // shouldn't use the distributed thunk!
+        return "local(\(#function)) -> \(called)"
+      }.value
+    } catch {
+      return "WRONG local(\(#function)) thrown(\(error))"
+    }
+  }
+
+  distributed func callDetachedSelf() async -> String {
+    do {
+      return try await Task.detached {
+        let called = try await self.callTaskSelf_inner() // shouldn't use the distributed thunk!
+        return "local(\(#function)) -> \(called)"
+      }.value
+    } catch {
+      return "WRONG local(\(#function)) thrown(\(error))"
+    }
+  }
+
   // === errors
 
   distributed func helloThrowsImplBoom() throws -> String {
@@ -54,7 +77,7 @@ distributed actor SomeSpecificDistributedActor {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 extension SomeSpecificDistributedActor {
   @_dynamicReplacement(for:_remote_helloAsyncThrows())
   nonisolated func _remote_impl_helloAsyncThrows() async throws -> String {
@@ -73,6 +96,21 @@ extension SomeSpecificDistributedActor {
 
   @_dynamicReplacement(for:_remote_hello())
   nonisolated func _remote_impl_hello() async throws -> String {
+    "remote(\(#function))"
+  }
+
+  @_dynamicReplacement(for:_remote_callTaskSelf())
+  nonisolated func _remote_impl_callTaskSelf() async throws -> String {
+    "remote(\(#function))"
+  }
+
+  @_dynamicReplacement(for:_remote_callDetachedSelf())
+  nonisolated func _remote_impl_callDetachedSelf() async throws -> String {
+    "remote(\(#function))"
+  }
+
+  @_dynamicReplacement(for:_remote_callTaskSelf_inner())
+  nonisolated func _remote_impl_callTaskSelf_inner() async throws -> String {
     "remote(\(#function))"
   }
 
@@ -100,29 +138,25 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct ActorAddress: ActorIdentity {
   let address: String
-  init(parse address : String) {
-    self.address = address
-  }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct FakeTransport: ActorTransport {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: Act.ID, as actorType: Act.Type)
-  throws -> Act?
+  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor {
-    return nil
+    nil
   }
 
   func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor {
-    .init(ActorAddress(parse: ""))
+    .init(ActorAddress(address: ""))
   }
 
   func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
@@ -134,7 +168,7 @@ struct FakeTransport: ActorTransport {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async {
   func check(actor: SomeSpecificDistributedActor) async {
     let personality = __isRemoteActor(actor) ? "remote" : "local"
@@ -151,25 +185,31 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
     let h4 = try! await actor.hello()
     print("\(personality) - hello: \(h4)")
 
+    let h5 = try! await actor.callTaskSelf()
+    print("\(personality) - callTaskSelf: \(h5)")
+
+    let h6 = try! await actor.callDetachedSelf()
+    print("\(personality) - callDetachedSelf: \(h6)")
+
     // error throws
     if __isRemoteActor(actor) {
       do {
         _ = try await actor.helloThrowsTransportBoom()
-        preconditionFailure("helloThrowsTransportBoom: should have thrown")
+        print("WRONG: helloThrowsTransportBoom: should have thrown")
       } catch {
         print("\(personality) - helloThrowsTransportBoom: \(error)")
       }
     } else {
       do {
         _ = try await actor.helloThrowsImplBoom()
-        preconditionFailure("helloThrowsImplBoom: Should have thrown")
+        print("WRONG: helloThrowsImplBoom: Should have thrown")
       } catch {
         print("\(personality) - helloThrowsImplBoom: \(error)")
       }
     }
   }
 
-  let remote = try! SomeSpecificDistributedActor(resolve: .init(address), using: transport)
+  let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
   assert(__isRemoteActor(remote) == true, "should be remote")
 
   let local = SomeSpecificDistributedActor(transport: transport)
@@ -182,6 +222,8 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
   // CHECK: local - helloAsync: local(helloAsync())
   // CHECK: local - helloThrows: local(helloThrows())
   // CHECK: local - hello: local(hello())
+  // CHECK: local - callTaskSelf: local(callTaskSelf()) -> local(callTaskSelf_inner())
+  // CHECK: local - callDetachedSelf: local(callDetachedSelf()) -> local(callTaskSelf_inner())
   // CHECK: local - helloThrowsImplBoom: Boom(whoFailed: "impl")
 
   print("remote isRemote: \(__isRemoteActor(remote))")
@@ -191,16 +233,18 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
   // CHECK: remote - helloAsync: remote(_remote_impl_helloAsync())
   // CHECK: remote - helloThrows: remote(_remote_impl_helloThrows())
   // CHECK: remote - hello: remote(_remote_impl_hello())
+  // CHECK: remote - callTaskSelf: remote(_remote_impl_callTaskSelf())
+  // CHECK: remote - callDetachedSelf: remote(_remote_impl_callDetachedSelf())
   // CHECK: remote - helloThrowsTransportBoom: Boom(whoFailed: "transport")
 
   print(local)
   print(remote)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
-    let address = ActorAddress(parse: "")
+    let address = ActorAddress(address: "")
     let transport = FakeTransport()
 
     await test_remote_invoke(address: address, transport: transport)

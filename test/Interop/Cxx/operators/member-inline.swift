@@ -185,4 +185,13 @@ OperatorsTestSuite.test("PtrToPtr.subscript (inline)") {
   expectEqual(23, arr[0]![0]![0])
 }
 
+// TODO: this causes a crash (does it also crash on main?)
+//OperatorsTestSuite.test("TemplatedSubscriptArrayByVal.subscript (inline)") {
+//  let ptr: UnsafeMutablePointer<Int32> =
+//    UnsafeMutablePointer<Int32>.allocate(capacity: 64)
+//  ptr[0] = 23
+//  var arr = TemplatedSubscriptArrayByVal(ptr: ptr)
+//  expectEqual(23, arr[0])
+//}
+
 runAllTests()

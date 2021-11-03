@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,7 +19,7 @@ import Foundation
 fileprivate var test:NSString = ""
 fileprivate var mutableTest = ""
 
-public let NSStringConversion = [
+public let benchmarks = [
   BenchmarkInfo(name: "NSStringConversion",
                 runFunction: run_NSStringConversion,
                 tags: [.validation, .api, .String, .bridging]),
@@ -105,44 +105,44 @@ public let NSStringConversion = [
                 setUpFunction: { mutableTest = "Thë qüick bröwn föx jumps over the lazy dög" } )
 ]
 
-public func run_NSStringConversion(_ N: Int) {
+public func run_NSStringConversion(_ n: Int) {
 let test:NSString = NSString(cString: "test", encoding: String.Encoding.ascii.rawValue)!
-  for _ in 1...N * 10000 {
+  for _ in 1...n * 10000 {
     //Doesn't test accessing the String contents to avoid changing historical benchmark numbers
     blackHole(identity(test) as String)
   }
 }
 
-fileprivate func innerLoop(_ str: NSString, _ N: Int, _ scale: Int = 5000) {
-  for _ in 1...N * scale {
+fileprivate func innerLoop(_ str: NSString, _ n: Int, _ scale: Int = 5000) {
+  for _ in 1...n * scale {
     for char in (identity(str) as String).utf8 {
       blackHole(char)
     }
   }
 }
 
-public func run_NSStringConversion_nonASCII(_ N: Int) {
-  innerLoop(test, N, 2500)
+public func run_NSStringConversion_nonASCII(_ n: Int) {
+  innerLoop(test, n, 2500)
 }
 
-public func run_NSMutableStringConversion(_ N: Int) {
-  innerLoop(test, N)
+public func run_NSMutableStringConversion(_ n: Int) {
+  innerLoop(test, n)
 }
 
-public func run_NSStringConversion_medium(_ N: Int) {
-  innerLoop(test, N, 1000)
+public func run_NSStringConversion_medium(_ n: Int) {
+  innerLoop(test, n, 1000)
 }
 
-public func run_NSStringConversion_long(_ N: Int) {
-  innerLoop(test, N, 1000)
+public func run_NSStringConversion_long(_ n: Int) {
+  innerLoop(test, n, 1000)
 }
 
-public func run_NSStringConversion_longNonASCII(_ N: Int) {
-  innerLoop(test, N, 300)
+public func run_NSStringConversion_longNonASCII(_ n: Int) {
+  innerLoop(test, n, 300)
 }
 
-fileprivate func innerMutableLoop(_ str: String, _ N: Int, _ scale: Int = 5000) {
-  for _ in 1...N * scale {
+fileprivate func innerMutableLoop(_ str: String, _ n: Int, _ scale: Int = 5000) {
+  for _ in 1...n * scale {
     let copy = (str as NSString).mutableCopy() as! NSMutableString
     for char in (identity(copy) as String).utf8 {
       blackHole(char)
@@ -150,56 +150,56 @@ fileprivate func innerMutableLoop(_ str: String, _ N: Int, _ scale: Int = 5000) 
   }
 }
 
-public func run_NSStringConversion_nonASCIIMutable(_ N: Int) {
-  innerMutableLoop(mutableTest, N, 500)
+public func run_NSStringConversion_nonASCIIMutable(_ n: Int) {
+  innerMutableLoop(mutableTest, n, 500)
 }
 
-public func run_NSStringConversion_mediumMutable(_ N: Int) {
-  innerMutableLoop(mutableTest, N, 500)
+public func run_NSStringConversion_mediumMutable(_ n: Int) {
+  innerMutableLoop(mutableTest, n, 500)
 }
 
-public func run_NSStringConversion_longMutable(_ N: Int) {
-  innerMutableLoop(mutableTest, N, 250)
+public func run_NSStringConversion_longMutable(_ n: Int) {
+  innerMutableLoop(mutableTest, n, 250)
 }
 
-public func run_NSStringConversion_longNonASCIIMutable(_ N: Int) {
-  innerMutableLoop(mutableTest, N, 150)
+public func run_NSStringConversion_longNonASCIIMutable(_ n: Int) {
+  innerMutableLoop(mutableTest, n, 150)
 }
 
-fileprivate func innerRebridge(_ str: NSString, _ N: Int, _ scale: Int = 5000) {
-  for _ in 1...N * scale {
+fileprivate func innerRebridge(_ str: NSString, _ n: Int, _ scale: Int = 5000) {
+  for _ in 1...n * scale {
     let bridged = identity(str) as String
     blackHole(bridged)
     blackHole(bridged as NSString)
   }
 }
 
-public func run_NSStringConversion_rebridge(_ N: Int) {
-  innerRebridge(test, N, 2500)
+public func run_NSStringConversion_rebridge(_ n: Int) {
+  innerRebridge(test, n, 2500)
 }
 
-public func run_NSStringConversion_nonASCII_rebridge(_ N: Int) {
-  innerRebridge(test, N, 2500)
+public func run_NSStringConversion_nonASCII_rebridge(_ n: Int) {
+  innerRebridge(test, n, 2500)
 }
 
-public func run_NSMutableStringConversion_rebridge(_ N: Int) {
-  innerRebridge(test, N)
+public func run_NSMutableStringConversion_rebridge(_ n: Int) {
+  innerRebridge(test, n)
 }
 
-public func run_NSStringConversion_medium_rebridge(_ N: Int) {
-  innerRebridge(test, N, 1000)
+public func run_NSStringConversion_medium_rebridge(_ n: Int) {
+  innerRebridge(test, n, 1000)
 }
 
-public func run_NSStringConversion_long_rebridge(_ N: Int) {
-  innerRebridge(test, N, 1000)
+public func run_NSStringConversion_long_rebridge(_ n: Int) {
+  innerRebridge(test, n, 1000)
 }
 
-public func run_NSStringConversion_longNonASCII_rebridge(_ N: Int) {
-  innerRebridge(test, N, 300)
+public func run_NSStringConversion_longNonASCII_rebridge(_ n: Int) {
+  innerRebridge(test, n, 300)
 }
 
-fileprivate func innerMutableRebridge(_ str: String, _ N: Int, _ scale: Int = 5000) {
-  for _ in 1...N * scale {
+fileprivate func innerMutableRebridge(_ str: String, _ n: Int, _ scale: Int = 5000) {
+  for _ in 1...n * scale {
     let copy = (str as NSString).mutableCopy() as! NSMutableString
     let bridged = identity(copy) as String
     blackHole(bridged)
@@ -207,24 +207,24 @@ fileprivate func innerMutableRebridge(_ str: String, _ N: Int, _ scale: Int = 50
   }
 }
 
-public func run_NSStringConversion_rebridgeMutable(_ N: Int) {
-  innerMutableRebridge(mutableTest, N, 1000)
+public func run_NSStringConversion_rebridgeMutable(_ n: Int) {
+  innerMutableRebridge(mutableTest, n, 1000)
 }
 
-public func run_NSStringConversion_nonASCII_rebridgeMutable(_ N: Int) {
-  innerMutableRebridge(mutableTest, N, 500)
+public func run_NSStringConversion_nonASCII_rebridgeMutable(_ n: Int) {
+  innerMutableRebridge(mutableTest, n, 500)
 }
 
-public func run_NSStringConversion_medium_rebridgeMutable(_ N: Int) {
-  innerMutableRebridge(mutableTest, N, 500)
+public func run_NSStringConversion_medium_rebridgeMutable(_ n: Int) {
+  innerMutableRebridge(mutableTest, n, 500)
 }
 
-public func run_NSStringConversion_long_rebridgeMutable(_ N: Int) {
-  innerMutableRebridge(mutableTest, N, 500)
+public func run_NSStringConversion_long_rebridgeMutable(_ n: Int) {
+  innerMutableRebridge(mutableTest, n, 500)
 }
 
-public func run_NSStringConversion_longNonASCII_rebridgeMutable(_ N: Int) {
-  innerMutableRebridge(mutableTest, N, 300)
+public func run_NSStringConversion_longNonASCII_rebridgeMutable(_ n: Int) {
+  innerMutableRebridge(mutableTest, n, 300)
 }
 
 #endif

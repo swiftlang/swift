@@ -30,7 +30,7 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   }
 
   final public var description: String {
-    SILNode_debugDescription(bridgedNode).takeString()
+    SILNode_debugDescription(bridgedNode).string
   }
   
   final public var operands: OperandArray {
@@ -40,7 +40,18 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   fileprivate var resultCount: Int { 0 }
   fileprivate func getResult(index: Int) -> Value { fatalError() }
 
-  final public var results: InstructionResults { InstructionResults(self) }
+  public struct Results : RandomAccessCollection {
+    fileprivate let inst: Instruction
+    fileprivate let numResults: Int
+
+    public var startIndex: Int { 0 }
+    public var endIndex: Int { numResults }
+    public subscript(_ index: Int) -> Value { inst.getResult(index: index) }
+  }
+
+  final public var results: Results {
+    Results(inst: self, numResults: resultCount)
+  }
 
   final public var location: Location {
     return Location(bridgedLocation: SILInstruction_getLocation(bridged))
@@ -103,26 +114,6 @@ extension OptionalBridgedInstruction {
   var instruction: Instruction? { obj.getAs(Instruction.self) }
 }
 
-public struct InstructionResults : Sequence, IteratorProtocol {
-  let inst: Instruction
-  let numResults: Int
-  var index: Int = 0
-
-  init(_ inst: Instruction) {
-    self.inst = inst
-    numResults = inst.resultCount
-  }
-
-  public mutating func next() -> Value? {
-    let idx = index
-    if idx < numResults {
-      index += 1
-      return inst.getResult(index: idx)
-    }
-    return nil
-  }
-}
-
 public class SingleValueInstruction : Instruction, Value {
   final public var definingInstruction: Instruction? { self }
 
@@ -132,12 +123,14 @@ public class SingleValueInstruction : Instruction, Value {
 
 public final class MultipleValueInstructionResult : Value {
   final public var description: String {
-    SILNode_debugDescription(bridgedNode).takeString()
+    SILNode_debugDescription(bridgedNode).string
   }
 
-  public var definingInstruction: Instruction? {
+  public var instruction: Instruction {
     MultiValueInstResult_getParent(bridged).instruction
   }
+
+  public var definingInstruction: Instruction? { instruction }
 
   var bridged: BridgedMultiValueResult {
     BridgedMultiValueResult(obj: SwiftObject(self))
@@ -184,6 +177,14 @@ final public class StoreInst : Instruction {
   public var destinationOperand: Operand { return operands[1] }
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
+  
+  // must match with enum class StoreOwnershipQualifier
+  public enum StoreOwnership: Int {
+    case unqualified = 0, initialize = 1, assign = 2, trivial = 3
+  }
+  public var destinationOwnership: StoreOwnership {
+    StoreOwnership(rawValue: StoreInst_getStoreOwnership(bridged))!
+  }
 }
 
 final public class CopyAddrInst : Instruction {
@@ -272,10 +273,34 @@ final public
 class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
+class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class IndexAddrInst : SingleValueInstruction {}
+
+final public
 class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
 class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class OpenExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
+
+final public
+class OpenExistentialBoxValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
 class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
@@ -323,8 +348,10 @@ class StructElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { StructElementAddrInst_fieldIndex(bridged) }
 }
 
-final public class EnumInst : SingleValueInstruction, UnaryInstruction {
+final public class EnumInst : SingleValueInstruction {
   public var caseIndex: Int { EnumInst_caseIndex(bridged) }
+  
+  public var operand: Value? { operands.first?.value }
 }
 
 final public
@@ -365,11 +392,16 @@ class ObjCMetatypeToObjectInst : SingleValueInstruction, UnaryInstruction {}
 final public
 class ValueToBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 
+final public class BridgeObjectToRefInst : SingleValueInstruction,
+                                           UnaryInstruction {}
+
 final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
 class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
@@ -383,6 +415,17 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   
   public var singleDirectResult: Value? { self }
 }
+
+final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class SuperMethodInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class ObjCMethodInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class ObjCSuperMethodInst : SingleValueInstruction, UnaryInstruction {}
+
+final public class WitnessMethodInst : SingleValueInstruction {}
+
 
 //===----------------------------------------------------------------------===//
 //                      single-value allocation instructions
@@ -399,9 +442,6 @@ final public class AllocRefInst : SingleValueInstruction, Allocation {
 final public class AllocRefDynamicInst : SingleValueInstruction, Allocation {
 }
 
-final public class AllocValueBufferInst : SingleValueInstruction, Allocation {
-}
-
 final public class AllocBoxInst : SingleValueInstruction, Allocation {
 }
 
@@ -412,7 +452,10 @@ final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation 
 //                            multi-value instructions
 //===----------------------------------------------------------------------===//
 
-final public class BeginCOWMutationInst : MultipleValueInstruction {
+final public class BeginCOWMutationInst : MultipleValueInstruction,
+                                          UnaryInstruction {
+  public var uniquenessResult: Value { return getResult(index: 0) }
+  public var bufferResult: Value { return getResult(index: 1) }
 }
 
 final public class DestructureStructInst : MultipleValueInstruction {

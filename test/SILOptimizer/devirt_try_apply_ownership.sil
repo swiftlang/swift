@@ -69,7 +69,7 @@ public func test6() -> Int32?
 sil_global [serialized] @_TZvOs7Process5_argcVs5Int32 : $Int32
 
 
-sil_global private_external [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
+sil_global [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
 
 
 sil_global [serialized] @_TZvOs7Process11_unsafeArgvGVs20UnsafeMutablePointerGS0_Vs4Int8__ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
@@ -736,7 +736,7 @@ bb4(%19 : @owned $Error):
 }
 
 
-sil private_external [serialized] [ossa] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@convention(thin) () -> ()
+sil [serialized] [ossa] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@convention(thin) () -> ()
 
 
 public class A {

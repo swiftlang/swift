@@ -16,6 +16,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/ABI/MetadataValues.h"
@@ -98,7 +99,8 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // manglings already, and the runtime ought to have a lookup table for
       // them. Symbolic referencing would be wasteful.
       if (type->getModuleContext()->hasStandardSubstitutions()
-          && Mangle::getStandardTypeSubst(type->getName().str())) {
+          && Mangle::getStandardTypeSubst(
+               type->getName().str(), AllowConcurrencyStandardSubstitutions)) {
         return false;
       }
       
@@ -146,6 +148,19 @@ SymbolicMangling
 IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
                                       CanGenericSignature Sig,
                                       CanType Ty) {
+  // If our target predates Swift 5.5, we cannot apply the standard
+  // substitutions for types defined in the Concurrency module.
+  ASTContext &ctx = Ty->getASTContext();
+  llvm::SaveAndRestore<bool> savedConcurrencyStandardSubstitutions(
+      AllowConcurrencyStandardSubstitutions);
+  if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
+          ctx.LangOpts.Target)) {
+    if (*runtimeCompatVersion < llvm::VersionTuple(5, 5))
+      AllowConcurrencyStandardSubstitutions = false;
+  }
+
+  llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(
+      AllowMarkerProtocols, false);
   return withSymbolicReferences(IGM, [&]{
     appendType(Ty, Sig);
   });
@@ -164,6 +179,14 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
     appendProtocolName(protocol);
     appendOperator("MS");
   }
+  return finalize();
+}
+
+std::string IRGenMangler::mangleProtocolConformanceDescriptorRecord(
+                                 const RootProtocolConformance *conformance) {
+  beginMangling();
+  appendProtocolConformance(conformance);
+  appendOperator("Hc");
   return finalize();
 }
 

@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -578,11 +579,6 @@ namespace {
     void printAbstractTypeParamCommon(AbstractTypeParamDecl *decl,
                                       const char *name) {
       printCommon(decl, name);
-      if (decl->getDeclContext()->getGenericEnvironmentOfContext()) {
-        if (auto superclassTy = decl->getSuperclass()) {
-          OS << " superclass='" << superclassTy->getString() << "'";
-        }
-      }
     }
 
     void visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
@@ -932,6 +928,9 @@ namespace {
 
       if (P->getAttrs().hasAttribute<NonEphemeralAttr>())
         OS << " nonEphemeral";
+
+      if (P->getAttrs().hasAttribute<NoImplicitCopyAttr>())
+        OS << " noImplicitCopy";
 
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
         printField("default_arg",
@@ -2166,12 +2165,6 @@ public:
   }
   void visitCovariantReturnConversionExpr(CovariantReturnConversionExpr *E){
     printCommon(E, "covariant_return_conversion_expr") << '\n';
-    printRec(E->getSubExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-  void visitImplicitlyUnwrappedFunctionConversionExpr(
-      ImplicitlyUnwrappedFunctionConversionExpr *E) {
-    printCommon(E, "implicitly_unwrapped_function_conversion_expr") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

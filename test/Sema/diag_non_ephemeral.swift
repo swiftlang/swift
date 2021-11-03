@@ -525,3 +525,16 @@ func ambiguous_fn(_ ptr: UnsafeRawPointer) {} // expected-note {{found this cand
 func test_ambiguity_with_function_instead_of_argument(_ x: inout Int) {
   ambiguous_fn(&x) // expected-error {{ambiguous use of 'ambiguous_fn'}}
 }
+
+func tuplify<Ts>(_ fn: @escaping (Ts) -> Void) -> (Ts) -> Void { fn }
+
+func testTuplingNonEphemeral(_ ptr: UnsafePointer<Int>) {
+  // Make sure we drop @_nonEphemeral when imploding params. This is to ensure
+  // we don't accidently break any potentially valid code.
+  let fn = tuplify(takesTwoPointers)
+  fn((ptr, ptr))
+
+  // Note we can't perform X-to-pointer conversions in this case even if we
+  // wanted to.
+  fn(([1], ptr)) // expected-error {{tuple type '([Int], UnsafePointer<Int>)' is not convertible to tuple type '(UnsafePointer<Int>, UnsafePointer<Int>)'}}
+}

@@ -24,7 +24,6 @@
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
-#include "swift/APIDigester/ModuleAnalyzerNodes.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "llvm/ADT/Hashing.h"
@@ -257,6 +256,8 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     if (!getRelativeDepPath(InPath, SDKPath))
       SerializationOpts.ModuleInterface = InPath;
 
+    SerializationOpts.SDKName = SubInstance.getASTContext().LangOpts.SDKName;
+    SerializationOpts.ABIDescriptorPath = ABIDescriptorPath.str();
     SmallVector<FileDependency, 16> Deps;
     bool serializeHashes = FEOpts.SerializeModuleInterfaceDependencyHashes;
     if (collectDepsForSerialization(SubInstance, Deps, serializeHashes)) {
@@ -264,6 +265,8 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     }
     if (ShouldSerializeDeps)
       SerializationOpts.Dependencies = Deps;
+    SerializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
+
     SILMod->setSerializeSILAction([&]() {
       if (isTypeChecking)
         return;
@@ -283,9 +286,6 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     }
     if (SubInstance.getDiags().hadAnyError()) {
       return std::make_error_code(std::errc::not_supported);
-    }
-    if (!ABIDescriptorPath.empty()) {
-      swift::ide::api::dumpModuleContent(Mod, ABIDescriptorPath, true);
     }
     return std::error_code();
     });

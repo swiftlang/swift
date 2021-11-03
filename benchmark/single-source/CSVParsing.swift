@@ -1,5 +1,5 @@
 import TestsUtils
-public let CSVParsing = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "CSVParsing.Char",
     runFunction: run_CSVParsing_characters,
@@ -346,7 +346,7 @@ public func buildWorkload() {
   let altIndices: [[String]] = contents.parseAltIndices().map {
     $0.map { String($0) }
   }
-  CheckResults(alt.elementsEqual(altIndices))
+  check(alt.elementsEqual(altIndices))
 
   var remainder = workload[...]
 
@@ -359,13 +359,13 @@ public func buildWorkload() {
       res[res.endIndex-1].append(field)
     }
   }
-  CheckResults(alt.elementsEqual(parseResult))
+  check(alt.elementsEqual(parseResult))
 }
 
 @inline(never)
-public func run_CSVParsing_characters(_ N: Int) {
+public func run_CSVParsing_characters(_ n: Int) {
   let contents = workload
-  for _ in 0..<N {
+  for _ in 0..<n {
     var remainder = contents[...]
     let result = try! parseCSV(&remainder, initialState: 0) {
       (result: inout Int, _, substr) in
@@ -377,9 +377,9 @@ public func run_CSVParsing_characters(_ N: Int) {
 }
 
 @inline(never)
-public func run_CSVParsing_scalars(_ N: Int) {
+public func run_CSVParsing_scalars(_ n: Int) {
   let contents = workload.unicodeScalars
-  for _ in 0..<N {
+  for _ in 0..<n {
     var remainder = contents[...]
     let result = try! parseCSV(&remainder, initialState: 0) {
       (result: inout Int, _, substr) in
@@ -391,9 +391,9 @@ public func run_CSVParsing_scalars(_ N: Int) {
 }
 
 @inline(never)
-public func run_CSVParsing_utf16(_ N: Int) {
+public func run_CSVParsing_utf16(_ n: Int) {
   let contents = workload.utf16
-  for _ in 0..<N {
+  for _ in 0..<n {
     var remainder = contents[...]
     let result = try! parseCSV(&remainder, initialState: 0) {
       (result: inout Int, _, substr) in
@@ -405,9 +405,9 @@ public func run_CSVParsing_utf16(_ N: Int) {
 }
 
 @inline(never)
-public func run_CSVParsing_utf8(_ N: Int) {
+public func run_CSVParsing_utf8(_ n: Int) {
   let contents = workload.utf8
-  for _ in 0..<N {
+  for _ in 0..<n {
     var remainder = contents[...]
     let result = try! parseCSV(&remainder, initialState: 0) {
       (result: inout Int, _, substr) in
@@ -420,17 +420,17 @@ public func run_CSVParsing_utf8(_ N: Int) {
 
 
 @inline(never)
-public func run_CSVParsingAlt(_ N: Int) {
+public func run_CSVParsingAlt(_ n: Int) {
   let contents = workload
-  for _ in 0..<N {
+  for _ in 0..<n {
     blackHole(contents.parseAlt())
   }
 }
 
 @inline(never)
-public func run_CSVParsingAltIndices(_ N: Int) {
+public func run_CSVParsingAltIndices(_ n: Int) {
   let contents = workload
-  for _ in 0..<N {
+  for _ in 0..<n {
     blackHole(contents.parseAltIndices())
   }
 }

@@ -47,6 +47,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
+  case ConstraintLocator::ConstructorMemberType:
   case ConstraintLocator::ResultBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
@@ -91,6 +92,8 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::UnresolvedMemberChainResult:
   case ConstraintLocator::PlaceholderType:
   case ConstraintLocator::ImplicitConversion:
+  case ConstraintLocator::ImplicitDynamicMemberSubscript:
+  case ConstraintLocator::ClosureBodyElement:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -321,6 +324,14 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       out << "constructor member";
       break;
 
+    case ConstructorMemberType: {
+      auto memberTypeElt = elt.castTo<LocatorPathElt::ConstructorMemberType>();
+      out << "constructor member type";
+      if (memberTypeElt.isShortFormOrSelfDelegatingConstructor())
+        out << " (for short-form or self.init call)";
+      break;
+    }
+
     case FunctionArgument:
       out << "function argument";
       break;
@@ -538,6 +549,16 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
 
     case PlaceholderType:
       out << "placeholder type";
+      break;
+
+    case ConstraintLocator::ClosureBodyElement:
+      // TODO: Would be great to print a kind of element this is e.g.
+      //       "if", "for each", "switch" etc.
+      out << "closure body element";
+      break;
+
+    case ConstraintLocator::ImplicitDynamicMemberSubscript:
+      out << "implicit dynamic member subscript";
       break;
 
     case ConstraintLocator::ImplicitConversion:

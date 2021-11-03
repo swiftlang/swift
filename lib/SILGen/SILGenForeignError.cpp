@@ -52,14 +52,14 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
     SILBasicBlock *contBB = SGF.createBasicBlock();
     SILBasicBlock *noSlotBB = SGF.createBasicBlock();
     SILBasicBlock *hasSlotBB = SGF.createBasicBlock();
-    SGF.B.createSwitchEnum(loc, foreignErrorSlot, nullptr,
-                 { { ctx.getOptionalSomeDecl(), hasSlotBB },
-                   { ctx.getOptionalNoneDecl(), noSlotBB } });
+    auto *switchEnum =
+        SGF.B.createSwitchEnum(loc, foreignErrorSlot, nullptr,
+                               {{ctx.getOptionalSomeDecl(), hasSlotBB},
+                                {ctx.getOptionalNoneDecl(), noSlotBB}});
+    SILValue slot = switchEnum->createOptionalSomeResult();
 
     // If we have the slot, emit a store to it.
     SGF.B.emitBlock(hasSlotBB);
-    SILValue slot =
-        hasSlotBB->createPhiArgument(errorPtrObjectTy, OwnershipKind::Owned);
     emitStoreToForeignErrorSlot(SGF, loc, slot, errorSrc);
     SGF.B.createBranch(loc, contBB);
 
@@ -358,8 +358,6 @@ emitResultIsNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
   // Take local ownership of the optional result value.
   SILValue optionalResult = origResult.forward(SGF);
 
-  SILType resultObjectType = optionalResult->getType().getOptionalObjectType();
-
   ASTContext &ctx = SGF.getASTContext();
 
   // If we're suppressing the check, just do an unchecked take.
@@ -374,9 +372,10 @@ emitResultIsNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
   SILBasicBlock *errorBB =
       SGF.createBasicBlock(functionSectionForConvention(foreignAsync));
   SILBasicBlock *contBB = SGF.createBasicBlock();
-  SGF.B.createSwitchEnum(loc, optionalResult, /*default*/ nullptr,
-                         { { ctx.getOptionalSomeDecl(), contBB },
-                           { ctx.getOptionalNoneDecl(), errorBB } });
+  auto *switchEnum =
+      SGF.B.createSwitchEnum(loc, optionalResult, /*default*/ nullptr,
+                             {{ctx.getOptionalSomeDecl(), contBB},
+                              {ctx.getOptionalNoneDecl(), errorBB}});
 
   // Emit the error block.
   SILValue error =
@@ -385,9 +384,8 @@ emitResultIsNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
   // In the continuation block, take ownership of the now non-optional
   // result value.
   SGF.B.emitBlock(contBB);
-  SILValue objectResult =
-      contBB->createPhiArgument(resultObjectType, OwnershipKind::Owned);
-  return {SGF.emitManagedRValueWithCleanup(objectResult), error};
+  ManagedValue objectResult = SGF.B.createOptionalSomeResult(switchEnum);
+  return {objectResult, error};
 }
 
 /// Perform a foreign error check by testing whether the error was nil.
@@ -407,12 +405,12 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
   // Switch on the optional error.
   SILBasicBlock *errorBB =
       SGF.createBasicBlock(functionSectionForConvention(foreignAsync));
-  errorBB->createPhiArgument(optionalError->getType().unwrapOptionalType(),
-                             OwnershipKind::Owned);
   SILBasicBlock *contBB = SGF.createBasicBlock();
-  SGF.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,
-                         { { ctx.getOptionalSomeDecl(), errorBB },
-                           { ctx.getOptionalNoneDecl(), contBB } });
+  auto *switchEnum =
+      SGF.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,
+                             {{ctx.getOptionalSomeDecl(), errorBB},
+                              {ctx.getOptionalNoneDecl(), contBB}});
+  switchEnum->createOptionalSomeResult();
 
   // Emit the error block. Pass in none for the errorSlot since we have passed
   // in the errorSlot as our BB argument so we can pass ownership correctly. In

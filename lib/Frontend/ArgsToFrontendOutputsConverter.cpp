@@ -341,6 +341,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_summary_path);
   auto abiDescriptorOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_abi_descriptor_path);
+  auto moduleSemanticInfoOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_module_semantic_info_path);
   auto optRecordOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_save_optimization_record_path);
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
@@ -348,7 +350,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
       !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
       !moduleSourceInfoOutput || !moduleSummaryOutput || !abiDescriptorOutput ||
-      !optRecordOutput) {
+      !moduleSemanticInfoOutput || !optRecordOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -371,6 +373,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
     sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[i];
     sop.ABIDescriptorOutputPath = (*abiDescriptorOutput)[i];
+    sop.ModuleSemanticInfoOutputPath = (*moduleSemanticInfoOutput)[i];
     sop.YAMLOptRecordPath = (*optRecordOutput)[i];
     sop.BitstreamOptRecordPath = (*optRecordOutput)[i];
     result.push_back(sop);
@@ -473,6 +476,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
 
   // There is no non-path form of -emit-abi-descriptor-path
   auto ABIDescriptorOutputPath = pathsFromArguments.ABIDescriptorOutputPath;
+  auto ModuleSemanticInfoOutputPath = pathsFromArguments.ModuleSemanticInfoOutputPath;
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
@@ -508,6 +512,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
   sop.ModuleSummaryOutputPath = moduleSummaryOutputPath;
   sop.ABIDescriptorOutputPath = ABIDescriptorOutputPath;
+  sop.ModuleSemanticInfoOutputPath = ModuleSemanticInfoOutputPath;
   sop.YAMLOptRecordPath = YAMLOptRecordPath;
   sop.BitstreamOptRecordPath = bitstreamOptRecordPath;
   return sop;

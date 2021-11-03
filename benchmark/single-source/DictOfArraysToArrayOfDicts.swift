@@ -6,14 +6,16 @@
 
 import TestsUtils
 
-public var DictOfArraysToArrayOfDicts = BenchmarkInfo(
-  name: "DictOfArraysToArrayOfDicts",
-  runFunction: run_DictOfArraysToArrayOfDicts,
-  tags: [.algorithm, .Dictionary]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "DictOfArraysToArrayOfDicts",
+    runFunction: run_DictOfArraysToArrayOfDicts,
+    tags: [.algorithm, .Dictionary]
+  ),
+]
 
 @inline(never)
-public func run_DictOfArraysToArrayOfDicts(_ N: Int) {
+public func run_DictOfArraysToArrayOfDicts(_ n: Int) {
   let returnedFromServer = [
     "title": ["abc",  "def", "ghi"],
     "time": ["1234", "5678", "0123"],
@@ -23,7 +25,7 @@ public func run_DictOfArraysToArrayOfDicts(_ N: Int) {
   var inverted: [[(String, String)]] = []
   var arrayOfDicts: [[String: String]] = [[:]]
 
-  for _ in 1...100*N {
+  for _ in 1...100*n {
     pairs = returnedFromServer.map {
       (key, value) in value.map { (key, $0) }
     }
@@ -39,7 +41,7 @@ public func run_DictOfArraysToArrayOfDicts(_ N: Int) {
     }
   }
 
-  CheckResults(arrayOfDicts.count == 3)
+  check(arrayOfDicts.count == 3)
 }
 
 // Given [

@@ -16,6 +16,7 @@
 #ifndef SWIFT_RUNTIME_RUNTIMEFNWRAPPERSGEN_H
 #define SWIFT_RUNTIME_RUNTIMEFNWRAPPERSGEN_H
 
+#include "swift/SIL/RuntimeEffect.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/ArrayRef.h"
 

@@ -2,7 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import _Concurrency
@@ -14,7 +14,7 @@ struct TestError: Error {}
   static func main() async {
     var tests = TestSuite("CheckedContinuation")
 
-    if #available(SwiftStdlib 5.5, *) {
+    if #available(SwiftStdlib 5.1, *) {
       tests.test("trap on double resume non-throwing continuation") {
         expectCrashLater()
 

@@ -871,8 +871,18 @@ bool Decl::isStdlibDecl() const {
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
   auto containingContext =
       AvailabilityInference::annotatedAvailableRange(this, getASTContext());
-  if (containingContext.hasValue())
+  if (containingContext.hasValue()) {
+    // If this entity comes from the concurrency module, adjust it's
+    // availability for linkage purposes up to Swift 5.5, so that we use
+    // weak references any time we reference those symbols when back-deploying
+    // concurrency.
+    ASTContext &ctx = getASTContext();
+    if (getModuleContext()->getName() == ctx.Id_Concurrency) {
+      containingContext->intersectWith(ctx.getConcurrencyAvailability());
+    }
+
     return *containingContext;
+  }
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
@@ -1658,18 +1668,23 @@ bool PatternBindingDecl::hasStorage() const {
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
-                                    DeclContext *InitContext) {
+                                    DeclContext *InitContext,
+                                    bool isFullyValidated) {
   auto PatternList = getMutablePatternList();
   PatternList[i].setPattern(P);
   PatternList[i].setInitContext(InitContext);
   
   // Make sure that any VarDecl's contained within the pattern know about this
   // PatternBindingDecl as their parent.
-  if (P)
+  if (P) {
     P->forEachVariable([&](VarDecl *VD) {
       if (!VD->isCaptureList())
         VD->setParentPatternBinding(this);
     });
+
+    if (isFullyValidated)
+      PatternList[i].setFullyValidated();
+  }
 }
 
 
@@ -1916,7 +1931,7 @@ static bool isDirectToStorageAccess(const DeclContext *UseDC,
   // If the storage is resilient, we cannot access it directly at all.
   if (var->isResilient(UseDC->getParentModule(),
                        UseDC->getResilienceExpansion()))
-    return false;
+    return var->getModuleContext()->getBypassResilience();
 
   if (isa<ConstructorDecl>(AFD) || isa<DestructorDecl>(AFD)) {
     // The access must also be a member access on 'self' in all language modes.
@@ -2932,10 +2947,6 @@ bool ValueDecl::isDynamic() const {
   return evaluateOrDefault(ctx.evaluator,
     IsDynamicRequest{const_cast<ValueDecl *>(this)},
     getAttrs().hasAttribute<DynamicAttr>());
-}
-
-bool ValueDecl::isDistributedActorIndependent() const {
-  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
 }
 
 bool ValueDecl::isObjCDynamicInGenericClass() const {
@@ -5202,6 +5213,20 @@ StringRef ProtocolDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
+ArrayRef<StructuralRequirement>
+ProtocolDecl::getStructuralRequirements() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               StructuralRequirementsRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
+
+ArrayRef<ProtocolDecl *>
+ProtocolDecl::getProtocolDependencies() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               ProtocolDependenciesRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
+
 ArrayRef<Requirement> ProtocolDecl::getRequirementSignature() const {
   return evaluateOrDefault(getASTContext().evaluator,
                RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
@@ -5355,10 +5380,6 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
       return true;
   }
   return false;
-}
-
-bool AbstractStorageDecl::isDistributedActorIndependent() const {
-  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
 }
 
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
@@ -5651,6 +5672,11 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   // setter.
   if (!isLet())
     return supportsMutation();
+
+  // Static 'let's are always immutable.
+  if (isStatic()) {
+    return false;
+  }
 
   //
   // All the remaining logic handles the special cases where you can
@@ -7722,27 +7748,6 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
   DerivativeFunctionConfigs->insert(config);
 }
 
-bool AbstractFunctionDecl::hasKnownUnsafeSendableFunctionParams() const {
-  auto nominal = getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal)
-    return false;
-
-  // DispatchQueue operations.
-  auto nominalName = nominal->getName().str();
-  if (nominalName == "DispatchQueue") {
-    auto name = getBaseName().userFacingName();
-    return llvm::StringSwitch<bool>(name)
-      .Case("sync", true)
-      .Case("async", true)
-      .Case("asyncAndWait", true)
-      .Case("asyncAfter", true)
-      .Case("concurrentPerform", true)
-      .Default(false);
-  }
-
-  return false;
-}
-
 void FuncDecl::setResultInterfaceType(Type type) {
   getASTContext().evaluator.cacheOutput(ResultTypeRequest{this},
                                         std::move(type));
@@ -7827,7 +7832,7 @@ FuncDecl *FuncDecl::createImported(ASTContext &Context, SourceLoc FuncLoc,
                                    Type FnRetType,
                                    GenericParamList *GenericParams,
                                    DeclContext *Parent, ClangNode ClangN) {
-  assert(ClangN && FnRetType);
+  assert(ClangN);
   auto *const FD = FuncDecl::createImpl(
       Context, SourceLoc(), StaticSpellingKind::None, FuncLoc, Name, NameLoc,
       Async, SourceLoc(), Throws, SourceLoc(), GenericParams, Parent, ClangN);

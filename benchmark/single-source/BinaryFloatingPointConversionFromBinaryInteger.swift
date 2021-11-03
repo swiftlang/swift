@@ -16,13 +16,15 @@
 import TestsUtils
 
 #if swift(>=4.2)
-public let BinaryFloatingPointConversionFromBinaryInteger = BenchmarkInfo(
-  name: "BinaryFloatingPointConversionFromBinaryInteger",
-  runFunction: run_BinaryFloatingPointConversionFromBinaryInteger,
-  tags: [.validation, .algorithm]
-)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "BinaryFloatingPointConversionFromBinaryInteger",
+    runFunction: run_BinaryFloatingPointConversionFromBinaryInteger,
+    tags: [.validation, .algorithm]
+  ),
+]
 #else
-public let BinaryFloatingPointConversionFromBinaryInteger: [BenchmarkInfo] = []
+public let benchmarks: [BenchmarkInfo] = []
 #endif
 
 struct MockBinaryInteger<T : BinaryInteger> {
@@ -196,17 +198,17 @@ extension MockBinaryInteger : BinaryInteger {
 #if swift(>=4.2)
 
 @inline(never)
-public func run_BinaryFloatingPointConversionFromBinaryInteger(_ N: Int) {
+public func run_BinaryFloatingPointConversionFromBinaryInteger(_ n: Int) {
   var xs = [Double]()
-  xs.reserveCapacity(N)
-  for _ in 1...N {
+  xs.reserveCapacity(n)
+  for _ in 1...n {
     var x = 0 as Double
     for i in 0..<2000 {
       x += Double._convert(from: MockBinaryInteger(getInt(i))).value
     }
     xs.append(x)
   }
-  CheckResults(xs[getInt(0)] == 1999000)
+  check(xs[getInt(0)] == 1999000)
 }
 
 #endif

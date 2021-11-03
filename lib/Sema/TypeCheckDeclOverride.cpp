@@ -482,7 +482,7 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
     auto *fnType = baseTy->getAs<AnyFunctionType>();
     baseTy = fnType->getResult();
     Type argTy = FunctionType::composeTuple(
-        ctx, baseTy->getAs<AnyFunctionType>()->getParams(), false);
+        ctx, baseTy->getAs<AnyFunctionType>()->getParams());
     auto diagKind = diag::override_type_mismatch_with_fixits_init;
     unsigned numArgs = baseInit->getParameters()->size();
     return computeFixitsForOverridenDeclaration(
@@ -1466,6 +1466,8 @@ namespace  {
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
+    UNINTERESTING_ATTR(NoLocks)
+    UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(Final)
@@ -1542,10 +1544,10 @@ namespace  {
     UNINTERESTING_ATTR(OriginallyDefinedIn)
     UNINTERESTING_ATTR(Actor)
     UNINTERESTING_ATTR(DistributedActor)
-    UNINTERESTING_ATTR(DistributedActorIndependent)
     UNINTERESTING_ATTR(GlobalActor)
     UNINTERESTING_ATTR(Async)
     UNINTERESTING_ATTR(Sendable)
+    UNINTERESTING_ATTR(NonSendable)
 
     UNINTERESTING_ATTR(AtRethrows)
     UNINTERESTING_ATTR(Marker)
@@ -1557,6 +1559,7 @@ namespace  {
     UNINTERESTING_ATTR(ImplicitSelfCapture)
     UNINTERESTING_ATTR(InheritActorContext)
     UNINTERESTING_ATTR(Isolated)
+    UNINTERESTING_ATTR(NoImplicitCopy)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

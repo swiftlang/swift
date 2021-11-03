@@ -37,22 +37,20 @@ RequirementMachine::getLocalRequirements(
   System.simplify(term);
   verify(term);
 
-  auto &protos = System.getProtocols();
-
   GenericSignature::LocalRequirements result;
-  result.anchor = Context.getTypeForTerm(term, genericParams, protos);
+  result.anchor = Context.getTypeForTerm(term, genericParams);
 
   auto *props = Map.lookUpProperties(term);
   if (!props)
     return result;
 
   if (props->isConcreteType()) {
-    result.concreteType = props->getConcreteType({}, term, protos, Context);
+    result.concreteType = props->getConcreteType({}, term, Context);
     return result;
   }
 
   if (props->hasSuperclassBound()) {
-    result.superclass = props->getSuperclassBound({}, term, protos, Context);
+    result.superclass = props->getSuperclassBound({}, term, Context);
   }
 
   for (const auto *proto : props->getConformsToExcludingSuperclassConformances())
@@ -139,7 +137,9 @@ RequirementMachine::getRequiredProtocols(Type depType) const {
   return result;
 }
 
-Type RequirementMachine::getSuperclassBound(Type depType) const {
+Type RequirementMachine::
+getSuperclassBound(Type depType,
+                   TypeArrayView<GenericTypeParamType> genericParams) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
   System.simplify(term);
@@ -152,8 +152,7 @@ Type RequirementMachine::getSuperclassBound(Type depType) const {
   if (!props->hasSuperclassBound())
     return Type();
 
-  auto &protos = System.getProtocols();
-  return props->getSuperclassBound({ }, term, protos, Context);
+  return props->getSuperclassBound(genericParams, term, Context);
 }
 
 bool RequirementMachine::isConcreteType(Type depType) const {
@@ -169,7 +168,9 @@ bool RequirementMachine::isConcreteType(Type depType) const {
   return props->isConcreteType();
 }
 
-Type RequirementMachine::getConcreteType(Type depType) const {
+Type RequirementMachine::
+getConcreteType(Type depType,
+                TypeArrayView<GenericTypeParamType> genericParams) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
   System.simplify(term);
@@ -182,8 +183,7 @@ Type RequirementMachine::getConcreteType(Type depType) const {
   if (!props->isConcreteType())
     return Type();
 
-  auto &protos = System.getProtocols();
-  return props->getConcreteType({ }, term, protos, Context);
+  return props->getConcreteType(genericParams, term, Context);
 }
 
 bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
@@ -213,9 +213,6 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
     case Symbol::Kind::Protocol:
       assert(prefix.empty() &&
              "Protocol symbol can only appear at the start of a type term");
-      if (!System.getProtocols().isKnownProtocol(symbol.getProtocol()))
-        return prefix;
-
       break;
 
     case Symbol::Kind::GenericParam:
@@ -231,9 +228,6 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
       auto conformsTo = props->getConformsTo();
 
       for (const auto *proto : symbol.getProtocols()) {
-        if (!System.getProtocols().isKnownProtocol(proto))
-          return prefix;
-
         // T.[P:A] is valid iff T conforms to P.
         if (std::find(conformsTo.begin(), conformsTo.end(), proto)
               == conformsTo.end())
@@ -264,8 +258,6 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
 /// not considered canonical, since they can be replaced with their
 /// concrete type).
 bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
-  auto &protos = System.getProtocols();
-
   // Look for non-canonical type parameters.
   return !type.findIf([&](Type component) -> bool {
     if (!component->isTypeParameter())
@@ -284,7 +276,7 @@ bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
     if (props->isConcreteType())
       return true;
 
-    auto anchor = Context.getTypeForTerm(term, {}, protos);
+    auto anchor = Context.getTypeForTerm(term, {});
     return CanType(anchor) != CanType(component);
   });
 }
@@ -300,7 +292,6 @@ bool RequirementMachine::isCanonicalTypeInContext(Type type) const {
 Type RequirementMachine::getCanonicalTypeInContext(
     Type type,
     TypeArrayView<GenericTypeParamType> genericParams) const {
-  const auto &protos = System.getProtocols();
 
   return type.transformRec([&](Type t) -> Optional<Type> {
     if (!t->isTypeParameter())
@@ -349,8 +340,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
       if (props) {
         if (props->isConcreteType()) {
           auto concreteType = props->getConcreteType(genericParams,
-                                                     prefix, protos,
-                                                     Context);
+                                                     prefix, Context);
           if (!concreteType->hasTypeParameter())
             return concreteType;
 
@@ -365,8 +355,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
         if (props->hasSuperclassBound() &&
             prefix.size() != term.size()) {
           auto superclass = props->getSuperclassBound(genericParams,
-                                                      prefix, protos,
-                                                      Context);
+                                                      prefix, Context);
           if (!superclass->hasTypeParameter())
             return superclass;
 
@@ -375,7 +364,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
         }
       }
 
-      return Context.getTypeForTerm(prefix, genericParams, protos);
+      return Context.getTypeForTerm(prefix, genericParams);
     }();
 
     // If T is already valid, the longest valid prefix U of T is T itself, and
@@ -400,8 +389,7 @@ Type RequirementMachine::getCanonicalTypeInContext(
 
     // Compute the type of the unresolved suffix term V, rooted in the
     // generic parameter τ_0_0.
-    auto origType = Context.getRelativeTypeForTerm(
-        term, prefix, System.getProtocols());
+    auto origType = Context.getRelativeTypeForTerm(term, prefix);
 
     // Substitute τ_0_0 in the above relative type with the concrete type
     // for U.
@@ -430,19 +418,6 @@ Type RequirementMachine::getCanonicalTypeInContext(
   });
 }
 
-/// Replace 'Self' in the given dependent type (\c depTy) with the given
-/// dependent type, producing a type that refers to the nested type.
-static Type replaceSelfWithType(Type selfType, Type depTy) {
-  if (auto depMemTy = depTy->getAs<DependentMemberType>()) {
-    Type baseType = replaceSelfWithType(selfType, depMemTy->getBase());
-    assert(depMemTy->getAssocType() && "Missing associated type");
-    return DependentMemberType::get(baseType, depMemTy->getAssocType());
-  }
-
-  assert(depTy->is<GenericTypeParamType>() && "missing Self?");
-  return selfType;
-}
-
 /// Retrieve the conformance access path used to extract the conformance of
 /// interface \c type to the given \c protocol.
 ///
@@ -458,12 +433,29 @@ static Type replaceSelfWithType(Type selfType, Type depTy) {
 ConformanceAccessPath
 RequirementMachine::getConformanceAccessPath(Type type,
                                              ProtocolDecl *protocol) {
-  auto canType = getCanonicalTypeInContext(type, { })->getCanonicalType();
-  assert(canType->isTypeParameter());
+  assert(type->isTypeParameter());
+
+  auto mutTerm = Context.getMutableTermForType(type->getCanonicalType(),
+                                               /*proto=*/nullptr);
+  System.simplify(mutTerm);
+  verify(mutTerm);
+
+#ifndef NDEBUG
+  auto *props = Map.lookUpProperties(mutTerm);
+  assert(props &&
+         "Subject type of conformance access path should be known");
+  assert(!props->isConcreteType() &&
+         "Concrete types do not have conformance access paths");
+  auto conformsTo = props->getConformsTo();
+  assert(std::find(conformsTo.begin(), conformsTo.end(), protocol) &&
+         "Subject type of conformance access path must conform to protocol");
+#endif
+
+  auto term = Term::get(mutTerm, Context);
 
   // Check if we've already cached the result before doing anything else.
   auto found = ConformanceAccessPaths.find(
-      std::make_pair(canType, protocol));
+      std::make_pair(term, protocol));
   if (found != ConformanceAccessPaths.end()) {
     return found->second;
   }
@@ -472,13 +464,13 @@ RequirementMachine::getConformanceAccessPath(Type type,
 
   FrontendStatsTracer tracer(Stats, "get-conformance-access-path");
 
-  auto recordPath = [&](CanType type, ProtocolDecl *proto,
+  auto recordPath = [&](Term term, ProtocolDecl *proto,
                         ConformanceAccessPath path) {
     // Add the path to the buffer.
-    CurrentConformanceAccessPaths.emplace_back(type, path);
+    CurrentConformanceAccessPaths.emplace_back(term, path);
 
     // Add the path to the map.
-    auto key = std::make_pair(type, proto);
+    auto key = std::make_pair(term, proto);
     auto inserted = ConformanceAccessPaths.insert(
         std::make_pair(key, path));
     assert(inserted.second);
@@ -504,7 +496,11 @@ RequirementMachine::getConformanceAccessPath(Type type,
       ArrayRef<ConformanceAccessPath::Entry> path(root);
       ConformanceAccessPath result(ctx.AllocateCopy(path));
 
-      recordPath(rootType, rootProto, result);
+      auto mutTerm = Context.getMutableTermForType(rootType, nullptr);
+      System.simplify(mutTerm);
+
+      auto rootTerm = Term::get(mutTerm, Context);
+      recordPath(rootTerm, rootProto, result);
     }
   }
 
@@ -512,14 +508,15 @@ RequirementMachine::getConformanceAccessPath(Type type,
   // path whose corresponding type canonicalizes to the one we are looking for.
   while (true) {
     auto found = ConformanceAccessPaths.find(
-        std::make_pair(canType, protocol));
+        std::make_pair(term, protocol));
     if (found != ConformanceAccessPaths.end()) {
       return found->second;
     }
 
     if (CurrentConformanceAccessPaths.empty()) {
       llvm::errs() << "Failed to find conformance access path for ";
-      llvm::errs() << type << " " << protocol->getName() << "\n:";
+      llvm::errs() << type << " (" << term << ")" << " : ";
+      llvm::errs() << protocol->getName() << ":\n";
       type.dump(llvm::errs());
       llvm::errs() << "\n";
       dump(llvm::errs());
@@ -529,7 +526,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
     // The buffer consists of all conformance access paths of length N.
     // Swap it out with an empty buffer, and fill it with all paths of
     // length N+1.
-    std::vector<std::pair<CanType, ConformanceAccessPath>> oldPaths;
+    std::vector<std::pair<Term, ConformanceAccessPath>> oldPaths;
     std::swap(CurrentConformanceAccessPaths, oldPaths);
 
     for (const auto &pair : oldPaths) {
@@ -547,21 +544,19 @@ RequirementMachine::getConformanceAccessPath(Type type,
         auto nextSubjectType = req.getFirstType()->getCanonicalType();
         auto *nextProto = req.getProtocolDecl();
 
-        // Compute the canonical anchor for this conformance requirement.
-        auto nextType = replaceSelfWithType(pair.first, nextSubjectType);
-        auto nextCanType = getCanonicalTypeInContext(nextType, { })
-            ->getCanonicalType();
+        MutableTerm mutTerm(pair.first);
+        mutTerm.append(Context.getMutableTermForType(nextSubjectType,
+                                                     /*proto=*/lastProto));
+        System.simplify(mutTerm);
 
-        // Skip "derived via concrete" sources.
-        if (!nextCanType->isTypeParameter())
-          continue;
+        auto nextTerm = Term::get(mutTerm, Context);
 
         // If we've already seen a path for this conformance, skip it and
         // don't add it to the buffer. Note that because we iterate over
         // conformance access paths in shortlex order, the existing
         // conformance access path is shorter than the one we found just now.
         if (ConformanceAccessPaths.count(
-                std::make_pair(nextCanType, nextProto)))
+                std::make_pair(nextTerm, nextProto)))
           continue;
 
         if (entries.empty()) {
@@ -576,7 +571,7 @@ RequirementMachine::getConformanceAccessPath(Type type,
         ConformanceAccessPath result = ctx.AllocateCopy(entries);
         entries.pop_back();
 
-        recordPath(nextCanType, nextProto, result);
+        recordPath(nextTerm, nextProto, result);
       }
     }
   }

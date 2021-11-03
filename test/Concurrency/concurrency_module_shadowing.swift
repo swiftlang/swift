@@ -6,10 +6,10 @@
 
 import ShadowsConcur
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func f(_ t : UnsafeCurrentTask) -> Bool {
   return t.someProperty == "123"
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func g(_: _Concurrency.UnsafeCurrentTask) {}

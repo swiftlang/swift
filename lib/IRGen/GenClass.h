@@ -25,6 +25,7 @@ namespace llvm {
   class Constant;
   class Value;
   class Function;
+  class MDString;
 }
 
 namespace swift {
@@ -200,6 +201,9 @@ namespace irgen {
   emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                              ClassDecl *theClass,
                                              llvm::Value *metadata);
+
+  /// For VFE, returns a type identifier for the given base method on a class.
+  llvm::MDString *typeIdForMethod(IRGenModule &IGM, SILDeclRef method);
 
   /// Given a metadata pointer, emit the callee for the given method.
   FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,

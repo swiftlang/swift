@@ -6,10 +6,10 @@
 // REQUIRES: libdispatch
 
 // rdar://76038845
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 enum TL {
   @TaskLocal
   static var number: Int = 0
@@ -17,7 +17,7 @@ enum TL {
   static var other: Int = 0
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @discardableResult
 func printTaskLocal<V>(
     _ key: TaskLocal<V>,
@@ -35,7 +35,7 @@ func printTaskLocal<V>(
 
 // ==== ------------------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func copyTo_async() async {
   await TL.$number.withValue(1111) {
     printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
@@ -59,7 +59,7 @@ func copyTo_async() async {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func copyTo_async_noWait() async {
   print(#function)
   TL.$number.withValue(1111) {
@@ -81,7 +81,7 @@ func copyTo_async_noWait() async {
   await Task.sleep(2 * second)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 class CustomClass {
   @TaskLocal
   static var current: CustomClass?
@@ -95,7 +95,7 @@ class CustomClass {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_unstructured_retains() async {
   let instance = CustomClass()
   CustomClass.$current.withValue(instance) {
@@ -120,20 +120,20 @@ func test_unstructured_retains() async {
   await Task.sleep(2 * 1_000_000_000)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_unstructured_noValues() async {
   await Task {
     // no values to copy
   }.value
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func downloadImage(from url: String) async throws -> String {
   await Task.sleep(10_000)
   return ""
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_unstructured_noValues_childTasks() async {
   @Sendable func work() async throws {
     let handle = Task {
@@ -153,7 +153,7 @@ func test_unstructured_noValues_childTasks() async {
 
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await copyTo_async()

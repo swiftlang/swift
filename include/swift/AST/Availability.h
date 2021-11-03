@@ -316,6 +316,9 @@ public:
   static Optional<AvailabilityContext> annotatedAvailableRange(const Decl *D,
                                                                ASTContext &C);
 
+  static AvailabilityContext
+    annotatedAvailableRangeForAttr(const SpecializeAttr* attr, ASTContext &ctx);
+
 };
 
 } // end namespace swift

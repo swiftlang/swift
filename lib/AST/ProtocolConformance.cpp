@@ -543,7 +543,7 @@ ConditionalRequirementsRequest::evaluate(Evaluator &evaluator,
 
   // Find the requirements in the extension that aren't proved by the original
   // type, these are the ones that make the conformance conditional.
-  const auto unsatReqs = extensionSig->requirementsNotSatisfiedBy(typeSig);
+  const auto unsatReqs = extensionSig.requirementsNotSatisfiedBy(typeSig);
   if (unsatReqs.empty())
     return {};
 

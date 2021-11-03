@@ -42,18 +42,13 @@ public func testSimple(c: C) {
 
 // CHECK-LABEL: sil @$s22closure_lifetime_fixup11testGeneric1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
 // CHECK:bb0([[ARG:%.*]] : $C):
-// CHECK:  [[F:%.*]] = function_ref @$s22closure_lifetime_fixup11testGeneric1cyAA1CC_tFSiyXEfU_ : $@convention(thin) (@guaranteed C) -> Int
+// CHECK:  [[F:%.*]] = function_ref @$s22closure_lifetime_fixup11testGeneric1cyAA1CC_tFSiyXEfU_ : $@convention(thin) @substituted <τ_0_0> (@guaranteed C) -> @out τ_0_0 for <Int>
 // CHECK-NEXT:  strong_retain [[ARG]] : $C
 // CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[F]]([[ARG]]) :
-// CHECK-NEXT:  [[MD:%.*]] = mark_dependence [[PA]] : $@noescape @callee_guaranteed () -> Int on [[ARG]] : $C
-// CHECK-NEXT:  // function_ref thunk for @callee_guaranteed () -> (@unowned Int)
-// CHECK-NEXT:  [[F:%.*]] = function_ref @$sSiIgd_SiIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
-// CHECK-NEXT:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[F]]([[MD]]) : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
-// CHECK-NEXT:  [[CF2:%.*]] = convert_function [[PA2]]
+// CHECK-NEXT:  [[MD:%.*]] = mark_dependence [[PA]] : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int> on [[ARG]] : $C
 // CHECK-NEXT:  // function_ref use_closureGeneric<A>(_:)
 // CHECK-NEXT:  [[F2:%.*]] = function_ref @$s22closure_lifetime_fixup04use_A7GenericyyxyXElF :
-// CHECK-NEXT:  apply [[F2]]<Int>([[CF2]]) :
-// CHECK-NEXT:  dealloc_stack [[PA2]]
+// CHECK-NEXT:  apply [[F2]]<Int>([[MD]]) :
 // CHECK-NEXT:  dealloc_stack [[PA]]
 // CHECK-NEXT:  strong_release [[ARG]]
 // CHECK-NEXT:  tuple ()
@@ -437,7 +432,6 @@ public protocol Q {
 }
 
 // CHECK-LABEL: sil @$s22closure_lifetime_fixup0A18WithAssociatedType1c1eyx_7ElementQztKAA1QRzlF
-// CHECK:  partial_apply [callee_guaranteed] [on_stack]
 // CHECK:  partial_apply [callee_guaranteed] [on_stack]
 // CHECK: try_apply
 public func closureWithAssociatedType<C : Q> (c: C, e: C.Element) throws {

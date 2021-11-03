@@ -209,6 +209,7 @@ static TypeLookupError TypeLookupErrorImpl(const char *fmt, Args... args) {
     char *str;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wformat-security"
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
     swift_asprintf(&str, fmt, args...);
 #pragma clang diagnostic pop
     return str;

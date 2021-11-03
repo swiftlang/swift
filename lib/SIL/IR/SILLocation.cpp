@@ -42,7 +42,7 @@ SourceLoc SILLocation::getSourceLoc() const {
 
   // Don't crash if the location is a FilenameAndLocation.
   // TODO: this is a workaround until rdar://problem/25225083 is implemented.
-  if (isFilenameAndLocation())
+  if (getStorageKind() == FilenameAndLocationKind)
     return SourceLoc();
 
   return getSourceLoc(getPrimaryASTNode());

@@ -17,7 +17,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#if defined(__MACH__) && defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+#if defined(__MACH__) && defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)
 
 #include "ImageInspection.h"
 #include "ImageInspectionCommon.h"
@@ -75,4 +75,4 @@ void swift::initializeDynamicReplacementLookup() {
   addImageDynamicReplacementBlockCallback(start1, size1, start2, size2);
 }
 
-#endif // defined(__MACH__) && defined(SWIFT_RUNTIME_MACHO_NO_DYLD)
+#endif // defined(__MACH__) && defined(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION)

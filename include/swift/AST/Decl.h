@@ -1284,6 +1284,8 @@ public:
   SourceLoc getStartLoc() const { return ExtensionLoc; }
   SourceLoc getLocFromSource() const { return ExtensionLoc; }
   SourceRange getSourceRange() const {
+    if (!Braces.isValid())
+      return SourceRange(ExtensionLoc);
     return { ExtensionLoc, Braces.End };
   }
 
@@ -1805,7 +1807,12 @@ public:
     return getPatternList()[i].getPattern();
   }
   
-  void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext);
+  void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext,
+                  bool isFullyValidated = false);
+
+  bool isFullyValidated(unsigned i) const {
+    return getPatternList()[i].isFullyValidated();
+  }
 
   DeclContext *getInitContext(unsigned i) const {
     return getPatternList()[i].getInitContext();
@@ -2390,8 +2397,6 @@ public:
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
-
-  bool isDistributedActorIndependent() const;
 
 private:
   bool isObjCDynamic() const {
@@ -3075,6 +3080,10 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// Prepare to traverse the list of extensions.
   void prepareExtensions();
 
+  /// Add loaded members from all extensions. Eagerly load any members that we
+  /// can't lazily load.
+  void addLoadedExtensions();
+
   /// Retrieve the conformance loader (if any), and removing it in the
   /// same operation. The caller is responsible for loading the
   /// conformances.
@@ -3196,6 +3205,11 @@ public:
 
   /// Add a new extension to this nominal type.
   void addExtension(ExtensionDecl *extension);
+
+  /// Add a member to this decl's lookup table.
+  ///
+  /// Calls "prepareLookupTable" as a side effect.
+  void addMemberToLookupTable(Decl *member);
 
   /// Retrieve the set of extensions of this type.
   ExtensionRange getExtensions();
@@ -4151,7 +4165,10 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
+  friend class StructuralRequirementsRequest;
+  friend class ProtocolDependenciesRequest;
   friend class RequirementSignatureRequest;
+  friend class RequirementSignatureRequestRQM;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
   friend class InheritedProtocolsRequest;
@@ -4337,6 +4354,17 @@ public:
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
+
+  /// Retrieve the original requirements written in source, as structural types.
+  ///
+  /// The requirement machine builds the requirement signature from structural
+  /// requirements. Almost everywhere else should use getRequirementSignature()
+  /// instead.
+  ArrayRef<StructuralRequirement> getStructuralRequirements() const;
+
+  /// Get the list of protocols appearing on the right hand side of conformance
+  /// requirements. Computed from the structural requirements, above.
+  ArrayRef<ProtocolDecl *> getProtocolDependencies() const;
 
   /// Retrieve the requirements that describe this protocol.
   ///
@@ -4776,8 +4804,6 @@ public:
   bool hasDidSetOrWillSetDynamicReplacement() const;
 
   bool hasAnyNativeDynamicAccessors() const;
-
-  bool isDistributedActorIndependent() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -5344,6 +5370,10 @@ public:
   }
   void setDefaultArgumentKind(DefaultArgumentKind K) {
     Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
+  }
+
+  bool isNoImplicitCopy() const {
+    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
   }
 
   /// Whether this parameter has a default argument expression available.
@@ -6239,14 +6269,6 @@ public:
   /// its type as above).
   Optional<unsigned> findPotentialCompletionHandlerParam(
       const AbstractFunctionDecl *asyncAlternative = nullptr) const;
-
-  /// Determine whether this function is implicitly known to have its
-  /// parameters of function type be @_unsafeSendable.
-  ///
-  /// This hard-codes knowledge of a number of functions that will
-  /// eventually have @_unsafeSendable and, eventually, @Sendable,
-  /// on their parameters of function type.
-  bool hasKnownUnsafeSendableFunctionParams() const;
 
   using DeclContext::operator new;
   using DeclContext::operator delete;

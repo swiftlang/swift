@@ -1407,7 +1407,8 @@ void SwiftLangSupport::findRenameRanges(
 
 void SwiftLangSupport::findLocalRenameRanges(
     StringRef Filename, unsigned Line, unsigned Column, unsigned Length,
-    ArrayRef<const char *> Args, CategorizedRenameRangesReceiver Receiver) {
+    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    CategorizedRenameRangesReceiver Receiver) {
   std::string Error;
   SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, Filename, Error);
   if (!Invok) {
@@ -1447,6 +1448,7 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
   getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
+                                   CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
 

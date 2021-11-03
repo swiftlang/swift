@@ -844,8 +844,11 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
     status = parseExprList(tok::l_paren, tok::r_paren, /*isArgumentList*/ false,
                            lpLoc, yieldElts, rpLoc, SyntaxKind::ExprList);
     for (auto &elt : yieldElts) {
-      assert(elt.Label.empty());
-      assert(elt.LabelLoc.isInvalid());
+      // We don't accept labels in a list of yields.
+      if (elt.LabelLoc.isValid()) {
+        diagnose(elt.LabelLoc, diag::unexpected_label_yield)
+          .fixItRemoveChars(elt.LabelLoc, elt.E->getStartLoc());
+      }
       yields.push_back(elt.E);
     }
   } else {

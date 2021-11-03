@@ -207,12 +207,8 @@ RequirementEnvironment::RequirementEnvironment(
   }
 
   // Produce the generic signature and environment.
-  // FIXME: Pass in a source location for the conformance, perhaps? It seems
-  // like this could fail.
-  syntheticSignature = evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        nullptr, std::move(genericParamTypes), std::move(requirements)},
-      GenericSignature());
+  syntheticSignature = buildGenericSignature(ctx, GenericSignature(),
+                                             std::move(genericParamTypes),
+                                             std::move(requirements));
   syntheticEnvironment = syntheticSignature.getGenericEnvironment();
 }

@@ -21,11 +21,11 @@ class D : B {
   }
 
   override init(x:Int) {
-    let _: () -> B = super.init // expected-error {{partial application of 'super.init' initializer chain is not allowed}}
+    let _: () -> B = super.init // expected-error {{cannot reference 'super.init' initializer chain as function value}}
   }
 
   convenience init(y:Int) {
-    let _: () -> D = self.init // expected-error {{partial application of 'self.init' initializer delegation is not allowed}}
+    let _: () -> D = self.init // expected-error {{cannot reference 'self.init' initializer delegation as function value}}
   }
 
   init(z: Int) {

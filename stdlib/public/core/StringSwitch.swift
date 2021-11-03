@@ -42,6 +42,9 @@ struct _OpaqueStringSwitchCache {
 internal typealias _StringSwitchCache = Dictionary<String, Int>
 
 internal struct _StringSwitchContext {
+  internal let cases: [StaticString]
+  internal let cachePtr: UnsafeMutablePointer<_StringSwitchCache>
+
   internal init(
     cases: [StaticString],
     cachePtr: UnsafeMutablePointer<_StringSwitchCache>
@@ -49,9 +52,6 @@ internal struct _StringSwitchContext {
     self.cases = cases
     self.cachePtr = cachePtr
   }
-
-  internal let cases: [StaticString]
-  internal let cachePtr: UnsafeMutablePointer<_StringSwitchCache>
 }
 
 /// The compiler intrinsic which is called to lookup a string in a table

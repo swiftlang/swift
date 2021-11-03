@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,11 +8,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: rdar78290608
-
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
 distributed actor SomeSpecificDistributedActor {
   deinit {
     print("deinit \(self.id)")
@@ -21,17 +18,14 @@ distributed actor SomeSpecificDistributedActor {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
 struct FakeActorID: ActorIdentity {
   let id: UInt64
 }
 
-@available(SwiftStdlib 5.5, *)
 enum FakeTransportError: ActorTransportError {
   case unsupportedActorIdentity(AnyActorIdentity)
 }
 
-@available(SwiftStdlib 5.5, *)
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address : String) {
@@ -39,7 +33,6 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
 final class FakeTransport: ActorTransport {
 
   deinit {
@@ -74,12 +67,11 @@ final class FakeTransport: ActorTransport {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
 func test_remote() async {
-  var address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
+  let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
   var transport: ActorTransport? = FakeTransport()
 
-  var remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport!)
+  let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport!)
 
   transport = nil
   print("done") // CHECK: done
@@ -88,12 +80,11 @@ func test_remote() async {
   print("remote.transport = \(remote.actorTransport)") // CHECK: remote.transport = main.FakeTransport
 
   // only once we exit the function and the remote is released, the transport has no more references
-  // CHECK: deinit AnyActorIdentity(ActorAddress(address: "sact://127.0.0.1/example#1234"))
+  // CHECK-DAG: deinit AnyActorIdentity(ActorAddress(address: "sact://127.0.0.1/example#1234"))
   // transport must deinit after the last actor using it does deinit
-  // CHECK: deinit main.FakeTransport
+  // CHECK-DAG: deinit main.FakeTransport
 }
 
-@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_remote()

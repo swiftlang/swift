@@ -26,20 +26,20 @@
 // RUN: %FileCheck %s -check-prefix=CHECK-BRIDGED-TYPEDEF -strict-whitespace < %t.printed.txt
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct1 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS: {{^}}  init(){{$}}
 // TAG_DECLS_AND_TYPEDEFS: {{^}}  init(x: Int32, y: Double){{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS:      /**
 // TAG_DECLS_AND_TYPEDEFS-NEXT:   @keyword Foo2
 // TAG_DECLS_AND_TYPEDEFS-NEXT: */
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct2 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS:      /**
@@ -48,38 +48,38 @@
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}typealias FooStructTypedef1 = FooStruct2{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStructTypedef2 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct3 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct4 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct5 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct6 {{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // Skip through unavailable typedefs when importing types.

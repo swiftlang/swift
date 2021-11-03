@@ -34,7 +34,7 @@ struct S4_P1: P1 {
 }
 
 @MainActor(unsafe)
-protocol P2 { // expected-note{{protocol 'P2' does not conform to the `Sendable` protocol}}
+protocol P2 { // expected-note{{protocol 'P2' does not conform to the 'Sendable' protocol}}
   func f() // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func g()
 }

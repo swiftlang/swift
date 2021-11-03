@@ -85,6 +85,10 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.Id##Ty;
 #include "clang/Basic/PPCTypes.def"
+#define RVV_TYPE(Name, Id, SingletonId)                                        \
+  case clang::BuiltinType::Id:                                                 \
+    return context.Id##Ty;
+#include "clang/Basic/RISCVVTypes.def"
   }
 
   // Not a valid BuiltinType.
@@ -865,7 +869,6 @@ ClangTypeConverter::getClangTemplateArguments(
     ArrayRef<Type> genericArgs,
     SmallVectorImpl<clang::TemplateArgument> &templateArgs) {
   assert(templateArgs.size() == 0);
-  assert(genericArgs.size() == templateParams->size());
 
   // Keep track of the types we failed to convert so we can return a useful
   // error.
@@ -874,6 +877,13 @@ ClangTypeConverter::getClangTemplateArguments(
     // Note: all template parameters must be template type parameters. This is
     // verified when we import the Clang decl.
     auto templateParam = cast<clang::TemplateTypeParmDecl>(param);
+    // We must have found a defaulted parameter at the end of the list.
+    if (templateParam->getIndex() >= genericArgs.size()) {
+      templateArgs.push_back(
+          clang::TemplateArgument(templateParam->getDefaultArgument()));
+      continue;
+    }
+
     auto replacement = genericArgs[templateParam->getIndex()];
     auto qualType = convert(replacement);
     if (qualType.isNull()) {

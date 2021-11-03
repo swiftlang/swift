@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,21 +12,23 @@
 
 import TestsUtils
 
-public let StringInterpolation = BenchmarkInfo(
-  name: "StringInterpolation",
-  runFunction: run_StringInterpolation,
-  tags: [.validation, .api, .String],
-  legacyFactor: 100)
-public let StringInterpolationSmall = BenchmarkInfo(
-  name: "StringInterpolationSmall",
-  runFunction: run_StringInterpolationSmall,
-  tags: [.validation, .api, .String],
-  legacyFactor: 10)
-public let StringInterpolationManySmallSegments = BenchmarkInfo(
-  name: "StringInterpolationManySmallSegments",
-  runFunction: run_StringInterpolationManySmallSegments,
-  tags: [.validation, .api, .String],
-  legacyFactor: 100)
+public let benchmarks = [
+  BenchmarkInfo(
+    name: "StringInterpolation",
+    runFunction: run_StringInterpolation,
+    tags: [.validation, .api, .String],
+    legacyFactor: 100),
+  BenchmarkInfo(
+    name: "StringInterpolationSmall",
+    runFunction: run_StringInterpolationSmall,
+    tags: [.validation, .api, .String],
+    legacyFactor: 10),
+  BenchmarkInfo(
+    name: "StringInterpolationManySmallSegments",
+    runFunction: run_StringInterpolationManySmallSegments,
+    tags: [.validation, .api, .String],
+    legacyFactor: 100),
+]
 
 class RefTypePrintable : CustomStringConvertible {
   var description: String {
@@ -35,13 +37,13 @@ class RefTypePrintable : CustomStringConvertible {
 }
 
 @inline(never)
-public func run_StringInterpolation(_ N: Int) {
+public func run_StringInterpolation(_ n: Int) {
   let reps = 100
   let refResult = reps
   let anInt: Int64 = 0x1234567812345678
   let aRefCountedObject = RefTypePrintable()
 
-  for _ in 1...N {
+  for _ in 1...n {
     var result = 0
     for _ in 1...reps {
       let s: String = getString(
@@ -54,17 +56,17 @@ public func run_StringInterpolation(_ N: Int) {
       result = result &+ Int(utf16.last!)
       blackHole(s)
     }
-    CheckResults(result == refResult)
+    check(result == refResult)
   }
 }
 
 @inline(never)
-public func run_StringInterpolationSmall(_ N: Int) {
+public func run_StringInterpolationSmall(_ n: Int) {
   let reps = 100
   let refResult = reps
   let anInt: Int64 = 0x42
 
-  for _ in 1...10*N {
+  for _ in 1...10*n {
     var result = 0
     for _ in 1...reps {
       let s: String = getString(
@@ -72,15 +74,15 @@ public func run_StringInterpolationSmall(_ N: Int) {
       result = result &+ Int(s.utf8.last!)
       blackHole(s)
     }
-    CheckResults(result == refResult)
+    check(result == refResult)
   }
 }
 
 @inline(never)
-public func run_StringInterpolationManySmallSegments(_ N: Int) {
-  let numHex = min(UInt64(N), 0x0FFF_FFFF_FFFF_FFFF)
-  let numOct = min(UInt64(N), 0x0000_03FF_FFFF_FFFF)
-  let numBin = min(UInt64(N), 0x7FFF)
+public func run_StringInterpolationManySmallSegments(_ n: Int) {
+  let numHex = min(UInt64(n), 0x0FFF_FFFF_FFFF_FFFF)
+  let numOct = min(UInt64(n), 0x0000_03FF_FFFF_FFFF)
+  let numBin = min(UInt64(n), 0x7FFF)
   let segments = [
     "abc",
     String(numHex, radix: 16),
@@ -98,7 +100,7 @@ public func run_StringInterpolationManySmallSegments(_ N: Int) {
   }
 
   let reps = 100
-  for _ in 1...N {
+  for _ in 1...n {
     for _ in 1...reps {
       blackHole("""
         \(getSegment(0)) \(getSegment(1))/\(getSegment(2))_\(getSegment(3))

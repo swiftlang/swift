@@ -5,6 +5,7 @@
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 import Swift
 import StdlibUnittest

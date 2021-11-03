@@ -27,14 +27,14 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALIZEBORROWSCOPES_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALIZEBORROWSCOPES_H
 
-#include "swift/Basic/DAGNodeWorklist.h"
+#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SILOptimizer/Utils/PrunedLiveness.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -69,10 +69,10 @@ private:
   InstructionDeleter &deleter;
 
   /// Visited set for general def-use traversal that prevents revisiting values.
-  DAGNodeWorklist<SILValue, 8> defUseWorklist;
+  GraphNodeWorklist<SILValue, 8> defUseWorklist;
 
   /// Visited set general CFG traversal that prevents revisiting blocks.
-  DAGNodeWorklist<SILBasicBlock *, 8> blockWorklist;
+  GraphNodeWorklist<SILBasicBlock *, 8> blockWorklist;
 
   /// Record any copies outside the borrow scope that were updated. This
   /// includes the outer copy that us used by outer uses and copies for any

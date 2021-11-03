@@ -475,7 +475,6 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
-
   setAccess(AccessLevel::Public);
 
   Bits.ModuleDecl.StaticLibrary = 0;
@@ -1500,9 +1499,11 @@ ModuleDecl::ReverseFullNameIterator::ReverseFullNameIterator(
 
 StringRef ModuleDecl::ReverseFullNameIterator::operator*() const {
   assert(current && "all name components exhausted");
-
+  // Return the module's real (binary) name, which can be different from
+  // the name if module aliasing was used (-module-alias flag). The real
+  // name is used for serialization and loading.
   if (auto *swiftModule = current.dyn_cast<const ModuleDecl *>())
-    return swiftModule->getName().str();
+    return swiftModule->getRealName().str();
 
   auto *clangModule =
       static_cast<const clang::Module *>(current.get<const void *>());
@@ -1562,6 +1563,11 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
         return lhs.accessPath.isSameAs(rhs.accessPath);
       });
   imports.erase(last, imports.end());
+}
+
+Identifier ModuleDecl::getRealName() const {
+  // This will return the real name for an alias (if used) or getName()
+  return getASTContext().getRealModuleName(getName());
 }
 
 Identifier ModuleDecl::getABIName() const {
@@ -2385,11 +2391,16 @@ void SourceFile::lookupImportedSPIGroups(
 bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   auto targetModule = targetDecl->getModuleContext();
   llvm::SmallSetVector<Identifier, 4> importedSPIGroups;
+
+  // Objective-C SPIs are always imported implicitly.
+  if (targetDecl->hasClangNode())
+    return !targetDecl->getSPIGroups().empty();
+
   lookupImportedSPIGroups(targetModule, importedSPIGroups);
-  if (importedSPIGroups.empty()) return false;
+  if (importedSPIGroups.empty())
+    return false;
 
   auto declSPIGroups = targetDecl->getSPIGroups();
-
   for (auto declSPI : declSPIGroups)
     if (importedSPIGroups.count(declSPI))
       return true;
@@ -2892,7 +2903,7 @@ SynthesizedFileUnit &SourceFile::getOrCreateSynthesizedFile() {
   return *SynthesizedFile;
 }
 
-TypeRefinementContext *SourceFile::getTypeRefinementContext() {
+TypeRefinementContext *SourceFile::getTypeRefinementContext() const {
   return TRC;
 }
 
@@ -2987,8 +2998,11 @@ void SynthesizedFileUnit::lookupValue(
     DeclName name, NLKind lookupKind,
     SmallVectorImpl<ValueDecl *> &result) const {
   for (auto *decl : TopLevelDecls) {
-    if (decl->getName().matchesRef(name))
-      result.push_back(decl);
+    if (auto VD = dyn_cast<ValueDecl>(decl)) {
+      if (VD->getName().matchesRef(name)) {
+        result.push_back(VD);
+      }
+    }
   }
 }
 

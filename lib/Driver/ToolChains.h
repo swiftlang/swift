@@ -15,7 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/ToolChain.h"
-#include "clang/Driver/DarwinSDKInfo.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Compiler.h"
 
@@ -81,7 +81,7 @@ protected:
   /// Information about the SDK that the application is being built against.
   /// This information is only used by the linker, so it is only populated
   /// when there will be a linker job.
-  mutable Optional<clang::driver::DarwinSDKInfo> SDKInfo;
+  mutable Optional<clang::DarwinSDKInfo> SDKInfo;
 
   const Optional<llvm::Triple> TargetVariant;
 

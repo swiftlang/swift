@@ -25,11 +25,11 @@ func useAtGeneric<T>(b: B<T>) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s17variant_overrides13useAtConcrete1byAA1BCySiG_tF
 func useAtConcrete(b: B<Int>) {
-  // CHECK: [[CLOSURE_FUNC:%.*]] = function_ref @$s17variant_overrides13useAtConcrete1byAA1BCySiG_tFyAFcfU_ : $@convention(thin) (@guaranteed B<Int>) -> ()
-  // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE_FUNC]] : $@convention(thin) (@guaranteed B<Int>) -> () to $@callee_guaranteed (@guaranteed B<Int>) -> ()
-  // CHECK: [[CLOSURE_CONVERTED:%.*]] = convert_function [[CLOSURE]] : $@callee_guaranteed (@guaranteed B<Int>) -> () to $@callee_guaranteed @substituted <τ_0_0> (@guaranteed B<τ_0_0>) -> () for <Int>
+  // CHECK: [[CLOSURE_FUNC:%.*]] = function_ref @$s17variant_overrides13useAtConcrete1byAA1BCySiG_tFyAFcfU_ :
+  // CHECK: [[CLOSURE_CONVERTED:%.*]] = convert_function [[CLOSURE_FUNC]] :
+  // CHECK: [[CLOSURE_THICK:%.*]] = thin_to_thick_function [[CLOSURE_CONVERTED]] :
   // CHECK: [[METHOD:%.*]] =  class_method %0 : $B<Int>, #B.foo : <T> (B<T>) -> (@escaping (B<T>) -> ()) -> (), $@convention(method) <τ_0_0> (@guaranteed @callee_guaranteed @substituted <τ_0_0> (@guaranteed B<τ_0_0>) -> () for <τ_0_0>, @guaranteed B<τ_0_0>) -> ()
-  // CHECK: apply [[METHOD]]<Int>(%4, %0) : $@convention(method) <τ_0_0> (@guaranteed @callee_guaranteed @substituted <τ_0_0> (@guaranteed B<τ_0_0>) -> () for <τ_0_0>, @guaranteed B<τ_0_0>) -> ()
+  // CHECK: apply [[METHOD]]<Int>([[CLOSURE_THICK]], %0) : $@convention(method) <τ_0_0> (@guaranteed @callee_guaranteed @substituted <τ_0_0> (@guaranteed B<τ_0_0>) -> () for <τ_0_0>, @guaranteed B<τ_0_0>) -> ()
 
   b.foo {_ in ()}
 }

@@ -413,10 +413,18 @@ def require_explicit_availability_target : Separate<["-"], "require-explicit-ava
   HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
   MetaVarName<"<target>">;
 
+def require_explicit_sendable : Flag<["-"], "require-explicit-sendable">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Require explicit Sendable annotations on public declarations">;
+
 def define_availability : Separate<["-"], "define-availability">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,
   MetaVarName<"<macro>">;
+
+def check_api_availability_only : Flag<["-"], "check-api-availability-only">,
+  Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
+  HelpText<"Only check the availability of the APIs, ignore function bodies">;
 
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,
@@ -429,6 +437,11 @@ def module_name : Separate<["-"], "module-name">,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
+
+def module_alias : Separate<["-"], "module-alias">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  MetaVarName<"<alias_name=underlying_name>">,
+  HelpText<"If a source file imports or references module <alias_name>, the <underlying_name> is used for the contents of the file">;
 
 def module_link_name : Separate<["-"], "module-link-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -554,7 +567,7 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
 def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
-  
+
 def lto_library : Separate<["-"], "lto-library">,
   Flags<[FrontendOption, ArgumentIsPath, NoInteractiveOption]>,
   HelpText<"Perform LTO with <lto-library>">, MetaVarName<"<lto-library>">;
@@ -595,12 +608,26 @@ def experimental_cxx_stdlib :
 
 def experimental_emit_module_separately:
   Flag<["-"], "experimental-emit-module-separately">,
-  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
-  HelpText<"Schedule a swift module emission job instead of a merge-modules job (new Driver only)">;
+  Flags<[NoInteractiveOption, HelpHidden]>,
+  HelpText<"Emit module files as a distinct job (new Driver only)">;
+
+def no_emit_module_separately:
+  Flag<["-"], "no-emit-module-separately">,
+  Flags<[NoInteractiveOption, HelpHidden]>,
+  HelpText<"Force using merge-module as the incremental build mode (new Driver only)">;
 
 def requirement_machine_EQ : Joined<["-"], "requirement-machine=">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Control usage of experimental generics implementation: 'on', 'off', or 'verify'">;
+
+def requirement_machine_protocol_signatures_EQ : Joined<["-"], "requirement-machine-protocol-signatures=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', or 'verify'">;
+
+def experimental_hermetic_seal_at_link:
+  Flag<["-"], "experimental-hermetic-seal-at-link">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Library code can assume that all clients are visible at linktime, and aggressively strip unused code">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -681,7 +708,7 @@ def save_optimization_record_path :
 def save_optimization_record_passes :
   Separate<["-"], "save-optimization-record-passes">,
   Flags<[FrontendOption]>,
-  HelpText<"Only include passes which match a specified regular expression in"
+  HelpText<"Only include passes which match a specified regular expression in "
            "the generated optimization record "
            "(by default, include all passes)">, MetaVarName<"<regex>">;
 
@@ -771,6 +798,10 @@ def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Perform cross-module optimization">;
 
+def ExperimentalPerformanceAnnotations : Flag<["-"], "experimental-performance-annotations">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Perform cross-module optimization">;
+
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
   HelpText<"Remove runtime safety checks.">;
@@ -804,6 +835,10 @@ def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,
   HelpText<"Specify the debug info format type to either 'dwarf' or 'codeview'">;
+
+def prefix_serialized_debugging_options : Flag<["-"], "prefix-serialized-debugging-options">,
+  Flags<[FrontendOption]>,
+  HelpText<"Apply debug prefix mappings to serialized debug info in Swiftmodule files">;
 
 // Verify debug info
 def verify_debug_info : Flag<["-"], "verify-debug-info">,
@@ -1246,6 +1281,11 @@ def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
          SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
+
+def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-access-level">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Include symbols with this access level or more when emitting a symbol graph">,
+  MetaVarName<"<level>">;
 
 def pretty_print: Flag<["-"], "pretty-print">,
   Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,

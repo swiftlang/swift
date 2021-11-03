@@ -781,3 +781,37 @@ func test_rdar65667992() {
     }
   }
 }
+
+func test_weak_with_nonoptional_type() {
+  class X {
+    func test() -> Int { 0 }
+  }
+
+  tuplify(true) { c in
+    weak var x: X = X() // expected-error {{'weak' variable should have optional type 'X?'}}
+
+    if let x = x {
+      x.test()
+    }
+
+    42
+  }
+}
+
+// rdar://80941497 - compiler fails to produce diagnostic when referencing missing member in optional context
+func test_missing_member_in_optional_context() {
+  struct Test {
+  }
+
+  var test: Test? = nil
+
+  tuplify(true) { c in
+    if let prop = test?.prop { // expected-error {{value of type 'Test' has no member 'prop'}}
+      0
+    }
+
+    if let method = test?.method() { // expected-error {{value of type 'Test' has no member 'method'}}
+      1
+    }
+  }
+}

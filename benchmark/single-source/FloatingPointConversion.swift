@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let FloatingPointConversion = [
+public let benchmarks = [
   BenchmarkInfo(
     name: "ConvertFloatingPoint.MockFloat64ToDouble",
     runFunction: run_ConvertFloatingPoint_MockFloat64ToDouble,
@@ -165,8 +165,8 @@ let mockFloat64s = doubles.map { MockFloat64($0) }
 // See also: test/SILOptimizer/floating_point_conversion.swift
 
 @inline(never)
-public func run_ConvertFloatingPoint_MockFloat64ToDouble(_ N: Int) {
-  for _ in 0..<(N * 100) {
+public func run_ConvertFloatingPoint_MockFloat64ToDouble(_ n: Int) {
+  for _ in 0..<(n * 100) {
     for element in mockFloat64s {
       let f = Double(identity(element))
       blackHole(f)
@@ -182,8 +182,8 @@ func convert<
 }
 
 @inline(never)
-public func run_ConvertFloatingPoint_MockFloat64Exactly(_ N: Int) {
-  for _ in 0..<(N * 25) {
+public func run_ConvertFloatingPoint_MockFloat64Exactly(_ n: Int) {
+  for _ in 0..<(n * 25) {
     for element in mockFloat64s {
       let f = convert(exactly: identity(element), to: Double.self)
       blackHole(f)
@@ -192,8 +192,8 @@ public func run_ConvertFloatingPoint_MockFloat64Exactly(_ N: Int) {
 }
 
 @inline(never)
-public func run_ConvertFloatingPoint_MockFloat64Exactly2(_ N: Int) {
-  for _ in 0..<(N * 25) {
+public func run_ConvertFloatingPoint_MockFloat64Exactly2(_ n: Int) {
+  for _ in 0..<(n * 25) {
     for element in mockFloat64s {
       let f = convert(exactly: identity(element), to: MockFloat32.self)
       blackHole(f)
@@ -202,8 +202,8 @@ public func run_ConvertFloatingPoint_MockFloat64Exactly2(_ N: Int) {
 }
 
 @inline(never)
-public func run_ConvertFloatingPoint_MockFloat64ToInt64(_ N: Int) {
-  for _ in 0..<(N * 1000) {
+public func run_ConvertFloatingPoint_MockFloat64ToInt64(_ n: Int) {
+  for _ in 0..<(n * 1000) {
     for element in mockFloat64s {
       let i = Int64(identity(element))
       blackHole(i)

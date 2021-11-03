@@ -4,6 +4,7 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 // REQUIRES: executable_test
+// REQUIRES: reflection
 
 import StdlibUnittest
 import PrintTestTypes

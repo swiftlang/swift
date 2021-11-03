@@ -191,17 +191,18 @@ SILDebugVariable::createFromAllocation(const AllocationInst *AI) {
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F, Optional<SILDebugVariable> Var,
-                               bool hasDynamicLifetime)
+                               bool hasDynamicLifetime, bool isLexical)
     : InstructionBase(Loc, elementType.getAddressType()),
       SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
                                  Var ? Var->Type.hasValue() : false,
                                  Var ? Var->Loc.hasValue() : false,
                                  Var ? Var->Scope != nullptr : false),
-      dynamicLifetime(hasDynamicLifetime) {
+      dynamicLifetime(hasDynamicLifetime), lexical(isLexical) {
   SILNode::Bits.AllocStackInst.NumOperands =
     TypeDependentOperands.size();
   assert(SILNode::Bits.AllocStackInst.NumOperands ==
          TypeDependentOperands.size() && "Truncation");
+  auto *VD = Loc.getLocation().getAsASTNode<VarDecl>();
   SILNode::Bits.AllocStackInst.VarInfo =
       TailAllocatedDebugVariable(Var, getTrailingObjects<char>(),
                                  getTrailingObjects<SILType>(),
@@ -209,7 +210,7 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                  getTrailingObjects<const SILDebugScope *>(),
                                  getTrailingObjects<SILDIExprElement>())
           .getRawValue();
-  if (auto *VD = Loc.getLocation().getAsASTNode<VarDecl>()) {
+  if (Var && VD) {
     TailAllocatedDebugVariable DbgVar(SILNode::Bits.AllocStackInst.VarInfo);
     DbgVar.setImplicit(VD->isImplicit() || DbgVar.isImplicit());
     SILNode::Bits.AllocStackInst.VarInfo = DbgVar.getRawValue();
@@ -218,19 +219,18 @@ AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                          TypeDependentOperands);
 }
 
-AllocStackInst *
-AllocStackInst::create(SILDebugLocation Loc,
-                       SILType elementType, SILFunction &F,
-                       Optional<SILDebugVariable> Var,
-                       bool hasDynamicLifetime) {
+AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
+                                       SILType elementType, SILFunction &F,
+                                       Optional<SILDebugVariable> Var,
+                                       bool hasDynamicLifetime,
+                                       bool isLexical) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
                                elementType.getASTType());
   void *Buffer = allocateDebugVarCarryingInst<AllocStackInst>(
       F.getModule(), Var, TypeDependentOperands);
-  return ::new (Buffer)
-      AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var,
-                     hasDynamicLifetime);
+  return ::new (Buffer) AllocStackInst(Loc, elementType, TypeDependentOperands,
+                                       F, Var, hasDynamicLifetime, isLexical);
 }
 
 VarDecl *AllocationInst::getDecl() const {
@@ -309,11 +309,10 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
                            SILFunction &F, Optional<SILDebugVariable> Var,
                            bool hasDynamicLifetime)
-    : InstructionBaseWithTrailingOperands(TypeDependentOperands, Loc,
-                                      SILType::getPrimitiveObjectType(BoxType)),
+    : InstructionBaseWithTrailingOperands(
+          TypeDependentOperands, Loc, SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()),
-      dynamicLifetime(hasDynamicLifetime) {
-}
+      dynamicLifetime(hasDynamicLifetime) {}
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
                                    CanSILBoxType BoxType,
@@ -399,26 +398,6 @@ AllocExistentialBoxInst *AllocExistentialBoxInst::create(
                                                 Conformances,
                                                 TypeDependentOperands,
                                                 F);
-}
-
-AllocValueBufferInst::AllocValueBufferInst(
-    SILDebugLocation DebugLoc, SILType valueType, SILValue operand,
-    ArrayRef<SILValue> TypeDependentOperands)
-    : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, operand,
-                                                    TypeDependentOperands,
-                                                 valueType.getAddressType()) {}
-
-AllocValueBufferInst *
-AllocValueBufferInst::create(SILDebugLocation DebugLoc, SILType valueType,
-                             SILValue operand, SILFunction &F) {
-  SmallVector<SILValue, 8> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, F, valueType.getASTType());
-  void *Buffer = F.getModule().allocateInst(
-      sizeof(AllocValueBufferInst) +
-          sizeof(Operand) * (TypeDependentOperands.size() + 1),
-      alignof(AllocValueBufferInst));
-  return ::new (Buffer) AllocValueBufferInst(DebugLoc, valueType, operand,
-                                             TypeDependentOperands);
 }
 
 BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
@@ -1778,17 +1757,15 @@ SwitchValueInst *SwitchValueInst::create(
 
 SelectValueInst::SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                                  SILType Type, SILValue DefaultResult,
-                                 ArrayRef<SILValue> CaseValuesAndResults,
-                                 ValueOwnershipKind forwardingOwnership)
+                                 ArrayRef<SILValue> CaseValuesAndResults)
     : InstructionBaseWithTrailingOperands(Operand, CaseValuesAndResults,
-                                          DebugLoc, Type, forwardingOwnership) {
-}
+                                          DebugLoc, Type) {}
 
 SelectValueInst *
 SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
                         SILValue DefaultResult,
                         ArrayRef<std::pair<SILValue, SILValue>> CaseValues,
-                        SILModule &M, ValueOwnershipKind forwardingOwnership) {
+                        SILModule &M) {
   // Allocate enough room for the instruction with tail-allocated data for all
   // the case values and the SILSuccessor arrays. There are `CaseBBs.size()`
   // SILValues and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
@@ -1803,8 +1780,8 @@ SelectValueInst::create(SILDebugLocation Loc, SILValue Operand, SILType Type,
 
   auto Size = totalSizeToAlloc<swift::Operand>(CaseValuesAndResults.size() + 1);
   auto Buf = M.allocateInst(Size, alignof(SelectValueInst));
-  return ::new (Buf) SelectValueInst(Loc, Operand, Type, DefaultResult,
-                                     CaseValuesAndResults, forwardingOwnership);
+  return ::new (Buf)
+      SelectValueInst(Loc, Operand, Type, DefaultResult, CaseValuesAndResults);
 }
 
 template <typename SELECT_ENUM_INST>
@@ -2894,4 +2871,69 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
   assert(ownershipKind &&
          "Conflicting ownership kinds when creating term inst from function "
          "result info?!");
+}
+
+// This may be called in an invalid SIL state. SILCombine creates new
+// terminators in non-terminator position and defers deleting the original
+// terminator until after all modification.
+SILPhiArgument *OwnershipForwardingTermInst::createResult(SILBasicBlock *succ,
+                                                          SILType resultTy) {
+  // The forwarding instruction declares a forwarding ownership kind that
+  // determines the ownership of its results.
+  auto resultOwnership = getForwardingOwnershipKind();
+
+  // Trivial results have no ownership. Although it is valid for a trivially
+  // typed value to have ownership, it is never necessary and less efficient.
+  if (resultTy.isTrivial(*getFunction())) {
+    resultOwnership = OwnershipKind::None;
+
+  } else if (resultOwnership == OwnershipKind::None) {
+    // switch_enum strangely allows results to acquire ownership out of thin
+    // air whenever the operand has no ownership and result is nontrivial:
+    //     %e = enum $Optional<AnyObject>, #Optional.none!enumelt
+    //     switch_enum %e : $Optional<AnyObject>,
+    //                 case #Optional.some!enumelt: bb2...
+    //   bb2(%arg : @guaranteed T):
+    //
+    // We can either use None or Guaranteed. None would correctly propagate
+    // ownership and would maintain the invariant that guaranteed values are
+    // always within a borrow scope. However it would result in a nontrivial
+    // type without ownership. The lifetime verifier does not like that.
+    resultOwnership = OwnershipKind::Guaranteed;
+  }
+  return succ->createPhiArgument(resultTy, resultOwnership);
+}
+
+SILPhiArgument *SwitchEnumInst::createDefaultResult() {
+  auto *f = getFunction();
+  if (!f->hasOwnership())
+    return nullptr;
+
+  if (!hasDefault())
+    return nullptr;
+
+  assert(getDefaultBB()->getNumArguments() == 0 && "precondition");
+
+  auto enumTy = getOperand()->getType();
+  NullablePtr<EnumElementDecl> uniqueCase = getUniqueCaseForDefault();
+
+  // Without a unique default case, the OSSA result simply forwards the
+  // switch_enum operand.
+  if (!uniqueCase)
+    return createResult(getDefaultBB(), enumTy);
+
+  // With a unique default case, the result is materialized exactly the same way
+  // as a matched result. It has a value iff the unique case has a payload.
+  if (!uniqueCase.get()->hasAssociatedValues())
+    return nullptr;
+
+  auto resultTy = enumTy.getEnumElementType(uniqueCase.get(), f->getModule(),
+                                            f->getTypeExpansionContext());
+  return createResult(getDefaultBB(), resultTy);
+}
+
+SILPhiArgument *SwitchEnumInst::createOptionalSomeResult() {
+  auto someDecl = getModule().getASTContext().getOptionalSomeDecl();
+  auto someBB = getCaseDestination(someDecl);
+  return createResult(someBB, getOperand()->getType().unwrapOptionalType());
 }

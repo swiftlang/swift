@@ -39,15 +39,6 @@ extension JoinedSequence {
   /// by a base iterator, concatenated using a given separator.
   @frozen // lazy-performance
   public struct Iterator {
-    @usableFromInline // lazy-performance
-    internal var _base: Base.Iterator
-    @usableFromInline // lazy-performance
-    internal var _inner: Base.Element.Iterator?
-    @usableFromInline // lazy-performance
-    internal var _separatorData: ContiguousArray<Element>
-    @usableFromInline // lazy-performance
-    internal var _separator: ContiguousArray<Element>.Iterator?
-    
     @frozen // lazy-performance
     @usableFromInline // lazy-performance
     internal enum _JoinIteratorState {
@@ -56,10 +47,19 @@ extension JoinedSequence {
       case generatingSeparator
       case end
     }
+
+    @usableFromInline // lazy-performance
+    internal var _base: Base.Iterator
+    @usableFromInline // lazy-performance
+    internal var _inner: Base.Element.Iterator?
+    @usableFromInline // lazy-performance
+    internal var _separatorData: ContiguousArray<Element>
+    @usableFromInline // lazy-performance
+    internal var _separator: ContiguousArray<Element>.Iterator?
     @usableFromInline // lazy-performance
     internal var _state: _JoinIteratorState = .start
 
-    /// Creates a sequence that presents the elements of `base` sequences
+    /// Creates an iterator that presents the elements of `base` sequences
     /// concatenated using `separator`.
     ///
     /// - Complexity: O(`separator.count`).
@@ -69,7 +69,7 @@ extension JoinedSequence {
       self._base = base
       self._separatorData = ContiguousArray(separator)
     }
-  }  
+  }
 }
 
 extension JoinedSequence.Iterator: IteratorProtocol {

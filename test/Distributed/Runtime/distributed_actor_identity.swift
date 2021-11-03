@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,10 +8,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-import StdlibUnittest
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
 struct ActorAddress: ActorIdentity, CustomStringConvertible {
   let id: String
   var description: Swift.String {
@@ -19,41 +17,38 @@ struct ActorAddress: ActorIdentity, CustomStringConvertible {
   }
 }
 
+
+func equality() {
+  let a = ActorAddress(id: "a")
+  let b = ActorAddress(id: "b")
+
+  let anyA = AnyActorIdentity(a)
+  let anyB = AnyActorIdentity(b)
+
+  print("\(a == a)") // CHECK: true
+  print("\(anyA == anyA)") // CHECK: true
+
+  print("\(a != b)") // CHECK: true
+  print("\(anyA != anyB)") // CHECK: true
+}
+
+func hash() {
+  let a = ActorAddress(id: "a")
+  let b = ActorAddress(id: "b")
+
+  let anyA = AnyActorIdentity(a)
+  let anyB = AnyActorIdentity(b)
+
+  print("\(a.hashValue == a.hashValue)") // CHECK: true
+  print("\(anyA.hashValue == anyA.hashValue)") // CHECK: true
+
+  print("\(a.hashValue != b.hashValue)") // CHECK: true
+  print("\(anyA.hashValue != anyB.hashValue)") // CHECK: true
+}
+
 @main struct Main {
-  static func main() async {
-    if #available(SwiftStdlib 5.5, *) {
-
-      let ActorIdentityTests = TestSuite("ActorIdentity")
-
-      ActorIdentityTests.test("equality") {
-        let a = ActorAddress(id: "a")
-        let b = ActorAddress(id: "b")
-
-        let anyA = AnyActorIdentity(a)
-        let anyB = AnyActorIdentity(b)
-
-        expectEqual(a, a)
-        expectEqual(anyA, anyA)
-
-        expectNotEqual(a, b)
-        expectNotEqual(anyA, anyB)
-      }
-
-      ActorIdentityTests.test("hash") {
-        let a = ActorAddress(id: "a")
-        let b = ActorAddress(id: "b")
-
-        let anyA = AnyActorIdentity(a)
-        let anyB = AnyActorIdentity(b)
-
-        expectEqual(a.hashValue, a.hashValue)
-        expectEqual(anyA.hashValue, anyA.hashValue)
-
-        expectNotEqual(a.hashValue, b.hashValue)
-        expectNotEqual(anyA.hashValue, anyB.hashValue)
-      }
-    }
-
-    await runAllTestsAsync()
+  static func main() {
+    equality()
+    hash()
   }
 }

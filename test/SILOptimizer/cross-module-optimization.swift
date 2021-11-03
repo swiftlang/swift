@@ -140,6 +140,8 @@ func testGlobal() {
   // CHECK-OUTPUT: 529387
   // CHECK-SIL2: integer_literal $Builtin.Int{{[0-9]+}}, 529387
   print(globalLet)
+  // CHECK-OUTPUT: 41
+  print(StructWithClosure.c(41))
   // CHECK-SIL2: } // end sil function '$s4Main10testGlobalyyF'
 }
 

@@ -439,6 +439,7 @@ private:
     case Node::Kind::NativePinningAddressor:
     case Node::Kind::NativePinningMutableAddressor:
     case Node::Kind::NominalTypeDescriptor:
+    case Node::Kind::NominalTypeDescriptorRecord:
     case Node::Kind::NonObjCAttribute:
     case Node::Kind::Number:
     case Node::Kind::ObjCAsyncCompletionHandlerImpl:
@@ -447,6 +448,7 @@ private:
     case Node::Kind::ObjCMetadataUpdateFunction:
     case Node::Kind::ObjCResilientClassStub:
     case Node::Kind::OpaqueTypeDescriptor:
+    case Node::Kind::OpaqueTypeDescriptorRecord:
     case Node::Kind::OpaqueTypeDescriptorAccessor:
     case Node::Kind::OpaqueTypeDescriptorAccessorImpl:
     case Node::Kind::OpaqueTypeDescriptorAccessorKey:
@@ -463,8 +465,10 @@ private:
     case Node::Kind::PropertyDescriptor:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
+    case Node::Kind::ProtocolConformanceDescriptorRecord:
     case Node::Kind::MetadataInstantiationCache:
     case Node::Kind::ProtocolDescriptor:
+    case Node::Kind::ProtocolDescriptorRecord:
     case Node::Kind::ProtocolRequirementsBaseDescriptor:
     case Node::Kind::ProtocolSelfConformanceDescriptor:
     case Node::Kind::ProtocolSelfConformanceWitness:
@@ -554,6 +558,7 @@ private:
     case Node::Kind::ProtocolConformanceRefInTypeModule:
     case Node::Kind::ProtocolConformanceRefInProtocolModule:
     case Node::Kind::ProtocolConformanceRefInOtherModule:
+    case Node::Kind::DistributedThunk:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
@@ -1982,6 +1987,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "opaque type symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
     return nullptr;
+  case Node::Kind::DistributedThunk:
+    if (!Options.ShortenThunk) {
+      Printer << "distributed thunk for ";
+    }
+    return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:
     if (!Options.ShortenThunk) {
       Printer << "dynamically replaceable key for ";
@@ -2017,8 +2027,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "protocol conformance descriptor for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::ProtocolConformanceDescriptorRecord:
+    Printer << "protocol conformance descriptor runtime record for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::ProtocolDescriptor:
     Printer << "protocol descriptor for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::ProtocolDescriptorRecord:
+    Printer << "protocol descriptor runtime record for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::ProtocolRequirementsBaseDescriptor:
@@ -2123,8 +2141,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "nominal type descriptor for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
+  case Node::Kind::NominalTypeDescriptorRecord:
+    Printer << "nominal type descriptor runtime record for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
   case Node::Kind::OpaqueTypeDescriptor:
     Printer << "opaque type descriptor for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::OpaqueTypeDescriptorRecord:
+    Printer << "opaque type descriptor runtime record for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OpaqueTypeDescriptorAccessor:

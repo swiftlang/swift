@@ -12,7 +12,7 @@
 
 #include "swift/Runtime/Config.h"
 
-#if SWIFT_OBJC_INTEROP
+#if SWIFT_OBJC_INTEROP && defined(SWIFT_ENABLE_REFLECTION)
 
 #include "Private.h"
 #include <Foundation/Foundation.h>

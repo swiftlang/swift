@@ -794,6 +794,7 @@ static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
   } else if (SA.isExported()) {
     NewFunc->setLinkage(NewFunc->isDefinition() ? SILLinkage::Public
                                                 : SILLinkage::PublicExternal);
+    NewFunc->setAvailabilityForLinkage(SA.getAvailability());
   }
 
   return NewFunc;

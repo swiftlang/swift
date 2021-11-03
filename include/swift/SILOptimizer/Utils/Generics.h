@@ -45,7 +45,8 @@ void trySpecializeApplyOfGeneric(
     SILOptFunctionBuilder &FunctionBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
     llvm::SmallVectorImpl<SILFunction *> &NewFunctions,
-    OptRemark::Emitter &ORE);
+    OptRemark::Emitter &ORE,
+    bool isMandatory);
 
 /// Helper class to describe re-abstraction of function parameters done during
 /// specialization.
@@ -336,11 +337,14 @@ class GenericFuncSpecializer {
   SubstitutionMap ContextSubs;
   std::string ClonedName;
 
+  bool isMandatory;
+
 public:
   GenericFuncSpecializer(SILOptFunctionBuilder &FuncBuilder,
                          SILFunction *GenericFunc,
                          SubstitutionMap ParamSubs,
-                         const ReabstractionInfo &ReInfo);
+                         const ReabstractionInfo &ReInfo,
+                         bool isMandatory = false);
 
   /// If we already have this specialization, reuse it.
   SILFunction *lookupSpecialization();

@@ -70,7 +70,6 @@ fromStableSILLinkage(unsigned value) {
   case SIL_LINKAGE_PUBLIC_EXTERNAL: return SILLinkage::PublicExternal;
   case SIL_LINKAGE_HIDDEN_EXTERNAL: return SILLinkage::HiddenExternal;
   case SIL_LINKAGE_SHARED_EXTERNAL: return SILLinkage::SharedExternal;
-  case SIL_LINKAGE_PRIVATE_EXTERNAL: return SILLinkage::PrivateExternal;
   default: return None;
   }
 }
@@ -527,14 +526,16 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
-      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs,
+      optimizationMode, perfConstr,
+      subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, specialPurpose, inlineStrategy,
-      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs,
+      optimizationMode, perfConstr,
+      subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass, funcTyID, replacedFunctionID, genericSigID,
       clangNodeOwnerID, SemanticsIDs);
@@ -657,6 +658,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setSpecialPurpose(SILFunction::Purpose(specialPurpose));
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
+    fn->setPerfConstraints((PerformanceConstraints)perfConstr);
     fn->setAlwaysWeakImported(isWeakImported);
     fn->setClassSubclassScope(SubclassScope(subclassScope));
     fn->setHasCReferences(bool(hasCReferences));
@@ -725,9 +727,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     IdentifierID targetFunctionID;
     IdentifierID spiGroupID;
     ModuleID spiModuleID;
+    unsigned LIST_VER_TUPLE_PIECES(available);
     SILSpecializeAttrLayout::readRecord(
         scratch, exported, specializationKindVal, specializedSigID,
-        targetFunctionID, spiGroupID, spiModuleID);
+        targetFunctionID, spiGroupID, spiModuleID,
+        LIST_VER_TUPLE_PIECES(available));
 
     SILFunction *target = nullptr;
     if (targetFunctionID) {
@@ -745,13 +749,19 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         specializationKindVal ? SILSpecializeAttr::SpecializationKind::Partial
                               : SILSpecializeAttr::SpecializationKind::Full;
 
+    llvm::VersionTuple available;
+    DECODE_VER_TUPLE(available);
+    auto availability = available.empty()
+      ? AvailabilityContext::alwaysAvailable()
+      : AvailabilityContext(VersionRange::allGTE(available));
+
     auto specializedSig = MF->getGenericSignature(specializedSigID);
     // Only add the specialize attributes once.
     if (shouldAddAtttributes) {
       // Read the substitution list and construct a SILSpecializeAttr.
       fn->addSpecializeAttr(SILSpecializeAttr::create(
           SILMod, specializedSig, exported != 0, specializationKind, target,
-          spiGroup, spiModule));
+          spiGroup, spiModule, availability));
     }
   }
 
@@ -905,7 +915,10 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     auto ValueCategory = SILValueCategory(Args[I + 1] & 0xF);
     SILType SILArgTy = getSILType(ArgTy, ValueCategory, Fn);
     if (IsEntry) {
-      Arg = CurrentBB->createFunctionArgument(SILArgTy);
+      auto *fArg = CurrentBB->createFunctionArgument(SILArgTy);
+      bool isNoImplicitCopy = (Args[I + 1] >> 16) & 0x1;
+      fArg->setNoImplicitCopy(isNoImplicitCopy);
+      Arg = fArg;
     } else {
       auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
       Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind);
@@ -1073,6 +1086,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   ApplyOptions ApplyOpts;
   ArrayRef<uint64_t> ListOfValues;
   SILLocation Loc = RegularLocation(SLoc);
+  ValueOwnershipKind forwardingOwnership(OwnershipKind::Any);
+  auto decodeValueOwnership = [](unsigned field){
+    // Invalid/Any ownership is never encoded.
+    return ValueOwnershipKind(field+1);
+  };
 
   switch (RecordKind) {
   default:
@@ -1099,6 +1117,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                            TyID2, TyCategory2,
                                            ValID);
     break;
+  case SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR:
+    SILOneTypeOneOperandExtraAttributeLayout::readRecord(scratch, RawOpCode,
+                                                         Attr, TyID, TyCategory,
+                                                         TyID2, TyCategory2,
+                                                         ValID);
+    break;
   case SIL_INIT_EXISTENTIAL:
     SILInitExistentialLayout::readRecord(scratch, RawOpCode,
                                          TyID, TyCategory,
@@ -1111,6 +1135,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILOneTypeValuesLayout::readRecord(scratch, RawOpCode, TyID, TyCategory,
                                        ListOfValues);
     break;
+  case SIL_ONE_TYPE_OWNERSHIP_VALUES: {
+    unsigned ownershipField;
+    SILOneTypeOwnershipValuesLayout::readRecord(scratch, RawOpCode,
+                                                ownershipField, TyID,
+                                                TyCategory, ListOfValues);
+    forwardingOwnership = decodeValueOwnership(ownershipField);
+    break;
+  }
   case SIL_TWO_OPERANDS:
     SILTwoOperandsLayout::readRecord(scratch, RawOpCode, Attr,
                                      TyID, TyCategory, ValID,
@@ -1204,12 +1236,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()), None,
         /*bool hasDynamicLifetime*/ Attr != 0);
     break;
-  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocStackInst: {
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    bool hasDynamicLifetime = Attr & 0x1;
+    bool isLexical = (Attr >> 1) & 0x1;
     ResultInst = Builder.createAllocStack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        None, /*bool hasDynamicLifetime*/ Attr != 0);
+        None, hasDynamicLifetime, isLexical);
     break;
+  }
   case SILInstructionKind::MetatypeInst:
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultInst = Builder.createMetatype(
@@ -1244,10 +1279,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
     ONETYPE_ONEOPERAND_INST(ValueMetatype)
     ONETYPE_ONEOPERAND_INST(ExistentialMetatype)
-    ONETYPE_ONEOPERAND_INST(AllocValueBuffer)
-    ONETYPE_ONEOPERAND_INST(ProjectValueBuffer)
     ONETYPE_ONEOPERAND_INST(ProjectExistentialBox)
-    ONETYPE_ONEOPERAND_INST(DeallocValueBuffer)
 #undef ONETYPE_ONEOPERAND_INST
   case SILInstructionKind::DeallocBoxInst:
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
@@ -1345,16 +1377,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
   case SILInstructionKind::PointerToAddressInst: {
-    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND_EXTRA_ATTR &&
            "Layout should be OneTypeOneOperand.");
-    bool isStrict = Attr & 0x01;
-    bool isInvariant = Attr & 0x02;
+    auto alignment = llvm::decodeMaybeAlign(Attr & 0xFF);
+    bool isStrict = Attr & 0x100;
+    bool isInvariant = Attr & 0x200;
     ResultInst = Builder.createPointerToAddress(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID2),
                                         (SILValueCategory)TyCategory2, Fn)),
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        isStrict, isInvariant);
+        isStrict, isInvariant, alignment);
     break;
   }
   case SILInstructionKind::DeallocExistentialBoxInst: {
@@ -1833,6 +1866,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
   UNARY_INSTRUCTION(CopyValue)
+  UNARY_INSTRUCTION(ExplicitCopyValue)
+  UNARY_INSTRUCTION(MoveValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
@@ -1862,12 +1897,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
   case SILInstructionKind::BeginBorrowInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
-    unsigned defined = Attr;
+    bool isLexical = Attr & 0x1;
     ResultInst = Builder.createBeginBorrow(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID),
                                         (SILValueCategory)TyCategory, Fn)),
-        defined == 1);
+        isLexical);
     break;
   }
 
@@ -1941,7 +1976,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::UncheckedOwnershipConversionInst: {
     auto Ty = MF->getType(TyID);
-    auto ResultKind = ValueOwnershipKind(Attr);
+    auto ResultKind = decodeValueOwnership(Attr);
     ResultInst = Builder.createUncheckedOwnershipConversion(
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
@@ -2252,10 +2287,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       CaseBBs.push_back( {cast<EnumElementDecl>(MF->getDecl(ListOfValues[I])),
                             getBBForReference(Fn, ListOfValues[I+1])} );
     }
-    if (OpCode == SILInstructionKind::SwitchEnumInst)
-      ResultInst = Builder.createSwitchEnum(Loc, Cond, DefaultBB, CaseBBs);
-    else
+    if (OpCode == SILInstructionKind::SwitchEnumInst) {
+      ResultInst = Builder.createSwitchEnum(Loc, Cond, DefaultBB, CaseBBs,
+                                            None, ProfileCounter(),
+                                            forwardingOwnership);
+    } else {
       ResultInst = Builder.createSwitchEnumAddr(Loc, Cond, DefaultBB, CaseBBs);
+    }
     break;
   }
   case SILInstructionKind::SelectEnumInst:
@@ -2520,7 +2558,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
     ResultInst =
         Builder.createCheckedCastBranch(Loc, isExact, op, targetLoweredType,
-                                        targetFormalType, successBB, failureBB);
+                                        targetFormalType, successBB, failureBB,
+                                        forwardingOwnership);
     break;
   }
   case SILInstructionKind::CheckedCastValueBranchInst: {
@@ -2889,14 +2928,16 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
-      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs,
+      optimizationMode, perfConstr,
+      subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
-      optimizationMode, subclassScope, hasCReferences, effect, numSpecAttrs,
+      optimizationMode, perfConstr,
+      subclassScope, hasCReferences, effect, numSpecAttrs,
       hasQualifiedOwnership, isWeakImported, LIST_VER_TUPLE_PIECES(available),
       isDynamic, isExactSelfClass, funcTyID, replacedFunctionID, genericSigID,
       clangOwnerID, SemanticsIDs);

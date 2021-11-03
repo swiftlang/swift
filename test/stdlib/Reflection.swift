@@ -3,6 +3,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %{python} %S/../Inputs/timeout.py 360 %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
+// REQUIRES: reflection
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours
 
 //

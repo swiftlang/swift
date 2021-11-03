@@ -3,7 +3,7 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: executable_test
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 
 // rdar://78109470
 // UNSUPPORTED: back_deployment_runtime
@@ -26,7 +26,7 @@ var tests = TestSuite("AsyncStream")
 
 @main struct Main {
   static func main() async {
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    if #available(SwiftStdlib 5.5, *) {
       final class Expectation: UnsafeSendable {
         var fulfilled = false
       }

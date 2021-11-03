@@ -307,6 +307,11 @@ void SwiftLangSupport::dependencyUpdated() {
   CompletionInst->markCachedCompilerInstanceShouldBeInvalidated();
 }
 
+void SwiftLangSupport::cancelRequest(
+    SourceKitCancellationToken CancellationToken) {
+  getASTManager()->cancelASTConsumer(CancellationToken);
+}
+
 UIdent SwiftLangSupport::getUIDForDeclLanguage(const swift::Decl *D) {
   if (D->hasClangNode())
     return KindObjC;

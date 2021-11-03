@@ -241,7 +241,7 @@ func sr_10837() {
     convenience init(foo: Int = 42) {
       self.init(value:)(foo) // Ok
       self.init(value:)
-      // expected-error@-1 {{partial application of 'self.init' initializer delegation is not allowed}}
+      // expected-error@-1 {{cannot reference 'self.init' initializer delegation as function value}}
     }
   }
 
@@ -249,7 +249,7 @@ func sr_10837() {
     override init(bar: Int) {
       super.init(bar:)(bar) // Ok
       super.init(bar:)
-      // expected-error@-1 {{partial application of 'super.init' initializer chain is not allowed}}
+      // expected-error@-1 {{cannot reference 'super.init' initializer chain as function value}}
     }
   }
 }

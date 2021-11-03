@@ -283,6 +283,11 @@ static llvm::cl::list<std::string>
 SwiftVersion("swift-version", llvm::cl::desc("Swift version"),
              llvm::cl::cat(Category));
 
+static llvm::cl::opt<std::string>
+ToolsDirectory("tools-directory",
+               llvm::cl::desc("Path to external executables (ld, clang, binutils)"),
+               llvm::cl::cat(Category));
+
 static llvm::cl::list<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
                 llvm::cl::cat(Category));
@@ -466,16 +471,10 @@ CodeCompletionSourceText("code-completion-sourcetext",
                          llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-CodeCOmpletionAnnotateResults("code-completion-annotate-results",
+CodeCompletionAnnotateResults("code-completion-annotate-results",
                               llvm::cl::desc("annotate completion results with XML"),
                               llvm::cl::cat(Category),
                               llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-CodeCompletionSourceFileInfo("code-completion-sourcefileinfo",
-                             llvm::cl::desc("print module source file information"),
-                             llvm::cl::cat(Category),
-                             llvm::cl::init(false));
 
 static llvm::cl::opt<std::string>
 DebugClientDiscriminator("debug-client-discriminator",
@@ -798,6 +797,11 @@ AllowCompilerErrors("allow-compiler-errors",
                     llvm::cl::desc("Whether to attempt to continue despite compiler errors"),
                     llvm::cl::init(false));
 
+static llvm::cl::opt<std::string>
+  DefineAvailability("define-availability",
+                     llvm::cl::desc("Define a macro for @available"),
+                     llvm::cl::cat(Category));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -926,7 +930,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             bool CodeCompletionKeywords,
                             bool CodeCompletionComments,
                             bool CodeCompletionAnnotateResults,
-                            bool CodeCompletionSourceFileInfo,
+                            bool CodeCompletionAddInitsToTopLevel,
+                            bool CodeCompletionCallPatternHeuristics,
                             bool CodeCompletionSourceText) {
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
@@ -936,7 +941,8 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
-  CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
+  CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
+  CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
 
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer(
@@ -1133,7 +1139,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                                  bool CodeCompletionKeywords,
                                  bool CodeCompletionComments,
                                  bool CodeCompletionAnnotateResults,
-                                 bool CodeCompletionSourceFileInfo,
+                                 bool CodeCompletionAddInitsToTopLevel,
+                                 bool CodeCompletionCallPatternHeuristics,
                                  bool CodeCompletionSourceText) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
@@ -1276,7 +1283,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
           // Consumer.
           ide::CodeCompletionContext CompletionContext(CompletionCache);
           CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
-          CompletionContext.setRequiresSourceFileInfo(CodeCompletionSourceFileInfo);
+          CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
+          CompletionContext.setCallPatternHeuristics(CodeCompletionCallPatternHeuristics);
           std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
               ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                       *Consumer));
@@ -1648,15 +1656,15 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
             SM, BufferID, Invocation.getMainFileSyntaxParsingCache(),
             syntaxArena);
 
-    ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
-                      Invocation.getLangOptions(),
-                      Invocation.getTypeCheckerOptions(),
-                      Invocation.getModuleName(),
-                      SynTreeCreator,
-                      Invocation.getMainFileSyntaxParsingCache());
+    ParserUnit Parser(
+        SM, SourceFileKind::Main, BufferID, Invocation.getLangOptions(),
+        Invocation.getTypeCheckerOptions(), Invocation.getSILOptions(),
+        Invocation.getModuleName(), SynTreeCreator,
+        Invocation.getMainFileSyntaxParsingCache());
 
     registerParseRequestFunctions(Parser.getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(Parser.getParser().Context.evaluator);
+    registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
 
     Parser.getDiagnosticEngine().addConsumer(PrintDiags);
 
@@ -1885,13 +1893,13 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   ParserUnit Parser(SM, SourceFileKind::Main, BufferID,
                     Invocation.getLangOptions(),
                     Invocation.getTypeCheckerOptions(),
-                    Invocation.getModuleName(),
-                    SynTreeCreator,
-                    Invocation.getMainFileSyntaxParsingCache());
+                    Invocation.getSILOptions(), Invocation.getModuleName(),
+                    SynTreeCreator, Invocation.getMainFileSyntaxParsingCache());
 
   registerParseRequestFunctions(Parser.getParser().Context.evaluator);
   registerTypeCheckerRequestFunctions(
       Parser.getParser().Context.evaluator);
+  registerClangImporterRequestFunctions(Parser.getParser().Context.evaluator);
 
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -2395,7 +2403,15 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto remangled = Demangle::mangleNode(typeNode);
+      auto mangling = Demangle::mangleNode(typeNode);
+      if (!mangling.isSuccess()) {
+        llvm::errs() << "Couldn't remangle type (failed at Node "
+                     << mangling.error().node << " with error "
+                     << mangling.error().code << ":" << mangling.error().line
+                     << ")\n";
+        return EXIT_FAILURE;
+      }
+      auto remangled = mangling.result();
 
       auto LTD = M->lookupLocalType(remangled);
 
@@ -3832,7 +3848,7 @@ int main(int argc, char *argv[]) {
         llvm::outs(), options::CodeCompletionKeywords,
         options::CodeCompletionComments,
         options::CodeCompletionSourceText,
-        options::CodeCOmpletionAnnotateResults);
+        options::CodeCompletionAnnotateResults);
     for (StringRef filename : options::InputFilenames) {
       auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(filename);
       if (!resultsOpt) {
@@ -3876,6 +3892,10 @@ int main(int argc, char *argv[]) {
   InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
+
+  if (!options::DefineAvailability.empty()) {
+    InitInvok.getLangOptions().AvailabilityMacros.push_back(options::DefineAvailability);
+  }
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
   InitInvok.getLangOptions().EnableCrossImportOverlays =
@@ -3924,6 +3944,12 @@ int main(int argc, char *argv[]) {
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
   }
+  if (!options::ToolsDirectory.empty()) {
+    SmallString<128> toolsDir(options::ToolsDirectory);
+    llvm::sys::path::append(toolsDir, "clang");
+    InitInvok.getClangImporterOptions().clangPath =
+        std::string(toolsDir);
+  }
   if (!options::ModuleCachePath.empty()) {
     // Honor the *last* -module-cache-path specified.
     InitInvok.getClangImporterOptions().ModuleCachePath =
@@ -3956,10 +3982,6 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
-  InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
-      options::CodeCompleteInitsInPostfixExpr;
-  InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=
-      options::CodeCompleteCallPatternHeuristics;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
@@ -4067,8 +4089,9 @@ int main(int argc, char *argv[]) {
                                      options::CodeCompletionDiagnostics,
                                      options::CodeCompletionKeywords,
                                      options::CodeCompletionComments,
-                                     options::CodeCOmpletionAnnotateResults,
-                                     options::CodeCompletionSourceFileInfo,
+                                     options::CodeCompletionAnnotateResults,
+                                     options::CodeCompleteInitsInPostfixExpr,
+                                     options::CodeCompleteCallPatternHeuristics,
                                      options::CodeCompletionSourceText);
     break;
 
@@ -4084,8 +4107,9 @@ int main(int argc, char *argv[]) {
                                 options::CodeCompletionDiagnostics,
                                 options::CodeCompletionKeywords,
                                 options::CodeCompletionComments,
-                                options::CodeCOmpletionAnnotateResults,
-                                options::CodeCompletionSourceFileInfo,
+                                options::CodeCompletionAnnotateResults,
+                                options::CodeCompleteInitsInPostfixExpr,
+                                options::CodeCompleteCallPatternHeuristics,
                                 options::CodeCompletionSourceText);
     break;
 

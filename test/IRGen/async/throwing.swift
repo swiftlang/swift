@@ -5,7 +5,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// UNSUPPORTED: use_os_stdlib
+// REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 // https://bugs.swift.org/browse/SR-14333

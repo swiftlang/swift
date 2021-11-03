@@ -10,6 +10,7 @@ let resultMinus = lhs - rhs
 let resultStar = lhs * rhs
 let resultSlash = lhs / rhs
 let resultPercent = lhs % rhs
+let resultCaret = lhs ^ rhs
 let resultAmp = lhs & rhs
 let resultPipe = lhs | rhs
 let resultLessLess = lhs << rhs

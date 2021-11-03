@@ -289,7 +289,7 @@ public:
   void clearNodeFactory() { Dem.clear(); }
 
   BuiltType decodeMangledType(Node *node);
-  
+
   ///
   /// Factory methods for all TypeRef kinds
   ///
@@ -300,12 +300,20 @@ public:
   }
 
   llvm::Optional<std::string> createTypeDecl(Node *node, bool &typeAlias) {
-    return Demangle::mangleNode(node);
+    auto mangling = Demangle::mangleNode(node);
+    if (!mangling.isSuccess()) {
+      return llvm::None;
+    }
+    return mangling.result();
   }
 
   BuiltProtocolDecl
   createProtocolDecl(Node *node) {
-    return std::make_pair(Demangle::mangleNode(node), false);
+    auto mangling = Demangle::mangleNode(node);
+    if (!mangling.isSuccess()) {
+      return llvm::None;
+    }
+    return std::make_pair(mangling.result(), false);
   }
 
   BuiltProtocolDecl
@@ -395,12 +403,16 @@ public:
       
       return underlyingTy->subst(*this, subs);
     }
-    
+
+    auto mangling = mangleNode(opaqueDescriptor,
+                               SymbolicResolver(),
+                               Dem);
+    if (!mangling.isSuccess())
+      return nullptr;
+
     // Otherwise, build a type ref that represents the opaque type.
     return OpaqueArchetypeTypeRef::create(*this,
-                                          mangleNode(opaqueDescriptor,
-                                                     SymbolicResolver(),
-                                                     Dem),
+                                          mangling.result(),
                                           nodeToString(opaqueDescriptor),
                                           ordinal,
                                           genericArgs);

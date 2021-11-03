@@ -116,7 +116,7 @@ ArgumentList *ArgumentList::createImplicit(ASTContext &ctx, SourceLoc lParenLoc,
 ArgumentList *ArgumentList::createImplicit(ASTContext &ctx,
                                            ArrayRef<Argument> args,
                                            AllocationArena arena) {
-  return createImplicit(ctx, SourceLoc(), args, SourceLoc());
+  return createImplicit(ctx, SourceLoc(), args, SourceLoc(), arena);
 }
 
 ArgumentList *ArgumentList::forImplicitSingle(ASTContext &ctx, Identifier label,
@@ -220,28 +220,35 @@ Optional<unsigned> ArgumentList::findArgumentExpr(Expr *expr,
 Expr *ArgumentList::packIntoImplicitTupleOrParen(
     ASTContext &ctx, llvm::function_ref<Type(Expr *)> getType) const {
   assert(!hasAnyInOutArgs() && "Cannot construct bare tuple/paren with inout");
+
+  // Make sure to preserve the source location info here and below as it may be
+  // needed for e.g serialization of its textual representation.
   if (auto *unary = getUnlabeledUnaryExpr()) {
-    auto *paren = new (ctx) ParenExpr(SourceLoc(), unary, SourceLoc());
+    auto *paren = new (ctx) ParenExpr(getLParenLoc(), unary, getRParenLoc());
     if (auto ty = getType(unary))
       paren->setType(ParenType::get(ctx, ty));
     paren->setImplicit();
     return paren;
   }
 
-  SmallVector<Expr *, 8> argExprs;
-  SmallVector<Identifier, 8> argLabels;
-  SmallVector<TupleTypeElt, 8> tupleEltTypes;
+  SmallVector<Expr *, 2> argExprs;
+  SmallVector<Identifier, 2> argLabels;
+  SmallVector<SourceLoc, 2> argLabelLocs;
+  SmallVector<TupleTypeElt, 2> tupleEltTypes;
 
   for (auto arg : *this) {
     auto *argExpr = arg.getExpr();
     argExprs.push_back(argExpr);
     argLabels.push_back(arg.getLabel());
+    argLabelLocs.push_back(arg.getLabelLoc());
     if (auto ty = getType(argExpr))
       tupleEltTypes.emplace_back(ty, arg.getLabel());
   }
   assert(tupleEltTypes.empty() || tupleEltTypes.size() == argExprs.size());
 
-  auto *tuple = TupleExpr::createImplicit(ctx, argExprs, argLabels);
+  auto *tuple =
+      TupleExpr::create(ctx, getLParenLoc(), argExprs, argLabels, argLabelLocs,
+                        getRParenLoc(), /*implicit*/ true);
   if (empty() || !tupleEltTypes.empty())
     tuple->setType(TupleType::get(tupleEltTypes, ctx));
 

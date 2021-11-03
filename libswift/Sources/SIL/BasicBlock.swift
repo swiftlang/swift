@@ -19,7 +19,7 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
   public var function: Function { SILBasicBlock_getFunction(bridged).function }
 
   public var description: String {
-    SILBasicBlock_debugDescription(bridged).takeString()
+    SILBasicBlock_debugDescription(bridged).string
   }
 
   public var arguments: ArgumentArray { ArgumentArray(block: self) }
@@ -67,6 +67,7 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
 }
 
 public func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
+public func != (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs !== rhs }
 
 public struct ArgumentArray : RandomAccessCollection {
   fileprivate let block: BasicBlock

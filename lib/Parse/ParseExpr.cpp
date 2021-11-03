@@ -1144,18 +1144,6 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         continue;
       }
 
-      // Handle the deprecated 'x.dynamicType' and migrate it to `type(of: x)`
-      if (Tok.getText() == "dynamicType") {
-        auto range = Result.get()->getSourceRange();
-        auto dynamicTypeExprRange = SourceRange(TokLoc, Tok.getLoc());
-        diagnose(TokLoc, diag::expr_dynamictype_deprecated)
-            .highlight(dynamicTypeExprRange)
-            .fixItReplace(dynamicTypeExprRange, ")")
-            .fixItInsert(range.Start, "type(of: ");
-
-        // fallthrough to an UnresolvedDotExpr.
-      }
-
       // Handle "x.<tab>" for code completion.
       if (Tok.is(tok::code_complete)) {
         assert(!InSwiftKeyPath);
@@ -3144,8 +3132,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                    Kind, [&] () -> ParserStatus {
     Identifier FieldName;
     SourceLoc FieldNameLoc;
-    if (Kind != SyntaxKind::YieldStmt)
-      parseOptionalArgumentLabel(FieldName, FieldNameLoc);
+    parseOptionalArgumentLabel(FieldName, FieldNameLoc);
 
     // See if we have an operator decl ref '(<op>)'. The operator token in
     // this case lexes as a binary operator because it neither leads nor

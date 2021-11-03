@@ -26,7 +26,6 @@
 #include <vector>
 
 #include "Debug.h"
-#include "ProtocolGraph.h"
 #include "RewriteContext.h"
 #include "RewriteSystem.h"
 
@@ -102,7 +101,6 @@ public:
   Type getSuperclassBound(
       TypeArrayView<GenericTypeParamType> genericParams,
       const MutableTerm &lookupTerm,
-      const ProtocolGraph &protos,
       RewriteContext &ctx) const;
 
   bool isConcreteType() const {
@@ -116,7 +114,6 @@ public:
   Type getConcreteType(
       TypeArrayView<GenericTypeParamType> genericParams,
       const MutableTerm &lookupTerm,
-      const ProtocolGraph &protos,
       RewriteContext &ctx) const;
 
   LayoutConstraint getLayoutConstraint() const {
@@ -139,13 +136,13 @@ public:
 /// Out-of-line methods are documented in PropertyMap.cpp.
 class PropertyMap {
   RewriteContext &Context;
+  RewriteSystem &System;
   std::vector<PropertyBag *> Entries;
   Trie<PropertyBag *, MatchKind::Longest> Trie;
 
   using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
   llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
 
-  const ProtocolGraph &Protos;
   DebugOptions Debug;
 
   PropertyBag *getOrCreateProperties(Term key);
@@ -156,18 +153,23 @@ class PropertyMap {
   PropertyMap &operator=(PropertyMap &&) = delete;
 
 public:
-  explicit PropertyMap(RewriteContext &ctx,
-                       const ProtocolGraph &protos)
-      : Context(ctx), Protos(protos) {
-    Debug = ctx.getDebugOptions();
+  explicit PropertyMap(RewriteSystem &system)
+      : Context(system.getRewriteContext()),
+        System(system) {
+    Debug = Context.getDebugOptions();
   }
 
   ~PropertyMap();
 
   PropertyBag *lookUpProperties(const MutableTerm &key) const;
 
+  std::pair<CompletionResult, unsigned>
+  buildPropertyMap(unsigned maxIterations,
+                   unsigned maxDepth);
+
   void dump(llvm::raw_ostream &out) const;
 
+private:
   void clear();
   void addProperty(Term key, Symbol property,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules);
@@ -176,7 +178,6 @@ public:
   void concretizeNestedTypesFromConcreteParents(
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const;
 
-private:
   void concretizeNestedTypesFromConcreteParent(
                    Term key, RequirementKind requirementKind,
                    CanType concreteType, ArrayRef<Term> substitutions,

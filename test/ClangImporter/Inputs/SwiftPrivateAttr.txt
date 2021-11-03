@@ -41,19 +41,19 @@ class __PrivFooSub : Foo {
 }
 func __privTest()
 struct S0 {
-  var __privValue: Int32
   init()
   init(__privValue: Int32)
+  var __privValue: Int32
 }
 struct __PrivS1 {
-  var value: Int32
   init()
   init(value: Int32)
+  var value: Int32
 }
 struct __PrivS2 {
-  var value: Int32
   init()
   init(value: Int32)
+  var value: Int32
 }
 var __PrivAnonymousA: Int { get }
 struct E0 : Equatable, RawRepresentable {

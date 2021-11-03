@@ -984,7 +984,8 @@ void LargeValueVisitor::visitTupleInst(SingleValueInstruction *instr) {
 
 void LargeValueVisitor::visitAllocStackInst(AllocStackInst *instr) {
   SILType currSILType = instr->getType().getObjectType();
-  if (getInnerFunctionType(currSILType)) {
+  if (pass.containsDifferentFunctionSignature(pass.F->getLoweredFunctionType(),
+                                              currSILType)) {
     pass.allocStackInstsToMod.push_back(instr);
   }
 }

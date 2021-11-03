@@ -219,7 +219,7 @@ ValueOwnershipKind::ValueOwnershipKind(StringRef S)
                     .Case("unowned", OwnershipKind::Unowned)
                     .Case("owned", OwnershipKind::Owned)
                     .Case("guaranteed", OwnershipKind::Guaranteed)
-                    .Case("any", OwnershipKind::None)
+                    .Case("none", OwnershipKind::None)
                     .Default(None);
   if (!Result.hasValue())
     llvm_unreachable("Invalid string representation of ValueOwnershipKind");

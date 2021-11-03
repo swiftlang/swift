@@ -80,17 +80,20 @@ void SILFunctionBuilder::addFunctionAttributes(
     if (hasSPI) {
       spiGroupIdent = spiGroups[0];
     }
+    auto availability =
+      AvailabilityInference::annotatedAvailableRangeForAttr(SA,
+         M.getSwiftModule()->getASTContext());
     if (targetFunctionDecl) {
       SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
       targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
       F->addSpecializeAttr(SILSpecializeAttr::create(
           M, SA->getSpecializedSignature(), SA->isExported(), kind,
           targetFunction, spiGroupIdent,
-          attributedFuncDecl->getModuleContext()));
+          attributedFuncDecl->getModuleContext(), availability));
     } else {
       F->addSpecializeAttr(SILSpecializeAttr::create(
           M, SA->getSpecializedSignature(), SA->isExported(), kind, nullptr,
-          spiGroupIdent, attributedFuncDecl->getModuleContext()));
+          spiGroupIdent, attributedFuncDecl->getModuleContext(), availability));
     }
   }
 
@@ -101,6 +104,12 @@ void SILFunctionBuilder::addFunctionAttributes(
   // @_silgen_name and @_cdecl functions may be called from C code somewhere.
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
+
+  if (Attrs.hasAttribute<NoLocksAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoLocks);
+  } else if (Attrs.hasAttribute<NoAllocationAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::NoAllocation);
+  }
 
   // Validate `@differentiable` attributes by calling `getParameterIndices`.
   // This is important for:
@@ -181,10 +190,13 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     // assert.
     assert(mod.getStage() == SILStage::Raw ||
            fn->getLoweredFunctionType() == constantType);
+    auto linkageForDef = constant.getLinkage(ForDefinition_t::ForDefinition);
+    auto fnLinkage = fn->getLinkage();
     assert(mod.getStage() == SILStage::Raw || fn->getLinkage() == linkage ||
            (forDefinition == ForDefinition_t::NotForDefinition &&
-            fn->getLinkage() ==
-                constant.getLinkage(ForDefinition_t::ForDefinition)));
+            (fnLinkage == linkageForDef ||
+             (linkageForDef == SILLinkage::PublicNonABI &&
+              fnLinkage == SILLinkage::SharedExternal))));
     if (forDefinition) {
       // In all the cases where getConstantLinkage returns something
       // different for ForDefinition, it returns an available-externally

@@ -7,7 +7,7 @@
 // CHECK:         [[NEW_SELF:%.*]] = apply [[SUPER_INIT]]
 
 // CHECK-LABEL: sil hidden [noinline] @$s10super_init3BarC{{[_0-9a-zA-Z]*}}fc
-// CHECK-NOT:     super_method [[ORIG_SELF]] : $Bar, #Foo.init!initializer
+// CHECK-NOT:     super_method
 // CHECK:         function_ref @$s10super_init3FooCACycfc
 
 class Foo {

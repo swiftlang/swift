@@ -25,6 +25,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VersionTuple.h"
+#include <array>
 #include <string>
 
 namespace swift {
@@ -181,7 +182,7 @@ std::string getSwiftFullVersion(Version effectiveLanguageVersion =
 
 /// Retrieves the repository revision number (or identifier) from which
 /// this Swift was built.
-std::string getSwiftRevision();
+StringRef getSwiftRevision();
 
 } // end namespace version
 } // end namespace swift

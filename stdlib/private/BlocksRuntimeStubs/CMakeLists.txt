@@ -11,7 +11,7 @@ foreach(SDK ${SWIFT_SDKS})
 
       set(test_bin_dir "${SWIFT_BINARY_DIR}/test${VARIANT_SUFFIX}")
 
-      _add_swift_target_library_single(
+      add_swift_target_library_single(
         BlocksRuntimeStub${VARIANT_SUFFIX}
         BlocksRuntimeStub
         SHARED NOSWIFTRT

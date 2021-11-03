@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
+#include "GenericSignatureBuilder.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -28,7 +29,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
@@ -67,7 +67,6 @@
 #include <algorithm>
 #include <memory>
 
-#include "RequirementMachine/RequirementMachine.h"
 #include "RequirementMachine/RewriteContext.h"
 
 using namespace swift;
@@ -538,14 +537,6 @@ struct ASTContext::Implementation {
 
   /// Memory allocation arena for the term rewriting system.
   std::unique_ptr<rewriting::RewriteContext> TheRewriteContext;
-
-  /// Stored requirement machines for canonical generic signatures.
-  ///
-  /// This should come after TheRewriteContext above, since various destructors
-  /// compile stats in the histograms stored in our RewriteContext.
-  llvm::DenseMap<GenericSignature,
-                 std::unique_ptr<rewriting::RequirementMachine>>
-    RequirementMachines;
 };
 
 ASTContext::Implementation::Implementation()
@@ -592,12 +583,11 @@ void ASTContext::operator delete(void *Data) throw() {
 }
 
 ASTContext *ASTContext::get(LangOptions &langOpts,
-                            TypeCheckerOptions &typeckOpts,
+                            TypeCheckerOptions &typeckOpts, SILOptions &silOpts,
                             SearchPathOptions &SearchPathOpts,
                             ClangImporterOptions &ClangImporterOpts,
                             symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
-                            SourceManager &SourceMgr,
-                            DiagnosticEngine &Diags) {
+                            SourceManager &SourceMgr, DiagnosticEngine &Diags) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
   // constraints.
@@ -609,33 +599,28 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
       llvm::alignAddr(impl, llvm::Align(alignof(Implementation))));
   new (impl) Implementation();
   return new (mem)
-      ASTContext(langOpts, typeckOpts, SearchPathOpts, ClangImporterOpts,
-                 SymbolGraphOpts, SourceMgr, Diags);
+      ASTContext(langOpts, typeckOpts, silOpts, SearchPathOpts,
+                 ClangImporterOpts, SymbolGraphOpts, SourceMgr, Diags);
 }
 
 ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
-                       SearchPathOptions &SearchPathOpts,
+                       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
                        ClangImporterOptions &ClangImporterOpts,
                        symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                        SourceManager &SourceMgr, DiagnosticEngine &Diags)
-  : LangOpts(langOpts),
-    TypeCheckerOpts(typeckOpts),
-    SearchPathOpts(SearchPathOpts),
-    ClangImporterOpts(ClangImporterOpts),
-    SymbolGraphOpts(SymbolGraphOpts),
-    SourceMgr(SourceMgr), Diags(Diags),
-    evaluator(Diags, langOpts),
-    TheBuiltinModule(createBuiltinModule(*this)),
-    StdlibModuleName(getIdentifier(STDLIB_NAME)),
-    SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
-    TheErrorType(
-      new (*this, AllocationArena::Permanent)
-        ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
-    TheUnresolvedType(new (*this, AllocationArena::Permanent)
-                      UnresolvedType(*this)),
-    TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
-    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
-                                            /*HasExplicitAnyObject=*/false)),
+    : LangOpts(langOpts), TypeCheckerOpts(typeckOpts), SILOpts(silOpts),
+      SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
+      SymbolGraphOpts(SymbolGraphOpts), SourceMgr(SourceMgr), Diags(Diags),
+      evaluator(Diags, langOpts), TheBuiltinModule(createBuiltinModule(*this)),
+      StdlibModuleName(getIdentifier(STDLIB_NAME)),
+      SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
+      TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(
+          *this, Type(), RecursiveTypeProperties::HasError)),
+      TheUnresolvedType(new (*this, AllocationArena::Permanent)
+                            UnresolvedType(*this)),
+      TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
+      TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
+                                              /*HasExplicitAnyObject=*/false)),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
@@ -1651,6 +1636,45 @@ void ASTContext::addModuleInterfaceChecker(
   getImpl().InterfaceChecker = std::move(checker);
 }
 
+void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
+  // This setter should be called only once after ASTContext has been initialized
+  assert(ModuleAliasMap.empty());
+  
+  for (auto k: aliasMap.keys()) {
+    auto v = aliasMap.lookup(k);
+    if (!v.empty()) {
+      auto key = getIdentifier(k);
+      auto val = getIdentifier(v);
+      // key is a module alias, val is its corresponding real name
+      ModuleAliasMap[key] = std::make_pair(val, true);
+      // add an entry with an alias as key for an easier lookup later
+      ModuleAliasMap[val] = std::make_pair(key, false);
+    }
+  }
+}
+
+Identifier ASTContext::getRealModuleName(Identifier key, bool alwaysReturnRealName, bool lookupAliasFromReal) const {
+  auto found = ModuleAliasMap.find(key);
+  if (found == ModuleAliasMap.end())
+    return key;
+
+  // Found an entry
+  auto realOrAlias = found->second;
+
+  // If alwaysReturnRealName, return the real name if the key is an
+  // alias or the key itself since that's the real name
+  if (alwaysReturnRealName) {
+     return realOrAlias.second ? realOrAlias.first : key;
+  }
+
+  // If lookupAliasFromReal, and the found entry should be keyed by a real
+  // name, return the entry value, otherwise, return an empty Identifier.
+  if (lookupAliasFromReal == realOrAlias.second)
+      return Identifier();
+
+  return realOrAlias.first;
+}
+
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     StringRef moduleName, bool isUnderlyingClangModule,
     ModuleDependenciesCache &cache, InterfaceSubContextDelegate &delegate,
@@ -1662,7 +1686,11 @@ Optional<ModuleDependencies> ASTContext::getModuleDependencies(
     if (!isUnderlyingClangModule) {
       if (auto found = cache.findDependencies(
               moduleName,
-              {ModuleDependenciesKind::SwiftTextual, searchPathSet}))
+              {ModuleDependenciesKind::SwiftSource, searchPathSet}))
+        return found;
+      if (auto found = cache.findDependencies(
+              moduleName,
+              {ModuleDependenciesKind::SwiftInterface, searchPathSet}))
         return found;
       if (auto found = cache.findDependencies(
               moduleName, {ModuleDependenciesKind::SwiftBinary, searchPathSet}))
@@ -1842,12 +1870,27 @@ ASTContext::getLoadedModules() const {
 }
 
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
-  return getImpl().LoadedModules.lookup(ModuleName);
+  // Look up a loaded module using an actual module name (physical name
+  // on disk). If the -module-alias option is used, the module name that
+  // appears in source code will be different from the real module name
+  // on disk, otherwise the same.
+  //
+  // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
+  // and a source file has 'import Foo', a module called Bar (real name)
+  // will be loaded and returned.
+  auto realName = getRealModuleName(ModuleName);
+  return getImpl().LoadedModules.lookup(realName);
 }
 
 void ASTContext::addLoadedModule(ModuleDecl *M) {
   assert(M);
-  getImpl().LoadedModules[M->getName()] = M;
+  // Add a loaded module using an actual module name (physical name
+  // on disk), in case -module-alias is used (otherwise same).
+  //
+  // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
+  // and a source file has 'import Foo', a module called Bar (real name)
+  // will be loaded and added to the map.
+  getImpl().LoadedModules[M->getRealName()] = M;
 }
 
 void ASTContext::registerGenericSignatureBuilder(
@@ -1961,32 +2004,7 @@ ASTContext::getOrCreateRequirementMachine(CanGenericSignature sig) {
   if (!rewriteCtx)
     rewriteCtx.reset(new rewriting::RewriteContext(*this));
 
-  // Check whether we already have a requirement machine for this
-  // signature.
-  auto &machines = getImpl().RequirementMachines;
-
-  auto &machinePtr = machines[sig];
-  if (machinePtr) {
-    auto *machine = machinePtr.get();
-    if (!machine->isComplete()) {
-      llvm::errs() << "Re-entrant construction of requirement "
-                   << "machine for " << sig << "\n";
-      abort();
-    }
-
-    return machine;
-  }
-
-  auto *machine = new rewriting::RequirementMachine(*rewriteCtx);
-
-  // Store this requirement machine before adding the signature,
-  // to catch re-entrant construction via addGenericSignature()
-  // below.
-  machinePtr.reset(machine);
-
-  machine->addGenericSignature(sig);
-
-  return machine;
+  return rewriteCtx->getRequirementMachine(sig);
 }
 
 bool ASTContext::isRecursivelyConstructingRequirementMachine(
@@ -1995,13 +2013,16 @@ bool ASTContext::isRecursivelyConstructingRequirementMachine(
   if (!rewriteCtx)
     return false;
 
-  auto &machines = getImpl().RequirementMachines;
+  return rewriteCtx->isRecursivelyConstructingRequirementMachine(sig);
+}
 
-  auto found = machines.find(sig);
-  if (found == machines.end())
-    return false;
+rewriting::RequirementMachine *
+ASTContext::getOrCreateRequirementMachine(const ProtocolDecl *proto) {
+  auto &rewriteCtx = getImpl().TheRewriteContext;
+  if (!rewriteCtx)
+    rewriteCtx.reset(new rewriting::RewriteContext(*this));
 
-  return !found->second->isComplete();
+  return rewriteCtx->getRequirementMachine(proto);
 }
 
 Optional<llvm::TinyPtrVector<ValueDecl *>>
@@ -2124,7 +2145,7 @@ void ASTContext::getVisibleTopLevelModuleNames(
 
   // Sort and unique.
   std::sort(names.begin(), names.end(), [](Identifier LHS, Identifier RHS) {
-    return LHS.str().compare_lower(RHS.str()) < 0;
+    return LHS.str().compare_insensitive(RHS.str()) < 0;
   });
   names.erase(std::unique(names.begin(), names.end()), names.end());
 }
@@ -3457,12 +3478,12 @@ Type AnyFunctionType::Param::getParameterType(bool forCanonical,
 }
 
 Type AnyFunctionType::composeTuple(ASTContext &ctx, ArrayRef<Param> params,
-                                   bool canonicalVararg) {
+                                   bool wantParamFlags) {
   SmallVector<TupleTypeElt, 4> elements;
   for (const auto &param : params) {
-    Type eltType = param.getParameterType(canonicalVararg, &ctx);
-    elements.emplace_back(eltType, param.getLabel(),
-                          param.getParameterFlags());
+    auto flags = wantParamFlags ? param.getParameterFlags()
+                                : ParameterTypeFlags();
+    elements.emplace_back(param.getParameterType(), param.getLabel(), flags);
   }
   return TupleType::get(elements, ctx);
 }
@@ -4254,13 +4275,11 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
   }
 # endif
 #endif
-  auto signature = evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        Decl->getOpaqueInterfaceGenericSignature().getPointer(),
+  auto signature = buildGenericSignature(
+        ctx,
+        Decl->getOpaqueInterfaceGenericSignature(),
         /*genericParams=*/{ },
-        std::move(newRequirements)},
-      nullptr);
+        std::move(newRequirements));
 
   auto reqs = signature->getLocalRequirements(opaqueParamType);
   auto superclass = reqs.superclass;
@@ -4840,6 +4859,7 @@ bool ASTContext::isTypeBridgedInExternalModule(
           // bridging implementations of CG types appear in the Foundation
           // module.
           nominal->getParentModule()->getName() == Id_CoreGraphics ||
+          nominal->getParentModule()->getName() == Id_CoreFoundation ||
           // CoreMedia is a dependency of AVFoundation, but the bridged
           // NSValue implementations for CMTime, CMTimeRange, and
           // CMTimeMapping are provided by AVFoundation, and AVFoundation
@@ -5025,10 +5045,10 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
   auto genericParam = GenericTypeParamType::get(0, 0, *this);
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           existential);
-  auto genericSig = evaluateOrDefault(
-      evaluator,
-      AbstractGenericSignatureRequest{nullptr, {genericParam}, {requirement}},
-      GenericSignature());
+  auto genericSig = buildGenericSignature(*this,
+                                          GenericSignature(),
+                                          {genericParam},
+                                          {requirement});
 
   CanGenericSignature canGenericSig(genericSig);
 
@@ -5126,13 +5146,9 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     }
   }
 
-  auto genericSig = evaluateOrDefault(
-      evaluator,
-      AbstractGenericSignatureRequest{
-        derivedClassSig.getPointer(),
-        std::move(addedGenericParams),
-        std::move(addedRequirements)},
-      GenericSignature());
+  auto genericSig = buildGenericSignature(*this, derivedClassSig,
+                                          std::move(addedGenericParams),
+                                          std::move(addedRequirements));
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
 }
@@ -5159,9 +5175,9 @@ bool ASTContext::overrideGenericSignatureReqsSatisfied(
 
   switch (direction) {
   case OverrideGenericSignatureReqCheck::BaseReqSatisfiedByDerived:
-    return sig->requirementsNotSatisfiedBy(derivedSig).empty();
+    return sig.requirementsNotSatisfiedBy(derivedSig).empty();
   case OverrideGenericSignatureReqCheck::DerivedReqSatisfiedByBase:
-    return derivedSig->requirementsNotSatisfiedBy(sig).empty();
+    return derivedSig.requirementsNotSatisfiedBy(sig).empty();
   }
   llvm_unreachable("Unhandled OverrideGenericSignatureReqCheck in switch");
 }

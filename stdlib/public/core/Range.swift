@@ -388,12 +388,14 @@ extension Range: CustomDebugStringConvertible {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension Range: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
   }
 }
+#endif
 
 extension Range: Equatable {
   /// Returns a Boolean value indicating whether two ranges are equal.

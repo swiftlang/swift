@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend %s -S -g -o - | %FileCheck %s
 
-// REQUIRES: rdar73761019
-
 func markUsed<T>(_ t: T) {}
 // CHECK: {{_?}}main:
 // CHECK: Lfunc_begin0:
@@ -9,7 +7,7 @@ func markUsed<T>(_ t: T) {}
 // proceeds to the first line.
 // CHECK: .loc    {{[0-9]}} 0 {{[0-9]}}
 // CHECK-NOT: Lfunc_end0:
-// CHECK: .loc    {{[0-9]}} [[@LINE+1]] {{[0-9]}} prologue_end
+// CHECK: .loc    {{[0-9]+}} {{[1-9][0-9]*}} {{[0-9]+}} prologue_end
 var a = 1
 var b = 2
 markUsed(a+b)
