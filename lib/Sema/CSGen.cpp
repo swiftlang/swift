@@ -1318,6 +1318,11 @@ namespace {
       if (result->hasError()) {
         return Type();
       }
+      // Diagnose top-level usages of placeholder types.
+      if (isa<TopLevelCodeDecl>(CS.DC) && isa<PlaceholderTypeRepr>(repr)) {
+        CS.getASTContext().Diags.diagnose(repr->getLoc(),
+                                          diag::placeholder_type_not_allowed);
+      }
       return result;
     }
 
