@@ -929,6 +929,101 @@ public:
                     llvm::function_ref<bool(AbstractFunctionDecl *)>predicate);
 };
 
+/// A system for recording and probing the intergrity of a type witness solution
+/// for a set of unresolved associated type declarations.
+///
+/// Right now can reason only about abstract type witnesses, i.e., same-type
+/// constraints, default type definitions, and bindings to generic parameters.
+class TypeWitnessSystem final {
+  /// Equivalence classes are used on demand to express equivalences between
+  /// witness candidates and reflect changes to resolved types across their
+  /// members.
+  struct EquivalenceClass final {
+    /// The resolved type for witness candidates belonging to this equivalence
+    /// class. The resolved type may be a type parameter, but cannot directly
+    /// pertain to a name variable in the system; instead, witness candidates
+    /// that should resolve to the same type share an equivalence class.
+    Type ResolvedTy;
+
+    EquivalenceClass(const EquivalenceClass &) = delete;
+    EquivalenceClass(EquivalenceClass &&) = delete;
+    EquivalenceClass &operator=(const EquivalenceClass &) = delete;
+    EquivalenceClass &operator=(EquivalenceClass &&) = delete;
+  };
+
+  /// A type witness candidate for a name variable.
+  struct TypeWitnessCandidate final {
+    /// The defaulted associated type declaration correlating with this
+    /// candidate, if present.
+    const AssociatedTypeDecl *DefaultedAssocType;
+
+    /// The equivalence class of this candidate.
+    EquivalenceClass *EquivClass;
+  };
+
+  /// The set of equivalence classes in the system.
+  llvm::SmallPtrSet<EquivalenceClass *, 4> EquivalenceClasses;
+
+  /// The mapping from name variables (the names of unresolved associated
+  /// type declarations) to their corresponding type witness candidates.
+  llvm::SmallDenseMap<Identifier, TypeWitnessCandidate, 4> TypeWitnesses;
+
+public:
+  TypeWitnessSystem(ArrayRef<AssociatedTypeDecl *> assocTypes);
+  ~TypeWitnessSystem();
+
+  TypeWitnessSystem(const TypeWitnessSystem &) = delete;
+  TypeWitnessSystem(TypeWitnessSystem &&) = delete;
+  TypeWitnessSystem &operator=(const TypeWitnessSystem &) = delete;
+  TypeWitnessSystem &operator=(TypeWitnessSystem &&) = delete;
+
+  /// Get the resolved type witness for the associated type with the given name.
+  Type getResolvedTypeWitness(Identifier name) const;
+  bool hasResolvedTypeWitness(Identifier name) const;
+
+  /// Get the defaulted associated type relating to the resolved type witness
+  /// for the associated type with the given name, if present.
+  const AssociatedTypeDecl *getDefaultedAssocType(Identifier name) const;
+
+  /// Record a type witness for the given associated type name.
+  ///
+  /// \note This need not lead to the resolution of a type witness, e.g.
+  /// an associated type may be defaulted to another.
+  void addTypeWitness(Identifier name, Type type);
+
+  /// Record a default type witness.
+  ///
+  /// \param defaultedAssocType The specific associated type declaration that
+  /// defines the given default type.
+  ///
+  /// \note This need not lead to the resolution of a type witness.
+  void addDefaultTypeWitness(Type type,
+                             const AssociatedTypeDecl *defaultedAssocType);
+
+  /// Record the given same-type requirement, if regarded of interest to
+  /// the system.
+  ///
+  /// \note This need not lead to the resolution of a type witness.
+  void addSameTypeRequirement(const Requirement &req);
+
+  void dump(llvm::raw_ostream &out,
+            const NormalProtocolConformance *conformance) const;
+
+private:
+  /// Form an equivalence between the given name variables.
+  void addEquivalence(Identifier name1, Identifier name2);
+
+  /// Merge \p equivClass2 into \p equivClass1.
+  ///
+  /// \note This will delete \p equivClass2 after migrating its members to
+  /// \p equivClass1.
+  void mergeEquivalenceClasses(EquivalenceClass *equivClass1,
+                               const EquivalenceClass *equivClass2);
+
+  /// Determine whether \p ty1 is a better resolved type than \p ty2.
+  static bool isBetterResolvedType(Type ty1, Type ty2);
+};
+
 /// Captures the state needed to infer associated types.
 class AssociatedTypeInference {
   /// The type checker we'll need to validate declarations etc.

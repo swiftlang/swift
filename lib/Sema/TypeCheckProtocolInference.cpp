@@ -2107,6 +2107,245 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   return None;
 }
 
+TypeWitnessSystem::TypeWitnessSystem(
+    ArrayRef<AssociatedTypeDecl *> assocTypes) {
+  for (auto *assocType : assocTypes) {
+    this->TypeWitnesses.try_emplace(assocType->getName());
+  }
+}
+
+TypeWitnessSystem::~TypeWitnessSystem() {
+  for (auto *equivClass : this->EquivalenceClasses) {
+    delete equivClass;
+  }
+}
+
+bool TypeWitnessSystem::hasResolvedTypeWitness(Identifier name) const {
+  return (bool)getResolvedTypeWitness(name);
+}
+
+Type TypeWitnessSystem::getResolvedTypeWitness(Identifier name) const {
+  assert(this->TypeWitnesses.count(name));
+
+  if (auto *equivClass = this->TypeWitnesses.lookup(name).EquivClass) {
+    return equivClass->ResolvedTy;
+  }
+
+  return Type();
+}
+
+const AssociatedTypeDecl *
+TypeWitnessSystem::getDefaultedAssocType(Identifier name) const {
+  assert(this->TypeWitnesses.count(name));
+
+  return this->TypeWitnesses.lookup(name).DefaultedAssocType;
+}
+
+void TypeWitnessSystem::addTypeWitness(Identifier name, Type type) {
+  assert(this->TypeWitnesses.count(name));
+
+  if (const auto *depTy = type->getAs<DependentMemberType>()) {
+    // If the type corresponds to a name variable in the system, form an
+    // equivalence between variables.
+    if (depTy->getBase()->is<GenericTypeParamType>()) {
+      if (this->TypeWitnesses.count(depTy->getName())) {
+        return addEquivalence(name, depTy->getName());
+      }
+    } else {
+      while (depTy->getBase()->is<DependentMemberType>()) {
+        depTy = depTy->getBase()->castTo<DependentMemberType>();
+      }
+
+      // Equivalences of the form 'Self.X == Self.X.*' do not contribute
+      // to solving the system, so just ignore them.
+      if (name == depTy->getName()) {
+        return;
+      }
+    }
+  }
+
+  auto &tyWitness = this->TypeWitnesses[name];
+
+  // Assume that the type resolves the type witness.
+  //
+  // If we already have a resolved type, keep going only if the new one is
+  // better.
+  if (tyWitness.EquivClass && tyWitness.EquivClass->ResolvedTy) {
+    if (!isBetterResolvedType(type, tyWitness.EquivClass->ResolvedTy)) {
+      return;
+    }
+  }
+
+  // If we can find an existing equivalence class for this type, use it.
+  for (auto *const equivClass : this->EquivalenceClasses) {
+    if (equivClass->ResolvedTy && equivClass->ResolvedTy->isEqual(type)) {
+      if (tyWitness.EquivClass) {
+        mergeEquivalenceClasses(equivClass, tyWitness.EquivClass);
+      } else {
+        tyWitness.EquivClass = equivClass;
+      }
+
+      return;
+    }
+  }
+
+  if (tyWitness.EquivClass) {
+    tyWitness.EquivClass->ResolvedTy = type;
+  } else {
+    auto *equivClass = new EquivalenceClass{type};
+    this->EquivalenceClasses.insert(equivClass);
+
+    tyWitness.EquivClass = equivClass;
+  }
+}
+
+void TypeWitnessSystem::addDefaultTypeWitness(
+    Type type, const AssociatedTypeDecl *defaultedAssocType) {
+  const auto name = defaultedAssocType->getName();
+  assert(this->TypeWitnesses.count(name));
+
+  auto &tyWitness = this->TypeWitnesses[name];
+  assert(!hasResolvedTypeWitness(name) && "already resolved a type witness");
+  assert(!tyWitness.DefaultedAssocType &&
+         "already recorded a default type witness");
+
+  // Set the defaulted associated type.
+  tyWitness.DefaultedAssocType = defaultedAssocType;
+
+  // Record the type witness.
+  addTypeWitness(name, type);
+}
+
+void TypeWitnessSystem::addSameTypeRequirement(const Requirement &req) {
+  assert(req.getKind() == RequirementKind::SameType);
+
+  auto *const depTy1 = req.getFirstType()->getAs<DependentMemberType>();
+  auto *const depTy2 = req.getSecondType()->getAs<DependentMemberType>();
+
+  // Equivalences other than 'Self.X == ...' (or '... == Self.X'), where
+  // 'X' is a name variable in this system, do not contribute to solving
+  // the system.
+  if (depTy1 && depTy1->getBase()->is<GenericTypeParamType>() &&
+      this->TypeWitnesses.count(depTy1->getName())) {
+    addTypeWitness(depTy1->getName(), req.getSecondType());
+  } else if (depTy2 && depTy2->getBase()->is<GenericTypeParamType>() &&
+             this->TypeWitnesses.count(depTy2->getName())) {
+    addTypeWitness(depTy2->getName(), req.getFirstType());
+  }
+}
+
+void TypeWitnessSystem::dump(
+    llvm::raw_ostream &out,
+    const NormalProtocolConformance *conformance) const {
+  llvm::SmallVector<Identifier, 4> sortedNames;
+  sortedNames.reserve(this->TypeWitnesses.size());
+
+  for (const auto &pair : this->TypeWitnesses) {
+    sortedNames.push_back(pair.first);
+  }
+
+  // Deterministic ordering.
+  llvm::array_pod_sort(sortedNames.begin(), sortedNames.end(),
+                       [](const Identifier *lhs, const Identifier *rhs) -> int {
+                         return lhs->compare(*rhs);
+                       });
+
+  out << "Abstract type witness system for conformance"
+      << " of " << conformance->getType() << " to "
+      << conformance->getProtocol()->getName() << ": {\n";
+
+  for (const auto &name : sortedNames) {
+    out.indent(2) << name << " => ";
+
+    const auto *eqClass = this->TypeWitnesses.lookup(name).EquivClass;
+    if (eqClass) {
+      if (eqClass->ResolvedTy) {
+        out << eqClass->ResolvedTy;
+      } else {
+        out << "(unresolved)";
+      }
+    } else {
+      out << "(unresolved)";
+    }
+
+    if (eqClass) {
+      out << ", " << eqClass;
+    }
+    out << "\n";
+  }
+  out << "}\n";
+}
+
+void TypeWitnessSystem::addEquivalence(Identifier name1, Identifier name2) {
+  assert(this->TypeWitnesses.count(name1));
+  assert(this->TypeWitnesses.count(name2));
+
+  if (name1 == name2) {
+    return;
+  }
+
+  auto &tyWitness1 = this->TypeWitnesses[name1];
+  auto &tyWitness2 = this->TypeWitnesses[name2];
+
+  // If both candidates are associated with existing equivalence classes,
+  // merge them.
+  if (tyWitness1.EquivClass && tyWitness2.EquivClass) {
+    mergeEquivalenceClasses(tyWitness1.EquivClass, tyWitness2.EquivClass);
+    return;
+  }
+
+  if (tyWitness1.EquivClass) {
+    tyWitness2.EquivClass = tyWitness1.EquivClass;
+  } else if (tyWitness2.EquivClass) {
+    tyWitness1.EquivClass = tyWitness2.EquivClass;
+  } else {
+    // Neither has an associated equivalence class.
+    auto *equivClass = new EquivalenceClass{nullptr};
+    this->EquivalenceClasses.insert(equivClass);
+
+    tyWitness1.EquivClass = equivClass;
+    tyWitness2.EquivClass = equivClass;
+  }
+}
+
+void TypeWitnessSystem::mergeEquivalenceClasses(
+    EquivalenceClass *equivClass1, const EquivalenceClass *equivClass2) {
+  assert(equivClass1 && equivClass2);
+  if (equivClass1 == equivClass2) {
+    return;
+  }
+
+  // Merge the second resolved type into the first.
+  if (equivClass1->ResolvedTy && equivClass2->ResolvedTy) {
+    if (isBetterResolvedType(equivClass2->ResolvedTy,
+                             equivClass1->ResolvedTy)) {
+      equivClass1->ResolvedTy = equivClass2->ResolvedTy;
+    }
+  } else if (equivClass2->ResolvedTy) {
+    equivClass1->ResolvedTy = equivClass2->ResolvedTy;
+  }
+
+  // Migrate members of the second equivalence class to the first.
+  for (auto &pair : this->TypeWitnesses) {
+    if (pair.second.EquivClass == equivClass2) {
+      pair.second.EquivClass = equivClass1;
+    }
+  }
+
+  // Finally, dispose of the second equivalence class.
+  this->EquivalenceClasses.erase(const_cast<EquivalenceClass *>(equivClass2));
+  delete equivClass2;
+}
+
+bool TypeWitnessSystem::isBetterResolvedType(Type ty1, Type ty2) {
+  assert(ty1 && ty2);
+  assert(
+      (ty1->isTypeParameter() || ty2->isTypeParameter() || ty1->isEqual(ty2)) &&
+      "Ambigious concrete resolved type");
+
+  return !ty1->isTypeParameter() && ty2->isTypeParameter();
+}
+
 void ConformanceChecker::resolveTypeWitnesses() {
   // Attempt to infer associated type witnesses.
   AssociatedTypeInference inference(getASTContext(), Conformance);
