@@ -450,11 +450,10 @@ ConstructorDecl *DIMemoryObjectInfo::getActorInitSelf() const {
       // is it for an actor?
       if (decl->isAnyActor())
         if (auto *silFn = MemoryInst->getFunction())
-          // is it a designated initializer?
+          // are we in a constructor?
           if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
                             silFn->getDeclContext()->getAsDecl()))
-            if (ctor->isDesignatedInit())
-              return ctor;
+            return ctor;
 
   return nullptr;
 }

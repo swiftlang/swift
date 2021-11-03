@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
-class NotConcurrent { } // expected-note 26{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
+class NotConcurrent { } // expected-note 25{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on actor operations
@@ -29,7 +29,7 @@ actor A2 {
   }
 
   convenience init(delegatingAsync value: NotConcurrent) async {
-    await self.init(valueAsync: value) // expected-warning{{non-sendable type 'NotConcurrent' passed in call to actor-isolated initializer 'init(valueAsync:)' cannot cross actor boundary}}
+    await self.init(valueAsync: value)
   }
 }
 

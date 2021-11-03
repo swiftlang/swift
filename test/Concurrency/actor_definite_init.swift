@@ -53,11 +53,9 @@ actor Convenient {
     init(throwyDesignated val: Int) throws {
         guard val > 0 else { throw BogusError.blah }
         self.x = 10
-        say(msg: "hello?")  // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        say(msg: "hello?")
 
-        Task { self }       // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        Task { self }
     }
 
     init(asyncThrowyDesignated val: Int) async throws {
@@ -114,104 +112,38 @@ actor MyActor {
         _ = self.x
         self.y = self.x
 
-        Task { self }     // expected-warning{{actor 'self' can only be captured by a closure from an async initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        Task { self } // expected-note 2 {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
 
-        self.helloWorld() // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        self.x = randomInt()  // expected-warning {{cannot access property 'x' here in non-isolated initializer}}
 
-        callMethod(self) // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                         // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        callMethod(self) // expected-note 5 {{after calling global function 'callMethod', only non-isolated properties of 'self' can be accessed from this init}}
 
-        passInout(&self.x) // expected-warning{{actor 'self' can only be passed 'inout' from an async initializer}}
+        passInout(&self.x) // expected-warning {{cannot access property 'x' here in non-isolated initializer}}
 
-        self.x = self.y
-        self.x = randomInt()
+        if c {
+          // expected-warning@+2 {{cannot access property 'y' here in non-isolated initializer}}
+          // expected-warning@+1 {{cannot access property 'x' here in non-isolated initializer}}
+          self.x = self.y
+        }
+
+        // expected-warning@+2 {{cannot access property 'y' here in non-isolated initializer}}
+        // expected-warning@+1 {{cannot access property 'x' here in non-isolated initializer}}
         (_, _) = (self.x, self.y)
-        _ = self.x == 0
+        _ = self.x == 0 // expected-warning {{cannot access property 'x' here in non-isolated initializer}}
 
-        self.hax = self     // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-        _ = self.hax
+        while c {
+          // expected-warning@+2 {{cannot access property 'hax' here in non-isolated initializer}}
+          // expected-note@+1 2 {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
+          self.hax = self
+          _ = self.hax  // expected-warning {{cannot access property 'hax' here in non-isolated initializer}}
+        }
 
-        _ = computedProp    // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        computedProp = 1    // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        Task { // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
-               // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        Task {
             _ = await self.hax
             await self.helloWorld()
         }
-    }
 
-    init?(i1_nil c:  Bool) {
-        self.x = 0
-        guard c else { return nil }
-        self.y = self.x
-
-        Task { self }     // expected-warning{{actor 'self' can only be captured by a closure from an async initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        self.helloWorld() // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        callMethod(self) // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                         // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        passInout(&self.x) // expected-warning{{actor 'self' can only be passed 'inout' from an async initializer}}
-
-        self.x = self.y
-
-        self.hax = self     // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-        _ = self.hax
-
-        _ = computedProp    // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        computedProp = 1    // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        Task { // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
-               // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-            _ = await self.hax
-            await self.helloWorld()
-        }
-    }
-
-    init!(i1_boom c:  Bool) {
-        self.x = 0
-        guard c else { return nil }
-        self.y = self.x
-
-        Task { self }     // expected-warning{{actor 'self' can only be captured by a closure from an async initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        self.helloWorld() // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        callMethod(self) // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                         // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        passInout(&self.x) // expected-warning{{actor 'self' can only be passed 'inout' from an async initializer}}
-
-        self.x = self.y
-
-        self.hax = self     // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-        _ = self.hax
-
-        _ = computedProp    // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        computedProp = 1    // expected-warning{{this use of actor 'self' can only appear in an async initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        Task { // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
-               // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-            _ = await self.hax
-            await self.helloWorld()
-        }
+        { _ = self }()
     }
 
     @MainActor
@@ -219,33 +151,11 @@ actor MyActor {
         self.x = 0
         self.y = self.x
 
-        Task { self }     // expected-warning{{actor 'self' cannot be captured by a closure from a global-actor isolated initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        Task { self } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
 
-        self.helloWorld() // expected-warning{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        callMethod(self)
 
-        callMethod(self) // expected-warning{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
-                         // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        passInout(&self.x) // expected-warning{{actor 'self' cannot be passed 'inout' from a global-actor isolated initializer}}
-
-        self.x = self.y
-
-        self.hax = self     // expected-warning{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
-        _ = self.hax
-
-        _ = computedProp    // expected-warning{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        computedProp = 1    // expected-warning{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        Task { // expected-warning {{actor 'self' cannot be captured by a closure from a global-actor isolated initializer}}
-               // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-            _ = await self.hax
-            await self.helloWorld()
-        }
+        passInout(&self.x) // expected-warning {{cannot access property 'x' here in non-isolated initializer}}
     }
 
     init(i3 c:  Bool) async {
@@ -270,42 +180,21 @@ actor MyActor {
             _ = self.hax
             self.helloWorld()
         }
+
+      { _ = self }()
     }
 
     @MainActor
     init(i4 c:  Bool) async {
-        self.x = 0
-        self.y = self.x
+      self.x = 0
+      self.y = self.x
 
-        Task { self }     // expected-warning{{actor 'self' cannot be captured by a closure from a global-actor isolated initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+      Task { self } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
 
-        self.helloWorld() // expected-warning{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+      callMethod(self)
 
-        callMethod(self) // expected-warning{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
-                         // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        passInout(&self.x) // expected-warning{{actor 'self' cannot be passed 'inout' from a global-actor isolated initializer}}
-
-        self.x = self.y
-
-        self.hax = self     // expected-warning{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
-        _ = self.hax
-
-        _ = computedProp    // expected-warning{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        computedProp = 1    // expected-warning{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
-                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-
-        Task { // expected-warning {{actor 'self' cannot be captured by a closure from a global-actor isolated initializer}}
-               // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-            _ = await self.hax
-            await self.helloWorld()
-        }
+      passInout(&self.x) // expected-warning {{cannot access property 'x' here in non-isolated initializer}}
     }
-
 }
 
 
@@ -315,10 +204,9 @@ actor X {
 
     init(v1 start: Int) {
         self.counter = start
-        Task { await self.setCounter(start + 1) } // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
-                                                  // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        Task { await self.setCounter(start + 1) } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
 
-        if self.counter != start {
+        if self.counter != start { // expected-warning {{cannot access property 'counter' here in non-isolated initializer}}
             fatalError("where's my protection?")
         }
     }
@@ -343,10 +231,10 @@ actor EscapeArtist {
     init(attempt1: Bool) {
         self.x = 0
 
-        globalVar = self    // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
+        globalVar = self    // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
         Task { await globalVar!.isolatedMethod() }
 
-        if self.x == 0 {
+        if self.x == 0 {  // expected-warning {{cannot access property 'x' here in non-isolated initializer}}
             fatalError("race detected.")
         }
     }
@@ -354,11 +242,11 @@ actor EscapeArtist {
     init(attempt2: Bool) {
         self.x = 0
 
-        let wrapped: EscapeArtist? = .some(self)    // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
+        let wrapped: EscapeArtist? = .some(self)    // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
         let selfUnchained = wrapped!
 
         Task { await selfUnchained.isolatedMethod() }
-        if self.x == 0 {
+        if self.x == 0 {  // expected-warning {{cannot access property 'x' here in non-isolated initializer}}
             fatalError("race detected.")
         }
     }
@@ -366,9 +254,7 @@ actor EscapeArtist {
     init(attempt3: Bool) {
         self.x = 0
 
-        // expected-warning@+2 {{variable 'unchainedSelf' was never mutated; consider changing to 'let' constant}}
-        // expected-warning@+1 {{this use of actor 'self' can only appear in an async initializer}}
-        var unchainedSelf = self
+        let unchainedSelf = self
 
         unchainedSelf.nonisolated()
     }
@@ -378,17 +264,15 @@ actor EscapeArtist {
 
         let unchainedSelf = self
 
-        unchainedSelf.nonisolated() // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
-                                    // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        unchainedSelf.nonisolated()
 
-        let _ = { unchainedSelf.nonisolated() } // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
-                                                // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        let _ = { unchainedSelf.nonisolated() }()
     }
 
     init(attempt5: Bool) {
         self.x = 0
 
-        let box = CardboardBox(item: self) // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
+        let box = CardboardBox(item: self)
         box.item.nonisolated()
     }
 
@@ -397,8 +281,7 @@ actor EscapeArtist {
         func fn() {
             self.nonisolated()
         }
-        fn()    // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
-                // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+        fn()
     }
 
     func isolatedMethod() { x += 1 }
@@ -407,46 +290,44 @@ actor EscapeArtist {
 
 @available(SwiftStdlib 5.5, *)
 actor Ahmad {
-  func f() {}
+  nonisolated func f() {}
+  var prop: Int = 0
   
   init(v1: Void) {
-    Task.detached { await self.f() } // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
-                                     // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-    
-    f()   // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
-          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+    Task.detached { self.f() } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
+    f()
+    prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer}}
   }
   
   nonisolated init(v2: Void) async {
-    Task.detached { await self.f() } // expected-warning {{actor 'self' cannot be captured by a closure from a non-isolated, designated initializer}} {{3-15=}}
-    // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
-    
-    f()   // expected-warning {{this use of actor 'self' cannot appear in a non-isolated, designated initializer}}
-    // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+    Task.detached { self.f() } // expected-note {{after making a copy of 'self', only non-isolated properties of 'self' can be accessed from this init}}
+    f()
+    prop += 1 // expected-warning {{cannot access property 'prop' here in non-isolated initializer}}
   }
 }
 
 @available(SwiftStdlib 5.5, *)
 actor Rain {
   var x: Int = 0
-  func f() {}
+  nonisolated func f() {}
 
-  init() {
-    defer { self.f() }  // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
-                        // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+  init(_ hollerBack: (Rain) -> () -> Void) {
+    defer { self.f() }
 
-    defer { _ = self.x }  // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
-                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+    defer { _ = self.x }  // expected-warning {{cannot access property 'x' here in non-isolated initializer}}
 
-    defer { Task { await self.f() } } // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
-                                      // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+    defer { Task { self.f() } }
+
+    defer { _ = hollerBack(self) } // expected-note {{after a call involving 'self', only non-isolated properties of 'self' can be accessed from this init}}
   }
 
-  init() async {
+  init(_ hollerBack: (Rain) -> () -> Void) async {
     defer { self.f() }
 
     defer { _ = self.x }
 
     defer { Task { self.f() } }
+
+    defer { _ = hollerBack(self) }
   }
 }

@@ -168,19 +168,6 @@ ERROR(variable_defer_use_uninit,none,
 ERROR(self_closure_use_uninit,none,
       "'self' captured by a closure before all members were initialized", ())
 
-ERROR(self_disallowed_nonisolated_actor_init,none,
-      "%select{|this use of }0actor 'self' cannot %2 %select{from|in}0 "
-      "%select{a non-isolated, designated|a global-actor isolated}1 initializer",
-      (bool, bool, StringRef))
-ERROR(self_disallowed_plain_actor_init,none,
-      "%select{|this use of }0actor 'self' can only %1 %select{from|in}0 an async initializer",
-      (bool, StringRef))
-NOTE(actor_convenience_init,none,
-     "convenience initializers allow non-isolated use of 'self' once "
-     "initialized",
-     ())
-
-
 
 
 ERROR(variable_addrtaken_before_initialized,none,
@@ -625,6 +612,16 @@ WARNING(warning_int_to_fp_inexact, none,
   "'%1' is not exactly representable as %0; it becomes '%2'",
   (Type, StringRef, StringRef))
 
+// Flow-isolation diagnostics
+ERROR(isolated_after_nonisolated, none,
+      "cannot access %1 %2 here in %select{non-isolated initializer|deinitializer}0",
+      (bool, DescriptiveDeclKind, DeclName))
+NOTE(nonisolated_blame, none, "after %1%2 %3, "
+     "only non-isolated properties of 'self' can be accessed from "
+     "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName))
+ERROR(non_sendable_from_deinit,none,
+        "cannot access %1 %2 with a non-sendable type %0 from non-isolated deinit",
+        (Type, DescriptiveDeclKind, DeclName))
 
 // Yield usage errors
 ERROR(return_before_yield, none, "accessor must yield before returning",())

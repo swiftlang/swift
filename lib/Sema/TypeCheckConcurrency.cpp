@@ -87,6 +87,71 @@ void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
   }
 }
 
+static bool requiresFlowIsolation(ActorIsolation typeIso,
+                                  ConstructorDecl const *ctor) {
+  assert(ctor->isDesignatedInit());
+
+  auto ctorIso = getActorIsolation(const_cast<ConstructorDecl *>(ctor));
+
+  // Regardless of async-ness, a mismatch in isolation means we need to be
+  // flow-sensitive.
+  if (typeIso != ctorIso)
+    return true;
+
+  // Otherwise, if it's an actor instance, then it depends on async-ness.
+  switch (typeIso.getKind()) {
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent:
+      return false;
+
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::DistributedActorInstance:
+      return !(ctor->hasAsync()); // need flow-isolation for non-async.
+  };
+}
+
+bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn) {
+  if (!fn)
+    return false;
+
+  // Only designated constructors or destructors use this kind of isolation.
+  if (auto const* ctor = dyn_cast<ConstructorDecl>(fn)) {
+    if (!ctor->isDesignatedInit())
+      return false;
+  } else if (!isa<DestructorDecl>(fn)) {
+    return false;
+  }
+
+  auto *dc = fn->getDeclContext();
+
+  // Must be part of a nominal type.
+  auto *nominal = dc->getSelfNominalTypeDecl();
+  assert(nominal && "init/deinit not part of a nominal?");
+
+  // If it's part of an actor type, then its deinit and some of its inits use
+  // flow-isolation.
+  if (nominal->isAnyActor()) {
+    if (isa<DestructorDecl>(fn))
+      return true;
+
+    return requiresFlowIsolation(ActorIsolation::forActorInstance(nominal),
+                                 cast<ConstructorDecl>(fn));
+  }
+
+  // Otherwise, the type must be isolated to a global actor.
+  auto nominalIso = getActorIsolation(nominal);
+  if (!nominalIso.isGlobalActor())
+    return false;
+
+  // if it's a deinit, then it's flow-isolated.
+  if (isa<DestructorDecl>(fn))
+    return true;
+
+  return requiresFlowIsolation(nominalIso, cast<ConstructorDecl>(fn));
+}
+
 bool IsActorRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   // Protocols are actors if they inherit from `Actor`.
@@ -313,6 +378,32 @@ Type swift::getExplicitGlobalActor(ClosureExpr *closure) {
   return globalActor;
 }
 
+/// A 'let' declaration is safe across actors if it is either
+/// nonisolated or it is accessed from within the same module.
+static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
+                                  VarDecl *var,
+                                  ActorIsolation &varIsolation) {
+  // must be immutable
+  if (!var->isLet())
+    return false;
+
+  // if nonisolated, it's OK
+  if (varIsolation == ActorIsolation::Independent)
+    return true;
+
+  // Otherwise, if it's in the same module then it's OK too.
+  if (fromModule == var->getDeclContext()->getParentModule())
+    return true;
+
+  return false;
+}
+
+bool swift::isLetAccessibleAnywhere(const ModuleDecl *fromModule,
+                                    VarDecl *let) {
+  auto isolation = getActorIsolation(let);
+  return varIsSafeAcrossActors(fromModule, let, isolation);
+}
+
 /// Determine the isolation rules for a given declaration.
 ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     ConcreteDeclRef declRef, const DeclContext *fromDC, bool fromExpression) {
@@ -366,18 +457,12 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
 
     auto isolation = getActorIsolation(cast<ValueDecl>(decl));
 
-    // 'let' declarations are immutable, so they can be accessed across
+    // 'let' declarations are immutable, so some of them can be accessed across
     // actors.
     bool isAccessibleAcrossActors = false;
     if (auto var = dyn_cast<VarDecl>(decl)) {
-      // A 'let' declaration is accessible across actors if it is either
-      // nonisolated or it is accessed from within the same module.
-      if (var->isLet() &&
-          (isolation == ActorIsolation::Independent ||
-           var->getDeclContext()->getParentModule() ==
-           fromDC->getParentModule())) {
+      if (varIsSafeAcrossActors(fromDC->getParentModule(), var, isolation))
         isAccessibleAcrossActors = true;
-      }
     }
 
     // A function that provides an asynchronous context has no restrictions
@@ -2580,9 +2665,53 @@ namespace {
           });
     }
 
-    static bool isConvenienceInit(AbstractFunctionDecl const* fn) {
-      if (auto ctor = dyn_cast_or_null<ConstructorDecl>(fn))
-        return ctor->isConvenienceInit();
+    /// To support flow-isolation, some member accesses in inits / deinits
+    /// must be permitted, despite the isolation of 'self' not being
+    /// correct in Sema.
+    ///
+    /// \param refCxt the context in which the member reference happens.
+    /// \param baseActor the actor referenced in the base of the member access.
+    /// \param member the declaration corresponding to the accessed member.
+    ///
+    /// \returns true iff the member access is permitted in Sema because it will
+    /// be verified later by flow-isolation.
+    bool checkedByFlowIsolation(DeclContext const *refCxt,
+                                ReferencedActor &baseActor,
+                                ValueDecl const *member) {
+
+      // base of member reference must be `self`
+      if (!baseActor.isActorSelf())
+        return false;
+
+      // Must be directly in an init/deinit that uses flow-isolation,
+      // or a defer within such a functions.
+      //
+      // NOTE: once flow-isolation can analyze calls to arbitrary local
+      // functions, we should be using isActorInitOrDeInitContext instead
+      // of this ugly loop.
+      AbstractFunctionDecl const* fnDecl = nullptr;
+      while (true) {
+        fnDecl = dyn_cast_or_null<AbstractFunctionDecl>(refCxt->getAsDecl());
+        if (!fnDecl)
+          return false;
+
+        // go up one level if this context is a defer.
+        if (auto *d = dyn_cast<FuncDecl>(fnDecl)) {
+          if (d->isDeferBody()) {
+            refCxt = refCxt->getParent();
+            continue;
+          }
+        }
+        break;
+      }
+
+      if (!usesFlowSensitiveIsolation(fnDecl))
+        return false;
+
+      // Stored properties are definitely OK.
+      if (auto *var = dyn_cast<VarDecl>(member))
+        if (var->hasStorage() && var->isInstanceMember())
+          return true;
 
       return false;
     }
@@ -2650,13 +2779,17 @@ namespace {
         if (isolatedActor)
           return false;
 
+        // For now, cross-actor self reference to a member is OK from an actor's
+        // init or deinit. Later, flow-isolation will check unsafe references.
+        if (isActorInitOrDeInitContext(getDeclContext()))
+          return false;
+
         // If we have a distributed actor that might be remote, check that
         // we are referencing a properly-distributed member.
         bool performDistributedChecks =
             isolation.getActorType()->isDistributedActor() &&
             !isolatedActor.isPotentiallyIsolated &&
-            !isa<ConstructorDecl>(member) &&
-            !isActorInitOrDeInitContext(getDeclContext());
+            !isa<ConstructorDecl>(member);
         if (performDistributedChecks) {
           if (auto access = checkDistributedAccess(memberLoc, member, context)){
             // This is a distributed access, so mark it as throwing or
@@ -2679,12 +2812,12 @@ namespace {
         if (isolatedActor)
           return false;
 
-        // An instance member of an actor can be referenced from an actor's
-        // designated initializer or deinitializer.
-        if (isolatedActor.isActorSelf() && member->isInstanceMember())
-          if (auto fn = isActorInitOrDeInitContext(getDeclContext()))
-            if (!isConvenienceInit(fn))
-              return false;
+        // Some initializers and deinitializers have special permission to
+        // access an isolated member on `self`. If that case applies, then we
+        // can skip checking.
+        if (checkedByFlowIsolation(getDeclContext(), isolatedActor,
+                                          member))
+          return false;
 
         // An escaping partial application of something that is part of
         // the actor's isolated state is never permitted.
@@ -3698,8 +3831,9 @@ bool HasIsolatedSelfRequest::evaluate(
   }
 
   if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
-    // In an actor's convenience or synchronous init, self is not isolated.
-    if (ctor->isConvenienceInit() || !ctor->hasAsync())
+    // When no other isolation applies to an actor's constructor,
+    // then it is isolated only if it is async.
+    if (!ctor->hasAsync())
       return false;
   }
 

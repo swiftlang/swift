@@ -751,15 +751,44 @@ extension SomeClassInActor.ID {
 // ----------------------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 actor SomeActorWithInits {
-  var mutableState: Int = 17
+  var mutableState: Int = 17 // expected-note 3 {{mutation of this property is only permitted within the actor}}
   var otherMutableState: Int
+  let nonSendable: SomeClass
+
+  // Sema should not complain about referencing non-sendable members
+  // in an actor init or deinit, as those are diagnosed later by flow-isolation.
+  init(_ x: SomeClass) {
+    self.nonSendable = x
+  }
 
   init(i1: Bool) {
     self.mutableState = 42
     self.otherMutableState = 17
 
-    self.isolated()
+    self.isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
     self.nonisolated()
+
+    defer {
+      isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+      mutableState += 1 // okay
+      nonisolated()
+    }
+
+    func local() {
+      isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+      mutableState += 1 // expected-error{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context}}
+      nonisolated()
+    }
+    local()
+
+    let _ = {
+      defer {
+        isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+        mutableState += 1  // expected-error{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context}}
+        nonisolated()
+      }
+      nonisolated()
+    }()
   }
 
   init(i2: Bool) async {
@@ -778,15 +807,16 @@ actor SomeActorWithInits {
 
   convenience init(i4: Bool) async {
     self.init(i1: i4)
-    await self.isolated()
+    self.isolated()
     self.nonisolated()
   }
 
-  @MainActor init(i5: Bool) {
+  @MainActor init(i5 x: SomeClass) {
     self.mutableState = 42
     self.otherMutableState = 17
+    self.nonSendable = x
 
-    self.isolated()
+    self.isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from the main actor}}
     self.nonisolated()
   }
 
@@ -794,7 +824,7 @@ actor SomeActorWithInits {
     self.mutableState = 42
     self.otherMutableState = 17
 
-    self.isolated()
+    await self.isolated()
     self.nonisolated()
   }
 
@@ -810,8 +840,27 @@ actor SomeActorWithInits {
     self.nonisolated()
   }
 
+  deinit {
+    let _ = self.nonSendable // OK only through typechecking, not SIL.
 
-  func isolated() { } // expected-note 2 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
+    defer {
+      isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+      mutableState += 1 // okay
+      nonisolated()
+    }
+
+    let _ = {
+      defer {
+        isolated() // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+        mutableState += 1  // expected-error{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context}}
+        nonisolated()
+      }
+      nonisolated()
+    }()
+  }
+
+
+  func isolated() { } // expected-note 9 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func nonisolated() {}
 }
 
@@ -890,6 +939,27 @@ extension OtherModuleActor {
     _ = self.b
     _ = self.c
     _ = self.d
+  }
+}
+
+actor CrossModuleFromInitsActor {
+  init(v1 actor: OtherModuleActor) {
+    _ = actor.a   // expected-error {{actor-isolated property 'a' can not be referenced from a non-isolated context}}
+    _ = actor.b   // okay
+
+    _ = actor.c   // expected-error {{actor-isolated property 'c' can not be referenced from a non-isolated context}}
+  }
+
+  init(v2 actor: OtherModuleActor) async {
+    _ = actor.a         // expected-error{{expression is 'async' but is not marked with 'await'}}
+    // expected-note@-1{{property access is 'async'}}
+    _ = await actor.a   // okay
+    _ = actor.b         // okay
+    _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
+    // expected-note@-1{{property access is 'async'}}
+    // expected-warning@-2{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
+    _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
+    _ = await actor.d // okay
   }
 }
 
@@ -1030,11 +1100,18 @@ func test_invalid_reference_to_actor_member_without_a_call_note() {
   }
 }
 
-// Actor isolation and "defer"
+// Actor isolation and initializers through typechecking only, not flow-isolation.
 actor Counter {
   var counter: Int = 0
 
-  func next() -> Int {
+  // expected-note@+2{{mutation of this property is only permitted within the actor}}
+  // expected-note@+1{{property declared here}}
+  var computedProp : Int {
+      get { 0 }
+      set { }
+  }
+
+  func next() -> Int { // expected-note 2 {{calls to instance method 'next()' from outside of its actor context are implicitly asynchronous}}
     defer {
       counter = counter + 1
     }
@@ -1049,6 +1126,20 @@ actor Counter {
     doIt()
 
     return counter
+  }
+
+  init() {
+    _ = self.next() // expected-error {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context}}
+    defer { _ = self.next() } // expected-error {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context}}
+
+    _ = computedProp  // expected-error {{actor-isolated property 'computedProp' can not be referenced from a non-isolated context}}
+    computedProp = 1  // expected-error {{actor-isolated property 'computedProp' can not be mutated from a non-isolated context}}
+
+  }
+
+  convenience init(material: Int) async {
+    self.init()
+    self.counter = 10 // FIXME: this should work, and also needs to work in definite initialization by injecting hops
   }
 }
 
