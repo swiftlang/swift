@@ -637,20 +637,6 @@ void process(NSString *path, void(^dylibVisitor)(NSString *),
 }
 
 
-@implementation NSString (sst)
--(NSString *)sst_stringByAppendingPathComponents:(NSArray *)components
-{
-    NSString *result = self;
-    @autoreleasepool {
-        for (NSString *component in components) {
-            result = [result stringByAppendingPathComponent:component];
-        }
-        [result retain];
-    }
-    return [result autorelease];
-}
-@end
-
 @implementation NSTask (sst)
 -(NSString *)sst_command {
     NSMutableString *command = [self.launchPath mutableCopy];
@@ -803,7 +789,7 @@ copyFile(NSFileManager *fm, NSString *src, NSString *dst, bool stripBitcode)
 }
 
 
-void copyLibraries(NSString *src_dir, NSString *dst_dir, 
+void copyLibraries(NSString *dst_dir,
                    NSMutableDictionary *libs, bool stripBitcode)
 {
     NSFileManager *fm = NSFileManager.defaultManager;
@@ -811,14 +797,14 @@ void copyLibraries(NSString *src_dir, NSString *dst_dir,
     [fm createDirectoryAtPath: dst_dir withIntermediateDirectories:YES 
      attributes:nil error:nil];
     
-    for (NSString *lib in libs) @autoreleasepool {
-        NSString *src = [src_dir stringByAppendingPathComponent:lib]; 
-        NSString *dst = [dst_dir stringByAppendingPathComponent:lib];
-        
+    for (NSString *src in libs) @autoreleasepool {
+        NSString *dst = [
+            dst_dir stringByAppendingPathComponent:src.lastPathComponent];
+
         // Compare UUIDs of src and dst and don't copy if they're the same.
         // Do not use mod times for this task: the dst copy gets code-signed 
         // and bitcode-stripped so it can look newer than it really is.
-        NSSet *srcUUIDs = libs[lib];
+        NSSet *srcUUIDs = libs[src];
         NSMutableSet *dstUUIDs = [NSMutableSet set];
         process(dst, nil, ^(NSUUID *uuid) {
             [dstUUIDs addObject:uuid];
@@ -831,15 +817,14 @@ void copyLibraries(NSString *src_dir, NSString *dst_dir,
 
         if ([srcUUIDs isEqualToSet:dstUUIDs]) {
             log_v("%s is up to date at %s", 
-                  lib.fileSystemRepresentation, dst.fileSystemRepresentation);
+                  src.fileSystemRepresentation, dst.fileSystemRepresentation);
             continue;
         }
         
         // Perform the copy.
-        
-        log_v("Copying %s from %s to %s", 
-              lib.fileSystemRepresentation, 
-              src_dir.fileSystemRepresentation, 
+
+        log_v("Copying %s to %s",
+              src.fileSystemRepresentation,
               dst_dir.fileSystemRepresentation);
         
         [fm removeItemAtPath:dst error:nil];  // fixme report this err?
@@ -899,7 +884,7 @@ int main(int argc, const char *argv[])
         // Copy source.
         // --source-libraries
         // or /path/to/swift-stdlib-tool/../../lib/swift/<--platform>
-        NSString *src_dir = nil;
+        NSMutableArray<NSString *> *src_dirs = [NSMutableArray array];
 
         // Copy destinations, signed and unsigned.
         // --destination and --unsigned-destination
@@ -939,7 +924,7 @@ int main(int argc, const char *argv[])
                 [embedDirs addObject:[NSString stringWithUTF8String:argv[++i]]];
             }
             if (0 == strcmp(argv[i], "--source-libraries")) {
-                src_dir = [NSString stringWithUTF8String:argv[++i]];
+                [src_dirs addObject:[NSString stringWithUTF8String:argv[++i]]];
             }
             if (0 == strcmp(argv[i], "--platform")) {
                 platform = [NSString stringWithUTF8String:argv[++i]];
@@ -976,22 +961,36 @@ int main(int argc, const char *argv[])
         }
 
         // Fix up src_dir and platform values.
-        if (!src_dir && !platform) {
-            // Neither src_dir nor platform is set. Die.
+        if (![src_dirs count] && !platform) {
+            // Neither src_dirs nor platform is set. Die.
             fail_usage("At least one of --source-libraries and --platform "
                        "must be set.");
         }
-        else if (!src_dir) {
-            // platform is set but src_dir is not. 
-            // Use platform to set src_dir relative to us.
-            src_dir = [[[self_executable stringByDeletingLastPathComponent]
-                        stringByDeletingLastPathComponent]
-                       sst_stringByAppendingPathComponents:
-                       @[ @"lib", @"swift-5.0", platform ]];
+        else if (![src_dirs count]) {
+            // platform is set but src_dirs is not.
+            // Use platform to set src_dirs relative to us.
+            NSString *root_path = [[self_executable stringByDeletingLastPathComponent]
+                                    stringByDeletingLastPathComponent];
+            NSURL *root_url = [[NSURL fileURLWithPath:root_path isDirectory:YES]
+                               URLByAppendingPathComponent:@"lib"];
+            NSArray<NSURL *> *URLs = [
+                fm contentsOfDirectoryAtURL:root_url
+                 includingPropertiesForKeys:@[NSURLNameKey, NSURLIsDirectoryKey]
+                                    options:NSDirectoryEnumerationSkipsHiddenFiles error:nil];
+
+            for (NSURL *URL in URLs) {
+                if ([URL.lastPathComponent hasPrefix:@"swift-"]) {
+                    [src_dirs addObject:[[URL URLByAppendingPathComponent:platform] path]];
+                }
+            }
+
+            if (![src_dirs count]) {
+                fail("Couldn't discover Swift library directories in: %s", root_path.fileSystemRepresentation);
+            }
         } else if (!platform) {
-            // src_dir is set but platform is not. 
-            // Pick platform from src_dir's name.
-            platform = src_dir.lastPathComponent;
+            // src_dirs is set but platform is not.
+            // Pick platform from any src_dirs' name.
+            platform = src_dirs[0].lastPathComponent;
         }
 
         // Add the platform to unsigned_dst_dir if it is not already present.
@@ -1037,10 +1036,13 @@ int main(int argc, const char *argv[])
             process(path, 
                ^(NSString *linkedLib) { 
                     @autoreleasepool {
-                        NSString *linkedSrc =
-                            [src_dir stringByAppendingPathComponent:linkedLib];
-                        if ([fm fileExistsAtPath:linkedSrc]) {
-                            swiftLibs[linkedLib] = [NSMutableSet set]; 
+                        for (NSString *src_dir in src_dirs) {
+                            NSString *linkedSrc =
+                                [src_dir stringByAppendingPathComponent:linkedLib];
+                            if ([fm fileExistsAtPath:linkedSrc]) {
+                                swiftLibs[linkedSrc] = [NSMutableSet set];
+                                break;
+                            }
                         }
                     }
                 }, 
@@ -1051,24 +1053,26 @@ int main(int argc, const char *argv[])
         // Also collect the Swift libraries' UUIDs.
         NSMutableArray *worklist = [swiftLibs.allKeys mutableCopy];
         while (worklist.count) @autoreleasepool {
-            NSString *lib = [worklist lastObject];
+            NSString *path = [worklist lastObject];
             [worklist removeLastObject];
-            NSString *path = [src_dir stringByAppendingPathComponent:lib];
             process(path, 
                 ^(NSString *linkedLib) {
                     @autoreleasepool {
-                        NSString *linkedSrc = 
-                            [src_dir stringByAppendingPathComponent:linkedLib];
-                        if (!swiftLibs[linkedLib]  &&  
-                            [fm fileExistsAtPath:linkedSrc]) 
-                        {
-                            swiftLibs[linkedLib] = [NSMutableSet set];
-                            [worklist addObject:linkedLib];
+                        for (NSString *src_dir in src_dirs) {
+                            NSString *linkedSrc =
+                                [src_dir stringByAppendingPathComponent:linkedLib];
+                            if (!swiftLibs[linkedSrc] &&
+                                [fm fileExistsAtPath:linkedSrc])
+                            {
+                                swiftLibs[linkedSrc] = [NSMutableSet set];
+                                [worklist addObject:linkedSrc];
+                                break;
+                            }
                         }
                     }
                 }, 
                 ^(NSUUID *uuid) {
-                    NSMutableSet *uuids = swiftLibs[lib];
+                    NSMutableSet *uuids = swiftLibs[path];
                     [uuids addObject:uuid];
                 });
         }
@@ -1078,31 +1082,36 @@ int main(int argc, const char *argv[])
         // with --resource-library.
         NSMutableDictionary *swiftLibsForResources = [NSMutableDictionary new];
         for (NSString *lib in resourceLibraries) @autoreleasepool {
-            NSString *libSrc = [src_dir stringByAppendingPathComponent:lib];
-            if ([fm fileExistsAtPath:libSrc]) {
-                swiftLibsForResources[lib] = [NSMutableSet set];
+            for (NSString *src_dir in src_dirs) {
+                NSString *libSrc = [src_dir stringByAppendingPathComponent:lib];
+                if ([fm fileExistsAtPath:libSrc]) {
+                    swiftLibsForResources[libSrc] = [NSMutableSet set];
+                    break;
+                }
             }
         }
 
         // Collect dependencies of --resource-library libs.
         worklist = [swiftLibsForResources.allKeys mutableCopy];
         while (worklist.count) @autoreleasepool {
-            NSString *lib = [worklist lastObject];
+            NSString *path = [worklist lastObject];
             [worklist removeLastObject];
-            NSString *path = [src_dir stringByAppendingPathComponent:lib];
             process(path,
                 ^(NSString *linkedLib) {
-                    NSString *linkedSrc =
-                        [src_dir stringByAppendingPathComponent:linkedLib];
-                    if (!swiftLibsForResources[linkedLib] &&
-                        [fm fileExistsAtPath:linkedSrc])
-                    {
-                        swiftLibsForResources[linkedLib] = [NSMutableSet set];
-                        [worklist addObject:linkedLib];
+                    for (NSString *src_dir in src_dirs) {
+                        NSString *linkedSrc =
+                            [src_dir stringByAppendingPathComponent:linkedLib];
+                        if (!swiftLibsForResources[linkedSrc] &&
+                            [fm fileExistsAtPath:linkedSrc])
+                        {
+                            swiftLibsForResources[linkedSrc] = [NSMutableSet set];
+                            [worklist addObject:linkedSrc];
+                            break;
+                        }
                     }
                 },
                 ^(NSUUID *uuid) {
-                    NSMutableSet *uuids = swiftLibsForResources[lib];
+                    NSMutableSet *uuids = swiftLibsForResources[path];
                     [uuids addObject:uuid];
                 });
         }
@@ -1111,26 +1120,25 @@ int main(int argc, const char *argv[])
         // Print the Swift libraries (full path to toolchain's copy)
         if (print) {
             for (NSString *lib in swiftLibs) {
-                printf("%s\n", [[src_dir stringByAppendingPathComponent:lib] 
-                                fileSystemRepresentation]);
+                printf("%s\n", lib.fileSystemRepresentation);
             }
         }
 
         // Copy the Swift libraries to $build_dir/$frameworks
         // and $build_dir/$unsigned_frameworks
         if (copy) {
-            copyLibraries(src_dir, dst_dir, swiftLibs, stripBitcode);
+            copyLibraries(dst_dir, swiftLibs, stripBitcode);
             if (unsigned_dst_dir) {
                 // Never strip bitcode from the unsigned libraries. 
                 // Their existing signatures must be preserved.
-                copyLibraries(src_dir, unsigned_dst_dir, swiftLibs, false);
+                copyLibraries(unsigned_dst_dir, swiftLibs, false);
             }
 
             if (resource_dst_dir) {
                 // Never strip bitcode from resources libraries, for
                 // the same reason as the libraries copied to
                 // unsigned_dst_dir.
-                copyLibraries(src_dir, resource_dst_dir, swiftLibsForResources, false);
+                copyLibraries(resource_dst_dir, swiftLibsForResources, false);
             }
         }
 
