@@ -36,7 +36,7 @@ class Value: Hashable {
   let value: Int
   let identity: Int
 
-  init(_ value: Int, identity: Int) {
+  init(_ value: Int, identity: Int = 0) {
     self.value = value
     self.identity = identity
   }
