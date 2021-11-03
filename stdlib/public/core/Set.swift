@@ -1158,6 +1158,16 @@ extension Set {
   /// - Returns: A new set.
   @inlinable
   public __consuming func subtracting(_ other: Set<Element>) -> Set<Element> {
+    // Heuristic: if `other` is small enough, it's better to make a copy of the
+    // set and remove each item one by one. (The best cutoff point depends on
+    // the `Element` type; the one below is an educated guess.) FIXME: Derive a
+    // better cutoff by benchmarking.
+    if other.count <= self.count / 8 {
+      var copy = self
+      copy._subtract(other)
+      return copy
+    }
+    // Otherwise do a regular subtraction using a temporary bitmap.
     return self._subtracting(other)
   }
 

@@ -681,13 +681,31 @@ extension _NativeSet {
   internal __consuming func subtracting<S: Sequence>(_ other: S) -> _NativeSet
   where S.Element == Element {
     guard count > 0 else { return _NativeSet() }
+
+    // Find one item that we need to remove before creating a result set.
+    var it = other.makeIterator()
+    var bucket: Bucket? = nil
+    while let next = it.next() {
+      let (b, found) = find(next)
+      if found {
+        bucket = b
+        break
+      }
+    }
+    guard let bucket = bucket else { return self }
+
     // Rather than directly creating a new set, calculate the difference in a
     // bitset first. This ensures we hash each element (in both sets) only once,
     // and that we'll have an exact count for the result set, preventing
     // rehashings during insertions.
     return _UnsafeBitset.withTemporaryCopy(of: hashTable.bitset) { difference in
       var remainingCount = self.count
-      for element in other {
+
+      let removed = difference.uncheckedRemove(bucket.offset)
+      _internalInvariant(removed)
+      remainingCount -= 1
+
+      while let element = it.next() {
         let (bucket, found) = find(element)
         if found {
           if difference.uncheckedRemove(bucket.offset) {
