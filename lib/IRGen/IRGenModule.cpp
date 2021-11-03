@@ -1786,9 +1786,10 @@ void IRGenModule::emitSwiftAsyncExtendedFrameInfoWeakRef() {
   // avoid optimizations.
   llvm::GlobalVariable *usage = new llvm::GlobalVariable(
       Module, extendedFramePointerFlagsWeakRef->getType(), false,
-      llvm::GlobalValue::PrivateLinkage,
+      llvm::GlobalValue::LinkOnceODRLinkage,
       static_cast<llvm::GlobalVariable *>(extendedFramePointerFlagsWeakRef),
       "_swift_async_extendedFramePointerFlagsUser");
+  usage->setVisibility(llvm::GlobalValue::HiddenVisibility);
   addUsedGlobal(usage);
 }
 
