@@ -27,8 +27,6 @@ from .playgroundsupport import PlaygroundSupport
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
 from .swift import Swift
-from .swiftdocc import SwiftDocC
-from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
 from .swiftevolve import SwiftEvolve
 from .swiftformat import SwiftFormat
@@ -65,6 +63,4 @@ __all__ = [
     'SourceKitLSP',
     'Benchmarks',
     'TSanLibDispatch',
-    'SwiftDocC',
-    'SwiftDocCRender'
 ]
