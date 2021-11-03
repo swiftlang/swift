@@ -5951,6 +5951,13 @@ ERROR(cannot_declare_computed_var_in_result_builder,none,
         "this behavior is deprecated", ())
 
 //------------------------------------------------------------------------------
+// MARK: Implicit conversion diagnostics
+//------------------------------------------------------------------------------
+ERROR(cannot_implicitly_convert_in_optional_context,none,
+      "cannot implicitly convert value of type %0 to expected type %1",
+      (Type, Type))
+
+//------------------------------------------------------------------------------
 // MARK: marker protocol diagnostics
 //------------------------------------------------------------------------------
 ERROR(marker_protocol_requirement, none,

@@ -2418,6 +2418,22 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
 
+  case ConstraintLocator::OptionalPayload: {
+    // If this is an attempt at a Double <-> CGFloat conversion
+    // through optional chaining, let's produce a tailored diagnostic.
+    if (isExpr<OptionalEvaluationExpr>(getAnchor())) {
+      if ((fromType->isDouble() || fromType->isCGFloatType()) &&
+          (toType->isDouble() || toType->isCGFloatType())) {
+        fromType = OptionalType::get(fromType);
+        toType = OptionalType::get(toType);
+        diagnostic = diag::cannot_implicitly_convert_in_optional_context;
+        break;
+      }
+    }
+
+    return false;
+  }
+
   default:
     return false;
   }
