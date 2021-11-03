@@ -1933,7 +1933,7 @@ public:
 
       HasError |= ConstraintSystem::preCheckExpression(
           E, DC, /*replaceInvalidRefsWithErrors=*/true,
-          /*leaveClosureBodiesUnchecked=*/true);
+          /*leaveClosureBodiesUnchecked=*/false);
 
       HasError |= transaction.hasErrors();
 
