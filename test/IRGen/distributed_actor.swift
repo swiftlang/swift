@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -enable-experimental-distributed | %IRGenFileCheck %s
+// UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
 // REQUIRES: distributed
 

@@ -5,6 +5,7 @@
 // which expects the exit code of the program to be non-zero;
 // We then check stderr for the expected error message using filecheck as usual.
 
+// UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
