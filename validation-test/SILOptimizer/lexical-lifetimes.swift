@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift -Xfrontend -enable-experimental-lexical-lifetimes -O -Xfrontend -enable-copy-propagation | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-lexical-lifetimes -Xfrontend -enable-copy-propagation) | %FileCheck %s
+
+// REQUIRES: executable_test
 
 // =============================================================================
 // = Declarations                                                           {{ =
