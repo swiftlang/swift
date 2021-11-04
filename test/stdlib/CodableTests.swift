@@ -480,7 +480,7 @@ class TestCodable : TestCodableSuper {
         }
     }
 
-    @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+    @available(SwiftStdlib 5.6, *)
     func test_Dictionary_JSON() {
         enum X: String, Codable { case a, b }
         enum Y: String, Codable, CodingKeyRepresentable { case a, b }
@@ -1054,7 +1054,7 @@ if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     tests["test_URLComponents_Plist"] = TestCodable.test_URLComponents_Plist
 }
 
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(SwiftStdlib 5.6, *) {
     tests["test_Dictionary_JSON"] = TestCodable.test_Dictionary_JSON
 }
 
