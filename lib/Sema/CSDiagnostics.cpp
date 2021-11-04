@@ -7677,8 +7677,11 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseForcedCastExpr() const {
 
   bool isBridged = CastKind == CheckedCastKind::BridgingCoercion;
   if (isCastTypeIUO()) {
-    toType = toType->getOptionalObjectType();
-    extraFromOptionals++;
+    // IUO type could either be optional or unwrapped.
+    if (auto objType = toType->getOptionalObjectType()) {
+      extraFromOptionals++;
+      toType = objType;
+    }
   }
 
   std::string extraFromOptionalsStr(extraFromOptionals, '!');
@@ -7776,7 +7779,8 @@ bool NoopCheckedCast::diagnoseForcedCastExpr() const {
   auto diagLoc = expr->getLoc();
 
   if (isCastTypeIUO()) {
-    toType = toType->getOptionalObjectType();
+    if (auto objType = toType->getOptionalObjectType())
+      toType = objType;
   }
 
   if (fromType->isEqual(toType)) {
