@@ -15,6 +15,8 @@
 import _Distributed
 
 distributed actor DA {
+  typealias Transport = AnyActorTransport
+
   distributed func hello(other: DA) {}
 }
 
