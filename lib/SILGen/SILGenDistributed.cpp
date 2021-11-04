@@ -51,12 +51,6 @@ static SILValue emitActorPropertyReference(
     VarDecl *property) {
   Type formalType = SGF.F.mapTypeIntoContext(property->getInterfaceType());
   SILType loweredType = SGF.getLoweredType(formalType).getAddressType();
-#if false
-  if (!loweredType.isAddress()) {
-    loweredType = SILType::getPrimitiveAddressType(
-        formalType->getCanonicalType());
-  }
-#endif
   return SGF.B.createRefElementAddr(loc, actorSelf, property, loweredType);
 }
 
