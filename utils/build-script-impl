@@ -358,11 +358,11 @@ function true_false() {
 
 function to_libswift_buildmode() {
     case "$1" in
-        false | FALSE | 0 | "")
+        false | FALSE | 0)
             echo "OFF"
             ;;
-        true | TRUE | 1)
-            echo "HOSTTOOLS"
+        true | TRUE | 1 | "")
+            echo "BOOTSTRAPPING"
             ;;
         *)
             echo `toupper $1`
