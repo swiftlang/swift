@@ -107,7 +107,7 @@ suite.test("hashValue forwarding") {
   //
   // See https://github.com/apple/swift/pull/39155
 
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(SwiftStdlib 5.6, *) {
     let r = CustomRawRepresentable2(rawValue: Bogus())!
     expectEqual(r.hashValue, 23.hashValue)
   }
