@@ -4,6 +4,9 @@
 
 import _Distributed
 
+/// Use the existential wrapper as the default actor transport.
+typealias DefaultActorTransport = AnyActorTransport
+
 distributed actor OK0 { }
 
 distributed actor OK1 {
