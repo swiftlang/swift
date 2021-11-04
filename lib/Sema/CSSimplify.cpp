@@ -5474,7 +5474,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       if (kind >= ConstraintKind::Subtype &&
           nominal1->getDecl() != nominal2->getDecl() &&
-          ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
+          ((nominal1->isCGFloat() || nominal2->isCGFloat()) &&
            (nominal1->isDouble() || nominal2->isDouble()))) {
         ConstraintLocatorBuilder location{locator};
         // Look through all value-to-optional promotions to allow
@@ -5532,7 +5532,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         auto isCGFloatInit = [&](ASTNode location) {
           if (auto *call = getAsExpr<CallExpr>(location)) {
             if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
-              return getInstanceType(typeExpr)->isCGFloatType();
+              return getInstanceType(typeExpr)->isCGFloat();
             }
           }
           return false;
@@ -5561,7 +5561,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               return false;
             })) {
           conversionsOrFixes.push_back(
-              desugar1->isCGFloatType()
+              desugar1->isCGFloat()
                   ? ConversionRestrictionKind::CGFloatToDouble
                   : ConversionRestrictionKind::DoubleToCGFloat);
         }
