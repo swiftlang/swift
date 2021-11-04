@@ -67,9 +67,47 @@ public protocol ActorTransport: Sendable {
   func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor
 
-  func actorReady<Act>(_ actor: Act) where Act: DistributedActor
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor
 
   /// Called during actor deinit/destroy.
   func resignIdentity(_ id: AnyActorIdentity)
-
 }
+
+@available(SwiftStdlib 5.6, *)
+public struct AnyActorTransport: ActorTransport {
+  let transport: ActorTransport
+
+  public init<Transport: ActorTransport>(_ transport: Transport) {
+    self.transport = transport
+  }
+
+  public func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
+    return try transport.decodeIdentity(from: decoder)
+  }
+
+  public func resolve<Act>(
+    _ identity: AnyActorIdentity, as actorType: Act.Type
+  ) throws -> Act? where Act: DistributedActor {
+    return try transport.resolve(identity, as: actorType)
+  }
+
+  public func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+      where Act: DistributedActor {
+    return transport.assignIdentity(actorType)
+  }
+
+  public func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor {
+    transport.actorReady(actor)
+  }
+
+  /// Called during actor deinit/destroy.
+  public func resignIdentity(_ id: AnyActorIdentity) {
+    transport.resignIdentity(id)
+  }
+}
+
+/// Use the existential wrapper as the default actor transport.
+@available(SwiftStdlib 5.6, *)
+public typealias DefaultActorTransport = AnyActorTransport

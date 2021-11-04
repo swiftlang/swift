@@ -13,7 +13,9 @@
 import _Distributed
 
 distributed actor LocalWorker {
-  init(transport: ActorTransport) {}
+  typealias Transport = FakeTransport
+
+  init(transport: FakeTransport) {}
 
   distributed func function() async throws -> String {
     "local:"
@@ -73,6 +75,9 @@ struct FakeTransport: ActorTransport {
     print("ready id:\(id)")
   }
 }
+
+@available(SwiftStdlib 5.5, *)
+typealias DefaultActorTransport = FakeTransport
 
 // ==== Execute ----------------------------------------------------------------
 

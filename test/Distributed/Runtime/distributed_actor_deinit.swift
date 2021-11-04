@@ -17,19 +17,19 @@ actor A {}
 
 @available(SwiftStdlib 5.6, *)
 distributed actor DA {
-  init(transport: ActorTransport) {}
+  init(transport: FakeTransport) {}
 }
 
 @available(SwiftStdlib 5.6, *)
 distributed actor DA_userDefined {
-  init(transport: ActorTransport) {}
+  init(transport: FakeTransport) {}
 
   deinit {}
 }
 
 @available(SwiftStdlib 5.6, *)
 distributed actor DA_userDefined2 {
-  init(transport: ActorTransport) {}
+  init(transport: FakeTransport) {}
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -42,7 +42,7 @@ distributed actor DA_state {
   var name = "Hello"
   var age = 42
 
-  init(transport: ActorTransport) {}
+  init(transport: FakeTransport) {}
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -92,6 +92,9 @@ final class FakeTransport: @unchecked Sendable, ActorTransport {
     print("resign address:\(identity)")
   }
 }
+
+@available(SwiftStdlib 5.6, *)
+typealias DefaultActorTransport = FakeTransport
 
 // ==== Execute ----------------------------------------------------------------
 

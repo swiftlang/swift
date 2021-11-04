@@ -184,20 +184,15 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
   if (!ctor->isDesignatedInit())
     return;
 
-  // === Designated initializers must accept exactly one ActorTransport
-  auto &C = ctor->getASTContext();
-  auto module = ctor->getParentModule();
-
+  // === Designated initializers must accept exactly one actor transport that
+  // matches the actor transport type of the actor.
   SmallVector<ParamDecl*, 2> transportParams;
   int transportParamsCount = 0;
-  auto protocolDecl = C.getProtocol(KnownProtocolKind::ActorTransport);
-  auto protocolTy = protocolDecl->getDeclaredInterfaceType();
-
+  Type transportTy = ctor->mapTypeIntoContext(
+      getDistributedActorTransportType(const_cast<ClassDecl *>(decl)));
   for (auto param : *ctor->getParameters()) {
     auto paramTy = ctor->mapTypeIntoContext(param->getInterfaceType());
-    auto conformance = TypeChecker::conformsToProtocol(paramTy, protocolDecl, module);
-
-    if (paramTy->isEqual(protocolTy) || !conformance.isInvalid()) {
+    if (paramTy->isEqual(transportTy)) {
       transportParamsCount += 1;
       transportParams.push_back(param);
     }
@@ -252,9 +247,13 @@ Type swift::getDistributedActorTransportType(NominalTypeDecl *actor) {
   assert(actor->isDistributedActor());
   auto &ctx = actor->getASTContext();
 
-  auto protocol = ctx.getProtocol(KnownProtocolKind::ActorTransport);
+  auto protocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
   if (!protocol)
     return ErrorType::get(ctx);
 
-  return protocol->getDeclaredInterfaceType();
+  // Dig out the actor transport type.
+  auto module = actor->getParentModule();
+  Type selfType = actor->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, protocol);
+  return conformance.getTypeWitnessByName(selfType, ctx.Id_Transport);
 }
