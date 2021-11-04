@@ -2740,6 +2740,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           origDeclID, paramIndicesVector);
       return;
     }
+
+    case DAK_TypeSequence: {
+      auto abbrCode = S.DeclTypeAbbrCodes[TypeSequenceDeclAttrLayout::Code];
+      TypeSequenceDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
+      return;
+    }
     }
   }
 

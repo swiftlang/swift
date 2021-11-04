@@ -2744,6 +2744,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         name, AtLoc, range, /*implicit*/ false));
     break;
   }
+  case DAK_TypeSequence: {
+    auto range = SourceRange(Loc, Tok.getRange().getStart());
+    Attributes.add(TypeSequenceAttr::create(Context, AtLoc, range));
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
