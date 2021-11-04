@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -requirement-machine=off %s | %FileCheck %s
+
+// FIXME(rdar://84987079)
 
 // Test derivative function vtable entries for `@differentiable` class members:
 // - Methods.
