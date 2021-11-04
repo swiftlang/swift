@@ -12,11 +12,13 @@ import _Distributed
 
 @available(SwiftStdlib 5.6, *)
 distributed actor SomeSpecificDistributedActor {
+  typealias Transport = FakeTransport
+
   let name: String
   let surname: String
   let age: Int
 
-  init(name: String, transport: ActorTransport) {
+  init(name: String, transport: FakeTransport) {
     self.name = name
     self.surname = "Surname"
     self.age = 42
@@ -78,6 +80,9 @@ struct FakeTransport: ActorTransport {
     print("resignIdentity id:\(id)")
   }
 }
+
+@available(SwiftStdlib 5.6, *)
+typealias DefaultActorTransport = FakeTransport
 
 // ==== Execute ----------------------------------------------------------------
 

@@ -62,6 +62,8 @@ struct FakeTransport: ActorTransport {
   func resignIdentity(_ id: AnyActorIdentity) {}
 }
 
+typealias DefaultActorTransport = FakeTransport
+
 // ==== Execute ----------------------------------------------------------------
 
 func test(transport: FakeTransport) async {

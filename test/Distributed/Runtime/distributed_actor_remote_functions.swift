@@ -166,10 +166,13 @@ struct FakeTransport: ActorTransport {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
+typealias DefaultActorTransport = FakeTransport
+
 // ==== Execute ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.6, *)
-func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async {
+func test_remote_invoke(address: ActorAddress, transport: FakeTransport) async {
   func check(actor: SomeSpecificDistributedActor) async {
     let personality = __isRemoteActor(actor) ? "remote" : "local"
 

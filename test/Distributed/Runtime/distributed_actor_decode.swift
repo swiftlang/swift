@@ -66,6 +66,9 @@ struct FakeTransport: ActorTransport {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
+typealias DefaultActorTransport = FakeTransport
+
 // ==== Test Coding ------------------------------------------------------------
 
 class TestEncoder: Encoder {
