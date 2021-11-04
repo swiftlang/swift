@@ -28,7 +28,7 @@ distributed actor Bad12 {
 distributed actor OK2 {
   var x: Int
 
-  init(x: Int, transport: ActorTransport) { // ok
+  init(x: Int, transport: AnyActorTransport) { // ok
     self.x = x
   }
 }
@@ -36,7 +36,7 @@ distributed actor OK2 {
 distributed actor Bad2 {
   var x: Int = 1
 
-  init(transport: ActorTransport, too many: ActorTransport) {
+  init(transport: AnyActorTransport, too many: AnyActorTransport) {
     // expected-error@-1{{designated distributed actor initializer 'init(transport:too:)' must accept exactly one ActorTransport parameter, found 2}}
   }
 }
@@ -44,14 +44,14 @@ distributed actor Bad2 {
 distributed actor OK3 {
   var x: Int
 
-  init(y: Int, transport: ActorTransport) {
+  init(y: Int, transport: AnyActorTransport) {
     self.x = y
   }
 }
 
 distributed actor OKMulti {
 
-  convenience init(y: Int, transport: ActorTransport) { // ok
+  convenience init(y: Int, transport: AnyActorTransport) { // ok
     self.init(transport: transport)
   }
 
@@ -59,7 +59,7 @@ distributed actor OKMulti {
 
 distributed actor OKMultiDefaultValues {
 
-  convenience init(y: Int, transport: ActorTransport, x: Int = 1234) { // ok
+  convenience init(y: Int, transport: AnyActorTransport, x: Int = 1234) { // ok
     self.init(transport: transport)
   }
 
@@ -99,6 +99,7 @@ struct FakeTransport: ActorTransport {
 }
 
 distributed actor OKSpecificTransportType {
+  typealias Transport = FakeTransport
 
   init(y: Int, transport fake: FakeTransport) { // ok
     // nothing

@@ -61,8 +61,8 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
     return param;
   };
 
-  Type addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-  Type transportType = getDistributedActorTransportType(decl);
+  auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+  auto transportType = getDistributedActorTransportType(decl);
 
   // (_ identity: AnyActorIdentity, using transport: ActorTransport)
   auto *params = ParameterList::create(
@@ -133,10 +133,11 @@ static ValueDecl *deriveDistributedActor_actorTransport(
 
   // ```
   // nonisolated
-  // let actorTransport: ActorTransport
+  // let actorTransport: Transport
   // ```
   // (no need for @actorIndependent because it is an immutable let)
-  Type propertyType = getDistributedActorTransportType(derived.Nominal);
+  auto propertyType = getDistributedActorTransportType(derived.Nominal);
+
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
@@ -154,6 +155,36 @@ static ValueDecl *deriveDistributedActor_actorTransport(
   return propDecl;
 }
 
+static Type deriveDistributedActor_Transport(
+    DerivedConformance &derived) {
+  assert(derived.Nominal->isDistributedActor());
+  auto &C = derived.Context;
+
+  // Look for a type DefaultActorTransport within the parent context.
+  auto defaultTransportLookup = TypeChecker::lookupUnqualified(
+      derived.getConformanceContext()->getModuleScopeContext(),
+      DeclNameRef(C.Id_DefaultActorTransport),
+      derived.ConformanceDecl->getLoc());
+  TypeDecl *defaultTransportTypeDecl = nullptr;
+  for (const auto &found : defaultTransportLookup) {
+    if (auto foundType = dyn_cast_or_null<TypeDecl>(found.getValueDecl())) {
+      if (defaultTransportTypeDecl) {
+        // Note: ambiguity, for now just fail.
+        return nullptr;
+      }
+
+      defaultTransportTypeDecl = foundType;
+      continue;
+    }
+  }
+
+  // There is no default, so fail to synthesize.
+  if (!defaultTransportTypeDecl)
+    return nullptr;
+
+  // Return the default transport type.
+  return defaultTransportTypeDecl->getDeclaredInterfaceType();
+}
 // ==== ------------------------------------------------------------------------
 
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
@@ -173,4 +204,18 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   }
 
   return nullptr;
+}
+
+std::pair<Type, TypeDecl *> DerivedConformance::deriveDistributedActor(
+    AssociatedTypeDecl *assocType) {
+  if (!canDeriveDistributedActor(Nominal, cast<DeclContext>(ConformanceDecl)))
+    return std::make_pair(Type(), nullptr);
+
+  if (assocType->getName() == Context.Id_Transport) {
+    return std::make_pair(deriveDistributedActor_Transport(*this), nullptr);
+  }
+
+  Context.Diags.diagnose(assocType->getLoc(),
+                         diag::broken_distributed_actor_requirement);
+  return std::make_pair(Type(), nullptr);
 }

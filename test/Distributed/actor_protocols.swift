@@ -39,15 +39,15 @@ actor A2: DistributedActor {
   nonisolated var id: AnyActorIdentity {
     fatalError()
   }
-  nonisolated var actorTransport: ActorTransport {
+  nonisolated var actorTransport: AnyActorTransport {
     fatalError()
   }
 
-  init(transport: ActorTransport) {
+  init(transport: AnyActorTransport) {
     fatalError()
   }
 
-  static func resolve(_ identity: AnyActorIdentity, using transport: ActorTransport) throws -> Self {
+  static func resolve(_ identity: AnyActorIdentity, using transport: AnyActorTransport) throws -> Self {
     fatalError()
   }
 }
@@ -57,14 +57,14 @@ final class C2: DistributedActor {
   nonisolated var id: AnyActorIdentity {
     fatalError()
   }
-  nonisolated var actorTransport: ActorTransport {
+  nonisolated var actorTransport: AnyActorTransport {
     fatalError()
   }
 
-  required init(transport: ActorTransport) {
+  required init(transport: AnyActorTransport) {
     fatalError()
   }
-  static func resolve(_ identity: AnyActorIdentity, using transport: ActorTransport) throws -> Self {
+  static func resolve(_ identity: AnyActorIdentity, using transport: AnyActorTransport) throws -> Self {
     fatalError()
   }
 }

@@ -58,6 +58,9 @@ struct FakeTransport: ActorTransport {
   }
 }
 
+@available(SwiftStdlib 5.6, *)
+typealias DefaultActorTransport = FakeTransport
+
 // ==== Execute ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.6, *)

@@ -18,7 +18,7 @@ distributed actor Philosopher {
   let INITIALIZED: Int
   let outside: Int = 1
 
-  init(transport: ActorTransport) {
+  init(transport: AnyActorTransport) {
     self.log = Logger(label: "name")
     self.INITIALIZED = 1
   }
@@ -54,7 +54,7 @@ distributed actor Philosopher {
   }
 }
 
-func test_outside(transport: ActorTransport) async throws {
+func test_outside(transport: AnyActorTransport) async throws {
   _ = try await Philosopher(transport: transport).dist()
   _ = Philosopher(transport: transport).log // expected-error{{distributed actor-isolated property 'log' can only be referenced inside the distributed actor}}
 

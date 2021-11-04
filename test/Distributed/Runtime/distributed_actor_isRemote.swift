@@ -77,6 +77,9 @@ struct FakeTransport: ActorTransport {
   }
 }
 
+@available(SwiftStdlib 5.6, *)
+typealias DefaultActorTransport = FakeTransport
+
 // ==== Execute ----------------------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
