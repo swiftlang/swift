@@ -32,7 +32,9 @@ struct E: Actor {
 
 // ==== -----------------------------------------------------------------------
 
-distributed actor DA: DistributedActor {} // ok
+distributed actor DA: DistributedActor {
+  typealias Transport = AnyActorTransport
+}
 
 actor A2: DistributedActor {
   // expected-error@-1{{non-distributed actor type 'A2' cannot conform to the 'DistributedActor' protocol}} {{1-1=distributed }}

@@ -4,7 +4,9 @@
 
 import _Distributed
 
-distributed actor DA { }
+distributed actor DA {
+  typealias Transport = AnyActorTransport
+}
 
 extension DA {
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17distributed_thunk2DAC1fyyFTE : $@convention(method) @async (@guaranteed DA) -> @error Error
