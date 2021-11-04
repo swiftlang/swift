@@ -445,7 +445,7 @@ extension __StringStorage {
 
   // @opaque
   fileprivate var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
-    precondition(
+    _precondition(
       hasBreadcrumbs, "Internal error: string breadcrumbs not present")
     return UnsafeMutablePointer(_realCapacityEnd)
   }
