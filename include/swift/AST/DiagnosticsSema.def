@@ -4490,6 +4490,10 @@ NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
+NOTE(actor_isolated_sync_func_value,none,
+     "calls function of type %0 from outside of its actor context are "
+     "implicitly asynchronous",
+     (Type))
 NOTE(note_distributed_actor_isolated_method,none,
      "distributed actor-isolated %0 %1 declared here",
      (DescriptiveDeclKind, DeclName))
