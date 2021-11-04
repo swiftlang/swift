@@ -2061,6 +2061,20 @@ public:
   }
 };
 
+/// The @_typeSequence attribute, which treats a generic param decl as a variadic
+/// sequence of value/type pairs.
+class TypeSequenceAttr : public DeclAttribute {
+  TypeSequenceAttr(SourceLoc atLoc, SourceRange Range);
+
+public:
+  static TypeSequenceAttr *create(ASTContext &Ctx, SourceLoc atLoc,
+                                  SourceRange Range);
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_TypeSequence;
+  }
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
