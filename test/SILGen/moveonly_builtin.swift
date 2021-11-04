@@ -27,7 +27,7 @@ class Klass {}
 // CHECK-SIL: bb0([[ARG:%.*]] :
 // CHECK-SIL-NEXT: debug_value
 // CHECK-SIL-NEXT: strong_retain
-// CHECK-SIL-NEXT: move_value
+// CHECK-SIL-NEXT: [allows_diagnostics] move_value
 // CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: return
 // CHECK-SIL: } // end sil function '$s8moveonly7useMoveyAA5KlassCADF'
@@ -55,7 +55,7 @@ func useMove(_ k: Klass) -> Klass {
 // CHECK-SIL: bb0([[ARG:%.*]] :
 // CHECK-SIL-NEXT: debug_value
 // CHECK-SIL-NEXT: strong_retain
-// CHECK-SIL-NEXT: move_value
+// CHECK-SIL-NEXT: [allows_diagnostics] move_value
 // CHECK-SIL-NEXT: tuple
 // CHECK-SIL-NEXT: return
 // CHECK-SIL: } // end sil function '$s8moveonly7useMoveyxxRlzClF'

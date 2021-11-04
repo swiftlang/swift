@@ -3156,7 +3156,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     UNARY_INSTRUCTION(DestroyAddr)
     UNARY_INSTRUCTION(CopyValue)
     UNARY_INSTRUCTION(ExplicitCopyValue)
-    UNARY_INSTRUCTION(MoveValue)
     UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)
@@ -3263,6 +3262,28 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
 
     ResultVal = B.createUncheckedOwnershipConversion(InstLoc, Val, RHSKind);
+    break;
+  }
+
+  case SILInstructionKind::MoveValueInst: {
+    bool allowsDiagnostics = false;
+    StringRef AttrName;
+    if (parseSILOptional(AttrName, *this)) {
+      if (!AttrName.equals("allows_diagnostics")) {
+        auto diag = diag::sil_movevalue_invalid_optional_attribute;
+        P.diagnose(InstLoc.getSourceLoc(), diag, AttrName);
+        return true;
+      }
+      allowsDiagnostics = true;
+    }
+
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    auto *MVI = B.createMoveValue(InstLoc, Val);
+    MVI->setAllowsDiagnostics(allowsDiagnostics);
+    ResultVal = MVI;
     break;
   }
 
