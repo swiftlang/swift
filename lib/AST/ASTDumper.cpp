@@ -521,7 +521,7 @@ namespace {
         OS << " kind=" << getImportKindString(ID->getImportKind());
 
       OS << " '";
-      ID->getImportPath().print(OS);
+      ID->getImportPath(/*withRealModuleName=*/true).print(OS);
       OS << "')";
     }
 

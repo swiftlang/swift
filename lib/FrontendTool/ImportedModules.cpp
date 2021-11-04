@@ -65,8 +65,7 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
     auto ID = dyn_cast<ImportDecl>(D);
     if (!ID)
       continue;
-
-    auto modulePath = ID->getModulePath();
+    auto modulePath = ID->getModulePath(/*withRealModuleName=*/true);
     // only the top-level name is needed (i.e. A in A.B.C)
     Modules.insert(modulePath[0].Item.str());
   }

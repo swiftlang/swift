@@ -1066,6 +1066,8 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
   auto D = new (ptr) ImportDecl(DC, ImportLoc, Kind, KindLoc, Path);
   if (ClangN)
     D->setClangNode(ClangN);
+  auto realName = Ctx.getRealModuleName(Path.front().Item);
+  D->setRealModuleName(realName);
   return D;
 }
 

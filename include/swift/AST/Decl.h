@@ -1132,13 +1132,14 @@ class ImportDecl final : public Decl,
 
   SourceLoc ImportLoc;
   SourceLoc KindLoc;
+  Identifier RealModuleName;
 
   /// The resolved module.
   ModuleDecl *Mod = nullptr;
 
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
              SourceLoc KindLoc, ImportPath Path);
-
+  void setRealModuleName(Identifier name) { RealModuleName = name; };
 public:
   static ImportDecl *create(ASTContext &C, DeclContext *DC,
                             SourceLoc ImportLoc, ImportKind Kind,
@@ -1162,12 +1163,28 @@ public:
     return static_cast<ImportKind>(Bits.ImportDecl.ImportKind);
   }
 
-  ImportPath getImportPath() const {
-    return ImportPath({ getTrailingObjects<ImportPath::Element>(),
+  ImportPath getImportPath(bool withRealModuleName = false) const {
+    auto path = ImportPath({ getTrailingObjects<ImportPath::Element>(),
                         static_cast<size_t>(Bits.ImportDecl.NumPathElements) });
+    if (withRealModuleName && !RealModuleName.empty()) {
+      ImportPath::Builder realPath;
+      for (auto elem: path) {
+        if (realPath.empty()) {
+          realPath.push_back(RealModuleName);
+        } else {
+          realPath.push_back(elem.Item);
+        }
+      }
+      path = ImportPath(realPath.get().getRaw());
+    }
+    return path;
   }
 
-  ImportPath::Module getModulePath() const {
+  ImportPath::Module getModulePath(bool withRealName = false) const {
+    if (withRealName && !RealModuleName.empty()) {
+      ImportPath::Module::Builder builder(RealModuleName);
+      return builder.get();
+    }
     return getImportPath().getModulePath(getImportKind());
   }
 
