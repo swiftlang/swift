@@ -6,6 +6,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 #include <objc/runtime.h>
 #include <dlfcn.h>
 #include <stdio.h>
