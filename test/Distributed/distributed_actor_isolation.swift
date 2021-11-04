@@ -7,6 +7,9 @@
 
 import _Distributed
 
+/// Use the existential wrapper as the default actor transport.
+typealias DefaultActorTransport = AnyActorTransport
+
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address : String) {

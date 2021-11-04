@@ -108,6 +108,6 @@ public struct AnyActorTransport: ActorTransport {
   }
 }
 
-/// Use the existential wrapper as the default actor transport.
-@available(SwiftStdlib 5.6, *)
-public typealias DefaultActorTransport = AnyActorTransport
+///// Use the existential wrapper as the default actor transport.
+//@available(SwiftStdlib 5.6, *)
+//public typealias DefaultActorTransport = AnyActorTransport
