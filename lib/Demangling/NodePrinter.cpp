@@ -1158,6 +1158,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   }
 
+  if (!Node) {
+    Printer << "<null node pointer>";
+    return nullptr;
+  }
+
   switch (auto kind = Node->getKind()) {
   case Node::Kind::Static:
     Printer << "static ";

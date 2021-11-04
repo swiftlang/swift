@@ -31,12 +31,15 @@ extension SwiftReflectionContextRef {
     return String(cString: cstr)
   }
 
-  func isAContiguousArrayOfClassElementType(metadata: swift_reflection_ptr_t) ->
+  func isAContiguousArray(metadata: swift_reflection_ptr_t) ->
   Bool {
     guard let name = name(metadata: metadata) else { return false }
-    guard name.starts(with: "Swift._ContiguousArrayStorage") else {
-        return false
-    }
+    return name.starts(with: "Swift._ContiguousArrayStorage")
+  }
+
+  func isAContiguousArrayOfClassElementType(metadata: swift_reflection_ptr_t) ->
+  Bool {
+    guard isAContiguousArray(metadata: metadata) else { return false }
     let tr = swift_reflection_typeRefForMetadata(self, UInt(metadata));
     guard tr != 0 else {
         return false
@@ -52,6 +55,17 @@ extension SwiftReflectionContextRef {
     }
     let typeInfo = swift_reflection_infoForTypeRef(self, argTr)
     return typeInfo.Kind == SWIFT_STRONG_REFERENCE
+  }
+
+  func arrayCount(
+    array: swift_reflection_ptr_t,
+    reader: (swift_addr_t, Int) -> UnsafeRawPointer?
+  ) -> UInt? {
+    let size = MemoryLayout<UInt>.stride * 3
+    guard let ptr = reader(array, size) else { return nil }
+    let typedPtr = ptr.bindMemory(to: UInt.self, capacity: 3)
+    // Array layout goes: metadata, refcount, count
+    return typedPtr[2]
   }
 
   func name(proto: swift_reflection_ptr_t) -> String? {
