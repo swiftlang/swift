@@ -18,7 +18,7 @@ extern "C" {
 SWIFT_REMOTE_MIRROR_LINKAGE
 unsigned long long swift_reflection_classIsSwiftMask = 2;
 
-SWIFT_REMOTE_MIRROR_LINKAGE uint32_t swift_reflection_libraryVersion = 1;
+SWIFT_REMOTE_MIRROR_LINKAGE uint32_t swift_reflection_libraryVersion = 2;
 }
 
 #include "swift/Demangling/Demangler.h"
@@ -43,6 +43,7 @@ struct SwiftReflectionContext {
   std::vector<std::function<void()>> freeFuncs;
   std::vector<std::tuple<swift_addr_t, swift_addr_t>> dataSegments;
   std::string lastString;
+  std::vector<swift_async_task_allocation_chunk_t> lastChunks;
 
   SwiftReflectionContext(MemoryReaderImpl impl) {
     auto Reader = std::make_shared<CMemoryReader>(impl);
@@ -774,22 +775,46 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
   return returnableCString(ContextRef, Error);
 }
 
-const char *swift_reflection_iterateAsyncTaskAllocations(
-    SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t AsyncTaskPtr,
-    swift_asyncTaskAllocationIterator Call, void *ContextPtr) {
+swift_async_task_slab_return_t
+swift_reflection_asyncTaskSlabPointer(SwiftReflectionContextRef ContextRef,
+                                      swift_reflection_ptr_t AsyncTaskPtr) {
   auto Context = ContextRef->nativeContext;
-  auto Error = Context->iterateAsyncTaskAllocations(
-      AsyncTaskPtr, [&](auto AllocationPtr, auto Count, auto Chunks) {
-        std::vector<swift_async_task_allocation_chunk_t> ConvertedChunks;
-        ConvertedChunks.reserve(Count);
-        for (unsigned i = 0; i < Count; i++) {
-          swift_async_task_allocation_chunk_t Chunk;
-          Chunk.Start = Chunks[i].Start;
-          Chunk.Length = Chunks[i].Length;
-          Chunk.Kind = convertAllocationChunkKind(Chunks[i].Kind);
-          ConvertedChunks.push_back(Chunk);
-        }
-        Call(AllocationPtr, Count, ConvertedChunks.data(), ContextPtr);
-      });
-  return returnableCString(ContextRef, Error);
+  llvm::Optional<std::string> Error;
+  NativeReflectionContext::StoredPointer SlabPtr;
+  std::tie(Error, SlabPtr) = Context->asyncTaskSlabPtr(AsyncTaskPtr);
+
+  swift_async_task_slab_return_t Result = {};
+  Result.Error = returnableCString(ContextRef, Error);
+  Result.SlabPtr = SlabPtr;
+  return Result;
+}
+
+swift_async_task_slab_allocations_return_t
+swift_reflection_asyncTaskSlabAllocations(SwiftReflectionContextRef ContextRef,
+                                          swift_reflection_ptr_t SlabPtr) {
+  auto Context = ContextRef->nativeContext;
+  llvm::Optional<std::string> Error;
+  NativeReflectionContext::AsyncTaskSlabInfo Info;
+  std::tie(Error, Info) = Context->asyncTaskSlabAllocations(SlabPtr);
+
+  swift_async_task_slab_allocations_return_t Result = {};
+  Result.Error = returnableCString(ContextRef, Error);
+
+  Result.NextSlab = Info.NextSlab;
+  Result.SlabSize = Info.SlabSize;
+
+  ContextRef->lastChunks.clear();
+  ContextRef->lastChunks.reserve(Info.Chunks.size());
+  for (auto &Chunk : Info.Chunks) {
+    swift_async_task_allocation_chunk_t ConvertedChunk;
+    ConvertedChunk.Start = Chunk.Start;
+    ConvertedChunk.Length = Chunk.Length;
+    ConvertedChunk.Kind = convertAllocationChunkKind(Chunk.Kind);
+    ContextRef->lastChunks.push_back(ConvertedChunk);
+  }
+
+  Result.ChunkCount = ContextRef->lastChunks.size();
+  Result.Chunks = ContextRef->lastChunks.data();
+
+  return Result;
 }
