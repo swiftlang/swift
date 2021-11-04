@@ -802,7 +802,7 @@ public:
 
   /// Check if this is a CGFloat type from CoreGraphics framework
   /// on macOS or Foundation on Linux.
-  bool isCGFloatType();
+  bool isCGFloat();
 
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module

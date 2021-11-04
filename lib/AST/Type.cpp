@@ -813,7 +813,7 @@ bool TypeBase::isStdlibType() {
   return false;
 }
 
-bool TypeBase::isCGFloatType() {
+bool TypeBase::isCGFloat() {
   auto *NTD = getAnyNominal();
   if (!NTD)
     return false;
