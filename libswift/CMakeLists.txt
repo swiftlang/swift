@@ -20,17 +20,16 @@ else()
 
   add_subdirectory(Sources)
 
-  if(${LIBSWIFT_BUILD_MODE} STREQUAL "HOSTTOOLS")
+  if(${LIBSWIFT_BUILD_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE-WITH-HOSTLIBS")
 
-    if (NOT CMAKE_Swift_COMPILER)
+    if (NOT SWIFT_EXEC_FOR_LIBSWIFT)
       message(FATAL_ERROR "Need a swift toolchain for building libswift")
     endif()
 
     add_libswift("libswift"
       SWIFT_EXEC "${SWIFT_EXEC_FOR_LIBSWIFT}")
 
-  elseif(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" OR
-         ${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+  elseif(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
 
     # Bootstrapping - stage 1, using the compiler from level 0
 
@@ -45,6 +44,12 @@ else()
         SWIFT_EXEC "${CMAKE_BINARY_DIR}/bootstrapping1/bin/swiftc"
         DEPENDS "bootstrapping1-all")
 
+    if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+      if(EXISTS "${CMAKE_BINARY_DIR}/bootstrapping0/lib/swift/macos/Swift.swiftmodule" OR
+         EXISTS "${CMAKE_BINARY_DIR}/bootstrapping1/lib/swift/macos/Swift.swiftmodule")
+        messsage(FATAL_ERROR "Please clean the ${CMAKE_BINARY_DIR}/bootstrapping[01] directories")
+      endif()
+    endif()
   else()
     message(FATAL_ERROR "Unknown LIBSWIFT_BUILD_MODE '${LIBSWIFT_BUILD_MODE}'")
   endif()
