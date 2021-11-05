@@ -117,10 +117,12 @@ RangeTraps.test("throughNaN")
   _ = ...Double.nan
 }
 
-RangeTraps.test("UIntOverflow")
-  .code {
-  expectCrashLater()
-  _blackHole((0 ..< UInt.max).count)
+if #available(SwiftStdlib 5.6, *) {
+  RangeTraps.test("UIntOverflow")
+    .code {
+    expectCrashLater()
+    _blackHole((0 ..< UInt.max).count)
+  }
 }
 
 if #available(SwiftStdlib 5.5, *) {

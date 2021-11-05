@@ -267,8 +267,8 @@ actor MyActor {
         computedProp = 1
 
         Task {
-            _ = await self.hax
-            await self.helloWorld()
+            _ = self.hax
+            self.helloWorld()
         }
     }
 
@@ -403,4 +403,50 @@ actor EscapeArtist {
 
     func isolatedMethod() { x += 1 }
     nonisolated func nonisolated() {}
+}
+
+@available(SwiftStdlib 5.5, *)
+actor Ahmad {
+  func f() {}
+  
+  init(v1: Void) {
+    Task.detached { await self.f() } // expected-warning {{actor 'self' can only be captured by a closure from an async initializer}}
+                                     // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+    
+    f()   // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
+          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+  }
+  
+  nonisolated init(v2: Void) async {
+    Task.detached { await self.f() } // expected-warning {{actor 'self' cannot be captured by a closure from a non-isolated, designated initializer}} {{3-15=}}
+    // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+    
+    f()   // expected-warning {{this use of actor 'self' cannot appear in a non-isolated, designated initializer}}
+    // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+actor Rain {
+  var x: Int = 0
+  func f() {}
+
+  init() {
+    defer { self.f() }  // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
+                        // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
+    defer { _ = self.x }  // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
+    defer { Task { await self.f() } } // expected-warning {{this use of actor 'self' can only appear in an async initializer}}
+                                      // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+  }
+
+  init() async {
+    defer { self.f() }
+
+    defer { _ = self.x }
+
+    defer { Task { await self.f() } }
+  }
 }
