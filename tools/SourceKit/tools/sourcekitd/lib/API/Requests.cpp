@@ -1910,6 +1910,8 @@ static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
     Elem.setBool(KeyIsSystem, true);
   if (Symbol.IsDynamic)
     Elem.setBool(KeyIsDynamic, true);
+  if (Symbol.IsSynthesized)
+    Elem.setBool(KeyIsSynthesized, true);
 
   if (Symbol.ParentNameOffset)
     Elem.set(KeyParentLoc, Symbol.ParentNameOffset.getValue());
