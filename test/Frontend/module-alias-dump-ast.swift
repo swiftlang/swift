@@ -24,7 +24,7 @@
 public struct Logger {
   public init() {}
 }
-public func setup() -> Logger? {
+public func setup() -> XLogging.Logger? {
   return Logger()
 }
 
