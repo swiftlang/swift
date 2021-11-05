@@ -246,7 +246,6 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
   // ==== Prepare argument references
   // --- Parameter: identity
   SILArgument *identityArg = F.getArgument(0);
-  assert(identityArg->getType().getASTType()->isEqual(C.getAnyActorIdentityType()));
 
   // --- Parameter: transport
   SILArgument *transportArg = F.getArgument(1);
