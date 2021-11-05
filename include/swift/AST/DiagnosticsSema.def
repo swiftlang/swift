@@ -4611,6 +4611,12 @@ ERROR(nonisolated_mutable_storage,none,
 ERROR(nonisolated_local_var,none,
       "'nonisolated' can not be applied to local variables",
       ())
+ERROR(nonisolated_actor_sync_init,none,
+      "'nonisolated' on an actor's synchronous initializer is invalid",
+      ())
+ERROR(nonisolated_actor_convenience_init,none,
+      "'nonisolated' on an actor's convenience initializer is redundant",
+      ())
 
 ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
