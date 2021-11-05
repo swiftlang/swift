@@ -3344,6 +3344,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
       return inferredIsolation(isolation);
   }
 
+  // If this is a dynamic replacement for another function, use the
+  // actor isolation of the function it replaces.
+  if (auto replacedDecl = value->getDynamicallyReplacedDecl()) {
+    if (auto isolation = getActorIsolation(replacedDecl))
+      return inferredIsolation(isolation);
+  }
+
   if (shouldInferAttributeInContext(value->getDeclContext())) {
     // If the declaration witnesses a protocol requirement that is isolated,
     // use that.
