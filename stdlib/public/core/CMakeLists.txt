@@ -368,8 +368,8 @@ if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
                       symlink-headers-bootstrapping1 ${swiftCore_common_dependencies}
                     BOOTSTRAPPING 1)
 
-  add_dependencies(bootstrapping1-all swiftCore-bootstrapping1)
-  add_dependencies(bootstrapping0-all swiftCore-bootstrapping0)
+  add_dependencies(bootstrapping1-corelib swiftCore-bootstrapping1)
+  add_dependencies(bootstrapping0-corelib swiftCore-bootstrapping0)
 endif()
 
 add_swift_target_library(swiftCore
