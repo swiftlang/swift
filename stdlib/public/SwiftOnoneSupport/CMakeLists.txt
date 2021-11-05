@@ -10,10 +10,7 @@ set(swiftOnoneSupport_common_options
   SWIFT_COMPILE_FLAGS "-parse-stdlib" "-Xllvm" "-sil-inline-generics=false" "-Xfrontend" "-validate-tbd-against-ir=none" "-Xfrontend" "-check-onone-completeness" "-Xfrontend" "-disable-access-control" "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND
-   (${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" OR
-    ${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS"))
-    
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND ${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
 
   set(swiftOnoneSupport_common_bootstrapping_options
     SHARED
@@ -27,27 +24,19 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND
 
   add_swift_target_library_single(swiftSwiftOnoneSupport-bootstrapping0 swiftSwiftOnoneSupport
     ${swiftOnoneSupport_common_bootstrapping_options}
-    MODULE_DEPENDENCY_TARGET swiftOnoneSupport_module_bootstrapping0
+    FILE_DEPENDS swiftCore-bootstrapping0
     BOOTSTRAPPING 0)
 
-  if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-    add_dependencies(bootstrapping0-all ${swiftOnoneSupport_module_bootstrapping0})
-  else()
-    add_dependencies(bootstrapping0-all swiftSwiftOnoneSupport-bootstrapping0)
-  endif()
+  add_dependencies(bootstrapping0-corelib swiftSwiftOnoneSupport-bootstrapping0)
 
   # Bootstrapping - stage 1
 
   add_swift_target_library_single(swiftSwiftOnoneSupport-bootstrapping1 swiftSwiftOnoneSupport
     ${swiftOnoneSupport_common_bootstrapping_options}
-    MODULE_DEPENDENCY_TARGET swiftOnoneSupport_module_bootstrapping1
+    FILE_DEPENDS swiftCore-bootstrapping1
     BOOTSTRAPPING 1)
 
-  if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-    add_dependencies(bootstrapping1-all ${swiftOnoneSupport_module_bootstrapping1})
-  else()
-    add_dependencies(bootstrapping1-all swiftSwiftOnoneSupport-bootstrapping1)
-  endif()
+  add_dependencies(bootstrapping1-corelib swiftSwiftOnoneSupport-bootstrapping1)
 
 endif()
 
