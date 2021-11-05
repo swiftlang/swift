@@ -5691,8 +5691,13 @@ SourceLoc constraints::getLoc(ASTNode anchor) {
     return anchor.getStartLoc();
   } else if (auto *S = anchor.dyn_cast<Stmt *>()) {
     return S->getStartLoc();
+  } else if (auto *P = anchor.dyn_cast<Pattern *>()) {
+    return P->getLoc();
+  } else if (auto *C = anchor.dyn_cast<StmtCondition *>()) {
+    return C->front().getStartLoc();
   } else {
-    return anchor.get<Pattern *>()->getLoc();
+    auto *I = anchor.get<CaseLabelItem *>();
+    return I->getStartLoc();
   }
 }
 
