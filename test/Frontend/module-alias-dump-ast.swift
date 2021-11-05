@@ -13,8 +13,9 @@
 // RUN: %target-swift-frontend -dump-ast %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t > %t/result-ast.output
 
 // RUN: %FileCheck %s -input-file %t/result-ast.output -check-prefix CHECK-AST
-// CHECK-AST: XLogging
 // CHECK-AST: module<AppleLogging>
+// RUN: not %FileCheck %s -input-file %t/result-ast.output -check-prefix CHECK-NOT-AST
+// CHECK-NOT-AST: XLogging
 
 
 // BEGIN FileLogging.swift
