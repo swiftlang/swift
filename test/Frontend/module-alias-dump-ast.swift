@@ -13,16 +13,18 @@
 // RUN: %target-swift-frontend -dump-ast %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t > %t/result-ast.output
 
 // RUN: %FileCheck %s -input-file %t/result-ast.output -check-prefix CHECK-AST
+// CHECK-AST-NOT: bind=XLogging
+// CHECK-AST-NOT: module<XLogging>
+// CHECK-AST-NOT: decl=XLogging
+// CHECK-AST: component id='XLogging' bind=AppleLogging
 // CHECK-AST: module<AppleLogging>
-// RUN: not %FileCheck %s -input-file %t/result-ast.output -check-prefix CHECK-NOT-AST
-// CHECK-NOT-AST: XLogging
-
+// CHECK-AST: decl=AppleLogging
 
 // BEGIN FileLogging.swift
 public struct Logger {
   public init() {}
 }
-public func setup() -> XLogging.Logger? {
+public func setup() -> Logger? {
   return Logger()
 }
 

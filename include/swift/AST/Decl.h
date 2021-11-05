@@ -1132,6 +1132,10 @@ class ImportDecl final : public Decl,
 
   SourceLoc ImportLoc;
   SourceLoc KindLoc;
+  // Used to store the real module name corresponding to this import decl
+  // in case module aliasing is used. For example if '-module-alias Foo=Bar'
+  // was passed and this decl is 'import Foo', the real name 'Bar' will be
+  // stored.
   Identifier RealModuleName;
 
   /// The resolved module.
@@ -1139,6 +1143,8 @@ class ImportDecl final : public Decl,
 
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
              SourceLoc KindLoc, ImportPath Path);
+  // Sets the real module name corresponding to this import decl in
+  // case module aliasing is used. Called in \c ImportDecl::create.
   void setRealModuleName(Identifier name) { RealModuleName = name; };
 public:
   static ImportDecl *create(ASTContext &C, DeclContext *DC,
@@ -1163,27 +1169,33 @@ public:
     return static_cast<ImportKind>(Bits.ImportDecl.ImportKind);
   }
 
-  ImportPath getImportPath(bool withRealModuleName = false) const {
+  /// Retrieves the full import path.
+  /// \param outRealModuleName An ImportPath builder to write the real module name to if module aliasing
+  ///        was used. For example, if '-module-alias Foo=Bar' was passed, the real name 'Bar' will be written
+  ///        to it, which corresponds to 'import Foo' in source file.
+  /// \returns An ImportPath corresponding to this import decl. If module aliasing was used, 'Foo' will be in the
+  ///          returned path instead of 'Bar' using the above example.
+  ImportPath getImportPath(ImportPath::Builder *outRealModuleName = nullptr) const {
     auto path = ImportPath({ getTrailingObjects<ImportPath::Element>(),
-                        static_cast<size_t>(Bits.ImportDecl.NumPathElements) });
-    if (withRealModuleName && !RealModuleName.empty()) {
-      ImportPath::Builder realPath;
+      static_cast<size_t>(Bits.ImportDecl.NumPathElements) });;
+
+    if (outRealModuleName != nullptr && !RealModuleName.empty()) {
       for (auto elem: path) {
-        if (realPath.empty()) {
-          realPath.push_back(RealModuleName);
+        if (outRealModuleName->empty()) {
+          // Add the real module name instead of its alias
+          outRealModuleName->push_back(RealModuleName);
         } else {
-          realPath.push_back(elem.Item);
+          // Add the rest if any (access path elements)
+          outRealModuleName->push_back(elem.Item);
         }
       }
-      path = ImportPath(realPath.get().getRaw());
     }
     return path;
   }
 
-  ImportPath::Module getModulePath(bool withRealName = false) const {
-    if (withRealName && !RealModuleName.empty()) {
-      ImportPath::Module::Builder builder(RealModuleName);
-      return builder.get();
+  ImportPath::Module getModulePath(ImportPath::Module::Builder *outRealModuleName = nullptr) const {
+    if (outRealModuleName != nullptr && !RealModuleName.empty()) {
+      outRealModuleName->push_back(RealModuleName);
     }
     return getImportPath().getModulePath(getImportKind());
   }

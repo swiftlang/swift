@@ -521,7 +521,17 @@ namespace {
         OS << " kind=" << getImportKindString(ID->getImportKind());
 
       OS << " '";
-      ID->getImportPath(/*withRealModuleName=*/true).print(OS);
+      // Check if module aliasing was used for the given imported module; for
+      // example, if '-module-alias Foo=Bar' was passed and this module has
+      // 'import Foo', its corresponding real module name 'Bar' should be printed.
+      ImportPath::Builder builderWithRealModuleName;
+      auto path = ID->getImportPath(/*outRealModuleName=*/&builderWithRealModuleName);
+      if (!builderWithRealModuleName.get().empty()) {
+        // Module aliasing was used, so print its real module name
+        builderWithRealModuleName.get().print(OS);
+      } else {
+        path.print(OS);
+      }
       OS << "')";
     }
 
@@ -1223,7 +1233,7 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
 
   switch (dc->getContextKind()) {
   case DeclContextKind::Module:
-    printName(os, cast<ModuleDecl>(dc)->getName());
+    printName(os, cast<ModuleDecl>(dc)->getRealName());
     break;
 
   case DeclContextKind::FileUnit:
@@ -1304,10 +1314,12 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     // Print the context.
     printContext(os, getDeclContext());
     os << ".";
+    // Print name.
+    getName().printPretty(os);
+  } else {
+    auto moduleName = cast<ModuleDecl>(this)->getRealName();
+    os << moduleName;
   }
-
-  // Print name.
-  getName().printPretty(os);
 
   // Print location.
   auto &srcMgr = getASTContext().SourceMgr;
