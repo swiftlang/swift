@@ -31,9 +31,6 @@ class SomeClass {}
 // SingleEnumPayloadEnumStruct Aligned group with 2 entries: pointer aligned single payload enum enum and a ptr
 // CHECK [36 x i8] c"a\00\00\00\02{{2|3}}\00\00\00\1{{2|3}}e\00\00\00\01\00\00\00\0Ae\00\00\00\01\00\00\00\01N{{2|3}}\00\00\00\01N
 
-// MultiPayloadStruct Multipayload with 11 payload cases and 4 no payload cases
-// CHECK [259 x i8] c"a\00\00\00\023\00\00\00\F2E\00\00\00\04\00\00\00\0B\00\00\00\01\00\00\00\11\00\00\00\11\00\00\00\11\00\00\00\11\00\00\00\11\00\00\00\11\00\00\00\11\00\00\00\11\00\00\00\17\00\00\00\1DNa\00\00\00\023\00\00\00\01N3\00\00\00\01Na\00\00\00\023\00\00\00\01N3\00\00\00\01Na\00\00\00\023\00\00\00\01N3\00\00\00\01Na\00\00\00\023\00\00\00\01N3\00\00\00\01Na\00\00\00\023\00\00\00\01N3\00\00\00\01Na\00\00\00\023\00\00\00\01N3\00\00\00\01Na\00\00\00\023\00\00\00\01N3\00\00\00\01Na\00\00\00\023\00\00\00\01N3\00\00\00\01Na\00\00\00\033\00\00\00\01N3\00\00\00\01N3\00\00\00\01Na\00\00\00\043\00\00\00\01N3\00\00\00\01N3\00\00\00\01N3\00\00\00\01L3\00\00\00\01N
-
 // SingleArchetypeStruct Struct with a field of archetype index 1
 // CHECK: [22 x i8] c"a\00\00\00\02?\00\00\00\05A\00\00\00\00{{2|3}}\00\00\00\01N
 
@@ -220,46 +217,6 @@ struct SingleEnumPayloadEnumStruct  {
     let a: EnumPayloadEnum
     let c: SomeClass
 }
-
-// CHECK: define{{.*}} void @"$s16bytecode_layouts18MultiPayloadStructVwxx"(
-// CHECK:   swift_generic_destroy
-// CHECK: }
-
-// CHECK: define{{.*}} %swift.opaque* @"$s16bytecode_layouts18MultiPayloadStructVwcp"(
-// CHECK:   swift_generic_initialize
-// CHECK: }
-
-// CHECK: define{{.*}} %swift.opaque* @"$s16bytecode_layouts18MultiPayloadStructVwca"(
-// CHECK:   swift_generic_assign
-// CHECK: }
-
-// CHECK: define{{.*}} %swift.opaque* @"$s16bytecode_layouts18MultiPayloadStructVwta"(
-// CHECK:   swift_generic_assign
-// CHECK: }
-@_GenerateLayoutBytecode
-struct MultiPayloadStruct  {
-    @_GenerateLayoutBytecode
-    enum MultiPayload  {
-        case Payload1(c: SomeClass)
-        case Payload2(c: SomeClass, d: SomeClass)
-        case Payload3(c: SomeClass, d: SomeClass)
-        case Payload4(c: SomeClass, d: SomeClass)
-        case Payload5(c: SomeClass, d: SomeClass)
-        case Payload6(c: SomeClass, d: SomeClass)
-        case Payload7(c: SomeClass, d: SomeClass)
-        case Payload8(c: SomeClass, d: SomeClass)
-        case Payload9(c: SomeClass, d: SomeClass)
-        case Payload10(c: SomeClass, d: SomeClass, e: SomeClass)
-        case Payload11(c: SomeClass, d: SomeClass, e: SomeClass, f: UInt64)
-        case NoPayload
-        case NoPayload2
-        case NoPayload3
-        case NoPayload4
-    }
-    let a: MultiPayload
-    let c: SomeClass
-}
-
 
 // CHECK: define{{.*}} void @"$s16bytecode_layouts21SingleArchetypeStructVwxx"(
 // CHECK:   swift_generic_destroy
