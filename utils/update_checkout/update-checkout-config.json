@@ -61,14 +61,14 @@
         "swift-installer-scripts": {
             "remote": { "id": "apple/swift-installer-scripts" } },
         "llvm-project": {
-            "remote": { "id": "swiftwasm/llvm-project" } }
+            "remote": { "id": "apple/llvm-project" } }
     },
     "default-branch-scheme": "wasm",
     "branch-schemes": {
         "wasm": {
             "aliases": ["wasm", "swiftwasm"],
             "repos": {
-                "llvm-project": "swiftwasm-stable/20210726",
+                "llvm-project": "stable/20210726",
                 "swift": "swiftwasm",
                 "cmark": "main",
                 "llbuild": "main",
@@ -91,30 +91,6 @@
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main"
-            }
-        },
-        "wasm/5.3": {
-            "aliases": ["wasm/5.3", "swiftwasm-release/5.3"],
-            "repos": {
-                "llvm-project": "swiftwasm-release/5.3",
-                "swift": "swiftwasm-release/5.3",
-                "cmark": "release/5.3",
-                "llbuild": "release/5.3",
-                "swift-tools-support-core": "release/5.3",
-                "swiftpm": "swiftwasm-release/5.3",
-                "swift-syntax": "release/5.3",
-                "swift-stress-tester": "release/5.3",
-                "swift-corelibs-xctest": "release/5.3",
-                "swift-corelibs-foundation": "release/5.3",
-                "swift-corelibs-libdispatch": "release/5.3",
-                "swift-integration-tests": "release/5.3",
-                "swift-xcode-playground-support": "release/5.3",
-                "ninja": "release",
-                "icu": "release-65-1",
-                "cmake": "v3.16.5",               
-                "indexstore-db": "release/5.3",
-                "sourcekit-lsp": "release/5.3",
-                "swift-format": "master"
             }
         },
        "main": {
