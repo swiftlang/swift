@@ -1025,6 +1025,7 @@ namespace {
     ASTContext &ctx;
     SmallVector<const DeclContext *, 4> contextStack;
     SmallVector<ApplyExpr*, 4> applyStack;
+    SmallVector<std::pair<OpaqueValueExpr *, Expr *>, 4> opaqueValues;
 
     /// Keeps track of the capture context of variables that have been
     /// explicitly captured in closures.
@@ -1244,6 +1245,13 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
+        opaqueValues.push_back({
+            openExistential->getOpaqueValue(),
+            openExistential->getExistentialValue()});
+        return { true, expr };
+      }
+
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         closure->setActorIsolation(determineClosureIsolation(closure));
         contextStack.push_back(closure);
@@ -1363,6 +1371,12 @@ namespace {
     }
 
     Expr *walkToExprPost(Expr *expr) override {
+      if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
+        assert(opaqueValues.back().first == openExistential->getOpaqueValue());
+        opaqueValues.pop_back();
+        return expr;
+      }
+
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         assert(contextStack.back() == closure);
         contextStack.pop_back();
@@ -1398,7 +1412,7 @@ namespace {
   private:
     /// Find the directly-referenced parameter or capture of a parameter for
     /// for the given expression.
-    static VarDecl *getReferencedParamOrCapture(Expr *expr) {
+    VarDecl *getReferencedParamOrCapture(Expr *expr) {
       // Look through identity expressions and implicit conversions.
       Expr *prior;
       do {
@@ -1408,6 +1422,16 @@ namespace {
 
         if (auto conversion = dyn_cast<ImplicitConversionExpr>(expr))
           expr = conversion->getSubExpr();
+
+        // Map opaque values.
+        if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(expr)) {
+          for (const auto &known : opaqueValues) {
+            if (known.first == opaqueValue) {
+              expr = known.second;
+              break;
+            }
+          }
+        }
       } while (prior != expr);
 
       // 'super' references always act on a 'self' variable.
@@ -1550,7 +1574,7 @@ namespace {
     }
 
     /// If the expression is a reference to `self`, the `self` declaration.
-    static VarDecl *getReferencedSelf(Expr *expr) {
+    VarDecl *getReferencedSelf(Expr *expr) {
       if (auto selfVar = getReferencedParamOrCapture(expr))
         if (selfVar->isSelfParameter() || selfVar->isSelfParamCapture())
           return selfVar;
@@ -1593,8 +1617,8 @@ namespace {
       // detect if it is a distributed actor, to provide better isolation notes
 
       auto isDistributedActor = false;
-      if (auto dc = dyn_cast<ClassDecl>(decl->getDeclContext()))
-        isDistributedActor = dc->isDistributedActor();
+      if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl())
+        isDistributedActor = nominal->isDistributedActor();
 
       // FIXME: Make this diagnostic more sensitive to the isolation context of
       // the declaration.
@@ -2538,8 +2562,8 @@ namespace {
       case ActorIsolationRestriction::Unsafe:
         // This case is hit when passing actor state inout to functions in some
         // cases. The error is emitted by diagnoseInOutArg.
-        auto classDecl = dyn_cast<ClassDecl>(member->getDeclContext());
-        if (classDecl && classDecl->isDistributedActor()) {
+        auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
+        if (nominal && nominal->isDistributedActor()) {
           auto funcDecl = dyn_cast<AbstractFunctionDecl>(member);
           if (funcDecl && !funcDecl->isStatic()) {
             member->diagnose(diag::distributed_actor_isolated_method);
