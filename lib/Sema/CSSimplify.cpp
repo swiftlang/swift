@@ -5474,7 +5474,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       if (kind >= ConstraintKind::Subtype &&
           nominal1->getDecl() != nominal2->getDecl() &&
-          ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
+          ((nominal1->isCGFloat() || nominal2->isCGFloat()) &&
            (nominal1->isDouble() || nominal2->isDouble()))) {
         ConstraintLocatorBuilder location{locator};
         // Look through all value-to-optional promotions to allow
@@ -5484,6 +5484,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           if (last->is<LocatorPathElt::OptionalPayload>()) {
             SmallVector<LocatorPathElt, 4> path;
             auto anchor = location.getLocatorParts(path);
+
+            // An attempt at Double/CGFloat conversion through
+            // optional chaining. This is not supported at the
+            // moment because solution application doesn't know
+            // how to map Double to/from CGFloat through optionals.
+            if (isExpr<OptionalEvaluationExpr>(anchor)) {
+              if (!shouldAttemptFixes())
+                return getTypeMatchFailure(locator);
+
+              conversionsOrFixes.push_back(ContextualMismatch::create(
+                  *this, nominal1, nominal2, getConstraintLocator(locator)));
+              break;
+            }
 
             // Drop all of the applied `value-to-optional` promotions.
             path.erase(llvm::remove_if(
@@ -5519,7 +5532,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         auto isCGFloatInit = [&](ASTNode location) {
           if (auto *call = getAsExpr<CallExpr>(location)) {
             if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
-              return getInstanceType(typeExpr)->isCGFloatType();
+              return getInstanceType(typeExpr)->isCGFloat();
             }
           }
           return false;
@@ -5548,7 +5561,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               return false;
             })) {
           conversionsOrFixes.push_back(
-              desugar1->isCGFloatType()
+              desugar1->isCGFloat()
                   ? ConversionRestrictionKind::CGFloatToDouble
                   : ConversionRestrictionKind::DoubleToCGFloat);
         }

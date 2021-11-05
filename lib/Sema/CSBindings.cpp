@@ -548,7 +548,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
   if (!TypeVar->getImpl().isClosureParameterType()) {
     auto type = binding.BindingType;
 
-    if (type->isCGFloatType() &&
+    if (type->isCGFloat() &&
         llvm::any_of(Bindings, [](const PotentialBinding &binding) {
           return binding.BindingType->isDouble();
         }))
@@ -557,7 +557,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
     if (type->isDouble()) {
       auto inferredCGFloat =
           llvm::find_if(Bindings, [](const PotentialBinding &binding) {
-            return binding.BindingType->isCGFloatType();
+            return binding.BindingType->isCGFloat();
           });
 
       if (inferredCGFloat != Bindings.end()) {
