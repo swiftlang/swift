@@ -682,8 +682,10 @@ void SILInlineCloner::visitBuiltinInst(BuiltinInst *Inst) {
         SILValue otherValue = getBuilder().emitLoadValueOperation(
             opLoc, otherSrcAddr, LoadOwnershipQualifier::Take);
 
+        // Create a move_value and set that we want it to be used for diagnostic
+        // emission.
         auto *mvi = getBuilder().createMoveValue(opLoc, otherValue);
-
+        mvi->setAllowsDiagnostics(true);
         getBuilder().emitStoreValueOperation(opLoc, mvi, otherResultAddr,
                                              StoreOwnershipQualifier::Init);
 

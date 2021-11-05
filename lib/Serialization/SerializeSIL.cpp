@@ -1462,6 +1462,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = ECMI->doKeepUnique();
     } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
       Attr = BBI->isLexical();
+    } else if (auto *MVI = dyn_cast<MoveValueInst>(&SI)) {
+      Attr = MVI->getAllowDiagnostics();
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;

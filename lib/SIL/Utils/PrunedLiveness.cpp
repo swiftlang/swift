@@ -80,6 +80,8 @@ void PrunedLiveness::updateForUse(SILInstruction *user, bool lifetimeEnding) {
   // Record all uses of blocks on the liveness boundary. For blocks marked
   // LiveWithin, the boundary is considered to be the last use in the block.
   if (!lifetimeEnding && useBlockLive == PrunedLiveBlocks::LiveOut) {
+    if (nonLifetimeEndingUsesInLiveOut)
+      nonLifetimeEndingUsesInLiveOut->insert(user);
     return;
   }
   // Note that a user may use the current value from multiple operands. If any
@@ -93,7 +95,7 @@ void PrunedLiveness::updateForUse(SILInstruction *user, bool lifetimeEnding) {
   //
   // This call is not considered the end of %val's lifetime. The @owned
   // argument must be copied.
-  auto iterAndSuccess = users.try_emplace(user, lifetimeEnding);
+  auto iterAndSuccess = users.insert({user, lifetimeEnding});
   if (!iterAndSuccess.second)
     iterAndSuccess.first->second &= lifetimeEnding;
 }

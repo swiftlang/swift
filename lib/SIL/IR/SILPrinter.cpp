@@ -1884,6 +1884,8 @@ public:
   }
 
   void visitMoveValueInst(MoveValueInst *I) {
+    if (I->getAllowDiagnostics())
+      *this << "[allows_diagnostics] ";
     *this << getIDAndType(I->getOperand());
   }
 
