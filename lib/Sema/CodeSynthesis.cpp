@@ -662,6 +662,9 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
 
   Expr *expr = superclassCallExpr;
 
+  if (superclassCtor->hasAsync()) {
+    expr = new (ctx) AwaitExpr(SourceLoc(), expr, type, /*implicit=*/true);
+  }
   if (superclassCtor->hasThrows()) {
     expr = new (ctx) TryExpr(SourceLoc(), expr, type, /*implicit=*/true);
   }
@@ -777,7 +780,8 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                               classDecl->getBraces().Start,
                               superclassCtor->isFailable(),
                               /*FailabilityLoc=*/SourceLoc(),
-                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+                              /*Async=*/superclassCtor->hasAsync(),
+                              /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
                               bodyParams, overrideInfo.GenericParams,
