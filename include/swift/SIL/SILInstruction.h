@@ -7337,8 +7337,17 @@ class MoveValueInst
                                   SingleValueInstruction> {
   friend class SILBuilder;
 
+  /// If set to true, we should emit the kill diagnostic for this move_value. If
+  /// set to false, we shouldn't emit such a diagnostic. This is a short term
+  /// addition until we get MoveOnly wrapper types into the SIL type system.
+  bool allowDiagnostics = false;
+
   MoveValueInst(SILDebugLocation DebugLoc, SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+
+public:
+  bool getAllowDiagnostics() const { return allowDiagnostics; }
+  void setAllowsDiagnostics(bool newValue) { allowDiagnostics = newValue; }
 };
 
 /// Given an object reference, return true iff it is non-nil and refers
