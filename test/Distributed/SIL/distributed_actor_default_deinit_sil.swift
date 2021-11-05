@@ -35,7 +35,7 @@ distributed actor MyDistActor {
 // CHECK: [[LOCAL_BB]]:
 // CHECK:   [[ID_REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
 // CHECK:   [[TPORT_REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorTransport
-// CHECK:   [[RESIGN:%[0-9]+]] = witness_method $AnyActorTransport, #ActorTransport.resignIdentity : <Self where Self : ActorTransport> (Self) -> (AnyActorIdentity) -> ()
+// CHECK:   [[RESIGN:%[0-9]+]] = witness_method $AnyActorTransport, #ActorTransport.resignIdentity : <Self where Self : ActorTransport> (Self) -> (Self.Identity) -> ()
 // CHECK:   apply [[RESIGN]]<AnyActorTransport>([[ID_REF]], [[TPORT_REF]])
 // CHECK:   br [[CONTINUE:bb[0-9]+]]
 

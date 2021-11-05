@@ -257,3 +257,36 @@ Type swift::getDistributedActorTransportType(NominalTypeDecl *actor) {
   auto conformance = module->lookupConformance(selfType, protocol);
   return conformance.getTypeWitnessByName(selfType, ctx.Id_Transport);
 }
+
+Type swift::getDistributedActorIdentityType(NominalTypeDecl *actor) {
+  assert(actor->isDistributedActor());
+  auto &ctx = actor->getASTContext();
+
+  auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+  if (!actorProtocol)
+    return ErrorType::get(ctx);
+
+  AssociatedTypeDecl *transportDecl =
+      actorProtocol->getAssociatedType(ctx.Id_Transport);
+  if (!transportDecl)
+    return ErrorType::get(ctx);
+
+  auto transportProtocol = ctx.getProtocol(KnownProtocolKind::ActorTransport);
+  if (!transportProtocol)
+    return ErrorType::get(ctx);
+
+  AssociatedTypeDecl *identityDecl =
+      transportProtocol->getAssociatedType(ctx.getIdentifier("Identity"));
+  if (!identityDecl)
+    return ErrorType::get(ctx);
+
+  auto module = actor->getParentModule();
+  Type selfType = actor->getSelfInterfaceType();
+  auto conformance = module->lookupConformance(selfType, actorProtocol);
+  Type dependentType = actorProtocol->getSelfInterfaceType();
+  dependentType = DependentMemberType::get(dependentType, transportDecl);
+  dependentType = DependentMemberType::get(dependentType, identityDecl);
+  return dependentType.subst(
+      SubstitutionMap::getProtocolSubstitutions(
+        actorProtocol, selfType, conformance));
+}

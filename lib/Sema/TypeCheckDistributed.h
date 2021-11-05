@@ -48,6 +48,9 @@ bool checkDistributedFunction(FuncDecl *decl, bool diagnose);
 /// Determine the distributed actor transport type for the given actor.
 Type getDistributedActorTransportType(NominalTypeDecl *actor);
 
+/// Determine the distributed actor identity type for the given actor.
+Type getDistributedActorIdentityType(NominalTypeDecl *actor);
+
 /// Diagnose a distributed func declaration in a not-distributed actor protocol.
 void diagnoseDistributedFunctionInNonDistributedActorProtocol(
   const ProtocolDecl *proto, InFlightDiagnostic &diag);
