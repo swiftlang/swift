@@ -1754,41 +1754,9 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
   if (isMultiPayloadEnum()) {
     // MULTIENUM := 'E' SIZE SIZE SIZE+ VALUE+
     // E numEmptyPayloads numPayloads legnthOfEachPayload payloads
-    layoutStr.push_back('E');
-
-    uint32_t numEmptyCasesBE;
-    uint32_t numCasesBE;
-    llvm::support::endian::write32be(&numEmptyCasesBE, numEmptyCases);
-    llvm::support::endian::write32be(&numCasesBE, cases.size());
-    layoutStr.insert(layoutStr.end(), (uint8_t *)(&numEmptyCasesBE),
-                     (uint8_t *)(&numEmptyCasesBE + 1));
-    layoutStr.insert(layoutStr.end(), (uint8_t *)(&numCasesBE),
-                     (uint8_t *)(&numCasesBE + 1));
-
-    std::vector<uint32_t> lengths;
-    std::vector<std::vector<uint8_t>> payloads;
-    for (auto &entry : cases) {
-      llvm::Optional<std::vector<uint8_t>> payloadLayout =
-          entry->layoutString(IGM);
-      if (!payloadLayout) {
-        return llvm::NoneType::None;
-      }
-      assert(payloadLayout->size() <= UINT32_MAX &&
-             "Enum layout exceeds length limit");
-      payloads.push_back(*payloadLayout);
-      std::string sizeString;
-      lengths.push_back(payloadLayout->size());
-    }
-    for (auto length : lengths) {
-      uint32_t lengthBE;
-      llvm::support::endian::write32be(&lengthBE, length);
-      layoutStr.insert(layoutStr.end(), (uint8_t *)(&lengthBE),
-                       (uint8_t *)(&lengthBE + 1));
-    }
-
-    for (auto payload : payloads) {
-      layoutStr.insert(layoutStr.end(), payload.begin(), payload.end());
-    }
+    //
+    // Not yet supported/implemented
+    return llvm::NoneType::None;
   } else {
     // SINGLEENUM := 'e' SIZE SIZE VALUE
     // e NumEmptyPayloads LengthOfPayload Payload

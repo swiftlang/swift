@@ -219,64 +219,6 @@ Tests.test("Nested Enum") {
   checkCopies(c, &c3)
 }
 
-Tests.test("MultiEnum") {
-  @_GenerateLayoutBytecode
-  enum MultiPayload : Equatable {
-    case Payload1(c: LifetimeTracked)
-    case Payload2(c: LifetimeTracked, d: LifetimeTracked)
-    case Payload3(c: LifetimeTracked, d: LifetimeTracked)
-    case Payload4(c: LifetimeTracked, d: LifetimeTracked)
-    case Payload5(c: LifetimeTracked, d: LifetimeTracked)
-    case Payload6(c: LifetimeTracked, d: LifetimeTracked)
-    case Payload7(c: LifetimeTracked, d: LifetimeTracked)
-    case Payload8(c: LifetimeTracked, d: LifetimeTracked)
-    case Payload9(c: LifetimeTracked, d: LifetimeTracked)
-    case Payload10(c: LifetimeTracked, d: LifetimeTracked, e: LifetimeTracked)
-    case Payload11(c: LifetimeTracked, d: LifetimeTracked, e: LifetimeTracked, f: UInt64)
-    case NoPayload
-    case NoPayload2
-    case NoPayload3
-    case NoPayload4
-  }
-
-  @_GenerateLayoutBytecode
-  struct MultiPayloadStruct : Equatable {
-    init(a: MultiPayload, c: LifetimeTracked) {
-      self.a = a
-      self.c = c
-    }
-    let a: MultiPayload
-    let c: LifetimeTracked
-  }
-  let _ = MultiPayloadStruct(a: .Payload1(c: LifetimeTracked(0)), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .Payload2(c: LifetimeTracked(0), d: LifetimeTracked(0)), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .Payload3(c: LifetimeTracked(0), d: LifetimeTracked(0)), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .Payload4(c: LifetimeTracked(0), d: LifetimeTracked(0)), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .Payload5(c: LifetimeTracked(0), d: LifetimeTracked(0)), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .Payload6(c: LifetimeTracked(0), d: LifetimeTracked(0)), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .Payload7(c: LifetimeTracked(0), d: LifetimeTracked(0)), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .Payload8(c: LifetimeTracked(0), d: LifetimeTracked(0)), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .Payload9(c: LifetimeTracked(0), d: LifetimeTracked(0)), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .Payload10(c: LifetimeTracked(0), d: LifetimeTracked(0), e: LifetimeTracked(0)), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .Payload11(c: LifetimeTracked(0), d: LifetimeTracked(0), e: LifetimeTracked(0), f: 0xAAAAAAAAAAAAAAAA), c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .NoPayload, c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .NoPayload2, c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .NoPayload3, c: LifetimeTracked(0))
-  let _ = MultiPayloadStruct(a: .NoPayload4, c: LifetimeTracked(0))
-
-  let a = MultiPayloadStruct(a: .Payload1(c: LifetimeTracked(0)), c: LifetimeTracked(0))
-  var b1 = MultiPayloadStruct(a: .Payload2(c: LifetimeTracked(1), d: LifetimeTracked(2)), c: LifetimeTracked(1))
-  var b2 = MultiPayloadStruct(a: .NoPayload2, c: LifetimeTracked(1))
-  checkCopies(a, &b1)
-  checkCopies(a, &b2)
-
-  let c = MultiPayloadStruct(a: .NoPayload3, c: LifetimeTracked(0))
-  var c1 = MultiPayloadStruct(a: .Payload2(c: LifetimeTracked(1), d: LifetimeTracked(2)), c: LifetimeTracked(1))
-  var c2 = MultiPayloadStruct(a: .NoPayload2, c: LifetimeTracked(1))
-  checkCopies(c, &c1)
-  checkCopies(c, &c2)
-}
-
 Tests.test("Archetypes") {
   @_GenerateLayoutBytecode
   struct ArchetypeStruct<T: Equatable> : Equatable {
@@ -381,46 +323,6 @@ Tests.test("Resilient") {
   checkCopies(g, &h2)
 }
 
-Tests.test("Archetype Multi Enums") {
-  @_GenerateLayoutBytecode
-  enum ArchetypeEnum<T>: Equatable {
-    case Left(_ a: LifetimeTracked)
-    case Right(_ b: LifetimeTracked)
-    case None
-  }
-  let a1 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(1))
-  var a2 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(2))
-  checkCopies(a1, &a2)
-
-  let b1 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(1))
-  var b2 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(2))
-  checkCopies(b1, &b2)
-
-  let c1 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(1))
-  var c2 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(2))
-  checkCopies(c1, &c2)
-
-  let d1 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(1))
-  var d2 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(2))
-  checkCopies(d1, &d2)
-
-  let e1 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(1))
-  var e2 = ArchetypeEnum<LifetimeTracked>.None
-  checkCopies(e1, &e2)
-
-  let f1 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(1))
-  var f2 = ArchetypeEnum<LifetimeTracked>.None
-  checkCopies(f1, &f2)
-
-  let g1 = ArchetypeEnum<LifetimeTracked>.None
-  var g2 = ArchetypeEnum<LifetimeTracked>.Left(LifetimeTracked(2))
-  checkCopies(g1, &g2)
-
-  let h1 = ArchetypeEnum<LifetimeTracked>.None
-  var h2 = ArchetypeEnum<LifetimeTracked>.Right(LifetimeTracked(2))
-  checkCopies(h1, &h2)
-}
-
 Tests.test("Archetype Enums") {
   @_GenerateLayoutBytecode
   enum ArchetypeEnum<T: Equatable> : Equatable {
@@ -447,31 +349,31 @@ Tests.test("Archetype Enums") {
 
 Tests.test("Bridging") {
   @_GenerateLayoutBytecode
-  struct StringStruct : Equatable {
-    init(a: String, b: LifetimeTracked) {
+  struct ArrayStruct : Equatable {
+    init(a: Array<LifetimeTracked>, b: LifetimeTracked) {
       self.a = a
       self.b = b
     }
-    let a: String
+    let a: Array<LifetimeTracked>
     let b: LifetimeTracked
   }
-  let a = StringStruct(a: "foo", b: LifetimeTracked(0))
-  var b = StringStruct(a: "bar", b: LifetimeTracked(0))
+  let a = ArrayStruct(a: [LifetimeTracked(1), LifetimeTracked(2), LifetimeTracked(3)], b: LifetimeTracked(0))
+  var b = ArrayStruct(a: [LifetimeTracked(4), LifetimeTracked(5), LifetimeTracked(6)], b: LifetimeTracked(0))
   checkCopies(a, &b)
 }
 
 Tests.test("Bridging Optional") {
   @_GenerateLayoutBytecode
-  struct StringStruct : Equatable {
-    init(a: String?, b: LifetimeTracked) {
+  struct ArrayStruct : Equatable {
+    init(a: Array<LifetimeTracked>?, b: LifetimeTracked) {
       self.a = a
       self.b = b
     }
-    let a: String?
+    let a: Array<LifetimeTracked>?
     let b: LifetimeTracked
   }
-  let a = StringStruct(a: "foo", b: LifetimeTracked(0))
-  var b = StringStruct(a: "bar", b: LifetimeTracked(0))
+  let a = ArrayStruct(a: [LifetimeTracked(1), LifetimeTracked(2), LifetimeTracked(3)], b: LifetimeTracked(0))
+  var b = ArrayStruct(a: [LifetimeTracked(4), LifetimeTracked(5), LifetimeTracked(6)], b: LifetimeTracked(0))
   checkCopies(a, &b)
 }
 
