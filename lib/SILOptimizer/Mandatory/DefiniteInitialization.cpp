@@ -925,6 +925,8 @@ void LifetimeChecker::injectActorHopForBlock(
   injectHopToExecutorAfter(loc, bbi, TheMemory.getUninitializedValue());
 }
 
+static bool isFailableInitReturnUseOfEnum(EnumInst *EI);
+
 void LifetimeChecker::injectActorHops() {
   auto ctor = TheMemory.getActorInitSelf();
 
@@ -947,11 +949,36 @@ void LifetimeChecker::injectActorHops() {
   // Returns true iff a block returns normally from the initializer,
   // which means that it returns `self` in some way (perhaps optional-wrapped).
   auto returnsSelf = [](SILBasicBlock &block) -> bool {
-    // This check relies on the fact that failable initializers are emitted by
-    // SILGen to perform their return in a fresh block with either:
-    //    1. No non-load uses of `self` (e.g., failing case)
-    //    2. An all-Yes in-availability. (e.g., success case)
-    return block.getTerminator()->getTermKind() == TermKind::ReturnInst;
+    auto term = block.getTerminator();
+    auto kind = term->getTermKind();
+
+    // Does this block return directly?
+    if (kind == TermKind::ReturnInst)
+      return true;
+
+
+    // Does this block return `self` wrapped in an Optional?
+    // The pattern would look like:
+    //
+    // thisBB:
+    //   ...
+    //   %x = enum $Optional<Dactor>, #Optional.some!enumelt
+    //   br exitBB(%x : $Optional<Dactor>)
+    //
+    // exitBB(%y : $Optional<Dactor>):
+    //   return %y : $Optional<Dactor>
+    //
+    if (kind == TermKind::BranchInst)
+      if (term->getNumOperands() == 1)
+        if (auto *passedVal = term->getOperand(0)->getDefiningInstruction())
+          if (auto *ei = dyn_cast<EnumInst>(passedVal))
+            if (isFailableInitReturnUseOfEnum(ei))
+              // Once we've reached this point, we know it's an Optional enum.
+              // To determine whether it's .some or .none, we can just check
+              // the number of operands.
+              return ei->getNumOperands() == 1; // is it .some ?
+
+    return false;
   };
 
   /////
