@@ -18,9 +18,9 @@ protocol DistProtocol: DistributedActor {
   // FIXME(distributed): avoid issuing these warnings, these originate from the call on the DistProtocol where we marked this func as dist isolated,
   func local() -> String
   // (the note appears a few times, because we misuse the call many times)
-  // expected-note@-2{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}}
-  // expected-note@-3{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}}
-  // expected-note@-4{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2{{distributed actor-isolated instance method 'local()' declared here}}
+  // expected-note@-3{{distributed actor-isolated instance method 'local()' declared here}}
+  // expected-note@-4{{distributed actor-isolated instance method 'local()' declared here}}
 
   distributed func dist() -> String
   distributed func dist(string: String) -> String
