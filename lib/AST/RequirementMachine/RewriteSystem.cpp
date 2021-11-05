@@ -101,6 +101,8 @@ void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
   if (Permanent)
     out << " [permanent]";
+  if (Explicit)
+    out << " [explicit]";
   if (Simplified)
     out << " [simplified]";
   if (Redundant)
@@ -133,7 +135,7 @@ void RewriteSystem::initialize(
     addPermanentRule(rule.first, rule.second);
 
   for (const auto &rule : requirementRules)
-    addRule(rule.first, rule.second);
+    addExplicitRule(rule.first, rule.second);
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.
@@ -408,6 +410,15 @@ bool RewriteSystem::addPermanentRule(MutableTerm lhs, MutableTerm rhs) {
   bool added = addRule(std::move(lhs), std::move(rhs));
   if (added)
     Rules.back().markPermanent();
+
+  return added;
+}
+
+/// Add a new rule, marking it explicit.
+bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs) {
+  bool added = addRule(std::move(lhs), std::move(rhs));
+  if (added)
+    Rules.back().markExplicit();
 
   return added;
 }
