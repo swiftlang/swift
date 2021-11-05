@@ -106,6 +106,8 @@ public:
   operator Kind() const { return getKind(); }
 
   bool isUnspecified() const { return kind == Unspecified; }
+  
+  bool isIndependent() const { return kind == Independent; }
 
   NominalTypeDecl *getActor() const {
     assert(getKind() == ActorInstance || getKind() == DistributedActorInstance);

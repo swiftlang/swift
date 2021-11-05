@@ -5535,6 +5535,26 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       return;
     }
   }
+  
+  // `nonisolated` on most actor initializers is invalid or redundant.
+  if (auto ctor = dyn_cast<ConstructorDecl>(D)) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+      if (nominal->isAnyActor()) {
+        if (ctor->isConvenienceInit()) {
+          // all convenience inits are `nonisolated` by default
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_convenience_init)
+            .warnUntilSwiftVersion(6);
+          return;
+          
+        } else if (!ctor->hasAsync()) {
+          // the isolation for a synchronous init cannot be `nonisolated`.
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_sync_init)
+            .warnUntilSwiftVersion(6);
+          return;
+        }
+      }
+    }
+  }
 
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     (void)getActorIsolation(VD);

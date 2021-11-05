@@ -424,6 +424,14 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     }
 
     case ActorIsolation::Independent:
+      // While some synchronous, non-delegating actor inits are
+      // nonisolated, they need cross-actor restrictions (e.g., for Sendable).
+      if (auto *ctor = dyn_cast<ConstructorDecl>(decl))
+        if (!ctor->isConvenienceInit())
+          if (auto *parent = dyn_cast<ClassDecl>(ctor->getParent()))
+              if (parent->isAnyActor())
+                return forActorSelf(parent, /*isCrossActor=*/true);
+
       return forUnrestricted();
 
     case ActorIsolation::Unspecified:
@@ -3254,11 +3262,12 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // An actor's convenience init is assumed to be actor-independent.
+  // Every actor's convenience or synchronous init is
+  // assumed to be actor-independent.
   if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl())
-    if (nominal->isActor())
+    if (nominal->isAnyActor())
       if (auto ctor = dyn_cast<ConstructorDecl>(value))
-        if (ctor->isConvenienceInit())
+        if (ctor->isConvenienceInit() || !ctor->hasAsync())
           defaultIsolation = ActorIsolation::forIndependent();
 
   // Function used when returning an inferred isolation.
@@ -3472,11 +3481,10 @@ bool HasIsolatedSelfRequest::evaluate(
     }
   }
 
-  // In an actor's convenience init, self is not isolated.
   if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
-    if (ctor->isConvenienceInit()) {
+    // In an actor's convenience or synchronous init, self is not isolated.
+    if (ctor->isConvenienceInit() || !ctor->hasAsync())
       return false;
-    }
   }
 
   return true;
