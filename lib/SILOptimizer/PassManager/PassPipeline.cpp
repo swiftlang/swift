@@ -164,8 +164,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // dead allocations.
   P.addPredictableDeadAllocationElimination();
 
-  // Now perform move only checking.
-  P.addMoveOnlyChecker();
+  // Now perform move semantic checking.
+  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
+                                         //   value.
+  P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
 
   P.addOptimizeHopToExecutor();
   P.addMandatoryGenericSpecializer();
