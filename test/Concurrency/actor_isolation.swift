@@ -470,6 +470,12 @@ extension MyActor {
   }
 }
 
+func testBadImplicitGlobalActorClosureCall() async {
+  { @MainActor in  }() // expected-error{{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-1{{calls function of type '@MainActor () -> ()' from outside of its actor context are implicitly asynchronous}}
+}
+
+
 @available(SwiftStdlib 5.1, *)
 struct GenericStruct<T> {
   @GenericGlobalActor<T> func f() { } // expected-note {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
