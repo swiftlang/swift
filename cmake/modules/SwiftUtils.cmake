@@ -112,8 +112,7 @@ function(get_bootstrapping_swift_lib_dir bs_lib_dir bootstrapping)
 endfunction()
 
 function(add_bootstrapping_target bootstrapping)
-  if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" OR
-     ${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+  if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
 
     set(target "bootstrapping${bootstrapping}-all")
     add_custom_target(${target})

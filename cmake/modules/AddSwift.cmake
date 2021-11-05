@@ -747,6 +747,13 @@ function(add_libswift name)
     set(deployment_version "10.15") # TODO: once #38675 lands, replace this with
 #   set(deployment_version "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
     set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+    if(${LIBSWIFT_BUILD_MODE} STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
+      # Let the cross-compiled compile don't pick up the compiled stdlib by providing
+      # an (almost) empty resource dir.
+      # The compiler will instead pick up the stdlib from the SDK.
+      get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
+      set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
+    endif()
   endif()
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
       ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
@@ -878,6 +885,7 @@ function(add_swift_host_tool executable)
     # Please add each rpath separately below to the list, explaining why you are
     # adding it.
     set(RPATH_LIST)
+    set(sdk_dir "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift")
 
     # If we found a swift compiler and are going to use swift code in swift
     # host side tools but link with clang, add the appropriate -L paths so we
@@ -890,9 +898,24 @@ function(add_swift_host_tool executable)
         get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
         target_link_directories(${executable} PUBLIC ${TOOLCHAIN_LIB_DIR})
 
-        # Add in the SDK directory for the host platform.
-        target_link_directories(${executable} PRIVATE
-          ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
+        # Add the SDK directory for the host platform.
+        target_link_directories(${executable} PRIVATE "${sdk_dir}")
+
+        # Include the abi stable system stdlib in our rpath.
+        list(APPEND RPATH_LIST "/usr/lib/swift")
+
+      elseif(LIBSWIFT_BUILD_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
+
+        # Intentinally don't add the lib dir of the cross-compiled compiler, so that
+        # the stdlib is not picked up from there, but from the SDK.
+        # This requires to explicitly add all the needed compatibility libraries. We
+        # can take them from the current build.
+        set(vsuffix "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
+        set(conctarget "swiftCompatibilityConcurrency${vsuffix}")
+        target_link_libraries(${executable} PUBLIC ${conctarget})
+
+        # Add the SDK directory for the host platform.
+        target_link_directories(${executable} PRIVATE "${sdk_dir}")
 
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
@@ -901,9 +924,8 @@ function(add_swift_host_tool executable)
         # Pick up the built libswiftCompatibility<n>.a libraries
         _link_built_compatibility_libs(${executable})
 
-        # Add in the SDK directory for the host platform.
-        target_link_directories(${executable} PRIVATE
-          ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
+        # Add the SDK directory for the host platform.
+        target_link_directories(${executable} PRIVATE "${sdk_dir}")
 
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
@@ -949,8 +971,7 @@ function(add_swift_host_tool executable)
       # NOTE: We do this /after/ target_link_directorying TOOLCHAIN_LIB_DIR to
       # ensure that we first find libraries from the toolchain, rather than from
       # the SDK.
-      target_link_directories(${executable} PRIVATE
-        ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
+      target_link_directories(${executable} PRIVATE "${sdk_dir}")
 
       # We also want to be able to find libraries from the base toolchain
       # directory. This is so swiftc can rely on its own host side dylibs that may
