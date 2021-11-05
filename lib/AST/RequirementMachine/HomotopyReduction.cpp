@@ -10,14 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A confluent rewrite system together with a set of rewrite loops that generate
-// the homotopy relation on rewrite paths is known as a 'coherent presentation'.
+//
+// This file implements the algorithm for computing a minimal set of rules from
+// a confluent rewrite system. A minimal set of rules is:
+//
+// 1) Large enough that computing the confluent completion produces the original
+//    rewrite system;
+//
+// 2) Small enough that no further rules can be deleted without changing the
+//    resulting confluent rewrite system.
+//
+// Redundant rules that are not part of the minimal set are redundant are
+// detected by analyzing the set of rewrite loops computed by the completion
+// procedure.
 //
 // If a rewrite rule appears exactly once in a loop and without context, the
 // loop witnesses a redundancy; the rewrite rule is equivalent to traveling
 // around the loop "in the other direction". This rewrite rule and the
-// corresponding loop can be deleted from the coherent presentation via a
-// Tietze transformation.
+// corresponding rewrite loop can be deleted.
 //
 // Any occurrence of the rule in the remaining loops is replaced with the
 // alternate definition obtained by splitting the loop that witnessed the
@@ -25,7 +35,7 @@
 // reduced left-canonical form. The loop witnessing the redundancy normalizes
 // to the empty loop and is deleted.
 //
-// Iterating this process eventually produces a minimal presentation.
+// Iterating this process eventually produces a minimal set of rewrite rules.
 //
 // For a description of the general algorithm, see "A Homotopical Completion
 // Procedure with Applications to Coherence of Monoids",
@@ -100,6 +110,58 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
   }
 
   return result;
+}
+
+/// If a rewrite loop contains an explicit rule in empty context, propagate the
+/// explicit bit to all other rules appearing in empty context within the same
+/// loop.
+///
+/// When computing generating conformances we prefer to eliminate non-explicit
+/// rules, as a heuristic to ensure that minimized conformance requirements
+/// remain in the same protocol as originally written, in cases where they can
+/// be moved between protocols.
+///
+/// However, conformance rules can also be written in a non-canonical way.
+///
+/// Most conformance requirements are non-canonical, since the original
+/// requirements use unresolved types. For example, a requirement 'Self.X.Y : Q'
+/// inside a protocol P will lower to a rewrite rule
+///
+///    [P].X.Y.[Q] => [P].X.Y
+///
+/// Completion will then add a new rule that looks something like this, using
+/// associated type symbols:
+///
+///    [P:X].[P2:Y].[Q] => [P:X].[P2:Y]
+///
+/// Furthermore, if [P:X].[P2:Y] simplies to some other term, such as [P:Z],
+/// there will be yet another rule added by completion:
+///
+///    [P:Z].[Q] => [P:Z]
+///
+/// The new rules are related to the original rule via rewrite loops where
+/// both rules appear in empty context. This algorithm will propagate the
+/// explicit bit from the original rule to the canonical rule.
+void RewriteSystem::propagateExplicitBits() {
+  for (const auto &loop : Loops) {
+    SmallVector<unsigned, 1> rulesInEmptyContext =
+      loop.findRulesAppearingOnceInEmptyContext(*this);
+
+    bool sawExplicitRule = false;
+
+    for (unsigned ruleID : rulesInEmptyContext) {
+      const auto &rule = getRule(ruleID);
+      if (rule.isExplicit())
+        sawExplicitRule = true;
+    }
+    if (sawExplicitRule) {
+      for (unsigned ruleID : rulesInEmptyContext) {
+        auto &rule = getRule(ruleID);
+        if (!rule.isPermanent() && !rule.isExplicit())
+          rule.markExplicit();
+      }
+    }
+  }
 }
 
 /// Given a rewrite rule which appears exactly once in a loop
@@ -579,7 +641,9 @@ findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
   replacementPath = loop.Path.splitCycleAtRule(ruleID);
 
   loop.markDeleted();
-  getRule(ruleID).markRedundant();
+
+  auto &rule = getRule(ruleID);
+  rule.markRedundant();
 
   return ruleID;
 }
@@ -686,6 +750,8 @@ void RewriteSystem::minimizeRewriteSystem() {
 
   // Check invariants before homotopy reduction.
   verifyRewriteLoops();
+
+  propagateExplicitBits();
 
   // First pass: Eliminate all redundant rules that are not conformance rules.
   performHomotopyReduction(/*redundantConformances=*/nullptr);
@@ -803,8 +869,11 @@ void RewriteSystem::verifyMinimizedRules() const {
     if (rule.isRedundant())
       continue;
 
-    // Simplified rules should be redundant.
-    if (rule.isSimplified()) {
+    // Simplified rules should be redundant, unless they're protocol conformance
+    // rules, which unfortunately might no be redundant, because we try to keep
+    // them in the original protocol definition for compatibility with the
+    // GenericSignatureBuilder's minimization algorithm.
+    if (rule.isSimplified() && !rule.isProtocolConformanceRule()) {
       llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
       dump(llvm::errs());
       abort();

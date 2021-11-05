@@ -322,6 +322,8 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
+  void propagateExplicitBits();
+
   bool
   isCandidateForDeletion(unsigned ruleID,
                          const llvm::DenseSet<unsigned> *redundantConformances) const;
