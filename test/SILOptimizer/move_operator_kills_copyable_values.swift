@@ -229,9 +229,27 @@ public class KlassPair {
     var y = Klass()
 }
 
-// No error since we are not moving p itself, but are moving a copy of x that we
-// loaded from p and then destroying that.
+// TODO: Emit a better error here! We should state that we are applying _move to
+// a class field and that is illegal.
 public func performMoveOnOneEltOfKlassPair(_ p: KlassPair) {
-    let _ = _move(p.x)
+    let _ = _move(p.x) // expected-error {{_move applied to value that the compiler does not know how to check. Please file a bug or an enhancement request!}}
     nonConsumingUse(p.y)
+}
+
+let myLetGlobal = Klass()
+var myVarGlobal = Klass()
+
+public func performMoveOnVarGlobalError() {
+    let _ = _move(myVarGlobal) // expected-error {{_move applied to value that the compiler does not know how to check. Please file a bug or an enhancement request!}}
+}
+
+// TODO: Support vars
+public func performMoveOnVarError() {
+    var k = myVarGlobal
+    let _ = _move(k) // expected-error {{_move applied to value that the compiler does not know how to check. Please file a bug or an enhancement request!}}
+    k = myVarGlobal
+}
+
+public func performMoveOnLetGlobalError() {
+    let _ = _move(myVarGlobal) // expected-error {{_move applied to value that the compiler does not know how to check. Please file a bug or an enhancement request!}}
 }

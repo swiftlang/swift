@@ -740,6 +740,9 @@ NOTE(sil_movekillscopyablevalue_use_here, none,
      "use here", ())
 NOTE(sil_movekillscopyablevalue_value_consumed_in_loop, none,
      "cyclic move here. move will occur multiple times in the loop", ())
+ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
+      "_move applied to value that the compiler does not know how to check. "
+      "Please file a bug or an enhancement request!", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
