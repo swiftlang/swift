@@ -212,7 +212,15 @@ namespace {
         return { false, expr };
       }
 
-      if (isa<BinaryExpr>(expr)) {
+      if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
+        if (auto *overload = dyn_cast<OverloadedDeclRefExpr>(binaryExpr->getFn())) {
+          // Don't walk into nil coalescing operators. Attempting to favor
+          // based on operand types is wrong for this operator.
+          auto identifier = overload->getDecls().front()->getBaseIdentifier();
+          if (identifier.isNilCoalescingOperator())
+            return { false, expr };
+        }
+
         LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
       }  
       
@@ -367,7 +375,7 @@ namespace {
 
       return true;
     }
-    
+
     return false;
   }
   
