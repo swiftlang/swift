@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/sil_witness_tables_external_conformance.swift
+// RUN: %target-swift-frontend -emit-module -static -o %t %S/sil_witness_tables_external_conformance.swift
 // RUN: %target-swift-frontend -I %t -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
