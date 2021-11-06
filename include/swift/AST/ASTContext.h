@@ -483,9 +483,27 @@ public:
   /// are the real (physical) module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
 
-  /// Retrieve the actual module name if a module alias is used via '-module-alias Foo=X', where Foo is
-  /// a module alias and X is the real (physical) name. Returns \p key if no aliasing is used.
-  Identifier getRealModuleName(Identifier key) const;
+  /// Look up option used in \c getRealModuleName when module aliasing is applied.
+  enum class ModuleAliasLookupOption {
+    alwaysRealName,
+    realNameFromAlias,
+    aliasFromRealName
+  };
+
+  /// Look up the module alias map by the given \p key and a lookup \p option.
+  ///
+  /// \param key A module alias or real name to look up the map by.
+  /// \param option A look up option \c ModuleAliasLookupOption. Defaults to alwaysRealName.
+  ///
+  /// \return The real name or alias mapped to the key.
+  ///         If no aliasing is used, return \p key regardless of \p option.
+  ///         If \p option is alwaysRealName, return the real module name whether the \p key is an alias
+  ///         or a real name.
+  ///         If \p option is realNameFromAlias, only return a real name if \p key is an alias.
+  ///         If \p option is aliasFromRealName, only return an alias if \p key is a real name.
+  ///         Else return a real name or an alias mapped to the \p key.
+  Identifier getRealModuleName(Identifier key,
+                               ModuleAliasLookupOption option = ModuleAliasLookupOption::alwaysRealName) const;
 
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,
