@@ -93,7 +93,10 @@ __swift_size_t _swift_stdlib_getHardwareConcurrency(void);
 ///
 /// This function is used by
 /// @c withUnsafeTemporaryAllocation(byteCount:alignment:_:).
-SWIFT_RUNTIME_STDLIB_API SWIFT_WEAK_IMPORT
+SWIFT_RUNTIME_STDLIB_API
+#if defined(__APPLE__) && defined(__MACH__)
+SWIFT_WEAK_IMPORT
+#endif
 __swift_bool swift_stdlib_isStackAllocationSafe(__swift_size_t byteCount,
                                                 __swift_size_t alignment);
 
