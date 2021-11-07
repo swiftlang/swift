@@ -103,7 +103,7 @@ foreach(sdk ${DISPATCH_SDKS})
                           -DCMAKE_ANDROID_API=${SWIFT_ANDROID_API_LEVEL}
                           -DBUILD_SHARED_LIBS=YES
                           -DENABLE_SWIFT=NO
-                          -DENABLE_TESTING=NO
+                          -DBUILD_TESTING=NO
                         INSTALL_COMMAND
                           # NOTE(compnerd) provide a custom install command to
                           # ensure that we strip out the DESTDIR environment
@@ -195,7 +195,7 @@ foreach(sdk ${DISPATCH_SDKS})
                             -DCMAKE_ANDROID_API=${SWIFT_ANDROID_API_LEVEL}
                             -DBUILD_SHARED_LIBS=NO
                             -DENABLE_SWIFT=NO
-                            -DENABLE_TESTING=NO
+                            -DBUILD_TESTING=NO
                           INSTALL_COMMAND
                             # NOTE(compnerd) provide a custom install command to
                             # ensure that we strip out the DESTDIR environment

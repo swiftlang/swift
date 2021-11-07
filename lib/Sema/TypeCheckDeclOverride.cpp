@@ -1560,6 +1560,8 @@ namespace  {
     UNINTERESTING_ATTR(InheritActorContext)
     UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(NoImplicitCopy)
+
+    UNINTERESTING_ATTR(TypeSequence)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

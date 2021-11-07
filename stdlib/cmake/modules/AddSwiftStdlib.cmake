@@ -679,8 +679,7 @@ function(add_swift_target_library_single target name)
         MACCATALYST_BUILD_FLAVOR
         BACK_DEPLOYMENT_LIBRARY
         ENABLE_LTO
-        BOOTSTRAPPING
-        MODULE_DEPENDENCY_TARGET)  
+        BOOTSTRAPPING)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -868,10 +867,6 @@ function(add_swift_target_library_single target name)
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
       ${BOOTSTRAPPING_arg})
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
-
-  if(SWIFTLIB_SINGLE_MODULE_DEPENDENCY_TARGET)
-    set(${SWIFTLIB_SINGLE_MODULE_DEPENDENCY_TARGET} ${swift_module_dependency_target} PARENT_SCOPE)
-  endif()
 
   # If there were any swift sources, then a .swiftmodule may have been created.
   # If that is the case, then add a target which is an alias of the module files.

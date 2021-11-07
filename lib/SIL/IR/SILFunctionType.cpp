@@ -408,32 +408,6 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
   return buildGenericSignature(ctx, sig, {}, reqs).getCanonicalSignature();
 }
 
-/// Given an original type, computes its tangent type for the purpose of
-/// building a linear map using this type.  When the original type is an
-/// archetype or contains a type parameter, appends a new generic parameter and
-/// a corresponding replacement type to the given containers.
-static CanType getAutoDiffTangentTypeForLinearMap(
-  Type originalType,
-  LookupConformanceFn lookupConformance,
-  SmallVectorImpl<GenericTypeParamType *> &substGenericParams,
-  SmallVectorImpl<Type> &substReplacements,
-  ASTContext &context
-) {
-  auto maybeTanType = originalType->getAutoDiffTangentSpace(lookupConformance);
-  assert(maybeTanType && "Type does not have a tangent space?");
-  auto tanType = maybeTanType->getCanonicalType();
-  // If concrete, the tangent type is concrete.
-  if (!tanType->hasArchetype() && !tanType->hasTypeParameter())
-    return tanType;
-  // Otherwise, the tangent type is a new generic parameter substituted for the
-  // tangent type.
-  auto gpIndex = substGenericParams.size();
-  auto gpType = CanGenericTypeParamType::get(0, gpIndex, context);
-  substGenericParams.push_back(gpType);
-  substReplacements.push_back(tanType);
-  return gpType;
-}
-
 /// Returns the differential type for the given original function type,
 /// parameter indices, and result index.
 static CanSILFunctionType getAutoDiffDifferentialType(
@@ -510,32 +484,45 @@ static CanSILFunctionType getAutoDiffDifferentialType(
   getDifferentiabilityParameters(originalFnTy, parameterIndices, diffParams);
   SmallVector<SILParameterInfo, 8> differentialParams;
   for (auto &param : diffParams) {
-    auto paramTanType = getAutoDiffTangentTypeForLinearMap(
-        param.getInterfaceType(), lookupConformance,
-        substGenericParams, substReplacements, ctx);
-    auto paramConv = getTangentParameterConvention(
-        // FIXME(rdar://82549134): Use `resultTanType` to compute it instead.
-        param.getInterfaceType()
-            ->getAutoDiffTangentSpace(lookupConformance)
-            ->getCanonicalType(),
-        param.getConvention());
-    differentialParams.push_back({paramTanType, paramConv});
+    auto paramTan =
+        param.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
+    assert(paramTan && "Parameter type does not have a tangent space?");
+    auto paramTanType = paramTan->getCanonicalType();
+    auto paramConv = getTangentParameterConvention(paramTanType,
+                                                   param.getConvention());
+    if (!paramTanType->hasArchetype() && !paramTanType->hasTypeParameter()) {
+      differentialParams.push_back(
+          {paramTan->getCanonicalType(), paramConv});
+    } else {
+      auto gpIndex = substGenericParams.size();
+      auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
+      substGenericParams.push_back(gpType);
+      substReplacements.push_back(paramTanType);
+      differentialParams.push_back({gpType, paramConv});
+    }
   }
   SmallVector<SILResultInfo, 1> differentialResults;
   for (auto resultIndex : resultIndices->getIndices()) {
     // Handle formal original result.
     if (resultIndex < originalFnTy->getNumResults()) {
       auto &result = originalResults[resultIndex];
-      auto resultTanType = getAutoDiffTangentTypeForLinearMap(
-          result.getInterfaceType(), lookupConformance,
-          substGenericParams, substReplacements, ctx);
-      auto resultConv = getTangentResultConvention(
-          // FIXME(rdar://82549134): Use `resultTanType` to compute it instead.
-          result.getInterfaceType()
-              ->getAutoDiffTangentSpace(lookupConformance)
-              ->getCanonicalType(),
-          result.getConvention());
-      differentialResults.push_back({resultTanType, resultConv});
+      auto resultTan =
+          result.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
+      assert(resultTan && "Result type does not have a tangent space?");
+      auto resultTanType = resultTan->getCanonicalType();
+      auto resultConv =
+          getTangentResultConvention(resultTanType, result.getConvention());
+      if (!resultTanType->hasArchetype() &&
+          !resultTanType->hasTypeParameter()) {
+        differentialResults.push_back(
+            {resultTan->getCanonicalType(), resultConv});
+      } else {
+        auto gpIndex = substGenericParams.size();
+        auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
+        substGenericParams.push_back(gpType);
+        substReplacements.push_back(resultTanType);
+        differentialResults.push_back({gpType, resultConv});
+      }
       continue;
     }
     // Handle original `inout` parameter.
@@ -550,11 +537,11 @@ static CanSILFunctionType getAutoDiffDifferentialType(
     if (parameterIndices->contains(paramIndex))
       continue;
     auto inoutParam = originalFnTy->getParameters()[paramIndex];
-    auto inoutParamTanType = getAutoDiffTangentTypeForLinearMap(
-        inoutParam.getInterfaceType(), lookupConformance,
-        substGenericParams, substReplacements, ctx);
+    auto paramTan = inoutParam.getInterfaceType()->getAutoDiffTangentSpace(
+        lookupConformance);
+    assert(paramTan && "Parameter type does not have a tangent space?");
     differentialResults.push_back(
-        {inoutParamTanType, ResultConvention::Indirect});
+        {paramTan->getCanonicalType(), ResultConvention::Indirect});
   }
 
   SubstitutionMap substitutions;
@@ -661,16 +648,23 @@ static CanSILFunctionType getAutoDiffPullbackType(
     // Handle formal original result.
     if (resultIndex < originalFnTy->getNumResults()) {
       auto &origRes = originalResults[resultIndex];
-      auto resultTanType = getAutoDiffTangentTypeForLinearMap(
-          origRes.getInterfaceType(), lookupConformance,
-          substGenericParams, substReplacements, ctx);
-      auto paramConv = getTangentParameterConventionForOriginalResult(
-          // FIXME(rdar://82549134): Use `resultTanType` to compute it instead.
-          origRes.getInterfaceType()
-              ->getAutoDiffTangentSpace(lookupConformance)
-              ->getCanonicalType(),
-          origRes.getConvention());
-      pullbackParams.push_back({resultTanType, paramConv});
+      auto resultTan = origRes.getInterfaceType()->getAutoDiffTangentSpace(
+          lookupConformance);
+      assert(resultTan && "Result type does not have a tangent space?");
+      auto resultTanType = resultTan->getCanonicalType();
+      auto paramTanConvention = getTangentParameterConventionForOriginalResult(
+          resultTanType, origRes.getConvention());
+      if (!resultTanType->hasArchetype() &&
+          !resultTanType->hasTypeParameter()) {
+        auto resultTanType = resultTan->getCanonicalType();
+        pullbackParams.push_back({resultTanType, paramTanConvention});
+      } else {
+        auto gpIndex = substGenericParams.size();
+        auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
+        substGenericParams.push_back(gpType);
+        substReplacements.push_back(resultTanType);
+        pullbackParams.push_back({gpType, paramTanConvention});
+      }
       continue;
     }
     // Handle original `inout` parameter.
@@ -680,18 +674,28 @@ static CanSILFunctionType getAutoDiffPullbackType(
     auto paramIndex =
         std::distance(originalFnTy->getParameters().begin(), &*inoutParamIt);
     auto inoutParam = originalFnTy->getParameters()[paramIndex];
+    auto paramTan = inoutParam.getInterfaceType()->getAutoDiffTangentSpace(
+        lookupConformance);
+    assert(paramTan && "Parameter type does not have a tangent space?");
     // The pullback parameter convention depends on whether the original `inout`
     // paramater is a differentiability parameter.
     // - If yes, the pullback parameter convention is `@inout`.
     // - If no, the pullback parameter convention is `@in_guaranteed`.
-    auto inoutParamTanType = getAutoDiffTangentTypeForLinearMap(
-        inoutParam.getInterfaceType(), lookupConformance,
-        substGenericParams, substReplacements, ctx);
     bool isWrtInoutParameter = parameterIndices->contains(paramIndex);
     auto paramTanConvention = isWrtInoutParameter
-        ? inoutParam.getConvention()
-        : ParameterConvention::Indirect_In_Guaranteed;
-    pullbackParams.push_back({inoutParamTanType, paramTanConvention});
+                                  ? inoutParam.getConvention()
+                                  : ParameterConvention::Indirect_In_Guaranteed;
+    auto paramTanType = paramTan->getCanonicalType();
+    if (!paramTanType->hasArchetype() && !paramTanType->hasTypeParameter()) {
+      pullbackParams.push_back(
+          SILParameterInfo(paramTanType, paramTanConvention));
+    } else {
+      auto gpIndex = substGenericParams.size();
+      auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
+      substGenericParams.push_back(gpType);
+      substReplacements.push_back(paramTanType);
+      pullbackParams.push_back({gpType, paramTanConvention});
+    }
   }
 
   // Collect pullback results.
@@ -703,16 +707,21 @@ static CanSILFunctionType getAutoDiffPullbackType(
     // and always appear as pullback parameters.
     if (param.isIndirectInOut())
       continue;
-    auto paramTanType = getAutoDiffTangentTypeForLinearMap(
-        param.getInterfaceType(), lookupConformance,
-        substGenericParams, substReplacements, ctx);
+    auto paramTan =
+        param.getInterfaceType()->getAutoDiffTangentSpace(lookupConformance);
+    assert(paramTan && "Parameter type does not have a tangent space?");
+    auto paramTanType = paramTan->getCanonicalType();
     auto resultTanConvention = getTangentResultConventionForOriginalParameter(
-        // FIXME(rdar://82549134): Use `resultTanType` to compute it instead.
-        param.getInterfaceType()
-            ->getAutoDiffTangentSpace(lookupConformance)
-            ->getCanonicalType(),
-        param.getConvention());
-    pullbackResults.push_back({paramTanType, resultTanConvention});
+        paramTanType, param.getConvention());
+    if (!paramTanType->hasArchetype() && !paramTanType->hasTypeParameter()) {
+      pullbackResults.push_back({paramTanType, resultTanConvention});
+    } else {
+      auto gpIndex = substGenericParams.size();
+      auto gpType = CanGenericTypeParamType::get(0, gpIndex, ctx);
+      substGenericParams.push_back(gpType);
+      substReplacements.push_back(paramTanType);
+      pullbackResults.push_back({gpType, resultTanConvention});
+    }
   }
   SubstitutionMap substitutions;
   if (!substGenericParams.empty()) {

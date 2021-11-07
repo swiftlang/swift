@@ -131,6 +131,7 @@ void emitActorTransportWitnessCall(
   if (methodSILFnTy->getSelfParameter().isFormalIndirect() &&
       !transport->getType().isAddress()) {
     auto buf = B.createAllocStack(loc, transport->getType(), None);
+    transport = B.emitCopyValueOperation(loc, transport);
     B.emitStoreValueOperation(
         loc, transport, buf, StoreOwnershipQualifier::Init);
     temporaryTransportBuffer = SILValue(buf);
@@ -169,18 +170,12 @@ void emitActorTransportWitnessCall(
   // If we had to create a buffer to pass the transport
   if (temporaryTransportBuffer) {
     emitCleanup([&](SILBuilder & builder) {
+      auto value = builder.emitLoadValueOperation(
+          loc, *temporaryTransportBuffer, LoadOwnershipQualifier::Take);
+      builder.emitDestroyValueOperation(loc, value);
       builder.createDeallocStack(loc, *temporaryTransportBuffer);
     });
   }
-
-  // If we opened an existential, then destroy the existential.
-#if false
-  if (openedExistential) {
-    emitCleanup([&](SILBuilder & builder) {
-      builder.emitDestroyAddr(loc, transport);
-    });
-  }
-#endif
 }
 
 void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,

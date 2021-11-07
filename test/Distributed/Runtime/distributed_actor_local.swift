@@ -69,6 +69,9 @@ struct FakeTransport: ActorTransport {
   func resignIdentity(_ id: AnyActorIdentity) {}
 }
 
+@available(SwiftStdlib 5.6, *)
+typealias DefaultActorTransport = FakeTransport
+
 // ==== Execute ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.6, *)

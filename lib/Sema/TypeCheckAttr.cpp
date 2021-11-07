@@ -244,6 +244,7 @@ public:
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
   void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
+  void visitTypeSequenceAttr(TypeSequenceAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
 
@@ -3289,6 +3290,13 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
   // it won't necessarily be able to say why.
 }
 
+void AttributeChecker::visitTypeSequenceAttr(TypeSequenceAttr *attr) {
+  if (!isa<GenericTypeParamDecl>(D)) {
+    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::type_sequence_on_non_generic_param);
+  }
+}
+
 void AttributeChecker::visitNonEphemeralAttr(NonEphemeralAttr *attr) {
   auto *param = cast<ParamDecl>(D);
   auto type = param->getInterfaceType()->lookThroughSingleOptionalType();
@@ -5525,6 +5533,26 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     if (dc->isModuleScopeContext() ||
         (dc->isTypeContext() && var->isStatic())) {
       return;
+    }
+  }
+  
+  // `nonisolated` on most actor initializers is invalid or redundant.
+  if (auto ctor = dyn_cast<ConstructorDecl>(D)) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+      if (nominal->isAnyActor()) {
+        if (ctor->isConvenienceInit()) {
+          // all convenience inits are `nonisolated` by default
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_convenience_init)
+            .warnUntilSwiftVersion(6);
+          return;
+          
+        } else if (!ctor->hasAsync()) {
+          // the isolation for a synchronous init cannot be `nonisolated`.
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_sync_init)
+            .warnUntilSwiftVersion(6);
+          return;
+        }
+      }
     }
   }
 

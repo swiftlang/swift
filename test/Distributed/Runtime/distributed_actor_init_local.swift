@@ -22,23 +22,23 @@ enum MyError: Error {
 
 @available(SwiftStdlib 5.6, *)
 distributed actor PickATransport1 {
-  init(kappa transport: ActorTransport, other: Int) {}
+  init(kappa transport: FakeTransport, other: Int) {}
 }
 
 @available(SwiftStdlib 5.6, *)
 distributed actor PickATransport2 {
-  init(other: Int, theTransport: ActorTransport) async {}
+  init(other: Int, theTransport: FakeTransport) async {}
 }
 
 @available(SwiftStdlib 5.6, *)
 distributed actor LocalWorker {
-  init(transport: ActorTransport) {}
+  init(transport: FakeTransport) {}
 }
 
 @available(SwiftStdlib 5.6, *)
 distributed actor Bug_CallsReadyTwice {
   var x: Int
-  init(transport: ActorTransport, wantBug: Bool) async {
+  init(transport: FakeTransport, wantBug: Bool) async {
     if wantBug {
       self.x = 1
     }
@@ -48,7 +48,7 @@ distributed actor Bug_CallsReadyTwice {
 
 @available(SwiftStdlib 5.6, *)
 distributed actor Throwy {
-  init(transport: ActorTransport, doThrow: Bool) throws {
+  init(transport: FakeTransport, doThrow: Bool) throws {
     if doThrow {
       throw MyError.test
     }
@@ -58,7 +58,7 @@ distributed actor Throwy {
 @available(SwiftStdlib 5.6, *)
 distributed actor ThrowBeforeFullyInit {
   var x: Int
-  init(transport: ActorTransport, doThrow: Bool) throws {
+  init(transport: FakeTransport, doThrow: Bool) throws {
     if doThrow {
       throw MyError.test
     }

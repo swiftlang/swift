@@ -131,3 +131,16 @@ func testIsolatedClosureInference(a: A) {
     a2.f()
   }
 }
+
+// "isolated" existential parameters.
+protocol P2: Actor {
+  func m()
+}
+
+@available(SwiftStdlib 5.1, *)
+func testExistentialIsolated(a: isolated P2, b: P2) async {
+  a.m()
+  await b.m()
+  b.m() // expected-error{{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-1{{calls to instance method 'm()' from outside of its actor context are implicitly asynchronous}}
+}

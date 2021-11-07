@@ -7,6 +7,9 @@
 
 import _Distributed
 
+/// Use the existential wrapper as the default actor transport.
+typealias DefaultActorTransport = AnyActorTransport
+
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address : String) {
@@ -168,4 +171,20 @@ func test_params(
   _ = try await distributed.distInt() // ok
   _ = try await distributed.distInt(int: 42) // ok
   _ = try await distributed.dist(notCodable: .init())
+}
+
+// Actor initializer isolation (through typechecking only!)
+distributed actor DijonMustard {
+  nonisolated init(transport: AnyActorTransport) {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+
+  convenience init(conv: AnyActorTransport) {
+    self.init(transport: conv)
+    self.f() // expected-error {{actor-isolated instance method 'f()' can not be referenced from a non-isolated context}}
+  }
+
+  func f() {} // expected-note {{distributed actor-isolated instance method 'f()' declared here}}
+
+  nonisolated convenience init(conv2: AnyActorTransport) { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+    self.init(transport: conv2)
+  }
 }

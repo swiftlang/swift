@@ -168,14 +168,12 @@ ERROR(variable_defer_use_uninit,none,
 ERROR(self_closure_use_uninit,none,
       "'self' captured by a closure before all members were initialized", ())
 
-/// false == sync; true == global-actor isolated
-ERROR(self_use_actor_init,none,
-      "this use of actor 'self' %select{can only|cannot}0 appear in "
-      "%select{an async|a global-actor isolated}0 initializer",
-      (bool))
-ERROR(self_disallowed_actor_init,none,
-      "actor 'self' %select{can only|cannot}0 %1 from "
-      "%select{an async|a global-actor isolated}0 initializer",
+ERROR(self_disallowed_nonisolated_actor_init,none,
+      "%select{|this use of }0actor 'self' cannot %2 %select{from|in}0 "
+      "%select{a non-isolated, designated|a global-actor isolated}1 initializer",
+      (bool, bool, StringRef))
+ERROR(self_disallowed_plain_actor_init,none,
+      "%select{|this use of }0actor 'self' can only %1 %select{from|in}0 an async initializer",
       (bool, StringRef))
 NOTE(actor_convenience_init,none,
      "convenience initializers allow non-isolated use of 'self' once "
@@ -732,6 +730,16 @@ ERROR(sil_moveonlychecker_value_consumed_more_than_once, none,
       "'%0' consumed more than once", (StringRef))
 NOTE(sil_moveonlychecker_consuming_use_here, none,
      "consuming use", ())
+
+// move kills copyable values checker diagnostics
+ERROR(sil_movekillscopyablevalue_value_consumed_more_than_once, none,
+      "'%0' used after being moved", (StringRef))
+NOTE(sil_movekillscopyablevalue_move_here, none,
+     "move here", ())
+NOTE(sil_movekillscopyablevalue_use_here, none,
+     "use here", ())
+NOTE(sil_movekillscopyablevalue_value_consumed_in_loop, none,
+     "cyclic move here. move will occur multiple times in the loop", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

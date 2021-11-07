@@ -35,7 +35,13 @@ public protocol AnyActor: Sendable, AnyObject {}
 /// distributed actor.
 @available(SwiftStdlib 5.6, *)
 public protocol DistributedActor:
-    AnyActor, Sendable, Identifiable, Hashable, Codable {
+    AnyActor, Identifiable, Hashable, Codable {
+    /// The type of transport used to communicate with actors of this type.
+    associatedtype Transport: ActorTransport
+
+    /// The type of identity used by the transport.
+    typealias Identity = Transport.Identity
+
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.
     ///
@@ -48,11 +54,7 @@ public protocol DistributedActor:
     ///
     /// - Parameter identity: identity uniquely identifying a, potentially remote, actor in the system
     /// - Parameter transport: `transport` which should be used to resolve the `identity`, and be associated with the returned actor
-// FIXME: Partially blocked on SE-309, because then we can store ActorIdentity directly
-//        We want to move to accepting a generic or existential identity here
-//    static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
-//      throws -> Self where Identity: ActorIdentity
-    static func resolve(_ identity: AnyActorIdentity, using transport: ActorTransport)
+    static func resolve(_ identity: Identity, using transport: Transport)
       throws -> Self
 
     /// The `ActorTransport` associated with this actor.
@@ -61,7 +63,7 @@ public protocol DistributedActor:
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    nonisolated var actorTransport: ActorTransport { get } // TODO: rename to `transport`?
+    nonisolated var actorTransport: Transport { get } // TODO: rename to `transport`?
 
     /// Logical identity of this distributed actor.
     ///
@@ -74,7 +76,7 @@ public protocol DistributedActor:
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    nonisolated var id: AnyActorIdentity { get }
+    nonisolated var id: Identity { get }
 }
 
 // ==== Hashable conformance ---------------------------------------------------
@@ -100,13 +102,13 @@ extension CodingUserInfoKey {
 @available(SwiftStdlib 5.6, *)
 extension DistributedActor {
   nonisolated public init(from decoder: Decoder) throws {
-    guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
+    guard let transport = decoder.userInfo[.actorTransportKey] as? Transport else {
       throw DistributedActorCodingError(message:
-        "Missing ActorTransport (for key .actorTransportKey) " +
+        "Missing Transport (for key .actorTransportKey) " +
         "in Decoder.userInfo, while decoding \(Self.self).")
     }
 
-    let id: AnyActorIdentity = try transport.decodeIdentity(from: decoder)
+    let id: Identity = try transport.decodeIdentity(from: decoder)
     self = try Self.resolve(id, using: transport)
   }
 
@@ -148,6 +150,7 @@ public protocol ActorIdentity: Sendable, Hashable, Codable {}
 
 @available(SwiftStdlib 5.6, *)
 public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomStringConvertible {
+  // FIXME: This probably shouldn't be public
   public let underlying: Any
   @usableFromInline let _hashInto: (inout Hasher) -> ()
   @usableFromInline let _equalTo: (Any) -> Bool
@@ -183,7 +186,7 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomString
           "ActorTransport not available under the decoder.userInfo")
     }
 
-    self = try transport.decodeIdentity(from: decoder)
+    self = try transport.decodeAnyIdentity(from: decoder)
   }
 
   public func encode(to encoder: Encoder) throws {

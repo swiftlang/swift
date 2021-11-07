@@ -641,9 +641,7 @@ public:
   /// Look for members of a nominal type or extension scope.
   ///
   /// \return true if the lookup should be stopped at this point.
-  virtual bool
-  lookInMembers(DeclContext *const scopeDC,
-                NominalTypeDecl *const nominal) = 0;
+  virtual bool lookInMembers(const DeclContext *scopeDC) const = 0;
 
   /// Called for local VarDecls that might not yet be in scope.
   ///
@@ -680,8 +678,7 @@ public:
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// Eventually this functionality should move into ASTScopeLookup
-  bool lookInMembers(DeclContext *const,
-                     NominalTypeDecl *const) override {
+  bool lookInMembers(const DeclContext *) const override {
     return false;
   }
 

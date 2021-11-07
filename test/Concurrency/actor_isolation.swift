@@ -470,6 +470,12 @@ extension MyActor {
   }
 }
 
+func testBadImplicitGlobalActorClosureCall() async {
+  { @MainActor in  }() // expected-error{{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-1{{calls function of type '@MainActor () -> ()' from outside of its actor context are implicitly asynchronous}}
+}
+
+
 @available(SwiftStdlib 5.1, *)
 struct GenericStruct<T> {
   @GenericGlobalActor<T> func f() { } // expected-note {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
@@ -991,3 +997,121 @@ class GenericSub1<T>: GenericSuper<[T]> { }
 
 @GenericGlobalActor<T>
 class GenericSub2<T>: GenericSuper<[T]> { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated class 'GenericSub2' has different actor isolation from global actor 'GenericGlobalActor<U>'-isolated superclass 'GenericSuper'}}
+
+/// Diagnostics for `nonisolated` on an actor initializer.
+actor Butterfly {
+  nonisolated init() {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+
+  nonisolated init(async: Void) async {}
+
+  nonisolated convenience init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+    self.init()
+  }
+
+  nonisolated convenience init(cookies: Void) async { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+    self.init()
+  }
+}
+
+// expected-note@+1 2 {{calls to global function 'takeIsolated' from outside of its actor context are implicitly asynchronous}}
+func takeIsolated(_ val: isolated SelfParamIsolationNonMethod) {}
+func take(_ val: SelfParamIsolationNonMethod) {}
+
+actor SelfParamIsolationNonMethod {
+  init(s0: Void) {
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosureInheriting { self.f() }
+
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosure { self.f() }
+
+    // expected-error@+1 {{call to actor-isolated global function 'takeIsolated' in a synchronous nonisolated context}}
+    takeIsolated(self)
+
+    take(self)
+  }
+
+  @MainActor init(s1: Void) {
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosureInheriting { self.f() }
+
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosure { self.f() }
+  }
+
+  init(a1: Void) async {
+    acceptAsyncSendableClosureInheriting { self.f() }
+
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosure { self.f() }
+
+    takeIsolated(self)
+
+    take(self)
+  }
+
+  @MainActor init(a2: Void) async {
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosureInheriting { self.f() }
+
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosure { self.f() }
+  }
+
+  nonisolated init(a3: Void) async {
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosureInheriting { self.f() }
+
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosure { self.f() }
+  }
+
+  deinit {
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosureInheriting { self.f() }
+
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosure { self.f() }
+
+    // expected-error@+1 {{call to actor-isolated global function 'takeIsolated' in a synchronous nonisolated context}}
+    takeIsolated(self)
+
+    take(self)
+  }
+
+  func f() {}
+}
+
+@MainActor
+final class MainActorInit: Sendable {
+  init() {
+    acceptAsyncSendableClosureInheriting { self.f() }
+
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosure { self.f() }
+  }
+
+  deinit {
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosureInheriting { self.f() }
+
+    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    acceptAsyncSendableClosure { self.f() }
+  }
+
+  func f() {}
+}
