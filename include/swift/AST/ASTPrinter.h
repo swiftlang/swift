@@ -386,7 +386,9 @@ void getInheritedForPrinting(
 StringRef getAccessorKindString(AccessorKind value);
 
 bool printCompatibilityFeatureChecksPre(ASTPrinter &printer, Decl *decl);
-void printCompatibilityFeatureChecksPost(ASTPrinter &printer);
+void printCompatibilityFeatureChecksPost(
+    ASTPrinter &printer,
+    llvm::function_ref<void()> printElse = []() -> void {});
 
 } // namespace swift
 

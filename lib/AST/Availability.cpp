@@ -182,7 +182,7 @@ AvailabilityInference::annotatedAvailableRangeForAttr(const SpecializeAttr* attr
 
   const AvailableAttr *bestAvailAttr = nullptr;
 
-  for (auto *availAttr : attr->getAvailabeAttrs()) {
+  for (auto *availAttr : attr->getAvailableAttrs()) {
     if (availAttr == nullptr || !availAttr->Introduced.hasValue() ||
         !availAttr->isActivePlatform(ctx) ||
         availAttr->isLanguageVersionSpecific() ||
