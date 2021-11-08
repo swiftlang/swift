@@ -1269,7 +1269,7 @@ int main(int argc, const char *argv[]) {
       // to preserve it in case it does not change.  We can use
       // this to avoid unnecessary copies during delta installs
       // to devices.
-      const auto dst = dst_dir + "/" + lib;
+      const auto dst = dst_dir + "/" + filename(lib);
       const auto oldSignatureData = query_code_signature(dst);
       const char *tmpFilePath = 0;
       if (!oldSignatureData.empty()) {
