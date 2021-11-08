@@ -1255,9 +1255,14 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 }
 
 NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
-  assert((hasBeenBound() || canNeverBeBound()) &&
-         "Extension must have already been bound (by bindExtensions)");
-  return ExtendedNominal.getPointer();
+  if (hasBeenBound()) {
+    return ExtendedNominal.getPointer();
+  } else if (canNeverBeBound()) {
+    return computeExtendedNominal();
+  }
+
+  llvm_unreachable(
+      "Extension must have already been bound (by bindExtensions)");
 }
 
 NominalTypeDecl *ExtensionDecl::computeExtendedNominal() const {
