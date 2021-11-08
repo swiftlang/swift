@@ -1168,7 +1168,7 @@ int main(int argc, const char *argv[])
                 }
 
                 NSString *lib = key;
-                NSString *dst = [dst_dir stringByAppendingPathComponent:lib];
+                NSString *dst = [dst_dir stringByAppendingPathComponent:lib.lastPathComponent];
 
                 // Get the code signature, and copy the dylib to the side
                 // to preserve it in case it does not change.  We can use
