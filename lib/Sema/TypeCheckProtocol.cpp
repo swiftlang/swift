@@ -98,7 +98,8 @@ struct swift::RequirementCheck {
 swift::Witness RequirementMatch::getWitness(ASTContext &ctx) const {
   auto syntheticEnv = ReqEnv->getSyntheticEnvironment();
   return swift::Witness(this->Witness, WitnessSubstitutions,
-                        syntheticEnv, ReqEnv->getRequirementToSyntheticMap());
+                        syntheticEnv, ReqEnv->getRequirementToSyntheticMap(),
+                        DerivativeGenSig);
 }
 
 AssociatedTypeDecl *
@@ -306,17 +307,16 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
 /// Given a witness, a requirement, and an existing `RequirementMatch` result,
 /// check if the requirement's `@differentiable` attributes are met by the
 /// witness.
-/// - If requirement's `@differentiable` attributes are met, or if `result` is
-///   not viable, returns `result`.
+/// - If `result` is not viable, do nothing.
+/// - If requirement's `@differentiable` attributes are met, update `result`
+///   with the matched derivative generic signature.
 /// - Otherwise, returns a "missing `@differentiable` attribute"
 ///   `RequirementMatch`.
-// Note: the `result` argument is only necessary for using
-// `RequirementMatch::WitnessSubstitutions`.
-static RequirementMatch
+static void
 matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
-                               ValueDecl *witness, RequirementMatch result) {
+                               ValueDecl *witness, RequirementMatch &result) {
   if (!result.isViable())
-    return result;
+    return;
 
   // Get the requirement and witness attributes.
   const auto &reqAttrs = req->getAttrs();
@@ -377,6 +377,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
       if (witnessConfig.parameterIndices ==
           reqDiffAttr->getParameterIndices()) {
         foundExactConfig = true;
+        // Store the matched witness derivative generic signature.
+        result.DerivativeGenSig = witnessConfig.derivativeGenericSignature;
         break;
       }
       if (witnessConfig.parameterIndices->isSupersetOf(
@@ -407,12 +409,12 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
         // appear if associated type inference is involved.
         if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
-          return RequirementMatch(
+          result = RequirementMatch(
               getStandinForAccessor(vdWitness, AccessorKind::Get),
               MatchKind::MissingDifferentiableAttr, reqDiffAttr);
         } else {
-          return RequirementMatch(witness, MatchKind::MissingDifferentiableAttr,
-                                  reqDiffAttr);
+          result = RequirementMatch(
+              witness, MatchKind::MissingDifferentiableAttr, reqDiffAttr);
         }
       }
 
@@ -461,6 +463,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
           witnessAFD->addDerivativeFunctionConfiguration(
               {newAttr->getParameterIndices(), resultIndices,
                newAttr->getDerivativeGenericSignature()});
+          // Store the witness derivative generic signature.
+          result.DerivativeGenSig = newAttr->getDerivativeGenericSignature();
         }
       }
       if (!success) {
@@ -475,17 +479,16 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
         // appear if associated type inference is involved.
         if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
-          return RequirementMatch(
+          result = RequirementMatch(
               getStandinForAccessor(vdWitness, AccessorKind::Get),
               MatchKind::MissingDifferentiableAttr, reqDiffAttr);
         } else {
-          return RequirementMatch(witness, MatchKind::MissingDifferentiableAttr,
-                                  reqDiffAttr);
+          result = RequirementMatch(
+              witness, MatchKind::MissingDifferentiableAttr, reqDiffAttr);
         }
       }
     }
   }
-  return result;
 }
 
 /// A property or subscript witness must have the same or fewer
@@ -817,7 +820,7 @@ swift::matchWitness(
   auto result = finalize(anyRenaming, optionalAdjustments);
   // Check if the requirement's `@differentiable` attributes are satisfied by
   // the witness.
-  result = matchWitnessDifferentiableAttr(dc, req, witness, result);
+  matchWitnessDifferentiableAttr(dc, req, witness, result);
   return result;
 }
 
