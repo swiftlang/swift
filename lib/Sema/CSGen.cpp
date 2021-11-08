@@ -238,10 +238,9 @@ namespace {
         return { false, expr };
       }      
 
-      // For exprs of a structural type that are not modeling argument lists,
-      // avoid merging the type variables. (We need to allow for cases like
+      // For exprs of a tuple, avoid favoring. (We need to allow for cases like
       // (Int, Int32).)
-      if (isa<TupleExpr>(expr) && !isa<ApplyExpr>(Parent.getAsExpr())) {
+      if (isa<TupleExpr>(expr)) {
         return { false, expr };
       }
 
