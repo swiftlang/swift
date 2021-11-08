@@ -1876,6 +1876,17 @@ public:
         !expression.pattern->isImplicit();
   }
 
+  /// Check whether this is an initializaion for `async let` pattern.
+  bool isAsyncLetInitializer() const {
+    if (!(kind == Kind::expression &&
+          expression.contextualPurpose == CTP_Initialization))
+      return false;
+
+    if (auto *PBD = getInitializationPatternBindingDecl())
+      return PBD->isAsyncLet();
+    return false;
+  }
+
   /// Whether to bind the types of any variables within the pattern via
   /// one-way constraints.
   bool shouldBindPatternVarsOneWay() const {

@@ -7581,6 +7581,13 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setArgs(args);
     cs.setType(apply, fnType->getResult());
 
+    if (target && target->isAsyncLetInitializer()) {
+      if (auto *FD = dyn_cast_or_null<FuncDecl>(callee.getDecl())) {
+        if (FD->isDistributed())
+          apply->setImplicitlyThrows(true);
+      }
+    }
+
     solution.setExprTypes(apply);
     Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
