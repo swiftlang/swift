@@ -58,3 +58,18 @@ struct S4 {
     _ = S4() // expected-error {{ambiguous use of 'init'}}
   }
 }
+
+infix operator ^^^
+func ^^^ (lhs: (Int, Int), rhs: Int) -> Int { 0 }  // expected-note {{found this candidate}}
+func ^^^ (lhs: (Int, Int), rhs: Int) -> String { "" }  // expected-note {{found this candidate}}
+
+// We shouldn't favor based on the type of a tuple element.
+struct S5 {
+  init(_ x: Int) {}
+  init(_ x: String) {}
+
+  func testFavoring() {
+    let x = 0
+    _ = S5((x, 0) ^^^ 0) // expected-error {{ambiguous use of operator '^^^'}}
+  }
+}
