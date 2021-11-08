@@ -108,7 +108,21 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     }
   }
 
-  let produce: () async throws -> Element?
+  final class _Context {
+    let storage: _Storage?
+    let produce: () async throws -> Element?
+
+    init(storage: _Storage? = nil, produce: @escaping () async throws -> Element?) {
+      self.storage = storage
+      self.produce = produce
+    }
+
+    deinit {
+      storage?.cancel()
+    }
+  }
+
+  let context: _Context
 
   /// Construct a AsyncThrowingStream buffering given an Element type.
   ///
@@ -132,14 +146,34 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     _ build: (Continuation) -> Void
   ) where Failure == Error {
     let storage: _Storage = .create(limit: limit)
-    self.init(unfolding: storage.next)
+    context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
   
   public init(
     unfolding produce: @escaping () async throws -> Element?
   ) where Failure == Error {
-    self.produce = produce
+    self.init(unfolding: produce, onCancel: nil)
+  }
+
+  public init(
+    unfolding produce: @escaping () async throws -> Element?, 
+    onCancel: (@Sendable () -> Void)?
+  ) where Failure == Error {
+    let storage: _AsyncStreamCriticalStorage<Optional<() async throws -> Element?>>
+      = .create(produce)
+    context = _Context {
+      return try await withTaskCancellationHandler {
+        guard let result = try await storage.value?() else {
+          storage.value = nil
+          return nil
+        }
+        return result
+      } onCancel: {
+        storage.value = nil
+        onCancel?()
+      }
+    }
   }
 }
 
@@ -161,7 +195,7 @@ extension AsyncThrowingStream: AsyncSequence {
 
   /// Construct an iterator.
   public func makeAsyncIterator() -> Iterator {
-    return Iterator(produce: produce)
+    return Iterator(produce: context.produce)
   }
 }
 
