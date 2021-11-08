@@ -1153,7 +1153,7 @@ sawSolution(const constraints::Solution &S) {
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
   Expr *ParentExpr = CS.getParentExpr(CompletionExpr);
   if (!ParentExpr)
-    ExpectedTy = CS.getContextualType(CompletionExpr);
+    ExpectedTy = CS.getContextualType(CompletionExpr, /*forConstraint=*/false);
 
   auto *CalleeLocator = S.getCalleeLocator(Locator);
   ValueDecl *ReferencedDecl = nullptr;
