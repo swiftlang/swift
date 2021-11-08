@@ -477,6 +477,10 @@ struct PrintOptions {
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
 
+  /// Whether to print @_specialize attributes that have an availability
+  /// parameter.
+  bool PrintSpecializeAttributeWithAvailability = true;
+
   /// \see ShouldQualifyNestedDeclarations
   enum class QualifyNestedDeclarations {
     Never,
