@@ -993,7 +993,7 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
         if (CS.shouldAttemptFixes())
           return false;
 
-        if (type->isAnyHashable() || type->isDouble() || type->isCGFloatType())
+        if (type->isAnyHashable() || type->isDouble() || type->isCGFloat())
           return false;
 
         {
