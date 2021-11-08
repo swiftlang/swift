@@ -4412,11 +4412,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::ConstructorMember:
-      if (auto typeExpr = getAsExpr<TypeExpr>(anchor)) {
-        // This is really an implicit 'init' MemberRef, so point at the base,
-        // i.e. the TypeExpr.
+      // - This is really an implicit 'init' MemberRef, so point at the base,
+      //   i.e. the TypeExpr.
+      // - For re-declarations we'd get an overloaded reference
+      //   with multiple choices for the same type.
+      if (isExpr<TypeExpr>(anchor) || isExpr<OverloadedDeclRefExpr>(anchor)) {
         range = SourceRange();
-        anchor = typeExpr;
         path = path.slice(1);
         continue;
       }
@@ -5693,8 +5694,13 @@ SourceLoc constraints::getLoc(ASTNode anchor) {
     return anchor.getStartLoc();
   } else if (auto *S = anchor.dyn_cast<Stmt *>()) {
     return S->getStartLoc();
+  } else if (auto *P = anchor.dyn_cast<Pattern *>()) {
+    return P->getLoc();
+  } else if (auto *C = anchor.dyn_cast<StmtCondition *>()) {
+    return C->front().getStartLoc();
   } else {
-    return anchor.get<Pattern *>()->getLoc();
+    auto *I = anchor.get<CaseLabelItem *>();
+    return I->getStartLoc();
   }
 }
 
