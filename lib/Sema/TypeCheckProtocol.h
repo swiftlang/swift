@@ -435,11 +435,13 @@ struct RequirementMatch {
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    Type witnessType,
                    Optional<RequirementEnvironment> env = None,
-                   ArrayRef<OptionalAdjustment> optionalAdjustments = {})
+                   ArrayRef<OptionalAdjustment> optionalAdjustments = {},
+                   GenericSignature derivativeGenSig = GenericSignature())
     : Witness(witness), Kind(kind), WitnessType(witnessType),
       ReqEnv(std::move(env)),
       OptionalAdjustments(optionalAdjustments.begin(),
-                          optionalAdjustments.end())
+                          optionalAdjustments.end()),
+      DerivativeGenSig(derivativeGenSig)
   {
     assert(hasWitnessType() == !witnessType.isNull() &&
            "Should (or should not) have witness type");
@@ -447,11 +449,13 @@ struct RequirementMatch {
 
   RequirementMatch(ValueDecl *witness, MatchKind kind, Requirement requirement,
                    Optional<RequirementEnvironment> env = None,
-                   ArrayRef<OptionalAdjustment> optionalAdjustments = {})
+                   ArrayRef<OptionalAdjustment> optionalAdjustments = {},
+                   GenericSignature derivativeGenSig = GenericSignature())
       : Witness(witness), Kind(kind), WitnessType(requirement.getFirstType()),
         MissingRequirement(requirement), ReqEnv(std::move(env)),
         OptionalAdjustments(optionalAdjustments.begin(),
-                            optionalAdjustments.end()) {
+                            optionalAdjustments.end()),
+        DerivativeGenSig(derivativeGenSig) {
     assert(hasWitnessType() && hasRequirement() &&
            "Should have witness type and requirement");
   }
@@ -480,6 +484,9 @@ struct RequirementMatch {
   /// Substitutions mapping the type of the witness to the requirement
   /// environment.
   SubstitutionMap WitnessSubstitutions;
+
+  /// The matched derivative generic signature.
+  GenericSignature DerivativeGenSig;
 
   /// Determine whether this match is viable.
   bool isViable() const {
