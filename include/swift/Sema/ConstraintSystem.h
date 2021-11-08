@@ -3209,7 +3209,7 @@ public:
   /// for use in constraint solving, \c forConstraint should be set to \c true,
   /// which will ensure that unbound generics have been opened and placeholder
   /// types have been converted to type variables, etc.
-  Type getContextualType(ASTNode node, bool forConstraint = false) {
+  Type getContextualType(ASTNode node, bool forConstraint) {
     if (forConstraint) {
       auto known = contextualTypes.find(node);
       if (known == contextualTypes.end())

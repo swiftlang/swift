@@ -6393,7 +6393,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // Diagnose conversions to invalid function types that couldn't be performed
   // beforehand because of placeholders.
   if (auto *fnTy = toType->getAs<FunctionType>()) {
-    auto contextTy = cs.getContextualType(expr);
+    auto contextTy = cs.getContextualType(expr, /*forConstraint=*/false);
     if (cs.getConstraintLocator(locator)->isForContextualType() && contextTy &&
         contextTy->hasPlaceholder()) {
       bool hadError = TypeChecker::diagnoseInvalidFunctionType(
