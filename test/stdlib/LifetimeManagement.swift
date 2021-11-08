@@ -15,7 +15,8 @@ suite.test("copy") {
 
 suite.test("move") {
   let k = Klass()
-  expectTrue(k === _move(k))
+  let k2 = k
+  expectTrue(k2 === _move(k))
 }
 
 runAllTests()

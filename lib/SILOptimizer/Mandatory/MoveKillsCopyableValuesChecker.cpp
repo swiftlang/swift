@@ -29,6 +29,9 @@
 
 using namespace swift;
 
+static llvm::cl::opt<bool>
+    DisableUnhandledMoveDiagnostic("sil-disable-unknown-move-diagnostic");
+
 //===----------------------------------------------------------------------===//
 //                            Diagnostic Utilities
 //===----------------------------------------------------------------------===//
@@ -383,6 +386,12 @@ bool MoveKillsCopyableValuesChecker::check() {
         // Only emit diagnostics if our move value allows us to.
         if (!mvi->getAllowDiagnostics())
           continue;
+
+        // Now that we know we may emit diagnostics for this, unset allows
+        // diagnostics so that we skip these when we search at the end for
+        // unvisited move_value [allows_diagnostics].
+        mvi->setAllowsDiagnostics(false);
+
         LLVM_DEBUG(llvm::dbgs() << "Move Value: " << *mvi);
         if (livenessInfo.liveness.isWithinBoundary(mvi)) {
           LLVM_DEBUG(llvm::dbgs() << "    WithinBoundary: Yes!\n");
@@ -412,6 +421,12 @@ namespace {
 class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
+    auto &astContext = fn->getASTContext();
+
+    // If we do not have experimental move only enabled, do not emit
+    // diagnostics.
+    if (!astContext.LangOpts.EnableExperimentalMoveOnly)
+      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
@@ -424,6 +439,26 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
 
     if (MoveKillsCopyableValuesChecker(getFunction()).check()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
+
+    // Now search through our function one last time and any move_value
+    // [allows_diagnostics] that remain are ones that we did not know how to
+    // check so emit a diagnostic so the user doesn't assume that they have
+    // guarantees.
+    //
+    // TODO: Emit specific diagnostics here (e.x.: _move of global).
+    if (DisableUnhandledMoveDiagnostic)
+      return;
+    for (auto &block : *fn) {
+      for (auto &inst : block) {
+        if (auto *mvi = dyn_cast<MoveValueInst>(&inst)) {
+          if (mvi->getAllowDiagnostics()) {
+            auto diag = diag::
+                sil_movekillscopyablevalue_move_applied_to_unsupported_move;
+            diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+          }
+        }
+      }
     }
   }
 };
