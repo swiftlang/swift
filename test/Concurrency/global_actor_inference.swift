@@ -518,6 +518,15 @@ func useUnsafeMainActor() {
 }
 
 // ----------------------------------------------------------------------
+// @IBAction implies @MainActor(unsafe)
+// ----------------------------------------------------------------------
+class SomeWidgetThing {
+  @IBAction func onTouch(_ object: AnyObject) {
+    onlyOnMainActor() // okay
+  }
+}
+
+// ----------------------------------------------------------------------
 // @_inheritActorContext
 // ----------------------------------------------------------------------
 func acceptAsyncSendableClosure<T>(_: @Sendable () async -> T) { }
