@@ -107,9 +107,11 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // We always create generic type parameters with an invalid depth.
     // Semantic analysis fills in the depth when it processes the generic
     // parameter list.
-    auto Param = new (Context) GenericTypeParamDecl(CurDeclContext, Name, NameLoc,
-                                            GenericTypeParamDecl::InvalidDepth,
-                                                    GenericParams.size());
+    const bool isTypeSequence =
+        attributes.getAttribute<TypeSequenceAttr>() != nullptr;
+    auto Param = new (Context) GenericTypeParamDecl(
+        CurDeclContext, Name, NameLoc, isTypeSequence,
+        GenericTypeParamDecl::InvalidDepth, GenericParams.size());
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);

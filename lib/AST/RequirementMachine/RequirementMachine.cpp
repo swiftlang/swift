@@ -87,16 +87,17 @@ RewriteSystemBuilder::getConcreteSubstitutionSchema(CanType concreteType,
   if (!concreteType->hasTypeParameter())
     return concreteType;
 
-  return CanType(concreteType.transformRec(
-    [&](Type t) -> Optional<Type> {
-      if (!t->isTypeParameter())
-        return None;
+  return CanType(concreteType.transformRec([&](Type t) -> Optional<Type> {
+    if (!t->isTypeParameter())
+      return None;
 
-      unsigned index = result.size();
-      result.push_back(Context.getTermForType(CanType(t), proto));
+    unsigned index = result.size();
+    result.push_back(Context.getTermForType(CanType(t), proto));
 
-      return CanGenericTypeParamType::get(/*depth=*/0, index, Context.getASTContext());
-    }));
+    return CanGenericTypeParamType::get(/*type sequence=*/ false,
+                                        /*depth=*/0, index,
+                                        Context.getASTContext());
+  }));
 }
 
 void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {

@@ -3050,7 +3050,8 @@ buildThunkSignature(SILGenFunction &SGF,
   }
 
   // Add a new generic parameter to replace the opened existential.
-  auto *newGenericParam = GenericTypeParamType::get(depth, 0, ctx);
+  auto *newGenericParam =
+      GenericTypeParamType::get(/*type sequence*/ false, depth, 0, ctx);
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
                              openedExistential->getOpenedExistentialType());
 

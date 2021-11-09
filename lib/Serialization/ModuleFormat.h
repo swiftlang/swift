@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 641; // diagnostic move only
+const uint16_t SWIFTMODULE_VERSION_MINOR = 642; // Type Sequence Bits in Generic Parameters
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -990,10 +990,11 @@ namespace decls_block {
     SubstitutionMapIDField // substitution map
   >;
 
-  using GenericTypeParamTypeLayout = BCRecordLayout<
-    GENERIC_TYPE_PARAM_TYPE,
+  using GenericTypeParamTypeLayout = BCRecordLayout<GENERIC_TYPE_PARAM_TYPE,
+    BCFixed<1>,  // type sequence?
     DeclIDField, // generic type parameter decl or depth
-    BCVBR<4>     // index + 1, or zero if we have a generic type parameter decl
+    BCVBR<4> // index + 1, or zero if we have a generic type
+            // parameter decl
   >;
 
   using DependentMemberTypeLayout = BCRecordLayout<
@@ -1201,12 +1202,12 @@ namespace decls_block {
     // Trailed by generic parameters (if any).
   >;
 
-  using GenericTypeParamDeclLayout = BCRecordLayout<
-    GENERIC_TYPE_PARAM_DECL,
-    IdentifierIDField,  // name
-    BCFixed<1>,         // implicit flag
-    BCVBR<4>,           // depth
-    BCVBR<4>            // index
+  using GenericTypeParamDeclLayout = BCRecordLayout<GENERIC_TYPE_PARAM_DECL,
+    IdentifierIDField, // name
+    BCFixed<1>,        // implicit flag
+    BCFixed<1>,        // type sequence?
+    BCVBR<4>,          // depth
+    BCVBR<4>           // index
   >;
 
   using AssociatedTypeDeclLayout = BCRecordLayout<

@@ -586,19 +586,18 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
       if (how == CombineSubstitutionMaps::AtDepth) {
         if (gp->getDepth() < firstDepthOrIndex)
           return Type();
-        return GenericTypeParamType::get(
-          gp->getDepth() + secondDepthOrIndex - firstDepthOrIndex,
-          gp->getIndex(),
-          ctx);
+        return GenericTypeParamType::get(gp->isTypeSequence(),
+                                         gp->getDepth() + secondDepthOrIndex -
+                                             firstDepthOrIndex,
+                                         gp->getIndex(), ctx);
       }
 
       assert(how == CombineSubstitutionMaps::AtIndex);
       if (gp->getIndex() < firstDepthOrIndex)
         return Type();
       return GenericTypeParamType::get(
-        gp->getDepth(),
-        gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex,
-        ctx);
+          gp->isTypeSequence(), gp->getDepth(),
+          gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex, ctx);
     }
 
     return type;
