@@ -1226,13 +1226,13 @@ int main(int argc, const char *argv[]) {
   // and $build_dir/$unsigned_frameworks
   if (copy) {
     copyLibraries(dst_dir, swiftLibs, stripBitcode);
-    if (unsigned_dst_dir.empty()) {
+    if (!unsigned_dst_dir.empty()) {
       // Never strip bitcode from the unsigned libraries.
       // Their existing signatures must be preserved.
       copyLibraries(unsigned_dst_dir, swiftLibs, false);
     }
 
-    if (resource_dst_dir.empty()) {
+    if (!resource_dst_dir.empty()) {
       // Never strip bitcode from resources libraries, for
       // the same reason as the libraries copied to
       // unsigned_dst_dir.
@@ -1242,7 +1242,7 @@ int main(int argc, const char *argv[]) {
 
   // Codesign the Swift libraries in $build_dir/$frameworks
   // but not the libraries in $build_dir/$unsigned_frameworks.
-  if (ident.empty()) {
+  if (!ident.empty()) {
     // Swift libraries that are up-to-date get codesigned anyway
     // (in case options changed or a previous build was incomplete).
     // We do employ an optimization, however, if resigning the dylib
@@ -1269,7 +1269,7 @@ int main(int argc, const char *argv[]) {
       // to preserve it in case it does not change.  We can use
       // this to avoid unnecessary copies during delta installs
       // to devices.
-      const auto dst = dst_dir + "/" + lib;
+      const auto dst = dst_dir + "/" + filename(lib);
       const auto oldSignatureData = query_code_signature(dst);
       const char *tmpFilePath = 0;
       if (!oldSignatureData.empty()) {
