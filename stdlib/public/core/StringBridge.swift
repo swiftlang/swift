@@ -481,7 +481,7 @@ private func getConstantTaggedCocoaContents(_ cocoaString: _CocoaString) ->
   let length = ivarPointer.pointee.length
   let isUTF16Mask:UInt = 0x0000_0000_0000_0004 //CFStringFlags bit 4: isUnicode
   let isASCII = ivarPointer.pointee.flags & isUTF16Mask == 0
-  precondition(isASCII) // we don't currently support non-ASCII here
+  _precondition(isASCII) // we don't currently support non-ASCII here
   let contentsPtr = ivarPointer.pointee.str
   return (
     utf16Length: Int(length),
