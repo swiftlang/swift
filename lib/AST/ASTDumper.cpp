@@ -524,14 +524,8 @@ namespace {
       // Check if module aliasing was used for the given imported module; for
       // example, if '-module-alias Foo=Bar' was passed and this module has
       // 'import Foo', its corresponding real module name 'Bar' should be printed.
-      ImportPath::Builder builderWithRealModuleName;
-      auto path = ID->getImportPath(/*outRealModuleName=*/&builderWithRealModuleName);
-      if (!builderWithRealModuleName.get().empty()) {
-        // Module aliasing was used, so print its real module name
-        builderWithRealModuleName.get().print(OS);
-      } else {
-        path.print(OS);
-      }
+      ImportPath::Builder scratch;
+      ID->getRealImportPath(scratch).print(OS);
       OS << "')";
     }
 
