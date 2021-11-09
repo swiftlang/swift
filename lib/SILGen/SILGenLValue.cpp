@@ -4215,7 +4215,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
         auto actorIso = component.asPhysical().takeActorIsolation();
 
         // If the load must happen in the context of an actor, do a hop first.
-        prevExecutor = emitHopToTargetActor(loc, actorIso, /*actorSelf=*/None);
+        prevExecutor = emitHopToTargetActor(loc, actorIso, addr);
         projection =
             emitLoad(loc, projection.getValue(), origFormalType,
                      substFormalType, rvalueTL, C, IsNotTake, isBaseGuaranteed);
