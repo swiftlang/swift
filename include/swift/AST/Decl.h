@@ -1211,10 +1211,33 @@ public:
     return scratch.get();
   }
 
-  ImportPath::Module getModulePath(ImportPath::Module::Builder *outRealModuleName = nullptr) const {
-    if (outRealModuleName != nullptr && !RealModuleName.empty()) {
-      outRealModuleName->push_back(RealModuleName);
-    }
+  /// Retrieves the part of the import path that contains the module name,
+  /// as written in the source code.
+  /// 
+  /// \returns A \c ModulePath corresponding to this import decl. If module
+  ///          aliasing was used, this will contain the aliased name of the module;
+  ///          for instance, if you wrote 'import Foo' but passed
+  ///          '-module-alias Foo=Bar', this module path will include 'Foo'. This
+  ///          return value is always owned by the AST context, so it can be
+  ///          persisted.
+  ImportPath::Module getModulePath() const {
+    return getImportPath().getModulePath(getImportKind());
+  }
+
+  /// Retrieves the part of the import path that contains the module name,
+  /// replacing any module aliases with real names.
+  /// 
+  /// \param scratch An \c ImportPath::Builder which may, if necessary, be used to
+  ///        construct the return value. It may go unused, so you should not try to
+  ///        read the result from it; use the return value instead.
+  /// \returns An \c ImportPath corresponding to this import decl. If module
+  ///          aliasing was used, this will contain the real name of the module;
+  ///          for instance, if you wrote 'import Foo' but passed
+  ///          '-module-alias Foo=Bar', this import path will include 'Bar'. This
+  ///          return value may be owned by \p scratch, so it should not be used
+  ///          after \p scratch is destroyed.
+  ImportPath::Module getRealModulePath(ImportPath::Builder &scratch) const {
+    return getRealImportPath(scratch).getModulePath(getImportKind());
     return getImportPath().getModulePath(getImportKind());
   }
 
