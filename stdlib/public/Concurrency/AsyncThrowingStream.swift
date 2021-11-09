@@ -153,13 +153,6 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   public init(
     unfolding produce: @escaping () async throws -> Element?
   ) where Failure == Error {
-    self.init(unfolding: produce, onCancel: nil)
-  }
-
-  public init(
-    unfolding produce: @escaping () async throws -> Element?, 
-    onCancel: (@Sendable () -> Void)?
-  ) where Failure == Error {
     let storage: _AsyncStreamCriticalStorage<Optional<() async throws -> Element?>>
       = .create(produce)
     context = _Context {
@@ -171,7 +164,6 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
         return result
       } onCancel: {
         storage.value = nil
-        onCancel?()
       }
     }
   }
