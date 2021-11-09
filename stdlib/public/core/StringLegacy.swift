@@ -28,7 +28,7 @@ extension String {
   ///   - count: The number of times to repeat `repeatedValue` in the resulting
   ///     string.
   public init(repeating repeatedValue: String, count: Int) {
-    precondition(count >= 0, "Negative count not allowed")
+    _precondition(count >= 0, "Negative count not allowed")
     guard count > 1 else {
       self = count == 0 ? "" : repeatedValue
       return
