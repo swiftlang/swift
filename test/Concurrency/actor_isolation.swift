@@ -822,6 +822,23 @@ func testCrossModuleLets(actor: OtherModuleActor) async {
   // expected-note@-1{{property access is 'async'}}
   // expected-warning@-2{{cannot use property 'c' with a non-sendable type 'SomeClass' across actors}}
   _ = await actor.c // expected-warning{{cannot use property 'c' with a non-sendable type 'SomeClass' across actors}}
+  _ = await actor.d // okay
+}
+
+func testCrossModuleAsIsolated(actor: isolated OtherModuleActor) {
+  _ = actor.a
+  _ = actor.b
+  _ = actor.c
+  _ = actor.d
+}
+
+extension OtherModuleActor {
+  func testCrossModuleInExtension() {
+    _ = self.a
+    _ = self.b
+    _ = self.c
+    _ = self.d
+  }
 }
 
 
