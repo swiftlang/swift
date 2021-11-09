@@ -15,6 +15,7 @@
 
 #include "CodeCompletion.h"
 #include "SourceKit/Core/LangSupport.h"
+#include "swift/IDE/CodeCompletion.h"
 #include "llvm/ADT/StringMap.h"
 
 namespace swift {
@@ -53,17 +54,11 @@ struct Options {
   unsigned popularityBonus = 2;
 };
 
-struct SwiftCompletionInfo {
-  swift::ASTContext *swiftASTContext = nullptr;
-  const swift::CompilerInvocation *invocation = nullptr;
-  swift::ide::CodeCompletionContext *completionContext = nullptr;
-};
-
 typedef llvm::StringMap<PopularityFactor> NameToPopularityMap;
 
 std::vector<Completion *>
 extendCompletions(ArrayRef<SwiftResult *> swiftResults, CompletionSink &sink,
-                  SwiftCompletionInfo &info,
+                  swift::ide::SwiftCompletionInfo &info,
                   const NameToPopularityMap *nameToPopularity,
                   const Options &options, Completion *prefix = nullptr,
                   bool clearFlair = false);

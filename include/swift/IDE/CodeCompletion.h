@@ -17,6 +17,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Frontend/Frontend.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -1062,6 +1063,12 @@ public:
   }
 };
 
+struct SwiftCompletionInfo {
+  swift::ASTContext *swiftASTContext = nullptr;
+  const swift::CompilerInvocation *invocation = nullptr;
+  CodeCompletionContext *completionContext = nullptr;
+};
+
 /// An abstract base class for consumers of code completion results.
 /// \see \c SimpleCachingCodeCompletionConsumer.
 class CodeCompletionConsumer {
@@ -1085,32 +1092,6 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
 
   /// Clients should override this method to receive \p Results.
   virtual void handleResults(CodeCompletionContext &context) = 0;
-};
-
-/// A code completion result consumer that prints the results to a
-/// \c raw_ostream.
-class PrintingCodeCompletionConsumer
-    : public SimpleCachingCodeCompletionConsumer {
-  llvm::raw_ostream &OS;
-  bool IncludeKeywords;
-  bool IncludeComments;
-  bool IncludeSourceText;
-  bool PrintAnnotatedDescription;
-
-public:
- PrintingCodeCompletionConsumer(llvm::raw_ostream &OS,
-                                bool IncludeKeywords = true,
-                                bool IncludeComments = true,
-                                bool IncludeSourceText = false,
-                                bool PrintAnnotatedDescription = false)
-     : OS(OS),
-       IncludeKeywords(IncludeKeywords),
-       IncludeComments(IncludeComments),
-       IncludeSourceText(IncludeSourceText),
-       PrintAnnotatedDescription(PrintAnnotatedDescription) {}
-
-  void handleResults(CodeCompletionContext &context) override;
-  void handleResults(MutableArrayRef<CodeCompletionResult *> Results);
 };
 
 /// Create a factory for code completion callbacks.
