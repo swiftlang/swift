@@ -8286,12 +8286,9 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
 
   // For an async let, wrap the initializer appropriately to make it a child
   // task.
-  if (auto patternBinding = target.getInitializationPatternBindingDecl()) {
-    if (patternBinding->isAsyncLet()) {
-      resultTarget.setExpr(
-          wrapAsyncLetInitializer(
-            cs, resultTarget.getAsExpr(), resultTarget.getDeclContext()));
-    }
+  if (target.isAsyncLetInitializer()) {
+    resultTarget.setExpr(wrapAsyncLetInitializer(
+        cs, resultTarget.getAsExpr(), resultTarget.getDeclContext()));
   }
 
   return resultTarget;
