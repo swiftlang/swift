@@ -186,16 +186,16 @@ extension AsyncThrowingStream: AsyncSequence {
   /// concurrently and contends with another call to next is a programmer error
   /// and will fatalError.
   public struct Iterator: AsyncIteratorProtocol {
-    let produce: () async throws -> Element?
+    let context: _Context
 
     public mutating func next() async throws -> Element? {
-      return try await produce()
+      return try await context.produce()
     }
   }
 
   /// Construct an iterator.
   public func makeAsyncIterator() -> Iterator {
-    return Iterator(produce: context.produce)
+    return Iterator(context: context)
   }
 }
 
