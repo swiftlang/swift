@@ -1417,19 +1417,13 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   const auto flags = desc.Options;
   auto *decl = desc.DC;
 
-  // We only use NamedLazyMemberLoading when a user opts-in and we have
-  // not yet loaded all the members into the IDC list in the first place.
   ASTContext &ctx = decl->getASTContext();
-  const bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
-                                          decl->hasLazyMembers());
   const bool includeAttrImplements =
       flags.contains(NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
 
   LLVM_DEBUG(llvm::dbgs() << decl->getNameStr() << ".lookupDirect("
                           << name << ")"
                           << ", hasLazyMembers()=" << decl->hasLazyMembers()
-                          << ", useNamedLazyMemberLoading="
-                          << useNamedLazyMemberLoading
                           << "\n");
 
   decl->prepareLookupTable();
@@ -1440,7 +1434,9 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   decl->addLoadedExtensions();
 
   auto &Table = *decl->LookupTable;
-  if (!useNamedLazyMemberLoading) {
+  // We only use NamedLazyMemberLoading when we have not yet loaded all the
+  // members into the IDC list.
+  if (!decl->hasLazyMembers()) {
     // Make sure we have the complete list of members (in this nominal and in
     // all extensions).
     (void)decl->getMembers();

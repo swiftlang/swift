@@ -516,8 +516,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                                               /*default*/ false);
   Opts.UseClangFunctionTypes |= Args.hasArg(OPT_use_clang_function_types);
 
-  Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
-
   if (Args.hasArg(OPT_verify_syntax_tree)) {
     Opts.BuildSyntaxTree = true;
     Opts.VerifySyntaxTree = true;

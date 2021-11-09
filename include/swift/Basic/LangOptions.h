@@ -270,9 +270,6 @@ namespace swift {
     ///
     /// Flags for developers
     ///
-
-    /// Enable named lazy member loading.
-    bool NamedLazyMemberLoading = true;
     
     /// Whether to record request references for incremental builds.
     bool RecordRequestReferences = true;
