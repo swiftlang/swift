@@ -1169,28 +1169,46 @@ public:
     return static_cast<ImportKind>(Bits.ImportDecl.ImportKind);
   }
 
-  /// Retrieves the full import path.
-  /// \param outRealModuleName An ImportPath builder to write the real module name to if module aliasing
-  ///        was used. For example, if '-module-alias Foo=Bar' was passed, the real name 'Bar' will be written
-  ///        to it, which corresponds to 'import Foo' in source file.
-  /// \returns An ImportPath corresponding to this import decl. If module aliasing was used, 'Foo' will be in the
-  ///          returned path instead of 'Bar' using the above example.
-  ImportPath getImportPath(ImportPath::Builder *outRealModuleName = nullptr) const {
-    auto path = ImportPath({ getTrailingObjects<ImportPath::Element>(),
-      static_cast<size_t>(Bits.ImportDecl.NumPathElements) });;
+  /// Retrieves the import path as written in the source code.
+  /// 
+  /// \returns An \c ImportPath corresponding to this import decl. If module
+  ///          aliasing was used, this will contain the aliased name of the module;
+  ///          for instance, if you wrote 'import Foo' but passed
+  ///          '-module-alias Foo=Bar', this import path will include 'Foo'. This
+  ///          return value is always owned by the AST context, so it can be
+  ///          persisted.
+  ImportPath getImportPath() const {
+     return ImportPath({ getTrailingObjects<ImportPath::Element>(),
+                         static_cast<size_t>(Bits.ImportDecl.NumPathElements) });
+  }
 
-    if (outRealModuleName != nullptr && !RealModuleName.empty()) {
-      for (auto elem: path) {
-        if (outRealModuleName->empty()) {
-          // Add the real module name instead of its alias
-          outRealModuleName->push_back(RealModuleName);
-        } else {
-          // Add the rest if any (access path elements)
-          outRealModuleName->push_back(elem.Item);
-        }
+  /// Retrieves the import path, replacing any module aliases with real names.
+  /// 
+  /// \param scratch An \c ImportPath::Builder which may, if necessary, be used to
+  ///        construct the return value. It may go unused, so you should not try to
+  ///        read the result from it; use the return value instead.
+  /// \returns An \c ImportPath corresponding to this import decl. If module
+  ///          aliasing was used, this will contain the real name of the module;
+  ///          for instance, if you wrote 'import Foo' but passed
+  ///          '-module-alias Foo=Bar', this import path will include 'Bar'. This
+  ///          return value may be owned by \p scratch, so it should not be used
+  ///          after \p scratch is destroyed.
+  ImportPath getRealImportPath(ImportPath::Builder &scratch) const {
+    assert(scratch.empty() && "non-empty scratch ImportPath::Builder?");
+    auto path = getImportPath();
+    if (RealModuleName.empty())
+      return path;
+
+    for (auto elem : path) {
+      if (scratch.empty()) {
+        // Add the real module name instead of its alias
+        scratch.push_back(RealModuleName);
+      } else {
+        // Add the rest if any (access path elements)
+        scratch.push_back(elem.Item);
       }
     }
-    return path;
+    return scratch.get();
   }
 
   ImportPath::Module getModulePath(ImportPath::Module::Builder *outRealModuleName = nullptr) const {
