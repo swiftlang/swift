@@ -66,19 +66,10 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
     if (!ID)
       continue;
 
-    // Check if module aliasing was used for an imported module; for example,
-    // if '-module-alias Foo=Bar' was passed and this module has 'import Foo',
-    // its corresponding real module name 'Bar' should be emitted.
-    ImportPath::Module::Builder builderWithRealModuleName;
-    auto modulePath = ID->getModulePath(/*outRealModuleName=*/&builderWithRealModuleName);
-
-    if (!builderWithRealModuleName.get().empty()) {
-      // Module aliasing was used, so use its real module name
-     Modules.insert(builderWithRealModuleName.get().front().Item.str());
-    } else {
-      // only the top-level name is needed (i.e. A in A.B.C)
-      Modules.insert(modulePath[0].Item.str());
-    }
+    ImportPath::Module::Builder scratch;
+    auto modulePath = ID->getRealModulePath(scratch);
+    // only the top-level name is needed (i.e. A in A.B.C)
+    Modules.insert(modulePath[0].Item.str());
   }
 
   // And now look in the C code we're possibly using.
