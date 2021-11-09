@@ -2085,8 +2085,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       auto &astContext = classTemplateSpecDecl->getASTContext();
       // Itanium mangler produces valid Swift identifiers, use it to generate a name for
       // this instantiation.
-      clang::MangleContext *mangler = clang::ItaniumMangleContext::create(
-          astContext, astContext.getDiagnostics());
+      std::unique_ptr<clang::MangleContext> mangler{
+          clang::ItaniumMangleContext::create(astContext,
+                                              astContext.getDiagnostics())};
       llvm::SmallString<128> storage;
       llvm::raw_svector_ostream buffer(storage);
       mangler->mangleTypeName(astContext.getRecordType(classTemplateSpecDecl),
