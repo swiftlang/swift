@@ -28,6 +28,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -930,6 +931,25 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
   return Optional<RequirementMatch>();
 }
 
+/// Determine the set of effects on a given declaration.
+static PossibleEffects getEffects(ValueDecl *value) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    PossibleEffects result;
+    if (func->hasThrows())
+      result |= EffectKind::Throws;
+    if (func->hasAsync())
+      result |= EffectKind::Async;
+    return result;
+  }
+
+  if (auto storage = dyn_cast<AbstractStorageDecl>(value)) {
+    if (auto accessor = storage->getEffectfulGetAccessor())
+      return getEffects(accessor);
+  }
+
+  return PossibleEffects();
+}
+
 RequirementMatch
 swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
                     ProtocolDecl *proto, ProtocolConformance *conformance,
@@ -1107,12 +1127,17 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               witnessType);
 
+    MatchKind matchKind = MatchKind::ExactMatch;
+    if (hasAnyError(optionalAdjustments))
+      matchKind = MatchKind::OptionalityConflict;
+    else if (anyRenaming)
+      matchKind = MatchKind::RenamedMatch;
+    else if (getEffects(witness).containsOnly(getEffects(req)))
+      matchKind = MatchKind::FewerEffects;
+
     // Success. Form the match result.
     RequirementMatch result(witness,
-                            hasAnyError(optionalAdjustments)
-                              ? MatchKind::OptionalityConflict
-                              : anyRenaming ? MatchKind::RenamedMatch
-                                            : MatchKind::ExactMatch,
+                            matchKind,
                             witnessType,
                             reqEnvironment,
                             optionalAdjustments);
@@ -2461,6 +2486,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   auto &diags = module->getASTContext().Diags;
   switch (match.Kind) {
   case MatchKind::ExactMatch:
+  case MatchKind::FewerEffects:
     diags.diagnose(match.Witness, diag::protocol_witness_exact_match,
                    withAssocTypes);
     break;
@@ -5746,7 +5772,7 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
   auto dc = conformance->getDeclContext();
   auto match = matchWitness(oneUseCache, conformance->getProtocol(),
                             conformance, dc, req, witness);
-  if (match.Kind == MatchKind::ExactMatch &&
+  if (match.isWellFormed() &&
       req->isObjC() && !witness->isObjC()) {
     // Special case: note to add @objc.
     auto diag =
@@ -6431,7 +6457,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         if (matchWitness(reqEnvCache, proto, *conformance,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
-              .Kind == MatchKind::ExactMatch) {
+              .isWellFormed()) {
           if (accessorKind) {
             auto *storageReq = dyn_cast<AbstractStorageDecl>(req);
             if (!storageReq)
