@@ -1453,11 +1453,13 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     DeclBaseName baseName(name.getBaseName());
 
     if (isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl())) {
-      // Namespaces will never have any members so we can just return whatever
-      // the lookup finds.
-      return evaluateOrDefault(
+      auto allFound = evaluateOrDefault(
           ctx.evaluator, CXXNamespaceMemberLookup({cast<EnumDecl>(decl), name}),
           {});
+      for (auto found : allFound)
+        Table.addMember(found);
+
+      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
     } else if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
       auto allFound = evaluateOrDefault(
           ctx.evaluator,
