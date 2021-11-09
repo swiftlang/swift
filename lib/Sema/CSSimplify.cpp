@@ -4060,7 +4060,7 @@ bool ConstraintSystem::repairFailures(
       // optionality if needed.
       auto contextualTy = simplifyType(rhs)->getOptionalObjectType();
       if (!lhs->getOptionalObjectType() && !lhs->hasTypeVariable() &&
-          !contextualTy->isTypeVariableOrMember()) {
+          contextualTy && !contextualTy->isTypeVariableOrMember()) {
         conversionsOrFixes.push_back(IgnoreContextualType::create(
             *this, lhs, rhs, getConstraintLocator(OEE->getSubExpr())));
         return true;
