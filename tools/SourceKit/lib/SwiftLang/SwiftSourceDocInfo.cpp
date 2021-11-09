@@ -1114,6 +1114,8 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
   Symbol.IsSystem = DInfo.VD->getModuleContext()->isSystemModule();
   Symbol.IsDynamic = DInfo.IsDynamic;
+  Symbol.IsSynthesized = DInfo.VD->isImplicit();
+
   Symbol.ParentNameOffset = getParamParentNameOffset(DInfo.VD, CursorLoc);
 
   return llvm::Error::success();
