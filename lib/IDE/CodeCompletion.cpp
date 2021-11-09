@@ -2739,10 +2739,17 @@ public:
     for (auto param : *func->getParameters()) {
       switch (param->getDefaultArgumentKind()) {
       case DefaultArgumentKind::Normal:
+      case DefaultArgumentKind::NilLiteral:
+      case DefaultArgumentKind::EmptyArray:
+      case DefaultArgumentKind::EmptyDictionary:
       case DefaultArgumentKind::StoredProperty:
       case DefaultArgumentKind::Inherited: // FIXME: include this?
         return true;
-      default:
+
+      case DefaultArgumentKind::None:
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+      case DefaultArgumentKind::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
         break;
       }
     }
