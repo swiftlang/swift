@@ -1,4 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking
+
+// UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
