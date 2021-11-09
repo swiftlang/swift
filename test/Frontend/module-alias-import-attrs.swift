@@ -1,4 +1,3 @@
-
 /// Test various import attributes with module aliasing.
 ///
 /// Module 'Lib' imports module 'XLogging' via module aliasing and with various import attributes.
@@ -24,9 +23,8 @@
 // RUN: test -f %t/Lib2.swiftmodule
 // RUN: llvm-bcanalyzer -dump %t/Lib2.swiftmodule > %t/Lib2.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK-REAL-NAME %s < %t/Lib2.dump.txt
+// CHECK-REAL-NAME-NOT: XLogging
 // CHECK-REAL-NAME: AppleLogging
-// RUN: not %FileCheck -check-prefix=CHECK-ALIAS %s < %t/Lib2.dump.txt
-// CHECK-ALIAS: XLogging
 
 /// Test @_implementationOnly: Should fail
 // RUN: not %target-swift-frontend -module-name Lib3 %t/FileLib3.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-path %t/Lib3.swiftmodule 2> %t/result-Lib3.output
@@ -43,9 +41,8 @@
 // RUN: %target-swift-frontend -module-name Lib4 %t/FileLib4.swift -module-alias XLogging=AppleLoggingEnablePrivate -I %t -emit-module -emit-module-path %t/Lib4.swiftmodule
 // RUN: llvm-bcanalyzer -dump %t/Lib4.swiftmodule > %t/Lib4.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK-REAL-NAME4 %s < %t/Lib4.dump.txt
+// CHECK-REAL-NAME4-NOT: XLogging
 // CHECK-REAL-NAME4: AppleLoggingEnablePrivate
-// RUN: not %FileCheck -check-prefix=CHECK-ALIAS4 %s < %t/Lib4.dump.txt
-// CHECK-ALIAS4: XLogging
 
 /// Test @testable: Should pass
 
@@ -56,25 +53,22 @@
 // RUN: %target-swift-frontend -module-name Lib5 %t/FileLib5.swift -module-alias XLogging=AppleLoggingEnableTesting -I %t -emit-module -emit-module-path %t/Lib5.swiftmodule
 // RUN: llvm-bcanalyzer -dump %t/Lib5.swiftmodule > %t/Lib5.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK-REAL-NAME5 %s < %t/Lib5.dump.txt
+// CHECK-REAL-NAME5-NOT: XLogging
 // CHECK-REAL-NAME5: AppleLoggingEnableTesting
-// RUN: not %FileCheck -check-prefix=CHECK-ALIAS5 %s < %t/Lib5.dump.txt
-// CHECK-ALIAS5: XLogging
 
 /// Test import struct: Should pass with correct module name reference
 // RUN: %target-swift-frontend -module-name Lib6 %t/FileLib6.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-path %t/Lib6.swiftmodule -c -o %t/Lib6.o
 // RUN: llvm-nm --defined-only %t/Lib6.o > %t/Lib6.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK-REAL-NAME6 %s < %t/Lib6.dump.txt
+// CHECK-REAL-NAME6-NOT: XLogging
 // CHECK-REAL-NAME6: s4Lib65start12AppleLogging6LoggerVyF
-// RUN: not %FileCheck -check-prefix=CHECK-ALIAS6 %s < %t/Lib6.dump.txt
-// CHECK-ALIAS6: XLogging
 
 /// Test canImport
 // RUN: %target-swift-frontend -module-name Lib7 %t/FileLib7.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-path %t/Lib7.swiftmodule -Rmodule-loading 2> %t/Lib7.dump.txt
 
 // RUN: %FileCheck -check-prefix=CHECK-LOAD %s < %t/Lib7.dump.txt
+// CHECK-LOAD-NOT: XLogging.swiftmodule
 // CHECK-LOAD: AppleLogging.swiftmodule
-// RUN: not %FileCheck -check-prefix=CHECK-NOT-LOAD %s < %t/Lib7.dump.txt
-// CHECK-NOT-LOAD: XLogging.swiftmodule
 
 /// Test @_exported: Should pass with correct module name reference
 // RUN: %target-swift-frontend -module-name Lib %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-path %t/Lib.swiftmodule
@@ -84,9 +78,8 @@
 
 // RUN: llvm-nm --defined-only %t/User.o > %t/User.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK-REAL-NAME-USER %s < %t/User.dump.txt
+// CHECK-REAL-NAME-USER-NOT: XLogging
 // CHECK-REAL-NAME-USER: s4User04MainA0V3use12AppleLogging6LoggerVyF
-// RUN: not %FileCheck -check-prefix=CHECK-ALIAS-USER %s < %t/User.dump.txt
-// CHECK-ALIAS-USER: XLogging
 
 // BEGIN FileLogging.swift
 public struct Logger {

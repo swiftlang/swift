@@ -1143,9 +1143,6 @@ class ImportDecl final : public Decl,
 
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
              SourceLoc KindLoc, ImportPath Path);
-  // Sets the real module name corresponding to this import decl in
-  // case module aliasing is used. Called in \c ImportDecl::create.
-  void setRealModuleName(Identifier name) { RealModuleName = name; };
 public:
   static ImportDecl *create(ASTContext &C, DeclContext *DC,
                             SourceLoc ImportLoc, ImportKind Kind,
@@ -1193,23 +1190,7 @@ public:
   ///          '-module-alias Foo=Bar', this import path will include 'Bar'. This
   ///          return value may be owned by \p scratch, so it should not be used
   ///          after \p scratch is destroyed.
-  ImportPath getRealImportPath(ImportPath::Builder &scratch) const {
-    assert(scratch.empty() && "non-empty scratch ImportPath::Builder?");
-    auto path = getImportPath();
-    if (RealModuleName.empty())
-      return path;
-
-    for (auto elem : path) {
-      if (scratch.empty()) {
-        // Add the real module name instead of its alias
-        scratch.push_back(RealModuleName);
-      } else {
-        // Add the rest if any (access path elements)
-        scratch.push_back(elem.Item);
-      }
-    }
-    return scratch.get();
-  }
+  ImportPath getRealImportPath(ImportPath::Builder &scratch) const;
 
   /// Retrieves the part of the import path that contains the module name,
   /// as written in the source code.
@@ -1238,7 +1219,6 @@ public:
   ///          after \p scratch is destroyed.
   ImportPath::Module getRealModulePath(ImportPath::Builder &scratch) const {
     return getRealImportPath(scratch).getModulePath(getImportKind());
-    return getImportPath().getModulePath(getImportKind());
   }
 
   ImportPath::Access getAccessPath() const {
