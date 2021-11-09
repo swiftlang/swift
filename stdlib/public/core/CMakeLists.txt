@@ -288,8 +288,9 @@ endif()
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
+set(compile_flags_for_final_build)
 if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
-  list(APPEND swift_stdlib_compile_flags "-DCOW_CHECKS_ENABLED")
+  list(APPEND compile_flags_for_final_build "-DCOW_CHECKS_ENABLED")
 endif()
 
 # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
@@ -318,8 +319,6 @@ set(swiftCore_common_options
                     ${SWIFTLIB_SOURCES}
                   GYB_SOURCES
                     ${SWIFTLIB_GYB_SOURCES}
-                  SWIFT_COMPILE_FLAGS
-                    ${swift_stdlib_compile_flags} -Xcc -DswiftCore_EXPORTS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                   LINK_FLAGS
                     ${swift_core_link_flags}
                   PRIVATE_LINK_LIBRARIES
@@ -327,7 +326,9 @@ set(swiftCore_common_options
                   INCORPORATE_OBJECT_LIBRARIES
                     ${swift_core_incorporate_object_libraries}
                   FRAMEWORK_DEPENDS
-                    ${swift_core_framework_depends})
+                    ${swift_core_framework_depends}
+                  SWIFT_COMPILE_FLAGS
+                    ${swift_stdlib_compile_flags} -Xcc -DswiftCore_EXPORTS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS})
 
 # The copy_shim_headers target dependency is required to let the
 # build system know that there's a rule to produce the shims
@@ -375,6 +376,7 @@ endif()
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
                   ${swiftCore_common_options}
+                  ${compile_flags_for_final_build}
                   FILE_DEPENDS
                     ${swiftCore_common_dependencies}
                   INSTALL_IN_COMPONENT
