@@ -40,7 +40,7 @@ extension AsyncSequence {
   public __consuming func dropFirst(
     _ count: Int = 1
   ) -> AsyncDropFirstSequence<Self> {
-    precondition(count >= 0, 
+    _precondition(count >= 0, 
       "Can't drop a negative number of elements from an async sequence")
     return AsyncDropFirstSequence(self, dropping: count)
   }
@@ -130,7 +130,7 @@ extension AsyncDropFirstSequence {
   ) -> AsyncDropFirstSequence<Base> {
     // If this is already a AsyncDropFirstSequence, we can just sum the current 
     // drop count and additional drop count.
-    precondition(count >= 0, 
+    _precondition(count >= 0,
       "Can't drop a negative number of elements from an async sequence")
     return AsyncDropFirstSequence(base, dropping: self.count + count)
   }
