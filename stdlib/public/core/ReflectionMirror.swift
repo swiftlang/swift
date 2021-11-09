@@ -188,7 +188,7 @@ extension Mirror {
 }
 
 /// Options for calling `_forEachField(of:options:body:)`.
-@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@available(SwiftStdlib 5.2, *)
 @_spi(Reflection)
 public struct _EachFieldOptions: OptionSet {
   public var rawValue: UInt32
@@ -211,7 +211,7 @@ public struct _EachFieldOptions: OptionSet {
 }
 
 /// The metadata "kind" for a type.
-@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@available(SwiftStdlib 5.2, *)
 @_spi(Reflection)
 public enum _MetadataKind: UInt {
   // With "flags":
@@ -259,7 +259,7 @@ public enum _MetadataKind: UInt {
 ///     and the `_MetadataKind` of the field's type.
 /// - Returns: `true` if every invocation of `body` returns `true`; otherwise,
 ///   `false`.
-@available(macOS 10.15.4, iOS 13.4, tvOS 13.4, watchOS 6.2, *)
+@available(SwiftStdlib 5.2, *)
 @discardableResult
 @_spi(Reflection)
 public func _forEachField(
@@ -302,7 +302,7 @@ public func _forEachField(
 ///     and the `_MetadataKind` of the field's type.
 /// - Returns: `true` if every invocation of `body` returns `true`; otherwise,
 ///   `false`.
-@available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *)
+@available(SwiftStdlib 5.4, *)
 @discardableResult
 @_spi(Reflection)
 public func _forEachFieldWithKeyPath<Root>(

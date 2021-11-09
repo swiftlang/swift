@@ -155,6 +155,7 @@ struct SILValuePrinterInfo {
   ID ValueID;
   SILType Type;
   Optional<ValueOwnershipKind> OwnershipKind;
+  bool IsNoImplicitCopy = false;
 
   SILValuePrinterInfo(ID ValueID) : ValueID(ValueID), Type(), OwnershipKind() {}
   SILValuePrinterInfo(ID ValueID, SILType Type)
@@ -162,6 +163,13 @@ struct SILValuePrinterInfo {
   SILValuePrinterInfo(ID ValueID, SILType Type,
                       ValueOwnershipKind OwnershipKind)
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind) {}
+  SILValuePrinterInfo(ID ValueID, SILType Type,
+                      ValueOwnershipKind OwnershipKind, bool IsNoImplicitCopy)
+      : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind),
+        IsNoImplicitCopy(IsNoImplicitCopy) {}
+  SILValuePrinterInfo(ID ValueID, SILType Type, bool IsNoImplicitCopy)
+      : ValueID(ValueID), Type(Type), OwnershipKind(),
+        IsNoImplicitCopy(IsNoImplicitCopy) {}
 };
 
 /// Return the fully qualified dotted path for DeclContext.
@@ -623,6 +631,8 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     if (!i.Type)
       return *this;
     *this << " : ";
+    if (i.IsNoImplicitCopy)
+      *this << "@noImplicitCopy ";
     if (i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
       *this << "@" << i.OwnershipKind.getValue() << " ";
     }
@@ -655,8 +665,15 @@ public:
   SILValuePrinterInfo getIDAndType(SILValue V) {
     return {Ctx.getID(V), V ? V->getType() : SILType()};
   }
+  SILValuePrinterInfo getIDAndType(SILFunctionArgument *arg) {
+    return {Ctx.getID(arg), arg->getType(), arg->isNoImplicitCopy()};
+  }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILValue V) {
     return {Ctx.getID(V), V ? V->getType() : SILType(), V.getOwnershipKind()};
+  }
+  SILValuePrinterInfo getIDAndTypeAndOwnership(SILFunctionArgument *arg) {
+    return {Ctx.getID(arg), arg->getType(), arg->getOwnershipKind(),
+            arg->isNoImplicitCopy()};
   }
 
   //===--------------------------------------------------------------------===//
@@ -728,20 +745,40 @@ public:
     if (BB->args_empty())
       return;
     *this << '(';
-    ArrayRef<SILArgument *> Args = BB->getArguments();
-
     // If SIL ownership is enabled and the given function has not had ownership
     // stripped out, print out ownership of SILArguments.
     if (BB->getParent()->hasOwnership()) {
-      *this << getIDAndTypeAndOwnership(Args[0]);
-      for (SILArgument *Arg : Args.drop_front()) {
-        *this << ", " << getIDAndTypeAndOwnership(Arg);
+      if (BB->isEntry()) {
+        auto Args = BB->getSILFunctionArguments();
+        *this << getIDAndTypeAndOwnership(Args[0]);
+        for (unsigned i : range(1, Args.size())) {
+          SILFunctionArgument *Arg = Args[i];
+          *this << ", " << getIDAndTypeAndOwnership(Arg);
+        }
+        *this << ')';
+      } else {
+        ArrayRef<SILArgument *> Args = BB->getArguments();
+        *this << getIDAndTypeAndOwnership(Args[0]);
+        for (SILArgument *Arg : Args.drop_front()) {
+          *this << ", " << getIDAndTypeAndOwnership(Arg);
+        }
+        *this << ')';
+      }
+      return;
+    }
+
+    if (BB->isEntry()) {
+      auto Args = BB->getSILFunctionArguments();
+      *this << getIDAndType(Args[0]);
+      for (unsigned i : range(1, Args.size())) {
+        SILFunctionArgument *Arg = Args[i];
+        *this << ", " << getIDAndType(Arg);
       }
       *this << ')';
       return;
     }
 
-    // Otherwise, fall back to the old behavior
+    ArrayRef<SILArgument *> Args = BB->getArguments();
     *this << getIDAndType(Args[0]);
     for (SILArgument *Arg : Args.drop_front()) {
       *this << ", " << getIDAndType(Arg);
@@ -1842,7 +1879,13 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitMoveValueInst(MoveValueInst *I) {
+    if (I->getAllowDiagnostics())
+      *this << "[allows_diagnostics] ";
     *this << getIDAndType(I->getOperand());
   }
 
@@ -2869,6 +2912,13 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     case OptimizationMode::ForSpeed: OS << "[Ospeed] "; break;
     case OptimizationMode::ForSize: OS << "[Osize] "; break;
     default: break;
+  }
+
+  PerformanceConstraints perf = getPerfConstraints();
+  switch (perf) {
+    case PerformanceConstraints::None:         break;
+    case PerformanceConstraints::NoLocks:      OS << "[no_locks] "; break;
+    case PerformanceConstraints::NoAllocation: OS << "[no_allocation] "; break;
   }
 
   if (getEffectsKind() == EffectsKind::ReadOnly)

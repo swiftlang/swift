@@ -17,15 +17,17 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -92,6 +94,8 @@ public:
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(RestatedObjCConformance)
   IGNORED_ATTR(Semantics)
+  IGNORED_ATTR(NoLocks)
+  IGNORED_ATTR(NoAllocation)
   IGNORED_ATTR(EmitAssemblyVisionRemarks)
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(SILGenName)
@@ -240,6 +244,7 @@ public:
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
   void visitTypeEraserAttr(TypeEraserAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
+  void visitTypeSequenceAttr(TypeSequenceAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
 
@@ -263,9 +268,65 @@ public:
 
   void visitReasyncAttr(ReasyncAttr *attr);
   void visitNonisolatedAttr(NonisolatedAttr *attr);
+
+  void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
 };
 
 } // end anonymous namespace
+
+void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
+  // Only allow for this attribute to be used when experimental move only is
+  // enabled.
+  if (!D->getASTContext().LangOpts.EnableExperimentalMoveOnly) {
+    auto error =
+        diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
+  auto *dc = D->getDeclContext();
+
+  // If we have a param decl that is marked as no implicit copy, change our
+  // default specifier to be owned.
+  if (auto *paramDecl = dyn_cast<ParamDecl>(D)) {
+    // We only handle non-lvalue arguments today.
+    if (paramDecl->getSpecifier() == ParamDecl::Specifier::InOut) {
+      auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+      diagnoseAndRemoveAttr(attr, error);
+      return;
+    }
+    return;
+  }
+
+  auto *vd = dyn_cast<VarDecl>(D);
+  if (!vd) {
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
+  // If we have a 'var' instead of a 'let', bail. We only support on local
+  // lets.
+  if (!vd->isLet()) {
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
+  // We only support local lets.
+  if (!dc->isLocalContext()) {
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+
+  // We do not support static vars either yet.
+  if (dc->isTypeContext() && vd->isStatic()) {
+    auto error = diag::noimplicitcopy_attr_valid_only_on_local_let_params;
+    diagnoseAndRemoveAttr(attr, error);
+    return;
+  }
+}
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
   DeclContext *dc = D->getDeclContext();
@@ -2231,28 +2292,18 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     return;
   }
 
-  // Form a new generic signature based on the old one.
-  GenericSignatureBuilder Builder(D->getASTContext());
+  InferredGenericSignatureRequest request{
+      DC->getParentModule(),
+      genericSig.getPointer(),
+      /*genericParams=*/nullptr,
+      WhereClauseOwner(FD, attr),
+      /*addedRequirements=*/{},
+      /*inferenceSources=*/{},
+      /*allowConcreteGenericParams=*/true};
 
-  // First, add the old generic signature.
-  Builder.addGenericSignature(genericSig);
-
-  // Go over the set of requirements, adding them to the builder.
-  WhereClauseOwner(FD, attr).visitRequirements(TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr *reqRepr) {
-        // Add the requirement to the generic signature builder.
-        using FloatingRequirementSource =
-          GenericSignatureBuilder::FloatingRequirementSource;
-        Builder.addRequirement(req, reqRepr,
-                               FloatingRequirementSource::forExplicit(
-                                 reqRepr->getSeparatorLoc()),
-                               nullptr, DC->getParentModule());
-        return false;
-      });
-
-  // Check the result.
-  auto specializedSig = std::move(Builder).computeGenericSignature(
-      /*allowConcreteGenericParams=*/true);
+  auto specializedSig = evaluateOrDefault(Ctx.evaluator, request,
+                                          GenericSignatureWithError())
+      .getPointer();
 
   // Check the validity of provided requirements.
   checkSpecializeAttrRequirements(attr, genericSig, specializedSig, Ctx);
@@ -3237,6 +3288,13 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
   // FIXME: When compiling without library evolution enabled, this should also
   // check whether VD or any of its accessors need a new vtable entry, even if
   // it won't necessarily be able to say why.
+}
+
+void AttributeChecker::visitTypeSequenceAttr(TypeSequenceAttr *attr) {
+  if (!isa<GenericTypeParamDecl>(D)) {
+    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::type_sequence_on_non_generic_param);
+  }
 }
 
 void AttributeChecker::visitNonEphemeralAttr(NonEphemeralAttr *attr) {
@@ -4266,7 +4324,8 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
   // - If the `@differentiable` attribute has a `where` clause, use it to
   //   compute the derivative generic signature.
   // - Otherwise, use the original function's generic signature by default.
-  derivativeGenSig = original->getGenericSignature();
+  auto originalGenSig = original->getGenericSignature();
+  derivativeGenSig = originalGenSig;
 
   // Handle the `where` clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
@@ -4291,7 +4350,6 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
       return true;
     }
 
-    auto originalGenSig = original->getGenericSignature();
     if (!originalGenSig) {
       // `where` clauses are valid only when the original function is generic.
       diags
@@ -4304,51 +4362,35 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
       return true;
     }
 
-    // Build a new generic signature for autodiff derivative functions.
-    GenericSignatureBuilder builder(ctx);
-    // Add the original function's generic signature.
-    builder.addGenericSignature(originalGenSig);
+    InferredGenericSignatureRequest request{
+        original->getParentModule(),
+        originalGenSig.getPointer(),
+        /*genericParams=*/nullptr,
+        WhereClauseOwner(original, attr),
+        /*addedRequirements=*/{},
+        /*inferenceSources=*/{},
+        /*allowConcreteParams=*/true};
 
-    using FloatingRequirementSource =
-        GenericSignatureBuilder::FloatingRequirementSource;
+    // Compute generic signature for derivative functions.
+    derivativeGenSig = evaluateOrDefault(ctx.evaluator, request,
+                                         GenericSignatureWithError())
+        .getPointer();
 
-    bool errorOccurred = false;
-    WhereClauseOwner(original, attr)
-        .visitRequirements(
-            TypeResolutionStage::Structural,
-            [&](const Requirement &req, RequirementRepr *reqRepr) {
-              switch (req.getKind()) {
-              case RequirementKind::SameType:
-              case RequirementKind::Superclass:
-              case RequirementKind::Conformance:
-                break;
+    bool hadInvalidRequirements = false;
+    for (auto req : derivativeGenSig.requirementsNotSatisfiedBy(originalGenSig)) {
+      if (req.getKind() == RequirementKind::Layout) {
+        // Layout requirements are not supported.
+        diags
+            .diagnose(attr->getLocation(),
+                      diag::differentiable_attr_layout_req_unsupported);
+        hadInvalidRequirements = true;
+      }
+    }
 
-              // Layout requirements are not supported.
-              case RequirementKind::Layout:
-                diags
-                    .diagnose(attr->getLocation(),
-                              diag::differentiable_attr_layout_req_unsupported)
-                    .highlight(reqRepr->getSourceRange());
-                errorOccurred = true;
-                return false;
-              }
-
-              // Add requirement to generic signature builder.
-              builder.addRequirement(
-                  req, reqRepr, FloatingRequirementSource::forExplicit(
-                    reqRepr->getSeparatorLoc()),
-                  nullptr, original->getModuleContext());
-              return false;
-            });
-
-    if (errorOccurred) {
+    if (hadInvalidRequirements) {
       attr->setInvalid();
       return true;
     }
-
-    // Compute generic signature for derivative functions.
-    derivativeGenSig = std::move(builder).computeGenericSignature(
-        /*allowConcreteGenericParams=*/true);
   }
 
   attr->setDerivativeGenericSignature(derivativeGenSig);
@@ -5434,9 +5476,10 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       return;
     } else if (auto protoDecl = dc->getSelfProtocolDecl()){
       if (!protoDecl->inheritsFromDistributedActor()) {
-        // TODO: could suggest adding `: DistributedActor` to the protocol as well
-        diagnoseAndRemoveAttr(
+        auto diag = diagnoseAndRemoveAttr(
             attr, diag::distributed_actor_func_not_in_distributed_actor);
+        diagnoseDistributedFunctionInNonDistributedActorProtocol(
+            protoDecl, diag);
         return;
       }
     } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {
@@ -5490,6 +5533,26 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     if (dc->isModuleScopeContext() ||
         (dc->isTypeContext() && var->isStatic())) {
       return;
+    }
+  }
+  
+  // `nonisolated` on most actor initializers is invalid or redundant.
+  if (auto ctor = dyn_cast<ConstructorDecl>(D)) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+      if (nominal->isAnyActor()) {
+        if (ctor->isConvenienceInit()) {
+          // all convenience inits are `nonisolated` by default
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_convenience_init)
+            .warnUntilSwiftVersion(6);
+          return;
+          
+        } else if (!ctor->hasAsync()) {
+          // the isolation for a synchronous init cannot be `nonisolated`.
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_sync_init)
+            .warnUntilSwiftVersion(6);
+          return;
+        }
+      }
     }
   }
 

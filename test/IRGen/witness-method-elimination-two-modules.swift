@@ -6,20 +6,20 @@
 // RUN: %empty-directory(%t)
 
 // (1) Build library swiftmodule
-// RUN: %target-build-swift -parse-as-library -Xfrontend -enable-llvm-wme \
+// RUN: %target-build-swift -parse-as-library -Onone -Xfrontend -enable-llvm-wme \
 // RUN:     %s -DLIBRARY -module-name Library \
 // RUN:     -emit-module -o %t/Library.swiftmodule \
 // RUN:     -emit-tbd -emit-tbd-path %t/libLibrary.tbd -Xfrontend -tbd-install_name=%t/libLibrary.dylib
 
 // (2) Build client
-// RUN: %target-build-swift -parse-as-library -Xfrontend -enable-llvm-wme \
+// RUN: %target-build-swift -parse-as-library -Onone -Xfrontend -enable-llvm-wme \
 // RUN:     %s -DCLIENT -module-name Main -I%t -L%t -lLibrary -o %t/main
 
 // (3) Extract a list of used symbols by client from library
 // RUN: %llvm-nm --undefined-only -m %t/main | grep 'from libLibrary' | awk '{print $3}' > %t/used-symbols
 
 // (4) Now produce the .dylib with just the symbols needed by the client
-// RUN: %target-build-swift -parse-as-library -Xfrontend -enable-llvm-wme -Xfrontend -internalize-at-link \
+// RUN: %target-build-swift -parse-as-library -Onone -Xfrontend -enable-llvm-wme -Xfrontend -internalize-at-link \
 // RUN:     %s -DLIBRARY -lto=llvm-full %lto_flags -module-name Library \
 // RUN:     -emit-library -o %t/libLibrary.dylib \
 // RUN:     -Xlinker -exported_symbols_list -Xlinker %t/used-symbols -Xlinker -dead_strip
@@ -28,12 +28,17 @@
 // RUN: %llvm-nm --defined-only %t/libLibrary.dylib | %FileCheck %s --check-prefix=NM
 
 // (6) Execution test
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/libLibrary.dylib | %FileCheck %s
 
 // REQUIRES: executable_test
 
-// Test disabled until LLVM GlobalDCE supports Swift wtables.
-// REQUIRES: rdar81868930
+// FIXME(mracek): More work needed to get this to work on non-Apple platforms.
+// REQUIRES: VENDOR=apple
+
+// For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
+// ASan cannot work in ("Interceptors are not working, AddressSanitizer is
+// loaded too late").
+// REQUIRES: no_asan
 
 #if LIBRARY
 

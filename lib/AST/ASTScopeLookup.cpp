@@ -241,10 +241,9 @@ bool Portion::lookupMembersOf(const GenericTypeOrExtensionScope *,
 bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
     const GenericTypeOrExtensionScope *scope,
     ASTScopeImpl::DeclConsumer consumer) const {
-  auto nt = scope->getCorrespondingNominalTypeDecl().getPtrOrNull();
-  if (!nt)
+  if (scope->getCorrespondingNominalTypeDecl().isNull())
     return false;
-  return consumer.lookInMembers(scope->getGenericContext(), nt);
+  return consumer.lookInMembers(scope->getGenericContext());
 }
 
 bool GenericTypeOrExtensionWherePortion::lookupMembersOf(

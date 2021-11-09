@@ -387,6 +387,7 @@ extension LoggingMutableCollection: MutableCollection {
      return try base.partition(by: belongsInSecondPartition)
    }
    
+  @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -601,6 +602,7 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
     return base.distance(from: start, to: end)
   }
 
+  @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

@@ -13,20 +13,22 @@
 import Swift
 import _Concurrency
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public protocol ActorTransport: Sendable {
+  /// The identity used by actors that communicate via this transport
+  associatedtype Identity: ActorIdentity = AnyActorIdentity
 
   // ==== ---------------------------------------------------------------------
   // - MARK: Resolving actors by identity
 
-  /// Upon decoding of a `AnyActorIdentity` this function will be called
+  /// Upon decoding of an `Identity` this function will be called
   /// on the transport that is set un the Decoder's `userInfo` at decoding time.
   /// This user info is to be set by the transport, as it receives messages and
   /// attempts decoding them. This way, messages received on a specific transport
   /// (which may be representing a connection, or general transport mechanism)
   /// is able to utilize local knowledge and type information about what kind of
   /// identity to attempt to decode.
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity
+  func decodeIdentity(from decoder: Decoder) throws -> Identity
 
   /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
   /// The returned value is either a local actor or proxy to a remote actor.
@@ -48,7 +50,7 @@ public protocol ActorTransport: Sendable {
   ///
   /// Detecting liveness of such remote actors shall be offered / by transport libraries
   /// by other means, such as "watching an actor for termination" or similar.
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
+  func resolve<Act>(_ identity: Identity, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor
 
   // ==== ---------------------------------------------------------------------
@@ -64,12 +66,76 @@ public protocol ActorTransport: Sendable {
   /// E.g. if an actor is created under address `addr1` then immediately invoking
   /// `transport.resolve(address: addr1, as: Greeter.self)` MUST return a reference
   /// to the same actor.
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignIdentity<Act>(_ actorType: Act.Type) -> Identity
       where Act: DistributedActor
 
-  func actorReady<Act>(_ actor: Act) where Act: DistributedActor
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor
 
   /// Called during actor deinit/destroy.
-  func resignIdentity(_ id: AnyActorIdentity)
-
+  func resignIdentity(_ id: Identity)
 }
+
+@available(SwiftStdlib 5.6, *)
+extension ActorTransport {
+  /// Try to resolve based on a type-erased actor identity.
+  func resolve<Act>(
+    anyIdentity identity: AnyActorIdentity, as actorType: Act.Type
+  ) throws -> Act? where Act: DistributedActor {
+    return try resolve(identity.underlying as! Identity, as: actorType)
+  }
+
+  /// Try to resign based on a type-erased actor identity.
+  func resignAnyIdentity(_ id: AnyActorIdentity) {
+    resignIdentity(id.underlying as! Identity)
+  }
+
+  func decodeAnyIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
+    AnyActorIdentity(try decodeIdentity(from: decoder))
+  }
+
+  func assignAnyIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+      where Act: DistributedActor {
+    return AnyActorIdentity(assignIdentity(actorType))
+  }
+}
+
+@available(SwiftStdlib 5.6, *)
+public struct AnyActorTransport: ActorTransport {
+  public typealias Identity = AnyActorIdentity
+
+  let transport: ActorTransport
+
+  public init<Transport: ActorTransport>(_ transport: Transport) {
+    self.transport = transport
+  }
+
+  public func decodeIdentity(from decoder: Decoder) throws -> Identity {
+    return try transport.decodeAnyIdentity(from: decoder)
+  }
+
+  public func resolve<Act>(
+    _ identity: Identity, as actorType: Act.Type
+  ) throws -> Act? where Act: DistributedActor {
+    return try transport.resolve(anyIdentity: identity, as: actorType)
+  }
+
+  public func assignIdentity<Act>(_ actorType: Act.Type) -> Identity
+      where Act: DistributedActor {
+    return transport.assignAnyIdentity(actorType)
+  }
+
+  public func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor {
+    transport.actorReady(actor)
+  }
+
+  /// Called during actor deinit/destroy.
+  public func resignIdentity(_ id: Identity) {
+    transport.resignAnyIdentity(id)
+  }
+}
+
+///// Use the existential wrapper as the default actor transport.
+//@available(SwiftStdlib 5.6, *)
+//public typealias DefaultActorTransport = AnyActorTransport

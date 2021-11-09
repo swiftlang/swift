@@ -151,6 +151,13 @@ SILModule::~SILModule() {
 }
 
 void SILModule::checkForLeaks() const {
+
+  /// Leak checking is not thread safe, because the instruction counters are
+  /// global non-atomic variables. Leak checking can only be done in case there
+  /// is a single SILModule in a single thread.
+  if (!getOptions().checkSILModuleLeaks)
+    return;
+
   int instsInModule = std::distance(scheduledForDeletion.begin(),
                                     scheduledForDeletion.end());
   for (const SILFunction &F : *this) {
@@ -415,6 +422,8 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
   // Builtins.def, so handle those first.
   if (OperationName.startswith("fence_"))
     Info.ID = BuiltinValueKind::Fence;
+  else if (OperationName.startswith("ifdef_"))
+    Info.ID = BuiltinValueKind::Ifdef;
   else if (OperationName.startswith("cmpxchg_"))
     Info.ID = BuiltinValueKind::CmpXChg;
   else if (OperationName.startswith("atomicrmw_"))

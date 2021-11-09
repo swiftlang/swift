@@ -907,9 +907,10 @@ public:
     // Restore conjunction constraint.
     restore(AfterConjunction, Conjunction);
 
-    // Restore best score.
-    CS.solverState->BestScore = BestScore;
-    CS.CurrentScore = CurrentScore;
+    // Restore best score only if conjunction fails because
+    // successful outcome should keep a score set by `restoreOuterState`.
+    if (HadFailure)
+      restoreOriginalScores();
   }
 
   StepResult resume(bool prevFailed) override;
@@ -954,6 +955,12 @@ protected:
   }
 
 private:
+  /// Restore best and current scores as they were before conjunction.
+  void restoreOriginalScores() const {
+    CS.solverState->BestScore = BestScore;
+    CS.CurrentScore = CurrentScore;
+  }
+
   // Restore constraint system state before conjunction.
   //
   // Note that this doesn't include conjunction constraint

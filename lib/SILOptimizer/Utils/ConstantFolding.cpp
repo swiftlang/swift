@@ -476,48 +476,6 @@ static SILValue constantFoldCompare(BuiltinInst *BI, BuiltinValueKind ID) {
       return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
     }
   }
-
-  // Fold x < 0 into false, if x is known to be a result of an unsigned
-  // operation with overflow checks enabled.
-  BuiltinInst *BIOp;
-  if (match(BI, m_BuiltinInst(BuiltinValueKind::ICMP_SLT,
-                              m_TupleExtractOperation(m_BuiltinInst(BIOp), 0),
-                              m_Zero()))) {
-    // Check if Other is a result of an unsigned operation with overflow.
-    switch (BIOp->getBuiltinInfo().ID) {
-    default:
-      break;
-    case BuiltinValueKind::UAddOver:
-    case BuiltinValueKind::USubOver:
-    case BuiltinValueKind::UMulOver:
-      // Was it an operation with an overflow check?
-      if (match(BIOp->getOperand(2), m_One())) {
-        SILBuilderWithScope B(BI);
-        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt());
-      }
-    }
-  }
-
-  // Fold x >= 0 into true, if x is known to be a result of an unsigned
-  // operation with overflow checks enabled.
-  if (match(BI, m_BuiltinInst(BuiltinValueKind::ICMP_SGE,
-                              m_TupleExtractOperation(m_BuiltinInst(BIOp), 0),
-                              m_Zero()))) {
-    // Check if Other is a result of an unsigned operation with overflow.
-    switch (BIOp->getBuiltinInfo().ID) {
-    default:
-      break;
-    case BuiltinValueKind::UAddOver:
-    case BuiltinValueKind::USubOver:
-    case BuiltinValueKind::UMulOver:
-      // Was it an operation with an overflow check?
-      if (match(BIOp->getOperand(2), m_One())) {
-        SILBuilderWithScope B(BI);
-        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
-      }
-    }
-  }
-
   return nullptr;
 }
 
@@ -1574,6 +1532,14 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
         continue;
       }
 
+      // Builtin.ifdef only replaced when not building the stdlib.
+      if (isApplyOfBuiltin(*inst, BuiltinValueKind::Ifdef)) {
+        if (!inst->getModule().getASTContext().SILOpts.ParseStdlib) {
+          WorkList.insert(inst);
+          continue;
+        }
+      }
+
       if (isApplyOfKnownAvailability(*inst)) {
         WorkList.insert(inst);
         continue;
@@ -1779,7 +1745,7 @@ ConstantFolder::processWorkList() {
     if (isApplyOfBuiltin(*I, BuiltinValueKind::GlobalStringTablePointer)) {
       if (constantFoldGlobalStringTablePointerBuiltin(cast<BuiltinInst>(I),
                                                       EnableDiagnostics)) {
-        // Here, the bulitin instruction got folded, so clean it up.
+        // Here, the builtin instruction got folded, so clean it up.
         eliminateDeadInstruction(I, callbacks);
       }
       continue;
@@ -1804,11 +1770,34 @@ ConstantFolder::processWorkList() {
 
     if (isApplyOfBuiltin(*I, BuiltinValueKind::IsConcrete)) {
       if (constantFoldIsConcrete(cast<BuiltinInst>(I))) {
-        // Here, the bulitin instruction got folded, so clean it up.
+        // Here, the builtin instruction got folded, so clean it up.
         recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true,
                                                    callbacks);
       }
       continue;
+    }
+
+    // Builtin.ifdef_... is expected to stay unresolved when building the stdlib
+    // and must be only used in @_alwaysEmitIntoClient exported functions, which
+    // means we never generate IR for it (when building stdlib). Client code is
+    // then always constant-folding this builtin based on the compilation flags
+    // of the client module.
+    if (isApplyOfBuiltin(*I, BuiltinValueKind::Ifdef)) {
+      if (!I->getModule().getASTContext().SILOpts.ParseStdlib) {
+        auto *BI = cast<BuiltinInst>(I);
+        StringRef flagName = BI->getName().str().drop_front(strlen("ifdef_"));
+        const LangOptions &langOpts = I->getModule().getASTContext().LangOpts;
+        bool val = langOpts.isCustomConditionalCompilationFlagSet(flagName);
+
+        SILBuilderWithScope builder(BI);
+        auto *inst = builder.createIntegerLiteral(
+            BI->getLoc(),
+            SILType::getBuiltinIntegerType(1, builder.getASTContext()), val);
+        BI->replaceAllUsesWith(inst);
+
+        eliminateDeadInstruction(I, callbacks);
+        continue;
+      }
     }
 
     if (auto *bi = dyn_cast<BuiltinInst>(I)) {

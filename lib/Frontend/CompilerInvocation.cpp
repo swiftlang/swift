@@ -443,6 +443,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
 
+  Opts.EnableExperimentalMoveOnly |=
+    Args.hasArg(OPT_enable_experimental_move_only);
+
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
@@ -1104,8 +1107,20 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
 
+  if (auto *A = Args.getLastArg(OPT_symbol_graph_minimum_access_level)) {
+    Opts.MinimumAccessLevel =
+        llvm::StringSwitch<AccessLevel>(A->getValue())
+            .Case("open", AccessLevel::Open)
+            .Case("public", AccessLevel::Public)
+            .Case("internal", AccessLevel::Internal)
+            .Case("fileprivate", AccessLevel::FilePrivate)
+            .Case("private", AccessLevel::Private)
+            .Default(AccessLevel::Public);
+  } else {
+    Opts.MinimumAccessLevel = AccessLevel::Public;
+  }
+
   // default values for generating symbol graphs during a build
-  Opts.MinimumAccessLevel = AccessLevel::Public;
   Opts.PrettyPrint = false;
   Opts.EmitSynthesizedMembers = true;
   Opts.PrintMessages = false;
@@ -1155,7 +1170,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   Opts.DisableModulesValidateSystemDependencies |=
       Args.hasArg(OPT_disable_modules_validate_system_headers);
 
-  if (const Arg *A = Args.getLastArg(OPT_explict_swift_module_map))
+  if (const Arg *A = Args.getLastArg(OPT_explicit_swift_module_map))
     Opts.ExplicitSwiftModuleMap = A->getValue();
   for (auto A: Args.filtered(OPT_candidate_module_file)) {
     Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));
@@ -1399,6 +1414,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalLexicalLifetimes |=
       Args.hasArg(OPT_enable_experimental_lexical_lifetimes);
+  // If experimental move only is enabled, always enable lexical lifetime as
+  // well. Move only depends on lexical lifetimes.
+  Opts.EnableExperimentalLexicalLifetimes |=
+      Args.hasArg(OPT_enable_experimental_move_only);
+
   Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
   Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
@@ -1410,6 +1430,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       OPT_disable_actor_data_race_checks, /*default=*/false);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
+  Opts.EnablePerformanceAnnotations |=
+      Args.hasArg(OPT_ExperimentalPerformanceAnnotations);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
@@ -1433,6 +1455,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
+  Opts.ParseStdlib = FEOpts.ParseStdlib;
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_EQ)) {
     llvm::Expected<llvm::remarks::Format> formatOrErr =
@@ -1853,6 +1876,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // witness.
   Opts.LazyInitializeProtocolConformances = Triple.isOSBinFormatCOFF();
 
+  // PE/COFF cannot deal with the cross-module reference to the
+  // AsyncFunctionPointer data block.  Force the use of indirect
+  // AsyncFunctionPointer access.
+  Opts.IndirectAsyncFunctionPointer = Triple.isOSBinFormatCOFF();
+
   if (Args.hasArg(OPT_disable_legacy_type_info)) {
     Opts.DisableLegacyTypeInfo = true;
   }
@@ -1949,14 +1977,32 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_llvm_vfe)) {
     Opts.VirtualFunctionElimination = true;
+
+    // FIXME(mracek): There are still some situations where we use mangled name
+    // without symbolic references, which means the dependency is not statically
+    // visible to the compiler/linker. Temporarily disable mangled accessors
+    // until we fix that.
+    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_enable_llvm_wme)) {
     Opts.WitnessMethodElimination = true;
+
+    // FIXME(mracek): There are still some situations where we use mangled name
+    // without symbolic references, which means the dependency is not statically
+    // visible to the compiler/linker. Temporarily disable mangled accessors
+    // until we fix that.
+    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_conditional_runtime_records)) {
     Opts.ConditionalRuntimeRecords = true;
+
+    // FIXME(mracek): There are still some situations where we use mangled name
+    // without symbolic references, which means the dependency is not statically
+    // visible to the compiler/linker. Temporarily disable mangled accessors
+    // until we fix that.
+    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_internalize_at_link)) {
@@ -1981,6 +2027,15 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
+  } else if (Triple.isWatchOS() && !Triple.isSimulatorEnvironment()) {
+    // watchOS does not support auto async frame pointers due to bitcode, so
+    // silently override "auto" to "never" when back-deploying. This approach
+    // sacrifies async backtraces when back-deploying but prevents crashes in
+    // older tools that cannot handle the async frame bit in the frame pointer.
+    unsigned major, minor, micro;
+    Triple.getWatchOSVersion(major, minor, micro);
+    if (major < 8)
+      Opts.SwiftAsyncFramePointer = SwiftAsyncFramePointerKind::Never;
   }
 
   return false;

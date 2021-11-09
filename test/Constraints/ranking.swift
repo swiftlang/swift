@@ -343,6 +343,55 @@ struct S4 {
   }
 }
 
+// rdar://84279742 – Make sure we prefer the unlabeled init here.
+struct S5 {
+  init(x: Int...) {}
+  init(_ x: Int...) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S5V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S5VyACSid_tcfC : $@convention(method) (@owned Array<Int>, @thin S5.Type) -> S5
+    _ = S5()
+  }
+}
+
+// We should also prefer the unlabeled case here.
+struct S6 {
+  init(_: Int = 0, x: Int...) {}
+  init(_: Int = 0, _: Int...) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S6V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S6VyACSi_SidtcfC : $@convention(method) (Int, @owned Array<Int>, @thin S6.Type) -> S6
+    _ = S6()
+  }
+}
+
+// However subtyping rules take precedence over labeling rules, so we should
+// prefer the labeled init here.
+struct S7 {
+  init(x: Int...) {}
+  init(_: Int?...) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S7V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S7V1xACSid_tcfC : $@convention(method) (@owned Array<Int>, @thin S7.Type) -> S7
+    _ = S7()
+  }
+}
+
+// Subtyping rules also let us prefer the Int... init here.
+struct S8 {
+  init(_: Int?...) {}
+  init(_: Int...) {}
+
+  // CHECK-LABEL: sil hidden [ossa] @$s7ranking2S8V15testInitRankingyyF
+  func testInitRanking() {
+    // CHECK: function_ref @$s7ranking2S8VyACSid_tcfC : $@convention(method) (@owned Array<Int>, @thin S8.Type) -> S8
+    _ = S8()
+  }
+}
+
 //--------------------------------------------------------------------
 // Pointer conversions
 //--------------------------------------------------------------------

@@ -61,8 +61,8 @@ import Swift
 /// - if the body returns normally:
 ///   - the group will await any not yet complete tasks,
 ///   - once the `withTaskGroup` returns the group is guaranteed to be empty.
-@available(SwiftStdlib 5.5, *)
-@_silgen_name("_$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("$ss13withTaskGroup2of9returning4bodyq_xm_q_mq_ScGyxGzYaXEtYar0_lF")
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -141,8 +141,8 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 ///   - once the `withTaskGroup` returns the group is guaranteed to be empty.
 /// - if the body throws:
 ///   - all tasks remaining in the group will be automatically cancelled.
-@available(SwiftStdlib 5.5, *)
-@_silgen_name("_$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("$ss21withThrowingTaskGroup2of9returning4bodyq_xm_q_mq_Scgyxs5Error_pGzYaKXEtYaKr0_lF")
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -179,7 +179,7 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 /// A task group serves as storage for dynamically spawned tasks.
 ///
 /// It is created by the `withTaskGroup` function.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @frozen
 public struct TaskGroup<ChildTaskResult: Sendable> {
 
@@ -406,7 +406,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 /// child tasks.
 ///
 /// It is created by the `withTaskGroup` function.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @frozen
 public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
@@ -641,7 +641,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
 /// ==== TaskGroup: AsyncSequence ----------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension TaskGroup: AsyncSequence {
   public typealias AsyncIterator = Iterator
   public typealias Element = ChildTaskResult
@@ -660,7 +660,7 @@ extension TaskGroup: AsyncSequence {
   /// after any task completes by throwing an error.
   ///
   /// - SeeAlso: `TaskGroup.next()`
-  @available(SwiftStdlib 5.5, *)
+  @available(SwiftStdlib 5.1, *)
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ChildTaskResult
 
@@ -694,7 +694,7 @@ extension TaskGroup: AsyncSequence {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension ThrowingTaskGroup: AsyncSequence {
   public typealias AsyncIterator = Iterator
   public typealias Element = ChildTaskResult
@@ -714,7 +714,7 @@ extension ThrowingTaskGroup: AsyncSequence {
   /// throwing an error, no further task results are returned.
   ///
   /// - SeeAlso: `ThrowingTaskGroup.next()`
-  @available(SwiftStdlib 5.5, *)
+  @available(SwiftStdlib 5.1, *)
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ChildTaskResult
 
@@ -753,11 +753,11 @@ extension ThrowingTaskGroup: AsyncSequence {
 
 /// ==== -----------------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_taskGroup_destroy")
 func _taskGroupDestroy(group: __owned Builtin.RawPointer)
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_taskGroup_addPending")
 @usableFromInline
 func _taskGroupAddPendingTask(
@@ -765,25 +765,25 @@ func _taskGroupAddPendingTask(
   unconditionally: Bool
 ) -> Bool
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_taskGroup_cancelAll")
 func _taskGroupCancelAll(group: Builtin.RawPointer)
 
 /// Checks ONLY if the group was specifically cancelled.
 /// The task itself being cancelled must be checked separately.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_taskGroup_isCancelled")
 func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_taskGroup_wait_next_throwing")
 func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_hasTaskGroupStatusRecord")
 func _taskHasTaskGroupStatusRecord() -> Bool
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 enum PollStatus: Int {
   case empty   = 0
   case waiting = 1
@@ -791,7 +791,7 @@ enum PollStatus: Int {
   case error   = 3
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_taskGroup_isEmpty")
 func _taskGroupIsEmpty(
   _ group: Builtin.RawPointer

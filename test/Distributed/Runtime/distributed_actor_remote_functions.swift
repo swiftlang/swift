@@ -21,7 +21,7 @@ struct Boom: Error {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 distributed actor SomeSpecificDistributedActor {
   let state: String = "hi there"
 
@@ -77,7 +77,7 @@ distributed actor SomeSpecificDistributedActor {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 extension SomeSpecificDistributedActor {
   @_dynamicReplacement(for:_remote_helloAsyncThrows())
   nonisolated func _remote_impl_helloAsyncThrows() async throws -> String {
@@ -138,12 +138,12 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct ActorAddress: ActorIdentity {
   let address: String
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct FakeTransport: ActorTransport {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented:\(#function)")
@@ -166,10 +166,13 @@ struct FakeTransport: ActorTransport {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
+typealias DefaultActorTransport = FakeTransport
+
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
-func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async {
+@available(SwiftStdlib 5.6, *)
+func test_remote_invoke(address: ActorAddress, transport: FakeTransport) async {
   func check(actor: SomeSpecificDistributedActor) async {
     let personality = __isRemoteActor(actor) ? "remote" : "local"
 
@@ -241,7 +244,7 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
   print(remote)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     let address = ActorAddress(address: "")

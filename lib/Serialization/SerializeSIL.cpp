@@ -484,7 +484,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
-      (unsigned)F.getOptimizationMode(), (unsigned)F.getClassSubclassScope(),
+      (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
+      (unsigned)F.getClassSubclassScope(),
       (unsigned)F.hasCReferences(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
       F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
@@ -584,9 +585,14 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
                                    SA->getOwnershipKind())::innerty>::type,
                                uint8_t>::value,
                   "Expected an underlying uint8_t type");
+    // This is 31 bits in size.
     unsigned packedMetadata = 0;
-    packedMetadata |= unsigned(SA->getType().getCategory());
-    packedMetadata |= unsigned(SA->getOwnershipKind()) << 8;
+    packedMetadata |= unsigned(SA->getType().getCategory());  // 8 bits
+    packedMetadata |= unsigned(SA->getOwnershipKind()) << 8;  // 8 bits
+    packedMetadata |= unsigned(SA->isNoImplicitCopy()) << 16; // 1 bit
+    // Used: 17 bits. Free: 15.
+    //
+    // TODO: We should be able to shrink the packed metadata of the first two.
     Args.push_back(packedMetadata);
 
     Args.push_back(vId);
@@ -1396,6 +1402,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UnmanagedRetainValueInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::CopyValueInst:
+  case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::ReleaseValueInst:
@@ -1455,6 +1462,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = ECMI->doKeepUnique();
     } else if (auto *BBI = dyn_cast<BeginBorrowInst>(&SI)) {
       Attr = BBI->isLexical();
+    } else if (auto *MVI = dyn_cast<MoveValueInst>(&SI)) {
+      Attr = MVI->getAllowDiagnostics();
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;

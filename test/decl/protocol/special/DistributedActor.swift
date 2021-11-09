@@ -4,6 +4,9 @@
 
 import _Distributed
 
+/// Use the existential wrapper as the default actor transport.
+typealias DefaultActorTransport = AnyActorTransport
+
 distributed actor D1 {
   var x: Int = 17
 }
@@ -40,19 +43,16 @@ protocol P1: DistributedActor {
 
 distributed actor D5: P1 {
   func dist() -> String { "" }
-  // expected-error@-1{{actor-isolated instance method 'dist()' cannot be used to satisfy a protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'dist()' cannot be used to satisfy a protocol requirement}}
   // expected-note@-2{{add 'distributed' to 'dist()' to make this instance method witness the protocol requirement}}{{3-3=distributed }}
 }
 
 // ==== Tests ------------------------------------------------------------------
 
 // Make sure the conformances have been added implicitly.
-@available(SwiftStdlib 5.5, *)
 func acceptDistributedActor<Act: DistributedActor>(_: Act.Type) { }
-@available(SwiftStdlib 5.5, *)
 func acceptAnyActor<Act: AnyActor>(_: Act.Type) { }
 
-@available(SwiftStdlib 5.5, *)
 func testConformance() {
   acceptDistributedActor(D1.self)
   acceptAnyActor(D1.self)

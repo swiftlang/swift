@@ -231,6 +231,16 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
         llvm::createAlwaysInlinerLegacyPass(/*insertlifetime*/false);
   }
 
+  bool RunSwiftMergeFunctions = true;
+
+  // LLVM MergeFunctions and SwiftMergeFunctions don't understand that the
+  // string in the metadata on calls in @llvm.type.checked.load intrinsics is
+  // semantically meaningful, and mis-compile (mis-merge) unrelated functions.
+  if (Opts.VirtualFunctionElimination || Opts.WitnessMethodElimination) {
+    PMBuilder.MergeFunctions = false;
+    RunSwiftMergeFunctions = false;
+  }
+
   bool RunSwiftSpecificLLVMOptzns =
       !Opts.DisableSwiftSpecificLLVMOptzns && !Opts.DisableLLVMOptzns;
 
@@ -268,7 +278,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addSanitizerCoveragePass);
   }
-  if (RunSwiftSpecificLLVMOptzns) {
+  if (RunSwiftSpecificLLVMOptzns && RunSwiftMergeFunctions) {
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
       [&](const PassManagerBuilder &Builder, PassManagerBase &PM) {
         if (Builder.OptLevel > 0) {
@@ -1139,8 +1149,10 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the embedding of bitcode.
   auto SILModuleRelease = [&SILMod]() {
+    bool checkForLeaks = SILMod->getOptions().checkSILModuleLeaks;
     SILMod.reset(nullptr);
-    SILModule::checkForLeaksAfterDestruction();
+    if (checkForLeaks)
+      SILModule::checkForLeaksAfterDestruction();
   };
   auto Thread = std::thread(SILModuleRelease);
   // Wait for the thread to terminate.
@@ -1441,8 +1453,10 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   // Free the memory occupied by the SILModule.
   // Execute this task in parallel to the LLVM compilation.
   auto SILModuleRelease = [&SILMod]() {
+    bool checkForLeaks = SILMod->getOptions().checkSILModuleLeaks;
     SILMod.reset(nullptr);
-    SILModule::checkForLeaksAfterDestruction();
+    if (checkForLeaks)
+      SILModule::checkForLeaksAfterDestruction();
   };
   auto releaseModuleThread = std::thread(SILModuleRelease);
 

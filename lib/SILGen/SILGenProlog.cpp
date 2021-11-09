@@ -10,20 +10,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGenFunction.h"
+#include "ArgumentSource.h"
 #include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "ManagedValue.h"
+#include "SILGenFunction.h"
 #include "Scope.h"
-#include "ArgumentSource.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/SIL/SILArgument.h"
 
 using namespace swift;
 using namespace Lowering;
+
+template <typename... T, typename... U>
+static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
+                     U &&...args) {
+  Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
 
 SILValue SILGenFunction::emitSelfDecl(VarDecl *selfDecl) {
   // Emit the implicit 'self' argument.
@@ -49,11 +56,13 @@ public:
   SILLocation loc;
   CanSILFunctionType fnTy;
   ArrayRef<SILParameterInfo> &parameters;
+  bool isNoImplicitCopy;
 
   EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent, SILLocation l,
                   CanSILFunctionType fnTy,
-                  ArrayRef<SILParameterInfo> &parameters)
-    : SGF(sgf), parent(parent), loc(l), fnTy(fnTy), parameters(parameters) {}
+                  ArrayRef<SILParameterInfo> &parameters, bool isNoImplicitCopy)
+      : SGF(sgf), parent(parent), loc(l), fnTy(fnTy), parameters(parameters),
+        isNoImplicitCopy(isNoImplicitCopy) {}
 
   ManagedValue visitType(CanType t, AbstractionPattern orig) {
     return visitType(t, orig, /*isInOut=*/false);
@@ -79,7 +88,7 @@ public:
     auto paramType =
         SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
-        paramType, loc.getAsASTNode<ValueDecl>());
+        paramType, loc.getAsASTNode<ValueDecl>(), isNoImplicitCopy);
 
     // This is a hack to deal with the fact that Self.Type comes in as a static
     // metatype, but we have to downcast it to a dynamic Self metatype to get
@@ -98,12 +107,21 @@ public:
 
     // This can happen if the value is resilient in the calling convention
     // but not resilient locally.
-    if (argType.isLoadable(SGF.F) && argType.isAddress()) {
-      if (mv.isPlusOne(SGF))
-        mv = SGF.B.createLoadTake(loc, mv);
-      else
-        mv = SGF.B.createLoadBorrow(loc, mv);
-      argType = argType.getObjectType();
+    if (argType.isLoadable(SGF.F)) {
+      if (argType.isAddress()) {
+        if (mv.isPlusOne(SGF))
+          mv = SGF.B.createLoadTake(loc, mv);
+        else
+          mv = SGF.B.createLoadBorrow(loc, mv);
+        argType = argType.getObjectType();
+      }
+    } else {
+      if (isNoImplicitCopy) {
+        // We do not support no implicit copy address only types. Emit an error.
+        auto diag = diag::noimplicitcopy_used_on_generic_or_existential;
+        diagnose(SGF.getASTContext(), mv.getValue().getLoc().getSourceLoc(),
+                 diag);
+      }
     }
 
     if (argType.getASTType() != paramType.getASTType()) {
@@ -217,14 +235,14 @@ struct ArgumentInitHelper {
 
   unsigned getNumArgs() const { return ArgNo; }
 
-  ManagedValue makeArgument(Type ty, bool isInOut, SILBasicBlock *parent,
-                            SILLocation l) {
+  ManagedValue makeArgument(Type ty, bool isInOut, bool isNoImplicitCopy,
+                            SILBasicBlock *parent, SILLocation l) {
     assert(ty && "no type?!");
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->getCanonicalType();
-    EmitBBArguments argEmitter(SGF, parent, l,
-                               f.getLoweredFunctionType(), parameters);
+    EmitBBArguments argEmitter(SGF, parent, l, f.getLoweredFunctionType(),
+                               parameters, isNoImplicitCopy);
 
     // Note: inouts of tuples are not exploded, so we bypass visit().
     AbstractionPattern origTy = OrigFnType
@@ -241,7 +259,8 @@ struct ArgumentInitHelper {
     SILLocation loc(pd);
     loc.markAsPrologue();
 
-    ManagedValue argrv = makeArgument(ty, pd->isInOut(), parent, loc);
+    ManagedValue argrv =
+        makeArgument(ty, pd->isInOut(), pd->isNoImplicitCopy(), parent, loc);
 
     if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
@@ -256,9 +275,17 @@ struct ArgumentInitHelper {
     if (!argrv.getType().isAddress()) {
       if (SGF.getASTContext().SILOpts.EnableExperimentalLexicalLifetimes &&
           value->getOwnershipKind() == OwnershipKind::Owned) {
+        bool isNoImplicitCopy = false;
+        if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+          isNoImplicitCopy = arg->isNoImplicitCopy();
         value =
             SILValue(SGF.B.createBeginBorrow(loc, value, /*isLexical*/ true));
         SGF.Cleanups.pushCleanup<EndBorrowCleanup>(value);
+        if (isNoImplicitCopy) {
+          value = SGF.B.emitCopyValueOperation(loc, value);
+          value = SGF.B.createMoveValue(loc, value);
+          SGF.enterDestroyCleanup(value);
+        }
       }
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
@@ -297,7 +324,8 @@ struct ArgumentInitHelper {
     Scope discardScope(SGF.Cleanups, CleanupLocation(PD));
 
     // Manage the parameter.
-    auto argrv = makeArgument(type, PD->isInOut(), &*f.begin(), paramLoc);
+    auto argrv = makeArgument(type, PD->isInOut(), PD->isNoImplicitCopy(),
+                              &*f.begin(), paramLoc);
 
     // Emit debug information for the argument.
     SILLocation loc(PD);
@@ -583,10 +611,7 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
       break;
     }
   } else if (auto *closureExpr = dyn_cast<AbstractClosureExpr>(FunctionDC)) {
-    bool wantExecutor = F.isAsync() ||
-      (wantDataRaceChecks &&
-       !(isa<ClosureExpr>(closureExpr) &&
-         cast<ClosureExpr>(closureExpr)->isUnsafeMainActor()));
+    bool wantExecutor = F.isAsync() || wantDataRaceChecks;
     auto actorIsolation = closureExpr->getActorIsolation();
     switch (actorIsolation.getKind()) {
     case ClosureActorIsolation::Independent:
@@ -645,7 +670,7 @@ SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
     actorType->getTypeOfMember(SGM.SwiftModule, sharedInstanceDecl);
 
   auto metaRepr =
-    nominal->isResilient(SGM.SwiftModule, ResilienceExpansion::Maximal)
+    nominal->isResilient(SGM.SwiftModule, F.getResilienceExpansion())
     ? MetatypeRepresentation::Thick
     : MetatypeRepresentation::Thin;
 

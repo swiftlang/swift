@@ -193,6 +193,7 @@ def _apply_default_arguments(args):
         args.test_swiftformat = False
         args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
+        args.test_swiftdocc = False
 
     # --test implies --test-early-swift-driver
     # (unless explicitly skipped with `--skip-test-early-swift-driver`)
@@ -518,7 +519,7 @@ def create_argument_parser():
            default=defaults.DSYMUTIL_JOBS,
            metavar='COUNT',
            help='the maximum number of parallel dsymutil jobs to use when '
-                'extracting symbols. Tweak with caution, since dsymutil'
+                'extracting symbols. Tweak with caution, since dsymutil '
                 'is memory intensive.')
 
     option('--disable-guaranteed-normal-arguments', store_true,
@@ -632,6 +633,8 @@ def create_argument_parser():
 
     option(['--swift-driver'], toggle_true('build_swift_driver'),
            help='build swift-driver')
+    option(['--swiftdocc'], toggle_true('build_swiftdocc'),
+           help='build Swift DocC')
 
     option(['--skip-early-swift-driver'], toggle_false('build_early_swift_driver'),
            help='skip building the early swift-driver')
@@ -660,6 +663,8 @@ def create_argument_parser():
            help='install new Swift driver')
     option(['--install-swiftevolve'], toggle_true('install_swiftevolve'),
            help='install SwiftEvolve')
+    option(['--install-swiftdocc'], toggle_true('install_swiftdocc'),
+           help='install Swift DocC')
     option(['--toolchain-benchmarks'],
            toggle_true('build_toolchainbenchmarks'),
            help='build Swift Benchmarks using swiftpm against the just built '
@@ -1119,6 +1124,8 @@ def create_argument_parser():
     option('--skip-test-swift-inspect',
            toggle_false('test_swift_inspect'),
            help='skip testing swift_inspect')
+    option('--skip-test-swiftdocc', toggle_false('test_swiftdocc'),
+           help='skip testing swift-docc')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')

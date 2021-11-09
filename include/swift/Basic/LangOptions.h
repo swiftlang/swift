@@ -320,6 +320,9 @@ namespace swift {
     /// Enable experimental 'distributed' actors and functions.
     bool EnableExperimentalDistributed = false;
 
+    /// Enable experimental 'move only' features.
+    bool EnableExperimentalMoveOnly = false;
+
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;

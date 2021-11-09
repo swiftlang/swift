@@ -871,8 +871,18 @@ bool Decl::isStdlibDecl() const {
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
   auto containingContext =
       AvailabilityInference::annotatedAvailableRange(this, getASTContext());
-  if (containingContext.hasValue())
+  if (containingContext.hasValue()) {
+    // If this entity comes from the concurrency module, adjust it's
+    // availability for linkage purposes up to Swift 5.5, so that we use
+    // weak references any time we reference those symbols when back-deploying
+    // concurrency.
+    ASTContext &ctx = getASTContext();
+    if (getModuleContext()->getName() == ctx.Id_Concurrency) {
+      containingContext->intersectWith(ctx.getConcurrencyAvailability());
+    }
+
     return *containingContext;
+  }
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
@@ -1245,9 +1255,14 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 }
 
 NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
-  assert((hasBeenBound() || canNeverBeBound()) &&
-         "Extension must have already been bound (by bindExtensions)");
-  return ExtendedNominal.getPointer();
+  if (hasBeenBound()) {
+    return ExtendedNominal.getPointer();
+  } else if (canNeverBeBound()) {
+    return computeExtendedNominal();
+  }
+
+  llvm_unreachable(
+      "Extension must have already been bound (by bindExtensions)");
 }
 
 NominalTypeDecl *ExtensionDecl::computeExtendedNominal() const {
@@ -5663,6 +5678,11 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   if (!isLet())
     return supportsMutation();
 
+  // Static 'let's are always immutable.
+  if (isStatic()) {
+    return false;
+  }
+
   //
   // All the remaining logic handles the special cases where you can
   // assign a 'let'.
@@ -7731,27 +7751,6 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
     const AutoDiffConfig &config) {
   prepareDerivativeFunctionConfigurations();
   DerivativeFunctionConfigs->insert(config);
-}
-
-bool AbstractFunctionDecl::hasKnownUnsafeSendableFunctionParams() const {
-  auto nominal = getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal)
-    return false;
-
-  // DispatchQueue operations.
-  auto nominalName = nominal->getName().str();
-  if (nominalName == "DispatchQueue") {
-    auto name = getBaseName().userFacingName();
-    return llvm::StringSwitch<bool>(name)
-      .Case("sync", true)
-      .Case("async", true)
-      .Case("asyncAndWait", true)
-      .Case("asyncAfter", true)
-      .Case("concurrentPerform", true)
-      .Default(false);
-  }
-
-  return false;
 }
 
 void FuncDecl::setResultInterfaceType(Type type) {

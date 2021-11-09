@@ -94,6 +94,9 @@ class Witness {
     ConcreteDeclRef declRef;
     GenericEnvironment *syntheticEnvironment;
     SubstitutionMap reqToSyntheticEnvSubs;
+    /// The derivative generic signature, when the requirement is a derivative
+    /// function.
+    GenericSignature derivativeGenSig;
   };
 
   llvm::PointerUnion<ValueDecl *, StoredWitness *> storage;
@@ -124,7 +127,8 @@ public:
   static Witness forDeserialized(ValueDecl *decl,
                                  SubstitutionMap substitutions) {
     // TODO: It's probably a good idea to have a separate 'deserialized' bit.
-    return Witness(decl, substitutions, nullptr, SubstitutionMap());
+    return Witness(
+        decl, substitutions, nullptr, SubstitutionMap(), CanGenericSignature());
   }
 
   /// Create a witness that requires substitutions.
@@ -138,10 +142,14 @@ public:
   ///
   /// \param reqToSyntheticEnvSubs The mapping from the interface types of the
   /// requirement into the interface types of the synthetic environment.
+  ///
+  /// \param derivativeGenSig The derivative generic signature, when the
+  /// requirement is a derivative function.
   Witness(ValueDecl *decl,
           SubstitutionMap substitutions,
           GenericEnvironment *syntheticEnv,
-          SubstitutionMap reqToSyntheticEnvSubs);
+          SubstitutionMap reqToSyntheticEnvSubs,
+          GenericSignature derivativeGenSig);
 
   /// Retrieve the witness declaration reference, which includes the
   /// substitutions needed to use the witness from the synthetic environment
@@ -181,6 +189,13 @@ public:
     if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
       return storedWitness->reqToSyntheticEnvSubs;
     return {};
+  }
+
+  /// Retrieve the derivative generic signature.
+  GenericSignature getDerivativeGenericSignature() const {
+    if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
+      return storedWitness->derivativeGenSig;
+    return GenericSignature();
   }
 
   SWIFT_DEBUG_DUMP;

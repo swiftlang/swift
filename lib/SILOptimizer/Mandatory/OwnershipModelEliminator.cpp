@@ -132,6 +132,7 @@ struct OwnershipModelEliminatorVisitor
   bool visitStoreInst(StoreInst *si);
   bool visitStoreBorrowInst(StoreBorrowInst *si);
   bool visitCopyValueInst(CopyValueInst *cvi);
+  bool visitExplicitCopyValueInst(ExplicitCopyValueInst *cvi);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
   bool visitLoadBorrowInst(LoadBorrowInst *lbi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi) {
@@ -275,6 +276,21 @@ bool OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *lbi) {
 }
 
 bool OwnershipModelEliminatorVisitor::visitCopyValueInst(CopyValueInst *cvi) {
+  // A copy_value of an address-only type cannot be replaced.
+  if (cvi->getType().isAddressOnly(*cvi->getFunction()))
+    return false;
+
+  // Now that we have set the unqualified ownership flag, destroy value
+  // operation will delegate to the appropriate strong_release, etc.
+  withBuilder<void>(cvi, [&](SILBuilder &b, SILLocation loc) {
+    b.emitCopyValueOperation(loc, cvi->getOperand());
+  });
+  eraseInstructionAndRAUW(cvi, cvi->getOperand());
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitExplicitCopyValueInst(
+    ExplicitCopyValueInst *cvi) {
   // A copy_value of an address-only type cannot be replaced.
   if (cvi->getType().isAddressOnly(*cvi->getFunction()))
     return false;

@@ -2611,14 +2611,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto numSPIGroups = attr->getSPIGroups().size();
       assert(pieces.size() == numArgs + numSPIGroups ||
              pieces.size() == (numArgs - 1 + numSPIGroups));
-      auto numAvailabilityAttrs = attr->getAvailabeAttrs().size();
+      auto numAvailabilityAttrs = attr->getAvailableAttrs().size();
       SpecializeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isExported(),
           (unsigned)attr->getSpecializationKind(),
           S.addGenericSignatureRef(attr->getSpecializedSignature()),
           S.addDeclRef(targetFunDecl), numArgs, numSPIGroups,
           numAvailabilityAttrs, pieces);
-      for (auto availAttr : attr->getAvailabeAttrs()) {
+      for (auto availAttr : attr->getAvailableAttrs()) {
         writeDeclAttribute(D, availAttr);
       }
       return;
@@ -2738,6 +2738,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       TransposeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
           origDeclID, paramIndicesVector);
+      return;
+    }
+
+    case DAK_TypeSequence: {
+      auto abbrCode = S.DeclTypeAbbrCodes[TypeSequenceDeclAttrLayout::Code];
+      TypeSequenceDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
       return;
     }
     }
@@ -3713,6 +3719,7 @@ public:
         param->isImplicitlyUnwrappedOptional(),
         param->isVariadic(),
         param->isAutoClosure(),
+        param->isIsolated(),
         getRawStableDefaultArgumentKind(argKind),
         defaultArgumentText);
 
@@ -5752,6 +5759,7 @@ void swift::serializeToBuffers(
 
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
+                      const symbolgraphgen::SymbolGraphOptions &symbolGraphOptions,
                       const SILModule *M,
                       const fine_grained_dependencies::SourceFileDepGraph *DG) {
   assert(!withNullAsEmptyStringRef(options.OutputPath).empty());
@@ -5796,22 +5804,12 @@ void swift::serialize(ModuleOrSourceFile DC,
     });
   }
 
-  if (!options.SymbolGraphOutputDir.empty()) {
+  if (!symbolGraphOptions.OutputDir.empty()) {
     if (DC.is<ModuleDecl *>()) {
       auto *M = DC.get<ModuleDecl*>();
       FrontendStatsTracer tracer(getContext(DC).Stats,
                                  "Serialization, symbolgraph");
-      symbolgraphgen::SymbolGraphOptions SGOpts {
-        options.SymbolGraphOutputDir,
-        M->getASTContext().LangOpts.Target,
-        /* PrettyPrint */false,
-        AccessLevel::Public,
-        /*EmitSynthesizedMembers*/true,
-        /*PrintMessages*/false,
-        /*EmitInheritedDocs*/options.SkipSymbolGraphInheritedDocs,
-        /*IncludeSPISymbols*/options.IncludeSPISymbolsInSymbolGraph,
-      };
-      symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
+      symbolgraphgen::emitSymbolGraphForModule(M, symbolGraphOptions);
     }
   }
   emitABIDescriptor(DC, options);

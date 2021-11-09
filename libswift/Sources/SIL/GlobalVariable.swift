@@ -18,7 +18,8 @@ final public class GlobalVariable : CustomStringConvertible {
   }
 
   public var description: String {
-    return SILGlobalVariable_debugDescription(bridged).string
+    var s = SILGlobalVariable_debugDescription(bridged)
+    return String(cString: s.c_str())
   }
 
   // TODO: initializer instructions

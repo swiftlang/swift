@@ -168,14 +168,12 @@ ERROR(variable_defer_use_uninit,none,
 ERROR(self_closure_use_uninit,none,
       "'self' captured by a closure before all members were initialized", ())
 
-/// false == sync; true == global-actor isolated
-ERROR(self_use_actor_init,none,
-      "this use of actor 'self' %select{can only|cannot}0 appear in "
-      "%select{an async|a global-actor isolated}0 initializer",
-      (bool))
-ERROR(self_disallowed_actor_init,none,
-      "actor 'self' %select{can only|cannot}0 %1 from "
-      "%select{an async|a global-actor isolated}0 initializer",
+ERROR(self_disallowed_nonisolated_actor_init,none,
+      "%select{|this use of }0actor 'self' cannot %2 %select{from|in}0 "
+      "%select{a non-isolated, designated|a global-actor isolated}1 initializer",
+      (bool, bool, StringRef))
+ERROR(self_disallowed_plain_actor_init,none,
+      "%select{|this use of }0actor 'self' can only %1 %select{from|in}0 an async initializer",
       (bool, StringRef))
 NOTE(actor_convenience_init,none,
      "convenience initializers allow non-isolated use of 'self' once "
@@ -310,6 +308,34 @@ WARNING(warn_infinite_recursive_call,none,
 WARNING(warn_dead_weak_store,none,
         "weak reference will always be nil because the referenced object is "
         "deallocated here", ())
+
+// performance diagnostics
+ERROR(performance_annotations_not_enabled,none,
+      "use -experimental-performance-annotations to enable performance annotations", ())
+ERROR(performance_dynamic_casting,none,
+      "dynamic casting can lock or allocate", ())
+ERROR(performance_metadata,none,
+      "%0 can cause metadata allocation or locks", (StringRef))
+ERROR(performance_metadata_type,none,
+      "Using type %0 can cause metadata allocation or locks", (Type))
+ERROR(performance_allocating,none,
+      "%0 can cause an allocation", (StringRef))
+ERROR(performance_deallocating,none,
+      "%0 can cause an deallocation", (StringRef))
+ERROR(performance_deallocating_type,none,
+      "%0 a value of type %1 can cause a deallocation", (StringRef, Type))
+ERROR(performance_locking,none,
+      "%0 can cause locking", (StringRef))
+ERROR(performance_arc,none,
+      "this code performs reference counting operations which can cause locking", ())
+ERROR(performance_objectivec,none,
+      "calls of Objective-C methods can have unpredictable performance", ())
+ERROR(performance_unknown_callees,none,
+      "called function is not known at compile time and can have unpredictable performance", ())
+ERROR(performance_callee_unavailable,none,
+      "called function is not availbale in this module and can have unpredictable performance", ())
+NOTE(performance_called_from,none,
+      "called from here", ())
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,
@@ -685,6 +711,38 @@ NOTE(capturepromotion_concurrentcapture_capturinguse_here, none,
      "capturing use", ())
 NOTE(capturepromotion_variable_defined_here,none,
      "variable defined here", ())
+
+// move operator used on generic or evalue
+ERROR(move_operator_used_on_generic_or_existential_value, none,
+      "move() used on a generic or existential value", ())
+
+// copy operator used on generic or evalue
+ERROR(copy_operator_used_on_generic_or_existential_value, none,
+      "copy() used on a generic or existential value", ())
+
+// noimplicitcopy on generic or existential binding
+ERROR(noimplicitcopy_used_on_generic_or_existential, none,
+      "@_noImplicitCopy can not be used on a generic or existential typed "
+      "binding or a nominal type containing such typed things", ())
+
+// move only checker diagnostics
+ERROR(sil_moveonlychecker_value_consumed_more_than_once, none,
+      "'%0' consumed more than once", (StringRef))
+NOTE(sil_moveonlychecker_consuming_use_here, none,
+     "consuming use", ())
+
+// move kills copyable values checker diagnostics
+ERROR(sil_movekillscopyablevalue_value_consumed_more_than_once, none,
+      "'%0' used after being moved", (StringRef))
+NOTE(sil_movekillscopyablevalue_move_here, none,
+     "move here", ())
+NOTE(sil_movekillscopyablevalue_use_here, none,
+     "use here", ())
+NOTE(sil_movekillscopyablevalue_value_consumed_in_loop, none,
+     "cyclic move here. move will occur multiple times in the loop", ())
+ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
+      "_move applied to value that the compiler does not know how to check. "
+      "Please file a bug or an enhancement request!", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

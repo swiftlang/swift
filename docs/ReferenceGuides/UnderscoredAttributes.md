@@ -620,3 +620,17 @@ within Swift 5 code that has adopted concurrency, but non-`@MainActor`
 
 See the forum post on [Concurrency in Swift 5 and 6](https://forums.swift.org/t/concurrency-in-swift-5-and-6/49337)
 for more details.
+
+## `@_noImplicitCopy`
+
+Marks a var decl as a variable that must be copied explicitly using the builtin
+function Builtin.copy.
+
+## `@_noAllocation`, `@_noLocks`
+
+These attributes are performance annotations. If a function is annotated with
+such an attribute, the compiler issues a diagnostic message if the function
+calls a runtime function which allocates memory or locks, respectively.
+The `@_noLocks` attribute implies `@_noAllocation` because a memory allocation
+also locks.
+

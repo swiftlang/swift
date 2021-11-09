@@ -302,6 +302,9 @@ ERROR(getset_cannot_be_implied,none,
 // Import
 ERROR(decl_expected_module_name,none,
       "expected module name in import declaration", ())
+ERROR(expected_module_alias,none,
+      "cannot refer to module as %0 because it has been aliased; use %1 "
+      "instead", (Identifier, Identifier))
 
 // Extension
 ERROR(expected_lbrace_extension,PointsToFirstBadToken,
@@ -630,6 +633,8 @@ ERROR(sil_keypath_index_operand_type_conflict,none,
 ERROR(sil_keypath_no_use_of_operand_in_pattern,none,
       "operand %0 is not referenced by any component in the pattern",
       (unsigned))
+ERROR(sil_movevalue_invalid_optional_attribute,none,
+      "Optional attribute '[%0]' can not be applied to move_value", (StringRef))
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,

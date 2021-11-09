@@ -422,6 +422,10 @@ def define_availability : Separate<["-"], "define-availability">,
   HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,
   MetaVarName<"<macro>">;
 
+def check_api_availability_only : Flag<["-"], "check-api-availability-only">,
+  Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
+  HelpText<"Only check the availability of the APIs, ignore function bodies">;
+
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
@@ -620,6 +624,11 @@ def requirement_machine_protocol_signatures_EQ : Joined<["-"], "requirement-mach
   Flags<[FrontendOption]>,
   HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', or 'verify'">;
 
+def experimental_hermetic_seal_at_link:
+  Flag<["-"], "experimental-hermetic-seal-at-link">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Library code can assume that all clients are visible at linktime, and aggressively strip unused code">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -699,7 +708,7 @@ def save_optimization_record_path :
 def save_optimization_record_passes :
   Separate<["-"], "save-optimization-record-passes">,
   Flags<[FrontendOption]>,
-  HelpText<"Only include passes which match a specified regular expression in"
+  HelpText<"Only include passes which match a specified regular expression in "
            "the generated optimization record "
            "(by default, include all passes)">, MetaVarName<"<regex>">;
 
@@ -786,6 +795,10 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
 def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Perform cross-module optimization">;
+
+def ExperimentalPerformanceAnnotations : Flag<["-"], "experimental-performance-annotations">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Perform cross-module optimization">;
 
@@ -1268,6 +1281,11 @@ def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
          SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
+
+def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-access-level">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Include symbols with this access level or more when emitting a symbol graph">,
+  MetaVarName<"<level>">;
 
 def pretty_print: Flag<["-"], "pretty-print">,
   Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,

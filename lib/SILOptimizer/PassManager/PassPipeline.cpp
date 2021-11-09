@@ -164,7 +164,13 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // dead allocations.
   P.addPredictableDeadAllocationElimination();
 
+  // Now perform move semantic checking.
+  P.addMoveKillsCopyableValuesChecker(); // No uses after _move of copyable
+                                         //   value.
+  P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
+
   P.addOptimizeHopToExecutor();
+  P.addMandatoryGenericSpecializer();
 
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
@@ -176,6 +182,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   if (P.getOptions().EnableCopyPropagation) {
     P.addDiagnoseLifetimeIssues();
   }
+  
+  P.addGlobalOpt();
+  P.addPerformanceDiagnostics();
+  
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
 }

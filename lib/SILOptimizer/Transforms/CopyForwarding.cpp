@@ -1471,7 +1471,8 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
   if (!CopyInst->isTakeOfSrc())
     return false;
 
-  if (!isa<AllocStackInst>(CopyInst->getSrc()))
+  auto *asi = dyn_cast<AllocStackInst>(CopyInst->getSrc());
+  if (!asi || asi->hasDynamicLifetime())
     return false;
 
   // The copy's dest must be an indirect SIL argument. Otherwise, it may not

@@ -15,7 +15,7 @@ func suspend() async {}
 // CHECK:   hop_to_executor [mandatory] [[ACTOR]] : $MainActor
 // CHECK:   strong_release [[ACTOR]] : $MainActor
 // CHECK:   apply %{{.*}}() : $@convention(thin) @async () -> ()
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func runDetached() {
   Task.detached {
     Builtin.hopToActor(MainActor.shared)

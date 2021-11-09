@@ -18,27 +18,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "RequirementMachine.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include <vector>
 
-#include "RequirementMachine.h"
-
 using namespace swift;
 using namespace rewriting;
-
-#define DEBUG_TYPE "Serialization"
-
-STATISTIC(NumLazyRequirementSignaturesLoaded,
-          "# of lazily-deserialized requirement signatures loaded");
-
-#undef DEBUG_TYPE
 
 namespace {
 
@@ -107,13 +98,11 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
   llvm::SmallDenseMap<TypeBase *, ConnectedComponent> sameTypeReqs;
 
   auto genericParams = proto->getGenericSignature().getGenericParams();
-  const auto &protos = System.getProtocols();
 
   // Convert a rewrite rule into a requirement.
   auto createRequirementFromRule = [&](const Rule &rule) {
     if (auto prop = rule.isPropertyRule()) {
-      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
-                                                protos);
+      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams);
 
       switch (prop->getKind()) {
       case Symbol::Kind::Protocol:
@@ -134,16 +123,14 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
                           Context.getTypeFromSubstitutionSchema(
                               prop->getSuperclass(),
                               prop->getSubstitutions(),
-                              genericParams, MutableTerm(),
-                              protos));
+                              genericParams, MutableTerm()));
         return;
 
       case Symbol::Kind::ConcreteType: {
         auto concreteType = Context.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
-                                genericParams, MutableTerm(),
-                                protos);
+                                genericParams, MutableTerm());
 
         auto &component = sameTypeReqs[subjectType.getPointer()];
         assert(!component.ConcreteType);
@@ -158,14 +145,13 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
       }
 
       llvm_unreachable("Invalid symbol kind");
-    } else if (rule.getLHS().back().getKind() != Symbol::Kind::Protocol) {
-      auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams,
-                                                   protos);
-      auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams,
-                                                protos);
-
-      sameTypeReqs[subjectType.getPointer()].Members.push_back(constraintType);
     }
+
+    assert(rule.getLHS().back().getKind() != Symbol::Kind::Protocol);
+    auto constraintType = Context.getTypeForTerm(rule.getLHS(), genericParams);
+    auto subjectType = Context.getTypeForTerm(rule.getRHS(), genericParams);
+
+    sameTypeReqs[subjectType.getPointer()].Members.push_back(constraintType);
   };
 
   if (getDebugOptions().contains(DebugFlags::Minimization)) {
@@ -199,10 +185,10 @@ RequirementMachine::buildRequirementSignature(ArrayRef<unsigned> rules,
   }
 
   // Finally, sort the requirements in canonical order.
-  std::sort(reqs.begin(), reqs.end(),
-            [](const Requirement &lhs, const Requirement &rhs) -> bool {
-              return lhs.compare(rhs) < 0;
-            });
+  llvm::array_pod_sort(reqs.begin(), reqs.end(),
+                       [](const Requirement *lhs, const Requirement *rhs) -> int {
+                         return lhs->compare(*rhs);
+                       });
 
   return reqs;
 }
@@ -227,104 +213,54 @@ RequirementMachine::computeMinimalRequirements() {
 }
 
 ArrayRef<Requirement>
-RequirementSignatureRequest::evaluate(Evaluator &evaluator,
-                                      ProtocolDecl *proto) const {
+RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
+                                         ProtocolDecl *proto) const {
   ASTContext &ctx = proto->getASTContext();
 
   // First check if we have a deserializable requirement signature.
-  if (proto->hasLazyRequirementSignature()) {
-    ++NumLazyRequirementSignaturesLoaded;
-    // FIXME: (transitional) increment the redundant "always-on" counter.
-    if (ctx.Stats)
-      ++ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded;
+  assert(!proto->hasLazyRequirementSignature() &&
+         "Should be handled in RequirementSignatureRequest");
 
-    auto contextData = static_cast<LazyProtocolData *>(
-        ctx.getOrCreateLazyContextData(proto, nullptr));
+  // We build requirement signatures for all protocols in a strongly connected
+  // component at the same time.
+  auto *machine = ctx.getOrCreateRequirementMachine(proto);
+  auto requirements = machine->computeMinimalRequirements();
 
-    SmallVector<Requirement, 8> requirements;
-    contextData->loader->loadRequirementSignature(
-        proto, contextData->requirementSignatureData, requirements);
-    if (requirements.empty())
-      return None;
-    return ctx.AllocateCopy(requirements);
-  }
+  bool debug = machine->getDebugOptions().contains(DebugFlags::Minimization);
 
-  auto buildViaGSB = [&]() {
-    GenericSignatureBuilder builder(proto->getASTContext());
+  // The requirement signature for the actual protocol that the result
+  // was kicked off with.
+  ArrayRef<Requirement> result;
 
-    // Add all of the generic parameters.
-    for (auto gp : *proto->getGenericParams())
-      builder.addGenericParameter(gp);
+  for (const auto &pair : requirements) {
+    auto *otherProto = pair.first;
+    const auto &reqs = pair.second;
 
-    // Add the conformance of 'self' to the protocol.
-    auto selfType =
-      proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-    auto requirement =
-      Requirement(RequirementKind::Conformance, selfType,
-                  proto->getDeclaredInterfaceType());
+    // setRequirementSignature() doesn't take ownership of the memory, so
+    // we have to make a copy of the std::vector temporary.
+    ArrayRef<Requirement> reqsCopy = ctx.AllocateCopy(reqs);
 
-    builder.addRequirement(
-            requirement,
-            GenericSignatureBuilder::RequirementSource::forRequirementSignature(
-                                                        builder, selfType, proto),
-            nullptr);
+    // Dump the result if requested.
+    if (debug) {
+      llvm::dbgs() << "Protocol " << otherProto->getName() << ": ";
 
-    auto reqSignature = std::move(builder).computeGenericSignature(
-                          /*allowConcreteGenericParams=*/false,
-                          /*requirementSignatureSelfProto=*/proto);
-    return reqSignature.getRequirements();
-  };
-
-  auto buildViaRQM = [&]() {
-    // We build requirement signatures for all protocols in a strongly connected
-    // component at the same time.
-    auto *machine = ctx.getOrCreateRequirementMachine(proto);
-    auto requirements = machine->computeMinimalRequirements();
-
-    bool debug = machine->getDebugOptions().contains(DebugFlags::Minimization);
-
-    // The requirement signature for the actual protocol that the result
-    // was kicked off with.
-    ArrayRef<Requirement> result;
-
-    for (const auto &pair : requirements) {
-      auto *otherProto = pair.first;
-      const auto &reqs = pair.second;
-
-      // setRequirementSignature() doesn't take ownership of the memory, so
-      // we have to make a copy of the std::vector temporary.
-      ArrayRef<Requirement> reqsCopy = ctx.AllocateCopy(reqs);
-
-      // Don't call setRequirementSignature() on the original proto; the
-      // request evaluator will do it for us.
-      if (otherProto == proto)
-        result = reqsCopy;
-      else
-        const_cast<ProtocolDecl *>(otherProto)->setRequirementSignature(reqsCopy);
-
-      // Dump the result if requested.
-      if (debug) {
-        llvm::dbgs() << "Protocol " << otherProto->getName() << ": ";
-
-        auto sig = GenericSignature::get(
-            otherProto->getGenericSignature().getGenericParams(),
-            reqsCopy);
-        llvm::dbgs() << sig << "\n";
-      }
+      auto sig = GenericSignature::get(
+          otherProto->getGenericSignature().getGenericParams(),
+          reqsCopy);
+      llvm::dbgs() << sig << "\n";
     }
 
-    // Return the result for the specific protocol this request was kicked off on.
-    return result;
-  };
-
-  switch (ctx.LangOpts.RequirementMachineProtocolSignatures) {
-  case RequirementMachineMode::Disabled:
-    return buildViaGSB();
-
-  case RequirementMachineMode::Enabled:
-    return buildViaRQM();
-
-  case RequirementMachineMode::Verify:
-    abort();
+    // Don't call setRequirementSignature() on the original proto; the
+    // request evaluator will do it for us.
+    if (otherProto == proto)
+      result = reqsCopy;
+    else {
+      ctx.evaluator.cacheOutput(
+        RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
+        std::move(reqsCopy));
+    }
   }
+
+  // Return the result for the specific protocol this request was kicked off on.
+  return result;
 }

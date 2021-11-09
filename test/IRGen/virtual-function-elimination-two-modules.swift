@@ -27,12 +27,17 @@
 // RUN: %llvm-nm --defined-only %t/libLibrary.dylib | %FileCheck %s --check-prefix=NM
 
 // (6) Execution test
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/libLibrary.dylib | %FileCheck %s
 
 // REQUIRES: executable_test
 
-// Test disabled until LLVM GlobalDCE supports Swift vtables.
-// REQUIRES: rdar81868930
+// FIXME(mracek): More work needed to get this to work on non-Apple platforms.
+// REQUIRES: VENDOR=apple
+
+// For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
+// ASan cannot work in ("Interceptors are not working, AddressSanitizer is
+// loaded too late").
+// REQUIRES: no_asan
 
 #if LIBRARY
 

@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking -warn-concurrency
 // REQUIRES: concurrency
 
-class NotConcurrent { } // expected-note 18{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
+class NotConcurrent { } // expected-note 21{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on actor operations
@@ -19,10 +19,23 @@ actor A2 {
   init(value: NotConcurrent) {
     self.localVar = value
   }
+
+  init(valueAsync value: NotConcurrent) async {
+    self.localVar = value
+  }
+
+  convenience init(delegatingSync value: NotConcurrent) {
+    self.init(value: value) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
+  }
+
+  convenience init(delegatingAsync value: NotConcurrent) async {
+    await self.init(valueAsync: value) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
+  }
 }
 
-func testActorCreation(value: NotConcurrent) {
+func testActorCreation(value: NotConcurrent) async {
   _ = A2(value: value) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
+  _ = await A2(valueAsync: value) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
 }
 
 extension A1 {

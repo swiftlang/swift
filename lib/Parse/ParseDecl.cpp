@@ -1632,6 +1632,9 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   if (NameMatch == Map.end())
     return makeParserSuccess(); // No match, it could be a standard platform.
 
+  SyntaxParsingContext VersionRestrictionContext(
+      SyntaxContext, SyntaxKind::AvailabilityVersionRestriction);
+
   consumeToken();
 
   llvm::VersionTuple Version;
@@ -2739,6 +2742,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     Attributes.add(new (Context) ProjectedValuePropertyAttr(
         name, AtLoc, range, /*implicit*/ false));
+    break;
+  }
+  case DAK_TypeSequence: {
+    auto range = SourceRange(Loc, Tok.getRange().getStart());
+    Attributes.add(TypeSequenceAttr::create(Context, AtLoc, range));
     break;
   }
   }

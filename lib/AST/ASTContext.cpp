@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
+#include "GenericSignatureBuilder.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -28,7 +29,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
@@ -1637,10 +1637,18 @@ void ASTContext::addModuleInterfaceChecker(
 }
 
 void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
+  // This setter should be called only once after ASTContext has been initialized
+  assert(ModuleAliasMap.empty());
+  
   for (auto k: aliasMap.keys()) {
-    auto val = aliasMap.lookup(k);
-    if (!val.empty()) {
-      ModuleAliasMap[getIdentifier(k)] = getIdentifier(val);
+    auto v = aliasMap.lookup(k);
+    if (!v.empty()) {
+      auto key = getIdentifier(k);
+      auto val = getIdentifier(v);
+      // key is a module alias, val is its corresponding real name
+      ModuleAliasMap[key] = std::make_pair(val, true);
+      // add an entry with an alias as key for an easier lookup later
+      ModuleAliasMap[val] = std::make_pair(key, false);
     }
   }
 }
@@ -2933,7 +2941,6 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   bool isStatic = false;
   SelfAccessKind selfAccess = SelfAccessKind::NonMutating;
   bool isDynamicSelf = false;
-  bool isIsolated = false;
 
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     isStatic = FD->isStatic();
@@ -2951,10 +2958,6 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     else if (wantDynamicSelf && FD->hasDynamicSelfResult())
       isDynamicSelf = true;
 
-    // If this is a non-static method within an actor, the 'self' parameter
-    // is isolated if this declaration is isolated.
-    isIsolated = evaluateOrDefault(
-        Ctx.evaluator, HasIsolatedSelfRequest{AFD}, false);
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
@@ -3010,6 +3013,10 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
     return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx));
+
+  // `self` is isolated if typechecker says the function is isolated to it.
+  bool isIsolated =
+      evaluateOrDefault(Ctx.evaluator, HasIsolatedSelfRequest{AFD}, false);
 
   auto flags = ParameterTypeFlags().withIsolated(isIsolated);
   switch (selfAccess) {
@@ -4272,13 +4279,11 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl, unsigned ordinal,
   }
 # endif
 #endif
-  auto signature = evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        Decl->getOpaqueInterfaceGenericSignature().getPointer(),
+  auto signature = buildGenericSignature(
+        ctx,
+        Decl->getOpaqueInterfaceGenericSignature(),
         /*genericParams=*/{ },
-        std::move(newRequirements)},
-      nullptr);
+        std::move(newRequirements));
 
   auto reqs = signature->getLocalRequirements(opaqueParamType);
   auto superclass = reqs.superclass;
@@ -4858,6 +4863,7 @@ bool ASTContext::isTypeBridgedInExternalModule(
           // bridging implementations of CG types appear in the Foundation
           // module.
           nominal->getParentModule()->getName() == Id_CoreGraphics ||
+          nominal->getParentModule()->getName() == Id_CoreFoundation ||
           // CoreMedia is a dependency of AVFoundation, but the bridged
           // NSValue implementations for CMTime, CMTimeRange, and
           // CMTimeMapping are provided by AVFoundation, and AVFoundation
@@ -5043,10 +5049,10 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
   auto genericParam = GenericTypeParamType::get(0, 0, *this);
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           existential);
-  auto genericSig = evaluateOrDefault(
-      evaluator,
-      AbstractGenericSignatureRequest{nullptr, {genericParam}, {requirement}},
-      GenericSignature());
+  auto genericSig = buildGenericSignature(*this,
+                                          GenericSignature(),
+                                          {genericParam},
+                                          {requirement});
 
   CanGenericSignature canGenericSig(genericSig);
 
@@ -5144,13 +5150,9 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     }
   }
 
-  auto genericSig = evaluateOrDefault(
-      evaluator,
-      AbstractGenericSignatureRequest{
-        derivedClassSig.getPointer(),
-        std::move(addedGenericParams),
-        std::move(addedRequirements)},
-      GenericSignature());
+  auto genericSig = buildGenericSignature(*this, derivedClassSig,
+                                          std::move(addedGenericParams),
+                                          std::move(addedRequirements));
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
 }

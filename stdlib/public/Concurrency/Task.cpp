@@ -36,8 +36,19 @@
 #endif
 
 #if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
+#include <Availability.h>
+#include <TargetConditionals.h>
+#if TARGET_OS_WATCH
+// Bitcode compilation for the watch device precludes defining the following asm
+// symbols, so we don't use them... but simulators are okay.
+#if TARGET_OS_SIMULATOR
 asm("\n .globl _swift_async_extendedFramePointerFlags" \
     "\n _swift_async_extendedFramePointerFlags = 0x0");
+#endif
+#else
+asm("\n .globl _swift_async_extendedFramePointerFlags" \
+    "\n _swift_async_extendedFramePointerFlags = 0x0");
+#endif
 #else
 #ifdef __APPLE__
 #if __POINTER_WIDTH__ == 64
@@ -433,7 +444,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   ExecutorRef executor = ExecutorRef::generic();
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
-  void *asyncLetBuffer = nullptr;
   bool hasAsyncLetResultBuffer = false;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
@@ -461,7 +471,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       // context, so that we can emplace the eventual result there instead
       // of in a FutureFragment.
       hasAsyncLetResultBuffer = true;
-      asyncLetBuffer = aletRecord->getResultBuffer();
       assert(asyncLet && "Missing async let storage");
         
       jobFlags.task_setIsAsyncLetTask(true);
@@ -513,7 +522,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     headerSize += sizeof(AsyncTask::GroupChildFragment);
   }
   if (futureResultType) {
-    headerSize += FutureFragment::fragmentSize(futureResultType);
+    headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
     // Add the future async context prefix.
     headerSize += sizeof(FutureAsyncContextPrefix);
   } else {

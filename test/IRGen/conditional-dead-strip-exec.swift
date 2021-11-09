@@ -3,10 +3,7 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -Xfrontend -disable-objc-interop \
-// RUN:     -Xfrontend -disable-reflection-metadata -Xfrontend -disable-reflection-names \
-// RUN:     -Xfrontend -conditional-runtime-records \
-// RUN:     %s -emit-ir -o %t/main.ll
+// RUN: %target-build-swift -Xfrontend -conditional-runtime-records %s -emit-ir -o %t/main.ll
 
 // RUN: %target-clang %t/main.ll -isysroot %sdk -L%swift_obj_root/lib/swift/%target-sdk-name -flto -o %t/main
 // RUN: %target-run %t/main | %FileCheck %s
@@ -15,8 +12,13 @@
 
 // REQUIRES: executable_test
 
-// Test disabled until LLVM GlobalDCE supports conditional references.
-// REQUIRES: rdar81868900
+// FIXME(mracek): More work needed to get this to work on non-Apple platforms.
+// REQUIRES: VENDOR=apple
+
+// For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
+// ASan cannot work in ("Interceptors are not working, AddressSanitizer is
+// loaded too late").
+// REQUIRES: no_asan
 
 // (1) used
 @inline(never) func func1_used() { print("func1_used") }
@@ -48,6 +50,10 @@ class UsedClass : UnusedProto, ActuallyUsedProto {
 	public func bark() { print("UsedClass.bark") }
 }
 
+// (9) unused protocol with associated type
+protocol ProtoWithAssocType { associatedtype T }
+struct Implementor : ProtoWithAssocType { typealias T = Int }
+
 print("Hello!")
 func1_used()
 let o = UsedClass()
@@ -70,6 +76,11 @@ p.bark()
 
 // (2)
 // NM-NOT: $s4main10func2_deadyyF
+
+// (9)
+// NM-NOT: $s4main11ImplementorVAA18ProtoWithAssocTypeAAMA
+// NM-NOT: $s4main11ImplementorVMf
+// NM-NOT: $s4main11ImplementorVMn
 
 // (4)
 // NM-NOT: $s4main11TheProtocolMp

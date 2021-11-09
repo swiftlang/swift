@@ -14,17 +14,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "GenericSignatureBuilderImpl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
+#include "GenericSignatureBuilder.h"
+#include "GenericSignatureBuilderImpl.h"
 #include "RequirementMachine/RequirementMachine.h"
 #include <functional>
 
@@ -1483,7 +1484,11 @@ int Requirement::compare(const Requirement &other) const {
   // We should only have multiple conformance requirements.
   assert(getKind() == RequirementKind::Conformance);
 
-  return TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
+  int compareProtos =
+    TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
+  assert(compareProtos != 0 && "Duplicate conformance requirements");
+
+  return compareProtos;
 }
 
 /// Compare two associated types.
@@ -1555,6 +1560,8 @@ int swift::compareDependentTypes(Type type1, Type type2) {
 
   return 0;
 }
+
+#pragma mark Generic signature verification
 
 void GenericSignature::verify() const {
   auto canSig = getCanonicalSignature();
@@ -1731,4 +1738,128 @@ void GenericSignature::verify() const {
       abort();
     }
   }
+}
+
+void swift::validateGenericSignature(ASTContext &context,
+                                     GenericSignature sig) {
+  llvm::errs() << "Validating generic signature: ";
+  sig->print(llvm::errs());
+  llvm::errs() << "\n";
+
+  // Try building a new signature having the same requirements.
+  SmallVector<GenericTypeParamType *, 2> genericParams;
+  for (auto *genericParam :  sig.getGenericParams())
+    genericParams.push_back(genericParam);
+
+  SmallVector<Requirement, 2> requirements;
+  for (auto requirement : sig.getRequirements())
+    requirements.push_back(requirement);
+
+  {
+    PrettyStackTraceGenericSignature debugStack("verifying", sig);
+
+    auto newSigWithError = evaluateOrDefault(
+        context.evaluator,
+        AbstractGenericSignatureRequest{
+            nullptr,
+            genericParams,
+            requirements},
+        GenericSignatureWithError());
+
+    // If there were any errors, the signature was invalid.
+    if (newSigWithError.getInt()) {
+      context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_valid,
+                             sig->getAsString());
+    }
+
+    auto newSig = newSigWithError.getPointer();
+
+    // The new signature should be equal.
+    if (!newSig->isEqual(sig)) {
+      context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_equal,
+                             sig->getAsString(), newSig->getAsString());
+    }
+  }
+
+  // Try removing each requirement in turn.
+  for (unsigned victimIndex : indices(requirements)) {
+    PrettyStackTraceGenericSignature debugStack("verifying", sig, victimIndex);
+
+    // Add the requirements *except* the victim.
+    SmallVector<Requirement, 2> newRequirements;
+    for (unsigned i : indices(requirements)) {
+      if (i != victimIndex)
+        newRequirements.push_back(requirements[i]);
+    }
+
+    auto newSigWithError = evaluateOrDefault(
+        context.evaluator,
+        AbstractGenericSignatureRequest{
+          nullptr,
+          genericParams,
+          newRequirements},
+        GenericSignatureWithError());
+
+    // If there were any errors, we formed an invalid signature, so
+    // just continue.
+    if (newSigWithError.getInt())
+      continue;
+
+    auto newSig = newSigWithError.getPointer();
+
+    // If the new signature once again contains the removed requirement, it's
+    // not redundant.
+    if (newSig->isEqual(sig))
+      continue;
+
+    // If the removed requirement is satisfied by the new generic signature,
+    // it is redundant. Complain.
+    if (newSig->isRequirementSatisfied(requirements[victimIndex])) {
+      SmallString<32> reqString;
+      {
+        llvm::raw_svector_ostream out(reqString);
+        requirements[victimIndex].print(out, PrintOptions());
+      }
+      context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_minimal,
+                             reqString, sig->getAsString());
+    }
+  }
+}
+
+void swift::validateGenericSignaturesInModule(ModuleDecl *module) {
+  LoadedFile *loadedFile = nullptr;
+  for (auto fileUnit : module->getFiles()) {
+    loadedFile = dyn_cast<LoadedFile>(fileUnit);
+    if (loadedFile) break;
+  }
+
+  if (!loadedFile) return;
+
+  // Check all of the (canonical) generic signatures.
+  SmallVector<GenericSignature, 8> allGenericSignatures;
+  SmallPtrSet<CanGenericSignature, 4> knownGenericSignatures;
+  (void)loadedFile->getAllGenericSignatures(allGenericSignatures);
+  ASTContext &context = module->getASTContext();
+  for (auto genericSig : allGenericSignatures) {
+    // Check whether this is the first time we've checked this (canonical)
+    // signature.
+    auto canGenericSig = genericSig.getCanonicalSignature();
+    if (!knownGenericSignatures.insert(canGenericSig).second) continue;
+
+    validateGenericSignature(context, canGenericSig);
+  }
+}
+
+GenericSignature
+swift::buildGenericSignature(ASTContext &ctx,
+                             GenericSignature baseSignature,
+                             SmallVector<GenericTypeParamType *, 2> addedParameters,
+                             SmallVector<Requirement, 2> addedRequirements) {
+  return evaluateOrDefault(
+      ctx.evaluator,
+      AbstractGenericSignatureRequest{
+        baseSignature.getPointer(),
+        addedParameters,
+        addedRequirements},
+      GenericSignatureWithError()).getPointer();
 }

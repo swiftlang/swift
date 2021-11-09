@@ -18,6 +18,7 @@
 #include "CSDiagnostics.h"
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -302,80 +303,19 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name) {
   return *result;
 }
 
-ArrayRef<Type> ConstraintSystem::
-getAlternativeLiteralTypes(KnownProtocolKind kind) {
-  unsigned index;
-
-  switch (kind) {
-#define PROTOCOL_WITH_NAME(Id, Name) \
-  case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, __, ___)
-#include "swift/AST/KnownProtocols.def"
-
-  case KnownProtocolKind::ExpressibleByArrayLiteral:     index = 0; break;
-  case KnownProtocolKind::ExpressibleByDictionaryLiteral:index = 1; break;
-  case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral: index = 2;
-    break;
-  case KnownProtocolKind::ExpressibleByFloatLiteral: index = 3; break;
-  case KnownProtocolKind::ExpressibleByIntegerLiteral: index = 4; break;
-  case KnownProtocolKind::ExpressibleByStringInterpolation: index = 5; break;
-  case KnownProtocolKind::ExpressibleByStringLiteral: index = 6; break;
-  case KnownProtocolKind::ExpressibleByNilLiteral: index = 7; break;
-  case KnownProtocolKind::ExpressibleByBooleanLiteral: index = 8; break;
-  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral: index = 9; break;
-  case KnownProtocolKind::ExpressibleByColorLiteral: index = 10; break;
-  case KnownProtocolKind::ExpressibleByImageLiteral: index = 11; break;
-  case KnownProtocolKind::ExpressibleByFileReferenceLiteral: index = 12; break;
-  }
-  static_assert(NumAlternativeLiteralTypes == 13, "Wrong # of literal types");
-
-  // If we already looked for alternative literal types, return those results.
-  if (AlternativeLiteralTypes[index])
-    return *AlternativeLiteralTypes[index];
-
-  SmallVector<Type, 4> types;
-
-  // Some literal kinds are related.
-  switch (kind) {
-#define PROTOCOL_WITH_NAME(Id, Name) \
-  case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, __, ___)
-#include "swift/AST/KnownProtocols.def"
-
-  case KnownProtocolKind::ExpressibleByArrayLiteral:
-  case KnownProtocolKind::ExpressibleByDictionaryLiteral:
-    break;
-
-  case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral:
-  case KnownProtocolKind::ExpressibleByStringInterpolation:
-  case KnownProtocolKind::ExpressibleByStringLiteral:
-  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
-    break;
-
-  case KnownProtocolKind::ExpressibleByIntegerLiteral:
+ArrayRef<Type>
+ConstraintSystem::getAlternativeLiteralTypes(KnownProtocolKind kind,
+                                             SmallVectorImpl<Type> &scratch) {
+  assert(scratch.empty());
+  if (kind == KnownProtocolKind::ExpressibleByIntegerLiteral) {
     // Integer literals can be treated as floating point literals.
     if (auto floatProto = getASTContext().getProtocol(
                             KnownProtocolKind::ExpressibleByFloatLiteral)) {
-      if (auto defaultType = TypeChecker::getDefaultType(floatProto, DC)) {
-        types.push_back(defaultType);
-      }
+      if (auto defaultType = TypeChecker::getDefaultType(floatProto, DC))
+        scratch.push_back(defaultType);
     }
-    break;
-
-  case KnownProtocolKind::ExpressibleByFloatLiteral:
-    break;
-
-  case KnownProtocolKind::ExpressibleByNilLiteral:
-  case KnownProtocolKind::ExpressibleByBooleanLiteral:
-    break;
-  case KnownProtocolKind::ExpressibleByColorLiteral:
-  case KnownProtocolKind::ExpressibleByImageLiteral:
-  case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
-    break;
   }
-
-  AlternativeLiteralTypes[index] = allocateCopy(types);
-  return *AlternativeLiteralTypes[index];
+  return scratch;
 }
 
 bool ConstraintSystem::containsCodeCompletionLoc(Expr *expr) const {
@@ -1218,9 +1158,8 @@ void ConstraintSystem::recordOpenedTypes(
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
-  OpenedTypes.push_back({ locatorPtr,
-    llvm::makeArrayRef(openedTypes,
-                       replacements.size()) });
+  OpenedTypes.insert(
+      {locatorPtr, llvm::makeArrayRef(openedTypes, replacements.size())});
 }
 
 /// Determine how many levels of argument labels should be removed from the
@@ -1250,6 +1189,24 @@ static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
   case FunctionRefKind::DoubleApply:
     // Never remove argument labels from a double application.
     return 0;
+  }
+
+  llvm_unreachable("Unhandled FunctionRefKind in switch.");
+}
+
+/// Determine the number of applications
+static unsigned getNumApplications(
+    ValueDecl *decl, bool hasAppliedSelf, FunctionRefKind functionRefKind) {
+  switch (functionRefKind) {
+  case FunctionRefKind::Unapplied:
+  case FunctionRefKind::Compound:
+    return 0 + hasAppliedSelf;
+
+  case FunctionRefKind::SingleApply:
+    return 1 + hasAppliedSelf;
+
+  case FunctionRefKind::DoubleApply:
+    return 2;
   }
 
   llvm_unreachable("Unhandled FunctionRefKind in switch.");
@@ -1336,8 +1293,10 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     AnyFunctionType *funcType = func->getInterfaceType()
         ->castTo<AnyFunctionType>();
-    if (!isRequirementOrWitness(locator))
-      funcType = applyGlobalActorType(funcType, func, useDC);
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(value, false, functionRefKind);
+      funcType = adjustFunctionTypeForConcurrency(funcType, func, useDC, numApplies, false);
+    }
     auto openedType = openFunctionType(
         funcType, locator, replacements, func->getDeclContext());
 
@@ -1366,8 +1325,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
-    if (!isRequirementOrWitness(locator))
-      funcType = applyGlobalActorType(funcType, funcDecl, useDC);
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(
+          funcDecl, false, functionRefKind);
+      funcType = adjustFunctionTypeForConcurrency(
+          funcType, funcDecl, useDC, numApplies, false);
+    }
 
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
@@ -1634,6 +1597,60 @@ Type constraints::getDynamicSelfReplacementType(
       ->getMetatypeInstanceType();
 }
 
+/// Determine whether this locator refers to a member of "DispatchQueue.main",
+/// which is a special dispatch queue that executes its work on the main actor.
+static bool isMainDispatchQueueMember(ConstraintLocator *locator) {
+  if (!locator)
+    return false;
+
+  if (locator->getPath().size() != 1 ||
+      !locator->isLastElement<LocatorPathElt::Member>())
+    return false;
+
+  auto expr = locator->getAnchor().dyn_cast<Expr *>();
+  if (!expr)
+    return false;
+
+  auto outerUnresolvedDot = dyn_cast<UnresolvedDotExpr>(expr);
+  if (!outerUnresolvedDot)
+    return false;
+
+
+  if (!isDispatchQueueOperationName(
+          outerUnresolvedDot->getName().getBaseName().userFacingName()))
+    return false;
+
+  auto innerUnresolvedDot = dyn_cast<UnresolvedDotExpr>(
+      outerUnresolvedDot->getBase());
+  if (!innerUnresolvedDot)
+    return false;
+
+  if (innerUnresolvedDot->getName().getBaseName().userFacingName() != "main")
+    return false;
+
+  auto typeExpr = dyn_cast<TypeExpr>(innerUnresolvedDot->getBase());
+  if (!typeExpr)
+    return false;
+
+  auto typeRepr = typeExpr->getTypeRepr();
+  if (!typeRepr)
+    return false;
+
+  auto identTypeRepr = dyn_cast<IdentTypeRepr>(typeRepr);
+  if (!identTypeRepr)
+    return false;
+
+  auto components = identTypeRepr->getComponentRange();
+  if (components.empty())
+    return false;
+
+  if (components.back()->getNameRef().getBaseName().userFacingName() !=
+        "DispatchQueue")
+    return false;
+
+  return true;
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
@@ -1711,8 +1728,13 @@ ConstraintSystem::getTypeOfMemberReference(
     // This is the easy case.
     funcType = value->getInterfaceType()->castTo<AnyFunctionType>();
 
-    if (!isRequirementOrWitness(locator))
-      funcType = applyGlobalActorType(funcType, value, useDC);
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(
+          value, hasAppliedSelf, functionRefKind);
+      funcType = adjustFunctionTypeForConcurrency(
+          funcType, value, useDC, numApplies,
+          isMainDispatchQueueMember(locator));
+    }
   } else {
     // For a property, build a type (Self) -> PropType.
     // For a subscript, build a type (Self) -> (Indices...) -> ElementType.
@@ -1799,7 +1821,7 @@ ConstraintSystem::getTypeOfMemberReference(
     }
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
-    OpenedExistentialTypes.push_back(
+    OpenedExistentialTypes.insert(
         {getConstraintLocator(locator), openedArchetype});
     baseOpenedTy = openedArchetype;
   }
@@ -2916,7 +2938,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     }
 
     if (isa<AbstractFunctionDecl>(decl) || isa<TypeDecl>(decl)) {
-      if (choice.getFunctionRefKind() == FunctionRefKind::Unapplied) {
+      auto anchor = locator->getAnchor();
+      // TODO: Instead of not increasing the score for arguments to #selector,
+      // a better fix for this is to port over the #selector diagnostics from
+      // CSApply to constraint fixes, and not attempt invalid disjunction
+      // choices based on the selector kind on the valid code path.
+      if (choice.getFunctionRefKind() == FunctionRefKind::Unapplied &&
+          !UnevaluatedRootExprs.contains(getAsExpr(anchor))) {
         increaseScore(SK_UnappliedFunction);
       }
     }
@@ -3588,7 +3616,7 @@ static bool diagnoseAmbiguityWithContextualType(
   auto name = result->choices.front().getName();
   DE.diagnose(getLoc(anchor), diag::no_candidates_match_result_type,
               name.getBaseName().userFacingName(),
-              cs.getContextualType(anchor));
+              cs.getContextualType(anchor, /*forConstraint=*/false));
 
   for (const auto &solution : solutions) {
     auto overload = solution.getOverloadChoice(calleeLocator);
@@ -3603,7 +3631,8 @@ static bool diagnoseAmbiguityWithContextualType(
         auto fnType = type->castTo<FunctionType>();
         DE.diagnose(
             loc, diag::cannot_convert_candidate_result_to_contextual_type,
-            decl->getName(), fnType->getResult(), cs.getContextualType(anchor));
+            decl->getName(), fnType->getResult(),
+            cs.getContextualType(anchor, /*forConstraint=*/false));
       } else {
         DE.diagnose(loc, diag::found_candidate_type, type);
       }
@@ -3677,7 +3706,8 @@ static bool diagnoseAmbiguity(
     if (locator->isForContextualType()) {
       auto baseName = name.getBaseName();
       DE.diagnose(getLoc(commonAnchor), diag::no_candidates_match_result_type,
-                  baseName.userFacingName(), cs.getContextualType(anchor));
+                  baseName.userFacingName(),
+                  cs.getContextualType(anchor, /*forConstraint=*/false));
     } else if (name.isOperator()) {
       auto *anchor = castToExpr(commonCalleeLocator->getAnchor());
 
@@ -4382,11 +4412,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::ConstructorMember:
-      if (auto typeExpr = getAsExpr<TypeExpr>(anchor)) {
-        // This is really an implicit 'init' MemberRef, so point at the base,
-        // i.e. the TypeExpr.
+      // - This is really an implicit 'init' MemberRef, so point at the base,
+      //   i.e. the TypeExpr.
+      // - For re-declarations we'd get an overloaded reference
+      //   with multiple choices for the same type.
+      if (isExpr<TypeExpr>(anchor) || isExpr<OverloadedDeclRefExpr>(anchor)) {
         range = SourceRange();
-        anchor = typeExpr;
         path = path.slice(1);
         continue;
       }
@@ -5663,8 +5694,13 @@ SourceLoc constraints::getLoc(ASTNode anchor) {
     return anchor.getStartLoc();
   } else if (auto *S = anchor.dyn_cast<Stmt *>()) {
     return S->getStartLoc();
+  } else if (auto *P = anchor.dyn_cast<Pattern *>()) {
+    return P->getLoc();
+  } else if (auto *C = anchor.dyn_cast<StmtCondition *>()) {
+    return C->front().getStartLoc();
   } else {
-    return anchor.get<Pattern *>()->getLoc();
+    auto *I = anchor.get<CaseLabelItem *>();
+    return I->getStartLoc();
   }
 }
 
@@ -5717,24 +5753,14 @@ getRequirementInfo(ConstraintSystem &cs, ConstraintLocator *reqLocator) {
   auto newPath = path.drop_back(iter - path.rbegin() + 1);
   auto *baseLoc = cs.getConstraintLocator(reqLocator->getAnchor(), newPath);
 
-  auto openedTypes = cs.getOpenedTypes();
-  auto substitutions = llvm::find_if(
-      openedTypes,
-      [&baseLoc](
-          const std::pair<ConstraintLocator *, ArrayRef<OpenedType>> &entry) {
-        return entry.first == baseLoc;
-      });
-
-  if (substitutions == openedTypes.end())
-    return None;
-
+  auto substitutions = cs.getOpenedTypes(baseLoc);
   auto replacement =
-      llvm::find_if(substitutions->second, [&GP](const OpenedType &entry) {
+      llvm::find_if(substitutions, [&GP](const OpenedType &entry) {
         auto *typeVar = entry.second;
         return typeVar->getImpl().getGenericParameter() == GP;
       });
 
-  if (replacement == substitutions->second.end())
+  if (replacement == substitutions.end())
     return None;
 
   auto *repr = cs.getRepresentative(replacement->second);

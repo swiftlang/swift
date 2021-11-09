@@ -13,13 +13,13 @@
 import Swift
 
 /// A service which can execute jobs.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: UnownedJob)
 }
 
 /// A service which can execute jobs.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public protocol SerialExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
   // get a redundant witness-table entry for it.  This allows us to
@@ -44,7 +44,7 @@ public protocol SerialExecutor: Executor {
 /// also keep the actor's associated executor alive; if they are
 /// different objects, the executor must be referenced strongly by the
 /// actor.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @frozen
 public struct UnownedSerialExecutor {
   #if compiler(>=5.5) && $BuiltinExecutor
@@ -70,14 +70,14 @@ public struct UnownedSerialExecutor {
 }
 
 // Used by the concurrency runtime
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("_swift_task_enqueueOnExecutor")
 internal func _enqueueOnExecutor<E>(job: UnownedJob, executor: E)
 where E: SerialExecutor {
   executor.enqueue(job)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_transparent
 public // COMPILER_INTRINSIC
 func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
@@ -98,7 +98,7 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
 // or else SILGen will emit a retain/release in unoptimized builds,
 // which won't work because DispatchQueues aren't actually
 // Swift-retainable.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueOnDispatchQueue")
 internal func _enqueueOnDispatchQueue(_ job: UnownedJob,
                                       queue: DispatchQueueShim)
@@ -110,7 +110,7 @@ internal func _enqueueOnDispatchQueue(_ job: UnownedJob,
 /// Expected to work for any primitive dispatch queue; note that this
 /// means a dispatch_queue_t, which is not the same as DispatchQueue
 /// on platforms where that is an instance of a wrapper class.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 internal final class DispatchQueueShim: UnsafeSendable, SerialExecutor {
   func enqueue(_ job: UnownedJob) {
     _enqueueOnDispatchQueue(job, queue: self)

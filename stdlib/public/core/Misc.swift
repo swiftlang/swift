@@ -64,13 +64,13 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
 
-@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_getMangledTypeName")
 public func _getMangledTypeName(_ type: Any.Type)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the mangled name for a given type.
-@available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 public // SPI
 func _mangledTypeName(_ type: Any.Type) -> String? {
   let (stringPtr, count) = _getMangledTypeName(type)
@@ -81,7 +81,7 @@ func _mangledTypeName(_ type: Any.Type) -> String? {
   let (result, repairsMade) = String._fromUTF8Repairing(
       UnsafeBufferPointer(start: stringPtr, count: count))
 
-  precondition(!repairsMade, "repairs made to _mangledTypeName, this is not expected since names should be valid UTF-8")
+  _precondition(!repairsMade, "repairs made to _mangledTypeName, this is not expected since names should be valid UTF-8")
 
   return result
 }
@@ -118,3 +118,10 @@ public func _getTypeByMangledNameInContext(
   genericContext: UnsafeRawPointer?,
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
+
+/// Prevents performance diagnostics in the passed closure.
+@_alwaysEmitIntoClient
+@_semantics("no_performance_analysis")
+public func _unsafePerformance<T>(_ c: () -> T) -> T {
+  return c()
+}

@@ -9,7 +9,7 @@
 
 import Foundation
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor Manager {
     static var shared = Manager()
 
@@ -25,7 +25,7 @@ actor Manager {
 }
 
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test() {
     detach {
         let x = await Manager.shared.manage()
@@ -37,7 +37,7 @@ func test() {
     }
 }
 
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 5.1, *) {
  test()
  sleep(30)
 } else {

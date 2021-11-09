@@ -41,6 +41,7 @@
 
 #include <algorithm>
 #include <csignal>
+#include <iostream>
 
 using llvm::ArrayRef;
 using llvm::dyn_cast;

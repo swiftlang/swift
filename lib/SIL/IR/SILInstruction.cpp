@@ -1264,6 +1264,12 @@ bool SILInstruction::isAllocatingStack() const {
   if (auto *PA = dyn_cast<PartialApplyInst>(this))
     return PA->isOnStack();
 
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -1275,6 +1281,13 @@ bool SILInstruction::isDeallocatingStack() const {
     if (DRI->canAllocOnStack())
       return true;
   }
+
+  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
+    if (BI->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
+      return true;
+    }
+  }
+
   return false;
 }
 

@@ -30,7 +30,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
-#include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
@@ -65,6 +65,7 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "swift/TBDGen/TBDGen.h"
@@ -468,7 +469,7 @@ static void verifyGenericSignaturesIfNeeded(const FrontendOptions &opts,
   if (verifyGenericSignaturesInModule.empty())
     return;
   if (auto module = Context.getModuleByName(verifyGenericSignaturesInModule))
-    GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
+    swift::validateGenericSignaturesInModule(module);
 }
 
 static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,
@@ -1301,7 +1302,9 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   serializationOpts.SerializeAllSIL = true;
   serializationOpts.IsSIB = true;
 
-  serialize(MSF, serializationOpts, SM);
+  symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
+
+  serialize(MSF, serializationOpts, symbolGraphOptions, SM);
   return Context.hadError();
 }
 
@@ -1554,11 +1557,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       fine_grained_dependencies::withReferenceDependencies(
           Mod, *Instance.getDependencyTracker(), Mod->getModuleFilename(),
           alsoEmitDotFile, [&](SourceFileDepGraph &&g) {
-            serialize(MSF, serializationOpts, SM.get(), &g);
+            serialize(MSF, serializationOpts, Invocation.getSymbolGraphOptions(), SM.get(), &g);
             return false;
           });
     } else {
-      serialize(MSF, serializationOpts, SM.get());
+      serialize(MSF, serializationOpts, Invocation.getSymbolGraphOptions(), SM.get());
     }
   };
 
@@ -2062,6 +2065,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
       FrontendOptions::ActionType::Immediate) {
     llvm::setBugReportMsg(nullptr);
   }
+  
+  /// Enable leaks checking because this SILModule is the only one in the process
+  /// (leaks checking is not thread safe).
+  Invocation.getSILOptions().checkSILModuleLeaks = true;
 
   PrettyStackTraceFrontend frontendTrace(Invocation.getLangOptions());
 

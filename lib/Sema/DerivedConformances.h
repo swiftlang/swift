@@ -311,6 +311,12 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDistributedActor(ValueDecl *requirement);
 
+  /// Derive a DistributedActor associated type for a distributed actor.
+  ///
+  /// \returns the derived type member, which will also be added to the type.
+  std::pair<Type, TypeDecl *> deriveDistributedActor(
+      AssociatedTypeDecl *assocType);
+
   /// Determine if \c Actor can be derived for the given type.
   static bool canDeriveActor(DeclContext *DC, NominalTypeDecl *NTD);
 

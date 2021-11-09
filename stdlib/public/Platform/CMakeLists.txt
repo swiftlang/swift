@@ -42,7 +42,8 @@ set(swiftDarwin_common_options
       DEPENDS ${darwin_depends})
 
 
-if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
+if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" AND
+   ${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
 
   set(swiftDarwin_common_bootstrapping_options
       ${swiftDarwin_common_options}
@@ -54,10 +55,12 @@ if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
 
   add_swift_target_library_single(swiftDarwin-bootstrapping0 swiftDarwin
       ${swiftDarwin_common_bootstrapping_options}
+      FILE_DEPENDS bootstrapping0-corelib
       BOOTSTRAPPING 0)
 
   add_swift_target_library_single(swiftDarwin-bootstrapping1 swiftDarwin
       ${swiftDarwin_common_bootstrapping_options}
+      FILE_DEPENDS bootstrapping1-corelib
       BOOTSTRAPPING 1)
 
   add_dependencies(bootstrapping1-all swiftDarwin-bootstrapping1)

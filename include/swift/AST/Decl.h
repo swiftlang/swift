@@ -4168,6 +4168,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class StructuralRequirementsRequest;
   friend class ProtocolDependenciesRequest;
   friend class RequirementSignatureRequest;
+  friend class RequirementSignatureRequestRQM;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
   friend class InheritedProtocolsRequest;
@@ -5371,6 +5372,10 @@ public:
     Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
   }
 
+  bool isNoImplicitCopy() const {
+    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
+  }
+
   /// Whether this parameter has a default argument expression available.
   ///
   /// Note that this will return false for deserialized declarations, which only
@@ -6264,14 +6269,6 @@ public:
   /// its type as above).
   Optional<unsigned> findPotentialCompletionHandlerParam(
       const AbstractFunctionDecl *asyncAlternative = nullptr) const;
-
-  /// Determine whether this function is implicitly known to have its
-  /// parameters of function type be @_unsafeSendable.
-  ///
-  /// This hard-codes knowledge of a number of functions that will
-  /// eventually have @_unsafeSendable and, eventually, @Sendable,
-  /// on their parameters of function type.
-  bool hasKnownUnsafeSendableFunctionParams() const;
 
   using DeclContext::operator new;
   using DeclContext::operator delete;

@@ -148,6 +148,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
     case BuiltinValueKind::DestroyTaskGroup:
+    case BuiltinValueKind::StackAlloc:
+    case BuiltinValueKind::StackDealloc:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime
@@ -155,6 +157,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AllocRaw:
     case BuiltinValueKind::DeallocRaw:
     case BuiltinValueKind::Fence:
+    case BuiltinValueKind::Ifdef:
     case BuiltinValueKind::AtomicLoad:
     case BuiltinValueKind::AtomicStore:
     case BuiltinValueKind::AtomicRMW:
@@ -171,6 +174,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
     case BuiltinValueKind::UnsafeGuaranteed:
+    case BuiltinValueKind::Move:
+    case BuiltinValueKind::Copy:
     case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::StartAsyncLet:
@@ -181,7 +186,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::DestroyDefaultActor:
     case BuiltinValueKind::InitializeDistributedRemoteActor:
-    case BuiltinValueKind::DestroyDistributedActor:
     case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     case BuiltinValueKind::BuildDefaultActorExecutorRef:
     case BuiltinValueKind::BuildMainActorExecutorRef:

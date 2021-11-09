@@ -358,11 +358,11 @@ function true_false() {
 
 function to_libswift_buildmode() {
     case "$1" in
-        false | FALSE | 0 | "")
+        false | FALSE | 0)
             echo "OFF"
             ;;
-        true | TRUE | 1)
-            echo "HOSTTOOLS"
+        true | TRUE | 1 | "")
+            echo "BOOTSTRAPPING"
             ;;
         *)
             echo `toupper $1`
@@ -3319,7 +3319,7 @@ for host in "${ALL_HOSTS[@]}"; do
         # INSTALL_SYMROOT and run dsymutil on them.
         if [[ -n "${DRY_RUN}" ]] && [[ -z "${ENABLE_EXTRACT_SYMBOL_DRY_RUN_TEST}" ]]; then
             echo "DRY_RUN! Coping executables and shared libraries from the `host_install_destdir` to
-                  INSTALL_SYMROOT and runing dsymutil on them."
+                  INSTALL_SYMROOT and running dsymutil on them."
         else
           (cd "${CURRENT_INSTALL_DIR}" &&
            find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \

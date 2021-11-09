@@ -212,7 +212,15 @@ namespace {
         return { false, expr };
       }
 
-      if (isa<BinaryExpr>(expr)) {
+      if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
+        if (auto *overload = dyn_cast<OverloadedDeclRefExpr>(binaryExpr->getFn())) {
+          // Don't walk into nil coalescing operators. Attempting to favor
+          // based on operand types is wrong for this operator.
+          auto identifier = overload->getDecls().front()->getBaseIdentifier();
+          if (identifier.isNilCoalescingOperator())
+            return { false, expr };
+        }
+
         LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
       }  
       
@@ -230,10 +238,9 @@ namespace {
         return { false, expr };
       }      
 
-      // For exprs of a structural type that are not modeling argument lists,
-      // avoid merging the type variables. (We need to allow for cases like
+      // For exprs of a tuple, avoid favoring. (We need to allow for cases like
       // (Int, Int32).)
-      if (isa<TupleExpr>(expr) && !isa<ApplyExpr>(Parent.getAsExpr())) {
+      if (isa<TupleExpr>(expr)) {
         return { false, expr };
       }
 
@@ -367,7 +374,7 @@ namespace {
 
       return true;
     }
-    
+
     return false;
   }
   
@@ -383,7 +390,7 @@ namespace {
       return true;
 
     // Don't favor narrowing conversions.
-    if (argTy->isDouble() && paramTy->isCGFloatType())
+    if (argTy->isDouble() && paramTy->isCGFloat())
       return false;
 
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
@@ -420,7 +427,7 @@ namespace {
         // it is the same as the parameter type.
         // Check whether there is a default type to compare against.
         if (paramTy->isEqual(defaultType) ||
-            (defaultType->isDouble() && paramTy->isCGFloatType()))
+            (defaultType->isDouble() && paramTy->isCGFloat()))
           return true;
       }
     }
@@ -560,12 +567,13 @@ namespace {
       // in order to preserve current behavior, let's not favor overloads
       // which would result in conversion from CGFloat to Double; otherwise
       // it would lead to ambiguities.
-      if (argTy->isCGFloatType() && paramTy->isDouble())
+      if (argTy->isCGFloat() && paramTy->isDouble())
         return false;
 
       return isFavoredParamAndArg(CS, paramTy, argTy) &&
-             hasContextuallyFavorableResultType(fnTy,
-                                                CS.getContextualType(expr));
+             hasContextuallyFavorableResultType(
+                 fnTy,
+                 CS.getContextualType(expr, /*forConstraint=*/false));
     };
 
     favorCallOverloads(expr, CS, isFavoredDecl);
@@ -714,15 +722,15 @@ namespace {
       auto firstParamTy = params[0].getOldType();
       auto secondParamTy = params[1].getOldType();
 
-      auto contextualTy = CS.getContextualType(expr);
+      auto contextualTy = CS.getContextualType(expr, /*forConstraint=*/false);
 
       // Avoid favoring overloads that would require narrowing conversion
       // to match the arguments.
       {
-        if (firstArgTy->isDouble() && firstParamTy->isCGFloatType())
+        if (firstArgTy->isDouble() && firstParamTy->isCGFloat())
           return false;
 
-        if (secondArgTy->isDouble() && secondParamTy->isCGFloatType())
+        if (secondArgTy->isDouble() && secondParamTy->isCGFloat())
           return false;
       }
 
@@ -1701,7 +1709,7 @@ namespace {
         return Type();
 
       auto locator = CS.getConstraintLocator(expr);
-      auto contextualType = CS.getContextualType(expr);
+      auto contextualType = CS.getContextualType(expr, /*forConstraint=*/false);
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
       auto joinElementTypes = [&](Optional<Type> elementType) {
@@ -1829,7 +1837,7 @@ namespace {
       auto valueAssocTy = dictionaryProto->getAssociatedType(C.Id_Value);
 
       auto locator = CS.getConstraintLocator(expr);
-      auto contextualType = CS.getContextualType(expr);
+      auto contextualType = CS.getContextualType(expr, /*forConstraint=*/false);
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
       // If a contextual type exists for this expression and is a dictionary
@@ -1896,7 +1904,7 @@ namespace {
 
       // If no contextual type is present, Merge equivalence classes of key 
       // and value types as necessary.
-      if (!CS.getContextualType(expr)) {
+      if (!CS.getContextualType(expr, /*forConstraint=*/false)) {
         for (auto element1 : expr->getElements()) {
           for (auto element2 : expr->getElements()) {
             if (element1 == element2)
@@ -2060,7 +2068,13 @@ namespace {
             return resolvedTy;
         }
 
-        if (auto contextualType = CS.getContextualType(closure)) {
+        // Because we are only pulling out the result type from the contextual
+        // type, we avoid prematurely converting any inferrable types by setting
+        // forConstraint=false. Later on in inferClosureType we call
+        // replaceInferableTypesWithTypeVars before returning to ensure we don't
+        // introduce any placeholders into the constraint system.
+        if (auto contextualType =
+                CS.getContextualType(closure, /*forConstraint=*/false)) {
           if (auto fnType = contextualType->getAs<FunctionType>())
             return fnType->getResult();
         }
@@ -3464,7 +3478,8 @@ namespace {
       // Note that the subexpression of a #selector expression is
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
-        CG.getConstraintSystem().UnevaluatedRootExprs.insert(sel->getSubExpr());
+        auto *subExpr = sel->getSubExpr()->getSemanticsProvidingExpr();
+        CG.getConstraintSystem().UnevaluatedRootExprs.insert(subExpr);
       }
 
       // Check an objc key-path expression, which fills in its semantic

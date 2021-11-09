@@ -1854,7 +1854,8 @@ static bool isSingleTupleParam(ASTContext &ctx,
     return false;
 
   const auto &param = params.front();
-  if (param.isVariadic() || param.isInOut() || param.hasLabel())
+  if (param.isVariadic() || param.isInOut() || param.hasLabel() ||
+      param.isIsolated())
     return false;
 
   auto paramType = param.getPlainType();
@@ -3972,10 +3973,10 @@ bool ConstraintSystem::repairFailures(
       // we can instead suggest the conditional downcast as it is safer in
       // situations like conditional binding.
       auto useConditionalCast =
-          llvm::any_of(ConstraintRestrictions, [&](auto &restriction) {
-            ConversionRestrictionKind restrictionKind;
+          llvm::any_of(ConstraintRestrictions, [&](const auto &restriction) {
             Type type1, type2;
-            std::tie(type1, type2, restrictionKind) = restriction;
+            std::tie(type1, type2) = restriction.first;
+            auto restrictionKind = restriction.second;
 
             if (restrictionKind != ConversionRestrictionKind::ValueToOptional)
               return false;
@@ -5017,7 +5018,8 @@ bool ConstraintSystem::repairFailures(
     // If `if` expression has a contextual type, let's consider it a source of
     // truth and produce a contextual mismatch instead of  per-branch failure,
     // because it's a better pointer than potential then-to-else type mismatch.
-    if (auto contextualType = getContextualType(anchor)) {
+    if (auto contextualType =
+            getContextualType(anchor, /*forConstraint=*/false)) {
       auto purpose = getContextualTypePurpose(anchor);
       if (contextualType->isEqual(rhs)) {
         auto *loc = getConstraintLocator(
@@ -5473,7 +5475,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       if (kind >= ConstraintKind::Subtype &&
           nominal1->getDecl() != nominal2->getDecl() &&
-          ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
+          ((nominal1->isCGFloat() || nominal2->isCGFloat()) &&
            (nominal1->isDouble() || nominal2->isDouble()))) {
         ConstraintLocatorBuilder location{locator};
         // Look through all value-to-optional promotions to allow
@@ -5483,6 +5485,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           if (last->is<LocatorPathElt::OptionalPayload>()) {
             SmallVector<LocatorPathElt, 4> path;
             auto anchor = location.getLocatorParts(path);
+
+            // An attempt at Double/CGFloat conversion through
+            // optional chaining. This is not supported at the
+            // moment because solution application doesn't know
+            // how to map Double to/from CGFloat through optionals.
+            if (isExpr<OptionalEvaluationExpr>(anchor)) {
+              if (!shouldAttemptFixes())
+                return getTypeMatchFailure(locator);
+
+              conversionsOrFixes.push_back(ContextualMismatch::create(
+                  *this, nominal1, nominal2, getConstraintLocator(locator)));
+              break;
+            }
 
             // Drop all of the applied `value-to-optional` promotions.
             path.erase(llvm::remove_if(
@@ -5518,7 +5533,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         auto isCGFloatInit = [&](ASTNode location) {
           if (auto *call = getAsExpr<CallExpr>(location)) {
             if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
-              return getInstanceType(typeExpr)->isCGFloatType();
+              return getInstanceType(typeExpr)->isCGFloat();
             }
           }
           return false;
@@ -5547,7 +5562,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               return false;
             })) {
           conversionsOrFixes.push_back(
-              desugar1->isCGFloatType()
+              desugar1->isCGFloat()
                   ? ConversionRestrictionKind::CGFloatToDouble
                   : ConversionRestrictionKind::DoubleToCGFloat);
         }
@@ -6432,7 +6447,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is a `nil` literal, it would be a contextual failure.
     if (auto *Nil = getAsExpr<NilLiteralExpr>(anchor)) {
       auto *fixLocator = getConstraintLocator(
-          getContextualType(Nil)
+          getContextualType(Nil, /*forConstraint=*/false)
               ? locator.withPathElement(LocatorPathElt::ContextualType(
                     getContextualTypePurpose(Nil)))
               : locator);
@@ -6769,7 +6784,6 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
     ConstraintSystem &cs, Type origFromType, Type origToType, Type fromType,
     Type toType, SmallVector<Type, 4> fromOptionals,
     SmallVector<Type, 4> toOptionals,
-    const std::vector<ConversionRestriction> &constraintRestrictions,
     ConstraintSystem::TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
 
@@ -6796,10 +6810,8 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   // "from" expression could be a type variable with value-to-optional
   // restrictions that we have to account for optionality mismatch.
   const auto subExprType = cs.getType(castExpr->getSubExpr());
-  if (llvm::is_contained(
-          constraintRestrictions,
-          std::make_tuple(fromType.getPointer(), subExprType.getPointer(),
-                          ConversionRestrictionKind::ValueToOptional))) {
+  if (cs.hasConversionRestriction(fromType, subExprType,
+                                  ConversionRestrictionKind::ValueToOptional)) {
     extraOptionals++;
     origFromType = OptionalType::get(origFromType);
   }
@@ -6959,7 +6971,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     if (auto *fix = maybeWarnAboutExtraneousCast(
             *this, origFromType, origToType, fromType, toType, fromOptionals,
-            toOptionals, ConstraintRestrictions, flags, locator)) {
+            toOptionals, flags, locator)) {
       (void)recordFix(fix);
     }
   };
@@ -7027,7 +7039,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // succeed or fail.
     if (auto *fix = maybeWarnAboutExtraneousCast(
             *this, origFromType, origToType, fromType, toType, fromOptionals,
-            toOptionals, ConstraintRestrictions, flags, locator)) {
+            toOptionals, flags, locator)) {
       (void)recordFix(fix);
     }
 
@@ -8892,13 +8904,10 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   if (builderType->hasTypeParameter()) {
     // Find the opened type for this callee and substitute in the type
     // parametes.
-    // FIXME: We should consider changing OpenedTypes to a MapVector.
-    for (const auto &opened : cs.getOpenedTypes()) {
-      if (opened.first == calleeLocator) {
-        OpenedTypeMap replacements(opened.second.begin(), opened.second.end());
-        builderType = cs.openType(builderType, replacements);
-        break;
-      }
+    auto substitutions = cs.getOpenedTypes(calleeLocator);
+    if (!substitutions.empty()) {
+      OpenedTypeMap replacements(substitutions.begin(), substitutions.end());
+      builderType = cs.openType(builderType, replacements);
     }
     assert(!builderType->hasTypeParameter());
   }
@@ -8988,15 +8997,22 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     auto param = inferredClosureType->getParams()[i];
     auto *paramDecl = paramList->get(i);
 
-    // In case of anonymous or name-only parameters, let's infer inout/variadic
-    // flags from context, that helps to propagate type information into the
-    // internal type of the parameter and reduces inference solver has to make.
+    // In case of anonymous or name-only parameters, let's infer
+    // inout/variadic/isolated flags from context, that helps to propagate
+    // type information into the internal type of the parameter and reduces
+    // inference solver has to make.
     if (!paramDecl->getTypeRepr()) {
       if (auto contextualParam = getContextualParamAt(i)) {
         auto flags = param.getParameterFlags();
+
+        // Note when a parameter is inferred to be isolated.
+        if (contextualParam->isIsolated() && !flags.isIsolated() && paramDecl)
+          isolatedParams.insert(paramDecl);
+
         param =
             param.withFlags(flags.withInOut(contextualParam->isInOut())
-                                 .withVariadic(contextualParam->isVariadic()));
+                                 .withVariadic(contextualParam->isVariadic())
+                                 .withIsolated(contextualParam->isIsolated()));
       }
     }
 
@@ -9662,7 +9678,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
     return SolutionKind::Error;
 
   // If the expression has contextual type information, try using that too.
-  if (auto contextualTy = getContextualType(keyPath)) {
+  if (auto contextualTy = getContextualType(keyPath, /*forConstraint=*/false)) {
     if (!tryMatchRootAndValueFromType(contextualTy))
       return SolutionKind::Error;
   }
@@ -11317,7 +11333,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                   FunctionType::get({FunctionType::Param(type1)}, type2),
                   memberTy, applicationLoc);
 
-    ImplicitValueConversions.push_back(
+    ImplicitValueConversions.insert(
         {getConstraintLocator(locator), restriction});
     return SolutionKind::Solved;
   }
@@ -11353,8 +11369,8 @@ ConstraintSystem::simplifyRestrictedConstraint(
       addFixConstraint(fix, matchKind, type1, type2, locator);
     }
 
-    ConstraintRestrictions.push_back(
-        std::make_tuple(type1.getPointer(), type2.getPointer(), restriction));
+    ConstraintRestrictions.insert({
+        std::make_pair(type1.getPointer(), type2.getPointer()), restriction});
     return SolutionKind::Solved;
   }
   case SolutionKind::Unsolved:
@@ -11514,7 +11530,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
     return true;
 
   if (isAugmentingFix(fix)) {
-    Fixes.push_back(fix);
+    Fixes.insert(fix);
     return false;
   }
 
@@ -11539,7 +11555,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   }
 
   if (!found)
-    Fixes.push_back(fix);
+    Fixes.insert(fix);
 
   return false;
 }
@@ -11561,7 +11577,7 @@ void ConstraintSystem::recordAnyTypeVarAsPotentialHole(Type type) {
 void ConstraintSystem::recordMatchCallArgumentResult(
     ConstraintLocator *locator, MatchCallArgumentResult result) {
   assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
-  argumentMatchingChoices.push_back({locator, result});
+  argumentMatchingChoices.insert({locator, result});
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(

@@ -668,7 +668,8 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     }
   }
 
-  /// Returns `true` iff this buffer's storage is uniquely-referenced.
+  /// Returns `true` if this buffer's storage is uniquely-referenced;
+  /// otherwise, returns `false`.
   ///
   /// This function should only be used for internal sanity checks.
   /// To guard a buffer mutation, use `beginCOWMutation`.
@@ -677,8 +678,9 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     return _isUnique(&_storage)
   }
 
-  /// Returns `true` and puts the buffer in a mutable state iff the buffer's
-  /// storage is uniquely-referenced.
+  /// Returns `true` and puts the buffer in a mutable state if the buffer's
+  /// storage is uniquely-referenced; otherwise, performs no action and returns
+  /// `false`.
   ///
   /// - Precondition: The buffer must be immutable.
   ///
@@ -817,7 +819,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     return UnsafeRawPointer(firstElementAddress)
   }
   
-  /// Returns `true` iff we have storage for elements of the given
+  /// Returns `true` if we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
   @inlinable
   func canStoreElements(ofDynamicType proposedElementType: Any.Type) -> Bool {

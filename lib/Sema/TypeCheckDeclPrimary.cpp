@@ -1709,12 +1709,16 @@ public:
 
         auto &diags = ID->getASTContext().Diags;
         InFlightDiagnostic inFlight =
-            diags.diagnose(ID, diag::warn_public_import_of_private_module,
+            diags.diagnose(ID, diag::error_public_import_of_private_module,
                            target->getName(), importer->getName());
         if (ID->getAttrs().isEmpty()) {
            inFlight.fixItInsert(ID->getStartLoc(),
                               "@_implementationOnly ");
         }
+
+        static bool treatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
+        if (!treatAsError)
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
     }
   }

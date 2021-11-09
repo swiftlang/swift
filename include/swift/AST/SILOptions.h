@@ -78,7 +78,10 @@ public:
 
   /// Controls whether cross module optimization is enabled.
   bool CrossModuleOptimization = false;
-  
+
+  /// Enables experimental performance annotations.
+  bool EnablePerformanceAnnotations = false;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
@@ -191,6 +194,15 @@ public:
   ///     original() // calls original() implementation if true
   /// }
   bool EnableDynamicReplacementCanCallPreviousImplementation = true;
+
+  /// Are we parsing the stdlib, i.e. -parse-stdlib?
+  bool ParseStdlib = false;
+
+  /// If true, check for leaking instructions when the SILModule is destructed.
+  ///
+  /// Warning: this is not thread safe. It can only be enabled in case there
+  /// is a single SILModule in a single thread.
+  bool checkSILModuleLeaks = false;
 
   /// The name of the file to which the backend should save optimization
   /// records.

@@ -405,10 +405,7 @@ static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignatu
     });
   }
 
-  return evaluateOrDefault(
-      ctx.evaluator,
-      AbstractGenericSignatureRequest{sig.getPointer(), {}, reqs},
-      GenericSignature()).getCanonicalSignature();
+  return buildGenericSignature(ctx, sig, {}, reqs).getCanonicalSignature();
 }
 
 /// Given an original type, computes its tangent type for the purpose of
@@ -1576,13 +1573,17 @@ class DestructureInputs {
   SmallVectorImpl<SILParameterInfo> &Inputs;
   SubstFunctionTypeCollector &Subst;
   unsigned NextOrigParamIndex = 0;
+  Optional<SmallBitVector> NoImplicitCopyIndices;
+
 public:
   DestructureInputs(TypeExpansionContext expansion, TypeConverter &TC,
                     const Conventions &conventions, const ForeignInfo &foreign,
                     SmallVectorImpl<SILParameterInfo> &inputs,
-                    SubstFunctionTypeCollector &subst)
+                    SubstFunctionTypeCollector &subst,
+                    Optional<SmallBitVector> noImplicitCopyIndices)
       : expansion(expansion), TC(TC), Convs(conventions), Foreign(foreign),
-        Inputs(inputs), Subst(subst) {}
+        Inputs(inputs), Subst(subst),
+        NoImplicitCopyIndices(noImplicitCopyIndices) {}
 
   void destructure(AbstractionPattern origType,
                    CanAnyFunctionType::CanParamArrayRef params,
@@ -1620,6 +1621,9 @@ private:
     // Add any foreign parameters that are positioned here.
     maybeAddForeignParameters();
 
+    bool hasNoImplicitCopy =
+        NoImplicitCopyIndices.hasValue() && NoImplicitCopyIndices->any();
+
     // Process all the non-self parameters.
     for (unsigned i = 0; i != numNonSelfParams; ++i) {
       auto ty = params[i].getParameterType();
@@ -1627,7 +1631,8 @@ private:
       auto flags = params[i].getParameterFlags();
 
       visit(flags.getValueOwnership(), /*forSelf=*/false, eltPattern, ty,
-            flags.isNoDerivative());
+            flags.isNoDerivative(),
+            hasNoImplicitCopy && (*NoImplicitCopyIndices)[i]);
     }
 
     // Process the self parameter.  Note that we implicitly drop self
@@ -1638,8 +1643,8 @@ private:
       auto eltPattern = origType.getFunctionParamType(numNonSelfParams);
       auto flags = selfParam.getParameterFlags();
 
-      visit(flags.getValueOwnership(), /*forSelf=*/true,
-            eltPattern, ty);
+      visit(flags.getValueOwnership(), /*forSelf=*/true, eltPattern, ty, false,
+            false);
     }
 
     TopLevelOrigType = AbstractionPattern::getInvalid();
@@ -1648,7 +1653,7 @@ private:
 
   void visit(ValueOwnership ownership, bool forSelf,
              AbstractionPattern origType, CanType substType,
-             bool isNonDifferentiable = false) {
+             bool isNonDifferentiable, bool isNoImplicitCopy) {
     assert(!isa<InOutType>(substType));
 
     // Tuples get handled specially, in some cases:
@@ -1665,9 +1670,8 @@ private:
           auto ownership = elt.getParameterFlags().getValueOwnership();
           assert(ownership == ValueOwnership::Default);
           assert(!elt.isVararg());
-          visit(ownership, forSelf,
-                origType.getTupleElementType(i),
-                CanType(elt.getRawType()));
+          visit(ownership, forSelf, origType.getTupleElementType(i),
+                CanType(elt.getRawType()), false, false);
         }
         return;
       case ValueOwnership::InOut:
@@ -1695,6 +1699,9 @@ private:
     } else if (substTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
+      // If we are no implicit copy, our ownership is always Owned.
+      if (isNoImplicitCopy)
+        ownership = ValueOwnership::Owned;
       convention = Convs.getDirect(ownership, forSelf, origParamIndex, origType,
                                    substTLConv);
       assert(!isIndirectFormalParameter(convention));
@@ -1760,9 +1767,8 @@ private:
     if (ForeignSelf) {
       // This is a "self", but it's not a Swift self, we handle it differently.
       visit(ForeignSelf->SubstSelfParam.getValueOwnership(),
-            /*forSelf=*/false,
-            ForeignSelf->OrigSelfParam,
-            ForeignSelf->SubstSelfParam.getParameterType());
+            /*forSelf=*/false, ForeignSelf->OrigSelfParam,
+            ForeignSelf->SubstSelfParam.getParameterType(), false, false);
     }
     return true;
   }
@@ -2110,7 +2116,8 @@ static CanSILFunctionType getSILFunctionType(
     SILExtInfoBuilder extInfoBuilder, const Conventions &conventions,
     const ForeignInfo &foreignInfo, Optional<SILDeclRef> origConstant,
     Optional<SILDeclRef> constant, Optional<SubstitutionMap> reqtSubs,
-    ProtocolConformanceRef witnessMethodConformance) {
+    ProtocolConformanceRef witnessMethodConformance,
+    Optional<SmallBitVector> noImplicitCopyIndices) {
   // Find the generic parameters.
   CanGenericSignature genericSig =
     substFnInterfaceType.getOptGenericSignature();
@@ -2200,7 +2207,8 @@ static CanSILFunctionType getSILFunctionType(
   SmallVector<SILParameterInfo, 8> inputs;
   {
     DestructureInputs destructurer(expansionContext, TC, conventions,
-                                   foreignInfo, inputs, subst);
+                                   foreignInfo, inputs, subst,
+                                   noImplicitCopyIndices);
     destructurer.destructure(origType, substFnInterfaceType.getParams(),
                              extInfoBuilder);
   }
@@ -2501,14 +2509,15 @@ static CanSILFunctionType getNativeSILFunctionType(
     AbstractionPattern origType, CanAnyFunctionType substInterfaceType,
     SILExtInfoBuilder extInfoBuilder, Optional<SILDeclRef> origConstant,
     Optional<SILDeclRef> constant, Optional<SubstitutionMap> reqtSubs,
-    ProtocolConformanceRef witnessMethodConformance) {
+    ProtocolConformanceRef witnessMethodConformance,
+    Optional<SmallBitVector> noImplicitCopyIndices) {
   assert(bool(origConstant) == bool(constant));
   auto getSILFunctionTypeForConventions =
       [&](const Conventions &convs) -> CanSILFunctionType {
     return getSILFunctionType(TC, context, origType, substInterfaceType,
                               extInfoBuilder, convs, ForeignInfo(),
                               origConstant, constant, reqtSubs,
-                              witnessMethodConformance);
+                              witnessMethodConformance, noImplicitCopyIndices);
   };
   switch (extInfoBuilder.getRepresentation()) {
   case SILFunctionType::Representation::Block:
@@ -2571,7 +2580,7 @@ CanSILFunctionType swift::getNativeSILFunctionType(
 
   return ::getNativeSILFunctionType(
       TC, context, origType, substType, silExtInfo.intoBuilder(), origConstant,
-      substConstant, reqtSubs, witnessMethodConformance);
+      substConstant, reqtSubs, witnessMethodConformance, None);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2950,7 +2959,7 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
     return getSILFunctionType(
         TC, TypeExpansionContext::minimal(), origPattern, substInterfaceType,
         extInfoBuilder, ObjCMethodConventions(method), foreignInfo, constant,
-        constant, None, ProtocolConformanceRef());
+        constant, None, ProtocolConformanceRef(), None);
   }
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
@@ -2966,7 +2975,7 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
                               substInterfaceType, extInfoBuilder, conventions,
                               foreignInfo, constant, constant, None,
-                              ProtocolConformanceRef());
+                              ProtocolConformanceRef(), None);
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
@@ -2979,7 +2988,7 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
                               substInterfaceType, extInfoBuilder,
                               CFunctionConventions(func), foreignInfo, constant,
-                              constant, None, ProtocolConformanceRef());
+                              constant, None, ProtocolConformanceRef(), None);
   }
 
   llvm_unreachable("call to unknown kind of C function");
@@ -3007,7 +3016,7 @@ static CanSILFunctionType getSILFunctionTypeForAbstractCFunction(
       return getSILFunctionType(
           TC, TypeExpansionContext::minimal(), origType, substType,
           extInfoBuilder, CFunctionTypeConventions(fnType), ForeignInfo(),
-          constant, constant, None, ProtocolConformanceRef());
+          constant, constant, None, ProtocolConformanceRef(), None);
     }
   }
 
@@ -3015,7 +3024,7 @@ static CanSILFunctionType getSILFunctionTypeForAbstractCFunction(
   return getSILFunctionType(TC, TypeExpansionContext::minimal(), origType,
                             substType, extInfoBuilder,
                             DefaultBlockConventions(), ForeignInfo(), constant,
-                            constant, None, ProtocolConformanceRef());
+                            constant, None, ProtocolConformanceRef(), None);
 }
 
 /// Try to find a clang method declaration for the given function.
@@ -3183,7 +3192,7 @@ static CanSILFunctionType getSILFunctionTypeForObjCSelectorFamily(
       TC, TypeExpansionContext::minimal(), AbstractionPattern(origType),
       substInterfaceType, extInfoBuilder, ObjCSelectorFamilyConventions(family),
       foreignInfo, constant, constant,
-      /*requirement subs*/ None, ProtocolConformanceRef());
+      /*requirement subs*/ None, ProtocolConformanceRef(), None);
 }
 
 static bool isImporterGeneratedAccessor(const clang::Decl *clangDecl,
@@ -3253,10 +3262,23 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
       }
     }();
 
+    Optional<SmallBitVector> noImplicitCopyIndices;
+    if (constant.hasDecl()) {
+      auto decl = constant.getDecl();
+      if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
+        noImplicitCopyIndices.emplace(funcDecl->getParameters()->size());
+        for (auto p : llvm::enumerate(*funcDecl->getParameters())) {
+          if (p.value()->isNoImplicitCopy()) {
+            noImplicitCopyIndices->set(p.index());
+          }
+        }
+      }
+    }
+
     return ::getNativeSILFunctionType(
-        TC, context, origType,
-        origLoweredInterfaceType, extInfoBuilder, constant, constant, None,
-        witnessMethodConformance);
+        TC, context, origType, origLoweredInterfaceType, extInfoBuilder,
+        constant, constant, None, witnessMethodConformance,
+        noImplicitCopyIndices);
   }
 
   ForeignInfo foreignInfo;

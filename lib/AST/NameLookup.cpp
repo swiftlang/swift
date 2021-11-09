@@ -34,8 +34,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
@@ -1448,15 +1450,34 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
     Table.updateLookupTable(decl);
   } else if (!Table.isLazilyComplete(name.getBaseName())) {
-    // The lookup table believes it doesn't have a complete accounting of this
-    // name - either because we're never seen it before, or another extension
-    // was registered since the last time we searched. Ask the loaders to give
-    // us a hand.
     DeclBaseName baseName(name.getBaseName());
-    populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
-    populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
 
-    Table.markLazilyComplete(baseName);
+    if (isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl())) {
+      // Namespaces will never have any members so we can just return whatever
+      // the lookup finds.
+      return evaluateOrDefault(
+          ctx.evaluator, CXXNamespaceMemberLookup({cast<EnumDecl>(decl), name}),
+          {});
+    } else if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
+      auto allFound = evaluateOrDefault(
+          ctx.evaluator,
+          ClangRecordMemberLookup({cast<StructDecl>(decl), name}), {});
+      // Add all the members we found, later we'll combine these with the
+      // existing members.
+      for (auto found : allFound)
+        Table.addMember(found);
+
+      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
+    } else {
+      // The lookup table believes it doesn't have a complete accounting of this
+      // name - either because we're never seen it before, or another extension
+      // was registered since the last time we searched. Ask the loaders to give
+      // us a hand.
+      populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
+      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
+    }
+
+    Table.markLazilyComplete(name.getBaseName());
   }
 
   // Look for a declaration with this name.

@@ -2263,6 +2263,11 @@ NOTE(associated_type_witness_conform_impossible,none,
      "candidate can not infer %0 = %1 because %1 "
      "is not a nominal type and so can't conform to %2",
      (Identifier, Type, Type))
+NOTE(suggest_opaque_type_witness,none,
+     "cannot infer %0 = %1 because %1 as a type cannot "
+     "conform to protocols; did you mean to use an opaque "
+     "result type?",
+     (Identifier, Type, Type))
 NOTE(associated_type_witness_inherit_impossible,none,
      "candidate can not infer %0 = %1 because %1 "
      "is not a class type and so can't inherit from %2",
@@ -2907,7 +2912,7 @@ WARNING(warn_implementation_only_conflict,none,
         (Identifier))
 NOTE(implementation_only_conflict_here,none,
      "imported as implementation-only here", ())
-WARNING(warn_public_import_of_private_module,none,
+ERROR(error_public_import_of_private_module,none,
         "private module %0 is imported publicly from the public module %1",
         (Identifier, Identifier))
 
@@ -4346,6 +4351,10 @@ NOTE(note_add_async_to_function,none,
 NOTE(note_add_nonisolated_to_decl,none,
      "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
+NOTE(note_add_async_and_throws_to_decl,none,
+     "mark the protocol requirement %0 '%select{|async|throws|async throws}1' "
+     "in order witness it with 'distributed' function declared in distributed actor %2",
+     (DeclName, unsigned, DeclName))
 NOTE(note_add_distributed_to_decl,none,
      "add 'distributed' to %0 to make this %1 witness the protocol requirement",
      (DeclName, DescriptiveDeclKind))
@@ -4408,6 +4417,8 @@ ERROR(actor_protocol_illegal_inheritance,none,
 ERROR(distributed_actor_protocol_illegal_inheritance,none,
       "non-distributed actor type %0 cannot conform to the 'DistributedActor' protocol",
       (DeclName))
+ERROR(broken_distributed_actor_requirement,none,
+      "DistributedActor protocol is broken: unexpected requirement", ())
 
 ERROR(unowned_executor_outside_actor,none,
       "'unownedExecutor' can only be implemented within the main "
@@ -4479,11 +4490,15 @@ NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
-NOTE(distributed_actor_isolated_method_note,none,
-     "only 'distributed' functions can be called from outside the distributed actor", // TODO(distributed): improve error message
-     ())
+NOTE(actor_isolated_sync_func_value,none,
+     "calls function of type %0 from outside of its actor context are "
+     "implicitly asynchronous",
+     (Type))
+NOTE(note_distributed_actor_isolated_method,none,
+     "distributed actor-isolated %0 %1 declared here",
+     (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_isolated_method,none,
-      "only 'distributed' functions can be called from outside the distributed actor", // TODO(distributed): improve error message to be more like 'non-distributed' ... defined here
+      "only 'distributed' functions can be called on a potentially remote distributed actor",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "distributed function parameter '%0' of type %1 does not conform to 'Codable'",
@@ -4492,7 +4507,7 @@ ERROR(distributed_actor_func_result_not_codable,none,
       "distributed function result type %0 does not conform to 'Codable'",
       (Type))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
-      "Distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
+      "distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
@@ -4517,6 +4532,9 @@ WARNING(shared_mutable_state_access,none,
         "shared mutable state", (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_witness,none,
      "actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
+     (DescriptiveDeclKind, DeclName))
+ERROR(distributed_actor_isolated_witness,none,
+     "distributed actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
      (DescriptiveDeclKind, DeclName))
 ERROR(global_actor_isolated_requirement,none,
       "%0 %1 must be isolated to the global actor %2 to satisfy corresponding "
@@ -4592,6 +4610,12 @@ ERROR(nonisolated_mutable_storage,none,
       ())
 ERROR(nonisolated_local_var,none,
       "'nonisolated' can not be applied to local variables",
+      ())
+ERROR(nonisolated_actor_sync_init,none,
+      "'nonisolated' on an actor's synchronous initializer is invalid",
+      ())
+ERROR(nonisolated_actor_convenience_init,none,
+      "'nonisolated' on an actor's convenience initializer is redundant",
       ())
 
 ERROR(actor_instance_property_wrapper,none,
@@ -5939,6 +5963,13 @@ ERROR(cannot_declare_computed_var_in_result_builder,none,
         "this behavior is deprecated", ())
 
 //------------------------------------------------------------------------------
+// MARK: Implicit conversion diagnostics
+//------------------------------------------------------------------------------
+ERROR(cannot_implicitly_convert_in_optional_context,none,
+      "cannot implicitly convert value of type %0 to expected type %1",
+      (Type, Type))
+
+//------------------------------------------------------------------------------
 // MARK: marker protocol diagnostics
 //------------------------------------------------------------------------------
 ERROR(marker_protocol_requirement, none,
@@ -6028,6 +6059,25 @@ ERROR(wrap_invalid_attr_added_by_access_note, none,
       (DiagnosticInfo *, StringRef, StringRef, DescriptiveDeclKind))
 
 #undef WHICH_ACCESS_NOTE
+
+// Move Only diagnostics
+
+ERROR(experimental_moveonly_feature_can_only_be_used_when_enabled,
+      none, "Can not use feature when experimental move only is disabled! Pass"
+      " the frontend flag -enable-experimental-move-only to swift to enable "
+      "the usage of this language feature", ())
+ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
+      none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
+ERROR(noimplicitcopy_attr_invalid_in_generic_context,
+      none, "'@_noImplicitCopy' attribute cannot be applied to entities in generic contexts", ())
+
+//------------------------------------------------------------------------------
+// MARK: variadics
+//------------------------------------------------------------------------------
+
+ERROR(type_sequence_on_non_generic_param, none,
+      "'@_typeSequence' must appear on a generic parameter",
+      ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -20,7 +20,7 @@ import _Concurrency
 ///
 /// FIXME(distributed): We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
 @_marker
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public protocol AnyActor: Sendable, AnyObject {}
 
 // ==== Distributed Actor -----------------------------------------------------
@@ -33,9 +33,15 @@ public protocol AnyActor: Sendable, AnyObject {}
 ///
 /// The 'DistributedActor' protocol provides the core functionality of any
 /// distributed actor.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public protocol DistributedActor:
     AnyActor, Identifiable, Hashable, Codable {
+    /// The type of transport used to communicate with actors of this type.
+    associatedtype Transport: ActorTransport
+
+    /// The type of identity used by the transport.
+    typealias Identity = Transport.Identity
+
     /// Resolves the passed in `identity` against the `transport`, returning
     /// either a local or remote actor reference.
     ///
@@ -48,11 +54,7 @@ public protocol DistributedActor:
     ///
     /// - Parameter identity: identity uniquely identifying a, potentially remote, actor in the system
     /// - Parameter transport: `transport` which should be used to resolve the `identity`, and be associated with the returned actor
-// FIXME: Partially blocked on SE-309, because then we can store ActorIdentity directly
-//        We want to move to accepting a generic or existential identity here
-//    static func resolve<Identity>(_ identity: Identity, using transport: ActorTransport)
-//      throws -> Self where Identity: ActorIdentity
-    static func resolve(_ identity: AnyActorIdentity, using transport: ActorTransport)
+    static func resolve(_ identity: Identity, using transport: Transport)
       throws -> Self
 
     /// The `ActorTransport` associated with this actor.
@@ -61,7 +63,7 @@ public protocol DistributedActor:
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    nonisolated var actorTransport: ActorTransport { get } // TODO: rename to `transport`?
+    nonisolated var actorTransport: Transport { get } // TODO: rename to `transport`?
 
     /// Logical identity of this distributed actor.
     ///
@@ -74,12 +76,12 @@ public protocol DistributedActor:
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    nonisolated var id: AnyActorIdentity { get }
+    nonisolated var id: Identity { get }
 }
 
 // ==== Hashable conformance ---------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 extension DistributedActor {
   nonisolated public func hash(into hasher: inout Hasher) {
     self.id.hash(into: &hasher)
@@ -93,20 +95,20 @@ extension DistributedActor {
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
-  @available(SwiftStdlib 5.5, *)
+  @available(SwiftStdlib 5.6, *)
   public static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_transport")!
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 extension DistributedActor {
   nonisolated public init(from decoder: Decoder) throws {
-    guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
+    guard let transport = decoder.userInfo[.actorTransportKey] as? Transport else {
       throw DistributedActorCodingError(message:
-        "Missing ActorTransport (for key .actorTransportKey) " +
+        "Missing Transport (for key .actorTransportKey) " +
         "in Decoder.userInfo, while decoding \(Self.self).")
     }
 
-    let id: AnyActorIdentity = try transport.decodeIdentity(from: decoder)
+    let id: Identity = try transport.decodeIdentity(from: decoder)
     self = try Self.resolve(id, using: transport)
   }
 
@@ -118,7 +120,7 @@ extension DistributedActor {
 
 // ==== Local actor special handling -------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 extension DistributedActor {
 
   /// Executes the passed 'body' only when the distributed actor is local instance.
@@ -143,11 +145,12 @@ extension DistributedActor {
 /******************************************************************************/
 
 /// Uniquely identifies a distributed actor, and enables sending messages and identifying remote actors.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public protocol ActorIdentity: Sendable, Hashable, Codable {}
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomStringConvertible {
+  // FIXME: This probably shouldn't be public
   public let underlying: Any
   @usableFromInline let _hashInto: (inout Hasher) -> ()
   @usableFromInline let _equalTo: (Any) -> Bool
@@ -183,7 +186,7 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomString
           "ActorTransport not available under the decoder.userInfo")
     }
 
-    self = try transport.decodeIdentity(from: decoder)
+    self = try transport.decodeAnyIdentity(from: decoder)
   }
 
   public func encode(to encoder: Encoder) throws {
@@ -208,11 +211,11 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomString
 /******************************************************************************/
 
 /// Error protocol to which errors thrown by any `ActorTransport` should conform.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public protocol ActorTransportError: Error {
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 public struct DistributedActorCodingError: ActorTransportError {
   public let message: String
 
@@ -243,10 +246,3 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 @_silgen_name("swift_distributedActor_remote_initialize")
 func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
-
-/// Called to destroy the default actor instance in an actor.
-/// The implementation will call this within the actor's deinit.
-///
-/// This will call `actorTransport.resignIdentity(self.id)`.
-@_silgen_name("swift_distributedActor_destroy")
-func _distributedActorDestroy(_ actor: AnyObject)

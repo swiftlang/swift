@@ -103,6 +103,12 @@
 #define SWIFT_ATTRIBUTE_UNAVAILABLE
 #endif
 
+#if (__has_attribute(weak_import))
+#define SWIFT_WEAK_IMPORT __attribute__((weak_import))
+#else
+#define SWIFT_WEAK_IMPORT
+#endif
+
 // Define the appropriate attributes for sharing symbols across
 // image (executable / shared-library) boundaries.
 //

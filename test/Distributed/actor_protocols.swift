@@ -32,22 +32,24 @@ struct E: Actor {
 
 // ==== -----------------------------------------------------------------------
 
-distributed actor DA: DistributedActor {} // ok
+distributed actor DA: DistributedActor {
+  typealias Transport = AnyActorTransport
+}
 
 actor A2: DistributedActor {
   // expected-error@-1{{non-distributed actor type 'A2' cannot conform to the 'DistributedActor' protocol}} {{1-1=distributed }}
   nonisolated var id: AnyActorIdentity {
     fatalError()
   }
-  nonisolated var actorTransport: ActorTransport {
+  nonisolated var actorTransport: AnyActorTransport {
     fatalError()
   }
 
-  init(transport: ActorTransport) {
+  init(transport: AnyActorTransport) {
     fatalError()
   }
 
-  static func resolve(_ identity: AnyActorIdentity, using transport: ActorTransport) throws -> Self {
+  static func resolve(_ identity: AnyActorIdentity, using transport: AnyActorTransport) throws -> Self {
     fatalError()
   }
 }
@@ -57,14 +59,14 @@ final class C2: DistributedActor {
   nonisolated var id: AnyActorIdentity {
     fatalError()
   }
-  nonisolated var actorTransport: ActorTransport {
+  nonisolated var actorTransport: AnyActorTransport {
     fatalError()
   }
 
-  required init(transport: ActorTransport) {
+  required init(transport: AnyActorTransport) {
     fatalError()
   }
-  static func resolve(_ identity: AnyActorIdentity, using transport: ActorTransport) throws -> Self {
+  static func resolve(_ identity: AnyActorIdentity, using transport: AnyActorTransport) throws -> Self {
     fatalError()
   }
 }

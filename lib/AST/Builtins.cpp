@@ -305,12 +305,10 @@ synthesizeGenericSignature(SynthesisContext &SC,
   CollectGenericParams collector(SC);
   list.Params.visit(collector);
 
-  return evaluateOrDefault(
-    SC.Context.evaluator,
-    AbstractGenericSignatureRequest{
-      nullptr, std::move(collector.GenericParamTypes),
-               std::move(collector.AddedRequirements)},
-    nullptr);
+  return buildGenericSignature(SC.Context,
+                               GenericSignature(),
+                               std::move(collector.GenericParamTypes),
+                               std::move(collector.AddedRequirements));
 }
 
 /// Build a builtin function declaration.
@@ -671,8 +669,8 @@ namespace {
     bool Async = false;
     BuiltinThrowsKind Throws = BuiltinThrowsKind::None;
 
-    // Accumulate params and requirements here, so that we can make the
-    // appropriate `AbstractGenericSignatureRequest` when `build()` is called.
+    // Accumulate params and requirements here, so that we can call
+    // `buildGenericSignature()` when `build()` is called.
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> addedRequirements;
 
@@ -727,11 +725,10 @@ namespace {
     }
 
     FuncDecl *build(Identifier name) {
-      auto GenericSig = evaluateOrDefault(
-        Context.evaluator,
-        AbstractGenericSignatureRequest{
-          nullptr, std::move(genericParamTypes), std::move(addedRequirements)},
-        nullptr);
+      auto GenericSig = buildGenericSignature(
+          Context, GenericSignature(),
+          std::move(genericParamTypes),
+          std::move(addedRequirements));
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList, GenericSig,
@@ -856,8 +853,12 @@ static ValueDecl *getDestroyArrayOperation(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getMoveOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
-                            _parameters(_owned(_typeparam(0))),
-                            _moveOnly(_typeparam(0)));
+                            _parameters(_owned(_typeparam(0))), _typeparam(0));
+}
+
+static ValueDecl *getCopyOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
+                            _parameters(_typeparam(0)), _typeparam(0));
 }
 
 static ValueDecl *getTransferArrayOperation(ASTContext &ctx, Identifier id) {
@@ -1024,8 +1025,24 @@ static ValueDecl *getDeallocOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
+static ValueDecl *getStackAllocOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_word, _word, _word),
+                            _rawPointer);
+}
+
+static ValueDecl *getStackDeallocOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
+                            _void);
+}
+
 static ValueDecl *getFenceOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
+}
+
+static ValueDecl *getIfdefOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _int(1));
 }
 
 static ValueDecl *getVoidErrorOperation(ASTContext &ctx, Identifier id) {
@@ -1474,13 +1491,6 @@ static ValueDecl *getDistributedActorInitializeRemote(ASTContext &ctx,
                             _generics(_unrestricted), // TODO(distributed): restrict to DistributedActor
                             _parameters(_metatype(_typeparam(0))),
                             _rawPointer);
-}
-
-static ValueDecl *getDistributedActorDestroy(ASTContext &ctx,
-                                                 Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin,
-                            _parameters(_nativeObject),
-                            _void);
 }
 
 static ValueDecl *getResumeContinuationReturning(ASTContext &ctx,
@@ -2280,6 +2290,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy))
       return getBuiltinFunction(Id, ArgElts, ResultTy);
   }
+
+  // If this starts with fence, we have special suffixes to handle.
+  if (OperationName.startswith("ifdef_")) {
+    OperationName = OperationName.drop_front(strlen("ifdef_"));
+    if (!Types.empty()) return nullptr;
+    if (OperationName.empty()) return nullptr;
+    return getIfdefOperation(Context, Id);
+  }
   
   // If this starts with fence, we have special suffixes to handle.
   if (OperationName.startswith("fence_")) {
@@ -2469,6 +2487,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   switch (BV) {
   case BuiltinValueKind::Fence:
+  case BuiltinValueKind::Ifdef:
   case BuiltinValueKind::CmpXChg:
   case BuiltinValueKind::AtomicRMW:
   case BuiltinValueKind::AtomicLoad:
@@ -2510,6 +2529,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty())
       return nullptr;
     return getMoveOperation(Context, Id);
+
+  case BuiltinValueKind::Copy:
+    if (!Types.empty())
+      return nullptr;
+    return getCopyOperation(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
@@ -2634,6 +2658,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DeallocRaw:
     return getDeallocOperation(Context, Id);
+
+  case BuiltinValueKind::StackAlloc:
+    return getStackAllocOperation(Context, Id);
+  case BuiltinValueKind::StackDealloc:
+    return getStackDeallocOperation(Context, Id);
 
   case BuiltinValueKind::CastToNativeObject:
   case BuiltinValueKind::UnsafeCastToNativeObject:
@@ -2828,9 +2857,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::InitializeDistributedRemoteActor:
     return getDistributedActorInitializeRemote(Context, Id);
-
-  case BuiltinValueKind::DestroyDistributedActor:
-    return getDistributedActorDestroy(Context, Id);
 
   case BuiltinValueKind::StartAsyncLet:
   case BuiltinValueKind::StartAsyncLetWithLocalBuffer:

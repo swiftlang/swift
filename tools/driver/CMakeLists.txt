@@ -1,7 +1,6 @@
 # The swift-frontend tool
 
-if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" OR
-   ${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
 
   # Bootstrapping - level 0
   # For more information on how bootstrapping works, see libswift/README.md.
@@ -40,6 +39,8 @@ if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" OR
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping1/bin")
 
+  add_dependencies(bootstrapping0-all swift-frontend-bootstrapping0)
+  add_dependencies(bootstrapping1-all swift-frontend-bootstrapping1)
 endif()
 
 add_swift_host_tool(swift-frontend
@@ -52,9 +53,9 @@ target_link_libraries(swift-frontend
                         swiftDriverTool
                         libswift)
 
-# Create a `swift-driver` symlinks adjacent to the `swift-frontend` executable
+# Create a `swift-driver` executable adjacent to the `swift-frontend` executable
 # to ensure that `swiftc` forwards to the standalone driver when invoked.
-swift_create_early_driver_symlinks(swift-frontend)
+swift_create_early_driver_copies(swift-frontend)
 
 swift_create_post_build_symlink(swift-frontend
   SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"

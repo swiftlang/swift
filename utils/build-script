@@ -56,7 +56,10 @@ _SUPPORTED_XCODE_BUILDS = [
     ("12.4", "12D4e"),
     ("12.5", "12E262"),
     ("13.0 beta", "13A5154h"),
-    ("13.0 beta 4", "13A5201i")
+    ("13.0 beta 4", "13A5201i"),
+    ("13.0", "13A233"),
+    ("13.1 RC 1", "13A1030d"),
+    ("13.2 beta", "13C5066c")
 ]
 
 # -----------------------------------------------------------------------------
@@ -263,7 +266,8 @@ def default_stdlib_deployment_targets(args):
     # OS X build machines configure all Darwin platforms by default.
     # Put iOS native targets last so that we test them last
     # (it takes a long time).
-    if host_target == StdlibDeploymentTarget.OSX.x86_64:
+    if host_target == StdlibDeploymentTarget.OSX.x86_64 or \
+            host_target == StdlibDeploymentTarget.OSX.arm64:
         targets = [host_target]
         if args.build_ios and args.build_ios_simulator:
             targets.extend(StdlibDeploymentTarget.iOSSimulator.targets)

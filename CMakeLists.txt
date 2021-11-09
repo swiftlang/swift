@@ -204,7 +204,9 @@ cmake_dependent_option(LIBSWIFT_BUILD_MODE "How to build libswift. Possible valu
     HOSTTOOLS:     libswift is built with a pre-installed toolchain
     BOOTSTRAPPING: libswift is built with a 2-stage bootstrapping process
     BOOTSTRAPPING-WITH-HOSTLIBS:   libswift is built with a 2-stage bootstrapping process,
-                   but the compiler links against the host system swift libs (macOS only)"
+                   but the compiler links against the host system swift libs (macOS only)
+    CROSSCOMPILE-WITH-HOSTLIBS:    libswift is built with a bootstrapping-with-hostlibs compiled
+                                   compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`"
   OFF "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" OFF)
 
 # The following only works with the Ninja generator in CMake >= 3.0.
@@ -405,6 +407,18 @@ option(SWIFT_REPORT_STATISTICS
     "Create json files which contain internal compilation statistics"
     FALSE)
 
+# Only Darwin platforms enable ObjC interop by default.
+if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
+  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP_default TRUE)
+else()
+  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP_default FALSE)
+endif()
+
+# Used by stdlib/toolchain as well, so this cannot be in stdlib/CMakeLists.txt
+option(SWIFT_STDLIB_ENABLE_OBJC_INTEROP
+       "Should stdlib be built with Obj-C interop."
+       "${SWIFT_STDLIB_ENABLE_OBJC_INTEROP_default}")
+
 #
 # User-configurable experimental options.  Do not use in production builds.
 #
@@ -513,6 +527,9 @@ if(SWIFT_ENABLE_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
   endif()
 endif()
 
+file(STRINGS "utils/availability-macros.def" SWIFT_STDLIB_AVAILABILITY_DEFINITIONS)
+list(FILTER SWIFT_STDLIB_AVAILABILITY_DEFINITIONS EXCLUDE REGEX "^\\s*(#.*)?$")
+
 #
 # Include CMake modules
 #
@@ -597,15 +614,19 @@ set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
   set(SWIFT_EXEC_FOR_LIBSWIFT "${CMAKE_Swift_COMPILER}")
-elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING" OR LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+elseif(LIBSWIFT_BUILD_MODE MATCHES "BOOTSTRAPPING.*")
   # If cross-compiling we don't have to bootstrap. We can just use the previously
   # built native swiftc to build libswift.
-  message(STATUS "Building libswift with native host tools instead of bootstrapping")
-  set(LIBSWIFT_BUILD_MODE "HOSTTOOLS")
+  message(STATUS "Building libswift with previously built tools instead of bootstrapping")
   set(SWIFT_EXEC_FOR_LIBSWIFT "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
+  if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+    set(LIBSWIFT_BUILD_MODE "CROSSCOMPILE-WITH-HOSTLIBS")
+  else()
+    set(LIBSWIFT_BUILD_MODE "HOSTTOOLS")
+  endif()
 endif()
 
-if(LIBSWIFT_BUILD_MODE STREQUAL "HOSTTOOLS" OR LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+if(LIBSWIFT_BUILD_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
   if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
     message(STATUS "array COW checks disabled when building libswift with host libraries")
     set(SWIFT_ENABLE_ARRAY_COW_CHECKS FALSE)

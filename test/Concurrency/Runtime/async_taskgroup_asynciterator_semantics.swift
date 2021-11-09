@@ -11,7 +11,7 @@ func boom() async throws -> Int {
   throw Boom()
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_next() async {
   let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
@@ -44,7 +44,7 @@ func test_taskGroup_next() async {
   print("result with group.next(): \(sum)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_for_in() async {
   let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
@@ -75,7 +75,7 @@ func test_taskGroup_for_in() async {
   print("result with for-in: \(sum)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_asyncIterator() async {
   let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
@@ -113,7 +113,7 @@ func test_taskGroup_asyncIterator() async {
   print("result with async iterator: \(sum)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func test_taskGroup_contains() async {
   let sum = await withTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...4 {
@@ -145,7 +145,7 @@ func test_taskGroup_contains() async {
   print("result with async iterator: \(sum)")
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_next()

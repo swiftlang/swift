@@ -766,10 +766,32 @@ static void addKeyPathDynamicMemberOverloads(
   }
 }
 
+namespace {
+/// A set of type variable bindings to compare for ranking.
+struct TypeBindingsToCompare {
+  Type Type1;
+  Type Type2;
+
+  // These bits are used in the case where we need to compare a lone unlabeled
+  // parameter with a labeled parameter, and allow us to prefer the unlabeled
+  // one.
+  bool Type1WasLabeled = false;
+  bool Type2WasLabeled = false;
+
+  TypeBindingsToCompare(Type type1, Type type2)
+      : Type1(type1), Type2(type2) {}
+
+  /// Whether the type bindings to compare are known to be the same.
+  bool areSameTypes() const {
+    return !Type1WasLabeled && !Type2WasLabeled && Type1->isEqual(Type2);
+  }
+};
+}; // end anonymous namespace
+
 /// Given the bound types of two constructor overloads, returns their parameter
 /// list types as tuples to compare for solution ranking, or \c None if they
 /// shouldn't be compared.
-static Optional<std::pair<Type, Type>>
+static Optional<TypeBindingsToCompare>
 getConstructorParamsAsTuples(ASTContext &ctx, Type boundTy1, Type boundTy2) {
   auto choiceTy1 =
       boundTy1->lookThroughAllOptionalTypes()->getAs<FunctionType>();
@@ -793,11 +815,43 @@ getConstructorParamsAsTuples(ASTContext &ctx, Type boundTy1, Type boundTy2) {
     if (initParams1[idx].isVariadic() != initParams2[idx].isVariadic())
       return None;
   }
+
+  // Awful hack needed to preserve source compatibility: If we have single
+  // variadic parameters to compare, where one has a label and the other does
+  // not, e.g (x: Int...) and (Int...), compare the parameter types by
+  // themselves, and make a note of which one has the label.
+  //
+  // This is needed because previously we would build a TupleType for a single
+  // unlabeled variadic parameter (Int...), which would let us compare it with
+  // a labeled parameter (x: Int...) and prefer the unlabeled version. With the
+  // parameter flags stripped however, (Int...) would become a paren type,
+  // which we wouldn't compare with the tuple type (x: Int...). To preserve the
+  // previous behavior in this case, just do a type comparison for the param
+  // types, and record where we stripped a label. The ranking logic can then use
+  // this to prefer the unlabeled variant. This is only needed in the single
+  // parameter case, as other cases will compare as tuples the same as before.
+  // In cases where variadics aren't used, we may end up trying to compare
+  // parens with tuples, but that's consistent with what we previously did.
+  //
+  // Note we can just do checks on initParams1, as we've already established
+  // sizes and variadic bits are consistent.
+  if (initParams1.size() == 1 && initParams1[0].isVariadic() &&
+      initParams1[0].hasLabel() != initParams2[0].hasLabel()) {
+    TypeBindingsToCompare bindings(initParams1[0].getParameterType(),
+                                   initParams2[0].getParameterType());
+    if (initParams1[0].hasLabel()) {
+      bindings.Type1WasLabeled = true;
+    } else {
+      bindings.Type2WasLabeled = true;
+    }
+    return bindings;
+  }
+
   auto tuple1 = AnyFunctionType::composeTuple(ctx, initParams1,
                                               /*wantParamFlags*/ false);
   auto tuple2 = AnyFunctionType::composeTuple(ctx, initParams2,
                                               /*wantParamFlags*/ false);
-  return std::make_pair(tuple1, tuple2);
+  return TypeBindingsToCompare(tuple1, tuple2);
 }
 
 SolutionCompareResult ConstraintSystem::compareSolutions(
@@ -1154,7 +1208,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   }
 
   // Compare the type variable bindings.
-  llvm::DenseMap<TypeVariableType *, std::pair<Type, Type>> typeDiff;
+  llvm::DenseMap<TypeVariableType *, TypeBindingsToCompare> typeDiff;
 
   const auto &bindings1 = solutions[idx1].typeBindings;
   const auto &bindings2 = solutions[idx2].typeBindings;
@@ -1185,8 +1239,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (binding2 == bindings2.end())
       continue;
 
-    auto concreteType1 = binding1.second;
-    auto concreteType2 = binding2->second;
+    TypeBindingsToCompare typesToCompare(binding1.second, binding2->second);
 
     // For short-form and self-delegating init calls, we want to prefer
     // parameter lists with subtypes over supertypes. To do this, compose tuples
@@ -1197,20 +1250,21 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // have some ranking and subtyping rules specific to tuples that we may need
     // to preserve to avoid breaking source.
     if (isShortFormOrSelfDelegatingConstructorBinding) {
-      auto diffs = getConstructorParamsAsTuples(cs.getASTContext(),
-                                                concreteType1, concreteType2);
+      auto diffs = getConstructorParamsAsTuples(
+          cs.getASTContext(), typesToCompare.Type1, typesToCompare.Type2);
       if (!diffs)
         continue;
-      std::tie(concreteType1, concreteType2) = *diffs;
+      typesToCompare = *diffs;
     }
 
-    if (!concreteType1->isEqual(concreteType2))
-      typeDiff.insert({typeVar, {concreteType1, concreteType2}});
+    if (!typesToCompare.areSameTypes())
+      typeDiff.insert({typeVar, typesToCompare});
   }
 
   for (auto &binding : typeDiff) {
-    auto type1 = binding.second.first;
-    auto type2 = binding.second.second;
+    auto types = binding.second;
+    auto type1 = types.Type1;
+    auto type2 = types.Type2;
 
     // If either of the types still contains type variables, we can't
     // compare them.
@@ -1251,11 +1305,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       auto unlabeled1 = getUnlabeledType(type1, cs.getASTContext());
       auto unlabeled2 = getUnlabeledType(type2, cs.getASTContext());
       if (unlabeled1->isEqual(unlabeled2)) {
-        if (type1->isEqual(unlabeled1)) {
+        if (type1->isEqual(unlabeled1) && !types.Type1WasLabeled) {
           ++score1;
           continue;
         }
-        if (type2->isEqual(unlabeled2)) {
+        if (type2->isEqual(unlabeled2) && !types.Type2WasLabeled) {
           ++score2;
           continue;
         }

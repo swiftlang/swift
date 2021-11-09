@@ -1466,6 +1466,8 @@ namespace  {
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
+    UNINTERESTING_ATTR(NoLocks)
+    UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(Final)
@@ -1557,6 +1559,9 @@ namespace  {
     UNINTERESTING_ATTR(ImplicitSelfCapture)
     UNINTERESTING_ATTR(InheritActorContext)
     UNINTERESTING_ATTR(Isolated)
+    UNINTERESTING_ATTR(NoImplicitCopy)
+
+    UNINTERESTING_ATTR(TypeSequence)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

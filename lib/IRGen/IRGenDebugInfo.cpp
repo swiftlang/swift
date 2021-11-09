@@ -447,19 +447,17 @@ private:
   createFile(StringRef FileName,
              Optional<llvm::DIFile::ChecksumInfo<StringRef>> CSInfo,
              Optional<StringRef> Source) {
-    StringRef Dir;
-    StringRef File;
-    SmallString<128> DirBuf;
-    SmallString<128> FileBuf;
-    std::string RemappedFileString = DebugPrefixMap.remapPath(FileName);
-    SmallString<128> RemappedFile = StringRef(RemappedFileString);
-    llvm::sys::path::remove_dots(RemappedFile);
-    std::string CurDir = DebugPrefixMap.remapPath(Opts.DebugCompilationDir);
-    if (llvm::sys::path::is_absolute(RemappedFile)) {
+    StringRef File, Dir;
+    StringRef CurDir = Opts.DebugCompilationDir;
+    SmallString<128> NormalizedFile(FileName);
+    SmallString<128> FileBuf, DirBuf;
+    llvm::sys::path::remove_dots(NormalizedFile);
+    if (llvm::sys::path::is_absolute(NormalizedFile) &&
+        llvm::sys::path::is_absolute(CurDir)) {
       // Strip the common prefix (if it is more than just "/") from current
       // directory and FileName for a more space-efficient encoding.
-      auto FileIt = llvm::sys::path::begin(RemappedFile);
-      auto FileE = llvm::sys::path::end(RemappedFile);
+      auto FileIt = llvm::sys::path::begin(NormalizedFile);
+      auto FileE = llvm::sys::path::end(NormalizedFile);
       auto CurDirIt = llvm::sys::path::begin(CurDir);
       auto CurDirE = llvm::sys::path::end(CurDir);
       for (; CurDirIt != CurDirE && *CurDirIt == *FileIt; ++CurDirIt, ++FileIt)
@@ -468,7 +466,7 @@ private:
         // Don't strip the common prefix if it is only the root "/"
         // since that would make LLVM diagnostic locations confusing.
         Dir = {};
-        File = RemappedFile;
+        File = NormalizedFile;
       } else {
         for (; FileIt != FileE; ++FileIt)
           llvm::sys::path::append(FileBuf, *FileIt);
@@ -476,12 +474,14 @@ private:
         File = FileBuf;
       }
     } else {
-      File = RemappedFile;
+      File = NormalizedFile;
       // Leave <compiler-generated> & friends as is, without directory.
       if (!(File.startswith("<") && File.endswith(">")))
         Dir = CurDir;
     }
-    llvm::DIFile *F = DBuilder.createFile(File, Dir, CSInfo, Source);
+    llvm::DIFile *F =
+        DBuilder.createFile(DebugPrefixMap.remapPath(File),
+                            DebugPrefixMap.remapPath(Dir), CSInfo, Source);
     DIFileCache[FileName].reset(F);
     return F;
   }
@@ -884,7 +884,9 @@ private:
     Mangle::ASTMangler Mangler;
     std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
 
-    if (!Opts.DisableRoundTripDebugTypes) {
+    // TODO(SR-15377): We currently cannot round trip some C++ types.
+    if (!Opts.DisableRoundTripDebugTypes &&
+        !Ty->getASTContext().LangOpts.EnableCXXInterop) {
       // Make sure we can reconstruct mangled types for the debugger.
 #ifndef NDEBUG
       auto &Ctx = Ty->getASTContext();
@@ -1878,9 +1880,13 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   StringRef SplitName = StringRef();
   // Note that File + Dir need not result in a valid path.
   // The directory part of the main file is the current working directory.
-  MainFile =
-      DBuilder.createFile(DebugPrefixMap.remapPath(SourcePath),
-                          DebugPrefixMap.remapPath(Opts.DebugCompilationDir));
+  std::string RemappedFile = DebugPrefixMap.remapPath(SourcePath);
+  std::string RemappedDir = DebugPrefixMap.remapPath(Opts.DebugCompilationDir);
+  bool RelFile = llvm::sys::path::is_relative(RemappedFile);
+  bool RelDir = llvm::sys::path::is_relative(RemappedDir);
+  MainFile = (RelFile && RelDir)
+                 ? createFile(SourcePath, {}, {})
+                 : DBuilder.createFile(RemappedFile, RemappedDir);
 
   StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
   StringRef SDK;

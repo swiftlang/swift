@@ -88,7 +88,7 @@ public protocol _ObjectiveCBridgeable {
 // Note: This function is not intended to be called from Swift.  The
 // availability information here is perfunctory; this function isn't considered
 // part of the Stdlib's Swift ABI.
-@available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
+@available(SwiftStdlib 5.2, *)
 @_cdecl("_SwiftCreateBridgedArray")
 @usableFromInline
 internal func _SwiftCreateBridgedArray_DoNotCall(
@@ -103,7 +103,7 @@ internal func _SwiftCreateBridgedArray_DoNotCall(
 // Note: This function is not intended to be called from Swift.  The
 // availability information here is perfunctory; this function isn't considered
 // part of the Stdlib's Swift ABI.
-@available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
+@available(SwiftStdlib 5.2, *)
 @_cdecl("_SwiftCreateBridgedMutableArray")
 @usableFromInline
 internal func _SwiftCreateBridgedMutableArray_DoNotCall(

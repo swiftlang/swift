@@ -56,6 +56,7 @@ TYPE_ATTR(noDerivative)
 TYPE_ATTR(async)
 TYPE_ATTR(Sendable)
 TYPE_ATTR(unchecked)
+TYPE_ATTR(_typeSequence)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -426,7 +427,12 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   NotSerialized |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   70)
-// NOTE: 71 is unused
+DECL_ATTR(_typeSequence, TypeSequence,
+  OnGenericTypeParam |
+  UserInaccessible |
+  NotSerialized |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  71)
 // NOTE: 72 is unused
 DECL_ATTR(_optimize, Optimize,
   OnAbstractFunction | OnSubscript | OnVar |
@@ -671,6 +677,23 @@ DECL_ATTR(_nonSendable, NonSendable,
   ABIStableToAdd | ABIBreakingToRemove |
   APIStableToAdd | APIBreakingToRemove,
   121)
+
+SIMPLE_DECL_ATTR(_noImplicitCopy, NoImplicitCopy,
+  UserInaccessible |
+  ABIStableToAdd | ABIBreakingToRemove |
+  APIStableToAdd | APIBreakingToRemove |
+  OnParam | OnVar,
+  122)
+
+SIMPLE_DECL_ATTR(_noLocks, NoLocks,
+  OnAbstractFunction | OnSubscript | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  123)
+
+SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
+  OnAbstractFunction | OnSubscript | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  124)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.

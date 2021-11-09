@@ -753,26 +753,23 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   return SM.getLocOffsetInBuffer(Loc, SM.findBufferContainingLoc(Loc));
 }
 
-static StringRef
-getModuleName(const ValueDecl *VD, llvm::BumpPtrAllocator &Allocator,
-              ModuleDecl *IgnoreModule = nullptr) {
+static StringRef getModuleName(const ValueDecl *VD,
+                               llvm::BumpPtrAllocator &Allocator) {
   ASTContext &Ctx = VD->getASTContext();
   ClangImporter *Importer =
       static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-  auto ClangNode = VD->getClangNode();
-  if (ClangNode) {
-    auto ClangMod = Importer->getClangOwningModule(ClangNode);
-    if (ClangMod)
+  if (auto ClangNode = VD->getClangNode()) {
+    if (const auto *ClangMod = Importer->getClangOwningModule(ClangNode))
       return copyString(Allocator, ClangMod->getFullModuleName());
-  } else if (VD->getModuleContext() != IgnoreModule) {
-    ModuleDecl *MD = VD->getModuleContext();
-    // If the decl is from a cross-import overlay module, report the
-    // overlay's declaring module as the owning module.
-    if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
-      MD = Declaring;
-    return MD->getNameStr();
+    return "";
   }
-  return "";
+
+  ModuleDecl *MD = VD->getModuleContext();
+  // If the decl is from a cross-import overlay module, report the
+  // overlay's declaring module as the owning module.
+  if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
+    MD = Declaring;
+  return MD->getNameStr();
 }
 
 struct DeclInfo {
@@ -1044,9 +1041,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
                                          llvm::makeArrayRef(ReferencedDecls));
   }
 
-  Symbol.ModuleName = copyString(Allocator,
-                                 getModuleName(DInfo.VD, Allocator,
-                                               /*ModuleToIgnore=*/MainModule));
+  Symbol.ModuleName = getModuleName(DInfo.VD, Allocator);
   if (auto IFaceGenRef =
           Lang.getIFaceGenContexts().find(Symbol.ModuleName, Invoc))
     Symbol.ModuleInterfaceName = IFaceGenRef->getDocumentName();
@@ -1119,6 +1114,8 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
   Symbol.IsSystem = DInfo.VD->getModuleContext()->isSystemModule();
   Symbol.IsDynamic = DInfo.IsDynamic;
+  Symbol.IsSynthesized = DInfo.VD->isImplicit();
+
   Symbol.ParentNameOffset = getParamParentNameOffset(DInfo.VD, CursorLoc);
 
   return llvm::Error::success();

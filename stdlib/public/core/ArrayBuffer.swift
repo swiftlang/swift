@@ -97,7 +97,8 @@ extension _ArrayBuffer {
     return _isNativeTypeChecked
   }
 
-  /// Returns `true` iff this buffer's storage is uniquely-referenced.
+  /// Returns `true` if this buffer's storage is uniquely referenced;
+  /// otherwise, returns `false`.
   ///
   /// This function should only be used for internal sanity checks.
   /// To guard a buffer mutation, use `beginCOWMutation`.
@@ -109,8 +110,9 @@ extension _ArrayBuffer {
     return _storage.isUniquelyReferencedNative()
    }
   
-  /// Returns `true` and puts the buffer in a mutable state iff the buffer's
-  /// storage is uniquely-referenced.
+  /// Returns `true` and puts the buffer in a mutable state if the buffer's
+  /// storage is uniquely-referenced; otherwise performs no action and
+  /// returns `false`.
   ///
   /// - Precondition: The buffer must be immutable.
   ///
@@ -252,23 +254,29 @@ extension _ArrayBuffer {
   internal func _typeCheckSlowPath(_ index: Int) {
     if _fastPath(_isNative) {
       let element: AnyObject = cast(toBufferOf: AnyObject.self)._native[index]
-      precondition(
-        element is Element,
-        """
-        Down-casted Array element failed to match the target type
-        Expected \(Element.self) but found \(type(of: element))
-        """
-      )
+      guard element is Element else {
+        _assertionFailure(
+          "Fatal error",
+          """
+          Down-casted Array element failed to match the target type
+          Expected \(Element.self) but found \(type(of: element))
+          """,
+          flags: _fatalErrorFlags()
+        )
+      }
     }
     else {
       let element = _nonNative[index]
-      precondition(
-        element is Element,
-        """
-        NSArray element failed to match the Swift Array Element type
-        Expected \(Element.self) but found \(type(of: element))
-        """
-      )
+      guard element is Element else {
+        _assertionFailure(
+          "Fatal error",
+          """
+          NSArray element failed to match the Swift Array Element type
+          Expected \(Element.self) but found \(type(of: element))
+          """,
+          flags: _fatalErrorFlags()
+        )
+      }
     }
   }
 
@@ -503,23 +511,29 @@ extension _ArrayBuffer {
       _native._checkValidSubscript(i)
       
       element = cast(toBufferOf: AnyObject.self)._native[i]
-      precondition(
-        element is Element,
-        """
-        Down-casted Array element failed to match the target type
-        Expected \(Element.self) but found \(type(of: element))
-        """
-      )
+      guard element is Element else {
+        _assertionFailure(
+          "Fatal error",
+          """
+          Down-casted Array element failed to match the target type
+          Expected \(Element.self) but found \(type(of: element))
+          """,
+          flags: _fatalErrorFlags()
+        )
+      }
     } else {
       // ObjC arrays do their own subscript checking.
       element = _nonNative[i]
-      precondition(
-        element is Element,
-        """
-        NSArray element failed to match the Swift Array Element type
-        Expected \(Element.self) but found \(type(of: element))
-        """
-      )
+      guard element is Element else {
+        _assertionFailure(
+          "Fatal error",
+          """
+          NSArray element failed to match the Swift Array Element type
+          Expected \(Element.self) but found \(type(of: element))
+          """,
+          flags: _fatalErrorFlags()
+        )
+      }
     }
     return element
   }

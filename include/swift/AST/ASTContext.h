@@ -350,8 +350,14 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
-  /// Mapping between aliases and real (physical) names of imported or referenced modules.
-  mutable llvm::DenseMap<Identifier, Identifier> ModuleAliasMap;
+  /// Set if a `-module-alias` was passed. Used to store mapping between module aliases and
+  /// their corresponding real names, and vice versa for a reverse lookup, which is needed to check
+  /// if the module names appearing in source files are aliases or real names.
+  /// \see ASTContext::getRealModuleName.
+  ///
+  /// The boolean in the value indicates whether or not the entry is keyed by an alias vs real name,
+  /// i.e. true if the entry is [key: alias_name, value: (real_name, true)].
+  mutable llvm::DenseMap<Identifier, std::pair<Identifier, bool>> ModuleAliasMap;
 
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &

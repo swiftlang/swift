@@ -1237,6 +1237,15 @@ public:
                       CopyValueInst(getSILDebugLocation(Loc), operand));
   }
 
+  ExplicitCopyValueInst *createExplicitCopyValue(SILLocation Loc,
+                                                 SILValue operand) {
+    assert(!operand->getType().isTrivial(getFunction()) &&
+           "Should not be passing trivial values to this api. Use instead "
+           "emitCopyValueOperation");
+    return insert(new (getModule())
+                      ExplicitCopyValueInst(getSILDebugLocation(Loc), operand));
+  }
+
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand,
                                        bool poisonRefs = false) {
     assert(isLoadableOrOpaque(operand->getType()));

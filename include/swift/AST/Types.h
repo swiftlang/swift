@@ -802,7 +802,7 @@ public:
 
   /// Check if this is a CGFloat type from CoreGraphics framework
   /// on macOS or Foundation on Linux.
-  bool isCGFloatType();
+  bool isCGFloat();
 
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
@@ -3395,8 +3395,6 @@ struct ParameterListInfo {
   SmallBitVector defaultArguments;
   SmallBitVector acceptsUnlabeledTrailingClosures;
   SmallBitVector propertyWrappers;
-  SmallBitVector unsafeSendable;
-  SmallBitVector unsafeMainActor;
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
 
@@ -3416,16 +3414,6 @@ public:
   /// The ParamDecl at the given index if the parameter has an applied
   /// property wrapper.
   bool hasExternalPropertyWrapper(unsigned paramIdx) const;
-
-  /// Whether the given parameter is unsafe Sendable, meaning that
-  /// we will treat it as Sendable in a context that has adopted concurrency
-  /// features.
-  bool isUnsafeSendable(unsigned paramIdx) const;
-
-  /// Whether the given parameter is unsafe MainActor, meaning that
-  /// we will treat it as being part of the main actor but that it is not
-  /// part of the type system.
-  bool isUnsafeMainActor(unsigned paramIdx) const;
 
   /// Whether the given parameter is a closure that should allow capture of
   /// 'self' to be implicit, without requiring "self.".

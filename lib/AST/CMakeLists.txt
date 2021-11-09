@@ -78,10 +78,11 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/GeneratingConformances.cpp
   RequirementMachine/GenericSignatureQueries.cpp
   RequirementMachine/PropertyMap.cpp
-  RequirementMachine/ProtocolGraph.cpp
+  RequirementMachine/PropertyUnification.cpp
   RequirementMachine/RequirementMachine.cpp
   RequirementMachine/RequirementMachineRequests.cpp
   RequirementMachine/RewriteContext.cpp
+  RequirementMachine/RewriteLoop.cpp
   RequirementMachine/RewriteSystem.cpp
   RequirementMachine/RewriteSystemCompletion.cpp
   RequirementMachine/Symbol.cpp

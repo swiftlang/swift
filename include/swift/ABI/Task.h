@@ -480,27 +480,42 @@ public:
       return resultType;
     }
 
-    /// Retrieve a pointer to the storage of result.
+    /// Retrieve a pointer to the storage of the result.
     OpaqueValue *getStoragePtr() {
-      return reinterpret_cast<OpaqueValue *>(
-          reinterpret_cast<char *>(this) + storageOffset(resultType));
+      // The result storage starts at the first aligned offset following
+      // the fragment header.  This offset will agree with the abstract
+      // calculation for `resultOffset` in the fragmentSize function below
+      // because the entire task is aligned to at least the target
+      // alignment (because it's aligned to MaxAlignment), which means
+      // `this` must have the same value modulo that alignment as
+      // `fragmentOffset` has in that function.
+      char *fragmentAddr = reinterpret_cast<char *>(this);
+      uintptr_t alignment = resultType->vw_alignment();
+      char *resultAddr = fragmentAddr + sizeof(FutureFragment);
+      uintptr_t unalignedResultAddrInt =
+        reinterpret_cast<uintptr_t>(resultAddr);
+      uintptr_t alignedResultAddrInt =
+        (unalignedResultAddrInt + alignment - 1) & ~(alignment - 1);
+      // We could just cast alignedResultAddrInt back to a pointer, but
+      // doing pointer arithmetic is more strictly conformant and less
+      // likely to annoy the optimizer.
+      resultAddr += (alignedResultAddrInt - unalignedResultAddrInt);
+      return reinterpret_cast<OpaqueValue *>(resultAddr);
     }
 
     /// Retrieve the error.
     SwiftError *&getError() { return error; }
 
-    /// Compute the offset of the storage from the base of the future
-    /// fragment.
-    static size_t storageOffset(const Metadata *resultType)  {
-      size_t offset = sizeof(FutureFragment);
+    /// Determine the size of the future fragment given the result type
+    /// of the future.
+    static size_t fragmentSize(size_t fragmentOffset,
+                               const Metadata *resultType) {
+      assert((fragmentOffset & (alignof(FutureFragment) - 1)) == 0);
       size_t alignment = resultType->vw_alignment();
-      return (offset + alignment - 1) & ~(alignment - 1);
-    }
-
-    /// Determine the size of the future fragment given a particular future
-    /// result type.
-    static size_t fragmentSize(const Metadata *resultType) {
-      return storageOffset(resultType) + resultType->vw_size();
+      size_t resultOffset = fragmentOffset + sizeof(FutureFragment);
+      resultOffset = (resultOffset + alignment - 1) & ~(alignment - 1);
+      size_t endOffset = resultOffset + resultType->vw_size();
+      return (endOffset - fragmentOffset);
     }
   };
 

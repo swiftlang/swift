@@ -82,28 +82,6 @@ SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
                                       APInt(1, Val));
 }
 
-SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
-  assert(BI->hasSubstitutions() && "Expected substitutions for canBeClass");
-
-  auto const &Subs = BI->getSubstitutions();
-  assert((Subs.getReplacementTypes().size() == 1) &&
-         "Expected one substitution in call to canBeClass");
-
-  auto Ty = Subs.getReplacementTypes()[0]->getCanonicalType();
-  switch (Ty->canBeClass()) {
-  case TypeTraitResult::IsNot:
-    return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(),
-                                        APInt(8, 0));
-  case TypeTraitResult::Is:
-    return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(),
-                                        APInt(8, 1));
-  case TypeTraitResult::CanBe:
-    return nullptr;
-  }
-
-  llvm_unreachable("Unhandled TypeTraitResult in switch.");
-}
-
 SILInstruction *SILCombiner::optimizeBuiltinIsConcrete(BuiltinInst *BI) {
   if (BI->getOperand(0)->getType().hasArchetype())
     return nullptr;
@@ -680,7 +658,7 @@ SILInstruction *SILCombiner::optimizeStringObject(BuiltinInst *BI) {
 
 SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   if (I->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
-    return optimizeBuiltinCanBeObjCClass(I);
+    return optimizeBuiltinCanBeObjCClass(I, Builder);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::IsConcrete)
     return optimizeBuiltinIsConcrete(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::COWBufferForReading)

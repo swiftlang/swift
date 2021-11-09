@@ -548,7 +548,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
   if (!TypeVar->getImpl().isClosureParameterType()) {
     auto type = binding.BindingType;
 
-    if (type->isCGFloatType() &&
+    if (type->isCGFloat() &&
         llvm::any_of(Bindings, [](const PotentialBinding &binding) {
           return binding.BindingType->isDouble();
         }))
@@ -557,7 +557,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
     if (type->isDouble()) {
       auto inferredCGFloat =
           llvm::find_if(Bindings, [](const PotentialBinding &binding) {
-            return binding.BindingType->isCGFloatType();
+            return binding.BindingType->isCGFloat();
           });
 
       if (inferredCGFloat != Bindings.end()) {
@@ -1709,7 +1709,8 @@ bool TypeVarBindingProducer::computeNext() {
     if (NumTries == 0 && binding.hasDefaultedLiteralProtocol()) {
       auto knownKind =
           *(binding.getDefaultedLiteralProtocol()->getKnownProtocolKind());
-      for (auto altType : CS.getAlternativeLiteralTypes(knownKind)) {
+      SmallVector<Type, 2> scratch;
+      for (auto altType : CS.getAlternativeLiteralTypes(knownKind, scratch)) {
         addNewBinding(binding.withSameSource(altType, BindingKind::Subtypes));
       }
     }
@@ -1983,7 +1984,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
-    cs.DefaultedConstraints.push_back(srcLocator);
+    cs.DefaultedConstraints.insert(srcLocator);
 
     if (type->isPlaceholder() && reportHole())
       return true;

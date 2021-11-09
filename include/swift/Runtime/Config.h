@@ -226,6 +226,22 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 // so changing this value is not sufficient.
 #define SWIFT_DEFAULT_LLVM_CC llvm::CallingConv::C
 
+// SWIFT_FORMAT(fmt,first) marks a function as taking a format string argument
+// at argument `fmt`, with the first argument for the format string as `first`.
+#if __has_attribute(format)
+#define SWIFT_FORMAT(fmt,first) __attribute__((format(printf, fmt, first)))
+#else
+#define SWIFT_FORMAT(fmt,first)
+#endif
+
+// SWIFT_VFORMAT(fmt) marks a function as taking a format string argument at
+// argument `fmt`, with the arguments in a `va_list`.
+#if __has_attribute(format)
+#define SWIFT_VFORMAT(fmt)      __attribute__((format(printf, fmt, 0)))
+#else
+#define SWIFT_VFORMAT(fmt)
+#endif
+
 // Pointer authentication.
 #if __has_feature(ptrauth_calls)
 #define SWIFT_PTRAUTH 1

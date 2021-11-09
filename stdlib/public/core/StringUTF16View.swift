@@ -158,7 +158,7 @@ extension String.UTF16View: BidirectionalCollection {
 
   @inlinable @inline(__always)
   public func index(before idx: Index) -> Index {
-    precondition(!idx.isZeroPosition)
+    _precondition(!idx.isZeroPosition)
     if _slowPath(_guts.isForeign) { return _foreignIndex(before: idx) }
     if _guts.isASCII { return idx.priorEncoded }
 

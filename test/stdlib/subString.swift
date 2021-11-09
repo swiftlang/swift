@@ -255,7 +255,7 @@ SubstringTests.test("UTF8View") {
 
     // The specialization for Substring.withContiguousStorageIfAvailable was
     // added in https://github.com/apple/swift/pull/29146.
-    guard #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+    guard #available(SwiftStdlib 5.3, *) else {
       return
     }
     checkHasContiguousStorage(t)
