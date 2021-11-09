@@ -3435,6 +3435,15 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
+  // @IBAction implies @MainActor(unsafe).
+  if (value->getAttrs().hasAttribute<IBActionAttr>()) {
+    ASTContext &ctx = value->getASTContext();
+    if (Type mainActor = ctx.getMainActorType()) {
+      return inferredIsolation(
+          ActorIsolation::forGlobalActor(mainActor, /*unsafe=*/true));
+    }
+  }
+
   // Default isolation for this member.
   return defaultIsolation;
 }
