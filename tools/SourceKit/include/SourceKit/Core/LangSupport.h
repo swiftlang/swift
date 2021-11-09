@@ -486,6 +486,7 @@ struct CursorSymbolInfo {
 
   bool IsSystem = false;
   bool IsDynamic = false;
+  bool IsSynthesized = false;
 
   llvm::Optional<unsigned> ParentNameOffset;
 };
