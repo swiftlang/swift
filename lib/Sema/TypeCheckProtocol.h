@@ -212,6 +212,9 @@ enum class MatchKind : uint8_t {
   /// The witness matched the requirement exactly.
   ExactMatch,
 
+  /// The witness has fewer effects than the requirement, which is okay.
+  FewerEffects,
+
   /// There is a difference in optionality.
   OptionalityConflict,
 
@@ -488,10 +491,47 @@ struct RequirementMatch {
   /// The matched derivative generic signature.
   GenericSignature DerivativeGenSig;
 
-  /// Determine whether this match is viable.
+  /// Determine whether this match is well-formed, meaning that it is any
+  /// difference determined by requirement matching is acceptable.
+  bool isWellFormed() const {
+    switch(Kind) {
+    case MatchKind::ExactMatch:
+    case MatchKind::FewerEffects:
+      return true;
+
+    case MatchKind::OptionalityConflict:
+    case MatchKind::RenamedMatch:
+    case MatchKind::WitnessInvalid:
+    case MatchKind::Circularity:
+    case MatchKind::KindConflict:
+    case MatchKind::TypeConflict:
+    case MatchKind::MissingRequirement:
+    case MatchKind::StaticNonStaticConflict:
+    case MatchKind::SettableConflict:
+    case MatchKind::PrefixNonPrefixConflict:
+    case MatchKind::PostfixNonPostfixConflict:
+    case MatchKind::MutatingConflict:
+    case MatchKind::NonMutatingConflict:
+    case MatchKind::ConsumingConflict:
+    case MatchKind::RethrowsConflict:
+    case MatchKind::RethrowsByConformanceConflict:
+    case MatchKind::AsyncConflict:
+    case MatchKind::ThrowsConflict:
+    case MatchKind::NonObjC:
+    case MatchKind::MissingDifferentiableAttr:
+    case MatchKind::EnumCaseWithAssociatedValues:
+      return false;
+    }
+
+    llvm_unreachable("Unhandled MatchKind in switch.");
+  }
+
+  /// Determine whether this match is viable, meaning that we could generate
+  /// a witness for it, even though there might be semantic errors.
   bool isViable() const {
     switch(Kind) {
     case MatchKind::ExactMatch:
+    case MatchKind::FewerEffects:
     case MatchKind::OptionalityConflict:
     case MatchKind::RenamedMatch:
       return true;
@@ -525,6 +565,7 @@ struct RequirementMatch {
   bool hasWitnessType() const {
     switch(Kind) {
     case MatchKind::ExactMatch:
+    case MatchKind::FewerEffects:
     case MatchKind::RenamedMatch:
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
