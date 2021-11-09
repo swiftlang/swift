@@ -5704,6 +5704,8 @@ const Type *ArchetypeType::getSubclassTrailingObjects() const {
 ///
 /// \sa GenericTypeParamDecl
 class GenericTypeParamType : public SubstitutableType {
+  static constexpr unsigned TYPE_SEQUENCE_BIT = (1 << 30);
+
   using DepthIndexTy = llvm::PointerEmbeddedInt<unsigned, 31>;
 
   /// The generic type parameter or depth/index.
@@ -5711,8 +5713,8 @@ class GenericTypeParamType : public SubstitutableType {
 
 public:
   /// Retrieve a generic type parameter at the given depth and index.
-  static GenericTypeParamType *get(unsigned depth, unsigned index,
-                                   const ASTContext &ctx);
+  static GenericTypeParamType *get(bool isTypeSequence, unsigned depth,
+                                   unsigned index, const ASTContext &ctx);
 
   /// Retrieve the declaration of the generic type parameter, or null if
   /// there is no such declaration.
@@ -5747,6 +5749,15 @@ public:
   /// Here 'T' and 'U' have indexes 0 and 1, respectively. 'V' has index 0.
   unsigned getIndex() const;
 
+  /// Returns \c true if this generic type parameter is declared as a type
+  /// sequence.
+  ///
+  /// \code
+  /// func foo<@_typeSequence T>(_ : T...) { }
+  /// struct Foo<@_typeSequence T> { }
+  /// \encode
+  bool isTypeSequence() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::GenericTypeParam;
@@ -5760,18 +5771,19 @@ private:
                         RecursiveTypeProperties::HasTypeParameter),
       ParamOrDepthIndex(param) { }
 
-  explicit GenericTypeParamType(unsigned depth,
-                                unsigned index,
-                                const ASTContext &ctx)
-    : SubstitutableType(TypeKind::GenericTypeParam, &ctx,
-                        RecursiveTypeProperties::HasTypeParameter),
-      ParamOrDepthIndex(depth << 16 | index) { }
+  explicit GenericTypeParamType(bool isTypeSequence, unsigned depth,
+                                unsigned index, const ASTContext &ctx)
+      : SubstitutableType(TypeKind::GenericTypeParam, &ctx,
+                          RecursiveTypeProperties::HasTypeParameter),
+        ParamOrDepthIndex(depth << 16 | index |
+                          ((isTypeSequence ? 1 : 0) << 30)) {}
 };
 BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
-  static CanGenericTypeParamType get(unsigned depth, unsigned index,
-                                     const ASTContext &C) {
-    return CanGenericTypeParamType(GenericTypeParamType::get(depth, index, C));
-  }
+static CanGenericTypeParamType get(bool isTypeSequence, unsigned depth,
+                                   unsigned index, const ASTContext &C) {
+  return CanGenericTypeParamType(
+      GenericTypeParamType::get(isTypeSequence, depth, index, C));
+}
 END_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
 
 /// A type that refers to a member type of some type that is dependent on a
@@ -6323,7 +6335,8 @@ constexpr bool TypeBase::isSugaredType<id##Type>() { \
 #include "swift/AST/TypeNodes.def"
 
 inline GenericParamKey::GenericParamKey(const GenericTypeParamType *p)
-  : Depth(p->getDepth()), Index(p->getIndex()) { }
+    : TypeSequence(p->isTypeSequence()), Depth(p->getDepth()),
+      Index(p->getIndex()) {}
 
 inline TypeBase *TypeBase::getDesugaredType() {
   if (!isa<SugarType>(this))

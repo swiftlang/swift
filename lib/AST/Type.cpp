@@ -1277,8 +1277,9 @@ CanType TypeBase::computeCanonicalType() {
 
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
            "parameter hasn't been validated");
-    Result = GenericTypeParamType::get(gpDecl->getDepth(), gpDecl->getIndex(),
-                                       gpDecl->getASTContext());
+    Result =
+        GenericTypeParamType::get(gpDecl->isTypeSequence(), gpDecl->getDepth(),
+                                  gpDecl->getIndex(), gpDecl->getASTContext());
     break;
   }
 
@@ -1525,7 +1526,7 @@ unsigned GenericTypeParamType::getDepth() const {
   }
 
   auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
-  return fixedNum >> 16;
+  return (fixedNum & ~GenericTypeParamType::TYPE_SEQUENCE_BIT) >> 16;
 }
 
 unsigned GenericTypeParamType::getIndex() const {
@@ -1535,6 +1536,16 @@ unsigned GenericTypeParamType::getIndex() const {
 
   auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
   return fixedNum & 0xFFFF;
+}
+
+bool GenericTypeParamType::isTypeSequence() const {
+  if (auto param = getDecl()) {
+    return param->isTypeSequence();
+  }
+
+  auto fixedNum = ParamOrDepthIndex.get<DepthIndexTy>();
+  return (fixedNum & GenericTypeParamType::TYPE_SEQUENCE_BIT) ==
+         GenericTypeParamType::TYPE_SEQUENCE_BIT;
 }
 
 Identifier GenericTypeParamType::getName() const {

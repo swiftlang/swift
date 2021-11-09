@@ -333,11 +333,13 @@ Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
         continue;
 
       case Symbol::Kind::Protocol:
-        handleRoot(GenericTypeParamType::get(0, 0, ctx.getASTContext()));
+        handleRoot(GenericTypeParamType::get(/*type sequence*/ false, 0, 0,
+                                             ctx.getASTContext()));
         continue;
 
       case Symbol::Kind::AssociatedType:
-        handleRoot(GenericTypeParamType::get(0, 0, ctx.getASTContext()));
+        handleRoot(GenericTypeParamType::get(/*type sequence*/ false, 0, 0,
+                                             ctx.getASTContext()));
 
         // An associated type term at the root means we have a dependent
         // member type rooted at Self; handle the associated type below.
@@ -400,7 +402,8 @@ Type RewriteContext::getRelativeTypeForTerm(
     const MutableTerm &term, const MutableTerm &prefix) const {
   assert(std::equal(prefix.begin(), prefix.end(), term.begin()));
 
-  auto genericParam = CanGenericTypeParamType::get(0, 0, Context);
+  auto genericParam =
+      CanGenericTypeParamType::get(/*type sequence*/ false, 0, 0, Context);
   return getTypeForSymbolRange(
       term.begin() + prefix.size(), term.end(), genericParam,
       { }, *this);

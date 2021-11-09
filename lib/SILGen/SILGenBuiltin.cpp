@@ -1411,9 +1411,10 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(MetatypeType::get(
-               GenericTypeParamType::get(0, 0, SGF.getASTContext()),
-               MetatypeRepresentation::Thick))
+      Type(MetatypeType::get(GenericTypeParamType::get(/*type sequence*/ false,
+                                                       /*depth*/ 0, /*index*/ 0,
+                                                       SGF.getASTContext()),
+                             MetatypeRepresentation::Thick))
           .subst(subs)
           ->getCanonicalType();
   CanType anyTypeType = ExistentialMetatypeType::get(
@@ -1435,7 +1436,9 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
           .withRepresentation(GenericFunctionType::Representation::Swift)
           .build();
   auto genericSig = subs.getGenericSignature().getCanonicalSignature();
-  auto genericResult = GenericTypeParamType::get(0, 0, ctx);
+  auto genericResult =
+      GenericTypeParamType::get(/*type sequence*/ false,
+                                /*depth*/ 0, /*index*/ 0, SGF.getASTContext());
   // <T> () async throws -> T
   CanType functionTy =
       GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
@@ -1466,9 +1469,12 @@ static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(
-        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext()), MetatypeRepresentation::Thick))
-          .subst(subs)->getCanonicalType();
+      Type(MetatypeType::get(GenericTypeParamType::get(/*type sequence*/ false,
+                                                       /*depth*/ 0, /*index*/ 0,
+                                                       SGF.getASTContext()),
+                             MetatypeRepresentation::Thick))
+          .subst(subs)
+          ->getCanonicalType();
   CanType anyTypeType = ExistentialMetatypeType::get(
       ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
   auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);

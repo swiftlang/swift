@@ -3704,15 +3704,17 @@ GenericFunctionType::GenericFunctionType(
   }
 }
 
-GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
+GenericTypeParamType *GenericTypeParamType::get(bool isTypeSequence,
+                                                unsigned depth, unsigned index,
                                                 const ASTContext &ctx) {
-  auto known = ctx.getImpl().GenericParamTypes.find({ depth, index });
+  const auto depthKey = depth | ((isTypeSequence ? 1 : 0) << 30);
+  auto known = ctx.getImpl().GenericParamTypes.find({depthKey, index});
   if (known != ctx.getImpl().GenericParamTypes.end())
     return known->second;
 
   auto result = new (ctx, AllocationArena::Permanent)
-                  GenericTypeParamType(depth, index, ctx);
-  ctx.getImpl().GenericParamTypes[{depth, index}] = result;
+      GenericTypeParamType(isTypeSequence, depth, index, ctx);
+  ctx.getImpl().GenericParamTypes[{depthKey, index}] = result;
   return result;
 }
 
@@ -4366,8 +4368,10 @@ CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
       ::new (mem) OpenedArchetypeType(ctx, existential,
                                 protos, layoutSuperclass,
                                 layoutConstraint, *knownID);
-  result->InterfaceType = GenericTypeParamType::get(0, 0, ctx);
-  
+  result->InterfaceType =
+      GenericTypeParamType::get(/*type sequence*/ false,
+                                /*depth*/ 0, /*index*/ 0, ctx);
+
   openedExistentialArchetypes[*knownID] = result;
   return CanOpenedArchetypeType(result);
 }
@@ -5011,8 +5015,9 @@ ASTContext::getClangTypeForIRGen(Type ty) {
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)
     return theSig;
-  
-  auto param = GenericTypeParamType::get(0, 0, *this);
+
+  auto param = GenericTypeParamType::get(/*type sequence*/ false,
+                                         /*depth*/ 0, /*index*/ 0, *this);
   auto sig = GenericSignature::get(param, { });
   auto canonicalSig = CanGenericSignature(sig);
   getImpl().SingleGenericParameterSignature = canonicalSig;
@@ -5041,7 +5046,9 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
 
-  auto genericParam = GenericTypeParamType::get(0, 0, *this);
+  auto genericParam =
+      GenericTypeParamType::get(/*type sequence*/ false,
+                                /*depth*/ 0, /*index*/ 0, *this);
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           existential);
   auto genericSig = buildGenericSignature(*this,
@@ -5126,7 +5133,8 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     }
 
     return CanGenericTypeParamType::get(
-        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), *this);
+        gp->isTypeSequence(), gp->getDepth() - baseDepth + derivedDepth,
+        gp->getIndex(), *this);
   };
 
   auto lookupConformanceFn =

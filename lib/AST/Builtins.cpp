@@ -234,9 +234,9 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  auto genericParam =
-    new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
-                                   ident, SourceLoc(), 0, index);
+  auto genericParam = new (ctx) GenericTypeParamDecl(
+      &M->getMainFile(FileUnitKind::Builtin), ident, SourceLoc(),
+      /*type sequence*/ false, 0, index);
   return genericParam;
 }
 
