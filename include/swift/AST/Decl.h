@@ -486,11 +486,12 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
   SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16,
+  SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16+1,
     : NumPadBits,
 
     Depth : 16,
-    Index : 16
+    Index : 16,
+    TypeSequence : 1
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
@@ -2883,7 +2884,7 @@ public:
   /// \param name The name of the generic parameter.
   /// \param nameLoc The location of the name.
   GenericTypeParamDecl(DeclContext *dc, Identifier name, SourceLoc nameLoc,
-                       unsigned depth, unsigned index);
+                       bool isTypeSequence, unsigned depth, unsigned index);
 
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
@@ -2904,6 +2905,15 @@ public:
     Bits.GenericTypeParamDecl.Depth = depth;
     assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
   }
+
+  /// Returns \c true if this generic type parameter is declared as a type
+  /// sequence.
+  ///
+  /// \code
+  /// func foo<@_typeSequence T>(_ : T...) { }
+  /// struct Foo<@_typeSequence T> { }
+  /// \encode
+  bool isTypeSequence() const { return Bits.GenericTypeParamDecl.TypeSequence; }
 
   /// The index of this generic type parameter within its generic parameter
   /// list.
@@ -7594,7 +7604,8 @@ inline bool Decl::isPotentiallyOverridable() const {
 }
 
 inline GenericParamKey::GenericParamKey(const GenericTypeParamDecl *d)
-  : Depth(d->getDepth()), Index(d->getIndex()) { }
+    : TypeSequence(d->isTypeSequence()), Depth(d->getDepth()),
+      Index(d->getIndex()) {}
 
 inline const GenericContext *Decl::getAsGenericContext() const {
   switch (getKind()) {

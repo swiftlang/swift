@@ -3949,8 +3949,8 @@ namespace {
 
           auto *typeParam = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
               param, AccessLevel::Public, dc,
-              Impl.SwiftContext.getIdentifier(param->getName()), SourceLoc(), 0,
-              i);
+              Impl.SwiftContext.getIdentifier(param->getName()), SourceLoc(),
+              /*type sequence*/ false, /*depth*/ 0, /*index*/ i);
           templateParams.push_back(typeParam);
           (void)++i;
         }
@@ -4419,11 +4419,13 @@ namespace {
 
       SmallVector<GenericTypeParamDecl *, 4> genericParams;
       for (auto &param : *decl->getTemplateParameters()) {
-        auto genericParamDecl = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
-            param, AccessLevel::Public, dc,
-            Impl.SwiftContext.getIdentifier(param->getName()),
-            Impl.importSourceLoc(param->getLocation()),
-            /*depth*/ 0, /*index*/ genericParams.size());
+        auto genericParamDecl =
+            Impl.createDeclWithClangNode<GenericTypeParamDecl>(
+                param, AccessLevel::Public, dc,
+                Impl.SwiftContext.getIdentifier(param->getName()),
+                Impl.importSourceLoc(param->getLocation()),
+                /*type sequence*/ false, /*depth*/ 0,
+                /*index*/ genericParams.size());
         genericParams.push_back(genericParamDecl);
       }
       auto genericParamList = GenericParamList::create(
@@ -7747,7 +7749,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
         objcGenericParam, AccessLevel::Public, dc,
         Impl.SwiftContext.getIdentifier(objcGenericParam->getName()),
         Impl.importSourceLoc(objcGenericParam->getLocation()),
-        /*depth*/ 0, /*index*/ genericParams.size());
+        /*type sequence*/ false, /*depth*/ 0, /*index*/ genericParams.size());
     // NOTE: depth is always 0 for ObjC generic type arguments, since only
     // classes may have generic types in ObjC, and ObjC classes cannot be
     // nested.

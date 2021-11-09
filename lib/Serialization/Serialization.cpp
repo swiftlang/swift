@@ -3385,11 +3385,11 @@ public:
     verifyAttrSerializable(genericParam);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericTypeParamDeclLayout::Code];
-    GenericTypeParamDeclLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                S.addDeclBaseNameRef(genericParam->getName()),
-                                genericParam->isImplicit(),
-                                genericParam->getDepth(),
-                                genericParam->getIndex());
+    GenericTypeParamDeclLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addDeclBaseNameRef(genericParam->getName()),
+        genericParam->isImplicit(), genericParam->isTypeSequence(),
+        genericParam->getDepth(), genericParam->getIndex());
   }
 
   void visitAssociatedTypeDecl(const AssociatedTypeDecl *assocType) {
@@ -4471,6 +4471,7 @@ public:
       indexPlusOne = genericParam->getIndex() + 1;
     }
     GenericTypeParamTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                           genericParam->isTypeSequence(),
                                            declIDOrDepth, indexPlusOne);
   }
 

@@ -90,7 +90,9 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
 
   SmallVector<GenericTypeParamType *, 4> params;
   for (unsigned i : indices(openedTypes)) {
-    params.push_back(GenericTypeParamType::get(0, i, t->getASTContext()));
+    params.push_back(GenericTypeParamType::get(/*type sequence*/ false,
+                                               /*depth*/ 0, /*index*/ i,
+                                               t->getASTContext()));
   }
   
   auto mappedSig = GenericSignature::get(params, {});

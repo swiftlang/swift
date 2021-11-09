@@ -467,11 +467,9 @@ computeDesignatedInitOverrideSignature(ASTContext &ctx,
         depth = genericSig.getGenericParams().back()->getDepth() + 1;
 
       for (auto *param : genericParams->getParams()) {
-        auto *newParam = new (ctx) GenericTypeParamDecl(classDecl,
-                                                        param->getName(),
-                                                        SourceLoc(),
-                                                        depth,
-                                                        param->getIndex());
+        auto *newParam = new (ctx) GenericTypeParamDecl(
+            classDecl, param->getName(), SourceLoc(), param->isTypeSequence(),
+            depth, param->getIndex());
         newParams.push_back(newParam);
       }
 
