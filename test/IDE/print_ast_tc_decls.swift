@@ -536,7 +536,7 @@ class d0170_TestAvailability {
 // PASS_COMMON-LABEL: {{^}}@objc class d0180_TestIBAttrs {{{$}}
 
   @IBAction func anAction(_: AnyObject) {}
-// PASS_COMMON-NEXT: {{^}}  @objc @IBAction func anAction(_: AnyObject){{$}}
+// PASS_COMMON-NEXT: {{^}}  @objc @IBAction @MainActor func anAction(_: AnyObject){{$}}
 
   @IBSegueAction func aSegueAction(_ coder: AnyObject, sender: AnyObject, identifier: AnyObject?) -> Any? { fatalError() }
 // PASS_COMMON-NEXT: {{^}}  @objc @IBSegueAction func aSegueAction(_ coder: AnyObject, sender: AnyObject, identifier: AnyObject?) -> Any?{{$}}
