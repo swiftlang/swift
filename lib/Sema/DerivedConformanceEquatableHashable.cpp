@@ -1011,7 +1011,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
         // Hashable because DerivedConformance::canDeriveHashable returns true
         // even if the conformance can't be derived. See the note there for
         // details.
-        auto *dc = cast<DeclContext>(ConformanceDecl);
+        auto *dc = ConformanceDecl->getDeclContext();
         tryDiagnoseFailedHashableDerivation(dc, Nominal);
         return nullptr;
       }
