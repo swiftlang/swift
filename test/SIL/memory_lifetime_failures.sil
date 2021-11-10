@@ -600,3 +600,39 @@ bb3:
   %15 = tuple ()
   return %15 : $()
 }
+
+// CHECK: SIL memory lifetime failure in @test_double_enum_destroy: memory is not initialized, but should
+sil [ossa] @test_double_enum_destroy : $@convention(thin) (@in Optional<String>) -> () {
+bb0(%0 : $*Optional<String>):
+  %l = load_borrow %0 : $*Optional<String>
+  switch_enum %l : $Optional<String>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2 
+
+bb1(%a : @guaranteed $String):
+  end_borrow %l : $Optional<String>
+  %2 = load [take] %0 : $*Optional<String>
+  destroy_value %2 : $Optional<String>
+  br bb3 
+
+bb2:
+  end_borrow %l : $Optional<String>
+  %3 = load [take] %0 : $*Optional<String>
+  destroy_value %3 : $Optional<String>
+  %4 = load [take] %0 : $*Optional<String>
+  destroy_value %4 : $Optional<String>
+  br bb3 
+
+bb3:
+  %r = tuple ()
+  return %r : $() 
+}
+
+// CHECK: SIL memory lifetime failure in @test_destroy_enum_before_return: indirect argument is not alive at function return
+sil [ossa] @test_destroy_enum_before_return : $@convention(thin) () -> @out Optional<String> {
+bb0(%0 : $*Optional<String>):
+  %1 = enum $Optional<String>, #Optional.none!enumelt
+  store %1 to [trivial] %0 : $*Optional<String>
+  destroy_addr %0 : $*Optional<String>
+  %r = tuple ()
+  return %r : $() 
+}
+
