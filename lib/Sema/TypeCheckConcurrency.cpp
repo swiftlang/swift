@@ -2651,6 +2651,11 @@ namespace {
       }
     }
     }
+
+    /// Determine whether the given reference is to a method on
+    /// a remote distributed actor in the given context.
+    bool isDistributedThunk(ConcreteDeclRef ref, Expr *context,
+                            bool isInAsyncLetInitializer);
   };
 }
 
@@ -2681,6 +2686,58 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
 
   // We hit the same context, so it won't execute concurrently.
   return false;
+}
+
+bool ActorIsolationChecker::isDistributedThunk(ConcreteDeclRef ref,
+                                               Expr *context,
+                                               bool isInAsyncLetInitializer) {
+  auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(ref.getDecl());
+  if (!(FD && FD->isInstanceMember() && FD->isDistributed()))
+    return false;
+
+  if (!isa<SelfApplyExpr>(context))
+    return false;
+
+  auto actor = getIsolatedActor(cast<SelfApplyExpr>(context)->getBase());
+
+  // If this is a method reference on an isolated or potentially isolated
+  // actor then it cannot be a remote thunk.
+  if (actor.isIsolated() || actor.isPotentiallyIsolated)
+    return false;
+
+  auto *dc = getDeclContext();
+
+  switch (ActorIsolationRestriction::forDeclaration(ref, dc)) {
+  case ActorIsolationRestriction::CrossActorSelf: {
+    // Not a thunk if it's used in actor init or de-init.
+    if (!isInAsyncLetInitializer && isActorInitOrDeInitContext(dc))
+      return false;
+
+    // Here we know that the method could be used across actors
+    // and the actor it's used on is non-isolated, which means
+    // that it could be a thunk, so we have to be conservative
+    // about it.
+    return true;
+  }
+
+  case ActorIsolationRestriction::ActorSelf: {
+    // An instance member of an actor can be referenced from an actor's
+    // designated initializer or deinitializer.
+    if (actor.isActorSelf() && !isInAsyncLetInitializer) {
+      if (auto fn = isActorInitOrDeInitContext(dc)) {
+        if (!isConvenienceInit(fn))
+          return false;
+      }
+    }
+
+    // Call on a non-isolated actor in async context requires
+    // implicit thunk.
+    return isInAsyncLetInitializer || isInAsynchronousContext();
+  }
+
+  default:
+    return false;
+  }
 }
 
 void swift::checkTopLevelActorIsolation(TopLevelCodeDecl *decl) {
@@ -4284,4 +4341,12 @@ bool swift::isAsynchronousContext(const DeclContext *dc) {
   }
 
   return false;
+}
+
+bool swift::constraints::isDistributedThunk(ConcreteDeclRef ref,
+                                            Expr *context,
+                                            DeclContext *dc,
+                                            bool isInAsyncLetInitializer) {
+  ActorIsolationChecker checker(dc);
+  return checker.isDistributedThunk(ref, context, isInAsyncLetInitializer);
 }

@@ -333,6 +333,14 @@ bool checkSendableConformance(
 /// function or a closure declaration marked as `async`.
 bool isAsynchronousContext(const DeclContext *dc);
 
+namespace constraints {
+/// Determine whether the given reference is to a method on
+/// a remote distributed actor in the given context.
+bool isDistributedThunk(ConcreteDeclRef ref, Expr *context,
+                        DeclContext *dc,
+                        bool isInAsyncLetInitializer);
+} // end namespace constraints
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */
