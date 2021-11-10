@@ -275,6 +275,11 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
                          xpc_dictionary_get_uint64(event,
                                                    xpc::KeyCancelRequest))) {
         sourcekitd::cancelRequest(/*CancellationToken=*/cancelToken);
+      } else if (SourceKitCancellationToken cancelToken =
+                     reinterpret_cast<SourceKitCancellationToken>(
+                         xpc_dictionary_get_uint64(
+                             event, xpc::KeyDisposeRequestHandle))) {
+        sourcekitd::disposeCancellationToken(/*CancellationToken=*/cancelToken);
       } else {
         assert(false && "unexpected message");
       }
