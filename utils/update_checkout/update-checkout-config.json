@@ -181,7 +181,7 @@
                 "cmake": "v3.16.5",
                 "indexstore-db": "release/5.5",
                 "sourcekit-lsp": "release/5.5",
-                "swift-format": "main",
+                "swift-format": "swift-5.5-branch",
                 "swift-installer-scripts": "main",
                 "swift-docc": "main",
                 "swift-lmdb": "main",
