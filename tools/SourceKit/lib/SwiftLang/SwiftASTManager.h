@@ -74,6 +74,7 @@
 #ifndef LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTASTMANAGER_H
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTASTMANAGER_H
 
+#include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/CancellationToken.h"
 #include "SwiftInvocation.h"
@@ -223,6 +224,7 @@ public:
   explicit SwiftASTManager(std::shared_ptr<SwiftEditorDocumentFileMap>,
                            std::shared_ptr<GlobalConfig> Config,
                            std::shared_ptr<SwiftStatistics> Stats,
+                           std::shared_ptr<RequestTracker> ReqTracker,
                            StringRef RuntimeResourcePath,
                            StringRef DiagnosticDocumentationPath);
   ~SwiftASTManager();
@@ -249,12 +251,6 @@ public:
                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
                   ArrayRef<ImmutableTextSnapshotRef> Snapshots =
                       ArrayRef<ImmutableTextSnapshotRef>());
-
-  /// Request the \c SwiftASTConsumer with the given \p CancellationToken to be
-  /// cancelled. If \p CancellationToken is \c nullptr or no consumer with the
-  /// given cancellation token exists (e.g. because the consumer already
-  /// finished), this is a no-op.
-  void cancelASTConsumer(SourceKitCancellationToken CancellationToken);
 
   std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
                                                       std::string &Error);

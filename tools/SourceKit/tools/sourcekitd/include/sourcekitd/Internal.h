@@ -180,6 +180,8 @@ void handleRequest(sourcekitd_object_t Request,
 
 void cancelRequest(SourceKitCancellationToken CancellationToken);
 
+void disposeCancellationToken(SourceKitCancellationToken CancellationToken);
+
 void printRequestObject(sourcekitd_object_t Obj, llvm::raw_ostream &OS);
 void printResponse(sourcekitd_response_t Resp, llvm::raw_ostream &OS);
 
