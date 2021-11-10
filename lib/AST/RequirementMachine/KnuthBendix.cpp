@@ -1,4 +1,4 @@
-//===--- RewriteSystemCompletion.cpp - Confluent completion procedure -----===//
+//===--- KnuthBendix.cpp - Confluent completion procedure -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,11 +23,13 @@
 // pair to the other. This can introduce more overlaps with existing rules, and
 // the process iterates until fixed point.
 //
+// This implementation also extends Knuth-Bendix to introduce new _generators_,
+// in addition to new relations as in the standard algorithm. See the comment at
+// the top of RewriteSystem::processMergedAssociatedTypes() for a description.
+//
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
-#include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
