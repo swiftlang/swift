@@ -71,7 +71,8 @@ struct MyStruct {}
 // KEYWORD2-NEXT:             Keyword/None:                       derivative[#Func Attribute#]; name=derivative
 // KEYWORD2-NEXT:             Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
-// KEYWORD2-NEXT:             Keyword/None:          Sendable[#Func Attribute#]; name=Sendable
+// KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
+// KEYWORD2-NEXT:             Keyword/None:                       _unavailableFromAsync[#Func Attribute#]; name=_unavailableFromAsync
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2:                  Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2:                  End completions
@@ -155,6 +156,7 @@ struct _S {
 // ON_INIT-DAG: Keyword/None:                       inlinable[#Constructor Attribute#]; name=inlinable
 // ON_INIT-DAG: Keyword/None:                       usableFromInline[#Constructor Attribute#]; name=usableFromInline
 // ON_INIT-DAG: Keyword/None:                       discardableResult[#Constructor Attribute#]; name=discardableResult
+// ON_INIT-DAG: Keyword/None:                       _unavailableFromAsync[#Constructor Attribute#]; name=_unavailableFromAsync
 // ON_INIT: End completions
 
   @#^ON_PROPERTY^# var foo
@@ -196,6 +198,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // ON_METHOD-DAG: Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
+// ON_METHOD-DAG: Keyword/None:                       _unavailableFromAsync[#Func Attribute#]; name=_unavailableFromAsync
 // ON_METHOD-NOT: Keyword
 // ON_METHOD: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_METHOD: End completions
@@ -257,6 +260,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
 // ON_MEMBER_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
+// ON_MEMBER_LAST-DAG: Keyword/None:                       _unavailableFromAsync[#Declaration Attribute#]; name=_unavailableFromAsync
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
@@ -307,6 +311,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // KEYWORD_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
 // KEYWORD_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
+// KEYWORD_LAST-DAG: Keyword/None:                       _unavailableFromAsync[#Declaration Attribute#]; name=_unavailableFromAsync
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST:                  End completions
