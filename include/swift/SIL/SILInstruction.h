@@ -7439,7 +7439,7 @@ class MarkUnresolvedMoveAddrInst
   FixedOperandList<2> Operands;
 
   MarkUnresolvedMoveAddrInst(SILDebugLocation DebugLoc, SILValue srcAddr,
-                   SILValue takeAddr)
+                             SILValue takeAddr)
       : InstructionBase(DebugLoc), Operands(this, srcAddr, takeAddr) {}
 
 public:

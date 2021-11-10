@@ -593,9 +593,9 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::EndAccessInst:
         break;
       case SILInstructionKind::MarkUnresolvedMoveAddrInst:
-        // We model mark_unresolved_move_addr as a copy_addr [init]. So no mutation can
-        // happen. The checker will prove eventually that we can convert it to a
-        // copy_addr [take] [init].
+        // We model mark_unresolved_move_addr as a copy_addr [init]. So no
+        // mutation can happen. The checker will prove eventually that we can
+        // convert it to a copy_addr [take] [init].
         break;
       case SILInstructionKind::CopyAddrInst:
         if (isConsumingOrMutatingCopyAddrUse(use))

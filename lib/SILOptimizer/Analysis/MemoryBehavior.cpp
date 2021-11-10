@@ -302,8 +302,8 @@ MemBehavior MemoryBehaviorVisitor::visitCopyAddrInst(CopyAddrInst *CAI) {
   return MemBehavior::None;
 }
 
-MemBehavior
-MemoryBehaviorVisitor::visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *MAI) {
+MemBehavior MemoryBehaviorVisitor::visitMarkUnresolvedMoveAddrInst(
+    MarkUnresolvedMoveAddrInst *MAI) {
   bool mayWrite = mayAlias(MAI->getDest());
   bool mayRead = mayAlias(MAI->getSrc());
 
