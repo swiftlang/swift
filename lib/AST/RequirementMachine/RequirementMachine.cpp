@@ -49,7 +49,15 @@ struct RewriteSystemBuilder {
   llvm::DenseMap<const ProtocolDecl *, bool> ProtocolMap;
   std::vector<const ProtocolDecl *> Protocols;
 
-  std::vector<std::pair<MutableTerm, MutableTerm>> AssociatedTypeRules;
+  /// New rules to add which will be marked 'permanent'. These are rules for
+  /// introducing associated types, and relationships between layout,
+  /// superclass and concrete type symbols. They are not eliminated by
+  /// homotopy reduction, since they are always added when the rewrite system
+  /// is built.
+  std::vector<std::pair<MutableTerm, MutableTerm>> PermanentRules;
+
+  /// New rules derived from requirements written by the user, which can be
+  /// eliminated by homotopy reduction.
   std::vector<std::pair<MutableTerm, MutableTerm>> RequirementRules;
 
   CanType getConcreteSubstitutionSchema(CanType concreteType,
@@ -141,7 +149,7 @@ void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
   MutableTerm rhs;
   rhs.add(Symbol::forAssociatedType(proto, type->getName(), Context));
 
-  AssociatedTypeRules.emplace_back(lhs, rhs);
+  PermanentRules.emplace_back(lhs, rhs);
 }
 
 /// Lowers a generic requirement to a rewrite rule.
@@ -189,29 +197,51 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     //
     // Together with a rewrite rule
     //
-    //   T.[layout: L] => T
+    //   [superclass: C<X, Y>].[layout: L] => [superclass: C<X, Y>]
     //
     // Where 'L' is either AnyObject or _NativeObject, depending on the
     // ancestry of C.
+    //
+    // The second rule is marked permanent. Completion will derive a new
+    // rule as a consequence of these two rules:
+    //
+    //   T.[layout: L] => T
+    //
+    // The new rule will be marked redundant by homotopy reduction since
+    // it is a consequence of the other two rules.
     auto otherType = CanType(req.getSecondType());
 
+    // Build the symbol [superclass: C<X, Y>].
     SmallVector<Term, 1> substitutions;
     otherType = getConcreteSubstitutionSchema(otherType, proto,
                                               substitutions);
+    auto superclassSymbol = Symbol::forSuperclass(otherType, substitutions,
+                                                  Context);
 
-    constraintTerm = subjectTerm;
-    constraintTerm.add(Symbol::forSuperclass(otherType, substitutions,
-                                             Context));
-    RequirementRules.emplace_back(subjectTerm, constraintTerm);
+    {
+      // Build the symbol [layout: L].
+      auto layout =
+        LayoutConstraint::getLayoutConstraint(
+          otherType->getClassOrBoundGenericClass()->usesObjCObjectModel()
+            ? LayoutConstraintKind::Class
+            : LayoutConstraintKind::NativeClass,
+          Context.getASTContext());
+      auto layoutSymbol = Symbol::forLayout(layout, Context);
 
+      MutableTerm layoutSubjectTerm;
+      layoutSubjectTerm.add(superclassSymbol);
+
+      MutableTerm layoutConstraintTerm = layoutSubjectTerm;
+      layoutConstraintTerm.add(layoutSymbol);
+
+      // Add the rule [superclass: C<X, Y>].[layout: L] => [superclass: C<X, Y>].
+      PermanentRules.emplace_back(layoutConstraintTerm,
+                                  layoutSubjectTerm);
+    }
+
+    // Build the term T.[superclass: C<X, Y>].
     constraintTerm = subjectTerm;
-    auto layout =
-      LayoutConstraint::getLayoutConstraint(
-        otherType->getClassOrBoundGenericClass()->usesObjCObjectModel()
-          ? LayoutConstraintKind::Class
-          : LayoutConstraintKind::NativeClass,
-        Context.getASTContext());
-    constraintTerm.add(Symbol::forLayout(layout, Context));
+    constraintTerm.add(superclassSymbol);
     break;
   }
 
@@ -283,7 +313,7 @@ void RewriteSystemBuilder::processProtocolDependencies() {
     MutableTerm rhs;
     rhs.add(Symbol::forProtocol(proto, Context));
 
-    AssociatedTypeRules.emplace_back(lhs, rhs);
+    PermanentRules.emplace_back(lhs, rhs);
 
     for (auto *assocType : proto->getAssociatedTypeMembers())
       addAssociatedType(assocType, proto);
@@ -457,10 +487,9 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   RewriteSystemBuilder builder(Context, Dump);
   builder.addGenericSignature(sig);
 
-  // Add the initial set of rewrite rules to the rewrite system, also
-  // providing the protocol graph to use for the linear order on terms.
+  // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
-                    std::move(builder.AssociatedTypeRules),
+                    std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
   computeCompletion(RewriteSystem::DisallowInvalidRequirements);
@@ -498,10 +527,9 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
   RewriteSystemBuilder builder(Context, Dump);
   builder.addProtocols(protos);
 
-  // Add the initial set of rewrite rules to the rewrite system, also
-  // providing the protocol graph to use for the linear order on terms.
+  // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
-                    std::move(builder.AssociatedTypeRules),
+                    std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
   // FIXME: Only if the protocols were written in source, though.
