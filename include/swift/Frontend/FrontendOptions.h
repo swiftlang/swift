@@ -333,6 +333,11 @@ public:
   /// skip nodes entirely, depending on the errors involved.
   bool AllowModuleWithCompilerErrors = false;
 
+  /// Downgrade all errors emitted in the module interface verification phase
+  /// to warnings.
+  /// TODO: remove this after we fix all project-side warnings in the interface.
+  bool DowngradeInterfaceVerificationError = false;
+
   /// True if the "-static" option is set.
   bool Static = false;
 
