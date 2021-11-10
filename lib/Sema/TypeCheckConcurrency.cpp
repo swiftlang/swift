@@ -1796,20 +1796,7 @@ namespace {
     }
 
     bool isInAsynchronousContext() const {
-      auto dc = getDeclContext();
-      if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-        return func->isAsyncContext();
-      }
-
-      if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-        if (auto type = closure->getType()) {
-          if (auto fnType = type->getAs<AnyFunctionType>()) {
-            return fnType->isAsync();
-          }
-        }
-      }
-
-      return false;
+      return isAsynchronousContext(getDeclContext());
     }
 
     enum class AsyncMarkingResult {
@@ -4281,4 +4268,20 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 
 bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {
   return contextUsesConcurrencyFeatures(dc);
+}
+
+bool swift::isAsynchronousContext(const DeclContext *dc) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+    return func->isAsyncContext();
+  }
+
+  if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+    if (auto type = closure->getType()) {
+      if (auto fnType = type->getAs<AnyFunctionType>()) {
+        return fnType->isAsync();
+      }
+    }
+  }
+
+  return false;
 }

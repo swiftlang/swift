@@ -328,6 +328,11 @@ bool isDispatchQueueOperationName(StringRef name);
 /// \returns true if an error occurred.
 bool checkSendableConformance(
     ProtocolConformance *conformance, SendableCheck check);
+
+/// Check whether the given declaration context is asynchronous e.g.
+/// function or a closure declaration marked as `async`.
+bool isAsynchronousContext(const DeclContext *dc);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */
