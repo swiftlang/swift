@@ -5,7 +5,7 @@ add_swift_host_tool(swift-syntax-parser-test
   swift-syntax-parser-test.cpp
   LLVM_LINK_COMPONENTS
     support
-  SWIFT_COMPONENT tools
+  SWIFT_COMPONENT testsuite-tools
 )
 if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
   set_target_properties(swift-syntax-parser-test PROPERTIES
