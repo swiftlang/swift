@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//
 // This file implements the algorithm for computing a minimal set of rules from
 // a confluent rewrite system. A minimal set of rules is:
 //
@@ -76,7 +75,10 @@ using namespace rewriting;
 llvm::SmallVector<unsigned, 1>
 RewriteLoop::findRulesAppearingOnceInEmptyContext(
     const RewriteSystem &system) const {
+  // Rules appearing in empty context (possibly more than once).
   llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
+
+  // The number of times each rule appears (with or without context).
   llvm::SmallDenseMap<unsigned, unsigned, 2> ruleMultiplicity;
 
   RewritePathEvaluator evaluator(Basepoint);
@@ -100,6 +102,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     step.apply(evaluator, system);
   }
 
+  // Collect all rules that we saw exactly once in empty context.
   SmallVector<unsigned, 1> result;
   for (auto rule : rulesInEmptyContext) {
     auto found = ruleMultiplicity.find(rule);
@@ -759,8 +762,10 @@ void RewriteSystem::minimizeRewriteSystem() {
   // Now find a minimal set of generating conformances.
   //
   // FIXME: For now this just produces a set of redundant conformances, but
-  // it should actually compute the full generating conformance basis, since
-  // we want to use the same information for finding conformance access paths.
+  // it should actually output the canonical generating conformance equation
+  // for each non-generating conformance. We can then use information to
+  // compute conformance access paths, instead of the current "brute force"
+  // algorithm used for that purpose.
   llvm::DenseSet<unsigned> redundantConformances;
   computeGeneratingConformances(redundantConformances);
 
