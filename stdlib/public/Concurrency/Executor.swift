@@ -12,13 +12,13 @@
 
 import Swift
 
-/// A service which can execute jobs.
+/// A service that can execute jobs.
 @available(SwiftStdlib 5.1, *)
 public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: UnownedJob)
 }
 
-/// A service which can execute jobs.
+/// A service that executes jobs.
 @available(SwiftStdlib 5.1, *)
 public protocol SerialExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
