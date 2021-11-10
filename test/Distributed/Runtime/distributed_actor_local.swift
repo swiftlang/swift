@@ -14,7 +14,7 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 distributed actor SomeSpecificDistributedActor {
 
   distributed func hello() async throws {
@@ -37,7 +37,7 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct ActorAddress: ActorIdentity {
   let address: String
   init(parse address : String) {
@@ -45,7 +45,7 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 struct FakeTransport: ActorTransport {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented \(#function)")
@@ -69,9 +69,12 @@ struct FakeTransport: ActorTransport {
   func resignIdentity(_ id: AnyActorIdentity) {}
 }
 
+@available(SwiftStdlib 5.6, *)
+typealias DefaultActorTransport = FakeTransport
+
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 func test_initializers() {
   let address = ActorAddress(parse: "")
   let transport = FakeTransport()
@@ -80,7 +83,7 @@ func test_initializers() {
   _ = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 func test_address() {
   let transport = FakeTransport()
 
@@ -88,7 +91,7 @@ func test_address() {
   _ = actor.id
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 func test_run(transport: FakeTransport) async {
   let actor = SomeSpecificDistributedActor(transport: transport)
 
@@ -97,7 +100,7 @@ func test_run(transport: FakeTransport) async {
   print("after") // CHECK: after
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 func test_echo(transport: FakeTransport) async {
   let actor = SomeSpecificDistributedActor(transport: transport)
 
@@ -105,7 +108,7 @@ func test_echo(transport: FakeTransport) async {
   print("echo: \(echo)") // CHECK: echo: 42
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     await test_run(transport: FakeTransport())

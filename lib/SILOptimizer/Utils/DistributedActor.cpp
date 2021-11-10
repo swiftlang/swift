@@ -52,68 +52,140 @@ SILArgument *findFirstActorTransportArg(SILFunction &F) {
   return nullptr;
 }
 
-void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
-                        SILValue transport) {
-
+void emitActorTransportWitnessCall(
+    SILBuilder &B, SILLocation loc, DeclName methodName,
+    SILValue transport, SILType actorType, ArrayRef<SILValue> args,
+    Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets) {
   auto &F = B.getFunction();
   auto &M = B.getModule();
   auto &C = F.getASTContext();
 
-  ProtocolDecl *actorProto = C.getProtocol(KnownProtocolKind::DistributedActor);
+  // Dig out the conformance to ActorTransport.
   ProtocolDecl *transProto = C.getProtocol(KnownProtocolKind::ActorTransport);
-  assert(actorProto);
   assert(transProto);
-
-  // Open the transport existential
   auto transportASTType = transport->getType().getASTType();
+  auto *module = M.getSwiftModule();
+  ProtocolConformanceRef transportConfRef;
+
+  // If the transport is an existential open it.
+  bool openedExistential = false;
   if (transportASTType->isAnyExistentialType()) {
-    OpenedArchetypeType *Opened;
+    OpenedArchetypeType *opened;
     transportASTType =
-        transportASTType->openAnyExistentialType(Opened)->getCanonicalType();
-    transport = B.createOpenExistentialAddr(loc, transport,
-                                            F.getLoweredType(transportASTType),
-                                            OpenedExistentialAccess::Immutable);
+        transportASTType->openAnyExistentialType(opened)->getCanonicalType();
+    transport = B.createOpenExistentialAddr(
+        loc, transport, F.getLoweredType(transportASTType),
+        OpenedExistentialAccess::Immutable);
+    openedExistential = true;
   }
 
-  // Make the transport.actorReady call
+  if (transportASTType->isTypeParameter() ||
+      transportASTType->is<ArchetypeType>()) {
+    transportConfRef = ProtocolConformanceRef(transProto);
+  } else {
+    transportConfRef = module->lookupConformance(transportASTType, transProto);
+  }
 
-  // the conformance here is just an abstract thing so we can simplify
-  auto transportConfRef = ProtocolConformanceRef(transProto);
   assert(!transportConfRef.isInvalid() &&
          "Missing conformance to `ActorTransport`");
 
-  Type selfTy = F.mapTypeIntoContext(actor->getType().getASTType());
-
-  // Note: it does not matter on what module we perform the lookup,
-  // it is currently ignored. So the Stdlib module is good enough.
-  auto *module = M.getSwiftModule();
-  auto distributedActorConfRef = module->lookupConformance(selfTy, actorProto);
-  assert(!distributedActorConfRef.isInvalid() &&
-         "Missing conformance to `DistributedActor`");
-
-  // Prepare the actorReady function
-  auto actorReadyMethod =
-      cast<FuncDecl>(transProto->getSingleRequirement(C.Id_actorReady));
-  auto actorReadyRef = SILDeclRef(actorReadyMethod, SILDeclRef::Kind::Func);
-  auto actorReadySILTy =
-      M.Types.getConstantInfo(B.getTypeExpansionContext(), actorReadyRef)
+  // Dig out the method.
+  auto method = cast<FuncDecl>(transProto->getSingleRequirement(methodName));
+  auto methodRef = SILDeclRef(method, SILDeclRef::Kind::Func);
+  auto methodSILTy =
+      M.Types.getConstantInfo(B.getTypeExpansionContext(), methodRef)
           .getSILType();
 
-  auto readyWitnessMethod =
-      B.createWitnessMethod(loc,
-                            /*lookupTy*/ transportASTType,
-                            /*Conformance*/ transportConfRef,
-                            /*member*/ actorReadyRef,
-                            /*methodTy*/ actorReadySILTy);
+  auto witnessMethod = B.createWitnessMethod(
+      loc, transportASTType, transportConfRef, methodRef, methodSILTy);
 
   // prepare conformance substitutions
-  auto genericSig = actorReadyMethod->getGenericSignature();
+  SubstitutionMap subs;
+  {
+    auto genericSig = method->getGenericSignature();
+    SmallVector<Type, 2> subTypes;
+    SmallVector<ProtocolConformanceRef, 2> subConformances;
+    subTypes.push_back(transportASTType);
+    subConformances.push_back(transportConfRef);
+    if (actorType) {
+      ProtocolDecl *actorProto = C.getProtocol(
+          KnownProtocolKind::DistributedActor);
+      assert(actorProto);
 
-  SubstitutionMap subs =
-      SubstitutionMap::get(genericSig, {transportASTType, selfTy},
-                           {transportConfRef, distributedActorConfRef});
+      ProtocolConformanceRef conformance;
+      auto distributedActorConfRef = module->lookupConformance(
+          actorType.getASTType(), actorProto);
+      assert(!distributedActorConfRef.isInvalid() &&
+             "Missing conformance to `DistributedActor`");
+      subTypes.push_back(actorType.getASTType());
+      subConformances.push_back(distributedActorConfRef);
+    }
 
-  B.createApply(loc, readyWitnessMethod, subs, {actor, transport});
+    subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
+  }
+
+  // If the self parameter is indirect but the transport is a value, put it
+  // into a temporary allocation.
+  auto methodSILFnTy = methodSILTy.castTo<SILFunctionType>();
+  Optional<SILValue> temporaryTransportBuffer;
+  if (methodSILFnTy->getSelfParameter().isFormalIndirect() &&
+      !transport->getType().isAddress()) {
+    auto buf = B.createAllocStack(loc, transport->getType(), None);
+    transport = B.emitCopyValueOperation(loc, transport);
+    B.emitStoreValueOperation(
+        loc, transport, buf, StoreOwnershipQualifier::Init);
+    temporaryTransportBuffer = SILValue(buf);
+  }
+
+  // Call the method.
+  SmallVector<SILValue, 2> allArgs(args.begin(), args.end());
+  allArgs.push_back(
+      temporaryTransportBuffer ? *temporaryTransportBuffer : transport);
+
+  SILInstruction *apply;
+  if (tryTargets) {
+    apply = B.createTryApply(
+        loc, witnessMethod, subs, allArgs, tryTargets->first,
+        tryTargets->second);
+  } else {
+    apply = B.createApply(loc, witnessMethod, subs, allArgs);
+  }
+
+  // Local function to emit a cleanup after the call.
+  auto emitCleanup = [&](llvm::function_ref<void(SILBuilder &builder)> fn) {
+    if (tryTargets) {
+      {
+        SILBuilderWithScope normalBuilder(tryTargets->first, apply);
+        fn(normalBuilder);
+      }
+      {
+        SILBuilderWithScope errorBuilder(tryTargets->second, apply);
+        fn(errorBuilder);
+      }
+    } else {
+      fn(B);
+    }
+  };
+
+  // If we had to create a buffer to pass the transport
+  if (temporaryTransportBuffer) {
+    emitCleanup([&](SILBuilder & builder) {
+      auto value = builder.emitLoadValueOperation(
+          loc, *temporaryTransportBuffer, LoadOwnershipQualifier::Take);
+      builder.emitDestroyValueOperation(loc, value);
+      builder.createDeallocStack(loc, *temporaryTransportBuffer);
+    });
+  }
+}
+
+void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
+                        SILValue transport) {
+
+  auto &F = B.getFunction();
+  auto &C = F.getASTContext();
+  emitActorTransportWitnessCall(
+      B, loc, C.Id_actorReady, transport,
+      F.mapTypeIntoContext(actor->getType()), { actor });
 }
 
 } // namespace swift

@@ -42,13 +42,13 @@ With the compiler from step 1, a minimal subset of the standard library is built
 
 This library will be less optimized than the final library build.
 
-In case the build mode is `bootstrapping-with-hostlibs`, only the swiftmodule files of the library are built, but not the binaries. The binaries are not needed because the compiler (and `sil-opt`) link against the system swift libraries.
+This step is skipped when the build mode is `bootstrapping-with-hostlibs`.
 
 #### 3. The level-1 _libswift_
 
 The build outputs of level-1 are stored in the `bootstrapping1` directory under the main build directory.
 
-The _libswift_ library is built using the level-0 compiler and standard library from step 1. and 2.
+The _libswift_ library is built using the level-0 compiler and standard library from step 2 - or the OS libraries in case of `bootstrapping-with-hostlibs`.
 
 #### 4. The level-1 compiler
 
@@ -60,11 +60,13 @@ Unless the build mode is `bootstrapping-with-hostlibs`, the level-1 compiler dyn
 
 Like in step 2, a minimal subset of the standard library is built, using the level-1 compiler from step 4.
 
-Unless the build mode is `bootstrapping-with-hostlibs`, in this step, the build system redirects the compiler's dynamic library path to the level-0 library (by setting `DY/LD_LIBRARY_PATH` in  `SwiftSource.cmake`:`_compile_swift_files`). This is needed because the level-1 libraries are not built, yet.
+In this step, the build system redirects the compiler's dynamic library path to the level-0 library (by setting `DY/LD_LIBRARY_PATH` in  `SwiftSource.cmake`:`_compile_swift_files`). This is needed because the level-1 libraries are not built, yet.
+
+This step is skipped when the build mode is `bootstrapping-with-hostlibs`.
 
 #### 6. The final _libswift_
 
-The final _libswift_ is built with the level-1 compiler and standard library from step 4. and 5.
+The final _libswift_ is built with the level-1 compiler and standard library from step 5 - or the OS libraries in case of `bootstrapping-with-hostlibs`.
 
 #### 7. The final compiler
 

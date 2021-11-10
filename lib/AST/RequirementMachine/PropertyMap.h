@@ -163,8 +163,13 @@ public:
 
   PropertyBag *lookUpProperties(const MutableTerm &key) const;
 
+  std::pair<CompletionResult, unsigned>
+  buildPropertyMap(unsigned maxIterations,
+                   unsigned maxDepth);
+
   void dump(llvm::raw_ostream &out) const;
 
+private:
   void clear();
   void addProperty(Term key, Symbol property,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules);
@@ -173,7 +178,6 @@ public:
   void concretizeNestedTypesFromConcreteParents(
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const;
 
-private:
   void concretizeNestedTypesFromConcreteParent(
                    Term key, RequirementKind requirementKind,
                    CanType concreteType, ArrayRef<Term> substitutions,

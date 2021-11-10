@@ -200,7 +200,7 @@ StringIndexTests.test("Scalar Align UTF-8 indices") {
 #if _runtime(_ObjC)
 import Foundation
 StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
-  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else {
+  guard #available(SwiftStdlib 5.1, *) else {
     return
   }
 
@@ -311,7 +311,7 @@ StringIndexTests.test("Exhaustive Index Interchange") {
     file: String = #file,
     line: UInt = #line
   ) {
-    guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else {
+    guard #available(SwiftStdlib 5.1, *) else {
       return
     }
 

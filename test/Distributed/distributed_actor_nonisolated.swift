@@ -4,7 +4,10 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
+/// Use the existential wrapper as the default actor transport.
+typealias DefaultActorTransport = AnyActorTransport
+
+@available(SwiftStdlib 5.6, *)
 distributed actor DA {
 
   let local: Int = 42

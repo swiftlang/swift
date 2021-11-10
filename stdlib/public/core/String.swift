@@ -516,7 +516,7 @@ extension String {
   ///     memory with room for `capacity` UTF-8 code units, initializes
   ///     that memory, and returns the number of initialized elements.
   @inline(__always)
-  @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+  @available(SwiftStdlib 5.3, *)
   public init(
     unsafeUninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
@@ -780,8 +780,8 @@ extension String {
   internal func _uppercaseASCII(_ x: UInt8) -> UInt8 {
     /// A "table" for which ASCII characters need to be upper cased.
     /// To determine which bit corresponds to which ASCII character, subtract 1
-    /// from the ASCII value of that character and divide by 2. The bit is set iff
-    /// that character is a lower case character.
+    /// from the ASCII value of that character and divide by 2. The bit is set if
+    /// that character is a lower case character; otherwise, it's not set.
     let _lowercaseTable: UInt64 =
       0b0001_1111_1111_1111_0000_0000_0000_0000 &<< 32
 
@@ -804,8 +804,8 @@ extension String {
   internal func _lowercaseASCII(_ x: UInt8) -> UInt8 {
     /// A "table" for which ASCII characters need to be lower cased.
     /// To determine which bit corresponds to which ASCII character, subtract 1
-    /// from the ASCII value of that character and divide by 2. The bit is set iff
-    /// that character is a upper case character.
+    /// from the ASCII value of that character and divide by 2. The bit is set if
+    /// that character is a upper case character; otherwise, it's not set.
     let _uppercaseTable: UInt64 =
       0b0000_0000_0000_0000_0001_1111_1111_1111 &<< 32
 

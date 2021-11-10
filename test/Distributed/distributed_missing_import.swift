@@ -4,7 +4,7 @@
 
 actor SomeActor { }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.6, *)
 distributed actor MissingImportDistributedActor_0 { }
 // expected-error@-1{{'_Distributed' module not imported, required for 'distributed actor'}}
 

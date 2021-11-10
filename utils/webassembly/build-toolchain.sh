@@ -111,6 +111,8 @@ build_target_toolchain() {
   # Set WASI as a UNIX platform to spoof LLVM
   # FIXME(katei): host-build clang's libcxx is capable with LLVM, but it somehow
   # fails libcxx version check. So activate LLVM_COMPILER_CHECKED to spoof the checker
+  # SWIFT_DRIVER_TEST_OPTIONS is used to specify clang resource dir for wasm32-unknown-wasi
+  # because it's not built beside clang
   cmake -B "$SWIFT_STDLIB_BUILD_DIR" \
     -C "$SOURCE_PATH/swift/cmake/caches/Runtime-WASI-wasm32.cmake" \
     -D CMAKE_TOOLCHAIN_FILE="$SOURCE_PATH/swift/utils/webassembly/toolchain-wasi.cmake" \
@@ -123,6 +125,10 @@ build_target_toolchain() {
     -D LLVM_COMPILER_CHECKED=YES \
     -D UNIX=1 \
     -D SWIFT_NATIVE_SWIFT_TOOLS_PATH="$HOST_BUILD_DIR/swift-$HOST_SUFFIX/bin" \
+    -D SWIFT_NATIVE_CLANG_TOOLS_PATH="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin" \
+    -D SWIFT_NATIVE_LLVM_TOOLS_PATH="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin" \
+    -D SWIFT_LIT_TEST_PATHS="$SWIFT_STDLIB_BUILD_DIR/test-wasi-wasm32/stdlib;$SWIFT_STDLIB_BUILD_DIR/test-wasi-wasm32/Concurrency/Runtime" \
+    -D SWIFT_DRIVER_TEST_OPTIONS=" -Xclang-linker -resource-dir -Xclang-linker $COMPILER_RT_BUILD_DIR" \
     -D SWIFT_WASI_SYSROOT_PATH="$WASI_SYSROOT_PATH" \
     -D SWIFT_WASI_wasm32_ICU_UC_INCLUDE="$BUILD_SDK_PATH/icu/include" \
     -D SWIFT_WASI_wasm32_ICU_UC="$BUILD_SDK_PATH/icu/lib/libicuuc.a" \
@@ -133,10 +139,6 @@ build_target_toolchain() {
     -S "$SOURCE_PATH/swift"
 
   ninja install -C "$SWIFT_STDLIB_BUILD_DIR"
-
-  # Copy tool binaries in target build dir to test stdlib
-  rsync -a "$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/" "$SWIFT_STDLIB_BUILD_DIR/bin/"
-  rsync -a "$HOST_BUILD_DIR/swift-$HOST_SUFFIX/bin/" "$SWIFT_STDLIB_BUILD_DIR/bin/"
 
   # Link compiler-rt libs to stdlib build dir
   mkdir -p "$SWIFT_STDLIB_BUILD_DIR/lib/clang/10.0.0/"

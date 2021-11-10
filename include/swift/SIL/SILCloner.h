@@ -1731,9 +1731,10 @@ void SILCloner<ImplClass>::visitExplicitCopyValueInst(
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitMoveValueInst(MoveValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createMoveValue(getOpLocation(Inst->getLoc()),
-                                         getOpValue(Inst->getOperand())));
+  auto *MVI = getBuilder().createMoveValue(getOpLocation(Inst->getLoc()),
+                                           getOpValue(Inst->getOperand()));
+  MVI->setAllowsDiagnostics(Inst->getAllowDiagnostics());
+  recordClonedInstruction(Inst, MVI);
 }
 
 template <typename ImplClass>

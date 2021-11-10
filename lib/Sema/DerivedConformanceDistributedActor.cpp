@@ -18,6 +18,7 @@
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 
@@ -28,8 +29,6 @@ bool DerivedConformance::canDeriveDistributedActor(
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   return classDecl && classDecl->isDistributedActor() && dc == nominal;
 }
-
-// ==== ------------------------------------------------------------------------
 
 /******************************************************************************/
 /******************************* RESOLVE FUNCTION *****************************/
@@ -62,10 +61,10 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
     return param;
   };
 
-  auto addressType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
-  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+  auto addressType = getDistributedActorIdentityType(decl);
+  auto transportType = getDistributedActorTransportType(decl);
 
-  // (_ identity: AnyActorIdentity, using transport: ActorTransport)
+  // (_ identity: Identity, using transport: ActorTransport)
   auto *params = ParameterList::create(
       C,
       /*LParenLoc=*/SourceLoc(),
@@ -78,7 +77,7 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
   // Func name: resolve(_:using:)
   DeclName name(C, C.Id_resolve, params);
 
-  // Expected type: (Self) -> (AnyActorIdentity, ActorTransport) throws -> (Self)
+  // Expected type: (Self) -> (Identity, ActorTransport) throws -> (Self)
   auto *factoryDecl =
       FuncDecl::createImplicit(C, StaticSpellingKind::KeywordStatic,
                                name, SourceLoc(),
@@ -106,9 +105,9 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
 
   // ```
   // nonisolated
-  // let id: AnyActorIdentity
+  // let id: Identity
   // ```
-  auto propertyType = C.getAnyActorIdentityDecl()->getDeclaredInterfaceType();
+  auto propertyType = getDistributedActorIdentityType(derived.Nominal);
 
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
@@ -134,10 +133,10 @@ static ValueDecl *deriveDistributedActor_actorTransport(
 
   // ```
   // nonisolated
-  // let actorTransport: ActorTransport
+  // let actorTransport: Transport
   // ```
   // (no need for @actorIndependent because it is an immutable let)
-  auto propertyType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+  auto propertyType = getDistributedActorTransportType(derived.Nominal);
 
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
@@ -156,6 +155,36 @@ static ValueDecl *deriveDistributedActor_actorTransport(
   return propDecl;
 }
 
+static Type deriveDistributedActor_Transport(
+    DerivedConformance &derived) {
+  assert(derived.Nominal->isDistributedActor());
+  auto &C = derived.Context;
+
+  // Look for a type DefaultActorTransport within the parent context.
+  auto defaultTransportLookup = TypeChecker::lookupUnqualified(
+      derived.getConformanceContext()->getModuleScopeContext(),
+      DeclNameRef(C.Id_DefaultActorTransport),
+      derived.ConformanceDecl->getLoc());
+  TypeDecl *defaultTransportTypeDecl = nullptr;
+  for (const auto &found : defaultTransportLookup) {
+    if (auto foundType = dyn_cast_or_null<TypeDecl>(found.getValueDecl())) {
+      if (defaultTransportTypeDecl) {
+        // Note: ambiguity, for now just fail.
+        return nullptr;
+      }
+
+      defaultTransportTypeDecl = foundType;
+      continue;
+    }
+  }
+
+  // There is no default, so fail to synthesize.
+  if (!defaultTransportTypeDecl)
+    return nullptr;
+
+  // Return the default transport type.
+  return defaultTransportTypeDecl->getDeclaredInterfaceType();
+}
 // ==== ------------------------------------------------------------------------
 
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
@@ -175,4 +204,18 @@ ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   }
 
   return nullptr;
+}
+
+std::pair<Type, TypeDecl *> DerivedConformance::deriveDistributedActor(
+    AssociatedTypeDecl *assocType) {
+  if (!canDeriveDistributedActor(Nominal, cast<DeclContext>(ConformanceDecl)))
+    return std::make_pair(Type(), nullptr);
+
+  if (assocType->getName() == Context.Id_Transport) {
+    return std::make_pair(deriveDistributedActor_Transport(*this), nullptr);
+  }
+
+  Context.Diags.diagnose(assocType->getLoc(),
+                         diag::broken_distributed_actor_requirement);
+  return std::make_pair(Type(), nullptr);
 }

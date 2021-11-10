@@ -871,8 +871,18 @@ bool Decl::isStdlibDecl() const {
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
   auto containingContext =
       AvailabilityInference::annotatedAvailableRange(this, getASTContext());
-  if (containingContext.hasValue())
+  if (containingContext.hasValue()) {
+    // If this entity comes from the concurrency module, adjust it's
+    // availability for linkage purposes up to Swift 5.5, so that we use
+    // weak references any time we reference those symbols when back-deploying
+    // concurrency.
+    ASTContext &ctx = getASTContext();
+    if (getModuleContext()->getName() == ctx.Id_Concurrency) {
+      containingContext->intersectWith(ctx.getConcurrencyAvailability());
+    }
+
     return *containingContext;
+  }
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
     return accessor->getStorage()->getAvailabilityForLinkage();
@@ -5662,6 +5672,11 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   // setter.
   if (!isLet())
     return supportsMutation();
+
+  // Static 'let's are always immutable.
+  if (isStatic()) {
+    return false;
+  }
 
   //
   // All the remaining logic handles the special cases where you can

@@ -661,8 +661,6 @@ public:
     memcpy(mask, src.mask, size);
   }
 
-  void makeZero() { memset(mask, 0, size); }
-
   bool isNonZero() const { return !isZero(); }
 
   bool isZero() const {

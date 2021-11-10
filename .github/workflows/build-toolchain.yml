@@ -148,10 +148,7 @@ jobs:
         if: ${{ matrix.run_stdlib_test }}
         run: |
           TARGET_STDLIB_BUILD_DIR=${{ github.workspace }}/target-build/swift-stdlib-wasi-wasm32
-          ./swift/utils/run-test --build-dir "$TARGET_STDLIB_BUILD_DIR" --target wasi-wasm32 \
-            "$TARGET_STDLIB_BUILD_DIR/test-wasi-wasm32/stdlib"
-          ./swift/utils/run-test --build-dir "$TARGET_STDLIB_BUILD_DIR" --target wasi-wasm32 \
-            "$TARGET_STDLIB_BUILD_DIR/test-wasi-wasm32/Concurrency/Runtime"
+          ninja check-swift-wasi-wasm32-custom -C "$TARGET_STDLIB_BUILD_DIR"
 
       - name: Run all tests for wasi-wasm32
         if: ${{ matrix.run_full_test }}

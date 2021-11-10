@@ -108,6 +108,22 @@ actor BoringActor {
         }
         myVar = 2
     }
+
+   // CHECK-LABEL: sil hidden @$s4test14SingleVarActorC14failable_asyncACSgSb_tYacfc : $@convention(method) @async (Bool, @owned SingleVarActor) -> @owned Optional<SingleVarActor> {
+   // CHECK: bb0({{%[0-9]+}} : $Bool, {{%[0-9]+}} : $SingleVarActor):
+   // CHECK:   cond_br {{%[0-9]+}}, [[SUCCESS_BB:bb[0-9]+]], {{bb[0-9]+}}
+   //
+   // CHECK: [[SUCCESS_BB]]:
+   // CHECK:   store {{%[0-9]+}} to {{%[0-9]+}} : $*Int
+   // CHECK:   hop_to_executor {{%[0-9]+}}
+   // CHECK:   enum $Optional<SingleVarActor>, #Optional.some!enumelt
+   //
+   // CHECK: } // end sil function '$s4test14SingleVarActorC14failable_asyncACSgSb_tYacfc'
+   init?(failable_async cond: Bool) async {
+     guard cond else { return nil }
+     myVar = 1
+   }
+
  }
 
 actor DefaultInit {
@@ -210,7 +226,7 @@ actor MultiVarActor {
     }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 actor TaskMaster {
     var task: Task<Void, Never>?
 
@@ -242,4 +258,13 @@ actor SomeActor {
     // CHECK-NEXT:      hop_to_executor {{%[0-9]+}} : $SomeActor
     // CHECK: } // end sil function '$s4test9SomeActorCACyYacfc'
     init() async {}
+}
+
+actor Ahmad {
+  var x: Int = 0
+  
+  // CHECK-LABEL: sil hidden @$s4test5AhmadCACyYacfc : $@convention(method) @async (@owned Ahmad) -> @owned Ahmad {
+  // CHECK:           store {{%[0-9]+}} to {{%[0-9]+}} : $*Int
+  // CHECK: } // end sil function '$s4test5AhmadCACyYacfc'
+  nonisolated init() async {} // no hop should appear here because of explicit nonisolated marking.
 }

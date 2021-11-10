@@ -26,7 +26,7 @@ var tests = TestSuite("AsyncStream")
 
 @main struct Main {
   static func main() async {
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    if #available(SwiftStdlib 5.5, *) {
       final class Expectation: UnsafeSendable {
         var fulfilled = false
       }

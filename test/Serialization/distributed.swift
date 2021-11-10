@@ -13,7 +13,7 @@
 import _Distributed
 import def_distributed
 
-func testDoSomethingDistributed(transport: ActorTransport) {
+func testDoSomethingDistributed(transport: AnyActorTransport) {
   let _: DA = DA(transport: transport)
 }
 

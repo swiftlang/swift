@@ -212,7 +212,15 @@ namespace {
         return { false, expr };
       }
 
-      if (isa<BinaryExpr>(expr)) {
+      if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
+        if (auto *overload = dyn_cast<OverloadedDeclRefExpr>(binaryExpr->getFn())) {
+          // Don't walk into nil coalescing operators. Attempting to favor
+          // based on operand types is wrong for this operator.
+          auto identifier = overload->getDecls().front()->getBaseIdentifier();
+          if (identifier.isNilCoalescingOperator())
+            return { false, expr };
+        }
+
         LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
       }  
       
@@ -367,7 +375,7 @@ namespace {
 
       return true;
     }
-    
+
     return false;
   }
   
@@ -383,7 +391,7 @@ namespace {
       return true;
 
     // Don't favor narrowing conversions.
-    if (argTy->isDouble() && paramTy->isCGFloatType())
+    if (argTy->isDouble() && paramTy->isCGFloat())
       return false;
 
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
@@ -420,7 +428,7 @@ namespace {
         // it is the same as the parameter type.
         // Check whether there is a default type to compare against.
         if (paramTy->isEqual(defaultType) ||
-            (defaultType->isDouble() && paramTy->isCGFloatType()))
+            (defaultType->isDouble() && paramTy->isCGFloat()))
           return true;
       }
     }
@@ -560,7 +568,7 @@ namespace {
       // in order to preserve current behavior, let's not favor overloads
       // which would result in conversion from CGFloat to Double; otherwise
       // it would lead to ambiguities.
-      if (argTy->isCGFloatType() && paramTy->isDouble())
+      if (argTy->isCGFloat() && paramTy->isDouble())
         return false;
 
       return isFavoredParamAndArg(CS, paramTy, argTy) &&
@@ -719,10 +727,10 @@ namespace {
       // Avoid favoring overloads that would require narrowing conversion
       // to match the arguments.
       {
-        if (firstArgTy->isDouble() && firstParamTy->isCGFloatType())
+        if (firstArgTy->isDouble() && firstParamTy->isCGFloat())
           return false;
 
-        if (secondArgTy->isDouble() && secondParamTy->isCGFloatType())
+        if (secondArgTy->isDouble() && secondParamTy->isCGFloat())
           return false;
       }
 

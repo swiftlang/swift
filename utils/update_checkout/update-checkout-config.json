@@ -60,6 +60,22 @@
             "remote": { "id": "apple/swift-format" } },
         "swift-installer-scripts": {
             "remote": { "id": "apple/swift-installer-scripts" } },
+        "swift-docc": {
+            "remote": { "id": "apple/swift-docc" } },
+        "swift-lmdb": {
+            "remote": { "id": "apple/swift-lmdb" } },
+        "swift-docc-render-artifact": {
+            "remote": { "id": "apple/swift-docc-render-artifact" } },
+        "swift-docc-symbolkit": {
+            "remote": { "id": "apple/swift-docc-symbolkit" } },
+        "swift-markdown": {
+            "remote": { "id": "apple/swift-markdown" } },
+        "swift-cmark-gfm": {
+            "remote": { "id": "apple/swift-cmark" } },
+        "swift-nio": {
+            "remote": { "id": "apple/swift-nio" } },
+        "swift-nio-ssl": {
+            "remote": { "id": "apple/swift-nio-ssl" } },
         "llvm-project": {
             "remote": { "id": "apple/llvm-project" } }
     },
@@ -123,7 +139,15 @@
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
-                "swift-installer-scripts": "main"
+                "swift-installer-scripts": "main",
+                "swift-docc": "main",
+                "swift-lmdb": "main",
+                "swift-docc-render-artifact": "main",
+                "swift-docc-symbolkit": "main",
+                "swift-markdown": "main",
+                "swift-cmark-gfm": "gfm",
+                "swift-nio": "2.31.2",
+                "swift-nio-ssl": "2.15.0"
             }
         },
         "rebranch": {
@@ -185,7 +209,15 @@
                 "indexstore-db": "release/5.5",
                 "sourcekit-lsp": "release/5.5",
                 "swift-format": "main",
-                "swift-installer-scripts": "main"
+                "swift-installer-scripts": "main",
+                "swift-docc": "main",
+                "swift-lmdb": "main",
+                "swift-docc-render-artifact": "main",
+                "swift-docc-symbolkit": "main",
+                "swift-markdown": "main",
+                "swift-cmark-gfm": "gfm",
+                "swift-nio": "2.31.2",
+                "swift-nio-ssl": "2.15.0"
             }
         },
         "release/5.5-08092021": {
@@ -214,7 +246,15 @@
                  "indexstore-db": "release/5.5-08092021",
                  "sourcekit-lsp": "release/5.5-08092021",
                  "swift-format": "main",
-                 "swift-installer-scripts": "main"
+                 "swift-installer-scripts": "main",
+                 "swift-docc": "main",
+                 "swift-lmdb": "main",
+                 "swift-docc-render-artifact": "main",
+                 "swift-docc-symbolkit": "main",
+                 "swift-markdown": "main",
+                 "swift-cmark-gfm": "gfm",
+                 "swift-nio": "2.31.2",
+                 "swift-nio-ssl": "2.15.0"
              }
         },
         "next" : {

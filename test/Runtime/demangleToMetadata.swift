@@ -60,7 +60,7 @@ func globalActorMetatypeFn<T>(_: T.Type) -> Any.Type {
   return Fn.self
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 func f1_actor(_: (isolated Actor) -> Void) { }
 
 DemangleToMetadataTests.test("function types") {
@@ -119,7 +119,7 @@ DemangleToMetadataTests.test("function types") {
   expectEqual(MainActorFn.self, globalActorMetatypeFn(Float.self))
 
   // isolated parameters
-  if #available(SwiftStdlib 5.5, *) {
+  if #available(SwiftStdlib 5.1, *) {
     expectEqual(type(of: f1_actor), _typeByName("yyScA_pYiXEc")!)
     typealias IsolatedFn = ((isolated Actor) -> Void) -> Void
     expectEqual(IsolatedFn.self, type(of: f1_actor))
@@ -482,7 +482,7 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // V !: P3 in InnerTEqualsConformsToP1
 }
 
-if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+if #available(SwiftStdlib 5.3, *) {
   DemangleToMetadataTests.test("Round-trip with _mangledTypeName and _typeByName") {
     func roundTrip<T>(_ type: T.Type) {
       let mangledName: String? = _mangledTypeName(type)
@@ -515,7 +515,7 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
   }
 }
 
-if #available(SwiftStdlib 5.5, *) {
+if #available(SwiftStdlib 5.1, *) {
   DemangleToMetadataTests.test("Concurrency standard substitutions") {
     expectEqual(TaskGroup<Int>.self, _typeByName("ScGySiG")!)
   }

@@ -4,20 +4,14 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.5, *)
+/// Use the existential wrapper as the default actor transport.
+@available(SwiftStdlib 5.6, *)
+typealias DefaultActorTransport = AnyActorTransport
+
+@available(SwiftStdlib 5.6, *)
 distributed actor Capybara { }
 
-//@available(SwiftStdlib 5.5, *)
-//protocol Wheeker: DistributedActor { }
-//@available(SwiftStdlib 5.5, *)
-//distributed actor GuineaPing: Wheeker { }
-
-@available(SwiftStdlib 5.5, *)
-func test(identity: AnyActorIdentity, transport: ActorTransport) async throws {
+@available(SwiftStdlib 5.6, *)
+func test(identity: AnyActorIdentity, transport: AnyActorTransport) async throws {
   let _: Capybara = try Capybara.resolve(identity, using: transport)
-
-// TODO: implement resolve being able to be called on a distributed actor protocol
-//       (yes, normally it is not allowed to call such function... so we need to
-//        discuss and figure out how we want to expose the resolve of a protocol)
-//  let c: Wheeker = try Wheeker.resolve(.init(identity), using: transport)
 }

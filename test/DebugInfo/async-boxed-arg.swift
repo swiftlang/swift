@@ -2,7 +2,7 @@
 // RUN:    -module-name M  -disable-availability-checking | %FileCheck %s --dump-input always
 // REQUIRES: concurrency
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension Collection where Element: Sendable {
   public func f() async throws {
     return try await withThrowingTaskGroup(of: Element.self) { group in

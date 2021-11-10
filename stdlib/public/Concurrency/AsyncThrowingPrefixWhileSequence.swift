@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncSequence {
   /// Returns an asynchronous sequence, containing the initial, consecutive
   /// elements of the base sequence that satisfy the given error-throwing
@@ -61,7 +61,7 @@ extension AsyncSequence {
 /// An asynchronous sequence, containing the initial, consecutive
 /// elements of the base sequence that satisfy the given error-throwing
 /// predicate.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 public struct AsyncThrowingPrefixWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -79,7 +79,7 @@ public struct AsyncThrowingPrefixWhileSequence<Base: AsyncSequence> {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
   /// The type of element produced by this asynchronous sequence.
   ///

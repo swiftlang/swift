@@ -1170,7 +1170,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
   Opts.DisableModulesValidateSystemDependencies |=
       Args.hasArg(OPT_disable_modules_validate_system_headers);
 
-  if (const Arg *A = Args.getLastArg(OPT_explict_swift_module_map))
+  if (const Arg *A = Args.getLastArg(OPT_explicit_swift_module_map))
     Opts.ExplicitSwiftModuleMap = A->getValue();
   for (auto A: Args.filtered(OPT_candidate_module_file)) {
     Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));
@@ -1876,6 +1876,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // witness.
   Opts.LazyInitializeProtocolConformances = Triple.isOSBinFormatCOFF();
 
+  // PE/COFF cannot deal with the cross-module reference to the
+  // AsyncFunctionPointer data block.  Force the use of indirect
+  // AsyncFunctionPointer access.
+  Opts.IndirectAsyncFunctionPointer = Triple.isOSBinFormatCOFF();
+
   if (Args.hasArg(OPT_disable_legacy_type_info)) {
     Opts.DisableLegacyTypeInfo = true;
   }
@@ -1972,14 +1977,32 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_llvm_vfe)) {
     Opts.VirtualFunctionElimination = true;
+
+    // FIXME(mracek): There are still some situations where we use mangled name
+    // without symbolic references, which means the dependency is not statically
+    // visible to the compiler/linker. Temporarily disable mangled accessors
+    // until we fix that.
+    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_enable_llvm_wme)) {
     Opts.WitnessMethodElimination = true;
+
+    // FIXME(mracek): There are still some situations where we use mangled name
+    // without symbolic references, which means the dependency is not statically
+    // visible to the compiler/linker. Temporarily disable mangled accessors
+    // until we fix that.
+    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_conditional_runtime_records)) {
     Opts.ConditionalRuntimeRecords = true;
+
+    // FIXME(mracek): There are still some situations where we use mangled name
+    // without symbolic references, which means the dependency is not statically
+    // visible to the compiler/linker. Temporarily disable mangled accessors
+    // until we fix that.
+    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_internalize_at_link)) {

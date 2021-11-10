@@ -26,7 +26,9 @@ namespace swift {
 class ClassDecl;
 class ConstructorDecl;
 class Decl;
+class DeclContext;
 class FuncDecl;
+class NominalTypeDecl;
 
 /******************************************************************************/
 /********************* Distributed Actor Type Checking ************************/
@@ -42,6 +44,16 @@ void checkDistributedActorProperties(const ClassDecl *decl);
 void checkDistributedActorConstructor(const ClassDecl *decl, ConstructorDecl *ctor);
 
 bool checkDistributedFunction(FuncDecl *decl, bool diagnose);
+
+/// Determine the distributed actor transport type for the given actor.
+Type getDistributedActorTransportType(NominalTypeDecl *actor);
+
+/// Determine the distributed actor identity type for the given actor.
+Type getDistributedActorIdentityType(NominalTypeDecl *actor);
+
+/// Diagnose a distributed func declaration in a not-distributed actor protocol.
+void diagnoseDistributedFunctionInNonDistributedActorProtocol(
+  const ProtocolDecl *proto, InFlightDiagnostic &diag);
 
 }
 

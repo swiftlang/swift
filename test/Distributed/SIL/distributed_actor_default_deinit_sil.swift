@@ -4,12 +4,15 @@
 
 import _Distributed
 
+/// Use the existential wrapper as the default actor transport.
+typealias DefaultActorTransport = AnyActorTransport
+
 class SomeClass {}
 
 distributed actor MyDistActor {
   let localOnlyField: SomeClass
 
-  init(transport: ActorTransport) {
+  init(transport: AnyActorTransport) {
     self.localOnlyField = SomeClass()
   }
 }
@@ -32,9 +35,8 @@ distributed actor MyDistActor {
 // CHECK: [[LOCAL_BB]]:
 // CHECK:   [[ID_REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
 // CHECK:   [[TPORT_REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorTransport
-// CHECK:   [[TPORT_OPENED:%[0-9]+]] = open_existential_addr immutable_access [[TPORT_REF]]
-// CHECK:   [[RESIGN:%[0-9]+]] = witness_method $@opened({{.*}}) ActorTransport, #ActorTransport.resignIdentity : <Self where Self : ActorTransport> (Self) -> (AnyActorIdentity) -> (), [[TPORT_OPENED]]
-// CHECK:   apply [[RESIGN]]<@opened({{.*}}) ActorTransport>([[ID_REF]], [[TPORT_OPENED]])
+// CHECK:   [[RESIGN:%[0-9]+]] = witness_method $AnyActorTransport, #ActorTransport.resignIdentity : <Self where Self : ActorTransport> (Self) -> (Self.Identity) -> ()
+// CHECK:   apply [[RESIGN]]<AnyActorTransport>([[ID_REF]], [[TPORT_REF]])
 // CHECK:   br [[CONTINUE:bb[0-9]+]]
 
 // *** If remote...
@@ -57,7 +59,7 @@ distributed actor MyDistActor {
             // *** destroy transport ***
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorTransport
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
-// CHECK:   destroy_addr [[ACCESS]] : $*ActorTransport
+// CHECK:   destroy_addr [[ACCESS]] : $*AnyActorTransport
 // CHECK:   end_access [[ACCESS]]
             // *** destroy identity ***
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
@@ -76,7 +78,7 @@ distributed actor MyDistActor {
             // *** the rest of this part is identical to the remote case ***
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorTransport
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
-// CHECK:   destroy_addr [[ACCESS]] : $*ActorTransport
+// CHECK:   destroy_addr [[ACCESS]] : $*AnyActorTransport
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]

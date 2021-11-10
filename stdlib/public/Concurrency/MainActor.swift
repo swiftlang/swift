@@ -14,7 +14,7 @@ import Swift
 
 /// A singleton actor whose executor is equivalent to the main
 /// dispatch queue.
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 @globalActor public final actor MainActor: GlobalActor {
   public static let shared = MainActor()
 
@@ -42,7 +42,7 @@ import Swift
   }
 }
 
-@available(SwiftStdlib 5.5, *)
+@available(SwiftStdlib 5.1, *)
 extension MainActor {
   /// Execute the given body closure on the main actor.
   ///

@@ -70,7 +70,7 @@ endforeach()
 # Put the output dir itself last so that it isn't considered the primary output.
 list(APPEND outputs "${output_dir}")
 
-add_custom_target("copy_shim_headers"
+add_custom_target("copy_shim_headers" ALL
     DEPENDS "${outputs}"
     COMMENT "Copying SwiftShims module to ${output_dir}")
 
@@ -156,27 +156,30 @@ if(NOT SWIFT_BUILT_STANDALONE)
   endforeach()
 endif()
 
-foreach(bootstrapping "0" "1")
-  get_bootstrapping_path(outdir ${SWIFTLIB_DIR} ${bootstrapping})
-  set(target_name "symlink-headers-bootstrapping${bootstrapping}")
+if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
+  foreach(bootstrapping "0" "1")
+    get_bootstrapping_path(outdir ${SWIFTLIB_DIR} ${bootstrapping})
+    set(target_name "symlink-headers-bootstrapping${bootstrapping}")
 
-  add_custom_command_target(unused_var
-      COMMAND
-        "${CMAKE_COMMAND}" "-E" "make_directory" "${outdir}"
-      COMMAND
-        "${CMAKE_COMMAND}" "-E" ${cmake_symlink_option}
-        ${output_dir} "${outdir}/shims"
-      COMMAND
-        "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
-        "${clang_headers_location}"
-        "${outdir}/clang"
+    add_custom_command_target(unused_var
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" "${outdir}"
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" ${cmake_symlink_option}
+          ${output_dir} "${outdir}/shims"
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
+          "${clang_headers_location}"
+          "${outdir}/clang"
 
-      CUSTOM_TARGET_NAME ${target_name}
-      OUTPUT "${outdir}/shims" "${outdir}/clang"
-      COMMENT "Symlinking headers for bootstrapping0")
+        CUSTOM_TARGET_NAME ${target_name}
+        OUTPUT "${outdir}/shims" "${outdir}/clang"
+        COMMENT "Symlinking headers for bootstrapping0")
 
-  add_dependencies(${target_name} copy_shim_headers)
-endforeach()
+    add_dependencies(${target_name} copy_shim_headers)
+    add_dependencies(bootstrapping${bootstrapping}-all ${target_name})
+  endforeach()
+endif()
 
 swift_install_in_component(FILES ${sources}
                            DESTINATION "lib/swift/shims"

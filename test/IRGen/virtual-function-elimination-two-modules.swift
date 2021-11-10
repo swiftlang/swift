@@ -27,7 +27,7 @@
 // RUN: %llvm-nm --defined-only %t/libLibrary.dylib | %FileCheck %s --check-prefix=NM
 
 // (6) Execution test
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/libLibrary.dylib | %FileCheck %s
 
 // REQUIRES: executable_test
 

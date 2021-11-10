@@ -4732,7 +4732,7 @@ extension RawRepresentable where RawValue == Float, Self: Decodable {
 }
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-@available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(SwiftStdlib 5.3, *)
 extension Float16: Codable {
   /// Creates a new instance by decoding from the given decoder.
   ///
@@ -5535,33 +5535,34 @@ internal struct _DictionaryCodingKey: CodingKey {
 /// and decoding `Dictionary` values keyed by the conforming type to and from
 /// a keyed container, rather than encoding and decoding the dictionary as an
 /// unkeyed container of alternating key-value pairs.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.6, *)
 public protocol CodingKeyRepresentable {
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.6, *)
   var codingKey: CodingKey { get }
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.6, *)
   init?<T: CodingKey>(codingKey: T)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == String {
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.6, *)
+extension RawRepresentable
+where Self: CodingKeyRepresentable, RawValue == String {
+  @available(SwiftStdlib 5.6, *)
   public var codingKey: CodingKey {
     _DictionaryCodingKey(stringValue: rawValue)
   }
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.6, *)
   public init?<T: CodingKey>(codingKey: T) {
     self.init(rawValue: codingKey.stringValue)
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.6, *)
 extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == Int {
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.6, *)
   public var codingKey: CodingKey {
     _DictionaryCodingKey(intValue: rawValue)
   }
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.6, *)
   public init?<T: CodingKey>(codingKey: T) {
     if let intValue = codingKey.intValue {
       self.init(rawValue: intValue)
@@ -5571,13 +5572,13 @@ extension RawRepresentable where Self: CodingKeyRepresentable, RawValue == Int {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.6, *)
 extension Int: CodingKeyRepresentable {
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.6, *)
   public var codingKey: CodingKey {
     _DictionaryCodingKey(intValue: self)
   }
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.6, *)
   public init?<T: CodingKey>(codingKey: T) {
     if let intValue = codingKey.intValue {
       self = intValue
@@ -5587,13 +5588,13 @@ extension Int: CodingKeyRepresentable {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.6, *)
 extension String: CodingKeyRepresentable {
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.6, *)
   public var codingKey: CodingKey {
     _DictionaryCodingKey(stringValue: self)
   }
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.6, *)
   public init?<T: CodingKey>(codingKey: T) {
     self = codingKey.stringValue
   }
@@ -5603,9 +5604,9 @@ extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
   /// Encodes the contents of this dictionary into the given encoder.
   ///
   /// If the dictionary uses keys that are `String`, `Int`, or a type conforming
-  /// to `CodingKeyRepresentable`, the contents are encoded in a keyed container.
-  /// Otherwise, the contents are encoded as alternating key-value pairs in an
-  /// unkeyed container.
+  /// to `CodingKeyRepresentable`, the contents are encoded in a keyed
+  /// container. Otherwise, the contents are encoded as alternating key-value
+  /// pairs in an unkeyed container.
   ///
   /// This function throws an error if any values are invalid for the given
   /// encoder's format.
@@ -5626,7 +5627,7 @@ extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
         let codingKey = _DictionaryCodingKey(intValue: key as! Int)
         try container.encode(value, forKey: codingKey)
       }
-    } else if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *),
+    } else if #available(SwiftStdlib 5.6, *),
               Key.self is CodingKeyRepresentable.Type {
       // Since the keys are CodingKeyRepresentable, we can use the `codingKey`
       // to create `_DictionaryCodingKey` instances.
@@ -5690,7 +5691,7 @@ extension Dictionary: Decodable where Key: Decodable, Value: Decodable {
         let value = try container.decode(Value.self, forKey: key)
         self[key.intValue! as! Key] = value
       }
-    } else if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *),
+    } else if #available(SwiftStdlib 5.6, *),
               let keyType = Key.self as? CodingKeyRepresentable.Type {
       // The keys are CodingKeyRepresentable, so we should be able to expect
       // a keyed container.

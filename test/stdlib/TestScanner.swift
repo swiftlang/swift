@@ -49,7 +49,7 @@ extension CharacterSet {
   }
 }
 
-@available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
+@available(SwiftStdlib 5.1, *)
 class TestScanner : TestScannerSuper {
   func testScanFloatingPoint() {
     // Leading whitespace:
@@ -491,7 +491,7 @@ class TestScanner : TestScannerSuper {
 }
 
 #if !FOUNDATION_XCTEST
-if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
+if #available(SwiftStdlib 5.1, *) {
   let testSuite = TestSuite("TestScanner")
   let handler = TestScanner()
   testSuite.test("testScanFloatingPoint") { handler.testScanFloatingPoint() }

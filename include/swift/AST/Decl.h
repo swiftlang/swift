@@ -4168,6 +4168,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class StructuralRequirementsRequest;
   friend class ProtocolDependenciesRequest;
   friend class RequirementSignatureRequest;
+  friend class RequirementSignatureRequestRQM;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
   friend class InheritedProtocolsRequest;
@@ -5369,6 +5370,10 @@ public:
   }
   void setDefaultArgumentKind(DefaultArgumentKind K) {
     Bits.ParamDecl.defaultArgumentKind = static_cast<unsigned>(K);
+  }
+
+  bool isNoImplicitCopy() const {
+    return getAttrs().hasAttribute<NoImplicitCopyAttr>();
   }
 
   /// Whether this parameter has a default argument expression available.

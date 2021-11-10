@@ -177,6 +177,7 @@ set(SWIFTLIB_ESSENTIAL
   UnavailableStringAPIs.swift
   UnicodeData.swift
   UnicodeEncoding.swift
+  UnicodeGraphemeBreakProperty.swift
   UnicodeHelpers.swift
   UnicodeParser.swift
   UnicodeScalarProperties.swift
@@ -336,8 +337,7 @@ set(swiftCore_common_options
 set(swiftCore_common_dependencies
     copy_shim_headers "${SWIFTLIB_DIR}/shims" ${GROUP_INFO_JSON_FILE})
 
-if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" OR
-   ${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
 
   list(FIND SWIFT_STDLIB_LIBRARY_BUILD_TYPES "SHARED" index_of_shared)
   if(index_of_shared EQUAL -1)
@@ -358,7 +358,6 @@ if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" OR
                     ${swiftCore_common_bootstrapping_options}
                     FILE_DEPENDS
                       symlink-headers-bootstrapping0 ${swiftCore_common_dependencies}
-                    MODULE_DEPENDENCY_TARGET swiftCore_module_bootstrapping0
                     BOOTSTRAPPING 0)
 
   # Bootstrapping - stage 1
@@ -367,18 +366,10 @@ if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" OR
                     ${swiftCore_common_bootstrapping_options}
                     FILE_DEPENDS
                       symlink-headers-bootstrapping1 ${swiftCore_common_dependencies}
-                    MODULE_DEPENDENCY_TARGET swiftCore_module_bootstrapping1
                     BOOTSTRAPPING 1)
 
-  if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-    # When linking swift-frontend against the system swift libraries, it's
-    # sufficient to create the swiftmodule files for bootstrapping.
-    add_dependencies(bootstrapping0-all ${swiftCore_module_bootstrapping0})
-    add_dependencies(bootstrapping1-all ${swiftCore_module_bootstrapping1})
-  else()
-    add_dependencies(bootstrapping1-all swiftCore-bootstrapping1)
-    add_dependencies(bootstrapping0-all swiftCore-bootstrapping0)
-  endif()
+  add_dependencies(bootstrapping1-corelib swiftCore-bootstrapping1)
+  add_dependencies(bootstrapping0-corelib swiftCore-bootstrapping0)
 endif()
 
 add_swift_target_library(swiftCore

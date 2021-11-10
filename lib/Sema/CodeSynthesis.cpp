@@ -299,13 +299,11 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       // copy access level of distributed actor init from the nominal decl
       accessLevel = decl->getEffectiveAccess();
 
-      auto transportDecl = ctx.getActorTransportDecl();
-
       // Create the parameter.
       auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_transport, Loc,
-                                      ctx.Id_transport, transportDecl);
+                                      ctx.Id_transport, decl);
       arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(transportDecl->getDeclaredInterfaceType());
+      arg->setInterfaceType(getDistributedActorTransportType(decl));
       arg->setImplicit();
 
       params.push_back(arg);
@@ -664,6 +662,9 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
 
   Expr *expr = superclassCallExpr;
 
+  if (superclassCtor->hasAsync()) {
+    expr = new (ctx) AwaitExpr(SourceLoc(), expr, type, /*implicit=*/true);
+  }
   if (superclassCtor->hasThrows()) {
     expr = new (ctx) TryExpr(SourceLoc(), expr, type, /*implicit=*/true);
   }
@@ -779,7 +780,8 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                               classDecl->getBraces().Start,
                               superclassCtor->isFailable(),
                               /*FailabilityLoc=*/SourceLoc(),
-                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+                              /*Async=*/superclassCtor->hasAsync(),
+                              /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
                               bodyParams, overrideInfo.GenericParams,

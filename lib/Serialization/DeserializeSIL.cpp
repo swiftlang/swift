@@ -915,7 +915,10 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     auto ValueCategory = SILValueCategory(Args[I + 1] & 0xF);
     SILType SILArgTy = getSILType(ArgTy, ValueCategory, Fn);
     if (IsEntry) {
-      Arg = CurrentBB->createFunctionArgument(SILArgTy);
+      auto *fArg = CurrentBB->createFunctionArgument(SILArgTy);
+      bool isNoImplicitCopy = (Args[I + 1] >> 16) & 0x1;
+      fArg->setNoImplicitCopy(isNoImplicitCopy);
+      Arg = fArg;
     } else {
       auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
       Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind);
@@ -1864,7 +1867,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
   UNARY_INSTRUCTION(CopyValue)
   UNARY_INSTRUCTION(ExplicitCopyValue)
-  UNARY_INSTRUCTION(MoveValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
@@ -1978,6 +1980,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         ResultKind);
+    break;
+  }
+
+  case SILInstructionKind::MoveValueInst: {
+    auto Ty = MF->getType(TyID);
+    auto AllowsDiagnostics = bool(Attr);
+    auto *MVI = Builder.createMoveValue(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    MVI->setAllowsDiagnostics(AllowsDiagnostics);
+    ResultInst = MVI;
     break;
   }
 

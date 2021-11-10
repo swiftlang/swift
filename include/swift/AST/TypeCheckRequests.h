@@ -406,6 +406,26 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Compute the requirements that describe a protocol using the
+/// RequirementMachine.
+class RequirementSignatureRequestRQM :
+    public SimpleRequest<RequirementSignatureRequestRQM,
+                         ArrayRef<Requirement>(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Requirement>
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Compute the requirements that describe a protocol.
 class RequirementSignatureRequest :
     public SimpleRequest<RequirementSignatureRequest,

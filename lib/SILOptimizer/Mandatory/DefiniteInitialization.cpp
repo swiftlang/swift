@@ -388,9 +388,10 @@ namespace {
 
   enum class ActorInitKind {
     None,           // not an actor init
-    Plain,          // synchronous, not isolated to global-actor
-    PlainAsync,     // asynchronous, not isolated to global-actor
-    GlobalActorIsolated  // isolated to global-actor (sync or async).
+    Plain,          // synchronous initializer
+    PlainAsync,     // asynchronous initializer
+    GlobalActorIsolated,  // isolated to global-actor (any async-ness)
+    NonIsolated           // explicitly 'nonisolated' (any async-ness)
   };
 
   /// LifetimeChecker - This is the main heavy lifting for definite
@@ -509,10 +510,18 @@ namespace {
     /// written out. Otherwise, the None initializer kind will be written out.
     bool isRestrictedActorInitSelf(ActorInitKind *kind = nullptr) const;
 
+    /// Emits a diagnostic to flag an illegal use of self in an actor init.
+    /// The message is tuned based on the input arguments.
+    /// \param ProblemDesc fills in the blank for "cannot ___ in an actor init"
+    /// \param suggestConvenienceInit if true, will emit a note about
+    ///                               convenience inits
+    /// \param specifyThisUse if true, precedes the message with "this use of"
+    ///                       to be more precise about the problem.
     void reportIllegalUseForActorInit(const DIMemoryUse &Use,
                                       ActorInitKind ActorKind,
                                       StringRef ProblemDesc,
-                                      bool suggestConvenienceInit) const;
+                                      bool suggestConvenienceInit,
+                                      bool specifyThisUse) const;
 
     void handleLoadUseFailureForActorInit(const DIMemoryUse &Use,
                                           ActorInitKind ActorKind) const;
@@ -916,6 +925,8 @@ void LifetimeChecker::injectActorHopForBlock(
   injectHopToExecutorAfter(loc, bbi, TheMemory.getUninitializedValue());
 }
 
+static bool isFailableInitReturnUseOfEnum(EnumInst *EI);
+
 void LifetimeChecker::injectActorHops() {
   auto ctor = TheMemory.getActorInitSelf();
 
@@ -938,11 +949,36 @@ void LifetimeChecker::injectActorHops() {
   // Returns true iff a block returns normally from the initializer,
   // which means that it returns `self` in some way (perhaps optional-wrapped).
   auto returnsSelf = [](SILBasicBlock &block) -> bool {
-    // This check relies on the fact that failable initializers are emitted by
-    // SILGen to perform their return in a fresh block with either:
-    //    1. No non-load uses of `self` (e.g., failing case)
-    //    2. An all-Yes in-availability. (e.g., success case)
-    return block.getTerminator()->getTermKind() == TermKind::ReturnInst;
+    auto term = block.getTerminator();
+    auto kind = term->getTermKind();
+
+    // Does this block return directly?
+    if (kind == TermKind::ReturnInst)
+      return true;
+
+
+    // Does this block return `self` wrapped in an Optional?
+    // The pattern would look like:
+    //
+    // thisBB:
+    //   ...
+    //   %x = enum $Optional<Dactor>, #Optional.some!enumelt
+    //   br exitBB(%x : $Optional<Dactor>)
+    //
+    // exitBB(%y : $Optional<Dactor>):
+    //   return %y : $Optional<Dactor>
+    //
+    if (kind == TermKind::BranchInst)
+      if (term->getNumOperands() == 1)
+        if (auto *passedVal = term->getOperand(0)->getDefiningInstruction())
+          if (auto *ei = dyn_cast<EnumInst>(passedVal))
+            if (isFailableInitReturnUseOfEnum(ei))
+              // Once we've reached this point, we know it's an Optional enum.
+              // To determine whether it's .some or .none, we can just check
+              // the number of operands.
+              return ei->getNumOperands() == 1; // is it .some ?
+
+    return false;
   };
 
   /////
@@ -1450,7 +1486,8 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
   // 'self' cannot be passed 'inout' from some kinds of actor initializers.
   if (isRestrictedActorInitSelf(&ActorKind))
     reportIllegalUseForActorInit(Use, ActorKind, "be passed 'inout'",
-                                 /*suggestConvenienceInit=*/false);
+                                 /*suggestConvenienceInit=*/false,
+                                 /*specifyThisUse=*/false);
 
   // One additional check: 'let' properties may never be passed inout, because
   // they are only allowed to have their initial value set, not a subsequent
@@ -1626,7 +1663,8 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     // no escaping uses of 'self' are allowed in restricted actor inits.
     if (isRestrictedActorInitSelf(&ActorKind))
       reportIllegalUseForActorInit(Use, ActorKind, "be captured by a closure",
-                                   /*suggestConvenienceInit=*/true);
+                                   /*suggestConvenienceInit=*/true,
+                                   /*specifyThisUse=*/false);
 
     return;
   }
@@ -2018,16 +2056,41 @@ bool LifetimeChecker::isRestrictedActorInitSelf(ActorInitKind *kind) const {
       *kind = k;
     return isRestricted;
   };
+  
+  // Determines whether the constructor was explicitly marked as `nonisolated`
+  auto isExplicitlyNonIsolated = [] (ConstructorDecl const* ctor) -> bool {
+      if (auto *attr = ctor->getAttrs().getAttribute<NonisolatedAttr>())
+        return !attr->isImplicit();
+      return false;
+    };
 
-  // Currently: being synchronous, or global-actor isolated, means the actor's
-  // self is restricted within the init.
+  // Currently: being synchronous, or having an explicitly specified isolation,
+  // means the actor's self is restricted within the init.
   if (auto *ctor = TheMemory.getActorInitSelf()) {
-    if (getActorIsolation(ctor).isGlobalActor())  // global-actor isolated?
-      return result(ActorInitKind::GlobalActorIsolated, true);
-    else if (!ctor->hasAsync()) // synchronous?
-      return result(ActorInitKind::Plain, true);
-    else
+    auto isolation = getActorIsolation(ctor);
+    switch (isolation.getKind()) {
+      case ActorIsolation::Unspecified:
+        assert(ctor->isObjC() && "unexpected kind of actor ctor isolation");
+        break;
+
+      case ActorIsolation::Independent:
+        if (isExplicitlyNonIsolated(ctor))
+          return result(ActorInitKind::NonIsolated, true);
+        break;
+
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::DistributedActorInstance:
+        break; // handle these below.
+
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
+        return result(ActorInitKind::GlobalActorIsolated, true);
+    };
+
+    if (ctor->hasAsync())
       return result(ActorInitKind::PlainAsync, false);
+    else
+      return result(ActorInitKind::Plain, true);
   }
 
   return result(ActorInitKind::None, false);
@@ -2037,25 +2100,47 @@ void LifetimeChecker::reportIllegalUseForActorInit(
                                            const DIMemoryUse &Use,
                                            ActorInitKind ActorKind,
                                            StringRef ProblemDesc,
-                                           bool suggestConvenienceInit) const {
+                                           bool suggestConvenienceInit,
+                                           bool specifyThisUse) const {
+
+  ConstructorDecl *asyncNonIsoCtor = nullptr;
+                                             
   switch(ActorKind) {
   case ActorInitKind::None:
   case ActorInitKind::PlainAsync:
     llvm::report_fatal_error("this actor init is never problematic!");
 
   case ActorInitKind::Plain:
-    diagnose(Module, Use.Inst->getLoc(), diag::self_disallowed_actor_init,
-             false, ProblemDesc)
+    diagnose(Module, Use.Inst->getLoc(), diag::self_disallowed_plain_actor_init,
+             specifyThisUse, ProblemDesc)
       .warnUntilSwiftVersion(6);
     break;
 
-  case ActorInitKind::GlobalActorIsolated:
-    diagnose(Module, Use.Inst->getLoc(), diag::self_disallowed_actor_init,
-             true, ProblemDesc)
-      .warnUntilSwiftVersion(6);
+  case ActorInitKind::NonIsolated:
+    if (auto *ctor = TheMemory.getActorInitSelf())
+      if (ctor->hasAsync())
+        asyncNonIsoCtor = ctor;
+    
+    LLVM_FALLTHROUGH;
+    
+  case ActorInitKind::GlobalActorIsolated: {
+    bool isGlobalInstead = ActorKind == ActorInitKind::GlobalActorIsolated;
+    auto diag = diagnose(Module, Use.Inst->getLoc(),
+             diag::self_disallowed_nonisolated_actor_init, specifyThisUse,
+             isGlobalInstead, ProblemDesc);
+    
+    // Emit a fix-it to remove `nonisolated`.
+    // For an async init, it would fix their program.
+    if (asyncNonIsoCtor) {
+      auto attr = asyncNonIsoCtor->getAttrs().getAttribute<NonisolatedAttr>();
+      diag.fixItRemove(attr->getRange());
+    }
+    
+    diag.warnUntilSwiftVersion(6);
     break;
   }
-
+  };
+                                             
   if (suggestConvenienceInit)
     diagnose(Module, Use.Inst->getLoc(), diag::actor_convenience_init);
 }
@@ -2083,29 +2168,20 @@ void LifetimeChecker::handleLoadUseFailureForActorInit(
     return;
   }
 
+  // Skip autogenerated instructions.
+  if (Use.Inst->getLoc().isAutoGenerated())
+    return;
+
   // Everything else is disallowed!
-  switch(ActorKind) {
-  case ActorInitKind::None:
-  case ActorInitKind::PlainAsync:
-    llvm::report_fatal_error("this actor init is never problematic!");
-
-  case ActorInitKind::Plain:
-    diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, false)
-      .warnUntilSwiftVersion(6);
-    break;
-
-  case ActorInitKind::GlobalActorIsolated:
-    diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, true)
-      .warnUntilSwiftVersion(6);
-    break;
-  }
-
+                            
   // We cannot easily determine which argument in the call the use of 'self'
   // appears in. If we could, then we could determine whether the callee
   // is 'isolated' to that parameter, in order to avoid suggesting a convenience
-  // init in those cases. Thus, the phrasing of the note should be informative.
-  if (isa<ApplyInst>(Inst))
-    diagnose(Module, Use.Inst->getLoc(), diag::actor_convenience_init);
+  // init in those cases. For now, just always suggest it if it's an apply.
+  bool suggestConvenience = isa<ApplyInst>(Inst);
+                                             
+  reportIllegalUseForActorInit(Use, ActorKind, "appear", suggestConvenience,
+                               /*specifyThisUse=*/true);
 }
 
 /// Check and diagnose various failures when a load use is not fully

@@ -11,7 +11,6 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-// XFAIL: windows
 
 import _Concurrency
 import NonresilientClass
