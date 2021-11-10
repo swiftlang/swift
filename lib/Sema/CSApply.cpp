@@ -7581,6 +7581,15 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setArgs(args);
     cs.setType(apply, fnType->getResult());
 
+    // If this is a call to a distributed method thunk, let's mark the
+    // call as implicitly throwing.
+    if (isDistributedThunk(callee, apply->getFn(), dc,
+                           target && target->isAsyncLetInitializer())) {
+      auto *FD = cast<AbstractFunctionDecl>(callee.getDecl());
+      if (!FD->hasThrows())
+        apply->setImplicitlyThrows(true);
+    }
+
     solution.setExprTypes(apply);
     Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
