@@ -6,6 +6,7 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-add_subdirectory(SIL)
-add_subdirectory(Optimizer)
-add_subdirectory(ExperimentalRegex)
+add_libswift_module(ExperimentalRegex
+  Regex.swift
+)
+

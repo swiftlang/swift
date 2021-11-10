@@ -31,7 +31,9 @@ _swift_gyb_target_sources(swiftParse PRIVATE
 target_link_libraries(swiftParse PRIVATE
   swiftAST
   swiftSyntax
-  swiftSyntaxParse)
+  swiftSyntaxParse
+  libswiftStub
+)
 
 add_dependencies(swiftParse swift-parse-syntax-generated-headers)
 
