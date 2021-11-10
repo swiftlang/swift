@@ -786,7 +786,7 @@ function(add_libswift name)
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
               "-parse-as-library" ${sources}
               "-wmo" ${libswift_compile_options}
-              "-I" "${CMAKE_SOURCE_DIR}/include/swift"
+              "-I" "${SWIFT_SOURCE_DIR}/include/swift"
               "-I" "${build_dir}"
       COMMENT "Building libswift module ${module}")
 
