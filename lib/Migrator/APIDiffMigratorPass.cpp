@@ -490,7 +490,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                             TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                             Type T, ReferenceMetaData Data) override {
-      if (D == Target && !Data.isImplicit) {
+      if (D == Target && !Data.isImplicit && Range.isValid()) {
         Result = Range;
         return false;
       }
