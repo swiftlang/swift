@@ -279,7 +279,7 @@ public struct AsyncStream<Element> {
     build(Continuation(storage: storage))
   }
 
-   
+  
   /// Constructs an asynchronous stream from a given element-producing
   /// closure, with an optional closure to handle cancellation.
   ///
