@@ -1185,7 +1185,9 @@ AssociatedTypeDecl *AssociatedTypeInference::completeSolution(
   for (const auto &witness : abstractTypeWitnesses) {
     Type type = witness.getType();
     if (type->hasTypeParameter()) {
-      if (witness.getKind() != AbstractTypeWitnessKind::GenericParam) {
+      if (witness.getKind() == AbstractTypeWitnessKind::GenericParam) {
+        type = type = dc->mapTypeIntoContext(type);
+      } else {
         // Replace type parameters with other known or tentative type witnesses.
         type = type.subst(
             [&](SubstitutableType *type) {
@@ -1200,23 +1202,26 @@ AssociatedTypeDecl *AssociatedTypeInference::completeSolution(
         if (type->hasError())
           return witness.getAssocType();
 
-        // FIXME: If we still have a type parameter and it isn't a generic
-        // parameter of the conforming nominal, it's either a cycle or a
-        // solution that is beyond the current algorithm, i.e.
-        //
+        // FIXME: If mapping into context yields an error, or we still have a
+        // type parameter despite not having a generic environment, then a type
+        // parameter was sent to a tentative type witness that itself is a type
+        // parameter, and the solution is cyclic, e.g. { A := B.A, B := A.B },
+        // or beyond the current algorithm, e.g.
         // protocol P {
         //   associatedtype A = B
         //   associatedtype B = C
         //   associatedtype C = Int
         // }
         // struct Conformer: P {}
-        if (type->hasTypeParameter() &&
-            !adoptee->getAnyNominal()->isGeneric()) {
+        if (dc->getGenericEnvironmentOfContext()) {
+          type = dc->mapTypeIntoContext(type);
+
+          if (type->hasError())
+            return witness.getAssocType();
+        } else if (type->hasTypeParameter()) {
           return witness.getAssocType();
         }
       }
-
-      type = dc->mapTypeIntoContext(type);
     }
 
     if (const auto &failed = checkTypeWitness(type, witness.getAssocType(),
