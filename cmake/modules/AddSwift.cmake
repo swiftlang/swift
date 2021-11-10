@@ -667,8 +667,8 @@ endfunction()
 function(add_libswift_module module)
   cmake_parse_arguments(ALSM
                         ""
-                        "DEPENDS"
                         ""
+                        "DEPENDS"
                         ${ARGN})
   set(sources ${ALSM_UNPARSED_ARGUMENTS})
   list(TRANSFORM sources PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
@@ -717,8 +717,8 @@ endfunction()
 function(add_libswift name)
   cmake_parse_arguments(ALS
                         ""
-                        "BOOTSTRAPPING;SWIFT_EXEC;DEPENDS"
-                        ""
+                        "BOOTSTRAPPING;SWIFT_EXEC"
+                        "DEPENDS"
                         ${ARGN})
 
   set(libswift_compile_options
