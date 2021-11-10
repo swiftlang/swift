@@ -362,7 +362,11 @@ function to_libswift_buildmode() {
             echo "OFF"
             ;;
         true | TRUE | 1 | "")
-            echo "BOOTSTRAPPING"
+            if [[ "$(uname -s)" == "Darwin" ]] ; then
+              echo "BOOTSTRAPPING-WITH-HOSTLIBS"
+            else
+              echo "BOOTSTRAPPING"
+            fi
             ;;
         *)
             echo `toupper $1`
