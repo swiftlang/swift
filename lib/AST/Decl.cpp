@@ -1066,7 +1066,8 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
   auto D = new (ptr) ImportDecl(DC, ImportLoc, Kind, KindLoc, Path);
   if (ClangN)
     D->setClangNode(ClangN);
-  auto realNameIfExists = Ctx.getRealModuleName(Path.front().Item, ASTContext::ModuleAliasLookupOption::realNameFromAlias);
+  auto realNameIfExists = Ctx.getRealModuleName(Path.front().Item,
+                                                ASTContext::ModuleAliasLookupOption::realNameFromAlias);
   if (!realNameIfExists.empty()) {
     D->RealModuleName = realNameIfExists;
   }
