@@ -1,6 +1,6 @@
 add_swift_host_tool(swift-remoteast-test
   swift-remoteast-test.cpp
-  SWIFT_COMPONENT tools
+  SWIFT_COMPONENT testsuite-tools
 )
 target_link_libraries(swift-remoteast-test
                       PRIVATE

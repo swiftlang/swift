@@ -2,7 +2,7 @@ add_swift_host_tool(swift-syntax-test
   swift-syntax-test.cpp
   LLVM_LINK_COMPONENTS
     Support
-  SWIFT_COMPONENT tools
+  SWIFT_COMPONENT testsuite-tools
 )
 target_link_libraries(swift-syntax-test
                       PRIVATE
