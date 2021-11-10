@@ -1672,6 +1672,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   // Spcial case: unnamed/anonymous fields.
   if (auto field = dyn_cast<clang::FieldDecl>(D)) {
+    static_assert((clang::Decl::lastField - clang::Decl::firstField) == 2,
+                  "update logic for new FieldDecl subclasses");
+    if (isa<clang::ObjCIvarDecl>(D) || isa<clang::ObjCAtDefsFieldDecl>(D))
+      // These are not ordinary fields and are not imported into Swift.
+      return result;
+
     if (field->isAnonymousStructOrUnion() || field->getDeclName().isEmpty()) {
       // Generate a field name for anonymous fields, this will be used in
       // order to be able to expose the indirect fields injected from there
