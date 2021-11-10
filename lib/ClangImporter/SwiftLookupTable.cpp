@@ -1860,6 +1860,11 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
 void importer::addEntryToLookupTable(SwiftLookupTable &table,
                                      clang::NamedDecl *named,
                                      NameImporter &nameImporter) {
+  clang::PrettyStackTraceDecl trace(
+      named, named->getLocation(),
+      nameImporter.getClangContext().getSourceManager(),
+      "while adding SwiftName lookup table entries for clang declaration");
+
   // Determine whether this declaration is suppressed in Swift.
   if (shouldSuppressDeclImport(named))
     return;
