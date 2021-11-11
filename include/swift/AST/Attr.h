@@ -487,7 +487,7 @@ public:
       Name(Name) {}
 
   SILGenNameAttr(StringRef Name, bool Implicit)
-    : SILGenNameAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+    : SILGenNameAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The symbol name.
   const StringRef Name;
@@ -505,7 +505,7 @@ public:
       Name(Name) {}
 
   CDeclAttr(StringRef Name, bool Implicit)
-    : CDeclAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+    : CDeclAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The symbol name.
   const StringRef Name;
@@ -524,7 +524,7 @@ public:
   Value(Value) {}
 
   SemanticsAttr(StringRef Value, bool Implicit)
-  : SemanticsAttr(Value, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
+  : SemanticsAttr(Value, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The semantics tag value.
   const StringRef Value;
