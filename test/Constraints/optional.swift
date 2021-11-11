@@ -499,3 +499,13 @@ func rdar75514153() {
   test_labeled(42, x: nil)   // expected-error {{no exact matches in call to local function 'test_labeled'}}
   test_labeled(42, x: (nil)) // expected-error {{no exact matches in call to local function 'test_labeled'}}
 }
+
+// rdar://85166519 - Crash dereferencing Null Type In Bogus Expression
+func rdar85166519() {
+  var v: Int? = nil
+
+  var _: [Int: AnyObject] = [ // expected-error {{dictionary of type '[Int : AnyObject]' cannot be initialized with array literal}}
+    // expected-note@-1 {{did you mean to use a dictionary literal instead?}}
+    v?.addingReportingOverflow(0) // expected-error {{cannot convert value of type '(partialValue: Int, overflow: Bool)?' to expected dictionary key type 'Int'}}
+  ]
+}
