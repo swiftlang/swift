@@ -959,6 +959,9 @@ public:
   }
 
   void annotate(const Decl *D, bool IsRef, CharSourceRange Range) {
+    if (!Range.isValid())
+      return;
+
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
     auto Kind = CodeCompletionResult::getCodeCompletionDeclKind(D);
