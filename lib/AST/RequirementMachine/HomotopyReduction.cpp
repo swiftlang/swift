@@ -836,6 +836,7 @@ void RewriteSystem::verifyRewriteLoops() const {
 /// since this suggests a misunderstanding on my part.
 void RewriteSystem::verifyRedundantConformances(
     llvm::DenseSet<unsigned> redundantConformances) const {
+#ifndef NDEBUG
   for (unsigned ruleID : redundantConformances) {
     const auto &rule = getRule(ruleID);
     assert(!rule.isPermanent() &&
@@ -853,11 +854,13 @@ void RewriteSystem::verifyRedundantConformances(
       abort();
     }
   }
+#endif
 }
 
 // Assert if homotopy reduction failed to eliminate a rewrite rule it was
 // supposed to delete.
 void RewriteSystem::verifyMinimizedRules() const {
+#ifndef NDEBUG
   for (const auto &rule : Rules) {
     // Note that sometimes permanent rules can be simplified, but they can never
     // be redundant.
@@ -895,4 +898,5 @@ void RewriteSystem::verifyMinimizedRules() const {
       abort();
     }
   }
+#endif
 }
