@@ -2126,15 +2126,6 @@ void PatternMatchEmission::emitEnumElementDispatch(
         }
       }
 
-      // Forward src along this path so we don't emit a destroy_addr on our
-      // subject value for this case.
-      //
-      // FIXME: Do we actually want to do this? SILGen tests today assume this
-      // pattern. It might be worth leaving the destroy_addr there to create
-      // additional liveness information. For now though, we maintain the
-      // current behavior.
-      src.getFinalManagedValue().forward(SGF);
-
       SILValue result;
       if (hasNonAny) {
         result = SGF.emitEmptyTuple(loc);

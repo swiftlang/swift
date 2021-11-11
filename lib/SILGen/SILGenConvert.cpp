@@ -454,13 +454,16 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
   SEBuilder.addOptionalNoneCase(
       isNotPresentBB, contBB,
-      [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
+      [&](ManagedValue inputNone, SwitchCaseFullExpr &&scope) {
+        if (getTypeLowering(input.getValue()->getType()).isAddressOnly() &&
+            silConv.useLoweredAddresses()) {
+          enterDestroyCleanup(input.getValue());
+        }
         if (!addressOnly) {
           SILValue none =
               B.createManagedOptionalNone(loc, resultTy).forward(*this);
           return scope.exitAndBranch(loc, none);
         }
-
         emitInjectOptionalNothingInto(loc, resultAddress.getValue(), resultTL);
         return scope.exitAndBranch(loc);
       });
