@@ -18,7 +18,7 @@ func bar(_ x: Int) -> some P {
 }
 
 // CHECK-LABEL: sil @$s43specialize_opaque_type_archetypes_multifile4testyyF : $@convention(thin) () -> () {
-// CHECK: function_ref @$s43specialize_opaque_type_archetypes_multifile4bar2yQrSiF : $@convention(thin) (Int) -> @out @_opaqueReturnTypeOf("$s43specialize_opaque_type_archetypes_multifile4bar2yQrSiF", 0)
+// CHECK: function_ref @$s43specialize_opaque_type_archetypes_multifile4bar2yQrSiF : $@convention(thin) @substituted <τ_0_0> (Int) -> @out τ_0_0 for <@_opaqueReturnTypeOf("$s43specialize_opaque_type_archetypes_multifile4bar2yQrSiF", 0) __>
 public func test() {
   print(bar(5))
   print(bar2(5))
