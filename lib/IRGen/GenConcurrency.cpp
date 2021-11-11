@@ -53,8 +53,7 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                      ScalarKind::POD);
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
   }
 
   static Size getSecondElementOffset(IRGenModule &IGM) {
