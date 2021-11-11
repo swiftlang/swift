@@ -216,5 +216,5 @@ testObjectForOptionalKeyPath.optionalObject = "foo"
 
 // CHECK-51-LABEL: observe keyPath with optional value
 // CHECK-51-NEXT: oldValue = Optional(nil), newValue = {{Optional\(nil\)|nil}}
-// CHECK-51-NEXT: oldValue = Optional(nil), newValue = {{Optional\(nil\)|nil}}
-// CHECK-51-NEXT: oldValue = Optional(nil), newValue = Optional(Optional("foo"))
+// CHECK-51-NEXT: oldValue = {{Optional\(nil\)|nil}}, newValue = {{Optional\(nil\)|nil}}
+// CHECK-51-NEXT: oldValue = {{Optional\(nil\)|nil}}, newValue = Optional(Optional("foo"))
