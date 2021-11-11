@@ -3095,6 +3095,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitExistentialTypeRepr(ExistentialTypeRepr *T) {
+    printCommon("type_existential");
+    printRec(T->getConstraint());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {
     printCommon("type_placeholder");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';

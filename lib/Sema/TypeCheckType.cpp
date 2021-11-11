@@ -2058,6 +2058,16 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                                        : ErrorType::get(getASTContext());
   }
 
+  case TypeReprKind::Existential: {
+    if (!getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+        !(options & TypeResolutionFlags::SilenceErrors)) {
+      diagnose(repr->getLoc(), diag::explicit_existential_not_supported);
+    }
+
+    auto *existential = cast<ExistentialTypeRepr>(repr);
+    return resolveType(existential->getConstraint(), options);
+  }
+
   case TypeReprKind::NamedOpaqueReturn:
     return resolveType(cast<NamedOpaqueReturnTypeRepr>(repr)->getBase(),
                        options);
