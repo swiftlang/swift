@@ -631,7 +631,7 @@ void CodeCompletionResult::dump() const {
 CodeCompletionResult *
 CodeCompletionResult::withFlair(CodeCompletionFlair newFlair,
                                 CodeCompletionResultSink &Sink) {
-  if (Kind == ResultKind::Declaration) {
+  if (getKind() == ResultKind::Declaration) {
     return new (*Sink.Allocator) CodeCompletionResult(
         getSemanticContext(), newFlair, getNumBytesToErase(),
         getCompletionString(), getAssociatedDeclKind(), isSystem(),
@@ -3265,7 +3265,8 @@ public:
       if (!IsImplicitlyCurriedInstanceMethod &&
           expectedTypeContext.requiresNonVoid() &&
           ResultType->isVoid()) {
-        Builder.setExpectedTypeRelation(CodeCompletionResult::Invalid);
+        Builder.setExpectedTypeRelation(
+            CodeCompletionResult::ExpectedTypeRelation::Invalid);
       }
     };
 
@@ -4321,13 +4322,14 @@ public:
       if (!T)
         continue;
 
-      auto typeRelation = CodeCompletionResult::Identical;
+      auto typeRelation = CodeCompletionResult::ExpectedTypeRelation::Identical;
       // Convert through optional types unless we're looking for a protocol
       // that Optional itself conforms to.
       if (kind != CodeCompletionLiteralKind::NilLiteral) {
         if (auto optionalObjT = T->getOptionalObjectType()) {
           T = optionalObjT;
-          typeRelation = CodeCompletionResult::Convertible;
+          typeRelation =
+              CodeCompletionResult::ExpectedTypeRelation::Convertible;
         }
       }
 
@@ -4415,19 +4417,19 @@ public:
     if (isCodeCompletionAtTopLevelOfLibraryFile(CurrDeclContext))
       flair |= CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope;
 
-    auto addFromProto = [&](
-        CodeCompletionLiteralKind kind,
-        llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer,
-        bool isKeyword = false) {
+    auto addFromProto =
+        [&](CodeCompletionLiteralKind kind,
+            llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer,
+            bool isKeyword = false) {
+          CodeCompletionResultBuilder builder(
+              Sink, CodeCompletionResult::ResultKind::Literal,
+              SemanticContextKind::None, {});
+          builder.setLiteralKind(kind);
+          builder.addFlair(flair);
 
-      CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Literal,
-                                          SemanticContextKind::None, {});
-      builder.setLiteralKind(kind);
-      builder.addFlair(flair);
-
-      consumer(builder);
-      addTypeRelationFromProtocol(builder, kind);
-    };
+          consumer(builder);
+          addTypeRelationFromProtocol(builder, kind);
+        };
 
     // FIXME: the pedantically correct way is to resolve Swift.*LiteralType.
 
@@ -4493,8 +4495,9 @@ public:
 
     // Add tuple completion (item, item).
     {
-      CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Literal,
-                                          SemanticContextKind::None, {});
+      CodeCompletionResultBuilder builder(
+          Sink, CodeCompletionResult::ResultKind::Literal,
+          SemanticContextKind::None, {});
       builder.setLiteralKind(LK::Tuple);
       builder.addFlair(flair);
 
@@ -4504,7 +4507,8 @@ public:
       for (auto T : expectedTypeContext.possibleTypes) {
         if (T && T->is<TupleType>() && !T->isVoid()) {
           addTypeAnnotation(builder, T);
-          builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
+          builder.setExpectedTypeRelation(
+              CodeCompletionResult::ExpectedTypeRelation::Identical);
           break;
         }
       }
@@ -6416,8 +6420,9 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
       [&](StringRef name, CodeCompletionKeywordKind K,
           llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer =
               nullptr) {
-        CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::Keyword,
-                                            SemanticContextKind::None, {});
+        CodeCompletionResultBuilder Builder(
+            Sink, CodeCompletionResult::ResultKind::Keyword,
+            SemanticContextKind::None, {});
         Builder.addBaseName(name);
         Builder.setKeywordKind(K);
         if (consumer)
@@ -7460,41 +7465,42 @@ swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
   auto startSize = targetSink.Results.size();
 
   if (onlyTypes) {
-    std::copy_if(sourceSink.Results.begin(), sourceSink.Results.end(),
-                 std::back_inserter(targetSink.Results),
-                 [](CodeCompletionResult *R) -> bool {
-      if (R->getKind() != CodeCompletionResult::Declaration)
-        return false;
-      switch(R->getAssociatedDeclKind()) {
-      case CodeCompletionDeclKind::Module:
-      case CodeCompletionDeclKind::Class:
-      case CodeCompletionDeclKind::Struct:
-      case CodeCompletionDeclKind::Enum:
-      case CodeCompletionDeclKind::Protocol:
-      case CodeCompletionDeclKind::TypeAlias:
-      case CodeCompletionDeclKind::AssociatedType:
-      case CodeCompletionDeclKind::GenericTypeParam:
-        return true;
-      case CodeCompletionDeclKind::PrecedenceGroup:
-      case CodeCompletionDeclKind::EnumElement:
-      case CodeCompletionDeclKind::Constructor:
-      case CodeCompletionDeclKind::Destructor:
-      case CodeCompletionDeclKind::Subscript:
-      case CodeCompletionDeclKind::StaticMethod:
-      case CodeCompletionDeclKind::InstanceMethod:
-      case CodeCompletionDeclKind::PrefixOperatorFunction:
-      case CodeCompletionDeclKind::PostfixOperatorFunction:
-      case CodeCompletionDeclKind::InfixOperatorFunction:
-      case CodeCompletionDeclKind::FreeFunction:
-      case CodeCompletionDeclKind::StaticVar:
-      case CodeCompletionDeclKind::InstanceVar:
-      case CodeCompletionDeclKind::LocalVar:
-      case CodeCompletionDeclKind::GlobalVar:
-        return false;
-      }
+    std::copy_if(
+        sourceSink.Results.begin(), sourceSink.Results.end(),
+        std::back_inserter(targetSink.Results),
+        [](CodeCompletionResult *R) -> bool {
+          if (R->getKind() != CodeCompletionResult::ResultKind::Declaration)
+            return false;
+          switch (R->getAssociatedDeclKind()) {
+          case CodeCompletionDeclKind::Module:
+          case CodeCompletionDeclKind::Class:
+          case CodeCompletionDeclKind::Struct:
+          case CodeCompletionDeclKind::Enum:
+          case CodeCompletionDeclKind::Protocol:
+          case CodeCompletionDeclKind::TypeAlias:
+          case CodeCompletionDeclKind::AssociatedType:
+          case CodeCompletionDeclKind::GenericTypeParam:
+            return true;
+          case CodeCompletionDeclKind::PrecedenceGroup:
+          case CodeCompletionDeclKind::EnumElement:
+          case CodeCompletionDeclKind::Constructor:
+          case CodeCompletionDeclKind::Destructor:
+          case CodeCompletionDeclKind::Subscript:
+          case CodeCompletionDeclKind::StaticMethod:
+          case CodeCompletionDeclKind::InstanceMethod:
+          case CodeCompletionDeclKind::PrefixOperatorFunction:
+          case CodeCompletionDeclKind::PostfixOperatorFunction:
+          case CodeCompletionDeclKind::InfixOperatorFunction:
+          case CodeCompletionDeclKind::FreeFunction:
+          case CodeCompletionDeclKind::StaticVar:
+          case CodeCompletionDeclKind::InstanceVar:
+          case CodeCompletionDeclKind::LocalVar:
+          case CodeCompletionDeclKind::GlobalVar:
+            return false;
+          }
 
-      llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
-    });
+          llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
+        });
   } else if (onlyPrecedenceGroups) {
     std::copy_if(sourceSink.Results.begin(), sourceSink.Results.end(),
                  std::back_inserter(targetSink.Results),

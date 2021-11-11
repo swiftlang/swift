@@ -87,7 +87,7 @@ class CodeCompletionResultBuilder {
       CurrentModule;
   ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
-      CodeCompletionResult::Unknown;
+      CodeCompletionResult::ExpectedTypeRelation::Unknown;
   bool Cancelled = false;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
       CodeCompletionResult::NotRecommendedReason::None;

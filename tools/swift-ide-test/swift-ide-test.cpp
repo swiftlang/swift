@@ -1046,7 +1046,8 @@ printCodeCompletionResultsImpl(MutableArrayRef<CodeCompletionResult *> Results,
                                bool PrintAnnotatedDescription) {
   unsigned NumResults = 0;
   for (auto Result : Results) {
-    if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
+    if (!IncludeKeywords &&
+        Result->getKind() == CodeCompletionResult::ResultKind::Keyword)
       continue;
     ++NumResults;
   }
@@ -1055,7 +1056,8 @@ printCodeCompletionResultsImpl(MutableArrayRef<CodeCompletionResult *> Results,
 
   OS << "Begin completions, " << NumResults << " items\n";
   for (auto Result : Results) {
-    if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
+    if (!IncludeKeywords &&
+        Result->getKind() == CodeCompletionResult::ResultKind::Keyword)
       continue;
     Result->printPrefix(OS);
     if (PrintAnnotatedDescription) {
