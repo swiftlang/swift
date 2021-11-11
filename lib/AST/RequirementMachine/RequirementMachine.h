@@ -27,6 +27,7 @@ class raw_ostream;
 
 namespace swift {
 
+class AbstractGenericSignatureRequestRQM;
 class ASTContext;
 class AssociatedTypeDecl;
 class CanType;
@@ -45,6 +46,7 @@ class RewriteContext;
 class RequirementMachine final {
   friend class swift::ASTContext;
   friend class swift::rewriting::RewriteContext;
+  friend class swift::AbstractGenericSignatureRequestRQM;
 
   CanGenericSignature Sig;
   SmallVector<Type, 2> Params;
@@ -81,6 +83,9 @@ class RequirementMachine final {
 
   void initWithGenericSignature(CanGenericSignature sig);
   void initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
+  void initWithAbstractRequirements(
+      ArrayRef<GenericTypeParamType *> genericParams,
+      ArrayRef<Requirement> requirements);
 
   bool isComplete() const;
 

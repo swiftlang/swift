@@ -546,6 +546,45 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
   }
 }
 
+/// Build a requirement machine from a set of generic parameters and
+/// (possibly non-canonical or non-minimal) structural requirements.
+void RequirementMachine::initWithAbstractRequirements(
+    ArrayRef<GenericTypeParamType *> genericParams,
+    ArrayRef<Requirement> requirements) {
+  Params.append(genericParams.begin(), genericParams.end());
+
+  auto &ctx = Context.getASTContext();
+  auto *Stats = ctx.Stats;
+
+  if (Stats)
+    ++Stats->getFrontendCounters().NumRequirementMachines;
+
+  FrontendStatsTracer tracer(Stats, "build-rewrite-system");
+
+  if (Dump) {
+    llvm::dbgs() << "Adding generic parameters:";
+    for (auto *paramTy : genericParams)
+      llvm::dbgs() << " " << Type(paramTy);
+    llvm::dbgs() << "\n";
+  }
+
+  // Collect the top-level requirements, and all transtively-referenced
+  // protocol requirement signatures.
+  RewriteSystemBuilder builder(Context, Dump);
+  builder.addRequirements(requirements);
+
+  // Add the initial set of rewrite rules to the rewrite system.
+  System.initialize(/*recordLoops=*/true,
+                    std::move(builder.PermanentRules),
+                    std::move(builder.RequirementRules));
+
+  computeCompletion(RewriteSystem::AllowInvalidRequirements);
+
+  if (Dump) {
+    llvm::dbgs() << "}\n";
+  }
+}
+
 /// Attempt to obtain a confluent rewrite system using the completion
 /// procedure.
 void RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {

@@ -26,6 +26,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
+#include <memory>
 #include <vector>
 
 using namespace swift;
@@ -292,4 +293,58 @@ RequirementMachine::computeMinimalGenericSignatureRequirements() {
 
   auto rules = System.getMinimizedGenericSignatureRules();
   return buildRequirementsFromRules(rules, getGenericParams());
+}
+
+GenericSignatureWithError
+AbstractGenericSignatureRequestRQM::evaluate(
+         Evaluator &evaluator,
+         const GenericSignatureImpl *baseSignatureImpl,
+         SmallVector<GenericTypeParamType *, 2> addedParameters,
+         SmallVector<Requirement, 2> addedRequirements) const {
+  GenericSignature baseSignature = GenericSignature{baseSignatureImpl};
+  // If nothing is added to the base signature, just return the base
+  // signature.
+  if (addedParameters.empty() && addedRequirements.empty())
+    return GenericSignatureWithError(baseSignature, /*hadError=*/false);
+
+  ASTContext &ctx = addedParameters.empty()
+      ? addedRequirements.front().getFirstType()->getASTContext()
+      : addedParameters.front()->getASTContext();
+
+  SmallVector<GenericTypeParamType *, 4> genericParams(
+      baseSignature.getGenericParams().begin(),
+      baseSignature.getGenericParams().end());
+  genericParams.append(
+      addedParameters.begin(),
+      addedParameters.end());
+
+  // If there are no added requirements, we can form the signature directly
+  // with the added parameters.
+  if (addedRequirements.empty()) {
+    auto result = GenericSignature::get(genericParams,
+                                        baseSignature.getRequirements());
+    return GenericSignatureWithError(result, /*hadError=*/false);
+  }
+
+  SmallVector<Requirement, 4> requirements(
+      baseSignature.getRequirements().begin(),
+      baseSignature.getRequirements().end());
+  requirements.append(
+      addedRequirements.begin(),
+      addedRequirements.end());
+
+  // Heap-allocate the requirement machine to save stack space.
+  std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
+      ctx.getRewriteContext()));
+
+  machine->initWithAbstractRequirements(genericParams, requirements);
+
+  auto minimalRequirements =
+    machine->computeMinimalGenericSignatureRequirements();
+
+  // FIXME: Implement this
+  bool hadError = false;
+
+  auto result = GenericSignature::get(genericParams, minimalRequirements);
+  return GenericSignatureWithError(result, hadError);
 }
