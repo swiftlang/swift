@@ -955,6 +955,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 

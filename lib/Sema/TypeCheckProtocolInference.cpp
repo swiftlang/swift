@@ -1225,6 +1225,10 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
   TypeWitnessSystem system(unresolvedAssocTypes);
   collectAbstractTypeWitnesses(system, unresolvedAssocTypes);
 
+  if (ctx.LangOpts.DumpTypeWitnessSystems) {
+    system.dump(llvm::dbgs(), conformance);
+  }
+
   // If we couldn't resolve an associated type, bail out.
   for (auto *assocType : unresolvedAssocTypes) {
     if (!system.hasResolvedTypeWitness(assocType->getName())) {
