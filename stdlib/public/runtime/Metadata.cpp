@@ -5953,9 +5953,9 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   static OnceToken_t getenvToken;
   SWIFT_ONCE_F(getenvToken, checkAllocatorDebugEnvironmentVariables, nullptr);
 
-  // If the size is larger than the maximum, just use malloc.
+  // If the size is larger than the maximum, just do a normal heap allocation.
   if (size > PoolRange::MaxPoolAllocationSize) {
-    void *allocation = malloc(size);
+    void *allocation = swift_slowAlloc(size, alignment - 1);
     memsetScribble(allocation, size);
     return allocation;
   }
@@ -5993,6 +5993,21 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       newState = PoolRange{allocation + sizeWithHeader,
                            poolSize - sizeWithHeader};
       __asan_poison_memory_region(allocation, newState.Remaining);
+    }
+
+    // NULL should be impossible, but check anyway in case of bugs or corruption
+    if (SWIFT_UNLIKELY(!allocation)) {
+      PoolRange curStateReRead = AllocationPool.load(std::memory_order_relaxed);
+      swift::fatalError(
+          0,
+          "Metadata allocator corruption: allocation is NULL. "
+          "curState: {%p, %zu} - curStateReRead: {%p, %zu} - "
+          "newState: {%p, %zu} - allocatedNewPage: %s - requested size: %zu - "
+          "sizeWithHeader: %zu - alignment: %zu - Tag: %d\n",
+          curState.Begin, curState.Remaining, curStateReRead.Begin,
+          curStateReRead.Remaining, newState.Begin, newState.Remaining,
+          allocatedNewPage ? "true" : "false", size, sizeWithHeader, alignment,
+          Tag);
     }
 
     // Swap in the new state.
@@ -6035,7 +6050,7 @@ void MetadataAllocator::Deallocate(const void *allocation, size_t size,
   __asan_poison_memory_region(allocation, size);
 
   if (size > PoolRange::MaxPoolAllocationSize) {
-    free(const_cast<void*>(allocation));
+    swift_slowDealloc(const_cast<void *>(allocation), size, Alignment - 1);
     return;
   }
 
