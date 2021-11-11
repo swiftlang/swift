@@ -63,11 +63,25 @@ MOCK_CONFIG = {
 }
 
 
+class CallQuietlyException(Exception):
+    def __init__(self, command, returncode, output):
+        self.command = command
+        self.returncode = returncode
+        self.output = output
+
+    def __str__(self):
+        return f"Command returned a non-zero exit status {self.returncode}:\n"\
+               f"Command: {' '.join(self.command)}\n" \
+               f"Output: {self.output.decode('utf-8')}"
+
+
 def call_quietly(*args, **kwargs):
-    with open(os.devnull, 'w') as f:
-        kwargs['stdout'] = f
-        kwargs['stderr'] = f
-        subprocess.check_call(*args, **kwargs)
+    kwargs['stderr'] = subprocess.STDOUT
+    try:
+        subprocess.check_output(*args, **kwargs)
+    except subprocess.CalledProcessError as e:
+        raise CallQuietlyException(command=e.cmd, returncode=e.returncode,
+                                   output=e.stdout) from e
 
 
 def create_dir(d):
