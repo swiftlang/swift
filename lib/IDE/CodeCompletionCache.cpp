@@ -224,18 +224,17 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto diagMessage = getString(diagMessageIndex);
 
     CodeCompletionResult *result = nullptr;
-    if (kind == CodeCompletionResult::Declaration) {
+    if (kind == CodeCompletionResult::ResultKind::Declaration) {
       result = new (*V.Sink.Allocator) CodeCompletionResult(
-          context, CodeCompletionFlair(), numBytesToErase, string,
-          declKind, isSystem, moduleName, notRecommended,
-          diagSeverity, diagMessage, briefDocComment,
+          context, CodeCompletionFlair(), numBytesToErase, string, declKind,
+          isSystem, moduleName, notRecommended, diagSeverity, diagMessage,
+          briefDocComment,
           copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
-          CodeCompletionResult::Unknown, opKind);
+          CodeCompletionResult::ExpectedTypeRelation::Unknown, opKind);
     } else {
-      result = new (*V.Sink.Allocator)
-          CodeCompletionResult(kind, context,  CodeCompletionFlair(),
-                               numBytesToErase, string,
-                               CodeCompletionResult::NotApplicable, opKind);
+      result = new (*V.Sink.Allocator) CodeCompletionResult(
+          kind, context, CodeCompletionFlair(), numBytesToErase, string,
+          CodeCompletionResult::ExpectedTypeRelation::NotApplicable, opKind);
     }
 
     V.Sink.Results.push_back(result);
@@ -351,7 +350,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
 
       // FIXME: compress bitfield
       LE.write(static_cast<uint8_t>(R->getKind()));
-      if (R->getKind() == CodeCompletionResult::Declaration)
+      if (R->getKind() == CodeCompletionResult::ResultKind::Declaration)
         LE.write(static_cast<uint8_t>(R->getAssociatedDeclKind()));
       else
         LE.write(static_cast<uint8_t>(~0u));
