@@ -146,7 +146,7 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
     // FIXME: this adhoc filtering should be configurable like it is in the
     // codeCompleteOpen path.
     for (auto *Result : Result->Results) {
-      if (Result->getKind() == CodeCompletionResult::Literal) {
+      if (Result->getKind() == CodeCompletionResult::ResultKind::Literal) {
         switch (Result->getLiteralKind()) {
         case CodeCompletionLiteralKind::NilLiteral:
         case CodeCompletionLiteralKind::BooleanLiteral:
@@ -155,7 +155,7 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
         case CodeCompletionLiteralKind::ColorLiteral:
           if (hasRequiredType &&
               Result->getExpectedTypeRelation() <
-                  CodeCompletionResult::Convertible)
+                  CodeCompletionResult::ExpectedTypeRelation::Convertible)
             continue;
           break;
         default:
@@ -390,16 +390,18 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   CodeCompletionInfo Info;
   if (Result->hasCustomKind()) {
     Info.CustomKind = Result->getCustomKind();
-  } else if (Result->getKind() == CodeCompletionResult::Keyword) {
+  } else if (Result->getKind() == CodeCompletionResult::ResultKind::Keyword) {
     Info.Kind = KeywordUID;
-  } else if (Result->getKind() == CodeCompletionResult::Pattern) {
+  } else if (Result->getKind() == CodeCompletionResult::ResultKind::Pattern) {
     Info.Kind = PatternUID;
-  } else if (Result->getKind() == CodeCompletionResult::BuiltinOperator) {
+  } else if (Result->getKind() ==
+             CodeCompletionResult::ResultKind::BuiltinOperator) {
     Info.Kind = PatternUID; // FIXME: add a UID for operators
-  } else if (Result->getKind() == CodeCompletionResult::Declaration) {
+  } else if (Result->getKind() ==
+             CodeCompletionResult::ResultKind::Declaration) {
     Info.Kind = SwiftLangSupport::getUIDForCodeCompletionDeclKind(
         Result->getAssociatedDeclKind());
-  } else if (Result->getKind() == CodeCompletionResult::Literal) {
+  } else if (Result->getKind() == CodeCompletionResult::ResultKind::Literal) {
     auto literalKind = Result->getLiteralKind();
     if (legacyLiteralToKeyword &&
         (literalKind == CodeCompletionLiteralKind::BooleanLiteral ||
@@ -515,17 +517,17 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   static UIdent CCTypeRelIdentical("source.codecompletion.typerelation.identical");
 
   switch (Result->getExpectedTypeRelation()) {
-  case CodeCompletionResult::NotApplicable:
+  case CodeCompletionResult::ExpectedTypeRelation::NotApplicable:
     Info.TypeRelation = CCTypeRelNotApplicable; break;
-  case CodeCompletionResult::Unknown:
+  case CodeCompletionResult::ExpectedTypeRelation::Unknown:
     Info.TypeRelation = CCTypeRelUnknown; break;
-  case CodeCompletionResult::Unrelated:
+  case CodeCompletionResult::ExpectedTypeRelation::Unrelated:
     Info.TypeRelation = CCTypeRelUnrelated; break;
-  case CodeCompletionResult::Invalid:
+  case CodeCompletionResult::ExpectedTypeRelation::Invalid:
     Info.TypeRelation = CCTypeRelInvalid; break;
-  case CodeCompletionResult::Convertible:
+  case CodeCompletionResult::ExpectedTypeRelation::Convertible:
     Info.TypeRelation = CCTypeRelConvertible; break;
-  case  CodeCompletionResult::Identical:
+  case CodeCompletionResult::ExpectedTypeRelation::Identical:
     Info.TypeRelation = CCTypeRelIdentical; break;
   }
 
@@ -984,8 +986,8 @@ static void transformAndForwardResults(
 
   organizer.groupAndSort(options);
 
-  if ((options.addInnerResults || options.addInnerOperators) &&
-      exactMatch && exactMatch->getKind() == Completion::Declaration) {
+  if ((options.addInnerResults || options.addInnerOperators) && exactMatch &&
+      exactMatch->getKind() == Completion::ResultKind::Declaration) {
     std::vector<Completion *> innerResults;
     bool hasDot = false;
     bool hasQDot = false;
