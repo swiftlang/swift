@@ -450,7 +450,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 
       // FIXME: swift-3-indexing-model: tests.
       if !newValue.isEmpty {
-        (_position! + bounds.lowerBound).assign(
+        (_position! + bounds.lowerBound).update(
           from: newValue.base._position! + newValue.startIndex,
           count: newValue.count)
       }
@@ -727,12 +727,20 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameters:
   ///   - repeatedValue: The value used when updating this pointer's memory.
   @inlinable // unsafe-performance
-  public func assign(repeating repeatedValue: Element) {
+  @_silgen_name("$sSr6assign9repeatingyx_tF")
+  public func update(repeating repeatedValue: Element) {
     guard let dstBase = _position else {
       return
     }
 
-    dstBase.assign(repeating: repeatedValue, count: count)
+    dstBase.update(repeating: repeatedValue, count: count)
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "update(repeating:)")
+  @_silgen_name("_deprecated_assign_repeating")
+  public func assign(repeating repeatedValue: Element) {
+    update(repeating: repeatedValue)
   }
 
   /// Updates the buffer's initialized memory with the given elements.
@@ -744,9 +752,9 @@ extension Unsafe${Mutable}BufferPointer {
   ///   the buffer's contents.
   /// - Returns: An iterator to any elements of `source` that didn't fit in the
   ///   buffer, and the index one past the last updated element in the buffer.
-  public func assign<S: Sequence>(
+  public func update<S: Sequence>(
     from source: S
-  ) -> (unwritten: S.Iterator, assigned: Index) where S.Element == Element {
+  ) -> (unwritten: S.Iterator, updated: Index) where S.Element == Element {
     var iterator = source.makeIterator()
     guard var pointer = baseAddress else { return (iterator, startIndex) }
     for index in indices {
@@ -769,14 +777,14 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An index one past the last updated element in the buffer,
   ///   or `endIndex`.
   @discardableResult
-  public func assign<C: Collection>(
+  public func update<C: Collection>(
     fromElements source: C
   ) -> Index where C.Element == Element {
     let count = Swift.min(source.count, self.count)
     guard count > 0, let base = baseAddress else { return startIndex }
 
     if let _ = source.withContiguousStorageIfAvailable({
-      base.assign(from: $0.baseAddress._unsafelyUnwrappedUnchecked,
+      base.update(from: $0.baseAddress._unsafelyUnwrappedUnchecked,
                   count: count)
     }) {
       return startIndex.advanced(by: count)
@@ -839,7 +847,7 @@ extension Unsafe${Mutable}BufferPointer {
   /// The region of memory starting at the beginning of this buffer and
   /// covering `fromElements.count` instances of its `Element` type  must be
   /// initialized, or `Element` must be a trivial type.
-  /// After calling `moveAssign(fromElements:)`,
+  /// After calling `moveUpdate(fromElements:)`,
   /// the region of memory underlying `source` is uninitialized.
   ///
   /// - Parameter source: A buffer containing the values to move.
@@ -848,10 +856,10 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An index one past the last updated element in the buffer,
   ///   or `endIndex`.
   @discardableResult
-  public func moveAssign(from source: Self) -> Index {
+  public func moveUpdate(fromElements source: Self) -> Index {
     guard let pointer = source.baseAddress, source.count > 0 else { return 0 }
     _debugPrecondition(count >= source.count)
-    baseAddress._unsafelyUnwrappedUnchecked.moveAssign(from: pointer,
+    baseAddress._unsafelyUnwrappedUnchecked.moveUpdate(from: pointer,
                                                        count: source.count)
     return startIndex.advanced(by: source.count)
   }
@@ -863,7 +871,7 @@ extension Unsafe${Mutable}BufferPointer {
   /// The region of memory starting at the beginning of this buffer and
   /// covering `fromElements.count` instances of its `Element` type  must be
   /// initialized, or `Element` must be a trivial type.
-  /// After calling `moveAssign(fromElements:)`,
+  /// After calling `moveUpdate(fromElements:)`,
   /// the region of memory underlying `source` is uninitialized.
   ///
   /// - Parameter source: A buffer containing the values to move.
@@ -872,8 +880,8 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Returns: An index one past the last updated element in the buffer,
   ///   or `endIndex`.
   @discardableResult
-  public func moveAssign(from source: Slice<Self>) -> Index {
-    return moveAssign(from: Self(rebasing: source))
+  public func moveUpdate(fromElements source: Slice<Self>) -> Index {
+    return moveUpdate(fromElements: Self(rebasing: source))
   }
 
   /// Deinitializes every instance in this buffer.
@@ -920,7 +928,7 @@ extension Unsafe${Mutable}BufferPointer {
   /// - Parameters:
   ///   - value: The value used to update the buffer element's memory.
   ///   - index: The index of the element to update
-  public func assignElement(at index: Index, _ value: Element) {
+  public func updateElement(at index: Index, to value: Element) {
     precondition(startIndex <= index && index < endIndex)
     let p = baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
     p.pointee = value

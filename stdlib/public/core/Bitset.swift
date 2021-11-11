@@ -118,7 +118,7 @@ extension _UnsafeBitset {
   @inlinable
   @inline(__always)
   internal func clear() {
-    words.assign(repeating: .empty, count: wordCount)
+    words.update(repeating: .empty, count: wordCount)
   }
 }
 

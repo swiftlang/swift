@@ -772,20 +772,28 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// The region of memory starting at this pointer and covering `count`
   /// instances of the pointer's `Pointee` type must be initialized or
   /// `Pointee` must be a trivial type. After calling
-  /// `assign(repeating:count:)`, the region is initialized.
+  /// `update(repeating:count:)`, the region is initialized.
   ///
   /// - Parameters:
   ///   - repeatedValue: The value used when updating this pointer's memory.
   ///   - count: The number of consecutive elements to update.
   ///     `count` must not be negative.
   @inlinable
-  public func assign(repeating repeatedValue: Pointee, count: Int) {
+  @_silgen_name("$sSp6assign9repeating5countyx_SitF")
+  public func update(repeating repeatedValue: Pointee, count: Int) {
     _debugPrecondition(count >= 0, "UnsafeMutablePointer.assign(repeating:count:) with negative count")
     for i in 0..<count {
       self[i] = repeatedValue
     }
   }
   
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "update(repeating:count:)")
+  @_silgen_name("_deprecated_assign_repeating_count")
+  public func assign(repeating repeatedValue: Pointee, count: Int) {
+    update(repeating: repeatedValue, count: count)
+  }
+
   /// Update this pointer's initialized memory.
   ///
   /// The range of memory starting at this pointer and covering one instance
@@ -796,7 +804,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///
   /// - Parameters:
   ///   - value: The value used to update this pointer's memory.
-  public func assign(_ value: Pointee) {
+  public func update(_ value: Pointee) {
     pointee = value
   }
 
@@ -806,7 +814,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// The region of memory starting at this pointer and covering `count`
   /// instances of the pointer's `Pointee` type must be initialized or
   /// `Pointee` must be a trivial type. After calling
-  /// `assign(from:count:)`, the region is initialized.
+  /// `update(from:count:)`, the region is initialized.
   ///
   /// - Note: Returns without performing work if `self` and `source` are equal.
   ///
@@ -817,9 +825,10 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to copy from the memory referenced by
   ///     `source` to this pointer's memory. `count` must not be negative.
   @inlinable
-  public func assign(from source: UnsafePointer<Pointee>, count: Int) {
+  @_silgen_name("$sSp6assign4from5countySPyxG_SitF")
+  public func update(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.assign with negative count")
+      count >= 0, "UnsafeMutablePointer.update with negative count")
     if UnsafePointer(self) < source || UnsafePointer(self) >= source + count {
       // assign forward from a disjoint or following overlapping range.
       Builtin.assignCopyArrayFrontToBack(
@@ -840,6 +849,13 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
       //   i -= 1
       // }
     }
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "update(from:count:)")
+  @_silgen_name("_deprecated_assign_from_count")
+  public func assign(from source: UnsafePointer<Pointee>, count: Int) {
+    update(from: source, count: count)
   }
 
   /// Moves instances from initialized source memory into the uninitialized
@@ -925,7 +941,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// The region of memory starting at this pointer and covering `count`
   /// instances of the pointer's `Pointee` type must be initialized or
   /// `Pointee` must be a trivial type. After calling
-  /// `moveAssign(from:count:)`, the region is initialized and the memory
+  /// `moveUpdate(from:count:)`, the region is initialized and the memory
   /// region `source..<(source + count)` is uninitialized.
   ///
   /// - Note: The source and destination memory regions must not overlap.
@@ -937,14 +953,15 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveAssign(
+  @_silgen_name("$sSp10moveAssign4from5countySpyxG_SitF")
+  public func moveUpdate(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
   ) {
     _debugPrecondition(
-      count >= 0, "UnsafeMutablePointer.moveAssign(from:) with negative count")
+      count >= 0, "UnsafeMutablePointer.moveUpdate(from:) with negative count")
     _debugPrecondition(
       self + count <= source || source + count <= self,
-      "moveAssign overlapping range")
+      "moveUpdate overlapping range")
     Builtin.assignTakeArray(
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // These builtins are equivalent to:
@@ -952,7 +969,16 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     //   self[i] = (source + i).move()
     // }
   }
-  
+
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "moveUpdate(from:count:)")
+  @_silgen_name("_deprecated_moveAssign_from_count")
+  public func moveAssign(
+    @_nonEphemeral from source: UnsafeMutablePointer, count: Int
+  ) {
+    moveUpdate(from: source, count: count)
+  }
+
   /// Deinitializes the specified number of values starting at this pointer.
   ///
   /// The region of memory starting at this pointer and covering `count`

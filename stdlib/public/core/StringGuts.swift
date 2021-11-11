@@ -432,7 +432,7 @@ public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else { return nil }
   let bytesToCopy = UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL
   let result = [CChar](unsafeUninitializedCapacity: bytesToCopy) { buf, initedCount in
-    buf.baseAddress!.assign(from: s, count: bytesToCopy)
+    buf.baseAddress!.update(from: s, count: bytesToCopy)
     initedCount = bytesToCopy
   }
   return result
