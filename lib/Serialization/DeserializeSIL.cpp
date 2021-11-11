@@ -2103,6 +2103,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         IsTake_t(isTake), IsInitialization_t(isInit));
     break;
   }
+
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory, Fn);
+    ResultInst = Builder.createMarkUnresolvedMoveAddr(Loc, getLocalValue(ValID, addrType),
+                                            getLocalValue(ValID2, addrType));
+    break;
+  }
+
   case SILInstructionKind::AssignInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory, Fn);
