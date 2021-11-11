@@ -1401,7 +1401,8 @@ SILArgument *LoadableStorageAllocation::replaceArgType(SILBuilder &argBuilder,
 void LoadableStorageAllocation::insertIndirectReturnArgs() {
   GenericEnvironment *genEnv = getSubstGenericEnvironment(pass.F);
   auto loweredTy = pass.F->getLoweredFunctionType();
-  SILType resultStorageType = loweredTy->getAllResultsInterfaceType();
+  SILType resultStorageType = loweredTy->getAllResultsSubstType(pass.F->getModule(),
+                                                                pass.F->getTypeExpansionContext());
   auto canType = resultStorageType.getASTType();
   if (canType->hasTypeParameter()) {
     assert(genEnv && "Expected a GenericEnv");

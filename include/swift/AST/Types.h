@@ -953,7 +953,7 @@ public:
                 CanType subst,
                 ArchetypeType *upperBound,
                 ArrayRef<ProtocolConformanceRef> substConformances)> substFn);
-  
+
   /// Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.
   bool matches(Type other, TypeMatchOptions matchOptions);

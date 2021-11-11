@@ -1738,7 +1738,8 @@ void IRGenerator::emitDynamicReplacements() {
   llvm::SmallSet<OpaqueTypeArchetypeType *, 8> origUniqueOpaqueTypes;
   for (auto *newFunc : DynamicReplacements) {
     auto newResultTy = newFunc->getLoweredFunctionType()
-             ->getAllResultsInterfaceType()
+             ->getAllResultsSubstType(newFunc->getModule(),
+                                      TypeExpansionContext::minimal())
              .getASTType();
     if (!newResultTy->hasOpaqueArchetype())
       continue;
@@ -1750,8 +1751,9 @@ void IRGenerator::emitDynamicReplacements() {
     auto *origFunc = newFunc->getDynamicallyReplacedFunction();
     assert(origFunc);
     auto origResultTy = origFunc->getLoweredFunctionType()
-                            ->getAllResultsInterfaceType()
-                            .getASTType();
+                  ->getAllResultsSubstType(origFunc->getModule(),
+                                           TypeExpansionContext::minimal())
+                  .getASTType();
     assert(origResultTy->hasOpaqueArchetype());
     origResultTy.visit([&](CanType ty) {
       if (auto opaque = ty->getAs<OpaqueTypeArchetypeType>())
