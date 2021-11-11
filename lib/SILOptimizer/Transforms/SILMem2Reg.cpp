@@ -666,6 +666,11 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
         runningVals = beginLexicalLifetimeAfterStore(asi, si);
         // Create a use of the newly created copy in order to keep phi pruning
         // from deleting our lifetime beginning instructions.
+        //
+        // TODO: Remove this hack, it is only necessary because erasePhiArgument
+        //       calls deleteEdgeValue which calls
+        //       deleteTriviallyDeadOperandsOfDeadArgument and deletes the copy
+        //       and borrow that we added and want not to have deleted.
         SILBuilderWithScope::insertAfter(
             runningVals->value.copy->getDefiningInstruction(),
             [&](auto builder) {
@@ -1665,22 +1670,30 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     GraphNodeWorklist<SILBasicBlock *, 2> worklist;
     worklist.initialize(parentBlock);
     while (auto *block = worklist.pop()) {
+      assert(domInfo->dominates(parentBlock, block));
       auto *terminator = block->getTerminator();
       if (isa<UnreachableInst>(terminator)) {
         endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/terminator, ctx,
                                      runningVals->value);
         continue;
       }
-      bool endedLifetime = false;
-      for (auto *successor : block->getSuccessorBlocks()) {
-        if (!domInfo->dominates(parentBlock, successor)) {
-          endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/terminator,
-                                       ctx, runningVals->value);
-          endedLifetime = true;
-          break;
-        }
-      }
-      if (endedLifetime) {
+      SILBasicBlock *successor = nullptr;
+      // If any successor is not dominated by the parentBlock, then we must end
+      // the lifetime before that successor.
+      //
+      // Suppose that a successor is not dominated by parentBlock.  Recall that
+      // block _is_ dominated by parentBlock.  Thus that successor must have
+      // more than one predecessor: block, and at least one other.  (Otherwise
+      // it would be dominated by parentBlock contrary to our assumption.)
+      // Recall that SIL does not allow critical edges.  Therefore block has
+      // only a single successor.
+      //
+      // Use the above fact to only look for lack of domination of a successor
+      // if that successor is the single successor of block.
+      if ((successor = block->getSingleSuccessorBlock()) &&
+          (!domInfo->dominates(parentBlock, successor))) {
+        endLexicalLifetimeBeforeInst(asi, /*beforeInstruction=*/terminator, ctx,
+                                     runningVals->value);
         continue;
       }
       for (auto *successor : block->getSuccessorBlocks()) {
