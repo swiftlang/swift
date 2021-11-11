@@ -855,9 +855,8 @@ private:
   ///
   /// \param fn A function to call to emit the actual diagnostic. If
   /// diagnostics are being deferred,
-  void diagnoseOrDefer(
-         ValueDecl *requirement, bool isError,
-         std::function<void(NormalProtocolConformance *)> fn);
+  void diagnoseOrDefer(const ValueDecl *requirement, bool isError,
+                       std::function<void(NormalProtocolConformance *)> fn);
 
   ArrayRef<MissingWitness> getLocalMissingWitness() {
     return GlobalMissingWitnesses.getArrayRef().
@@ -1051,7 +1050,7 @@ class AssociatedTypeInference {
     typeWitnesses;
 
   /// Information about a failed, defaulted associated type.
-  AssociatedTypeDecl *failedDefaultedAssocType = nullptr;
+  const AssociatedTypeDecl *failedDefaultedAssocType = nullptr;
   Type failedDefaultedWitness;
   CheckTypeWitnessResult failedDefaultedResult;
 

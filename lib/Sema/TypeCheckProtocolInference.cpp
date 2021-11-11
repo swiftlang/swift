@@ -1222,85 +1222,79 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
     return nullptr;
   }
 
-  // Examine the solution for errors and attempt to compute abstract type
-  // witnesses for associated types that are still lacking an entry.
-  llvm::SmallVector<AbstractTypeWitness, 2> abstractTypeWitnesses;
-  for (auto *const assocType : unresolvedAssocTypes) {
-    // Try to compute the type without the aid of a specific potential witness.
-    if (const auto &typeWitness = computeAbstractTypeWitness(assocType)) {
-      // Record the type witness immediately to make it available
-      // for substitutions into other tentative type witnesses.
-      typeWitnesses.insert(assocType, {typeWitness->getType(), reqDepth});
+  TypeWitnessSystem system(unresolvedAssocTypes);
+  collectAbstractTypeWitnesses(system, unresolvedAssocTypes);
 
-      abstractTypeWitnesses.push_back(std::move(typeWitness.getValue()));
-      continue;
+  // If we couldn't resolve an associated type, bail out.
+  for (auto *assocType : unresolvedAssocTypes) {
+    if (!system.hasResolvedTypeWitness(assocType->getName())) {
+      return assocType;
     }
-
-    // The solution is incomplete.
-    return assocType;
   }
 
-  // Check each abstract type witness we computed against the generic
-  // requirements on the corresponding associated type.
+  // Record the tentative type witnesses to make them available during
+  // substitutions.
+  for (auto *assocType : unresolvedAssocTypes) {
+    typeWitnesses.insert(
+        assocType,
+        {system.getResolvedTypeWitness(assocType->getName()), reqDepth});
+  }
+
+  // Check each abstract type witness against the generic requirements on the
+  // corresponding associated type.
   const auto substOptions = getSubstOptionsWithCurrentTypeWitnesses();
-  for (const auto &witness : abstractTypeWitnesses) {
-    Type type = witness.getType();
+  for (auto *const assocType : unresolvedAssocTypes) {
+    Type type = system.getResolvedTypeWitness(assocType->getName());
     if (type->hasTypeParameter()) {
-      if (witness.getKind() == AbstractTypeWitnessKind::GenericParam) {
-        type = type = dc->mapTypeIntoContext(type);
-      } else {
-        // Replace type parameters with other known or tentative type witnesses.
-        type = type.subst(
-            [&](SubstitutableType *type) {
-              if (type->isEqual(proto->getSelfInterfaceType()))
-                return adoptee;
+      // Replace type parameters with other known or tentative type witnesses.
+      type = type.subst(
+          [&](SubstitutableType *type) {
+            if (type->isEqual(proto->getSelfInterfaceType()))
+              return adoptee;
 
-              return Type();
-            },
-            LookUpConformanceInModule(dc->getParentModule()), substOptions);
+            return Type();
+          },
+          LookUpConformanceInModule(dc->getParentModule()), substOptions);
 
-        // If the substitution produced an error, we're done.
+      // If the substitution produced an error, give up.
+      if (type->hasError())
+        return assocType;
+
+      // FIXME: We should find a better way to detect and reason about these
+      // cyclic solutions.
+      // If mapping into context yields an error, or we still have a type
+      // parameter despite not having a generic environment, then a type
+      // parameter was sent to a tentative type witness that itself is a type
+      // parameter, and the solution is cyclic, e.g { A := B.A, B := A.B };
+      // bail out in these cases.
+      if (dc->isGenericContext()) {
+        type = dc->mapTypeIntoContext(type);
+
         if (type->hasError())
-          return witness.getAssocType();
-
-        // FIXME: If mapping into context yields an error, or we still have a
-        // type parameter despite not having a generic environment, then a type
-        // parameter was sent to a tentative type witness that itself is a type
-        // parameter, and the solution is cyclic, e.g. { A := B.A, B := A.B },
-        // or beyond the current algorithm, e.g.
-        // protocol P {
-        //   associatedtype A = B
-        //   associatedtype B = C
-        //   associatedtype C = Int
-        // }
-        // struct Conformer: P {}
-        if (dc->getGenericEnvironmentOfContext()) {
-          type = dc->mapTypeIntoContext(type);
-
-          if (type->hasError())
-            return witness.getAssocType();
-        } else if (type->hasTypeParameter()) {
-          return witness.getAssocType();
-        }
+          return assocType;
+      } else if (type->hasTypeParameter()) {
+        return assocType;
       }
     }
 
-    if (const auto &failed = checkTypeWitness(type, witness.getAssocType(),
-                                              conformance, substOptions)) {
+    if (const auto failed =
+            checkTypeWitness(type, assocType, conformance, substOptions)) {
       // We failed to satisfy a requirement. If this is a default type
       // witness failure and we haven't seen one already, write it down.
-      if (witness.getKind() == AbstractTypeWitnessKind::Default &&
-          !failedDefaultedAssocType && !failed.isError()) {
-        failedDefaultedAssocType = witness.getDefaultedAssocType();
+      auto *defaultedAssocType =
+          system.getDefaultedAssocType(assocType->getName());
+      if (defaultedAssocType && !failedDefaultedAssocType &&
+          !failed.isError()) {
+        failedDefaultedAssocType = defaultedAssocType;
         failedDefaultedWitness = type;
         failedDefaultedResult = std::move(failed);
       }
 
-      return witness.getAssocType();
+      return assocType;
     }
 
-    // Update the solution entry.
-    typeWitnesses.insert(witness.getAssocType(), {type, reqDepth});
+    // Update the entry for this associated type.
+    typeWitnesses.insert(assocType, {type, reqDepth});
   }
 
   return nullptr;

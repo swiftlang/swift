@@ -5376,8 +5376,8 @@ void swift::diagnoseConformanceFailure(Type T,
 }
 
 void ConformanceChecker::diagnoseOrDefer(
-       ValueDecl *requirement, bool isError,
-       std::function<void(NormalProtocolConformance *)> fn) {
+    const ValueDecl *requirement, bool isError,
+    std::function<void(NormalProtocolConformance *)> fn) {
   if (isError)
     Conformance->setInvalid();
 
