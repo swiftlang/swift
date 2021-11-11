@@ -226,7 +226,7 @@ bool CursorInfoResolver::visitDeclReference(ValueDecl *D,
                                             ReferenceMetaData Data) {
   if (isDone())
     return false;
-  if (Data.isImplicit)
+  if (Data.isImplicit || !Range.isValid())
     return true;
   return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
 }
