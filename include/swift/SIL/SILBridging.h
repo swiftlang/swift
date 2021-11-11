@@ -141,7 +141,8 @@ typedef enum {
   MayHaveSideEffectsBehavior
 } BridgedMemoryBehavior;
 
-typedef long SwiftInt;
+
+typedef intptr_t SwiftInt;
 
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
 
