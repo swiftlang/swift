@@ -6437,6 +6437,8 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
 
   case TypeKind::ProtocolComposition: {
     // 'Any', 'AnyObject' and single protocol compositions are simple
+    // FIXME: single protocol compositions spelled with `any` are not
+    // simple.
     auto composition = cast<const ProtocolCompositionType>(this);
     auto memberCount = composition->getMembers().size();
     if (composition->hasExplicitAnyObject())
