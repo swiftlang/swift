@@ -2230,6 +2230,9 @@ private:
   }
 
   void annotateSourceEntity(const SemanticSourceEntity &Entity) {
+    if (!Entity.Range.isValid())
+      return;
+
     const char *LocPtr =
         BufStart + SM.getLocOffsetInBuffer(Entity.Range.getStart(), BufferID);
 

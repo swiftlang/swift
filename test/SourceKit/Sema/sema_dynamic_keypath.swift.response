@@ -1,0 +1,176 @@
+[
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 24,
+    key.length: 3,
+    key.is_system: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 37,
+    key.length: 3,
+    key.is_system: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 78,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 103,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.offset: 161,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.offset: 177,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.var.instance,
+    key.offset: 191,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.var.local,
+    key.offset: 197,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.class,
+    key.offset: 243,
+    key.length: 15,
+    key.is_system: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.offset: 259,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.offset: 262,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 269,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.offset: 274,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 296,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.offset: 301,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.var.instance,
+    key.offset: 304,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.var.local,
+    key.offset: 317,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.ref.var.instance,
+    key.offset: 338,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.var.local,
+    key.offset: 351,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.ref.var.local,
+    key.offset: 361,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.ref.var.instance,
+    key.offset: 370,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 396,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 401,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.var.local,
+    key.offset: 421,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.var.instance,
+    key.offset: 423,
+    key.length: 7
+  },
+  {
+    key.kind: source.lang.swift.ref.var.local,
+    key.offset: 437,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.var.instance,
+    key.offset: 439,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.ref.var.instance,
+    key.offset: 451,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.class,
+    key.offset: 487,
+    key.length: 7,
+    key.is_system: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 495,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 500,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.generic_type_param,
+    key.offset: 512,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.function.free,
+    key.offset: 543,
+    key.length: 13
+  },
+  {
+    key.kind: source.lang.swift.ref.var.instance,
+    key.offset: 568,
+    key.length: 7
+  }
+]
