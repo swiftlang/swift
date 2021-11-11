@@ -1406,6 +1406,33 @@ public:
   /// is the corresponding value passed?
   CallingConventionKind getParameterConvention(TypeConverter &TC) const;
   
+  /// Generate the abstraction pattern for lowering the substituted SIL
+  /// function type for a function type matching this abstraction pattern.
+  ///
+  /// This abstraction pattern must be a function abstraction pattern, matching
+  /// \c substType .
+  ///
+  /// Where the abstraction pattern involves substitutable types, in order
+  /// to minimize function conversions, we extract those positions out into
+  /// fresh generic arguments, with the minimum set of constraints necessary
+  /// to maintain the calling convention (such as passed-directly or
+  /// passed-indirectly) as well as satisfy requirements of where the generic
+  /// argument structurally appears in the type.
+  /// The goal is for similar-shaped generic function types to remain
+  /// canonically equivalent, like `(T, U) -> ()`, `(T, T) -> ()`,
+  /// `(U, T) -> ()` or `(T, T.A) -> ()` when given substitutions that produce
+  /// the same function types.
+  ///
+  /// Returns a new AbstractionPattern to use for type lowering, as well as
+  /// the SubstitutionMap used to map `substType` into the new abstraction
+  /// pattern's generic environment, and the coroutine yield type mapped into
+  /// the generic environment of the new abstraction pattern.
+  std::tuple<AbstractionPattern, SubstitutionMap, AbstractionPattern>
+  getSubstFunctionTypePattern(CanAnyFunctionType substType,
+                              TypeConverter &TC,
+                              AbstractionPattern coroutineYieldOrigType,
+                              CanType coroutineYieldSubstType) const;
+  
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;
   
