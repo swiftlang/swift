@@ -50,13 +50,13 @@ MOCK_CONFIG = {
             'remote': {'id': 'repo2'},
         },
     },
-    'default-branch-scheme': 'master',
+    'default-branch-scheme': 'main',
     'branch-schemes': {
-        'master': {
-            'aliases': ['master'],
+        'main': {
+            'aliases': ['main'],
             'repos': {
-                'repo1': 'master',
-                'repo2': 'master',
+                'repo1': 'main',
+                'repo2': 'main',
             }
         }
     }
@@ -101,7 +101,11 @@ def setup_mock_remote(base_dir):
         create_dir(remote_repo_path)
         create_dir(local_repo_path)
         call_quietly(['git', 'init', '--bare', remote_repo_path])
+        call_quietly(['git', 'symbolic-ref', 'HEAD', 'refs/heads/main'],
+                     cwd=remote_repo_path)
         call_quietly(['git', 'clone', '-l', remote_repo_path, local_repo_path])
+        call_quietly(['git', 'symbolic-ref', 'HEAD', 'refs/heads/main'],
+                     cwd=local_repo_path)
         for (i, (filename, contents)) in enumerate(v):
             filename_path = os.path.join(local_repo_path, filename)
             with open(filename_path, 'w') as f:
@@ -109,7 +113,7 @@ def setup_mock_remote(base_dir):
             call_quietly(['git', 'add', filename], cwd=local_repo_path)
             call_quietly(['git', 'commit', '-m', 'Commit %d' % i],
                          cwd=local_repo_path)
-            call_quietly(['git', 'push', 'origin', 'master'],
+            call_quietly(['git', 'push', 'origin', 'main'],
                          cwd=local_repo_path)
 
     base_config = MOCK_CONFIG
