@@ -90,7 +90,8 @@ func hasBackdeployedConcurrencyRuntime() -> Bool {
   //
   // This makes the two tests below fall back to older, higher-level exclusivity
   // checks in the stdlib, which will still trap, but with a different message.
-  if #available(SwiftStdlib 5.5, *) { return false }
+  if #available(SwiftStdlib 5.5, *) { return false } // recent enough production stdlib
+  if #available(SwiftStdlib 9999, *) { return false } // dev stdlib
   return true
 }
 
