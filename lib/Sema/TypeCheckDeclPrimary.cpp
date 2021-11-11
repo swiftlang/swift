@@ -1696,6 +1696,8 @@ public:
 
     DeclVisitor<DeclChecker>::visit(decl);
 
+    TypeChecker::checkUnsupportedProtocolType(decl);
+
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       auto &Context = getASTContext();
       TypeChecker::checkForForbiddenPrefix(Context, VD->getBaseName());
