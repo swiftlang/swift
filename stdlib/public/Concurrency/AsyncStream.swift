@@ -139,7 +139,22 @@ public struct AsyncStream<Element> {
     }
   }
 
-  let produce: () async -> Element?
+  final class _Context {
+    let storage: _Storage?
+    let produce: () async -> Element?
+
+    init(storage: _Storage? = nil, produce: @escaping () async -> Element?) {
+      self.storage = storage
+      self.produce = produce
+    }
+
+    deinit {
+      storage?.cancel()
+    }
+  }
+
+  let context: _Context
+  
 
   /// Construct a AsyncStream buffering given an Element type.
   ///
@@ -163,7 +178,7 @@ public struct AsyncStream<Element> {
     _ build: (Continuation) -> Void
   ) {
     let storage: _Storage = .create(limit: limit)
-    self.init(unfolding: storage.next)
+    context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
 
@@ -174,7 +189,7 @@ public struct AsyncStream<Element> {
   ) {
     let storage: _AsyncStreamCriticalStorage<Optional<() async -> Element?>>
       = .create(produce)
-    self.produce = {
+    context = _Context {
       return await withTaskCancellationHandler {
         guard let result = await storage.value?() else {
           storage.value = nil
@@ -198,7 +213,7 @@ extension AsyncStream: AsyncSequence {
   /// concurrently and contends with another call to next is a programmer error
   /// and will fatalError.
   public struct Iterator: AsyncIteratorProtocol {
-    let produce: () async -> Element?
+    let context: _Context
 
     /// The next value from the AsyncStream.
     ///
@@ -210,13 +225,13 @@ extension AsyncStream: AsyncSequence {
     /// awaiting a value, this will terminate the AsyncStream and next may return nil
     /// immediately (or will return nil on subsequent calls)
     public mutating func next() async -> Element? {
-      await produce()
+      await context.produce()
     }
   }
 
   /// Construct an iterator.
   public func makeAsyncIterator() -> Iterator {
-    return Iterator(produce: produce)
+    return Iterator(context: context)
   }
 }
 
