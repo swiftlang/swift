@@ -203,9 +203,9 @@ Assert.test("_internalInvariant")
   .crashOutputMatches("this should fail")
   .code {
   var x = 2
-  _internalInvariant(x * 21 == 42, "should not fail")
+  Swift._internalInvariant(x * 21 == 42, "should not fail")
   expectCrashLater()
-  _internalInvariant(x == 42, "this should fail")
+  Swift._internalInvariant(x == 42, "this should fail")
 }
 
 Assert.test("_internalInvariantFailure")
