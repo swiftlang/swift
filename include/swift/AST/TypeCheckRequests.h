@@ -406,8 +406,9 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Compute the requirements that describe a protocol using the
-/// RequirementMachine.
+/// Compute a protocol's requirement signature using the RequirementMachine.
+/// This is temporary; once the GenericSignatureBuilder goes away this will
+/// be folded into RequirementSignatureRequest.
 class RequirementSignatureRequestRQM :
     public SimpleRequest<RequirementSignatureRequestRQM,
                          ArrayRef<Requirement>(ProtocolDecl *),

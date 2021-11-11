@@ -340,7 +340,9 @@ public:
   void minimizeRewriteSystem();
 
   llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
-  getMinimizedRules(ArrayRef<const ProtocolDecl *> protos);
+  getMinimizedProtocolRules(ArrayRef<const ProtocolDecl *> protos) const;
+
+  std::vector<unsigned> getMinimizedGenericSignatureRules() const;
 
   void verifyRewriteLoops() const;
 

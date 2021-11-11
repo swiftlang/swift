@@ -779,10 +779,14 @@ void RewriteSystem::minimizeRewriteSystem() {
 }
 
 /// Collect all non-permanent, non-redundant rules whose domain is equal to
-/// one of the protocols in \p proto. These rules form the requirement
-/// signatures of these protocols.
+/// one of the protocols in \p proto. In other words, the first symbol of the
+/// left hand side term is either a protocol symbol or associated type symbol
+/// whose protocol is in \p proto.
+///
+/// These rules form the requirement signatures of these protocols.
 llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
-RewriteSystem::getMinimizedRules(ArrayRef<const ProtocolDecl *> protos) {
+RewriteSystem::getMinimizedProtocolRules(
+    ArrayRef<const ProtocolDecl *> protos) const {
   assert(Minimized);
 
   llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>> rules;
@@ -801,6 +805,33 @@ RewriteSystem::getMinimizedRules(ArrayRef<const ProtocolDecl *> protos) {
     const auto *proto = domain[0];
     if (std::find(protos.begin(), protos.end(), proto) != protos.end())
       rules[proto].push_back(ruleID);
+  }
+
+  return rules;
+}
+
+/// Collect all non-permanent, non-redundant rules whose left hand side
+/// begins with a generic parameter symbol.
+///
+/// These rules form the top-level generic signature for this rewrite system.
+std::vector<unsigned>
+RewriteSystem::getMinimizedGenericSignatureRules() const {
+  assert(Minimized);
+
+  std::vector<unsigned> rules;
+  for (unsigned ruleID : indices(Rules)) {
+    const auto &rule = getRule(ruleID);
+
+    if (rule.isPermanent())
+      continue;
+
+    if (rule.isRedundant())
+      continue;
+
+    if (rule.getLHS()[0].getKind() != Symbol::Kind::GenericParam)
+      continue;
+
+    rules.push_back(ruleID);
   }
 
   return rules;

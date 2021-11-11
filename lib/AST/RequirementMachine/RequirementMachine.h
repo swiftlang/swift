@@ -47,6 +47,7 @@ class RequirementMachine final {
   friend class swift::rewriting::RewriteContext;
 
   CanGenericSignature Sig;
+  SmallVector<Type, 2> Params;
   ArrayRef<const ProtocolDecl *> Protos;
 
   RewriteContext &Context;
@@ -87,8 +88,14 @@ class RequirementMachine final {
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
-  std::vector<Requirement> buildRequirementSignature(
-    ArrayRef<unsigned> rules, const ProtocolDecl *proto) const;
+  std::vector<Requirement> buildRequirementsFromRules(
+    ArrayRef<unsigned> rules,
+    TypeArrayView<GenericTypeParamType> genericParams) const;
+
+  TypeArrayView<GenericTypeParamType> getGenericParams() const {
+    return TypeArrayView<GenericTypeParamType>(
+      ArrayRef<Type>(Params));
+  }
 
 public:
   ~RequirementMachine();
@@ -116,7 +123,9 @@ public:
   TypeDecl *lookupNestedType(Type depType, Identifier name) const;
 
   llvm::DenseMap<const ProtocolDecl *, std::vector<Requirement>>
-  computeMinimalRequirements();
+  computeMinimalProtocolRequirements();
+
+  std::vector<Requirement> computeMinimalGenericSignatureRequirements();
 
   void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;
