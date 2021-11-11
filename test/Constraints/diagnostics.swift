@@ -1137,7 +1137,7 @@ func badTypes() {
 // rdar://34357545
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
-  // expected-error@-1 {{placeholders are not allowed as top-level types}}
+  // expected-error@-1 {{type of expression is ambiguous without more context}}
 }
 
 do {
