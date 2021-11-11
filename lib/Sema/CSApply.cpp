@@ -8643,6 +8643,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     Type convertType = target.getExprConversionType();
     auto shouldCoerceToContextualType = [&]() {
       return convertType &&
+          !convertType->hasPlaceholder() &&
           !target.isOptionalSomePatternInit() &&
           !(solution.getType(resultExpr)->isUninhabited() &&
             cs.getContextualTypePurpose(target.getAsExpr())
