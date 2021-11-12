@@ -1228,6 +1228,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                             ^(sourcekitd_response_t resp) {
                               auto &info = asyncResponses[respIndex];
                               info.response = resp;
+                              sourcekitd_request_handle_dispose(
+                                  info.requestHandle);
                               info.semaphore.signal(); // Ready to be handled!
                             });
 
