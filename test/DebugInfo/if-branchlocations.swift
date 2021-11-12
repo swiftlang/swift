@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-sil -disable-copy-propagation -emit-verbose-sil -g -o - | %FileCheck %s --check-prefixes=CHECK,CHECK-NCP
-// RUN: %target-swift-frontend %s -emit-sil -enable-copy-propagation -emit-verbose-sil -g -o - | %FileCheck %s --check-prefixes=CHECK,CHECK-CP
+// RUN: %target-swift-frontend %s -emit-sil -enable-copy-propagation -disable-lexical-lifetimes -emit-verbose-sil -g -o - | %FileCheck %s --check-prefixes=CHECK,CHECK-CP
 
 class NSURL {}
 

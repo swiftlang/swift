@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -disable-copy-propagation %s -emit-sil -emit-verbose-sil -g -o - | %FileCheck --check-prefixes=CHECK-SIL,CHECK-NCP %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-copy-propagation %s -emit-sil -emit-verbose-sil -g -o - | %FileCheck --check-prefixes=CHECK-SIL,CHECK-CP %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-copy-propagation -disable-lexical-lifetimes %s -emit-sil -emit-verbose-sil -g -o - | %FileCheck --check-prefixes=CHECK-SIL,CHECK-CP %s
 import StdlibUnittest
 
 class Obj {}
