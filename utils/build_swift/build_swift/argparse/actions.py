@@ -12,13 +12,8 @@ Hierarchy of action classes which support multiple destinations, similar to the
 default actions provided by the standard argparse.
 """
 
-
-from __future__ import absolute_import, unicode_literals
-
 import argparse
 import copy
-
-import six
 
 from .types import BoolType, PathType
 
@@ -81,7 +76,7 @@ class Action(argparse.Action):
         if dests == argparse.SUPPRESS:
             dests = []
             metavar = metavar or ''
-        elif isinstance(dests, six.string_types):
+        elif isinstance(dests, str):
             dests = [dests]
             metavar = metavar or dests[0].upper()
 
@@ -138,7 +133,7 @@ class AppendAction(Action):
             **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        if isinstance(values, six.string_types):
+        if isinstance(values, str):
             values = [values]
 
         for dest in self.dests:
@@ -343,5 +338,5 @@ class UnsupportedAction(Action):
         if self.message is not None:
             parser.error(self.message)
 
-        arg = option_string or six.text_type(values)
+        arg = option_string or str(values)
         parser.error('unsupported argument: {}'.format(arg))

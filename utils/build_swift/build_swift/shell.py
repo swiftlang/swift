@@ -11,9 +11,6 @@
 Shell utilities wrapper module.
 """
 
-
-from __future__ import absolute_import, unicode_literals
-
 import abc
 import collections
 import functools
@@ -24,25 +21,9 @@ import shutil
 import subprocess
 import sys
 from copy import copy as _copy
+from pathlib import Path
 from shlex import split
 from subprocess import CalledProcessError
-
-import six
-from six.moves import map
-
-
-try:
-    # Python 2
-    from pipes import quote as _quote
-except ImportError:
-    from shutil import quote as _quote
-
-
-try:
-    # Python 3.4
-    from pathlib import Path
-except ImportError:
-    Path = None
 
 
 __all__ = [
@@ -107,11 +88,8 @@ def _convert_pathlib_path(path):
     unicode string.
     """
 
-    if Path is None:
-        return path
-
     if isinstance(path, Path):
-        return six.text_type(path)
+        return str(path)
 
     return path
 
@@ -150,14 +128,14 @@ def _normalize_args(args):
     CommandWrapper instances into a one-dimensional list of strings.
     """
 
-    if isinstance(args, six.string_types):
+    if isinstance(args, str):
         return shlex.split(args)
 
     def normalize_arg(arg):
         arg = _convert_pathlib_path(arg)
 
-        if isinstance(arg, six.string_types):
-            return [six.text_type(arg)]
+        if isinstance(arg, str):
+            return [arg]
         if isinstance(arg, AbstractWrapper):
             return list(map(_convert_pathlib_path, arg.command))
 
@@ -208,7 +186,7 @@ def _normalize_command(func):
 
     @functools.wraps(func)
     def wrapper(command, **kwargs):
-        if not isinstance(command, six.string_types):
+        if not isinstance(command, str):
             command = _normalize_args(command)
 
         return func(command, **kwargs)
@@ -249,11 +227,11 @@ def quote(command):
     "rm -rf '~/Documents/My Homework'"
     """
 
-    if isinstance(command, six.string_types):
-        return _quote(command)
+    if isinstance(command, str):
+        return shlex.quote(command)
 
     if isinstance(command, collections.Iterable):
-        return ' '.join([_quote(arg) for arg in _normalize_args(command)])
+        return ' '.join([shlex.quote(arg) for arg in _normalize_args(command)])
 
     raise ValueError('Invalid command type: {}'.format(type(command).__name__))
 
@@ -337,16 +315,7 @@ def check_output(command, **kwargs):
     Output is returned as a unicode string.
     """
 
-    if six.PY3:
-        kwargs['encoding'] = 'utf-8'
-
-    output = subprocess.check_output(command, **kwargs)
-
-    if six.PY3:
-        return output
-
-    # Return unicode string rather than bytes in Python 2.
-    return six.text_type(output, errors='ignore')
+    return subprocess.check_output(command, encoding='utf-8', errors='ignore', **kwargs)
 
 
 # -----------------------------------------------------------------------------
@@ -484,8 +453,7 @@ def wraps(command):
     return CommandWrapper(command)
 
 
-@six.add_metaclass(abc.ABCMeta)
-class AbstractWrapper(object):
+class AbstractWrapper(object, metaclass=abc.ABCMeta):
     """Abstract base class for implementing wrappers around command line
     utilities and executables. Subclasses must implement the `command` method
     which returns a command list suitable for use with executor instances.
@@ -555,7 +523,7 @@ class ExecutableWrapper(AbstractWrapper):
 
         self.EXECUTABLE = _convert_pathlib_path(self.EXECUTABLE)
 
-        if not isinstance(self.EXECUTABLE, six.string_types):
+        if not isinstance(self.EXECUTABLE, str):
             raise AttributeError(
                 '{}.EXECUTABLE must be an executable name or path'.format(
                     type(self).__name__))

@@ -6,49 +6,22 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-
-from __future__ import absolute_import, unicode_literals
-
 import collections
 import sys
 import unittest
+from io import StringIO
+from pathlib import Path
+from unittest import mock
+from unittest.mock import MagicMock, mock_open, patch
 
 from build_swift import shell
 
-import six
-from six import StringIO
-
 from .. import utils
-
-
-try:
-    # Python 3.4
-    from pathlib import Path
-except ImportError:
-    pass
-
-try:
-    # Python 3.3
-    from unittest import mock
-    from unittest.mock import patch, mock_open, MagicMock
-except ImportError:
-    mock, mock_open = None, None
-
-    class MagicMock(object):
-        def __init__(self, *args, **kwargs):
-            pass
-
-    def _id(obj):
-        return obj
-
-    def patch(*args, **kwargs):
-        return _id
-
 
 # -----------------------------------------------------------------------------
 # Constants
 
-_OPEN_NAME = '{}.open'.format(six.moves.builtins.__name__)
+_OPEN_NAME = 'builtins.open'
 
 
 # -----------------------------------------------------------------------------
@@ -74,14 +47,6 @@ class TestHelpers(unittest.TestCase):
     # -------------------------------------------------------------------------
     # _convert_pathlib_path
 
-    @utils.requires_module('unittest.mock')
-    @utils.requires_module('pathlib')
-    @patch('build_swift.shell.Path', None)
-    def test_convert_pathlib_path_pathlib_not_imported(self):
-        path = Path('/path/to/file.txt')
-
-        self.assertEqual(shell._convert_pathlib_path(path), path)
-
     @utils.requires_module('pathlib')
     def test_convert_pathlib_path(self):
         path = Path('/path/to/file.txt')
@@ -90,7 +55,7 @@ class TestHelpers(unittest.TestCase):
 
         self.assertEqual(
             shell._convert_pathlib_path(path),
-            six.text_type(path))
+            str(path))
 
     # -------------------------------------------------------------------------
     # _get_stream_file
@@ -368,20 +333,14 @@ class TestSubprocessWrappers(unittest.TestCase):
     @patch('subprocess.check_output')
     def test_check_output(self, mock_check_output):
         # Before Python 3 the subprocess.check_output function returned bytes.
-        if six.PY3:
-            mock_check_output.return_value = ''
-        else:
-            mock_check_output.return_value = b''
+        mock_check_output.return_value = ''
 
         output = shell.check_output('ls')
 
         # We always expect str (utf-8) output
-        self.assertIsInstance(output, six.text_type)
+        self.assertIsInstance(output, str)
 
-        if six.PY3:
-            mock_check_output.assert_called_with('ls', encoding='utf-8')
-        else:
-            mock_check_output.assert_called_with('ls')
+        mock_check_output.assert_called_with('ls', encoding='utf-8', errors='ignore')
 
 
 class TestShellUtilities(unittest.TestCase):
@@ -468,7 +427,7 @@ class TestShellUtilities(unittest.TestCase):
     @patch('build_swift.shell._convert_pathlib_path')
     def test_pushd_converts_pathlib_path(self, mock_convert):
         path = Path('/other/path')
-        mock_convert.return_value = six.text_type(path)
+        mock_convert.return_value = str(path)
 
         shell.pushd(path)
 
