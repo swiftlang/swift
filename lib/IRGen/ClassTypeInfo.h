@@ -19,7 +19,6 @@
 
 #include "ClassLayout.h"
 #include "HeapTypeInfo.h"
-#include "TypeLayout.h"
 
 namespace swift {
 namespace irgen {
@@ -47,7 +46,7 @@ public:
   ClassTypeInfo(llvm::PointerType *irType, Size size, SpareBitVector spareBits,
                 Alignment align, ClassDecl *theClass,
                 ReferenceCounting refcount)
-      : HeapTypeInfo(refcount, irType, size, std::move(spareBits), align),
+      : HeapTypeInfo(irType, size, std::move(spareBits), align),
         TheClass(theClass), Refcount(refcount) {}
 
   ReferenceCounting getReferenceCounting() const { return Refcount; }
