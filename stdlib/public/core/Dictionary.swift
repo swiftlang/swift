@@ -2101,17 +2101,17 @@ public typealias DictionaryIndex<Key: Hashable, Value> =
 public typealias DictionaryIterator<Key: Hashable, Value> =
   Dictionary<Key, Value>.Iterator
 
-extension Dictionary: Sendable, UnsafeSendable
+extension Dictionary: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Keys: Sendable, UnsafeSendable
+extension Dictionary.Keys: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Values: Sendable, UnsafeSendable
+extension Dictionary.Values: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Keys.Iterator: Sendable, UnsafeSendable
+extension Dictionary.Keys.Iterator: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Values.Iterator: Sendable, UnsafeSendable
+extension Dictionary.Values.Iterator: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Index: Sendable, UnsafeSendable
+extension Dictionary.Index: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }
-extension Dictionary.Iterator: Sendable, UnsafeSendable
+extension Dictionary.Iterator: @unchecked Sendable
   where Key: Sendable, Value: Sendable { }

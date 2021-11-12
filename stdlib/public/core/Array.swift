@@ -1990,4 +1990,4 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
   }
 }
 
-extension Array: Sendable, UnsafeSendable where Element: Sendable { }
+extension Array: @unchecked Sendable where Element: Sendable { }
