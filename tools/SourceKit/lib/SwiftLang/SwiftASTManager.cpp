@@ -556,10 +556,11 @@ struct SwiftASTManager::Implementation {
   explicit Implementation(
       std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
       std::shared_ptr<GlobalConfig> Config,
-      std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath,
+      std::shared_ptr<SwiftStatistics> Stats,
+      std::shared_ptr<RequestTracker> ReqTracker, StringRef RuntimeResourcePath,
       StringRef DiagnosticDocumentationPath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
-        RuntimeResourcePath(RuntimeResourcePath),
+        ReqTracker(ReqTracker), RuntimeResourcePath(RuntimeResourcePath),
         DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
   }
@@ -567,6 +568,7 @@ struct SwiftASTManager::Implementation {
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs;
   std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<SwiftStatistics> Stats;
+  std::shared_ptr<RequestTracker> ReqTracker;
   std::string RuntimeResourcePath;
   std::string DiagnosticDocumentationPath;
   SourceManager SourceMgr;
@@ -590,9 +592,11 @@ struct SwiftASTManager::Implementation {
   struct ScheduledConsumer {
     SwiftASTConsumerWeakRef Consumer;
     const void *OncePerASTToken;
-    SourceKitCancellationToken CancellationToken;
   };
 
+  /// FIXME: Once we no longer support implicit cancellation using
+  /// OncePerASTToken, we can stop keeping track of ScheduledConsumers and
+  /// completely rely on RequestTracker for cancellation.
   llvm::sys::Mutex ScheduledConsumersMtx;
   std::vector<ScheduledConsumer> ScheduledConsumers;
 
@@ -632,9 +636,11 @@ struct SwiftASTManager::Implementation {
 SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocs,
     std::shared_ptr<GlobalConfig> Config,
-    std::shared_ptr<SwiftStatistics> Stats, StringRef RuntimeResourcePath,
+    std::shared_ptr<SwiftStatistics> Stats,
+    std::shared_ptr<RequestTracker> ReqTracker, StringRef RuntimeResourcePath,
     StringRef DiagnosticDocumentationPath)
-    : Impl(*new Implementation(EditorDocs, Config, Stats, RuntimeResourcePath,
+    : Impl(*new Implementation(EditorDocs, Config, Stats, ReqTracker,
+                               RuntimeResourcePath,
                                DiagnosticDocumentationPath)) {}
 
 SwiftASTManager::~SwiftASTManager() {
@@ -766,30 +772,18 @@ void SwiftASTManager::processASTAsync(
         }
       }
     }
-    Impl.ScheduledConsumers.push_back(
-        {ASTConsumer, OncePerASTToken, CancellationToken});
+    Impl.ScheduledConsumers.push_back({ASTConsumer, OncePerASTToken});
   }
 
   Producer->enqueueConsumer(ASTConsumer, fileSystem, Snapshots,
                             shared_from_this());
-}
 
-void SwiftASTManager::cancelASTConsumer(
-    SourceKitCancellationToken CancellationToken) {
-  if (!CancellationToken) {
-    return;
-  }
-  Impl.cleanDeletedConsumers();
-  llvm::sys::ScopedLock L(Impl.ScheduledConsumersMtx);
-  for (auto ScheduledConsumer : Impl.ScheduledConsumers) {
-    if (ScheduledConsumer.CancellationToken == CancellationToken) {
-      if (auto Consumer = ScheduledConsumer.Consumer.lock()) {
-        Consumer->requestCancellation();
-        // Multiple consumers might share the same cancellation token (see
-        // documentation on ScheduledConsumer), so we can't break here.
-      }
+  auto WeakConsumer = SwiftASTConsumerWeakRef(ASTConsumer);
+  Impl.ReqTracker->setCancellationHandler(CancellationToken, [WeakConsumer] {
+    if (auto Consumer = WeakConsumer.lock()) {
+      Consumer->requestCancellation();
     }
-  }
+  });
 }
 
 void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {

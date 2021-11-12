@@ -627,6 +627,10 @@ SOURCEKITD_PUBLIC
 void
 sourcekitd_cancel_request(sourcekitd_request_handle_t handle);
 
+/// Dispose a request handle returned by \c sourcekitd_send_request.
+SOURCEKITD_PUBLIC
+void sourcekitd_request_handle_dispose(sourcekitd_request_handle_t handle);
+
 #if SOURCEKITD_HAS_BLOCKS
 
 /// Sets the handler which should be called to receive notifications.

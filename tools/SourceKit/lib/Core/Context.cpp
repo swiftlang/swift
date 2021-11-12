@@ -44,7 +44,8 @@ SourceKit::Context::Context(
       DiagnosticDocumentationPath(DiagnosticDocumentationPath),
       NotificationCtr(
           new NotificationCenter(shouldDispatchNotificationsOnMain)),
-      Config(new GlobalConfig()), SlowRequestSim(new SlowRequestSimulator()) {
+      Config(new GlobalConfig()), ReqTracker(new RequestTracker()),
+      SlowRequestSim(new SlowRequestSimulator(ReqTracker)) {
   // Should be called last after everything is initialized.
   SwiftLang = LangSupportFactoryFn(*this);
 }
