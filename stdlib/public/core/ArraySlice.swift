@@ -1506,7 +1506,7 @@ extension ArraySlice {
   }
 }
 
-extension ArraySlice: Sendable, UnsafeSendable
+extension ArraySlice: @unchecked Sendable
   where Element: Sendable { }
 
 #if INTERNAL_CHECKS_ENABLED
