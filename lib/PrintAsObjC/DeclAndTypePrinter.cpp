@@ -728,6 +728,8 @@ private:
     auto resultTy = getForeignResultType(
         FD, funcTy, asyncConvention, errorConvention);
 
+    os << "SWIFT_EXTERN ";
+
     // The result type may be a partial function type we need to close
     // up later.
     PrintMultiPartType multiPart(*this);
