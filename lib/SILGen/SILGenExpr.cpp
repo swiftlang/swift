@@ -2736,7 +2736,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 
   // Add empty generic type parameter to match function signature on WebAssembly
   if (!genericSig && Target.isOSBinFormatWasm()) {
-    auto param = GenericTypeParamType::get(0, 0, SGM.getASTContext());
+    auto param = GenericTypeParamType::get(false, 0, 0, SGM.getASTContext());
     auto sig = GenericSignature::get(param, { });
     genericSig = CanGenericSignature(sig);
     genericEnv = sig.getGenericEnvironment();
@@ -2887,7 +2887,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
   // Add empty generic type parameter to match function signature on WebAssembly
   if (!genericSig && Target.isOSBinFormatWasm()) {
-    auto param = GenericTypeParamType::get(0, 0, SGM.getASTContext());
+    auto param = GenericTypeParamType::get(false, 0, 0, SGM.getASTContext());
     auto sig = GenericSignature::get(param, { });
     genericSig = CanGenericSignature(sig);
     genericEnv = sig.getGenericEnvironment();
@@ -3070,7 +3070,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
   // Add empty generic type parameter to match function signature on WebAssembly
   if (!genericSig && Target.isOSBinFormatWasm()) {
-    auto param = GenericTypeParamType::get(0, 0, SGM.getASTContext());
+    auto param = GenericTypeParamType::get(false, 0, 0, SGM.getASTContext());
     auto sig = GenericSignature::get(param, { });
     genericSig = CanGenericSignature(sig);
     genericEnv = sig.getGenericEnvironment();
