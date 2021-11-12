@@ -937,17 +937,37 @@ class TypeWitnessSystem final {
   /// Equivalence classes are used on demand to express equivalences between
   /// witness candidates and reflect changes to resolved types across their
   /// members.
-  struct EquivalenceClass final {
-    /// The resolved type for witness candidates belonging to this equivalence
-    /// class. The resolved type may be a type parameter, but cannot directly
-    /// pertain to a name variable in the system; instead, witness candidates
-    /// that should resolve to the same type share an equivalence class.
-    Type ResolvedTy;
+  class EquivalenceClass final {
+    /// The pointer:
+    /// - The resolved type for witness candidates belonging to this equivalence
+    ///   class. The resolved type may be a type parameter, but cannot directly
+    ///   pertain to a name variable in the owning system; instead, witness
+    ///   candidates that should resolve to the same type share an equivalence
+    ///   class.
+    /// The int:
+    /// - A flag indicating whether the resolved type is ambiguous. When set,
+    ///   the resolved type is null.
+    llvm::PointerIntPair<Type, 1, bool> ResolvedTyAndIsAmbiguous;
+
+  public:
+    EquivalenceClass(Type ty) : ResolvedTyAndIsAmbiguous(ty, false) {}
 
     EquivalenceClass(const EquivalenceClass &) = delete;
     EquivalenceClass(EquivalenceClass &&) = delete;
     EquivalenceClass &operator=(const EquivalenceClass &) = delete;
     EquivalenceClass &operator=(EquivalenceClass &&) = delete;
+
+    Type getResolvedType() const {
+      return ResolvedTyAndIsAmbiguous.getPointer();
+    }
+    void setResolvedType(Type ty);
+
+    bool isAmbiguous() const {
+      return ResolvedTyAndIsAmbiguous.getInt();
+    }
+    void setAmbiguous() {
+      ResolvedTyAndIsAmbiguous = {nullptr, true};
+    }
   };
 
   /// A type witness candidate for a name variable.

@@ -2156,6 +2156,13 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   return None;
 }
 
+void TypeWitnessSystem::EquivalenceClass::setResolvedType(Type ty) {
+  assert(ty && "cannot resolve to a null type");
+  assert(!isAmbiguous() && "must not set resolved type when ambiguous");
+
+  ResolvedTyAndIsAmbiguous.setPointer(ty);
+}
+
 TypeWitnessSystem::TypeWitnessSystem(
     ArrayRef<AssociatedTypeDecl *> assocTypes) {
   for (auto *assocType : assocTypes) {
@@ -2177,7 +2184,7 @@ Type TypeWitnessSystem::getResolvedTypeWitness(Identifier name) const {
   assert(this->TypeWitnesses.count(name));
 
   if (auto *equivClass = this->TypeWitnesses.lookup(name).EquivClass) {
-    return equivClass->ResolvedTy;
+    return equivClass->getResolvedType();
   }
 
   return Type();
@@ -2219,15 +2226,16 @@ void TypeWitnessSystem::addTypeWitness(Identifier name, Type type) {
   //
   // If we already have a resolved type, keep going only if the new one is
   // better.
-  if (tyWitness.EquivClass && tyWitness.EquivClass->ResolvedTy) {
-    if (!isBetterResolvedType(type, tyWitness.EquivClass->ResolvedTy)) {
+  if (tyWitness.EquivClass && tyWitness.EquivClass->getResolvedType()) {
+    if (!isBetterResolvedType(type, tyWitness.EquivClass->getResolvedType())) {
       return;
     }
   }
 
   // If we can find an existing equivalence class for this type, use it.
   for (auto *const equivClass : this->EquivalenceClasses) {
-    if (equivClass->ResolvedTy && equivClass->ResolvedTy->isEqual(type)) {
+    if (equivClass->getResolvedType() &&
+        equivClass->getResolvedType()->isEqual(type)) {
       if (tyWitness.EquivClass) {
         mergeEquivalenceClasses(equivClass, tyWitness.EquivClass);
       } else {
@@ -2239,9 +2247,9 @@ void TypeWitnessSystem::addTypeWitness(Identifier name, Type type) {
   }
 
   if (tyWitness.EquivClass) {
-    tyWitness.EquivClass->ResolvedTy = type;
+    tyWitness.EquivClass->setResolvedType(type);
   } else {
-    auto *equivClass = new EquivalenceClass{type};
+    auto *equivClass = new EquivalenceClass(type);
     this->EquivalenceClasses.insert(equivClass);
 
     tyWitness.EquivClass = equivClass;
@@ -2308,8 +2316,10 @@ void TypeWitnessSystem::dump(
 
     const auto *eqClass = this->TypeWitnesses.lookup(name).EquivClass;
     if (eqClass) {
-      if (eqClass->ResolvedTy) {
-        out << eqClass->ResolvedTy;
+      if (eqClass->getResolvedType()) {
+        out << eqClass->getResolvedType();
+      } else if (eqClass->isAmbiguous()) {
+        out << "(ambiguous)";
       } else {
         out << "(unresolved)";
       }
@@ -2349,7 +2359,7 @@ void TypeWitnessSystem::addEquivalence(Identifier name1, Identifier name2) {
     tyWitness1.EquivClass = tyWitness2.EquivClass;
   } else {
     // Neither has an associated equivalence class.
-    auto *equivClass = new EquivalenceClass{nullptr};
+    auto *equivClass = new EquivalenceClass(nullptr);
     this->EquivalenceClasses.insert(equivClass);
 
     tyWitness1.EquivClass = equivClass;
@@ -2365,13 +2375,13 @@ void TypeWitnessSystem::mergeEquivalenceClasses(
   }
 
   // Merge the second resolved type into the first.
-  if (equivClass1->ResolvedTy && equivClass2->ResolvedTy) {
-    if (isBetterResolvedType(equivClass2->ResolvedTy,
-                             equivClass1->ResolvedTy)) {
-      equivClass1->ResolvedTy = equivClass2->ResolvedTy;
+  if (equivClass1->getResolvedType() && equivClass2->getResolvedType()) {
+    if (isBetterResolvedType(equivClass2->getResolvedType(),
+                             equivClass1->getResolvedType())) {
+      equivClass1->setResolvedType(equivClass2->getResolvedType());
     }
-  } else if (equivClass2->ResolvedTy) {
-    equivClass1->ResolvedTy = equivClass2->ResolvedTy;
+  } else if (equivClass2->getResolvedType()) {
+    equivClass1->setResolvedType(equivClass2->getResolvedType());
   }
 
   // Migrate members of the second equivalence class to the first.
