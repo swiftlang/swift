@@ -83,6 +83,18 @@ ArrayTraps.test("bounds_with_downcast")
   _ = da[2]
 }
 
+func hasBackdeployedConcurrencyRuntime() -> Bool {
+  // If the stdlib we've loaded predates Swift 5.5, then we're running on a back
+  // deployed concurrency runtime, which has the side effect of disabling
+  // regular runtime exclusivity checks.
+  //
+  // This makes the two tests below fall back to older, higher-level exclusivity
+  // checks in the stdlib, which will still trap, but with a different message.
+  if #available(SwiftStdlib 5.5, *) { return false } // recent enough production stdlib
+  if #available(SwiftStdlib 9999, *) { return false } // dev stdlib
+  return true
+}
+
 var ArraySemanticOptzns = TestSuite("ArraySemanticOptzns" + testSuiteSuffix)
 
 class BaseClass {
@@ -131,8 +143,11 @@ ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "Fatal access conflict detected." : "")
+  .crashOutputMatches(
+    !_isDebugAssertConfiguration() ? ""
+    : hasBackdeployedConcurrencyRuntime() ? "inout rules were violated"
+    : "Fatal access conflict detected."
+  )
   .code {
   let v = ViolateInoutSafetySwitchToObjcBuffer()
   expectCrashLater()
@@ -174,8 +189,11 @@ ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "Fatal access conflict detected." : "")
+  .crashOutputMatches(
+    !_isDebugAssertConfiguration() ? ""
+    : hasBackdeployedConcurrencyRuntime() ? "inout rules were violated"
+    : "Fatal access conflict detected."
+  )
   .code {
   let v = ViolateInoutSafetyNeedElementTypeCheck()
   expectCrashLater()
