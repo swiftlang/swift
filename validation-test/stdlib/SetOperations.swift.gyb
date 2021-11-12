@@ -254,66 +254,6 @@ suite.test("symmetricDifference.${inputKind}.${argumentKind}") {
 %     if needsCocoa:
 #if _runtime(_ObjC)
 %     end
-suite.test("formIntersection.${inputKind}.${argumentKind}") {
-  var a = ${inputGenerator}(0 ..< 10, identity: 1)
-  let b = ${argumentGenerator}(5 ..< 15, identity: 2)
-  a.formSymmetricDifference(b)
-  expectTrue(isNativeSet(a))
-  expectEqual(a.count, 10)
-  // Check the resulting items and that they come from the correct input set.
-  for v in 5 ..< 10 {
-    expectFalse(a.contains(Value(v)), "Found \(v) in result")
-  }
-  for v in Array(0 ..< 5) + Array(10 ..< 15) {
-    guard let i = a.firstIndex(of: Value(v)) else {
-      expectTrue(false, "Could not find \(v) in result")
-      continue
-    }
-    expectEqual(a[i].identity, v < 5 ? 1 : 2)
-  }
-}
-%     if needsCocoa:
-#endif
-%     end
-%   end
-% end
-
-% for inputKind, inputGenerator in inputKinds.items():
-%   for argumentKind, argumentGenerator in argumentKinds.items():
-%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
-%     if needsCocoa:
-#if _runtime(_ObjC)
-%     end
-suite.test("symmetricDifference.${inputKind}.${argumentKind}") {
-  let a = ${inputGenerator}(0 ..< 10, identity: 1)
-  let b = ${argumentGenerator}(5 ..< 15, identity: 2)
-  let c = a.symmetricDifference(b)
-  expectTrue(isNativeSet(c))
-  expectEqual(c.count, 10)
-  // Check the resulting items and that they come from the correct input set.
-  for v in 5 ..< 10 {
-    expectFalse(c.contains(Value(v)), "Found \(v) in result")
-  }
-  for v in Array(0 ..< 5) + Array(10 ..< 15) {
-    guard let i = c.firstIndex(of: Value(v)) else {
-      expectTrue(false, "Could not find \(v) in result")
-      continue
-    }
-    expectEqual(c[i].identity, v < 5 ? 1 : 2)
-  }
-}
-%     if needsCocoa:
-#endif
-%     end
-%   end
-% end
-
-% for inputKind, inputGenerator in inputKinds.items():
-%   for argumentKind, argumentGenerator in argumentKinds.items():
-%     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
-%     if needsCocoa:
-#if _runtime(_ObjC)
-%     end
 suite.test("formSymmetricDifference.${inputKind}.${argumentKind}") {
   var a = ${inputGenerator}(0 ..< 10, identity: 1)
   let b = ${argumentGenerator}(5 ..< 15, identity: 2)
