@@ -1426,5 +1426,5 @@ extension ContiguousArray {
   }
 }
 
-extension ContiguousArray: Sendable, UnsafeSendable
+extension ContiguousArray: @unchecked Sendable
   where Element: Sendable { }
