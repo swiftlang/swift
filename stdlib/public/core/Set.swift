@@ -1639,9 +1639,9 @@ extension Set {
 public typealias SetIndex<Element: Hashable> = Set<Element>.Index
 public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
 
-extension Set: Sendable, UnsafeSendable
+extension Set: @unchecked Sendable
   where Element: Sendable { }
-extension Set.Index: Sendable, UnsafeSendable
+extension Set.Index: @unchecked Sendable
   where Element: Sendable { }
-extension Set.Iterator: Sendable, UnsafeSendable
+extension Set.Iterator: @unchecked Sendable
   where Element: Sendable { }

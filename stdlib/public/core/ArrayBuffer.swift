@@ -693,6 +693,6 @@ extension _ArrayBuffer {
   }
 }
 
-extension _ArrayBuffer: Sendable, UnsafeSendable
+extension _ArrayBuffer: @unchecked Sendable
   where Element: Sendable { }
 #endif

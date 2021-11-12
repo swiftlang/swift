@@ -406,8 +406,9 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Compute the requirements that describe a protocol using the
-/// RequirementMachine.
+/// Compute a protocol's requirement signature using the RequirementMachine.
+/// This is temporary; once the GenericSignatureBuilder goes away this will
+/// be folded into RequirementSignatureRequest.
 class RequirementSignatureRequestRQM :
     public SimpleRequest<RequirementSignatureRequestRQM,
                          ArrayRef<Requirement>(ProtocolDecl *),
@@ -1439,6 +1440,38 @@ using GenericSignatureWithError = llvm::PointerIntPair<GenericSignature, 1>;
 
 class AbstractGenericSignatureRequest :
     public SimpleRequest<AbstractGenericSignatureRequest,
+                         GenericSignatureWithError (const GenericSignatureImpl *,
+                                                    SmallVector<GenericTypeParamType *, 2>,
+                                                    SmallVector<Requirement, 2>),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  GenericSignatureWithError
+  evaluate(Evaluator &evaluator,
+           const GenericSignatureImpl *baseSignature,
+           SmallVector<GenericTypeParamType *, 2> addedParameters,
+           SmallVector<Requirement, 2> addedRequirements) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+
+  /// Abstract generic signature requests never have source-location info.
+  SourceLoc getNearestLoc() const {
+    return SourceLoc();
+  }
+};
+
+/// Build a generic signature using the RequirementMachine. This is temporary;
+/// once the GenericSignatureBuilder goes away this will be folded into
+/// AbstractGenericSignatureRequest.
+class AbstractGenericSignatureRequestRQM :
+    public SimpleRequest<AbstractGenericSignatureRequestRQM,
                          GenericSignatureWithError (const GenericSignatureImpl *,
                                                     SmallVector<GenericTypeParamType *, 2>,
                                                     SmallVector<Requirement, 2>),

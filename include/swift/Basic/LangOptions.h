@@ -473,17 +473,21 @@ namespace swift {
     /// Enables fine-grained debug output from the requirement machine.
     std::string DebugRequirementMachine;
 
-    /// Maximum iteration count for requirement machine confluent completion
+    /// Maximum iteration count for requirement machine Knuth-Bendix completion
     /// algorithm.
     unsigned RequirementMachineStepLimit = 4000;
 
-    /// Maximum term length for requirement machine confluent completion
+    /// Maximum term length for requirement machine Knuth-Bendix completion
     /// algorithm.
     unsigned RequirementMachineDepthLimit = 10;
 
     /// Enable the new experimental protocol requirement signature minimization
     /// algorithm.
     RequirementMachineMode RequirementMachineProtocolSignatures =
+        RequirementMachineMode::Disabled;
+
+    /// Enable the new experimental generic signature minimization algorithm.
+    RequirementMachineMode RequirementMachineGenericSignatures =
         RequirementMachineMode::Disabled;
 
     /// Sets the target we are building for and updates platform conditions
