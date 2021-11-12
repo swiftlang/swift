@@ -144,3 +144,19 @@ func testExistentialIsolated(a: isolated P2, b: P2) async {
   b.m() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{calls to instance method 'm()' from outside of its actor context are implicitly asynchronous}}
 }
+
+// "isolated" parameters of closures make the closure itself isolated.
+extension TestActor {
+  func isolatedMethod() { }
+}
+
+@available(SwiftStdlib 5.1, *)
+func isolatedClosures() {
+  let _: (isolated TestActor) -> Void = { (ta: isolated TestActor) in
+    ta.isolatedMethod() // okay, isolated to ta
+
+    _ = {
+      ta.isolatedMethod() // okay, isolated to ta
+    }
+  }
+}

@@ -116,6 +116,14 @@ bool TypeVariableType::Implementation::isKeyPathType() const {
   return locator && locator->isKeyPathType();
 }
 
+bool TypeVariableType::Implementation::isSubscriptResultType() const {
+  if (!(locator && locator->getAnchor()))
+    return false;
+
+  return isExpr<SubscriptExpr>(locator->getAnchor()) &&
+         locator->isLastElement<LocatorPathElt::FunctionResult>();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);

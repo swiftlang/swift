@@ -1937,31 +1937,6 @@ Type ResolveTypeRequest::evaluate(Evaluator &evaluator,
   if (validateAutoClosureAttributeUse(ctx.Diags, TyR, result, options))
     return ErrorType::get(ctx);
 
-  // Diagnose an attempt to use a placeholder at the top level.
-  if (result->getCanonicalType()->is<PlaceholderType>() &&
-      resolution->getOptions().contains(TypeResolutionFlags::Direct)) {
-    if (!resolution->getOptions().contains(TypeResolutionFlags::SilenceErrors))
-      ctx.Diags.diagnose(loc, diag::top_level_placeholder_type);
-
-    TyR->setInvalid();
-    return ErrorType::get(ctx);
-  }
-
-  // Now that top-level placeholders have been diagnosed, replace them according
-  // to the user-specified handler (if it exists).
-  if (const auto handlerFn = resolution->getPlaceholderHandler()) {
-    result = result.get().transform([&](Type ty) {
-      if (auto *oldTy = ty->getAs<PlaceholderType>()) {
-        auto originator = oldTy->getOriginator();
-        if (auto *repr = originator.dyn_cast<PlaceholderTypeRepr *>())
-          if (auto newTy = handlerFn(ctx, repr))
-            return newTy;
-      }
-
-      return ty;
-    });
-  }
-
   return result;
 }
 
@@ -2090,21 +2065,18 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                        options);
 
   case TypeReprKind::Placeholder: {
-    if (resolution.getPlaceholderHandler())
-      // For now, just form a `PlaceholderType` so that we can properly diagnose
-      // invalid top-level placeholders. `ResolveTypeRequest::evaluate` will
-      // take care of substituting the placeholder based on the caller-specified
-      // handler.
-      return PlaceholderType::get(getASTContext(),
-                                  cast<PlaceholderTypeRepr>(repr));
+    auto &ctx = getASTContext();
+    // Fill in the placeholder if there's an appropriate handler.
+    if (const auto handlerFn = resolution.getPlaceholderHandler())
+      if (const auto ty = handlerFn(ctx, cast<PlaceholderTypeRepr>(repr)))
+        return ty;
 
-    // If there's no handler, complain if we're allowed to and bail out with an
-    // error.
+    // Complain if we're allowed to and bail out with an error.
     if (!options.contains(TypeResolutionFlags::SilenceErrors))
-      getASTContext().Diags.diagnose(repr->getLoc(),
+      ctx.Diags.diagnose(repr->getLoc(),
                          diag::placeholder_type_not_allowed);
 
-    return ErrorType::get(getASTContext());
+    return ErrorType::get(resolution.getASTContext());
   }
 
   case TypeReprKind::Fixed:

@@ -67,19 +67,19 @@ remapConcreteSubstitutionSchema(CanType concreteType,
   if (!concreteType->hasTypeParameter())
     return concreteType;
 
-  return CanType(concreteType.transformRec(
-    [&](Type t) -> Optional<Type> {
-      if (!t->isTypeParameter())
-        return None;
+  return CanType(concreteType.transformRec([&](Type t) -> Optional<Type> {
+    if (!t->isTypeParameter())
+      return None;
 
-      auto term = ctx.getRelativeTermForType(CanType(t), substitutions);
+    auto term = ctx.getRelativeTermForType(CanType(t), substitutions);
 
-      unsigned newIndex = result.size();
-      result.push_back(Term::get(term, ctx));
+    unsigned newIndex = result.size();
+    result.push_back(Term::get(term, ctx));
 
-      return CanGenericTypeParamType::get(/*depth=*/0, newIndex,
-                                          ctx.getASTContext());
-    }));
+    return CanGenericTypeParamType::get(/*type sequence=*/ false,
+                                        /*depth=*/ 0, newIndex,
+                                        ctx.getASTContext());
+  }));
 }
 
 namespace {

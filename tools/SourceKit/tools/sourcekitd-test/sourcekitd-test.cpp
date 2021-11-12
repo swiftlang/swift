@@ -1711,6 +1711,7 @@ struct ResponseSymbolInfo {
   std::vector<const char *> ReceiverUSRs;
   bool IsSystem = false;
   bool IsDynamic = false;
+  bool IsSynthesized = false;
   unsigned ParentOffset = 0;
 
   static ResponseSymbolInfo read(sourcekitd_variant_t Info) {
@@ -1802,6 +1803,8 @@ struct ResponseSymbolInfo {
     Symbol.IsSystem = sourcekitd_variant_dictionary_get_bool(Info, KeyIsSystem);
     Symbol.IsDynamic =
         sourcekitd_variant_dictionary_get_bool(Info, KeyIsDynamic);
+    Symbol.IsSynthesized =
+        sourcekitd_variant_dictionary_get_bool(Info, KeyIsSynthesized);
 
     Symbol.ParentOffset =
         sourcekitd_variant_dictionary_get_int64(Info, KeyParentLoc);
@@ -1864,6 +1867,8 @@ struct ResponseSymbolInfo {
     }
     if (IsDynamic)
       OS << "DYNAMIC\n";
+    if (IsSynthesized)
+      OS << "SYNTHESIZED\n";
     if (ParentOffset) {
       OS << "PARENT OFFSET: " << ParentOffset << "\n";
     }

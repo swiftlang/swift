@@ -26,6 +26,12 @@ func test(r: Lens<Rectangle>) {
   _ = r.bottomRight.y
 }
 
+func keyPathTester<V>(keyPath: KeyPath<Lens<Rectangle>, V>) {}
+
+func testKeyPath() {
+  keyPathTester(keyPath: \.topLeft)
+}
+
 // RUN: %sourcekitd-test -req=cursor -pos=18:3 -cursor-action %s -- %s | %FileCheck -check-prefix=SUBSCRIPT %s
 // SUBSCRIPT: source.lang.swift.decl.function.subscript (18:3-18:12)
 // SUBSCRIPT: subscript(dynamicMember:)
@@ -60,3 +66,12 @@ func test(r: Lens<Rectangle>) {
 // YREF: ACTIONS BEGIN
 // YREF: source.refactoring.kind.rename.global
 // YREF: ACTIONS END
+
+// RUN: %sourcekitd-test -req=cursor -pos=32:28 -cursor-action %s -- %s | %FileCheck -check-prefix=KEYPATH %s
+// KEYPATH: source.lang.swift.ref.var.instance
+// KEYPATH: topLeft
+// KEYPATH: Point
+// KEYPATH: ACTIONS BEGIN
+// KEYPATH: source.refactoring.kind.rename.global
+// KEYPATH: ACTIONS END
+

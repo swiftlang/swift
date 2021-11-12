@@ -23,6 +23,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -1374,4 +1376,445 @@ AbstractionPattern::operator==(const AbstractionPattern &other) const {
       && CXXMethod == other.CXXMethod
       && OtherData == other.OtherData;
   }
+}
+
+namespace {
+class SubstFunctionTypePatternVisitor
+  : public TypeVisitor<SubstFunctionTypePatternVisitor, CanType,
+                       AbstractionPattern>
+{
+public:
+  TypeConverter &TC;
+  SmallVector<GenericTypeParamType *, 2> substGenericParams;
+  SmallVector<Requirement, 2> substRequirements;
+  SmallVector<Type, 2> substReplacementTypes;
+  CanType substYieldType;
+  
+  SubstFunctionTypePatternVisitor(TypeConverter &TC)
+    : TC(TC) {}
+  
+  // Creates and returns a fresh type parameter in the substituted generic
+  // signature if `pattern` is a type parameter or opaque archetype. Returns
+  // null otherwise.
+  CanType handleTypeParameterInAbstractionPattern(AbstractionPattern pattern,
+                                                  Type substTy) {
+    if (!pattern.isTypeParameterOrOpaqueArchetype())
+      return CanType();
+
+    // If so, let's put a fresh generic parameter in the substituted signature
+    // here.
+    unsigned paramIndex = substGenericParams.size();
+    auto gp = GenericTypeParamType::get(false, 0, paramIndex, TC.Context);
+    substGenericParams.push_back(gp);
+    substReplacementTypes.push_back(substTy);
+    
+    if (auto layout = pattern.getLayoutConstraint()) {
+      // Look at the layout constraint on this position in the abstraction pattern
+      // and carry it over, with some generalization to the point it affects
+      // calling convention.
+      // TODO: We should do this once we surface more interesting layout
+      // constraints in the language. There are several places in type lowering
+      // that need to be changed to allow for this and generate correct calling
+      // convention lowering.
+#if WE_MAKE_LAYOUT_CONSTRAINTS_AVAILABLE_IN_THE_SURFACE_LANGUAGE
+      switch (layout->getKind()) {
+      // Keep these layout constraints as is.
+      case LayoutConstraintKind::RefCountedObject:
+      case LayoutConstraintKind::TrivialOfAtMostSize:
+        break;
+      
+      case LayoutConstraintKind::UnknownLayout:
+      case LayoutConstraintKind::Trivial:
+        // These constraints don't really constrain the ABI, so we can
+        // eliminate them.
+        layout = LayoutConstraint();
+        break;
+    
+      // Replace these specific constraints with one of the more general
+      // constraints above.
+      case LayoutConstraintKind::NativeClass:
+      case LayoutConstraintKind::Class:
+      case LayoutConstraintKind::NativeRefCountedObject:
+        // These can all be generalized to RefCountedObject.
+        layout = LayoutConstraint::getLayoutConstraint(
+                                   LayoutConstraintKind::RefCountedObject);
+        break;
+          
+      case LayoutConstraintKind::TrivialOfExactSize:
+        // Generalize to TrivialOfAtMostSize.
+        layout = LayoutConstraint::getLayoutConstraint(
+           LayoutConstraintKind::TrivialOfAtMostSize,
+           layout->getTrivialSizeInBits(),
+           layout->getAlignmentInBits(),
+           C);
+        break;
+      }
+#endif
+      
+      if (layout) {
+        substRequirements.push_back(
+                      Requirement(RequirementKind::Layout, gp, layout));
+      }
+    }
+    
+    return CanType(gp);
+  }
+
+  CanType visitType(TypeBase *t, AbstractionPattern pattern) {
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, t))
+      return gp;
+    
+    assert(!pattern.getType()->hasTypeParameter()
+           && !pattern.getType()->hasArchetype()
+           && !pattern.getType()->hasOpaqueArchetype());
+    return pattern.getType();
+  }
+  
+  CanType visitDynamicSelfType(DynamicSelfType *dst,
+                               AbstractionPattern pattern) {
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, dst))
+      return gp;
+
+    // A "dynamic self" type can be bound to another dynamic self type, or the
+    // non-dynamic base class type.
+    if (auto origDynSelf = dyn_cast<DynamicSelfType>(pattern.getType())) {
+      auto origSelf = AbstractionPattern(pattern.getGenericSignatureOrNull(),
+                                         origDynSelf.getSelfType());
+      
+      auto newBase = visit(dst->getSelfType(), origSelf);
+      return DynamicSelfType::get(newBase, TC.Context)
+        ->getCanonicalType();
+    }
+    
+    return visit(dst->getSelfType(), pattern);
+  }
+  
+  CanType visitAnyMetatypeType(AnyMetatypeType *mt, AbstractionPattern pattern){
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, mt))
+      return gp;
+    
+    auto origMeta = cast<AnyMetatypeType>(pattern.getType());
+    
+    auto substInstance = visit(mt->getInstanceType(),
+                       AbstractionPattern(pattern.getGenericSignatureOrNull(),
+                                          origMeta.getInstanceType()));
+    
+    return isa<ExistentialMetatypeType>(origMeta)
+      ? CanType(CanExistentialMetatypeType::get(substInstance))
+      : CanType(CanMetatypeType::get(substInstance));
+  }
+  
+  CanType handleGenericNominalType(CanType orig, Type subst,
+                                   CanGenericSignature origSig) {
+    // If there are no loose type parameters in the pattern here, we don't need
+    // to do a recursive visit at all.
+    if (!orig->hasTypeParameter()
+        && !orig->hasArchetype()
+        && !orig->hasOpaqueArchetype()) {
+      return CanType(subst);
+    }
+    
+    // If the substituted type is a subclass of the abstraction pattern
+    // type, use the substituted type for the abstraction pattern. This only
+    // comes up when lowering override types for vtable entries.
+    auto getDifferentBaseClass = [](Type substInstance, Type origInstance) -> ClassDecl* {
+      if (auto dynA = substInstance->getAs<DynamicSelfType>()) {
+        substInstance = dynA->getSelfType();
+      }
+      if (auto dynB = origInstance->getAs<DynamicSelfType>()) {
+        origInstance = dynB->getSelfType();
+      }
+      if (auto aClass = substInstance->getClassOrBoundGenericClass()) {
+        if (auto bClass = origInstance->getClassOrBoundGenericClass()) {
+          if (aClass != bClass) {
+            return bClass;
+          }
+        }
+      }
+      
+      return nullptr;
+    };
+    
+    // Both instance and class methods can be overridden; check for metatype
+    // subtyping too.
+    ClassDecl *differentOrigClass = getDifferentBaseClass(subst, orig);
+    if (!differentOrigClass) {
+      if (auto substMeta = subst->getAs<MetatypeType>()) {
+        if (auto origMeta = dyn_cast<MetatypeType>(orig)) {
+          differentOrigClass = getDifferentBaseClass(substMeta->getInstanceType(),
+                                                     origMeta->getInstanceType());
+        }
+      }
+    }
+    
+    if (differentOrigClass) {
+      orig = CanType(subst);
+      origSig = TC.getCurGenericSignature();
+      assert((!subst->hasTypeParameter() || origSig) &&
+             "lowering mismatched interface types in a context without "
+             "a generic signature");
+    }
+    
+    auto decl = orig->getAnyNominal();
+    
+    // Any type parameters we use as arguments to the nominal type must still
+    // satisfy the requirements on the nominal type. So we pull all of the
+    // generic requirements from the nominal type declaration into the
+    // substituted signature, then same-type-constrain those variables to the
+    // types we get by recursively visiting the bound generic arguments.
+    auto moduleDecl = decl->getParentModule();
+    auto origSubMap = orig->getContextSubstitutionMap(moduleDecl,
+                                                decl,
+                                                decl->getGenericEnvironment());
+    auto substSubMap = subst->getContextSubstitutionMap(moduleDecl, decl,
+                                                decl->getGenericEnvironment());
+    
+    auto nomGenericSig = decl->getGenericSignature().getCanonicalSignature();
+    
+    llvm::DenseMap<GenericTypeParamType*, GenericTypeParamType*>
+      substGPMapping;
+    
+    // Create parallel generic params for the nominal type's generic params.
+    for (unsigned i = 0; i < nomGenericSig.getGenericParams().size(); ++i) {
+      auto nomTyParam = nomGenericSig.getGenericParams()[i];
+      // If the nominal type same-type constrains away this generic parameter,
+      // we don't need to visit it.
+      if (nomGenericSig->isConcreteType(nomTyParam))
+        continue;
+      
+      unsigned substGPIndex = substGenericParams.size();
+      auto substGP = GenericTypeParamType::get(false, 0,
+                                               substGPIndex, TC.Context);
+      substGenericParams.push_back(substGP);
+      substReplacementTypes.push_back(Type());
+      substGPMapping.insert({nomGenericSig.getGenericParams()[i], substGP});
+    }
+    
+    // Create parallel requirements too, mapping from the generic signature's
+    // params to our parallel params.
+    auto substGPMap = SubstitutionMap::get(nomGenericSig,
+      [&](SubstitutableType *dt) -> Type {
+        auto mapping = substGPMapping.find(cast<GenericTypeParamType>(dt));
+        assert(mapping != substGPMapping.end());
+        return mapping->second;
+      }, [&](CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
+        // We should always be substituting type parameter for type parameter
+        return ProtocolConformanceRef(conformedProtocol);
+      });
+    
+    for (auto reqt : nomGenericSig.getRequirements()) {
+      auto firstTy = reqt.getFirstType().subst(substGPMap);
+      switch (auto kind = reqt.getKind()) {
+      case RequirementKind::SameType:
+        // Skip same-type constraints that define away primary generic params,
+        // since we didn't duplicate those params.
+        if (reqt.getFirstType()->getAs<GenericTypeParamType>()
+            && nomGenericSig->isConcreteType(reqt.getFirstType()))
+          continue;
+          
+        LLVM_FALLTHROUGH;
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass: {
+        auto secondTy = reqt.getSecondType().subst(substGPMap);
+        substRequirements.push_back(Requirement(kind, firstTy, secondTy));
+        break;
+      }
+      case RequirementKind::Layout:
+        substRequirements.push_back(Requirement(kind, firstTy,
+                                                reqt.getLayoutConstraint()));
+        break;
+      }
+    }
+    
+    // Now recur into the type arguments, and same-type-constrain the
+    // substituted type arguments to the parallel generic parameter, giving us
+    // the intersection of constraints on the type binding and the nominal type's
+    // requirements.
+    llvm::DenseMap<GenericTypeParamType*, Type>
+      newGPMapping;
+
+    for (auto gp : nomGenericSig.getGenericParams()) {
+      if (nomGenericSig->isConcreteType(gp))
+        continue;
+      
+      auto origParamTy = Type(gp).subst(origSubMap)
+        ->getCanonicalType();
+      auto substParamTy = Type(gp).subst(substSubMap)
+        ->getCanonicalType();
+      
+      auto newParamTy = visit(substParamTy,
+                              AbstractionPattern(origSig, origParamTy));
+      newGPMapping.insert({gp, newParamTy});
+      auto substGPTy = Type(gp).subst(substGPMap)->castTo<GenericTypeParamType>();
+      substRequirements.push_back(Requirement(RequirementKind::SameType,
+                                              substGPTy,
+                                              newParamTy));
+      assert(!substReplacementTypes[substGPTy->getIndex()]);
+      substReplacementTypes[substGPTy->getIndex()] = substParamTy;
+    }
+    
+    auto newSubMap = SubstitutionMap::get(nomGenericSig,
+      [&](SubstitutableType *dt) -> Type {
+        auto mapping = newGPMapping.find(cast<GenericTypeParamType>(dt));
+        assert(mapping != newGPMapping.end());
+        return mapping->second;
+      }, [&](CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
+        // We should always be substituting type parameter for type parameter
+        return ProtocolConformanceRef(conformedProtocol);
+      });
+    
+    return decl->getDeclaredInterfaceType().subst(newSubMap)->getCanonicalType();
+  }
+  
+  CanType visitNominalType(NominalType *nom, AbstractionPattern pattern) {
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, nom))
+      return gp;
+
+    auto nomDecl = nom->getDecl();
+    
+    // If the type is generic (because it's a nested type in a generic context),
+    // process the generic type bindings.
+    if (!isa<ProtocolDecl>(nomDecl) && nomDecl->isGenericContext()) {
+      return handleGenericNominalType(pattern.getType(), nom,
+                                      pattern.getGenericSignatureOrNull());
+    }
+    
+    // Otherwise, there are no structural type parameters to visit.
+    return CanType(nom);
+  }
+  
+  CanType visitBoundGenericType(BoundGenericType *bgt,
+                                AbstractionPattern pattern) {
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, bgt))
+      return gp;
+
+    return handleGenericNominalType(pattern.getType(), bgt,
+                                    pattern.getGenericSignatureOrNull());
+  }
+  
+  CanType visitTupleType(TupleType *tuple, AbstractionPattern pattern) {
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, tuple))
+      return gp;
+    
+    // Break down the tuple.
+    SmallVector<TupleTypeElt, 4> tupleElts;
+    for (unsigned i = 0; i < tuple->getNumElements(); ++i) {
+      auto elt = tuple->getElement(i);
+      auto substEltTy = visit(elt.getType(),
+                              pattern.getTupleElementType(i));
+      tupleElts.push_back(
+            TupleTypeElt(substEltTy, elt.getName(), elt.getParameterFlags()));
+    }
+    
+    return CanType(TupleType::get(tupleElts, TC.Context));
+  }
+  
+  CanType handleUnabstractedFunctionType(AnyFunctionType *func,
+                                         AbstractionPattern pattern,
+                                         CanType yieldType,
+                                         AbstractionPattern yieldPattern) {
+    SmallVector<FunctionType::Param, 4> newParams;
+    
+    for (unsigned i = 0; i < func->getParams().size(); ++i) {
+      auto param = func->getParams()[i];
+      // Lower the formal type of the argument binding, eliminating variadicity.
+      auto newParamTy = visit(param.getParameterType(true)->getCanonicalType(),
+                              pattern.getFunctionParamType(i));
+      auto newParam = FunctionType::Param(newParamTy,
+                                          param.getLabel(),
+                                          param.getParameterFlags()
+                                            .withVariadic(false),
+                                          param.getInternalLabel());
+      newParams.push_back(newParam);
+    }
+    
+    if (yieldType) {
+      substYieldType = visit(yieldType, yieldPattern);
+    }
+    
+    auto newResultTy = visit(func->getResult(),
+                             pattern.getFunctionResultType());
+    
+    Optional<FunctionType::ExtInfo> extInfo;
+    if (func->hasExtInfo())
+      extInfo = func->getExtInfo();
+    
+    return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams),
+                  CanType(newResultTy),
+                  extInfo);
+  }
+  
+  CanType visitFunctionType(FunctionType *func,
+                            AbstractionPattern pattern) {
+    if (auto gp = handleTypeParameterInAbstractionPattern(pattern, func))
+      return gp;
+
+    return handleUnabstractedFunctionType(func, pattern,
+                                          CanType(),
+                                          AbstractionPattern::getInvalid());
+  }
+};
+}
+
+std::tuple<AbstractionPattern, SubstitutionMap, AbstractionPattern>
+AbstractionPattern::getSubstFunctionTypePattern(CanAnyFunctionType substType,
+                                                TypeConverter &TC,
+                                                AbstractionPattern origYieldType,
+                                                CanType substYieldType)
+const {
+  // If this abstraction pattern isn't meaningfully generic, then we don't
+  // need to do any transformation.
+  if (!isTypeParameterOrOpaqueArchetype()
+      && !isOpaqueFunctionOrOpaqueDerivativeFunction()
+      && !getType()->hasArchetype()
+      && !getType()->hasOpaqueArchetype()
+      && !getType()->hasTypeParameter()
+      && !isa<GenericFunctionType>(getType())) {
+    return std::make_tuple(
+            AbstractionPattern(TC.getCurGenericSignature(), substType),
+            SubstitutionMap(),
+            substYieldType
+              ? AbstractionPattern(TC.getCurGenericSignature(), substYieldType)
+              : AbstractionPattern::getInvalid());
+  }
+
+  SubstFunctionTypePatternVisitor visitor(TC);
+  auto substTy = visitor.handleUnabstractedFunctionType(substType, *this,
+                                                        substYieldType,
+                                                        origYieldType);
+  
+  auto substSig = buildGenericSignature(TC.Context, GenericSignature(),
+                                        std::move(visitor.substGenericParams),
+                                        std::move(visitor.substRequirements))
+    .getCanonicalSignature();
+  
+  auto subMap = SubstitutionMap::get(substSig,
+    [&](SubstitutableType *dependentType) -> Type {
+      auto index = cast<GenericTypeParamType>(dependentType)->getIndex();
+      return visitor.substReplacementTypes[index];
+    }, [&](CanType dependentType,
+           Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) -> ProtocolConformanceRef {
+      // TODO: Should have collected the conformances used in the original
+      // type.
+      if (conformingReplacementType->isTypeParameter())
+        return ProtocolConformanceRef(conformedProtocol);
+    
+      return TC.M.lookupConformance(conformingReplacementType, conformedProtocol);
+    });
+
+  auto yieldType = visitor.substYieldType;
+  if (yieldType)
+    yieldType = yieldType->getCanonicalType(substSig);
+  
+  return std::make_tuple(
+          AbstractionPattern(substSig, substTy->getCanonicalType(substSig)),
+          subMap,
+          yieldType
+            ? AbstractionPattern(substSig, yieldType)
+            : AbstractionPattern::getInvalid());
 }

@@ -982,6 +982,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (!Options.PrintSPIs && !attr->getSPIGroups().empty())
       return false;
 
+    // Don't print the _specialize attribute if we are asked to skip the ones
+    // with availability parameters.
+    if (!Options.PrintSpecializeAttributeWithAvailability &&
+        !attr->getAvailableAttrs().empty())
+      return false;
+
     Printer << "@" << getAttrName() << "(";
     auto exported = attr->isExported() ? "true" : "false";
     auto kind = attr->isPartialSpecialization() ? "partial" : "full";
@@ -993,7 +999,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "kind: " << kind << ", ";
     if (target)
       Printer << "target: " << target << ", ";
-    auto availAttrs = attr->getAvailabeAttrs();
+    auto availAttrs = attr->getAvailableAttrs();
     if (!availAttrs.empty()) {
       Printer << "availability: ";
       auto numAttrs = availAttrs.size();

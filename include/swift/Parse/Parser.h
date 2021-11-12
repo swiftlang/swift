@@ -221,12 +221,6 @@ public:
   /// The location of the previous token.
   SourceLoc PreviousLoc;
 
-  /// Stop parsing immediately.
-  void cutOffParsing() {
-    // Cut off parsing by acting as if we reached the end-of-file.
-    Tok.setKind(tok::eof);
-  }
-
   /// Use this to assert that the parser has advanced the lexing location, e.g.
   /// before a specific parser function has returned.
   class AssertParserMadeProgressBeforeLeavingScopeRAII {
@@ -329,35 +323,21 @@ public:
 
   /// An RAII object that notes when we have seen a structure marker.
   class StructureMarkerRAII {
-    Parser *const P;
+    Parser &P;
 
     /// Max nesting level
     // TODO: customizable.
     enum { MaxDepth = 256 };
 
-    StructureMarkerRAII(Parser *parser) : P(parser) {}
-
-    /// Have the parser start the new Structure or fail if already too deep.
-    bool pushStructureMarker(Parser &parser, SourceLoc loc,
-                             StructureMarkerKind kind);
+    StructureMarkerRAII(Parser &parser) : P(parser) {}
 
   public:
-    StructureMarkerRAII(Parser &parser, SourceLoc loc, StructureMarkerKind kind)
-        : StructureMarkerRAII(
-              pushStructureMarker(parser, loc, kind) ? &parser : nullptr) {}
+    StructureMarkerRAII(Parser &parser, SourceLoc loc,
+                        StructureMarkerKind kind);
 
     StructureMarkerRAII(Parser &parser, const Token &tok);
 
-    /// Did we fail to push the new structure?
-    bool isFailed() {
-      return P == nullptr;
-    }
-
-    ~StructureMarkerRAII() {
-      if (P != nullptr) {
-        P->StructureMarkers.pop_back();
-      }
-    }
+    ~StructureMarkerRAII() { P.StructureMarkers.pop_back(); }
   };
   friend class StructureMarkerRAII;
 

@@ -562,6 +562,9 @@ def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-
 def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
 
+def downgrade_typecheck_interface_error : Flag<["-"], "downgrade-typecheck-interface-error">,
+  HelpText<"Downgrade error to warning when typechecking emitted module interfaces">;
+
 def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
   HelpText<"Load Swift modules in memory">;
 

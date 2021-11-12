@@ -3121,10 +3121,6 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                    SourceLoc &rightLoc, SyntaxKind Kind) {
   StructureMarkerRAII ParsingExprList(*this, Tok);
   
-  if (ParsingExprList.isFailed()) {
-    return makeParserError();
-  }
-
   leftLoc = consumeToken(leftTok);
   return parseList(rightTok, leftLoc, rightLoc, /*AllowSepAfterLast=*/false,
                    rightTok == tok::r_paren ? diag::expected_rparen_expr_list

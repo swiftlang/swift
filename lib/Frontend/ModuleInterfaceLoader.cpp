@@ -1497,7 +1497,9 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   if (LoaderOpts.remarkOnRebuildFromInterface) {
     GenericArgs.push_back("-Rmodule-interface-rebuild");
   }
-
+  // This flag only matters when we are verifying an textual interface.
+  frontendOpts.DowngradeInterfaceVerificationError =
+    LoaderOpts.downgradeInterfaceVerificationError;
   // Note that we don't assume cachePath is the same as the Clang
   // module cache path at this point.
   if (buildModuleCacheDirIfAbsent && !moduleCachePath.empty())

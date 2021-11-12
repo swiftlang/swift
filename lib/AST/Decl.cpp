@@ -1066,6 +1066,11 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
   auto D = new (ptr) ImportDecl(DC, ImportLoc, Kind, KindLoc, Path);
   if (ClangN)
     D->setClangNode(ClangN);
+  auto realNameIfExists = Ctx.getRealModuleName(Path.front().Item,
+                                                ASTContext::ModuleAliasLookupOption::realNameFromAlias);
+  if (!realNameIfExists.empty()) {
+    D->RealModuleName = realNameIfExists;
+  }
   return D;
 }
 
@@ -1156,6 +1161,24 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   }
 
   return FirstKind;
+}
+
+ImportPath ImportDecl::getRealImportPath(ImportPath::Builder &scratch) const {
+  assert(scratch.empty() && "scratch ImportPath::Builder must be initially empty");
+  auto path = getImportPath();
+  if (RealModuleName.empty())
+    return path;
+
+  for (auto elem : path) {
+    if (scratch.empty()) {
+      // Add the real module name instead of its alias
+      scratch.push_back(RealModuleName);
+    } else {
+      // Add the rest if any (access path elements)
+      scratch.push_back(elem.Item);
+    }
+  }
+  return scratch.get();
 }
 
 ArrayRef<ValueDecl *> ImportDecl::getDecls() const {
@@ -1255,9 +1278,14 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 }
 
 NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
-  assert((hasBeenBound() || canNeverBeBound()) &&
-         "Extension must have already been bound (by bindExtensions)");
-  return ExtendedNominal.getPointer();
+  if (hasBeenBound()) {
+    return ExtendedNominal.getPointer();
+  } else if (canNeverBeBound()) {
+    return computeExtendedNominal();
+  }
+
+  llvm_unreachable(
+      "Extension must have already been bound (by bindExtensions)");
 }
 
 NominalTypeDecl *ExtensionDecl::computeExtendedNominal() const {
@@ -4038,12 +4066,14 @@ AbstractTypeParamDecl::getConformingProtocols() const {
 
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
                                            SourceLoc nameLoc,
-                                           unsigned depth, unsigned index)
-  : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
+                                           bool isTypeSequence, unsigned depth,
+                                           unsigned index)
+    : AbstractTypeParamDecl(DeclKind::GenericTypeParam, dc, name, nameLoc) {
   Bits.GenericTypeParamDecl.Depth = depth;
   assert(Bits.GenericTypeParamDecl.Depth == depth && "Truncation");
   Bits.GenericTypeParamDecl.Index = index;
   assert(Bits.GenericTypeParamDecl.Index == index && "Truncation");
+  Bits.GenericTypeParamDecl.TypeSequence = isTypeSequence;
   auto &ctx = dc->getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) GenericTypeParamType(this);
   setInterfaceType(MetatypeType::get(type, ctx));

@@ -696,6 +696,6 @@ extension UnsafeMutableBufferPointer {
     }
 
     // FIXME: Remove this, it works around rdar://problem/45044610
-    precondition(result)
+    _precondition(result)
   }
 }

@@ -28,6 +28,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -98,7 +99,8 @@ struct swift::RequirementCheck {
 swift::Witness RequirementMatch::getWitness(ASTContext &ctx) const {
   auto syntheticEnv = ReqEnv->getSyntheticEnvironment();
   return swift::Witness(this->Witness, WitnessSubstitutions,
-                        syntheticEnv, ReqEnv->getRequirementToSyntheticMap());
+                        syntheticEnv, ReqEnv->getRequirementToSyntheticMap(),
+                        DerivativeGenSig);
 }
 
 AssociatedTypeDecl *
@@ -306,17 +308,16 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
 /// Given a witness, a requirement, and an existing `RequirementMatch` result,
 /// check if the requirement's `@differentiable` attributes are met by the
 /// witness.
-/// - If requirement's `@differentiable` attributes are met, or if `result` is
-///   not viable, returns `result`.
+/// - If `result` is not viable, do nothing.
+/// - If requirement's `@differentiable` attributes are met, update `result`
+///   with the matched derivative generic signature.
 /// - Otherwise, returns a "missing `@differentiable` attribute"
 ///   `RequirementMatch`.
-// Note: the `result` argument is only necessary for using
-// `RequirementMatch::WitnessSubstitutions`.
-static RequirementMatch
+static void
 matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
-                               ValueDecl *witness, RequirementMatch result) {
+                               ValueDecl *witness, RequirementMatch &result) {
   if (!result.isViable())
-    return result;
+    return;
 
   // Get the requirement and witness attributes.
   const auto &reqAttrs = req->getAttrs();
@@ -377,6 +378,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
       if (witnessConfig.parameterIndices ==
           reqDiffAttr->getParameterIndices()) {
         foundExactConfig = true;
+        // Store the matched witness derivative generic signature.
+        result.DerivativeGenSig = witnessConfig.derivativeGenericSignature;
         break;
       }
       if (witnessConfig.parameterIndices->isSupersetOf(
@@ -407,12 +410,12 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
         // appear if associated type inference is involved.
         if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
-          return RequirementMatch(
+          result = RequirementMatch(
               getStandinForAccessor(vdWitness, AccessorKind::Get),
               MatchKind::MissingDifferentiableAttr, reqDiffAttr);
         } else {
-          return RequirementMatch(witness, MatchKind::MissingDifferentiableAttr,
-                                  reqDiffAttr);
+          result = RequirementMatch(
+              witness, MatchKind::MissingDifferentiableAttr, reqDiffAttr);
         }
       }
 
@@ -461,6 +464,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
           witnessAFD->addDerivativeFunctionConfiguration(
               {newAttr->getParameterIndices(), resultIndices,
                newAttr->getDerivativeGenericSignature()});
+          // Store the witness derivative generic signature.
+          result.DerivativeGenSig = newAttr->getDerivativeGenericSignature();
         }
       }
       if (!success) {
@@ -475,17 +480,16 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         // FIXME(TF-1014): `@differentiable` attribute diagnostic does not
         // appear if associated type inference is involved.
         if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
-          return RequirementMatch(
+          result = RequirementMatch(
               getStandinForAccessor(vdWitness, AccessorKind::Get),
               MatchKind::MissingDifferentiableAttr, reqDiffAttr);
         } else {
-          return RequirementMatch(witness, MatchKind::MissingDifferentiableAttr,
-                                  reqDiffAttr);
+          result = RequirementMatch(
+              witness, MatchKind::MissingDifferentiableAttr, reqDiffAttr);
         }
       }
     }
   }
-  return result;
 }
 
 /// A property or subscript witness must have the same or fewer
@@ -817,7 +821,7 @@ swift::matchWitness(
   auto result = finalize(anyRenaming, optionalAdjustments);
   // Check if the requirement's `@differentiable` attributes are satisfied by
   // the witness.
-  result = matchWitnessDifferentiableAttr(dc, req, witness, result);
+  matchWitnessDifferentiableAttr(dc, req, witness, result);
   return result;
 }
 
@@ -925,6 +929,25 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
   }
 
   return Optional<RequirementMatch>();
+}
+
+/// Determine the set of effects on a given declaration.
+static PossibleEffects getEffects(ValueDecl *value) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    PossibleEffects result;
+    if (func->hasThrows())
+      result |= EffectKind::Throws;
+    if (func->hasAsync())
+      result |= EffectKind::Async;
+    return result;
+  }
+
+  if (auto storage = dyn_cast<AbstractStorageDecl>(value)) {
+    if (auto accessor = storage->getEffectfulGetAccessor())
+      return getEffects(accessor);
+  }
+
+  return PossibleEffects();
 }
 
 RequirementMatch
@@ -1104,12 +1127,17 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               witnessType);
 
+    MatchKind matchKind = MatchKind::ExactMatch;
+    if (hasAnyError(optionalAdjustments))
+      matchKind = MatchKind::OptionalityConflict;
+    else if (anyRenaming)
+      matchKind = MatchKind::RenamedMatch;
+    else if (getEffects(witness).containsOnly(getEffects(req)))
+      matchKind = MatchKind::FewerEffects;
+
     // Success. Form the match result.
     RequirementMatch result(witness,
-                            hasAnyError(optionalAdjustments)
-                              ? MatchKind::OptionalityConflict
-                              : anyRenaming ? MatchKind::RenamedMatch
-                                            : MatchKind::ExactMatch,
+                            matchKind,
                             witnessType,
                             reqEnvironment,
                             optionalAdjustments);
@@ -2458,6 +2486,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   auto &diags = module->getASTContext().Diags;
   switch (match.Kind) {
   case MatchKind::ExactMatch:
+  case MatchKind::FewerEffects:
     diags.diagnose(match.Witness, diag::protocol_witness_exact_match,
                    withAssocTypes);
     break;
@@ -5743,7 +5772,7 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
   auto dc = conformance->getDeclContext();
   auto match = matchWitness(oneUseCache, conformance->getProtocol(),
                             conformance, dc, req, witness);
-  if (match.Kind == MatchKind::ExactMatch &&
+  if (match.isWellFormed() &&
       req->isObjC() && !witness->isObjC()) {
     // Special case: note to add @objc.
     auto diag =
@@ -6428,7 +6457,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         if (matchWitness(reqEnvCache, proto, *conformance,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
-              .Kind == MatchKind::ExactMatch) {
+              .isWellFormed()) {
           if (accessorKind) {
             auto *storageReq = dyn_cast<AbstractStorageDecl>(req);
             if (!storageReq)

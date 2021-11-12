@@ -134,6 +134,10 @@ SILLocation SILValue::getLoc() const {
   return Value->getFunction()->getLocation();
 }
 
+void SILValue::dump() const {
+  Value->dump();
+}
+
 //===----------------------------------------------------------------------===//
 //                               OwnershipKind
 //===----------------------------------------------------------------------===//

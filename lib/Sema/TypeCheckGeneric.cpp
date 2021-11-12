@@ -218,7 +218,8 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       return nullptr;
     }
 
-    auto *paramType = GenericTypeParamType::get(opaqueSignatureDepth, i, ctx);
+    auto *paramType = GenericTypeParamType::get(/*type sequence*/ false,
+                                                opaqueSignatureDepth, i, ctx);
     genericParamTypes.push_back(paramType);
 
     // Try to resolve the constraint repr in the parent decl context. It should

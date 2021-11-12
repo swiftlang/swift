@@ -129,7 +129,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
     let i = _guts.scalarAlign(i)
-    precondition(i._encodedOffset > 0)
+    _precondition(i._encodedOffset > 0)
     // TODO(String performance): isASCII fast-path
 
     if _fastPath(_guts.isFastUTF8) {

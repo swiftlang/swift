@@ -200,6 +200,11 @@ RequirementMachine::computeMinimalRequirements() {
   assert(Protos.size() > 0);
   System.minimizeRewriteSystem();
 
+  if (Dump) {
+    llvm::dbgs() << "Minimized rewrite system:\n";
+    dump(llvm::dbgs());
+  }
+
   auto rules = System.getMinimizedRules(Protos);
 
   // Note that we build 'result' by iterating over 'Protos' rather than

@@ -17,6 +17,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Frontend/Frontend.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -624,7 +625,7 @@ class CodeCompletionResult {
   friend class CodeCompletionResultBuilder;
 
 public:
-  enum ResultKind {
+  enum class ResultKind {
     Declaration,
     Keyword,
     Pattern,
@@ -634,7 +635,7 @@ public:
 
   /// Describes the relationship between the type of the completion results and
   /// the expected type at the code completion position.
-  enum ExpectedTypeRelation {
+  enum class ExpectedTypeRelation {
     /// The result does not have a type (e.g. keyword).
     NotApplicable,
 
@@ -703,12 +704,13 @@ public:
                        CodeCompletionOperatorKind KnownOperatorKind =
                            CodeCompletionOperatorKind::None,
                        StringRef BriefDocComment = StringRef())
-      : Kind(Kind), KnownOperatorKind(unsigned(KnownOperatorKind)),
-        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
+      : Kind(unsigned(Kind)), KnownOperatorKind(unsigned(KnownOperatorKind)),
+        SemanticContext(unsigned(SemanticContext)),
+        Flair(unsigned(Flair.toRaw())),
         NotRecommended(unsigned(NotRecommendedReason::None)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
-    assert(Kind != Declaration && "use the other constructor");
+        BriefDocComment(BriefDocComment), TypeDistance(unsigned(TypeDistance)) {
+    assert(Kind != ResultKind::Declaration && "use the other constructor");
     assert(CompletionString);
     if (isOperator() && KnownOperatorKind == CodeCompletionOperatorKind::None)
       this->KnownOperatorKind =
@@ -725,16 +727,16 @@ public:
   /// \note The caller must ensure \c CodeCompletionString outlives this result.
   CodeCompletionResult(CodeCompletionKeywordKind Kind,
                        SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair,
-                       unsigned NumBytesToErase,
+                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance,
                        StringRef BriefDocComment = StringRef())
-      : Kind(Keyword), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
+      : Kind(unsigned(ResultKind::Keyword)), KnownOperatorKind(0),
+        SemanticContext(unsigned(SemanticContext)),
+        Flair(unsigned(Flair.toRaw())),
         NotRecommended(unsigned(NotRecommendedReason::None)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
+        BriefDocComment(BriefDocComment), TypeDistance(unsigned(TypeDistance)) {
     assert(CompletionString);
     AssociatedKind = static_cast<unsigned>(Kind);
     IsSystem = 0;
@@ -749,11 +751,12 @@ public:
                        CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance)
-      : Kind(Literal), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
+      : Kind(unsigned(ResultKind::Literal)), KnownOperatorKind(0),
+        SemanticContext(unsigned(SemanticContext)),
+        Flair(unsigned(Flair.toRaw())),
         NotRecommended(unsigned(NotRecommendedReason::None)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        TypeDistance(TypeDistance) {
+        TypeDistance(unsigned(TypeDistance)) {
     AssociatedKind = static_cast<unsigned>(LiteralKind);
     IsSystem = 0;
     DiagnosticSeverity = 0;
@@ -772,13 +775,13 @@ public:
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
                        StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
-                       enum ExpectedTypeRelation TypeDistance)
-      : Kind(ResultKind::Declaration), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
-        NotRecommended(unsigned(NotRecReason)),
+                       ExpectedTypeRelation TypeDistance)
+      : Kind(unsigned(ResultKind::Declaration)), KnownOperatorKind(0),
+        SemanticContext(unsigned(SemanticContext)),
+        Flair(unsigned(Flair.toRaw())), NotRecommended(unsigned(NotRecReason)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         ModuleName(ModuleName), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), TypeDistance(TypeDistance) {
+        AssociatedUSRs(AssociatedUSRs), TypeDistance(unsigned(TypeDistance)) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     IsSystem = getDeclIsSystem(AssociatedDecl);
@@ -803,14 +806,15 @@ public:
                        ArrayRef<StringRef> AssociatedUSRs,
                        ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind)
-      : Kind(ResultKind::Declaration),
+      : Kind(unsigned(ResultKind::Declaration)),
         KnownOperatorKind(unsigned(KnownOperatorKind)),
         SemanticContext(unsigned(SemanticContext)),
         Flair(unsigned(Flair.toRaw())), NotRecommended(unsigned(NotRecReason)),
         IsSystem(IsSystem), NumBytesToErase(NumBytesToErase),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        TypeDistance(TypeDistance), DiagnosticSeverity(unsigned(diagSeverity)),
+        TypeDistance(unsigned(TypeDistance)),
+        DiagnosticSeverity(unsigned(diagSeverity)),
         DiagnosticMessage(DiagnosticMessage) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
@@ -827,23 +831,23 @@ public:
   ResultKind getKind() const { return static_cast<ResultKind>(Kind); }
 
   CodeCompletionDeclKind getAssociatedDeclKind() const {
-    assert(getKind() == Declaration);
+    assert(getKind() == ResultKind::Declaration);
     return static_cast<CodeCompletionDeclKind>(AssociatedKind);
   }
 
   CodeCompletionLiteralKind getLiteralKind() const {
-    assert(getKind() == Literal);
+    assert(getKind() == ResultKind::Literal);
     return static_cast<CodeCompletionLiteralKind>(AssociatedKind);
   }
 
   CodeCompletionKeywordKind getKeywordKind() const {
-    assert(getKind() == Keyword);
+    assert(getKind() == ResultKind::Keyword);
     return static_cast<CodeCompletionKeywordKind>(AssociatedKind);
   }
 
   bool isOperator() const {
-    if (getKind() != Declaration)
-      return getKind() == BuiltinOperator;
+    if (getKind() != ResultKind::Declaration)
+      return getKind() == ResultKind::BuiltinOperator;
     switch (getAssociatedDeclKind()) {
     case CodeCompletionDeclKind::PrefixOperatorFunction:
     case CodeCompletionDeclKind::PostfixOperatorFunction:
@@ -1062,6 +1066,12 @@ public:
   }
 };
 
+struct SwiftCompletionInfo {
+  swift::ASTContext *swiftASTContext = nullptr;
+  const swift::CompilerInvocation *invocation = nullptr;
+  CodeCompletionContext *completionContext = nullptr;
+};
+
 /// An abstract base class for consumers of code completion results.
 /// \see \c SimpleCachingCodeCompletionConsumer.
 class CodeCompletionConsumer {
@@ -1085,32 +1095,6 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
 
   /// Clients should override this method to receive \p Results.
   virtual void handleResults(CodeCompletionContext &context) = 0;
-};
-
-/// A code completion result consumer that prints the results to a
-/// \c raw_ostream.
-class PrintingCodeCompletionConsumer
-    : public SimpleCachingCodeCompletionConsumer {
-  llvm::raw_ostream &OS;
-  bool IncludeKeywords;
-  bool IncludeComments;
-  bool IncludeSourceText;
-  bool PrintAnnotatedDescription;
-
-public:
- PrintingCodeCompletionConsumer(llvm::raw_ostream &OS,
-                                bool IncludeKeywords = true,
-                                bool IncludeComments = true,
-                                bool IncludeSourceText = false,
-                                bool PrintAnnotatedDescription = false)
-     : OS(OS),
-       IncludeKeywords(IncludeKeywords),
-       IncludeComments(IncludeComments),
-       IncludeSourceText(IncludeSourceText),
-       PrintAnnotatedDescription(PrintAnnotatedDescription) {}
-
-  void handleResults(CodeCompletionContext &context) override;
-  void handleResults(MutableArrayRef<CodeCompletionResult *> Results);
 };
 
 /// Create a factory for code completion callbacks.

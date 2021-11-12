@@ -48,3 +48,8 @@ module TemplatesWithForwardDecl {
   header "templates-with-forward-decl.h"
   requires cplusplus
 }
+
+module Extensions {
+  header "extensions.h"
+  requires cplusplus
+}

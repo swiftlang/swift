@@ -264,3 +264,9 @@ func test_that_optionality_of_closure_result_is_preserved() {
     a.flatMap { (group: [S]) -> [S]? in s.map { group + [$0] } } // Ok
   })
 }
+
+// rdar://85263844 - initializer 'init(_:)' requires the types be equivalent
+func rdar85263844(arr: [(q: String, a: Int)]) -> AnySequence<(question: String, answer: Int)> {
+  AnySequence(arr.map { $0 }) // FIXME: This is supposed to type-check.
+  // expected-error@-1 {{initializer 'init(_:)' requires the types '(question: String, answer: Int)' and '(q: String, a: Int)' be equivalent}}
+}
