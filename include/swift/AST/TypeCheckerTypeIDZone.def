@@ -20,6 +20,11 @@ SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
                                          SmallVector<GenericTypeParamType *, 2>,
                                          SmallVector<Requirement, 2>),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequestRQM,
+              GenericSignatureWithError (const GenericSignatureImpl *,
+                                         SmallVector<GenericTypeParamType *, 2>,
+                                         SmallVector<Requirement, 2>),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ApplyAccessNoteRequest,
               evaluator::SideEffect(ValueDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AttachedResultBuilderRequest,

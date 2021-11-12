@@ -74,12 +74,12 @@ bool Rule::isProtocolRefinementRule() const {
       LHS[1].getKind() == Symbol::Kind::Protocol &&
       LHS[0] != LHS[1]) {
 
-    // A protocol refinement rule only if it comes from a directly-stated
+    // A protocol refinement rule must be from a directly-stated
     // inheritance clause entry. It can only become redundant if it is
     // written in terms of other protocol refinement rules; otherwise, it
     // must appear in the protocol's requirement signature.
     //
-    // See RewriteSystem::isValidRefinementPath().
+    // See RewriteSystem::isValidRefinementPath() for an explanation.
     auto *proto = LHS[0].getProtocol();
     auto *otherProto = LHS[1].getProtocol();
 

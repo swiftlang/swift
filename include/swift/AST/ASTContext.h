@@ -140,7 +140,7 @@ namespace namelookup {
 }
 
 namespace rewriting {
-  class RequirementMachine;
+  class RewriteContext;
 }
 
 namespace syntax {
@@ -1215,20 +1215,12 @@ public:
   GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
                                                      CanGenericSignature sig);
 
-  /// Retrieve or create a term rewriting system for answering queries on
-  /// type parameters written against the given generic signature.
-  rewriting::RequirementMachine *getOrCreateRequirementMachine(
-      CanGenericSignature sig);
+  rewriting::RewriteContext &getRewriteContext();
 
   /// This is a hack to break cycles. Don't introduce new callers of this
   /// method.
   bool isRecursivelyConstructingRequirementMachine(
       CanGenericSignature sig);
-
-  /// Retrieve or create a term rewriting system for answering queries on
-  /// type parameters written against the given protocol requirement signature.
-  rewriting::RequirementMachine *getOrCreateRequirementMachine(
-      const ProtocolDecl *proto);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
