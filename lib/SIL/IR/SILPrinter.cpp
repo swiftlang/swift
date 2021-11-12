@@ -1708,7 +1708,12 @@ public:
     *this << getIDAndType(BI->getIndex()) << " to ";
     *this << BI->getBoundType();
   }
-  
+
+  void visitRebindMemoryInst(RebindMemoryInst *BI) {
+    *this << getIDAndType(BI->getBase()) << " to ";
+    *this << getIDAndType(BI->getInToken());
+  }
+
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType();
     printForwardingOwnershipKind(CI, CI->getOperand());

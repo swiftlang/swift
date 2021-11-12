@@ -897,6 +897,14 @@ static ValueDecl *getBindMemoryOperation(ASTContext &ctx, Identifier id) {
   fd->getAttrs().add(new (ctx) DiscardableResultAttr(/*implicit*/true));
   return fd;
 }
+
+static ValueDecl *getRebindMemoryOperation(ASTContext &ctx, Identifier id) {
+  FuncDecl *fd = getBuiltinFunction(ctx, id, _thin,
+                                    _parameters(_rawPointer,
+                                                _word),
+                                    _word);
+  fd->getAttrs().add(new (ctx) DiscardableResultAttr(/*implicit*/true));
+  return fd;
 }
 
 static ValueDecl *getAllocWithTailElemsOperation(ASTContext &Context,
@@ -2631,6 +2639,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::BindMemory:
     if (!Types.empty()) return nullptr;
     return getBindMemoryOperation(Context, Id);
+
+  case BuiltinValueKind::RebindMemory:
+    if (!Types.empty()) return nullptr;
+    return getRebindMemoryOperation(Context, Id);
 
   case BuiltinValueKind::ProjectTailElems:
     if (!Types.empty()) return nullptr;

@@ -973,6 +973,20 @@ static ManagedValue emitBuiltinBindMemory(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(bindMemory);
 }
 
+static ManagedValue emitBuiltinRebindMemory(SILGenFunction &SGF,
+                                            SILLocation loc,
+                                            SubstitutionMap subs,
+                                            ArrayRef<ManagedValue> args,
+                                            SGFContext C) {
+  assert(subs.empty() && "rebindMemory should have no substitutions");
+  assert(args.size() == 2 && "rebindMemory should have two arguments");
+
+  auto *rebindMemory = SGF.B.createRebindMemory(loc, args[0].getValue(),
+                                                args[1].getValue());
+
+  return ManagedValue::forUnmanaged(rebindMemory);
+}
+
 static ManagedValue emitBuiltinAllocWithTailElems(SILGenFunction &SGF,
                                               SILLocation loc,
                                               SubstitutionMap subs,

@@ -4909,6 +4909,38 @@ public:
   }
 };
 
+/// "%out_token = rebind_memory
+///     %0 : $Builtin.RawPointer, %in_token : $Builtin.Word
+///
+/// Binds memory at the raw pointer %0 to the types abstractly represented by
+/// %in_token.
+///
+/// %in_token is itself the result of a bind_memory or rebind_memory and
+/// represents a previously cached set of bound types.
+///
+/// %out_token represents the previously bound types of this memory region,
+/// before binding it to %in_token.
+class RebindMemoryInst final : public SingleValueInstruction {
+  FixedOperandList<2> Operands;
+
+public:
+  enum { BaseOperIdx, InTokenOperIdx };
+
+  RebindMemoryInst(SILDebugLocation Loc, SILValue Base, SILValue InToken,
+                   SILType TokenType)
+      : SingleValueInstruction(SILInstructionKind::RebindMemoryInst, Loc,
+                               TokenType),
+        Operands{this, Base, InToken} {}
+
+public:
+  SILValue getBase() const { return getAllOperands()[BaseOperIdx].get(); }
+
+  SILValue getInToken() const { return getAllOperands()[InTokenOperIdx].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
+
 //===----------------------------------------------------------------------===//
 // Conversion instructions.
 //===----------------------------------------------------------------------===//

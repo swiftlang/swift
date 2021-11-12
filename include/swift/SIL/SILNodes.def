@@ -750,14 +750,16 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(KeyPathInst, keypath,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
-  // BindMemory has no physical side effect. Semantically it writes to
-  // its affected memory region because any reads or writes accessing
+  // BindMemory and RebindMemory have no physical side effect. Semantically they
+  // write to their affected memory region because any reads or writes accessing
   // that memory must be dependent on the bind operation.
   SINGLE_VALUE_INST(BindMemoryInst, bind_memory,
                     SILInstruction, MayWrite, DoesNotRelease)
+  SINGLE_VALUE_INST(RebindMemoryInst, rebind_memory,
+                    SILInstruction, MayWrite, DoesNotRelease)
 
-SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, BindMemoryInst)
-NODE_RANGE(ValueBase, SILPhiArgument, BindMemoryInst)
+SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, RebindMemoryInst)
+NODE_RANGE(ValueBase, SILPhiArgument, RebindMemoryInst)
 
 // Terminators
 ABSTRACT_INST(TermInst, SILInstruction)
