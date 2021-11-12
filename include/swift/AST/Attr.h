@@ -2231,6 +2231,11 @@ public:
   /// attribute list, or \c nullptr if there are none.
   const DeclAttribute *getEffectiveSendableAttr() const;
 
+  DeclAttribute *getEffectiveSendableAttr() {
+    return const_cast<DeclAttribute *>(
+         const_cast<const DeclAttributes *>(this)->getEffectiveSendableAttr());
+  }
+
 private:
   /// Predicate used to filter MatchingAttributeRange.
   template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {

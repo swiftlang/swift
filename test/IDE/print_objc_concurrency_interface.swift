@@ -23,6 +23,7 @@ import _Concurrency
 // CHECK-SAME: @unchecked Sendable
 
 // CHECK-LABEL: class NonSendableClass
+// CHECK-NOT: @unchecked Sendable
 // CHECK: @available(*, unavailable)
 // CHECK-NEXT: extension NonSendableClass : @unchecked Sendable {
 
@@ -30,10 +31,54 @@ import _Concurrency
 // CHECK-SAME: @unchecked Sendable
 
 // CHECK-LABEL: class AuditedNonSendable
+// CHECK-NOT: @unchecked Sendable
 // CHECK: @available(*, unavailable)
 // CHECK-NEXT: extension AuditedNonSendable : @unchecked Sendable {
 
 // CHECK-LABEL: class AuditedBoth
+// CHECK-NOT: @unchecked Sendable
 // CHECK: @available(*, unavailable)
 // CHECK-NEXT: extension AuditedBoth : @unchecked Sendable {
+
+// CHECK-LABEL: enum SendableEnum :
+// CHECK-SAME: @unchecked Sendable
+
+// CHECK-LABEL: enum NonSendableEnum :
+// CHECK-NOT: @unchecked Sendable
+// CHECK: @available(*, unavailable)
+// CHECK-NEXT: extension NonSendableEnum : @unchecked Sendable {
+
+// CHECK-LABEL: struct SendableOptions :
+// CHECK-SAME: @unchecked Sendable
+
+// CHECK-LABEL: struct NonSendableOptions :
+// CHECK-NOT: @unchecked Sendable
+// CHECK: @available(*, unavailable)
+// CHECK-NEXT: extension NonSendableOptions : @unchecked Sendable {
+
+// CHECK-LABEL: public struct SendableError :
+// CHECK-NOT: @unchecked Sendable
+// CHECK: public enum Code :
+// CHECK-SAME: @unchecked Sendable
+
+// CHECK-LABEL: public struct NonSendableError :
+// CHECK-NOT: @unchecked Sendable
+// CHECK: public enum Code :
+// CHECK-SAME: @unchecked Sendable
+
+// CHECK-LABEL: struct SendableStringEnum :
+// CHECK-SAME: @unchecked Sendable
+
+// CHECK-LABEL: struct NonSendableStringEnum :
+// CHECK-NOT: @unchecked Sendable
+// CHECK: @available(*, unavailable)
+// CHECK-NEXT: extension NonSendableStringEnum : @unchecked Sendable {
+
+// CHECK-LABEL: struct SendableStringStruct :
+// CHECK-SAME: @unchecked Sendable
+
+// CHECK-LABEL: struct NonSendableStringStruct :
+// CHECK-NOT: @unchecked Sendable
+// CHECK: @available(*, unavailable)
+// CHECK-NEXT: extension NonSendableStringStruct : @unchecked Sendable {
 

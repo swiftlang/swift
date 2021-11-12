@@ -8498,6 +8498,36 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
     }
   }
 
+  // The rest of this concerns '@Sendable' and '@_nonSendable`. These don't
+  // affect typealiases, even when there's an underlying nominal type in clang.
+  if (isa<TypeAliasDecl>(MappedDecl))
+    return;
+
+  // Some types have an implicit '@Sendable' attribute.
+  if (ClangDecl->hasAttr<clang::SwiftNewTypeAttr>() ||
+      ClangDecl->hasAttr<clang::EnumExtensibilityAttr>() ||
+      ClangDecl->hasAttr<clang::FlagEnumAttr>() ||
+      ClangDecl->hasAttr<clang::NSErrorDomainAttr>())
+    MappedDecl->getAttrs().add(
+                          new (SwiftContext) SendableAttr(/*isImplicit=*/true));
+
+  // 'Error' conforms to 'Sendable', so error wrappers have to be 'Sendable'
+  // and it doesn't make sense for the 'Code' enum to be non-'Sendable'.
+  if (ClangDecl->hasAttr<clang::NSErrorDomainAttr>()) {
+    // If any @_nonSendable attributes are running the show, invalidate and
+    // diagnose them.
+    while (NonSendableAttr *attr = dyn_cast_or_null<NonSendableAttr>(
+                           MappedDecl->getAttrs().getEffectiveSendableAttr())) {
+      assert(attr->Specificity == NonSendableKind::Specific &&
+             "didn't we just add an '@Sendable' that should beat this "
+             "'@_nonSendable(_assumed)'?");
+      attr->setInvalid();
+      diagnose(HeaderLoc(ClangDecl->getLocation()),
+               diag::clang_error_code_must_be_sendable,
+               ClangDecl->getNameAsString());
+    }
+  }
+
   // Now that we've collected all @Sendable and @_nonSendable attributes, we
   // can see if we should synthesize a Sendable conformance.
   if (auto nominal = dyn_cast<NominalTypeDecl>(MappedDecl)) {
