@@ -750,9 +750,14 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(KeyPathInst, keypath,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
-  SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, KeyPathInst)
+  // BindMemory has no physical side effect. Semantically it writes to
+  // its affected memory region because any reads or writes accessing
+  // that memory must be dependent on the bind operation.
+  SINGLE_VALUE_INST(BindMemoryInst, bind_memory,
+                    SILInstruction, MayWrite, DoesNotRelease)
 
-NODE_RANGE(ValueBase, SILPhiArgument, KeyPathInst)
+SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, BindMemoryInst)
+NODE_RANGE(ValueBase, SILPhiArgument, BindMemoryInst)
 
 // Terminators
 ABSTRACT_INST(TermInst, SILInstruction)
@@ -839,12 +844,6 @@ ABSTRACT_INST(RefCountingInst, SILInstruction)
                  RefCountingInst, MayHaveSideEffects,
        DoesNotRelease)
   INST_RANGE(RefCountingInst, StrongRetainInst, AutoreleaseValueInst)
-
-// BindMemory has no physical side effect. Semantically it writes to
-// its affected memory region because any reads or writes accessing
-// that memory must be dependent on the bind operation.
-NON_VALUE_INST(BindMemoryInst, bind_memory,
-               SILInstruction, MayWrite, DoesNotRelease)
 
 // FIXME: Is MayHaveSideEffects appropriate?
 BRIDGED_NON_VALUE_INST(FixLifetimeInst, fix_lifetime,

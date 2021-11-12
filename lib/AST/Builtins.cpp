@@ -888,12 +888,15 @@ static ValueDecl *getEndCOWMutation(ASTContext &ctx, Identifier id) {
 }
 
 static ValueDecl *getBindMemoryOperation(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted),
-                            _parameters(_rawPointer,
-                                        _word,
-                                        _metatype(_typeparam(0))),
-                            _void);
+  FuncDecl *fd = getBuiltinFunction(ctx, id, _thin,
+                                    _generics(_unrestricted),
+                                    _parameters(_rawPointer,
+                                                _word,
+                                                _metatype(_typeparam(0))),
+                                    _word);
+  fd->getAttrs().add(new (ctx) DiscardableResultAttr(/*implicit*/true));
+  return fd;
+}
 }
 
 static ValueDecl *getAllocWithTailElemsOperation(ASTContext &Context,

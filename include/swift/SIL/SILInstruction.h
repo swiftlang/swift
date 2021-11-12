@@ -4866,14 +4866,16 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
-/// BindMemoryInst -
-/// "bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T"
+/// "%token = bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T"
+///
 /// Binds memory at the raw pointer %0 to type $T with enough capacity
-/// to hold $1 values.
-class BindMemoryInst final :
-    public InstructionBaseWithTrailingOperands<
-                                          SILInstructionKind::BindMemoryInst,
-                                          BindMemoryInst, NonValueInstruction> {
+/// to hold %1 values.
+///
+/// %token is an opaque word representing the previously bound types of this
+/// memory region, before binding it to a contiguous region of type $T.
+class BindMemoryInst final : public InstructionBaseWithTrailingOperands<
+                                 SILInstructionKind::BindMemoryInst,
+                                 BindMemoryInst, SingleValueInstruction> {
   friend SILBuilder;
 
   SILType BoundType;
@@ -4883,10 +4885,11 @@ class BindMemoryInst final :
     SILFunction &F);
 
   BindMemoryInst(SILDebugLocation Loc, SILValue Base, SILValue Index,
-                 SILType BoundType,
+                 SILType BoundType, SILType TokenType,
                  ArrayRef<SILValue> TypeDependentOperands)
-    : InstructionBaseWithTrailingOperands(Base, Index, TypeDependentOperands,
-                                          Loc), BoundType(BoundType) {}
+      : InstructionBaseWithTrailingOperands(Base, Index, TypeDependentOperands,
+                                            Loc, TokenType),
+        BoundType(BoundType) {}
 
 public:
   enum { BaseOperIdx, IndexOperIdx, NumFixedOpers };

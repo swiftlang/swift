@@ -961,16 +961,16 @@ static ManagedValue emitBuiltinBindMemory(SILGenFunction &SGF,
                                           ArrayRef<ManagedValue> args,
                                           SGFContext C) {
   assert(subs.getReplacementTypes().size() == 1 && "bindMemory should have a single substitution");
-  assert(args.size() == 3 && "bindMemory should have three argument");
+  assert(args.size() == 3 && "bindMemory should have three arguments");
 
   // The substitution determines the element type for bound memory.
   CanType boundFormalType = subs.getReplacementTypes()[0]->getCanonicalType();
   SILType boundType = SGF.getLoweredType(boundFormalType);
 
-  SGF.B.createBindMemory(loc, args[0].getValue(),
-                         args[1].getValue(), boundType);
+  auto *bindMemory = SGF.B.createBindMemory(loc, args[0].getValue(),
+                                            args[1].getValue(), boundType);
 
-  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+  return ManagedValue::forUnmanaged(bindMemory);
 }
 
 static ManagedValue emitBuiltinAllocWithTailElems(SILGenFunction &SGF,

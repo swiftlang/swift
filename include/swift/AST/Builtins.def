@@ -452,7 +452,10 @@ BUILTIN_SIL_OPERATION(BeginCOWMutation_native, "beginCOWMutation_native", Specia
 /// inout argument. After calling this builtin, the buffer must not be mutated.
 BUILTIN_SIL_OPERATION(EndCOWMutation, "endCOWMutation", Special)
 
-/// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> ()
+/// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> Builtin.Word
+///
+/// Binds memory to a statically known type. Returns an opaque token
+/// representing the memory region's previously bound types.
 BUILTIN_SIL_OPERATION(BindMemory, "bindMemory", Special)
 
 /// allocWithTailElems_<n>(C.Type,

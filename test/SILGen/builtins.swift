@@ -791,7 +791,7 @@ func unsafeGuaranteedEnd(_ t: Builtin.Int8) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins10bindMemory{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Builtin.Word, [[T:%.*]] : $@thick T.Type):
-// CHECK: bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
+// CHECK: %{{.*}} = bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
 // CHECK:   return {{%.*}} : $()
 // CHECK: }
 func bindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {

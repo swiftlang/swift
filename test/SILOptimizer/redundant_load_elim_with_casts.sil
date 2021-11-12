@@ -115,10 +115,10 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
   %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A
   %3 = load %2 : $*A
   %4 = integer_literal $Builtin.Word, 1
-  bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $A2
-  %5 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A2
-  store %1 to %5 : $*A2
-  bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $A
+  %5 = bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $A2
+  %6 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A2
+  store %1 to %6 : $*A2
+  %8 = bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $A
   %20 = load %2 : $*A
   %30 = tuple(%3 : $A, %20 : $A)
   return %30 : $(A, A)
