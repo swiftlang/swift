@@ -25,10 +25,12 @@ using namespace rewriting;
 
 namespace {
 
-/// A utility class for bulding a rewrite system from the top-level requirements
-/// of a generic signature, and all protocol requirement signatures from all
-/// transitively-referenced protocols.
-struct RewriteSystemBuilder {
+/// A utility class for bulding rewrite rules from the top-level requirements
+/// of a generic signature.
+///
+/// This also collects requirements from the transitive closure of all protocols
+/// appearing on the right hand side of conformance requirements.
+struct RuleBuilder {
   RewriteContext &Context;
   bool Dump;
 
@@ -64,8 +66,7 @@ struct RewriteSystemBuilder {
                                         const ProtocolDecl *proto,
                                         SmallVectorImpl<Term> &result);
 
-  RewriteSystemBuilder(RewriteContext &ctx, bool dump)
-    : Context(ctx), Dump(dump) {}
+  RuleBuilder(RewriteContext &ctx, bool dump) : Context(ctx), Dump(dump) {}
   void addRequirements(ArrayRef<Requirement> requirements);
   void addProtocols(ArrayRef<const ProtocolDecl *> proto);
   void addProtocol(const ProtocolDecl *proto,
@@ -74,7 +75,7 @@ struct RewriteSystemBuilder {
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
                       const ProtocolDecl *proto);
-  void processProtocolDependencies();
+  void collectRulesFromReferencedProtocols();
 };
 
 } // end namespace
@@ -87,9 +88,9 @@ struct RewriteSystemBuilder {
 /// For example, given the concrete type Foo<X.Y, Array<Z>>, this produces the
 /// result type Foo<τ_0_0, Array<τ_0_1>>, with result array {X.Y, Z}.
 CanType
-RewriteSystemBuilder::getConcreteSubstitutionSchema(CanType concreteType,
-                                                    const ProtocolDecl *proto,
-                                                    SmallVectorImpl<Term> &result) {
+RuleBuilder::getConcreteSubstitutionSchema(CanType concreteType,
+                                           const ProtocolDecl *proto,
+                                           SmallVectorImpl<Term> &result) {
   assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
 
   if (!concreteType->hasTypeParameter())
@@ -108,7 +109,7 @@ RewriteSystemBuilder::getConcreteSubstitutionSchema(CanType concreteType,
   }));
 }
 
-void RewriteSystemBuilder::addRequirements(ArrayRef<Requirement> requirements) {
+void RuleBuilder::addRequirements(ArrayRef<Requirement> requirements) {
   // Collect all protocols transitively referenced from these requirements.
   for (auto req : requirements) {
     if (req.getKind() == RequirementKind::Conformance) {
@@ -116,21 +117,21 @@ void RewriteSystemBuilder::addRequirements(ArrayRef<Requirement> requirements) {
     }
   }
 
-  processProtocolDependencies();
+  collectRulesFromReferencedProtocols();
 
   // Add rewrite rules for all top-level requirements.
   for (const auto &req : requirements)
     addRequirement(req, /*proto=*/nullptr);
 }
 
-void RewriteSystemBuilder::addProtocols(ArrayRef<const ProtocolDecl *> protos) {
+void RuleBuilder::addProtocols(ArrayRef<const ProtocolDecl *> protos) {
   // Collect all protocols transitively referenced from this connected component
   // of the protocol dependency graph.
   for (auto proto : protos) {
     addProtocol(proto, /*initialComponent=*/true);
   }
 
-  processProtocolDependencies();
+  collectRulesFromReferencedProtocols();
 }
 
 /// For an associated type T in a protocol P, we add a rewrite rule:
@@ -139,8 +140,8 @@ void RewriteSystemBuilder::addProtocols(ArrayRef<const ProtocolDecl *> protos) {
 ///
 /// Intuitively, this means "if a type conforms to P, it has a nested type
 /// named T".
-void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
-                                             const ProtocolDecl *proto) {
+void RuleBuilder::addAssociatedType(const AssociatedTypeDecl *type,
+                                    const ProtocolDecl *proto) {
   MutableTerm lhs;
   lhs.add(Symbol::forProtocol(proto, Context));
   lhs.add(Symbol::forName(type->getName(), Context));
@@ -160,8 +161,8 @@ void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
 /// If \p proto is non-null, this is a generic requirement in the protocol's
 /// requirement signature. The added rewrite rule will be rooted in a
 /// protocol symbol.
-void RewriteSystemBuilder::addRequirement(const Requirement &req,
-                                          const ProtocolDecl *proto) {
+void RuleBuilder::addRequirement(const Requirement &req,
+                                 const ProtocolDecl *proto) {
   if (Dump) {
     llvm::dbgs() << "+ ";
     req.dump(llvm::dbgs());
@@ -281,8 +282,8 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
 }
 
 /// Record information about a protocol if we have no seen it yet.
-void RewriteSystemBuilder::addProtocol(const ProtocolDecl *proto,
-                                       bool initialComponent) {
+void RuleBuilder::addProtocol(const ProtocolDecl *proto,
+                              bool initialComponent) {
   if (ProtocolMap.count(proto) > 0)
     return;
 
@@ -290,7 +291,7 @@ void RewriteSystemBuilder::addProtocol(const ProtocolDecl *proto,
   Protocols.push_back(proto);
 }
 
-void RewriteSystemBuilder::processProtocolDependencies() {
+void RuleBuilder::collectRulesFromReferencedProtocols() {
   unsigned i = 0;
   while (i < Protocols.size()) {
     auto *proto = Protocols[i++];
@@ -490,7 +491,7 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RewriteSystemBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, Dump);
   builder.addRequirements(sig.getRequirements());
 
   // Add the initial set of rewrite rules to the rewrite system.
@@ -530,7 +531,7 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
     llvm::dbgs() << " {\n";
   }
 
-  RewriteSystemBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, Dump);
   builder.addProtocols(protos);
 
   // Add the initial set of rewrite rules to the rewrite system.
@@ -570,7 +571,7 @@ void RequirementMachine::initWithAbstractRequirements(
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RewriteSystemBuilder builder(Context, Dump);
+  RuleBuilder builder(Context, Dump);
   builder.addRequirements(requirements);
 
   // Add the initial set of rewrite rules to the rewrite system.
