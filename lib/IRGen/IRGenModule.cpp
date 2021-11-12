@@ -1246,7 +1246,7 @@ llvm::Constant *IRGenModule::getOpaquePtr(llvm::Constant *ptr) {
 }
 
 static void appendEncodedName(raw_ostream &os, StringRef name) {
-  if (clang::isValidIdentifier(name)) {
+  if (clang::isValidAsciiIdentifier(name)) {
     os << "_" << name;
   } else {
     for (auto c : name)

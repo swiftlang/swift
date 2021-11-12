@@ -1599,10 +1599,10 @@ public:
     if (!advanceIf('-') || !advanceIf(' '))
       return None;
 
-    if (ptr == end || !clang::isIdentifierBody(*ptr))
+    if (ptr == end || !clang::isisAsciiIdentifierContinue(*ptr))
       return None;
     const char *identStart = ptr++;
-    while (advanceIf([](char c) { return clang::isIdentifierBody(c); }))
+    while (advanceIf([](char c) { return clang::isAsciiIdentifierContinue(c); }))
       ;
     StringRef ident(identStart, ptr - identStart);
 

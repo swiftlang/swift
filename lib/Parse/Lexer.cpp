@@ -35,9 +35,9 @@
 using namespace swift;
 using namespace swift::syntax;
 
-// clang::isIdentifierHead and clang::isIdentifierBody are deliberately not in
-// this list as a reminder that they are using C rules for identifiers.
-// (Admittedly these are the same as Swift's right now.)
+// clang::isAsciiIdentifierStart and clang::isAsciiIdentifierContinue are
+// deliberately not in this list as a reminder that they are using C rules for
+// identifiers. (Admittedly these are the same as Swift's right now.)
 using clang::isAlphanumeric;
 using clang::isDigit;
 using clang::isHexDigit;
@@ -514,7 +514,7 @@ void Lexer::skipSlashStarComment() {
 
 static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
   if (c < 0x80)
-    return clang::isIdentifierBody(c, /*dollar*/true);
+    return clang::isAsciiIdentifierContinue(c, /*dollar*/true);
   
   // N1518: Recommendations for extended identifier characters for C and C++
   // Proposed Annex X.1: Ranges of characters allowed
@@ -672,10 +672,10 @@ void Lexer::lexHash() {
 
   // Scan for [a-zA-Z]+ to see what we match.
   const char *tmpPtr = CurPtr;
-  if (clang::isIdentifierHead(*tmpPtr)) {
+  if (clang::isAsciiIdentifierStart(*tmpPtr)) {
     do {
       ++tmpPtr;
-    } while (clang::isIdentifierBody(*tmpPtr));
+    } while (clang::isAsciiIdentifierContinue(*tmpPtr));
   }
 
   // Map the character sequence onto
@@ -2442,10 +2442,10 @@ void Lexer::lexImpl() {
     return lexOperatorIdentifier();
   case '%':
     // Lex %[0-9a-zA-Z_]+ as a local SIL value
-    if (InSILBody && clang::isIdentifierBody(CurPtr[0])) {
+    if (InSILBody && clang::isAsciiIdentifierContinue(CurPtr[0])) {
       do {
         ++CurPtr;
-      } while (clang::isIdentifierBody(CurPtr[0]));
+      } while (clang::isAsciiIdentifierContinue(CurPtr[0]));
       
       return formToken(tok::sil_local_name, TokStart);
     }
