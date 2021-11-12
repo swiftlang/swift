@@ -416,7 +416,7 @@ extension _HashTable {
   @_effects(releasenone)
   internal func copyContents(of other: _HashTable) {
     _internalInvariant(bucketCount == other.bucketCount)
-    self.words.assign(from: other.words, count: wordCount)
+    self.words.update(from: other.words, count: wordCount)
   }
 
   /// Insert a new entry with the specified hash value into the table.
@@ -446,7 +446,7 @@ extension _HashTable {
       // without a special case.
       words[0] = Word.allBits.subtracting(elementsBelow: bucketCount)
     } else {
-      words.assign(repeating: .empty, count: wordCount)
+      words.update(repeating: .empty, count: wordCount)
     }
   }
 
