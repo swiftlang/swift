@@ -16,6 +16,7 @@
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
 #include <vector>
 #include "RewriteContext.h"
 #include "Symbol.h"
@@ -32,6 +33,9 @@ class ProtocolDecl;
 class Requirement;
 
 namespace rewriting {
+
+void
+desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
 
 /// A utility class for bulding rewrite rules from the top-level requirements
 /// of a generic signature.

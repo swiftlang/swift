@@ -39,12 +39,154 @@
 using namespace swift;
 using namespace rewriting;
 
+//
+// Requirement desugaring -- used in two places:
+//
+// 1) AbstractGenericSignatureRequest, where the added requirements might have
+// substitutions applied.
+//
+// 2) StructuralRequirementsRequest, which performs further processing to wrap
+// desugared requirements with source location information.
+//
+
+/// Desugar a same-type requirement that possibly has concrete types on either
+/// side into a series of same-type and concrete-type requirements where the
+/// left hand side is always a type parameter.
+static void desugarSameTypeRequirement(Type lhs, Type rhs,
+                                       SmallVectorImpl<Requirement> &result) {
+  class Matcher : public TypeMatcher<Matcher> {
+    SmallVectorImpl<Requirement> &result;
+
+  public:
+    explicit Matcher(SmallVectorImpl<Requirement> &result)
+      : result(result) {}
+
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
+        result.emplace_back(RequirementKind::SameType,
+                            firstType, secondType);
+        return true;
+      }
+
+      if (firstType->isTypeParameter()) {
+        result.emplace_back(RequirementKind::SameType,
+                            firstType, secondType);
+        return true;
+      }
+
+      if (secondType->isTypeParameter()) {
+        result.emplace_back(RequirementKind::SameType,
+                            secondType, firstType);
+        return true;
+      }
+
+      // FIXME: Record concrete type conflict, diagnose upstream
+      return true;
+    }
+  } matcher(result);
+
+  // FIXME: Record redundancy and diagnose upstream
+  (void) matcher.match(lhs, rhs);
+}
+
+static void desugarSuperclassRequirement(Type subjectType,
+                                         Type constraintType,
+                                         SmallVectorImpl<Requirement> &result) {
+  if (!subjectType->isTypeParameter()) {
+    // FIXME: Perform unification, diagnose redundancy or conflict upstream
+    return;
+  }
+
+  result.emplace_back(RequirementKind::Superclass, subjectType, constraintType);
+}
+
+static void desugarLayoutRequirement(Type subjectType,
+                                     LayoutConstraint layout,
+                                     SmallVectorImpl<Requirement> &result) {
+  if (!subjectType->isTypeParameter()) {
+    // FIXME: Diagnose redundancy or conflict upstream
+    return;
+  }
+
+  result.emplace_back(RequirementKind::Layout, subjectType, layout);
+}
+
 /// Desugar a protocol conformance requirement by splitting up protocol
-/// compositions on the right hand side until conformance and superclass
+/// compositions on the right hand side into conformance and superclass
 /// requirements.
-static void addTypeRequirement(Type subjectType, Type constraintType,
-                               SourceLoc loc, bool wasInferred,
-                               SmallVectorImpl<StructuralRequirement> &result) {
+static void desugarConformanceRequirement(Type subjectType, Type constraintType,
+                                          SmallVectorImpl<Requirement> &result) {
+  // Fast path.
+  if (constraintType->is<ProtocolType>()) {
+    if (!subjectType->isTypeParameter()) {
+      // FIXME: Check conformance, diagnose redundancy or conflict upstream
+      return;
+    }
+
+    result.emplace_back(RequirementKind::Conformance, subjectType,
+                        constraintType);
+    return;
+  }
+
+  auto layout = constraintType->getExistentialLayout();
+
+  if (auto layoutConstraint = layout.getLayoutConstraint())
+    desugarLayoutRequirement(subjectType, layoutConstraint, result);
+
+  if (auto superclass = layout.explicitSuperclass)
+    desugarSuperclassRequirement(subjectType, superclass, result);
+
+  for (auto *proto : layout.getProtocols()) {
+    if (!subjectType->isTypeParameter()) {
+      // FIXME: Check conformance, diagnose redundancy or conflict upstream
+      return;
+    }
+
+    result.emplace_back(RequirementKind::Conformance, subjectType,
+                        proto);
+  }
+}
+
+/// Convert a requirement where the subject type might not be a type parameter,
+/// or the constraint type in the conformance requirement might be a protocol
+/// composition, into zero or more "proper" requirements which can then be
+/// converted into rewrite rules by the RuleBuilder.
+void
+swift::rewriting::desugarRequirement(Requirement req,
+                                     SmallVectorImpl<Requirement> &result) {
+  auto firstType = req.getFirstType();
+
+  switch (req.getKind()) {
+  case RequirementKind::Conformance:
+    desugarConformanceRequirement(firstType, req.getSecondType(), result);
+    break;
+
+  case RequirementKind::Superclass:
+    desugarSuperclassRequirement(firstType, req.getSecondType(), result);
+    break;
+
+  case RequirementKind::Layout:
+    desugarLayoutRequirement(firstType, req.getLayoutConstraint(), result);
+    break;
+
+  case RequirementKind::SameType:
+    desugarSameTypeRequirement(firstType, req.getSecondType(), result);
+    break;
+  }
+}
+
+//
+// StructuralRequirementsRequest computation.
+//
+// This realizes RequirementReprs into Requirements, desugars them using the
+// above, performs requirement inference, and wraps them with source location
+// information.
+//
+
+static void realizeTypeRequirement(Type subjectType, Type constraintType,
+                                   SourceLoc loc, bool wasInferred,
+                                   SmallVectorImpl<StructuralRequirement> &result) {
   // Check whether we have a reasonable constraint type at all.
   if (!constraintType->isExistentialType() &&
       !constraintType->getClassOrBoundGenericClass()) {
@@ -52,85 +194,19 @@ static void addTypeRequirement(Type subjectType, Type constraintType,
     return;
   }
 
-  // Protocol requirements.
+  SmallVector<Requirement, 2> reqs;
+
   if (constraintType->isExistentialType()) {
-    auto layout = constraintType->getExistentialLayout();
-
-    if (auto layoutConstraint = layout.getLayoutConstraint()) {
-      result.push_back({
-          Requirement(RequirementKind::Layout, subjectType, layoutConstraint),
-          loc, wasInferred});
-    }
-
-    if (auto superclass = layout.explicitSuperclass) {
-      result.push_back({
-          Requirement(RequirementKind::Superclass, subjectType, superclass),
-          loc, wasInferred});
-    }
-
-    for (auto *proto : layout.getProtocols()) {
-      result.push_back({
-          Requirement(RequirementKind::Conformance, subjectType, proto),
-          loc, wasInferred});
-    }
-
-    return;
+    // Handle conformance requirements.
+    desugarConformanceRequirement(subjectType, constraintType, reqs);
+  } else {
+    // Handle superclass requirements.
+    desugarSuperclassRequirement(subjectType, constraintType, reqs);
   }
 
-  // Superclass constraint.
-  result.push_back({
-      Requirement(RequirementKind::Superclass, subjectType, constraintType),
-      loc, wasInferred});
-}
-
-/// Desugar a same-type requirement that possibly has concrete types on either
-/// side into a series of same-type and concrete-type requirements where the
-/// left hand side is always a type parameter.
-static void addSameTypeRequirement(Type lhs, Type rhs,
-                                   SourceLoc loc, bool wasInferred,
-                                   SmallVectorImpl<StructuralRequirement> &result) {
-  class Matcher : public TypeMatcher<Matcher> {
-    SourceLoc loc;
-    bool wasInferred;
-    SmallVectorImpl<StructuralRequirement> &result;
-
-  public:
-    Matcher(SourceLoc loc, bool wasInferred,
-            SmallVectorImpl<StructuralRequirement> &result)
-        : loc(loc), wasInferred(wasInferred), result(result) {}
-
-    bool mismatch(TypeBase *firstType, TypeBase *secondType,
-                  Type sugaredFirstType) {
-      if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
-        result.push_back({Requirement(RequirementKind::SameType,
-                                      firstType, secondType),
-                          loc, wasInferred});
-        return true;
-      }
-
-      if (firstType->isTypeParameter()) {
-        result.push_back({Requirement(RequirementKind::SameType,
-                                      firstType, secondType),
-                          loc, wasInferred});
-        return true;
-      }
-
-      if (secondType->isTypeParameter()) {
-        result.push_back({Requirement(RequirementKind::SameType,
-                                      secondType, firstType),
-                          loc, wasInferred});
-        return true;
-      }
-
-      // FIXME: Diagnose concrete type conflict
-      return true;
-    }
-  } matcher(loc, wasInferred, result);
-
-  // FIXME: If both sides concrete and was not inferred, diagnose redundancy
-  // FIXME: If both sides are equal as type parameters and not inferred,
-  // diagnose redundancy
-  (void) matcher.match(lhs, rhs);
+  // Add source location information.
+  for (auto req : reqs)
+    result.push_back({req, loc, wasInferred});
 }
 
 static void inferRequirements(Type type, SourceLoc loc,
@@ -138,8 +214,8 @@ static void inferRequirements(Type type, SourceLoc loc,
   // FIXME: Implement
 }
 
-static void addRequirement(Requirement req, RequirementRepr *reqRepr, bool infer,
-                           SmallVectorImpl<StructuralRequirement> &result) {
+static void realizeRequirement(Requirement req, RequirementRepr *reqRepr, bool infer,
+                               SmallVectorImpl<StructuralRequirement> &result) {
   auto firstType = req.getFirstType();
   if (infer) {
     auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
@@ -152,11 +228,6 @@ static void addRequirement(Requirement req, RequirementRepr *reqRepr, bool infer
   switch (req.getKind()) {
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
-    if (!firstType->isTypeParameter()) {
-      // FIXME: Warn about redundancy if not inferred, diagnose conflicts
-      break;
-    }
-
     auto secondType = req.getSecondType();
     if (infer) {
       auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
@@ -164,19 +235,20 @@ static void addRequirement(Requirement req, RequirementRepr *reqRepr, bool infer
       inferRequirements(secondType, secondLoc, result);
     }
 
-    addTypeRequirement(firstType, secondType, loc, /*wasInferred=*/false,
-                       result);
+    realizeTypeRequirement(firstType, secondType, loc, /*wasInferred=*/false,
+                           result);
     break;
   }
 
-  case RequirementKind::Layout:
-    if (!firstType->isTypeParameter()) {
-      // FIXME: Warn about redundancy if not inferred, diagnose conflicts
-      break;
-    }
+  case RequirementKind::Layout: {
+    SmallVector<Requirement, 2> reqs;
+    desugarLayoutRequirement(firstType, req.getLayoutConstraint(), reqs);
 
-    result.push_back({req, loc, /*wasInferred=*/false});
+    for (auto req : reqs)
+      result.push_back({req, loc, /*wasInferred=*/false});
+
     break;
+  }
 
   case RequirementKind::SameType: {
     auto secondType = req.getSecondType();
@@ -186,15 +258,18 @@ static void addRequirement(Requirement req, RequirementRepr *reqRepr, bool infer
       inferRequirements(secondType, secondLoc, result);
     }
 
-    addSameTypeRequirement(firstType, secondType, loc, /*wasInferred=*/false,
-                           result);
+    SmallVector<Requirement, 2> reqs;
+    desugarSameTypeRequirement(req.getFirstType(), secondType, reqs);
+
+    for (auto req : reqs)
+      result.push_back({req, loc, /*wasInferred=*/false});
     break;
   }
   }
 }
 
-static void addInheritedRequirements(TypeDecl *decl, Type type, bool infer,
-                              SmallVectorImpl<StructuralRequirement> &result) {
+static void realizeInheritedRequirements(TypeDecl *decl, Type type, bool infer,
+                               SmallVectorImpl<StructuralRequirement> &result) {
   auto &ctx = decl->getASTContext();
   auto inheritedTypes = decl->getInherited();
 
@@ -212,8 +287,8 @@ static void addInheritedRequirements(TypeDecl *decl, Type type, bool infer,
       inferRequirements(inheritedType, loc, result);
     }
 
-    addTypeRequirement(type, inheritedType, loc, /*wasInferred=*/false,
-                       result);
+    realizeTypeRequirement(type, inheritedType, loc, /*wasInferred=*/false,
+                           result);
   }
 }
 
@@ -228,13 +303,13 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
   auto selfTy = proto->getSelfInterfaceType();
 
-  addInheritedRequirements(proto, selfTy,
-                           /*infer=*/false, result);
+  realizeInheritedRequirements(proto, selfTy,
+                               /*infer=*/false, result);
 
   // Add requirements from the protocol's own 'where' clause.
   WhereClauseOwner(proto).visitRequirements(TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
-        addRequirement(req, reqRepr, /*infer=*/false, result);
+        realizeRequirement(req, reqRepr, /*infer=*/false, result);
         return false;
       });
 
@@ -253,14 +328,14 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   for (auto assocTypeDecl : proto->getAssociatedTypeMembers()) {
     // Add requirements placed directly on this associated type.
     auto assocType = assocTypeDecl->getDeclaredInterfaceType();
-    addInheritedRequirements(assocTypeDecl, assocType, /*infer=*/false,
-                             result);
+    realizeInheritedRequirements(assocTypeDecl, assocType, /*infer=*/false,
+                                 result);
 
     // Add requirements from this associated type's where clause.
     WhereClauseOwner(assocTypeDecl).visitRequirements(
         TypeResolutionStage::Structural,
         [&](const Requirement &req, RequirementRepr *reqRepr) {
-          addRequirement(req, reqRepr, /*infer=*/false, result);
+          realizeRequirement(req, reqRepr, /*infer=*/false, result);
           return false;
         });
   }
@@ -301,6 +376,10 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
 
   return ctx.AllocateCopy(result);
 }
+
+//
+// Building rewrite rules from desugared requirements.
+//
 
 /// Given a concrete type that may contain type parameters in structural positions,
 /// collect all the structural type parameter components, and replace them all with
@@ -556,8 +635,11 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
     // we can trigger the computation of the requirement signatures of the
     // next component recursively.
     if (ProtocolMap[proto]) {
-      for (auto req : proto->getStructuralRequirements())
+      for (auto req : proto->getStructuralRequirements()) {
+        // FIXME: Keep source location information around for redundancy
+        // diagnostics.
         addRequirement(req.req.getCanonical(), proto);
+      }
     } else {
       for (auto req : proto->getRequirementSignature())
         addRequirement(req.getCanonical(), proto);
