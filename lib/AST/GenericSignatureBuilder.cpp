@@ -8876,9 +8876,23 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
-    if (rqmResult.size() != gsbResult.size() ||
-        !std::equal(rqmResult.begin(), rqmResult.end(),
-                    gsbResult.begin())) {
+    // For now, only compare conformance requirements, since those are the
+    // important ones from the ABI perspective.
+    SmallVector<Requirement, 2> rqmConformances;
+    for (auto req : rqmResult) {
+      if (req.getKind() == RequirementKind::Conformance)
+        rqmConformances.push_back(req);
+    }
+    SmallVector<Requirement, 2> gsbConformances;
+    for (auto req : gsbResult) {
+      if (req.getKind() == RequirementKind::Conformance)
+        gsbConformances.push_back(req);
+    }
+
+    if (rqmConformances.size() != gsbConformances.size() ||
+        !std::equal(rqmConformances.begin(),
+                    rqmConformances.end(),
+                    gsbConformances.begin())) {
       llvm::errs() << "RequirementMachine protocol signature minimization is broken:\n";
       llvm::errs() << "Protocol: " << proto->getName() << "\n";
 
