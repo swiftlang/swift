@@ -624,6 +624,10 @@ def requirement_machine_protocol_signatures_EQ : Joined<["-"], "requirement-mach
   Flags<[FrontendOption]>,
   HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', or 'verify'">;
 
+def requirement_machine_generic_signatures_EQ : Joined<["-"], "requirement-machine-generic-signatures=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', or 'verify'">;
+
 def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
   Flags<[FrontendOption, HelpHidden]>,

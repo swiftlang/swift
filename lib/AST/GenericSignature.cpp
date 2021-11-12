@@ -199,7 +199,7 @@ GenericSignatureImpl::getRequirementMachine() const {
     return Machine;
 
   const_cast<GenericSignatureImpl *>(this)->Machine
-      = getASTContext().getOrCreateRequirementMachine(
+      = getASTContext().getRewriteContext().getRequirementMachine(
           getCanonicalSignature());
   return Machine;
 }

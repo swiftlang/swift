@@ -859,6 +859,20 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
+  if (auto A = Args.getLastArg(OPT_requirement_machine_generic_signatures_EQ)) {
+    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
+        .Case("off", RequirementMachineMode::Disabled)
+        .Case("on", RequirementMachineMode::Enabled)
+        .Case("verify", RequirementMachineMode::Verify)
+        .Default(None);
+
+    if (value)
+      Opts.RequirementMachineGenericSignatures = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+
   Opts.DumpRequirementMachine = Args.hasArg(
       OPT_dump_requirement_machine);
   Opts.AnalyzeRequirementMachine = Args.hasArg(
