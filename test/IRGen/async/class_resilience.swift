@@ -44,7 +44,7 @@ open class MyBaseClass<T> {
 // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience14callsAwaitableyx010resilient_A09BaseClassCyxGYalF"(%swift.opaque* noalias nocapture %0, %swift.context* swiftasync %1{{.*}})
 // CHECK-DIRECT: %swift.async_func_pointer* @"$s15resilient_class9BaseClassC4waitxyYaFTjTu"
 // CHECK-INDIRECT: [[LOAD:%[0-9]+]] = load %swift.async_func_pointer*, %swift.async_func_pointer** inttoptr (i64 and (i64 add (i64 ptrtoint (%swift.async_func_pointer** @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1), i64 -2) to %swift.async_func_pointer**), align {{4|8}}
-// CHECK-INDIRECT-NEXT: %14 = select i1 icmp eq (i64 and (i64 add (i64 ptrtoint (%swift.async_func_pointer** @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1), i64 1), i64 0),
+// CHECK-INDIRECT-NEXT: select i1 icmp eq (i64 and (i64 add (i64 ptrtoint (%swift.async_func_pointer** @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1), i64 1), i64 0),
 // CHECK-INDIRECT-SAME: %swift.async_func_pointer* inttoptr (i64 add (i64 ptrtoint (%swift.async_func_pointer** @"\01__imp_$s15resilient_class9BaseClassC4waitxyYaFTjTu" to i64), i64 1) to %swift.async_func_pointer*),
 // CHECK-INDIRECT-SAME: %swift.async_func_pointer* [[LOAD]]
 // CHECK: ret void
