@@ -390,20 +390,27 @@ void sourcekitd::handleRequest(sourcekitd_object_t Req,
   }
 
   handleRequestImpl(
-      Req, CancellationToken, [Receiver](sourcekitd_response_t Resp) {
+      Req, CancellationToken,
+      [Receiver, CancellationToken](sourcekitd_response_t Resp) {
         LOG_SECTION("handleRequest-after", InfoHighPrio) {
           // Responses are big, print them out with info medium priority.
           if (Logger::isLoggingEnabledForLevel(Logger::Level::InfoMediumPrio))
             sourcekitd::printResponse(Resp, Log->getOS());
         }
 
+        sourcekitd::disposeCancellationToken(CancellationToken);
+
         Receiver(Resp);
       });
 }
 
 void sourcekitd::cancelRequest(SourceKitCancellationToken CancellationToken) {
-  getGlobalContext().getSlowRequestSimulator()->cancel(CancellationToken);
-  getGlobalContext().getSwiftLangSupport().cancelRequest(CancellationToken);
+  getGlobalContext().getRequestTracker()->cancel(CancellationToken);
+}
+
+void sourcekitd::disposeCancellationToken(
+    SourceKitCancellationToken CancellationToken) {
+  getGlobalContext().getRequestTracker()->stopTracking(CancellationToken);
 }
 
 static std::unique_ptr<llvm::MemoryBuffer> getInputBufForRequest(
