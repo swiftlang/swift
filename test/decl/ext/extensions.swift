@@ -37,6 +37,14 @@ protocol NestingTest5 {
 func nestingTest6() {
   extension Foo {} // expected-error {{declaration is only valid at file scope}}
 }
+extension Array {
+  func foo() {
+    extension Array { // expected-error {{declaration is only valid at file scope}}
+    // FIXME: Confusing error
+    // expected-error@-2 {{constrained extension must be declared on the unspecialized generic type 'Array' with constraints specified by a 'where' clause}}
+    }
+  }
+}
 
 //===--- Test that we only allow extensions only for nominal types.
 

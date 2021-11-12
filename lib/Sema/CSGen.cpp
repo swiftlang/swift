@@ -238,10 +238,9 @@ namespace {
         return { false, expr };
       }      
 
-      // For exprs of a structural type that are not modeling argument lists,
-      // avoid merging the type variables. (We need to allow for cases like
+      // For exprs of a tuple, avoid favoring. (We need to allow for cases like
       // (Int, Int32).)
-      if (isa<TupleExpr>(expr) && !isa<ApplyExpr>(Parent.getAsExpr())) {
+      if (isa<TupleExpr>(expr)) {
         return { false, expr };
       }
 
@@ -572,8 +571,9 @@ namespace {
         return false;
 
       return isFavoredParamAndArg(CS, paramTy, argTy) &&
-             hasContextuallyFavorableResultType(fnTy,
-                                                CS.getContextualType(expr));
+             hasContextuallyFavorableResultType(
+                 fnTy,
+                 CS.getContextualType(expr, /*forConstraint=*/false));
     };
 
     favorCallOverloads(expr, CS, isFavoredDecl);
@@ -722,7 +722,7 @@ namespace {
       auto firstParamTy = params[0].getOldType();
       auto secondParamTy = params[1].getOldType();
 
-      auto contextualTy = CS.getContextualType(expr);
+      auto contextualTy = CS.getContextualType(expr, /*forConstraint=*/false);
 
       // Avoid favoring overloads that would require narrowing conversion
       // to match the arguments.
@@ -1326,6 +1326,11 @@ namespace {
       if (result->hasError()) {
         return Type();
       }
+      // Diagnose top-level usages of placeholder types.
+      if (isa<TopLevelCodeDecl>(CS.DC) && isa<PlaceholderTypeRepr>(repr)) {
+        CS.getASTContext().Diags.diagnose(repr->getLoc(),
+                                          diag::placeholder_type_not_allowed);
+      }
       return result;
     }
 
@@ -1709,7 +1714,7 @@ namespace {
         return Type();
 
       auto locator = CS.getConstraintLocator(expr);
-      auto contextualType = CS.getContextualType(expr);
+      auto contextualType = CS.getContextualType(expr, /*forConstraint=*/false);
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
       auto joinElementTypes = [&](Optional<Type> elementType) {
@@ -1837,7 +1842,7 @@ namespace {
       auto valueAssocTy = dictionaryProto->getAssociatedType(C.Id_Value);
 
       auto locator = CS.getConstraintLocator(expr);
-      auto contextualType = CS.getContextualType(expr);
+      auto contextualType = CS.getContextualType(expr, /*forConstraint=*/false);
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
       // If a contextual type exists for this expression and is a dictionary
@@ -1904,7 +1909,7 @@ namespace {
 
       // If no contextual type is present, Merge equivalence classes of key 
       // and value types as necessary.
-      if (!CS.getContextualType(expr)) {
+      if (!CS.getContextualType(expr, /*forConstraint=*/false)) {
         for (auto element1 : expr->getElements()) {
           for (auto element2 : expr->getElements()) {
             if (element1 == element2)
@@ -2068,7 +2073,13 @@ namespace {
             return resolvedTy;
         }
 
-        if (auto contextualType = CS.getContextualType(closure)) {
+        // Because we are only pulling out the result type from the contextual
+        // type, we avoid prematurely converting any inferrable types by setting
+        // forConstraint=false. Later on in inferClosureType we call
+        // replaceInferableTypesWithTypeVars before returning to ensure we don't
+        // introduce any placeholders into the constraint system.
+        if (auto contextualType =
+                CS.getContextualType(closure, /*forConstraint=*/false)) {
           if (auto fnType = contextualType->getAs<FunctionType>())
             return fnType->getResult();
         }

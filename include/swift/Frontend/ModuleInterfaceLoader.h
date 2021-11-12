@@ -299,12 +299,14 @@ struct ModuleInterfaceLoaderOptions {
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
   bool disableBuildingInterface = false;
+  bool downgradeInterfaceVerificationError = false;
   std::string mainExecutablePath;
   ModuleInterfaceLoaderOptions(const FrontendOptions &Opts):
     remarkOnRebuildFromInterface(Opts.RemarkOnRebuildFromModuleInterface),
     disableInterfaceLock(Opts.DisableInterfaceFileLock),
     disableImplicitSwiftModule(Opts.DisableImplicitModules),
     disableBuildingInterface(Opts.DisableBuildingInterface),
+    downgradeInterfaceVerificationError(Opts.DowngradeInterfaceVerificationError),
     mainExecutablePath(Opts.MainExecutablePath)
   {
     switch (Opts.RequestedAction) {

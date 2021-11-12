@@ -4060,7 +4060,7 @@ bool ConstraintSystem::repairFailures(
       // optionality if needed.
       auto contextualTy = simplifyType(rhs)->getOptionalObjectType();
       if (!lhs->getOptionalObjectType() && !lhs->hasTypeVariable() &&
-          !contextualTy->isTypeVariableOrMember()) {
+          contextualTy && !contextualTy->isTypeVariableOrMember()) {
         conversionsOrFixes.push_back(IgnoreContextualType::create(
             *this, lhs, rhs, getConstraintLocator(OEE->getSubExpr())));
         return true;
@@ -5018,7 +5018,8 @@ bool ConstraintSystem::repairFailures(
     // If `if` expression has a contextual type, let's consider it a source of
     // truth and produce a contextual mismatch instead of  per-branch failure,
     // because it's a better pointer than potential then-to-else type mismatch.
-    if (auto contextualType = getContextualType(anchor)) {
+    if (auto contextualType =
+            getContextualType(anchor, /*forConstraint=*/false)) {
       auto purpose = getContextualTypePurpose(anchor);
       if (contextualType->isEqual(rhs)) {
         auto *loc = getConstraintLocator(
@@ -6446,7 +6447,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is a `nil` literal, it would be a contextual failure.
     if (auto *Nil = getAsExpr<NilLiteralExpr>(anchor)) {
       auto *fixLocator = getConstraintLocator(
-          getContextualType(Nil)
+          getContextualType(Nil, /*forConstraint=*/false)
               ? locator.withPathElement(LocatorPathElt::ContextualType(
                     getContextualTypePurpose(Nil)))
               : locator);
@@ -9677,7 +9678,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
     return SolutionKind::Error;
 
   // If the expression has contextual type information, try using that too.
-  if (auto contextualTy = getContextualType(keyPath)) {
+  if (auto contextualTy = getContextualType(keyPath, /*forConstraint=*/false)) {
     if (!tryMatchRootAndValueFromType(contextualTy))
       return SolutionKind::Error;
   }

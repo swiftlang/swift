@@ -145,7 +145,7 @@ extension String.UTF8View: BidirectionalCollection {
 
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
-    precondition(!i.isZeroPosition)
+    _precondition(!i.isZeroPosition)
     if _fastPath(_guts.isFastUTF8) {
       return i.strippingTranscoding.priorEncoded
     }

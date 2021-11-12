@@ -67,12 +67,28 @@ bool Rule::isIdentityConformanceRule() const {
 /// If this is a rule of the form [P].[Q] => [P] where [P] and [Q] are
 /// protocol symbols, return true, otherwise return false.
 bool Rule::isProtocolRefinementRule() const {
-  return (LHS.size() == 2 &&
-          RHS.size() == 1 &&
-          LHS[0] == RHS[0] &&
-          LHS[0].getKind() == Symbol::Kind::Protocol &&
-          LHS[1].getKind() == Symbol::Kind::Protocol &&
-          LHS[0] != LHS[1]);
+  if (LHS.size() == 2 &&
+      RHS.size() == 1 &&
+      LHS[0] == RHS[0] &&
+      LHS[0].getKind() == Symbol::Kind::Protocol &&
+      LHS[1].getKind() == Symbol::Kind::Protocol &&
+      LHS[0] != LHS[1]) {
+
+    // A protocol refinement rule only if it comes from a directly-stated
+    // inheritance clause entry. It can only become redundant if it is
+    // written in terms of other protocol refinement rules; otherwise, it
+    // must appear in the protocol's requirement signature.
+    //
+    // See RewriteSystem::isValidRefinementPath().
+    auto *proto = LHS[0].getProtocol();
+    auto *otherProto = LHS[1].getProtocol();
+
+    auto inherited = proto->getInheritedProtocols();
+    return (std::find(inherited.begin(), inherited.end(), otherProto)
+            != inherited.end());
+  }
+
+  return false;
 }
 
 /// Returns the length of the left hand side.
@@ -101,6 +117,8 @@ void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
   if (Permanent)
     out << " [permanent]";
+  if (Explicit)
+    out << " [explicit]";
   if (Simplified)
     out << " [simplified]";
   if (Redundant)
@@ -122,21 +140,18 @@ RewriteSystem::~RewriteSystem() {
 
 void RewriteSystem::initialize(
     bool recordLoops,
-    std::vector<std::pair<MutableTerm, MutableTerm>> &&associatedTypeRules,
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
     std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules) {
   assert(!Initialized);
   Initialized = 1;
 
   RecordLoops = recordLoops;
 
-  for (const auto &rule : associatedTypeRules) {
-    bool added = addRule(rule.first, rule.second);
-    if (added)
-      Rules.back().markPermanent();
-  }
+  for (const auto &rule : permanentRules)
+    addPermanentRule(rule.first, rule.second);
 
   for (const auto &rule : requirementRules)
-    addRule(rule.first, rule.second);
+    addExplicitRule(rule.first, rule.second);
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.
@@ -406,6 +421,24 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
   return true;
 }
 
+/// Add a new rule, marking it permanent.
+bool RewriteSystem::addPermanentRule(MutableTerm lhs, MutableTerm rhs) {
+  bool added = addRule(std::move(lhs), std::move(rhs));
+  if (added)
+    Rules.back().markPermanent();
+
+  return added;
+}
+
+/// Add a new rule, marking it explicit.
+bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs) {
+  bool added = addRule(std::move(lhs), std::move(rhs));
+  if (added)
+    Rules.back().markExplicit();
+
+  return added;
+}
+
 /// Delete any rules whose left hand sides can be reduced by other rules,
 /// and reduce the right hand sides of all remaining rules as much as
 /// possible.
@@ -504,7 +537,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
   }
 
   for (const auto &rule : Rules) {
-    if (rule.isSimplified())
+    if (rule.isSimplified() || rule.isPermanent())
       continue;
 
     const auto &lhs = rule.getLHS();

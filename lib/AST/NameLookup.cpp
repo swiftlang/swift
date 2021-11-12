@@ -1453,11 +1453,13 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     DeclBaseName baseName(name.getBaseName());
 
     if (isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl())) {
-      // Namespaces will never have any members so we can just return whatever
-      // the lookup finds.
-      return evaluateOrDefault(
+      auto allFound = evaluateOrDefault(
           ctx.evaluator, CXXNamespaceMemberLookup({cast<EnumDecl>(decl), name}),
           {});
+      for (auto found : allFound)
+        Table.addMember(found);
+
+      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
     } else if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
       auto allFound = evaluateOrDefault(
           ctx.evaluator,
@@ -2566,8 +2568,9 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // The generic parameter 'Self'.
     auto &ctx = value->getASTContext();
     auto selfId = ctx.Id_Self;
-    auto selfDecl = new (ctx) GenericTypeParamDecl(
-        proto, selfId, SourceLoc(), /*depth=*/0, /*index=*/0);
+    auto selfDecl = new (ctx)
+        GenericTypeParamDecl(proto, selfId, SourceLoc(),
+                             /*type sequence=*/false, /*depth=*/0, /*index=*/0);
     auto protoType = proto->getDeclaredInterfaceType();
     InheritedEntry selfInherited[1] = {
       InheritedEntry(TypeLoc::withoutLoc(protoType)) };

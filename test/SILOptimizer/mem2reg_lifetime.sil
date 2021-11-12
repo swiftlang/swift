@@ -1548,6 +1548,7 @@ entry(%instance : @owned $C):
 }
 
 
+// End lifetime before unreachable inst.
 // CHECK-LABEL: sil [ossa] @unreachable_5 : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
@@ -1567,6 +1568,7 @@ exit:
   unreachable
 }
 
+// Bail out if alloc_stack is in unreachable block.
 // CHECK-LABEL: sil [ossa] @unreachable_6 : $@convention(thin) (@owned C) -> () {
 // CHECK:         alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'unreachable_6'
@@ -1585,6 +1587,7 @@ exit:
 }
 
 
+// Bail out if alloc_stack is in unreachable block.
 // CHECK-LABEL: sil [ossa] @unreachable_7 : $@convention(thin) (@owned C) -> () {
 // CHECK:         alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'unreachable_7'
@@ -1606,7 +1609,7 @@ exit:
   return %res : $()
 }
 
-
+// Bail out if alloc_stack is in unreachable block.
 // CHECK-LABEL: sil [ossa] @unreachable_8 : $@convention(thin) (@owned C) -> () {
 // CHECK:         alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'unreachable_8'
@@ -1632,7 +1635,7 @@ exit:
   return %res : $()
 }
 
-
+// End lifetime after loop which is followed by unreachable.
 // CHECK-LABEL: sil [ossa] @unreachable_loop_1 : $@convention(thin) () -> () {
 // CHECK:       {{bb[0-9]+}}:
 // CHECK:         [[GET_C:%[^,]+]] = function_ref @getC : $@convention(thin) () -> @owned C
@@ -1672,7 +1675,7 @@ die:
   unreachable
 }
 
-
+// Bail out if alloc_stack is in unreachable block.
 // CHECK-LABEL: sil [ossa] @unreachable_loop_2 : $@convention(thin) () -> () {
 // CHECK:         alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'unreachable_loop_2'
@@ -1697,7 +1700,7 @@ die:
   unreachable
 }
 
-
+// Bail out if alloc_stack is in unreachable block.
 // CHECK-LABEL: sil [ossa] @unreachable_loop_3 : $@convention(thin) () -> () {
 // CHECK:         alloc_stack [lexical]
 // CHECK-LABEL: } // end sil function 'unreachable_loop_3'

@@ -1017,10 +1017,6 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
   TypeContext.setCreateSyntax(SyntaxKind::TupleType);
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
 
-  if (ParsingTypeTuple.isFailed()) {
-    return makeParserError();
-  }
-
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
   unsigned EllipsisIdx;

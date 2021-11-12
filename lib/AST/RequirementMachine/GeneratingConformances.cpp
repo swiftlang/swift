@@ -607,8 +607,13 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
 /// conformance rules.
 void RewriteSystem::computeGeneratingConformances(
     llvm::DenseSet<unsigned> &redundantConformances) {
-  // All conformance rules, sorted by left hand side.
-  SmallVector<std::pair<unsigned, Term>, 4> conformanceRules;
+  // All conformance rules, sorted by (isExplicit(), getLHS()), with non-explicit
+  // rules with longer left hand sides coming first.
+  //
+  // The idea here is that we want less canonical rules to be eliminated first,
+  // but we prefer to eliminate non-explicit rules, in an attempt to keep protocol
+  // conformance rules in the same protocol as they were originally defined in.
+  SmallVector<unsigned, 4> conformanceRules;
 
   // Maps a conformance rule to a conformance path deriving the subject type's
   // base type. For example, consider the following conformance rule:
@@ -640,8 +645,7 @@ void RewriteSystem::computeGeneratingConformances(
     if (!rule.isProtocolConformanceRule())
       continue;
 
-    auto lhs = rule.getLHS();
-    conformanceRules.emplace_back(ruleID, lhs);
+    conformanceRules.push_back(ruleID);
 
     // Initially, every non-redundant conformance rule can be expressed
     // as itself.
@@ -654,6 +658,8 @@ void RewriteSystem::computeGeneratingConformances(
       protocolRefinements.insert(ruleID);
       continue;
     }
+
+    auto lhs = rule.getLHS();
 
     // Record a parent path if the subject type itself requires a non-trivial
     // conformance path to derive.
@@ -696,14 +702,18 @@ void RewriteSystem::computeGeneratingConformances(
   // Sort the list of conformance rules in reverse order; we're going to try
   // to minimize away less canonical rules first.
   std::sort(conformanceRules.begin(), conformanceRules.end(),
-            [&](const std::pair<unsigned, Term> &lhs,
-                const std::pair<unsigned, Term> &rhs) -> bool {
-              return lhs.second.compare(rhs.second, Context) > 0;
+            [&](unsigned lhs, unsigned rhs) -> bool {
+              const auto &lhsRule = getRule(lhs);
+              const auto &rhsRule = getRule(rhs);
+
+              if (lhsRule.isExplicit() != rhsRule.isExplicit())
+                return !lhsRule.isExplicit();
+
+              return lhsRule.getLHS().compare(rhsRule.getLHS(), Context) > 0;
             });
 
   // Find a minimal set of generating conformances.
-  for (const auto &pair : conformanceRules) {
-    unsigned ruleID = pair.first;
+  for (unsigned ruleID : conformanceRules) {
     const auto &paths = conformancePaths[ruleID];
 
     bool isProtocolRefinement = protocolRefinements.count(ruleID) > 0;

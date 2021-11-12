@@ -2349,7 +2349,11 @@ void Lexer::lexImpl() {
 
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
-  
+
+  if (LexerCutOffPoint && CurPtr >= LexerCutOffPoint) {
+    return formToken(tok::eof, TokStart);
+  }
+
   switch (*CurPtr++) {
   default: {
     char const *Tmp = CurPtr-1;

@@ -631,7 +631,7 @@ void CodeCompletionResult::dump() const {
 CodeCompletionResult *
 CodeCompletionResult::withFlair(CodeCompletionFlair newFlair,
                                 CodeCompletionResultSink &Sink) {
-  if (Kind == ResultKind::Declaration) {
+  if (getKind() == ResultKind::Declaration) {
     return new (*Sink.Allocator) CodeCompletionResult(
         getSemanticContext(), newFlair, getNumBytesToErase(),
         getCompletionString(), getAssociatedDeclKind(), isSystem(),
@@ -2739,10 +2739,17 @@ public:
     for (auto param : *func->getParameters()) {
       switch (param->getDefaultArgumentKind()) {
       case DefaultArgumentKind::Normal:
+      case DefaultArgumentKind::NilLiteral:
+      case DefaultArgumentKind::EmptyArray:
+      case DefaultArgumentKind::EmptyDictionary:
       case DefaultArgumentKind::StoredProperty:
       case DefaultArgumentKind::Inherited: // FIXME: include this?
         return true;
-      default:
+
+      case DefaultArgumentKind::None:
+#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+      case DefaultArgumentKind::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
         break;
       }
     }
@@ -3258,7 +3265,8 @@ public:
       if (!IsImplicitlyCurriedInstanceMethod &&
           expectedTypeContext.requiresNonVoid() &&
           ResultType->isVoid()) {
-        Builder.setExpectedTypeRelation(CodeCompletionResult::Invalid);
+        Builder.setExpectedTypeRelation(
+            CodeCompletionResult::ExpectedTypeRelation::Invalid);
       }
     };
 
@@ -4314,13 +4322,14 @@ public:
       if (!T)
         continue;
 
-      auto typeRelation = CodeCompletionResult::Identical;
+      auto typeRelation = CodeCompletionResult::ExpectedTypeRelation::Identical;
       // Convert through optional types unless we're looking for a protocol
       // that Optional itself conforms to.
       if (kind != CodeCompletionLiteralKind::NilLiteral) {
         if (auto optionalObjT = T->getOptionalObjectType()) {
           T = optionalObjT;
-          typeRelation = CodeCompletionResult::Convertible;
+          typeRelation =
+              CodeCompletionResult::ExpectedTypeRelation::Convertible;
         }
       }
 
@@ -4408,19 +4417,19 @@ public:
     if (isCodeCompletionAtTopLevelOfLibraryFile(CurrDeclContext))
       flair |= CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope;
 
-    auto addFromProto = [&](
-        CodeCompletionLiteralKind kind,
-        llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer,
-        bool isKeyword = false) {
+    auto addFromProto =
+        [&](CodeCompletionLiteralKind kind,
+            llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer,
+            bool isKeyword = false) {
+          CodeCompletionResultBuilder builder(
+              Sink, CodeCompletionResult::ResultKind::Literal,
+              SemanticContextKind::None, {});
+          builder.setLiteralKind(kind);
+          builder.addFlair(flair);
 
-      CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Literal,
-                                          SemanticContextKind::None, {});
-      builder.setLiteralKind(kind);
-      builder.addFlair(flair);
-
-      consumer(builder);
-      addTypeRelationFromProtocol(builder, kind);
-    };
+          consumer(builder);
+          addTypeRelationFromProtocol(builder, kind);
+        };
 
     // FIXME: the pedantically correct way is to resolve Swift.*LiteralType.
 
@@ -4486,8 +4495,9 @@ public:
 
     // Add tuple completion (item, item).
     {
-      CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Literal,
-                                          SemanticContextKind::None, {});
+      CodeCompletionResultBuilder builder(
+          Sink, CodeCompletionResult::ResultKind::Literal,
+          SemanticContextKind::None, {});
       builder.setLiteralKind(LK::Tuple);
       builder.addFlair(flair);
 
@@ -4497,7 +4507,8 @@ public:
       for (auto T : expectedTypeContext.possibleTypes) {
         if (T && T->is<TupleType>() && !T->isVoid()) {
           addTypeAnnotation(builder, T);
-          builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
+          builder.setExpectedTypeRelation(
+              CodeCompletionResult::ExpectedTypeRelation::Identical);
           break;
         }
       }
@@ -6409,8 +6420,9 @@ static void addPoundDirectives(CodeCompletionResultSink &Sink) {
       [&](StringRef name, CodeCompletionKeywordKind K,
           llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer =
               nullptr) {
-        CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::Keyword,
-                                            SemanticContextKind::None, {});
+        CodeCompletionResultBuilder Builder(
+            Sink, CodeCompletionResult::ResultKind::Keyword,
+            SemanticContextKind::None, {});
         Builder.addBaseName(name);
         Builder.setKeywordKind(K);
         if (consumer)
@@ -7406,81 +7418,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   deliverCompletionResults(CompletionContext, Lookup, CurDeclContext, Consumer);
 }
 
-void PrintingCodeCompletionConsumer::handleResults(
-    CodeCompletionContext &context) {
-  auto results = context.takeResults();
-  handleResults(results);
-}
-
-void PrintingCodeCompletionConsumer::handleResults(
-    MutableArrayRef<CodeCompletionResult *> Results) {
-  unsigned NumResults = 0;
-  for (auto Result : Results) {
-    if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
-      continue;
-    ++NumResults;
-  }
-  if (NumResults == 0)
-    return;
-
-  OS << "Begin completions, " << NumResults << " items\n";
-  for (auto Result : Results) {
-    if (!IncludeKeywords && Result->getKind() == CodeCompletionResult::Keyword)
-      continue;
-    Result->printPrefix(OS);
-    if (PrintAnnotatedDescription) {
-      printCodeCompletionResultDescriptionAnnotated(*Result, OS, /*leadingPunctuation=*/false);
-      OS << "; typename=";
-      printCodeCompletionResultTypeNameAnnotated(*Result, OS);
-    } else {
-      Result->getCompletionString()->print(OS);
-    }
-
-    OS << "; name=";
-    printCodeCompletionResultFilterName(*Result, OS);
-
-    if (IncludeSourceText) {
-      OS << "; sourcetext=";
-      SmallString<64> buf;
-      {
-        llvm::raw_svector_ostream bufOS(buf);
-        printCodeCompletionResultSourceText(*Result, bufOS);
-      }
-      OS.write_escaped(buf);
-    }
-
-    StringRef comment = Result->getBriefDocComment();
-    if (IncludeComments && !comment.empty()) {
-      OS << "; comment=" << comment;
-    }
-
-    if (Result->getDiagnosticSeverity() !=
-        CodeCompletionDiagnosticSeverity::None) {
-      OS << "; diagnostics=" << comment;
-      switch (Result->getDiagnosticSeverity()) {
-      case CodeCompletionDiagnosticSeverity::Error:
-        OS << "error";
-        break;
-      case CodeCompletionDiagnosticSeverity::Warning:
-        OS << "warning";
-        break;
-      case CodeCompletionDiagnosticSeverity::Remark:
-        OS << "remark";
-        break;
-      case CodeCompletionDiagnosticSeverity::Note:
-        OS << "note";
-        break;
-      case CodeCompletionDiagnosticSeverity::None:
-        llvm_unreachable("none");
-      }
-      OS << ":" << Result->getDiagnosticMessage();
-    }
-
-    OS << "\n";
-  }
-  OS << "End completions\n";
-}
-
 namespace {
 class CodeCompletionCallbacksFactoryImpl
     : public CodeCompletionCallbacksFactory {
@@ -7528,41 +7465,42 @@ swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
   auto startSize = targetSink.Results.size();
 
   if (onlyTypes) {
-    std::copy_if(sourceSink.Results.begin(), sourceSink.Results.end(),
-                 std::back_inserter(targetSink.Results),
-                 [](CodeCompletionResult *R) -> bool {
-      if (R->getKind() != CodeCompletionResult::Declaration)
-        return false;
-      switch(R->getAssociatedDeclKind()) {
-      case CodeCompletionDeclKind::Module:
-      case CodeCompletionDeclKind::Class:
-      case CodeCompletionDeclKind::Struct:
-      case CodeCompletionDeclKind::Enum:
-      case CodeCompletionDeclKind::Protocol:
-      case CodeCompletionDeclKind::TypeAlias:
-      case CodeCompletionDeclKind::AssociatedType:
-      case CodeCompletionDeclKind::GenericTypeParam:
-        return true;
-      case CodeCompletionDeclKind::PrecedenceGroup:
-      case CodeCompletionDeclKind::EnumElement:
-      case CodeCompletionDeclKind::Constructor:
-      case CodeCompletionDeclKind::Destructor:
-      case CodeCompletionDeclKind::Subscript:
-      case CodeCompletionDeclKind::StaticMethod:
-      case CodeCompletionDeclKind::InstanceMethod:
-      case CodeCompletionDeclKind::PrefixOperatorFunction:
-      case CodeCompletionDeclKind::PostfixOperatorFunction:
-      case CodeCompletionDeclKind::InfixOperatorFunction:
-      case CodeCompletionDeclKind::FreeFunction:
-      case CodeCompletionDeclKind::StaticVar:
-      case CodeCompletionDeclKind::InstanceVar:
-      case CodeCompletionDeclKind::LocalVar:
-      case CodeCompletionDeclKind::GlobalVar:
-        return false;
-      }
+    std::copy_if(
+        sourceSink.Results.begin(), sourceSink.Results.end(),
+        std::back_inserter(targetSink.Results),
+        [](CodeCompletionResult *R) -> bool {
+          if (R->getKind() != CodeCompletionResult::ResultKind::Declaration)
+            return false;
+          switch (R->getAssociatedDeclKind()) {
+          case CodeCompletionDeclKind::Module:
+          case CodeCompletionDeclKind::Class:
+          case CodeCompletionDeclKind::Struct:
+          case CodeCompletionDeclKind::Enum:
+          case CodeCompletionDeclKind::Protocol:
+          case CodeCompletionDeclKind::TypeAlias:
+          case CodeCompletionDeclKind::AssociatedType:
+          case CodeCompletionDeclKind::GenericTypeParam:
+            return true;
+          case CodeCompletionDeclKind::PrecedenceGroup:
+          case CodeCompletionDeclKind::EnumElement:
+          case CodeCompletionDeclKind::Constructor:
+          case CodeCompletionDeclKind::Destructor:
+          case CodeCompletionDeclKind::Subscript:
+          case CodeCompletionDeclKind::StaticMethod:
+          case CodeCompletionDeclKind::InstanceMethod:
+          case CodeCompletionDeclKind::PrefixOperatorFunction:
+          case CodeCompletionDeclKind::PostfixOperatorFunction:
+          case CodeCompletionDeclKind::InfixOperatorFunction:
+          case CodeCompletionDeclKind::FreeFunction:
+          case CodeCompletionDeclKind::StaticVar:
+          case CodeCompletionDeclKind::InstanceVar:
+          case CodeCompletionDeclKind::LocalVar:
+          case CodeCompletionDeclKind::GlobalVar:
+            return false;
+          }
 
-      llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
-    });
+          llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
+        });
   } else if (onlyPrecedenceGroups) {
     std::copy_if(sourceSink.Results.begin(), sourceSink.Results.end(),
                  std::back_inserter(targetSink.Results),

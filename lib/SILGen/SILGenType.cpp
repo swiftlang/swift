@@ -416,7 +416,7 @@ public:
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(reqDecl)) {
         return addMethodImplementation(
-            requirementRef, requirementRef.withDecl(witness.getDecl()),
+            requirementRef, getWitnessRef(requirementRef, witness),
             witness);
       }
 
@@ -444,7 +444,8 @@ public:
       witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
 
     return addMethodImplementation(
-        requirementRef, requirementRef.withDecl(witnessAccessor), witness);
+        requirementRef, getWitnessRef(requirementRef, witnessAccessor),
+        witness);
   }
 
 private:
@@ -457,6 +458,21 @@ private:
       isFreeFunctionWitness(requirementRef.getDecl(), witnessRef.getDecl());
     asDerived().addMethodImplementation(requirementRef, witnessRef,
                                         isFree, witness);
+  }
+
+  SILDeclRef getWitnessRef(SILDeclRef requirementRef, Witness witness) {
+    auto witnessRef = requirementRef.withDecl(witness.getDecl());
+    // If the requirement/witness is a derivative function, we need to
+    // substitute the witness's derivative generic signature in its derivative
+    // function identifier.
+    if (requirementRef.isAutoDiffDerivativeFunction()) {
+      auto *reqrRerivativeId = requirementRef.getDerivativeFunctionIdentifier();
+      auto *witnessDerivativeId = AutoDiffDerivativeFunctionIdentifier::get(
+          reqrRerivativeId->getKind(), reqrRerivativeId->getParameterIndices(),
+          witness.getDerivativeGenericSignature(), witnessRef.getASTContext());
+      witnessRef = witnessRef.asAutoDiffDerivativeFunction(witnessDerivativeId);
+    }
+    return witnessRef;
   }
 };
 

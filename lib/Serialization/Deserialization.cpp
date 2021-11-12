@@ -1047,12 +1047,9 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
       auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
       if (!name.empty()) {
-        auto paramDecl =
-          createDecl<GenericTypeParamDecl>(getAssociatedModule(),
-                                           name,
-                                           SourceLoc(),
-                                           paramTy->getDepth(),
-                                           paramTy->getIndex());
+        auto paramDecl = createDecl<GenericTypeParamDecl>(
+            getAssociatedModule(), name, SourceLoc(), paramTy->isTypeSequence(),
+            paramTy->getDepth(), paramTy->getIndex());
         paramTy = paramDecl->getDeclaredInterfaceType()
                    ->castTo<GenericTypeParamType>();
       }
@@ -2680,19 +2677,19 @@ public:
                                   StringRef blobData) {
     IdentifierID nameID;
     bool isImplicit;
+    bool isTypeSequence;
     unsigned depth;
     unsigned index;
 
-    decls_block::GenericTypeParamDeclLayout::readRecord(scratch, nameID,
-                                                        isImplicit,
-                                                        depth,
-                                                        index);
+    decls_block::GenericTypeParamDeclLayout::readRecord(
+        scratch, nameID, isImplicit, isTypeSequence, depth, index);
 
     // Always create GenericTypeParamDecls in the associated file; the real
     // context will reparent them.
     auto *DC = MF.getFile();
     auto genericParam = MF.createDecl<GenericTypeParamDecl>(
-        DC, MF.getIdentifier(nameID), SourceLoc(), depth, index);
+        DC, MF.getIdentifier(nameID), SourceLoc(), isTypeSequence, depth,
+        index);
     declOrOffset = genericParam;
 
     if (isImplicit)
@@ -5478,7 +5475,8 @@ public:
     if (!sig)
       MF.fatal();
 
-    Type interfaceType = GenericTypeParamType::get(depth, index, ctx);
+    Type interfaceType =
+        GenericTypeParamType::get(/*type sequence*/ false, depth, index, ctx);
     Type contextType = sig.getGenericEnvironment()
         ->mapTypeIntoContext(interfaceType);
 
@@ -5532,11 +5530,12 @@ public:
 
   Expected<Type> deserializeGenericTypeParamType(ArrayRef<uint64_t> scratch,
                                                  StringRef blobData) {
+    bool typeSequence;
     DeclID declIDOrDepth;
     unsigned indexPlusOne;
 
-    decls_block::GenericTypeParamTypeLayout::readRecord(scratch, declIDOrDepth,
-                                                        indexPlusOne);
+    decls_block::GenericTypeParamTypeLayout::readRecord(
+        scratch, typeSequence, declIDOrDepth, indexPlusOne);
 
     if (indexPlusOne == 0) {
       auto genericParam
@@ -5548,7 +5547,8 @@ public:
       return genericParam->getDeclaredInterfaceType();
     }
 
-    return GenericTypeParamType::get(declIDOrDepth,indexPlusOne-1,ctx);
+    return GenericTypeParamType::get(typeSequence, declIDOrDepth,
+                                     indexPlusOne - 1, ctx);
   }
 
   Expected<Type> deserializeProtocolCompositionType(ArrayRef<uint64_t> scratch,

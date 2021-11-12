@@ -489,23 +489,27 @@ public:
   /// are the real (physical) module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
 
-  /// Look up the module alias map by the given \p key.
+  /// Look up option used in \c getRealModuleName when module aliasing is applied.
+  enum class ModuleAliasLookupOption {
+    alwaysRealName,
+    realNameFromAlias,
+    aliasFromRealName
+  };
+
+  /// Look up the module alias map by the given \p key and a lookup \p option.
   ///
-  /// \param key A module alias or real name to look up the map by
-  /// \param alwaysReturnRealName Indicates whether it should always retrieve the real module name
-  ///        given \p key. Defaults to true. This takes a higher precedence than
-  ///        \p lookupAliasFromReal.
-  /// \param lookupAliasFromReal Indicates whether to look up an alias by treating \p key
-  ///        as a real name. Defaults to false.
+  /// \param key A module alias or real name to look up the map by.
+  /// \param option A look up option \c ModuleAliasLookupOption. Defaults to alwaysRealName.
+  ///
   /// \return The real name or alias mapped to the key.
-  ///         If \p alwaysReturnRealName is true, return the real module name if \p key is an alias
-  ///         or the key itself since that's the real name.
-  ///         If \p lookupAliasFromReal is true, and \p alwaysReturnRealName is false, return
-  ///         only if \p key is a real name, else an empty Identifier.
-  ///         If no aliasing is used, return \p key.
+  ///         If no aliasing is used, return \p key regardless of \p option.
+  ///         If \p option is alwaysRealName, return the real module name whether the \p key is an alias
+  ///         or a real name.
+  ///         If \p option is realNameFromAlias, only return a real name if \p key is an alias.
+  ///         If \p option is aliasFromRealName, only return an alias if \p key is a real name.
+  ///         Else return a real name or an alias mapped to the \p key.
   Identifier getRealModuleName(Identifier key,
-                               bool alwaysReturnRealName = true,
-                               bool lookupAliasFromReal = false) const;
+                               ModuleAliasLookupOption option = ModuleAliasLookupOption::alwaysRealName) const;
 
   /// Decide how to interpret two precedence groups.
   Associativity associateInfixOperators(PrecedenceGroupDecl *left,

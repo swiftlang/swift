@@ -1653,26 +1653,31 @@ void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
   }
 }
 
-Identifier ASTContext::getRealModuleName(Identifier key, bool alwaysReturnRealName, bool lookupAliasFromReal) const {
+Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption option) const {
   auto found = ModuleAliasMap.find(key);
   if (found == ModuleAliasMap.end())
-    return key;
+    return key; // No module aliasing was used, so just return the given key
 
   // Found an entry
-  auto realOrAlias = found->second;
+  auto value = found->second;
 
-  // If alwaysReturnRealName, return the real name if the key is an
-  // alias or the key itself since that's the real name
-  if (alwaysReturnRealName) {
-     return realOrAlias.second ? realOrAlias.first : key;
+  // With the alwaysRealName option, look up the real name by treating
+  // the given key as an alias; if the key's not an alias, return the key
+  // itself since that's the real name.
+  if (option == ModuleAliasLookupOption::alwaysRealName) {
+     return value.second ? value.first : key;
   }
 
-  // If lookupAliasFromReal, and the found entry should be keyed by a real
-  // name, return the entry value, otherwise, return an empty Identifier.
-  if (lookupAliasFromReal == realOrAlias.second)
+  // With realNameFromAlias or aliasFromRealName option, only return the value
+  // if the given key matches the description (whether it's an alias or real name)
+  // by looking up the value.second (true if keyed by an alias). If not matched,
+  // return an empty Identifier.
+  if ((option == ModuleAliasLookupOption::realNameFromAlias && !value.second) ||
+      (option == ModuleAliasLookupOption::aliasFromRealName && value.second))
       return Identifier();
 
-  return realOrAlias.first;
+  // Otherwise return the value found (whether the key is an alias or real name)
+  return value.first;
 }
 
 Optional<ModuleDependencies> ASTContext::getModuleDependencies(
@@ -3639,7 +3644,6 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               Optional<ExtInfo> info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!result->hasTypeVariable());
-  assert(!result->hasPlaceholder());
 
   llvm::FoldingSetNodeID id;
   GenericFunctionType::Profile(id, sig, params, result, info);
@@ -3704,15 +3708,17 @@ GenericFunctionType::GenericFunctionType(
   }
 }
 
-GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
+GenericTypeParamType *GenericTypeParamType::get(bool isTypeSequence,
+                                                unsigned depth, unsigned index,
                                                 const ASTContext &ctx) {
-  auto known = ctx.getImpl().GenericParamTypes.find({ depth, index });
+  const auto depthKey = depth | ((isTypeSequence ? 1 : 0) << 30);
+  auto known = ctx.getImpl().GenericParamTypes.find({depthKey, index});
   if (known != ctx.getImpl().GenericParamTypes.end())
     return known->second;
 
   auto result = new (ctx, AllocationArena::Permanent)
-                  GenericTypeParamType(depth, index, ctx);
-  ctx.getImpl().GenericParamTypes[{depth, index}] = result;
+      GenericTypeParamType(isTypeSequence, depth, index, ctx);
+  ctx.getImpl().GenericParamTypes[{depthKey, index}] = result;
   return result;
 }
 
@@ -4366,8 +4372,10 @@ CanOpenedArchetypeType OpenedArchetypeType::get(Type existential,
       ::new (mem) OpenedArchetypeType(ctx, existential,
                                 protos, layoutSuperclass,
                                 layoutConstraint, *knownID);
-  result->InterfaceType = GenericTypeParamType::get(0, 0, ctx);
-  
+  result->InterfaceType =
+      GenericTypeParamType::get(/*type sequence*/ false,
+                                /*depth*/ 0, /*index*/ 0, ctx);
+
   openedExistentialArchetypes[*knownID] = result;
   return CanOpenedArchetypeType(result);
 }
@@ -5011,8 +5019,9 @@ ASTContext::getClangTypeForIRGen(Type ty) {
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)
     return theSig;
-  
-  auto param = GenericTypeParamType::get(0, 0, *this);
+
+  auto param = GenericTypeParamType::get(/*type sequence*/ false,
+                                         /*depth*/ 0, /*index*/ 0, *this);
   auto sig = GenericSignature::get(param, { });
   auto canonicalSig = CanGenericSignature(sig);
   getImpl().SingleGenericParameterSignature = canonicalSig;
@@ -5041,7 +5050,9 @@ CanGenericSignature ASTContext::getOpenedArchetypeSignature(Type type) {
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
 
-  auto genericParam = GenericTypeParamType::get(0, 0, *this);
+  auto genericParam =
+      GenericTypeParamType::get(/*type sequence*/ false,
+                                /*depth*/ 0, /*index*/ 0, *this);
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           existential);
   auto genericSig = buildGenericSignature(*this,
@@ -5126,7 +5137,8 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     }
 
     return CanGenericTypeParamType::get(
-        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), *this);
+        gp->isTypeSequence(), gp->getDepth() - baseDepth + derivedDepth,
+        gp->getIndex(), *this);
   };
 
   auto lookupConformanceFn =

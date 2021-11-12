@@ -398,7 +398,7 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
 
     auto &cs = solution.getConstraintSystem();
     auto anchor = locator->getAnchor();
-    auto contextualType = cs.getContextualType(anchor);
+    auto contextualType = cs.getContextualType(anchor, /*forConstraint=*/false);
     auto exprType = cs.getType(anchor);
     return std::make_tuple(contextualTypeElt->getPurpose(), exprType,
                            contextualType);

@@ -141,6 +141,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.RemarkOnRebuildFromModuleInterface |=
     Args.hasArg(OPT_Rmodule_interface_rebuild);
 
+  Opts.DowngradeInterfaceVerificationError |=
+    Args.hasArg(OPT_downgrade_typecheck_interface_error);
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();

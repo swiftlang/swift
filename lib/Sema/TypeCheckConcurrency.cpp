@@ -2611,6 +2611,13 @@ namespace {
           return ClosureActorIsolation::forGlobalActor(globalActorType);
       }
 
+      // If a closure has an isolated parameter, it is isolated to that
+      // parameter.
+      for (auto param : *closure->getParameters()) {
+        if (param->isIsolated())
+          return ClosureActorIsolation::forActorInstance(param);
+      }
+
       // Sendable closures are actor-independent unless the closure has
       // specifically opted into inheriting actor isolation.
       if (isSendableClosure(closure, /*forActorIsolation=*/true))
@@ -3425,6 +3432,15 @@ ActorIsolation ActorIsolationRequest::evaluate(
     if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
       if (auto selfTypeIsolation = getActorIsolation(selfTypeDecl))
         return inferredIsolation(selfTypeIsolation, onlyGlobal);
+    }
+  }
+
+  // @IBAction implies @MainActor(unsafe).
+  if (value->getAttrs().hasAttribute<IBActionAttr>()) {
+    ASTContext &ctx = value->getASTContext();
+    if (Type mainActor = ctx.getMainActorType()) {
+      return inferredIsolation(
+          ActorIsolation::forGlobalActor(mainActor, /*unsafe=*/true));
     }
   }
 

@@ -42,12 +42,13 @@ class Rule final {
   Term LHS;
   Term RHS;
 
-  /// Associated type introduction rules are 'permanent', meaning they cannot
-  /// be deleted by homotopy reduction. This is because they do not correspond
-  /// to generic requirements and are re-added when the rewrite system is
-  /// built, so by leaving them in place we can find other redundancies
-  /// instead.
+  /// A 'permanent' rule cannot be deleted by homotopy reduction. These
+  /// do not correspond to generic requirements and are re-added when the
+  /// rewrite system is built.
   unsigned Permanent : 1;
+
+  /// An 'explicit' rule is a generic requirement written by the user.
+  unsigned Explicit : 1;
 
   /// A 'simplified' rule was eliminated by simplifyRewriteSystem() if one of two
   /// things happen:
@@ -69,6 +70,7 @@ public:
   Rule(Term lhs, Term rhs)
       : LHS(lhs), RHS(rhs) {
     Permanent = false;
+    Explicit = false;
     Simplified = false;
     Redundant = false;
   }
@@ -84,34 +86,38 @@ public:
 
   bool isProtocolRefinementRule() const;
 
-  /// See above for an explanation.
+  /// See above for an explanation of these predicates.
   bool isPermanent() const {
     return Permanent;
   }
 
-  /// See above for an explanation.
+  bool isExplicit() const {
+    return Explicit;
+  }
+
   bool isSimplified() const {
     return Simplified;
   }
 
-  /// See above for an explanation.
   bool isRedundant() const {
     return Redundant;
   }
 
-  /// Deletes the rule, which removes it from consideration in term
-  /// simplification and completion. Deleted rules are simply marked as
-  /// such instead of being physically removed from the rules vector
-  /// in the rewrite system, to ensure that indices remain valid across
-  /// deletion.
   void markSimplified() {
     assert(!Simplified);
     Simplified = true;
   }
 
   void markPermanent() {
-    assert(!Permanent);
+    assert(!Explicit && !Permanent &&
+           "Permanent and explicit are mutually exclusive");
     Permanent = true;
+  }
+
+  void markExplicit() {
+    assert(!Explicit && !Permanent &&
+           "Permanent and explicit are mutually exclusive");
+    Explicit = true;
   }
 
   void markRedundant() {
@@ -230,7 +236,7 @@ public:
   RewriteContext &getRewriteContext() const { return Context; }
 
   void initialize(bool recordLoops,
-                  std::vector<std::pair<MutableTerm, MutableTerm>> &&assocaitedTypeRules,
+                  std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
   unsigned getRuleID(const Rule &rule) const {
@@ -252,6 +258,10 @@ public:
 
   bool addRule(MutableTerm lhs, MutableTerm rhs,
                const RewritePath *path=nullptr);
+
+  bool addPermanentRule(MutableTerm lhs, MutableTerm rhs);
+
+  bool addExplicitRule(MutableTerm lhs, MutableTerm rhs);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
@@ -312,20 +322,19 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
+  void propagateExplicitBits();
+
   bool
   isCandidateForDeletion(unsigned ruleID,
-                         bool firstPass,
                          const llvm::DenseSet<unsigned> *redundantConformances) const;
 
   Optional<unsigned>
-  findRuleToDelete(bool firstPass,
-                   const llvm::DenseSet<unsigned> *redundantConformances,
+  findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
                    RewritePath &replacementPath);
 
   void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
 
   void performHomotopyReduction(
-      bool firstPass,
       const llvm::DenseSet<unsigned> *redundantConformances);
 
   void minimizeRewriteSystem();

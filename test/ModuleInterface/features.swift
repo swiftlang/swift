@@ -9,6 +9,16 @@
 // the uses of those features are guarded by appropriate #if's that allow older
 // compilers to skip over the uses of newer features.
 
+// CHECK: #if compiler(>=5.3) && $SpecializeAttributeWithAvailability
+// CHECK: @_specialize(exported: true, kind: full, availability: macOS, introduced: 12; where T == Swift.Int)
+// CHECK: public func specializeWithAvailability<T>(_ t: T)
+// CHECK: #else
+// CHECK: public func specializeWithAvailability<T>(_ t: T)
+// CHECK: #endif
+@_specialize(exported: true, availability: macOS 12, *; where T == Int)
+public func specializeWithAvailability<T>(_ t: T) {
+}
+
 // CHECK: #if compiler(>=5.3) && $Actors
 // CHECK-NEXT: public actor MyActor
 // CHECK:        @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {

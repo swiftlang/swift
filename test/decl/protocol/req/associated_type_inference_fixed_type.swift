@@ -120,3 +120,12 @@ protocol P13c: P13a, P13b where A == B {}
 struct S13: P13c { // OK, A == B == Never
   func foo(arg: Never) {}
 }
+
+protocol P14 {
+  associatedtype A = Array<Self>
+}
+do {
+  struct Outer<Element> {
+    struct Conformer: P14 {}
+  }
+}

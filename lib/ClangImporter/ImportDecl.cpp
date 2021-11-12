@@ -3376,8 +3376,11 @@ namespace {
       if (alreadyImportedResult != Impl.ImportedDecls.end())
         return alreadyImportedResult->second;
       result = Impl.createDeclWithClangNode<StructDecl>(
-          decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
-          name, Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
+          decl, AccessLevel::Public,
+          SourceLoc(), // FIXME: Impl.importSourceLoc(decl->getBeginLoc()) results in a bad import: SR-15440
+          name,
+          SourceLoc(), // FIXME: Impl.importSourceLoc(decl->getLocation()) result in a bad import: SR-15440
+          None, nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -3949,8 +3952,8 @@ namespace {
 
           auto *typeParam = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
               param, AccessLevel::Public, dc,
-              Impl.SwiftContext.getIdentifier(param->getName()), SourceLoc(), 0,
-              i);
+              Impl.SwiftContext.getIdentifier(param->getName()), SourceLoc(),
+              /*type sequence*/ false, /*depth*/ 0, /*index*/ i);
           templateParams.push_back(typeParam);
           (void)++i;
         }
@@ -4215,7 +4218,7 @@ namespace {
         Impl.createDeclWithClangNode<VarDecl>(decl, AccessLevel::Public,
                               /*IsStatic*/ false,
                               VarDecl::Introducer::Var,
-                              Impl.importSourceLoc(decl->getLocation()),
+                              SourceLoc(), // FIXME: Impl.importSourceLoc(decl->getLocation()) result in a bad import: SR-15440
                               name, dc);
       if (decl->getType().isConstQualified()) {
         // Note that in C++ there are ways to change the values of const
@@ -4419,11 +4422,13 @@ namespace {
 
       SmallVector<GenericTypeParamDecl *, 4> genericParams;
       for (auto &param : *decl->getTemplateParameters()) {
-        auto genericParamDecl = Impl.createDeclWithClangNode<GenericTypeParamDecl>(
-            param, AccessLevel::Public, dc,
-            Impl.SwiftContext.getIdentifier(param->getName()),
-            Impl.importSourceLoc(param->getLocation()),
-            /*depth*/ 0, /*index*/ genericParams.size());
+        auto genericParamDecl =
+            Impl.createDeclWithClangNode<GenericTypeParamDecl>(
+                param, AccessLevel::Public, dc,
+                Impl.SwiftContext.getIdentifier(param->getName()),
+                Impl.importSourceLoc(param->getLocation()),
+                /*type sequence*/ false, /*depth*/ 0,
+                /*index*/ genericParams.size());
         genericParams.push_back(genericParamDecl);
       }
       auto genericParamList = GenericParamList::create(
@@ -6937,7 +6942,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   assert(!importedName.getAsyncInfo());
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       objcMethod, AccessLevel::Public, importedName.getDeclName(),
-      /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
+      /*NameLoc=*/Impl.importSourceLoc(objcMethod->getBeginLoc()), failability, /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
       /*ThrowsLoc=*/SourceLoc(), bodyParams,
@@ -7747,7 +7752,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
         objcGenericParam, AccessLevel::Public, dc,
         Impl.SwiftContext.getIdentifier(objcGenericParam->getName()),
         Impl.importSourceLoc(objcGenericParam->getLocation()),
-        /*depth*/ 0, /*index*/ genericParams.size());
+        /*type sequence*/ false, /*depth*/ 0, /*index*/ genericParams.size());
     // NOTE: depth is always 0 for ObjC generic type arguments, since only
     // classes may have generic types in ObjC, and ObjC classes cannot be
     // nested.
