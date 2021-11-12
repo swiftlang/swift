@@ -1223,7 +1223,7 @@ public:
     // unsubstituted type.
     if ((origType.isTypeParameter()
          && !origType.isConcreteType()
-         && !origType.requiresClass())
+         && !origType.hasLoadableLayoutConstraint())
         || substTL.isAddressOnly()) {
       return true;
 
@@ -1307,7 +1307,7 @@ static bool isFormallyPassedIndirectly(TypeConverter &TC,
   // If the substituted type is passed indirectly, so must the
   // unsubstituted type.
   if ((origType.isTypeParameter() && !origType.isConcreteType()
-       && !origType.requiresClass())
+       && !origType.hasLoadableLayoutConstraint())
       || substTL.isAddressOnly()) {
     return true;
 
