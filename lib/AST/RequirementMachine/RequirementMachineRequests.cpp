@@ -233,7 +233,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
   // We build requirement signatures for all protocols in a strongly connected
   // component at the same time.
-  auto *machine = ctx.getOrCreateRequirementMachine(proto);
+  auto *machine = ctx.getRewriteContext().getRequirementMachine(proto);
   auto requirements = machine->computeMinimalProtocolRequirements();
 
   bool debug = machine->getDebugOptions().contains(DebugFlags::Minimization);
