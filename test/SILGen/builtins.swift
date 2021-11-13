@@ -886,3 +886,10 @@ func valueToBridgeObject(_ x: UInt) -> Builtin.BridgeObject {
 func assumeTrue(_ x: Builtin.Int1) {
   Builtin.assume_Int1(x)
 }
+
+// CHECK: sil hidden [ossa] @$s8builtins15assumeAlignmentyyBp_BwtF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {  
+// CHECK: builtin "assumeAlignment"(%{{.*}} : $Builtin.RawPointer, %{{.*}} : $Builtin.Word) : $Builtin.RawPointer
+// CHECK: return
+func assumeAlignment(_ p: Builtin.RawPointer, _ x: Builtin.Word) {
+  Builtin.assumeAlignment(p, x)
+}
