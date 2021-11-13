@@ -260,8 +260,7 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  attrs = attrs.addAttributes(IGM.getLLVMContext(),
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
 
 static void addInoutParameterAttributes(IRGenModule &IGM,
@@ -276,8 +275,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM,
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  attrs = attrs.addAttributes(IGM.getLLVMContext(),
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
 
 static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
@@ -319,25 +317,21 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
     assert(storageType);
     b.addStructRetAttr(storageType);
   }
-  attrs = attrs.addAttributes(IGM.getLLVMContext(),
-                              paramIndex + llvm::AttributeList::FirstArgIndex,
-                              b);
+  attrs = attrs.addParamAttributes(IGM.getLLVMContext(), paramIndex, b);
 }
 
 void IRGenModule::addSwiftAsyncContextAttributes(llvm::AttributeList &attrs,
                                                  unsigned argIndex) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::SwiftAsync);
-  attrs = attrs.addAttributes(this->getLLVMContext(),
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
 }
 
 void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
                                          unsigned argIndex) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::SwiftSelf);
-  attrs = attrs.addAttributes(this->getLLVMContext(),
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
 }
 
 void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
@@ -355,9 +349,8 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
   b.addAttribute(llvm::Attribute::NoAlias);
   b.addAttribute(llvm::Attribute::NoCapture);
   b.addDereferenceableAttr(getPointerSize().getValue());
-  
-  auto attrIndex = argIndex + llvm::AttributeList::FirstArgIndex;
-  attrs = attrs.addAttributes(this->getLLVMContext(), attrIndex, b);
+
+  attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
 }
 
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
@@ -368,18 +361,13 @@ void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
   b.addByValAttr(storageType);
   b.addAttribute(llvm::Attribute::getWithAlignment(
       IGM.getLLVMContext(), llvm::Align(align.getValue())));
-  attrs = attrs.addAttributes(IGM.getLLVMContext(),
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  attrs = attrs.addParamAttributes(IGM.getLLVMContext(), argIndex, b);
 }
 
-void irgen::addExtendAttribute(IRGenModule &IGM, llvm::AttributeList &attrs,
-                               unsigned index, bool signExtend) {
-  llvm::AttrBuilder b;
+static llvm::Attribute::AttrKind attrKindForExtending(bool signExtend) {
   if (signExtend)
-    b.addAttribute(llvm::Attribute::SExt);
-  else
-    b.addAttribute(llvm::Attribute::ZExt);
-  attrs = attrs.addAttributes(IGM.getLLVMContext(), index, b);
+    return llvm::Attribute::SExt;
+  return llvm::Attribute::ZExt;
 }
 
 namespace swift {
@@ -1366,7 +1354,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     bool signExt = clangResultTy->hasSignedIntegerRepresentation();
     assert((signExt || clangResultTy->hasUnsignedIntegerRepresentation()) &&
            "Invalid attempt to add extension attribute to argument!");
-    addExtendAttribute(IGM, Attrs, llvm::AttributeList::ReturnIndex, signExt);
+    Attrs = Attrs.addRetAttribute(IGM.getLLVMContext(),
+                                  attrKindForExtending(signExt));
   }
 
   // If we return indirectly, that is the first parameter type.
@@ -1396,8 +1385,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       bool signExt = paramTys[i]->hasSignedIntegerRepresentation();
       assert((signExt || paramTys[i]->hasUnsignedIntegerRepresentation()) &&
              "Invalid attempt to add extension attribute to argument!");
-      addExtendAttribute(IGM, Attrs, getCurParamIndex() +
-                         llvm::AttributeList::FirstArgIndex, signExt);
+      Attrs = Attrs.addParamAttribute(IGM.getLLVMContext(), getCurParamIndex(),
+                                      attrKindForExtending(signExt));
       LLVM_FALLTHROUGH;
     }
     case clang::CodeGen::ABIArgInfo::Direct: {
@@ -2147,8 +2136,7 @@ public:
 
       assert(LastArgWritten > 0);
       Args[--LastArgWritten] = errorResultSlot.getAddress();
-      addAttribute(LastArgWritten + llvm::AttributeList::FirstArgIndex,
-                   llvm::Attribute::NoCapture);
+      addParamAttribute(LastArgWritten, llvm::Attribute::NoCapture);
       IGF.IGM.addSwiftErrorAttributes(CurCallee.getMutableAttributes(),
                                       LastArgWritten);
 
@@ -2847,12 +2835,12 @@ fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
     auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
     if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
         paramTy->getPointerElementType() != attrList.getParamStructRetType(i))
-      attrList = attrList.replaceAttributeType(
+      attrList = attrList.replaceAttributeTypeAtIndex(
           context, attrListIndex, llvm::Attribute::StructRet,
           paramTy->getPointerElementType());
     if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
         paramTy->getPointerElementType() != attrList.getParamByValType(i))
-      attrList = attrList.replaceAttributeType(
+      attrList = attrList.replaceAttributeTypeAtIndex(
           context, attrListIndex, llvm::Attribute::ByVal,
           paramTy->getPointerElementType());
   }
@@ -4090,11 +4078,17 @@ void CallEmission::setArgs(Explosion &adjusted, bool isOutlined,
   }
 }
 
-void CallEmission::addAttribute(unsigned index,
-                                llvm::Attribute::AttrKind attr) {
+void CallEmission::addFnAttribute(llvm::Attribute::AttrKind attr) {
   assert(state == State::Emitting);
   auto &attrs = CurCallee.getMutableAttributes();
-  attrs = attrs.addAttribute(IGF.IGM.getLLVMContext(), index, attr);
+  attrs = attrs.addFnAttribute(IGF.IGM.getLLVMContext(), attr);
+}
+
+void CallEmission::addParamAttribute(unsigned paramIndex,
+                                     llvm::Attribute::AttrKind attr) {
+  assert(state == State::Emitting);
+  auto &attrs = CurCallee.getMutableAttributes();
+  attrs = attrs.addParamAttribute(IGF.IGM.getLLVMContext(), paramIndex, attr);
 }
 
 /// Initialize an Explosion with the parameters of the current

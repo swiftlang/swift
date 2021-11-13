@@ -1263,7 +1263,7 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
   // Merge initial attributes with outAttrs.
   llvm::AttrBuilder b;
   IGM.constructInitialFnAttributes(b);
-  fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
+  fwd->addFnAttrs(b);
 
   IRGenFunction subIGF(IGM, fwd);
   if (origType->isAsync()) {
