@@ -333,13 +333,24 @@ bool checkSendableConformance(
 /// function or a closure declaration marked as `async`.
 bool isAsynchronousContext(const DeclContext *dc);
 
-namespace constraints {
-/// Determine whether the given reference is to a method on
-/// a remote distributed actor in the given context.
-bool isDistributedThunk(ConcreteDeclRef ref, Expr *context,
-                        DeclContext *dc,
-                        bool isInAsyncLetInitializer);
-} // end namespace constraints
+/// Check whether we are in an actor's initializer or deinitializer.
+/// \returns nullptr iff we are not in such a declaration. Otherwise,
+///          returns a pointer to the declaration.
+AbstractFunctionDecl const *isActorInitOrDeInitContext(
+    const DeclContext *dc,
+    llvm::function_ref<bool(const AbstractClosureExpr *)> isSendable);
+
+/// Find the directly-referenced parameter or capture of a parameter for
+/// for the given expression.
+VarDecl *getReferencedParamOrCapture(
+    Expr *expr,
+    llvm::function_ref<Expr *(OpaqueValueExpr *)> getExistentialValue);
+
+/// Check whether given variable references to a potentially
+/// isolated actor.
+bool isPotentiallyIsolatedActor(
+    VarDecl *var, llvm::function_ref<bool(ParamDecl *)> isIsolated =
+                      [](ParamDecl *P) { return P->isIsolated(); });
 
 } // end namespace swift
 

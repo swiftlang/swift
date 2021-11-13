@@ -1014,14 +1014,7 @@ namespace {
     bool isActorSelf() const {
       if (!actor)
         return false;
-
-      if (!actor->isSelfParameter() && !actor->isSelfParamCapture())
-        return false;
-
-      auto dc = actor->getDeclContext();
-      while (!dc->isTypeContext() && !dc->isModuleScopeContext())
-        dc = dc->getParent();
-      return getSelfActorDecl(dc);
+      return actor->isActorSelf();
     }
 
     explicit operator bool() const { return isIsolated(); }
@@ -1421,36 +1414,15 @@ namespace {
     /// Find the directly-referenced parameter or capture of a parameter for
     /// for the given expression.
     VarDecl *getReferencedParamOrCapture(Expr *expr) {
-      // Look through identity expressions and implicit conversions.
-      Expr *prior;
-      do {
-        prior = expr;
-
-        expr = expr->getSemanticsProvidingExpr();
-
-        if (auto conversion = dyn_cast<ImplicitConversionExpr>(expr))
-          expr = conversion->getSubExpr();
-
-        // Map opaque values.
-        if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(expr)) {
-          for (const auto &known : opaqueValues) {
-            if (known.first == opaqueValue) {
-              expr = known.second;
-              break;
+      return ::getReferencedParamOrCapture(
+          expr, [&](OpaqueValueExpr *opaqueValue) -> Expr * {
+            for (const auto &known : opaqueValues) {
+              if (known.first == opaqueValue) {
+                return known.second;
+              }
             }
-          }
-        }
-      } while (prior != expr);
-
-      // 'super' references always act on a 'self' variable.
-      if (auto super = dyn_cast<SuperRefExpr>(expr))
-        return super->getSelf();
-
-      // Declaration references to a variable.
-      if (auto declRef = dyn_cast<DeclRefExpr>(expr))
-        return dyn_cast<VarDecl>(declRef->getDecl());
-
-      return nullptr;
+            return nullptr;
+          });
     }
 
     /// Find the isolated actor instance to which the given expression refers.
@@ -1458,31 +1430,7 @@ namespace {
       // Check whether this expression is an isolated parameter or a reference
       // to a capture thereof.
       auto var = getReferencedParamOrCapture(expr);
-      bool isPotentiallyIsolated = false;
-      if (!var) {
-        isPotentiallyIsolated = false;
-      } else if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
-        // FIXME(distributed): we did a dynamic check and know that this actor is local,
-        //  but we can't express that to the type system; the real implementation
-        //  will have to mark 'self' as "known to be local" after an is-local check.
-        isPotentiallyIsolated = true;
-      } else if (auto param = dyn_cast<ParamDecl>(var)) {
-        isPotentiallyIsolated = param->isIsolated();
-      } else if (var->isSelfParamCapture()) {
-        // Find the "self" parameter that we captured and determine whether
-        // it is potentially isolated.
-        for (auto dc = var->getDeclContext(); dc; dc = dc->getParent()) {
-          if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-            if (auto selfDecl = func->getImplicitSelfDecl()) {
-              isPotentiallyIsolated = selfDecl->isIsolated();
-              break;
-            }
-          }
-
-          if (dc->isModuleScopeContext() || dc->isTypeContext())
-            break;
-        }
-      }
+      bool isPotentiallyIsolated = isPotentiallyIsolatedActor(var);
 
       // Walk the scopes between the variable reference and the variable
       // declaration to determine whether it is still isolated.
@@ -2341,42 +2289,12 @@ namespace {
       return diagnosed;
     }
 
-    /// Check whether we are in an actor's initializer or deinitializer.
-    /// \returns nullptr iff we are not in such a declaration. Otherwise,
-    ///          returns a pointer to the declaration.
-    static AbstractFunctionDecl const* isActorInitOrDeInitContext(const DeclContext *dc) {
-      while (true) {
-        // Non-Sendable closures are considered part of the enclosing context.
-        if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-          if (isSendableClosure(closure, /*forActorIsolation=*/false))
-            return nullptr;
-
-          dc = dc->getParent();
-          continue;
-        }
-
-        if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-          // If this is an initializer or deinitializer of an actor, we're done.
-          if ((isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) &&
-              getSelfActorDecl(dc->getParent()))
-            return func;
-
-          // Non-Sendable local functions are considered part of the enclosing
-          // context.
-          if (func->getDeclContext()->isLocalContext()) {
-            if (auto fnType =
-                    func->getInterfaceType()->getAs<AnyFunctionType>()) {
-              if (fnType->isSendable())
-                return nullptr;
-
-              dc = dc->getParent();
-              continue;
-            }
-          }
-        }
-
-        return nullptr;
-      }
+    static AbstractFunctionDecl const *
+    isActorInitOrDeInitContext(const DeclContext *dc) {
+      return ::isActorInitOrDeInitContext(
+          dc, [](const AbstractClosureExpr *closure) {
+            return isSendableClosure(closure, /*forActorIsolation=*/false);
+          });
     }
 
     static bool isConvenienceInit(AbstractFunctionDecl const* fn) {
@@ -2686,58 +2604,6 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
 
   // We hit the same context, so it won't execute concurrently.
   return false;
-}
-
-bool ActorIsolationChecker::isDistributedThunk(ConcreteDeclRef ref,
-                                               Expr *context,
-                                               bool isInAsyncLetInitializer) {
-  auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(ref.getDecl());
-  if (!(FD && FD->isInstanceMember() && FD->isDistributed()))
-    return false;
-
-  if (!isa<SelfApplyExpr>(context))
-    return false;
-
-  auto actor = getIsolatedActor(cast<SelfApplyExpr>(context)->getBase());
-
-  // If this is a method reference on an isolated or potentially isolated
-  // actor then it cannot be a remote thunk.
-  if (actor.isIsolated() || actor.isPotentiallyIsolated)
-    return false;
-
-  auto *dc = getDeclContext();
-
-  switch (ActorIsolationRestriction::forDeclaration(ref, dc)) {
-  case ActorIsolationRestriction::CrossActorSelf: {
-    // Not a thunk if it's used in actor init or de-init.
-    if (!isInAsyncLetInitializer && isActorInitOrDeInitContext(dc))
-      return false;
-
-    // Here we know that the method could be used across actors
-    // and the actor it's used on is non-isolated, which means
-    // that it could be a thunk, so we have to be conservative
-    // about it.
-    return true;
-  }
-
-  case ActorIsolationRestriction::ActorSelf: {
-    // An instance member of an actor can be referenced from an actor's
-    // designated initializer or deinitializer.
-    if (actor.isActorSelf() && !isInAsyncLetInitializer) {
-      if (auto fn = isActorInitOrDeInitContext(dc)) {
-        if (!isConvenienceInit(fn))
-          return false;
-      }
-    }
-
-    // Call on a non-isolated actor in async context requires
-    // implicit thunk.
-    return isInAsyncLetInitializer || isInAsynchronousContext();
-  }
-
-  default:
-    return false;
-  }
 }
 
 void swift::checkTopLevelActorIsolation(TopLevelCodeDecl *decl) {
@@ -4343,10 +4209,106 @@ bool swift::isAsynchronousContext(const DeclContext *dc) {
   return false;
 }
 
-bool swift::constraints::isDistributedThunk(ConcreteDeclRef ref,
-                                            Expr *context,
-                                            DeclContext *dc,
-                                            bool isInAsyncLetInitializer) {
-  ActorIsolationChecker checker(dc);
-  return checker.isDistributedThunk(ref, context, isInAsyncLetInitializer);
+AbstractFunctionDecl const *swift::isActorInitOrDeInitContext(
+    const DeclContext *dc,
+    llvm::function_ref<bool(const AbstractClosureExpr *)> isSendable) {
+  while (true) {
+    // Non-Sendable closures are considered part of the enclosing context.
+    if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+      if (isSendable(closure))
+        return nullptr;
+
+      dc = dc->getParent();
+      continue;
+    }
+
+    if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+      // If this is an initializer or deinitializer of an actor, we're done.
+      if ((isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) &&
+          getSelfActorDecl(dc->getParent()))
+        return func;
+
+      // Non-Sendable local functions are considered part of the enclosing
+      // context.
+      if (func->getDeclContext()->isLocalContext()) {
+        if (auto fnType = func->getInterfaceType()->getAs<AnyFunctionType>()) {
+          if (fnType->isSendable())
+            return nullptr;
+
+          dc = dc->getParent();
+          continue;
+        }
+      }
+    }
+
+    return nullptr;
+  }
+}
+
+/// Find the directly-referenced parameter or capture of a parameter for
+/// for the given expression.
+VarDecl *swift::getReferencedParamOrCapture(
+    Expr *expr,
+    llvm::function_ref<Expr *(OpaqueValueExpr *)> getExistentialValue) {
+  // Look through identity expressions and implicit conversions.
+  Expr *prior;
+
+  do {
+    prior = expr;
+
+    expr = expr->getSemanticsProvidingExpr();
+
+    if (auto conversion = dyn_cast<ImplicitConversionExpr>(expr))
+      expr = conversion->getSubExpr();
+
+    // Map opaque values.
+    if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(expr)) {
+      if (auto *value = getExistentialValue(opaqueValue))
+        expr = value;
+    }
+  } while (prior != expr);
+
+  // 'super' references always act on a 'self' variable.
+  if (auto super = dyn_cast<SuperRefExpr>(expr))
+    return super->getSelf();
+
+  // Declaration references to a variable.
+  if (auto declRef = dyn_cast<DeclRefExpr>(expr))
+    return dyn_cast<VarDecl>(declRef->getDecl());
+
+  return nullptr;
+}
+
+bool swift::isPotentiallyIsolatedActor(
+    VarDecl *var, llvm::function_ref<bool(ParamDecl *)> isIsolated) {
+  if (!var)
+    return false;
+
+  if (var->getName().str().equals("__secretlyKnownToBeLocal")) {
+    // FIXME(distributed): we did a dynamic check and know that this actor is
+    // local,
+    //  but we can't express that to the type system; the real implementation
+    //  will have to mark 'self' as "known to be local" after an is-local check.
+    return true;
+  }
+
+  if (auto param = dyn_cast<ParamDecl>(var))
+    return isIsolated(param);
+
+  if (var->isSelfParamCapture()) {
+    // Find the "self" parameter that we captured and determine whether
+    // it is potentially isolated.
+    for (auto dc = var->getDeclContext(); dc; dc = dc->getParent()) {
+      if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+        if (auto selfDecl = func->getImplicitSelfDecl()) {
+          return selfDecl->isIsolated();
+        }
+      }
+
+      if (dc->isModuleScopeContext() || dc->isTypeContext())
+        break;
+    }
+  }
+
+  return false;
 }
