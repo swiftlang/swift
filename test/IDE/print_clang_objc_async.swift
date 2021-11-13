@@ -99,8 +99,8 @@ import _Concurrency
 // CHECK-LABEL: protocol ProtocolWithSwiftAttributes {
 // CHECK-NEXT: nonisolated func independentMethod()
 // CHECK-NEXT: nonisolated func nonisolatedMethod()
-// CHECK-NEXT: {{^}} @objc @MainActor func mainActorMethod()
-// CHECK-NEXT: {{^}} @objc @MainActor func uiActorMethod()
+// CHECK-NEXT: {{^}} @MainActor @objc func mainActorMethod()
+// CHECK-NEXT: {{^}} @MainActor @objc func uiActorMethod()
 // CHECK-NEXT: {{^}} @objc optional func missingAtAttributeMethod()
 // CHECK-NEXT: {{^[}]$}}
 
@@ -108,4 +108,4 @@ import _Concurrency
 
 // CHECK: func doSomethingConcurrently(_ block: @Sendable () -> Void)
 
-// CHECK: @MainActor protocol TripleMainActor {
+// CHECK: @MainActor @objc protocol TripleMainActor {
