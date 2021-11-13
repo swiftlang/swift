@@ -13,10 +13,6 @@ public func experimental_regex_strawperson(
   }
 }
 
-public func register() {
-  registerSwiftPasses
-}
-
 public func registerParser() {
-  Parser_registerParseRegexpFn({ experimental_regex_strawperson })
+  Parser_registerParseRegexStrawperson({ experimental_regex_strawperson($0) })
 }

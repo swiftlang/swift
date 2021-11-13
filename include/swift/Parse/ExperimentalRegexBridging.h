@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-typedef const char *(* _Nonnull ParseRegexStrawperson)(const char *);
+typedef const char *(* _Nonnull ParseRegexStrawperson)(const char * _Nonnull);
 
 void Parser_registerParseRegexStrawperson(ParseRegexStrawperson fn);
 

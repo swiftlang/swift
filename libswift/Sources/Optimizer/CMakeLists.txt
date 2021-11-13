@@ -7,7 +7,7 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 add_libswift_module(Optimizer
-    DEPENDS SIL)
+    DEPENDS SIL ExperimentalRegex)
 
 add_subdirectory(Analysis)
 add_subdirectory(InstructionPasses)
