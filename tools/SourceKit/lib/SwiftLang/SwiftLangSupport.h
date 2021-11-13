@@ -14,6 +14,7 @@
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTLANGSUPPORT_H
 
 #include "CodeCompletion.h"
+#include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Statistic.h"
@@ -304,6 +305,7 @@ class SwiftLangSupport : public LangSupport {
   std::string DiagnosticDocumentationPath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
+  std::shared_ptr<RequestTracker> ReqTracker;
   SwiftInterfaceGenMap IFaceGenContexts;
   ThreadSafeRefCntPtr<SwiftCompletionCache> CCCache;
   ThreadSafeRefCntPtr<SwiftPopularAPI> PopularAPI;
@@ -486,8 +488,6 @@ public:
   void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) override;
 
   void dependencyUpdated() override;
-
-  void cancelRequest(SourceKitCancellationToken CancellationToken) override;
 
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
                    ArrayRef<const char *> Args) override;

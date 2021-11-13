@@ -745,8 +745,6 @@ public:
 
   virtual void dependencyUpdated() {}
 
-  virtual void cancelRequest(SourceKitCancellationToken CancellationToken) = 0;
-
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,
                            ArrayRef<const char *> Args) = 0;

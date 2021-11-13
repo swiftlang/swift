@@ -227,6 +227,17 @@ void sourcekitd_cancel_request(sourcekitd_request_handle_t handle) {
   xpc_release(msg);
 }
 
+void sourcekitd_request_handle_dispose(sourcekitd_request_handle_t handle) {
+  xpc_connection_t conn = getGlobalConnection();
+  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr, 0);
+  xpc_dictionary_set_uint64(msg, xpc::KeyDisposeRequestHandle,
+                            reinterpret_cast<uint64_t>(handle));
+
+  xpc_connection_send_message(conn, msg);
+
+  xpc_release(msg);
+}
+
 /// To avoid repeated crashes, used to notify the service to delay typechecking
 /// in the editor for a certain amount of seconds.
 static std::atomic<size_t> SemanticEditorDelaySecondsNum;

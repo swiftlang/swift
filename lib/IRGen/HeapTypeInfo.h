@@ -64,10 +64,9 @@ class HeapTypeInfo
 protected:
   using super::asDerived;
 public:
-  HeapTypeInfo(ReferenceCounting refcounting, llvm::PointerType *storage,
-               Size size, SpareBitVector spareBits, Alignment align)
-      : super(swift::irgen::refcountingToScalarKind(refcounting), storage, size, spareBits,
-              align) {}
+  HeapTypeInfo(llvm::PointerType *storage, Size size, SpareBitVector spareBits,
+               Alignment align)
+    : super(storage, size, spareBits, align) {}
 
   bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                  ReferenceCounting *refcounting) const override {

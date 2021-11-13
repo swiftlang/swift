@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//
 // This file implements the algorithm for computing a minimal set of rules from
 // a confluent rewrite system. A minimal set of rules is:
 //
@@ -76,7 +75,10 @@ using namespace rewriting;
 llvm::SmallVector<unsigned, 1>
 RewriteLoop::findRulesAppearingOnceInEmptyContext(
     const RewriteSystem &system) const {
+  // Rules appearing in empty context (possibly more than once).
   llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
+
+  // The number of times each rule appears (with or without context).
   llvm::SmallDenseMap<unsigned, unsigned, 2> ruleMultiplicity;
 
   RewritePathEvaluator evaluator(Basepoint);
@@ -100,6 +102,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     step.apply(evaluator, system);
   }
 
+  // Collect all rules that we saw exactly once in empty context.
   SmallVector<unsigned, 1> result;
   for (auto rule : rulesInEmptyContext) {
     auto found = ruleMultiplicity.find(rule);
@@ -759,8 +762,10 @@ void RewriteSystem::minimizeRewriteSystem() {
   // Now find a minimal set of generating conformances.
   //
   // FIXME: For now this just produces a set of redundant conformances, but
-  // it should actually compute the full generating conformance basis, since
-  // we want to use the same information for finding conformance access paths.
+  // it should actually output the canonical generating conformance equation
+  // for each non-generating conformance. We can then use information to
+  // compute conformance access paths, instead of the current "brute force"
+  // algorithm used for that purpose.
   llvm::DenseSet<unsigned> redundantConformances;
   computeGeneratingConformances(redundantConformances);
 
@@ -774,10 +779,14 @@ void RewriteSystem::minimizeRewriteSystem() {
 }
 
 /// Collect all non-permanent, non-redundant rules whose domain is equal to
-/// one of the protocols in \p proto. These rules form the requirement
-/// signatures of these protocols.
+/// one of the protocols in \p proto. In other words, the first symbol of the
+/// left hand side term is either a protocol symbol or associated type symbol
+/// whose protocol is in \p proto.
+///
+/// These rules form the requirement signatures of these protocols.
 llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
-RewriteSystem::getMinimizedRules(ArrayRef<const ProtocolDecl *> protos) {
+RewriteSystem::getMinimizedProtocolRules(
+    ArrayRef<const ProtocolDecl *> protos) const {
   assert(Minimized);
 
   llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>> rules;
@@ -796,6 +805,33 @@ RewriteSystem::getMinimizedRules(ArrayRef<const ProtocolDecl *> protos) {
     const auto *proto = domain[0];
     if (std::find(protos.begin(), protos.end(), proto) != protos.end())
       rules[proto].push_back(ruleID);
+  }
+
+  return rules;
+}
+
+/// Collect all non-permanent, non-redundant rules whose left hand side
+/// begins with a generic parameter symbol.
+///
+/// These rules form the top-level generic signature for this rewrite system.
+std::vector<unsigned>
+RewriteSystem::getMinimizedGenericSignatureRules() const {
+  assert(Minimized);
+
+  std::vector<unsigned> rules;
+  for (unsigned ruleID : indices(Rules)) {
+    const auto &rule = getRule(ruleID);
+
+    if (rule.isPermanent())
+      continue;
+
+    if (rule.isRedundant())
+      continue;
+
+    if (rule.getLHS()[0].getKind() != Symbol::Kind::GenericParam)
+      continue;
+
+    rules.push_back(ruleID);
   }
 
   return rules;
@@ -831,6 +867,7 @@ void RewriteSystem::verifyRewriteLoops() const {
 /// since this suggests a misunderstanding on my part.
 void RewriteSystem::verifyRedundantConformances(
     llvm::DenseSet<unsigned> redundantConformances) const {
+#ifndef NDEBUG
   for (unsigned ruleID : redundantConformances) {
     const auto &rule = getRule(ruleID);
     assert(!rule.isPermanent() &&
@@ -848,11 +885,13 @@ void RewriteSystem::verifyRedundantConformances(
       abort();
     }
   }
+#endif
 }
 
 // Assert if homotopy reduction failed to eliminate a rewrite rule it was
 // supposed to delete.
 void RewriteSystem::verifyMinimizedRules() const {
+#ifndef NDEBUG
   for (const auto &rule : Rules) {
     // Note that sometimes permanent rules can be simplified, but they can never
     // be redundant.
@@ -890,4 +929,5 @@ void RewriteSystem::verifyMinimizedRules() const {
       abort();
     }
   }
+#endif
 }

@@ -162,6 +162,10 @@ void sourcekitd_cancel_request(sourcekitd_request_handle_t handle) {
   sourcekitd::cancelRequest(/*CancellationToken=*/handle);
 }
 
+void sourcekitd_request_handle_dispose(sourcekitd_request_handle_t handle) {
+  sourcekitd::disposeCancellationToken(/*CancellationToken=*/handle);
+}
+
 void
 sourcekitd_set_interrupted_connection_handler(
                           sourcekitd_interrupted_connection_handler_t handler) {

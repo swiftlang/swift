@@ -273,7 +273,7 @@ configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
-      CCCache(new SwiftCompletionCache) {
+      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
@@ -282,7 +282,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
   ASTMgr = std::make_shared<SwiftASTManager>(
-      EditorDocuments, SKCtx.getGlobalConfiguration(), Stats,
+      EditorDocuments, SKCtx.getGlobalConfiguration(), Stats, ReqTracker,
       RuntimeResourcePath, DiagnosticDocumentationPath);
 
   CompletionInst = std::make_shared<CompletionInstance>();
@@ -305,11 +305,6 @@ void SwiftLangSupport::globalConfigurationUpdated(
 
 void SwiftLangSupport::dependencyUpdated() {
   CompletionInst->markCachedCompilerInstanceShouldBeInvalidated();
-}
-
-void SwiftLangSupport::cancelRequest(
-    SourceKitCancellationToken CancellationToken) {
-  getASTManager()->cancelASTConsumer(CancellationToken);
 }
 
 UIdent SwiftLangSupport::getUIDForDeclLanguage(const swift::Decl *D) {

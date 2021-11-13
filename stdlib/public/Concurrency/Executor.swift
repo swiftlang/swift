@@ -111,7 +111,7 @@ internal func _enqueueOnDispatchQueue(_ job: UnownedJob,
 /// means a dispatch_queue_t, which is not the same as DispatchQueue
 /// on platforms where that is an instance of a wrapper class.
 @available(SwiftStdlib 5.1, *)
-internal final class DispatchQueueShim: UnsafeSendable, SerialExecutor {
+internal final class DispatchQueueShim: @unchecked Sendable, SerialExecutor {
   func enqueue(_ job: UnownedJob) {
     _enqueueOnDispatchQueue(job, queue: self)
   }

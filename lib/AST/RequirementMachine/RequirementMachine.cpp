@@ -66,7 +66,7 @@ struct RewriteSystemBuilder {
 
   RewriteSystemBuilder(RewriteContext &ctx, bool dump)
     : Context(ctx), Dump(dump) {}
-  void addGenericSignature(CanGenericSignature sig);
+  void addRequirements(ArrayRef<Requirement> requirements);
   void addProtocols(ArrayRef<const ProtocolDecl *> proto);
   void addProtocol(const ProtocolDecl *proto,
                    bool initialComponent);
@@ -108,10 +108,9 @@ RewriteSystemBuilder::getConcreteSubstitutionSchema(CanType concreteType,
   }));
 }
 
-void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
-  // Collect all protocols transitively referenced from the generic signature's
-  // requirements.
-  for (auto req : sig.getRequirements()) {
+void RewriteSystemBuilder::addRequirements(ArrayRef<Requirement> requirements) {
+  // Collect all protocols transitively referenced from these requirements.
+  for (auto req : requirements) {
     if (req.getKind() == RequirementKind::Conformance) {
       addProtocol(req.getProtocolDecl(), /*initialComponent=*/false);
     }
@@ -119,8 +118,8 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
 
   processProtocolDependencies();
 
-  // Add rewrite rules for all requirements in the top-level signature.
-  for (const auto &req : sig.getRequirements())
+  // Add rewrite rules for all top-level requirements.
+  for (const auto &req : requirements)
     addRequirement(req, /*proto=*/nullptr);
 }
 
@@ -350,7 +349,7 @@ void RequirementMachine::verify(const MutableTerm &term) const {
   // generic parameter.
   if (term.begin()->getKind() == Symbol::Kind::GenericParam) {
     auto *genericParam = term.begin()->getGenericParam();
-    auto genericParams = Sig.getGenericParams();
+    TypeArrayView<GenericTypeParamType> genericParams = getGenericParams();
     auto found = std::find(genericParams.begin(),
                            genericParams.end(),
                            genericParam);
@@ -428,8 +427,13 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
   out << "Requirement machine for ";
   if (Sig)
     out << Sig;
-  else {
-    out << "[";
+  else if (!Params.empty()) {
+    out << "fresh signature ";
+    for (auto paramTy : Params)
+      out << " " << Type(paramTy);
+  } else {
+    assert(!Protos.empty());
+    out << "protocols [";
     for (auto *proto : Protos) {
       out << " " << proto->getName();
     }
@@ -467,6 +471,8 @@ RequirementMachine::~RequirementMachine() {}
 /// performed on this requirement machine.
 void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   Sig = sig;
+  Params.append(sig.getGenericParams().begin(),
+                sig.getGenericParams().end());
 
   PrettyStackTraceGenericSignature debugStack("building rewrite system for", sig);
 
@@ -485,7 +491,7 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
   RewriteSystemBuilder builder(Context, Dump);
-  builder.addGenericSignature(sig);
+  builder.addRequirements(sig.getRequirements());
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
@@ -533,6 +539,45 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
                     std::move(builder.RequirementRules));
 
   // FIXME: Only if the protocols were written in source, though.
+  computeCompletion(RewriteSystem::AllowInvalidRequirements);
+
+  if (Dump) {
+    llvm::dbgs() << "}\n";
+  }
+}
+
+/// Build a requirement machine from a set of generic parameters and
+/// (possibly non-canonical or non-minimal) structural requirements.
+void RequirementMachine::initWithAbstractRequirements(
+    ArrayRef<GenericTypeParamType *> genericParams,
+    ArrayRef<Requirement> requirements) {
+  Params.append(genericParams.begin(), genericParams.end());
+
+  auto &ctx = Context.getASTContext();
+  auto *Stats = ctx.Stats;
+
+  if (Stats)
+    ++Stats->getFrontendCounters().NumRequirementMachines;
+
+  FrontendStatsTracer tracer(Stats, "build-rewrite-system");
+
+  if (Dump) {
+    llvm::dbgs() << "Adding generic parameters:";
+    for (auto *paramTy : genericParams)
+      llvm::dbgs() << " " << Type(paramTy);
+    llvm::dbgs() << "\n";
+  }
+
+  // Collect the top-level requirements, and all transtively-referenced
+  // protocol requirement signatures.
+  RewriteSystemBuilder builder(Context, Dump);
+  builder.addRequirements(requirements);
+
+  // Add the initial set of rewrite rules to the rewrite system.
+  System.initialize(/*recordLoops=*/true,
+                    std::move(builder.PermanentRules),
+                    std::move(builder.RequirementRules));
+
   computeCompletion(RewriteSystem::AllowInvalidRequirements);
 
   if (Dump) {

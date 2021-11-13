@@ -2003,31 +2003,18 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   return builder;
 }
 
-rewriting::RequirementMachine *
-ASTContext::getOrCreateRequirementMachine(CanGenericSignature sig) {
+rewriting::RewriteContext &
+ASTContext::getRewriteContext() {
   auto &rewriteCtx = getImpl().TheRewriteContext;
   if (!rewriteCtx)
     rewriteCtx.reset(new rewriting::RewriteContext(*this));
 
-  return rewriteCtx->getRequirementMachine(sig);
+  return *rewriteCtx;
 }
 
 bool ASTContext::isRecursivelyConstructingRequirementMachine(
       CanGenericSignature sig) {
-  auto &rewriteCtx = getImpl().TheRewriteContext;
-  if (!rewriteCtx)
-    return false;
-
-  return rewriteCtx->isRecursivelyConstructingRequirementMachine(sig);
-}
-
-rewriting::RequirementMachine *
-ASTContext::getOrCreateRequirementMachine(const ProtocolDecl *proto) {
-  auto &rewriteCtx = getImpl().TheRewriteContext;
-  if (!rewriteCtx)
-    rewriteCtx.reset(new rewriting::RewriteContext(*this));
-
-  return rewriteCtx->getRequirementMachine(proto);
+  return getRewriteContext().isRecursivelyConstructingRequirementMachine(sig);
 }
 
 Optional<llvm::TinyPtrVector<ValueDecl *>>

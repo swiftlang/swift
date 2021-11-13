@@ -113,7 +113,8 @@ class CursorInfoTest : public ::testing::Test {
   NullEditorConsumer Consumer;
 
 public:
-  LangSupport &getLang() { return Ctx.getSwiftLangSupport(); }
+  SourceKit::Context &getContext() { return Ctx; }
+  LangSupport &getLang() { return getContext().getSwiftLangSupport(); }
 
   void SetUp() override {
     llvm::InitializeAllTargets();
@@ -496,7 +497,7 @@ TEST_F(CursorInfoTest, CursorInfoCancellation) {
         CursorInfoSema.signal();
       });
 
-  getLang().cancelRequest(CancellationToken);
+  getContext().getRequestTracker()->cancel(CancellationToken);
 
   bool expired = CursorInfoSema.wait(30 * 1000);
   if (expired)

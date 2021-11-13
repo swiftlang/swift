@@ -110,7 +110,7 @@ internal final class CheckedContinuationCanary {
 /// enough to obtain the extra checking without further source modification in
 /// most circumstances.
 @available(SwiftStdlib 5.1, *)
-public struct CheckedContinuation<T, E: Error>: UnsafeSendable {
+public struct CheckedContinuation<T, E: Error>: @unchecked Sendable {
   private let canary: CheckedContinuationCanary
   
   /// Initialize a `CheckedContinuation` wrapper around an
