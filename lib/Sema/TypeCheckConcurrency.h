@@ -329,10 +329,6 @@ bool isDispatchQueueOperationName(StringRef name);
 bool checkSendableConformance(
     ProtocolConformance *conformance, SendableCheck check);
 
-/// Check whether the given declaration context is asynchronous e.g.
-/// function or a closure declaration marked as `async`.
-bool isAsynchronousContext(const DeclContext *dc);
-
 /// Check whether we are in an actor's initializer or deinitializer.
 /// \returns nullptr iff we are not in such a declaration. Otherwise,
 ///          returns a pointer to the declaration.
