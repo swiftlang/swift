@@ -943,8 +943,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
       else
         buildFnAttr.addAttribute(Attr);
     }
-    fn->addAttributes(llvm::AttributeList::FunctionIndex, buildFnAttr);
-    fn->addAttributes(llvm::AttributeList::ReturnIndex, buildRetAttr);
+    fn->addFnAttrs(buildFnAttr);
+    fn->addRetAttrs(buildRetAttr);
     fn->addParamAttrs(0, buildFirstParamAttr);
   }
 
@@ -1182,14 +1182,10 @@ void IRGenerator::addBackDeployedObjCActorInitialization(ClassDecl *ClassDecl) {
 
 llvm::AttributeList IRGenModule::getAllocAttrs() {
   if (AllocAttrs.isEmpty()) {
+    AllocAttrs = llvm::AttributeList().addRetAttribute(
+        getLLVMContext(), llvm::Attribute::NoAlias);
     AllocAttrs =
-        llvm::AttributeList::get(getLLVMContext(),
-                                 llvm::AttributeList::ReturnIndex,
-                                 llvm::Attribute::NoAlias);
-    AllocAttrs =
-        AllocAttrs.addAttribute(getLLVMContext(),
-                                llvm::AttributeList::FunctionIndex,
-                                llvm::Attribute::NoUnwind);
+        AllocAttrs.addFnAttribute(getLLVMContext(), llvm::Attribute::NoUnwind);
   }
   return AllocAttrs;
 }
@@ -1206,7 +1202,7 @@ void IRGenModule::setHasNoFramePointer(llvm::AttrBuilder &Attrs) {
 void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
   llvm::AttrBuilder b;
   setHasNoFramePointer(b);
-  F->addAttributes(llvm::AttributeList::FunctionIndex, b);
+  F->addFnAttrs(b);
 }
 
 /// Construct initial function attributes from options.
@@ -1230,8 +1226,7 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
 llvm::AttributeList IRGenModule::constructInitialAttributes() {
   llvm::AttrBuilder b;
   constructInitialFnAttributes(b);
-  return llvm::AttributeList::get(getLLVMContext(),
-                                  llvm::AttributeList::FunctionIndex, b);
+  return llvm::AttributeList().addFnAttributes(getLLVMContext(), b);
 }
 
 llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {
