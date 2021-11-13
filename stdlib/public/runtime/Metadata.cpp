@@ -44,7 +44,6 @@
 #include <windows.h>
 #else
 #include <sys/mman.h>
-#include <unistd.h>
 // WASI doesn't support dynamic linking yet.
 #if !defined(__wasi__)
 #include <dlfcn.h>
