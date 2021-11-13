@@ -501,6 +501,19 @@ static void addFrontendFlagOption(llvm::opt::OptTable &table,
   }
 }
 
+swiftscan_string_ref_t
+swiftscan_compiler_target_info_query(swiftscan_scan_invocation_t invocation) {
+  int argc = invocation->argv->count;
+  std::vector<const char *> Compilation;
+  for (int i = 0; i < argc; ++i)
+    Compilation.push_back(get_C_string(invocation->argv->strings[i]));
+
+  auto TargetInfo = getTargetInfo(Compilation);
+  if (TargetInfo.getError())
+    return create_null();
+  return TargetInfo.get();
+}
+
 swiftscan_string_set_t *
 swiftscan_compiler_supported_arguments_query() {
   std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();

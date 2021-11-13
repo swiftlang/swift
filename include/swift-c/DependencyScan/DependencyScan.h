@@ -300,12 +300,16 @@ swiftscan_batch_scan_result_dispose(swiftscan_batch_scan_result_t *result);
 SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation);
 
-//=== Feature-Query Functions -----------------------------------------===//
+//=== Feature-Query Functions ---------------------------------------------===//
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_compiler_supported_arguments_query();
 
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_compiler_supported_features_query();
+
+//=== Target-Info Functions -----------------------------------------------===//
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_compiler_target_info_query(swiftscan_scan_invocation_t invocation);
 
 //=== Scanner Functions ---------------------------------------------------===//
 
