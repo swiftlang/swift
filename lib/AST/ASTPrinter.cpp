@@ -3414,9 +3414,6 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   printAttributes(param);
 
-  if (param->isIsolated())
-    Printer << "isolated ";
-
   printArgName();
 
   TypeLoc TheTypeLoc;
