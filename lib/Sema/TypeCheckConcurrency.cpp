@@ -3963,9 +3963,6 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     return conformance;
   };
 
-  if (auto nonSendable = nominal->getAttrs().getAttribute<NonSendableAttr>())
-    return formConformance(nonSendable);
-
   // A non-protocol type with a global actor is implicitly Sendable.
   if (nominal->getGlobalActorAttr()) {
     // If this is a class, check the superclass. We won't infer Sendable
@@ -3984,6 +3981,12 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
     // Form the implicit conformance to Sendable.
     return formConformance(nullptr);
+  }
+
+  if (auto attr = nominal->getAttrs().getEffectiveSendableAttr()) {
+    assert(!isa<SendableAttr>(attr) &&
+           "Conformance should have been added by SynthesizedProtocolAttr!");
+    return formConformance(cast<NonSendableAttr>(attr));
   }
 
   // Only structs and enums can get implicit Sendable conformances by

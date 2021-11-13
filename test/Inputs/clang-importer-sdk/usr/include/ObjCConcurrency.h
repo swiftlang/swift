@@ -5,6 +5,21 @@
 
 #define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
 
+#ifdef __SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS
+  #define SENDABLE __attribute__((__swift_attr__("@Sendable")))
+  #define NONSENDABLE __attribute__((__swift_attr__("@_nonSendable")))
+  #define ASSUME_NONSENDABLE_BEGIN _Pragma("clang attribute ASSUME_NONSENDABLE.push (__attribute__((swift_attr(\"@_nonSendable(_assumed)\"))), apply_to = any(objc_interface, record, enum))")
+  #define ASSUME_NONSENDABLE_END _Pragma("clang attribute ASSUME_NONSENDABLE.pop")
+#else
+  // If we take this #else, we should see minor failures of some subtests,
+  // but not systematic failures of everything that uses this header.
+  #define SENDABLE
+  #define NONSENDABLE
+  #define ASSUME_NONSENDABLE_BEGIN
+  #define ASSUME_NONSENDABLE_END
+#endif
+
+
 #define NS_EXTENSIBLE_STRING_ENUM __attribute__((swift_wrapper(struct)));
 typedef NSString *Flavor NS_EXTENSIBLE_STRING_ENUM;
 
@@ -166,7 +181,7 @@ __attribute__((__swift_attr__("@MainActor(unsafe)")))
 @end
 
 // Do something concurrently, but without escaping.
-void doSomethingConcurrently(__attribute__((noescape)) __attribute__((swift_attr("@Sendable"))) void (^block)(void));
+void doSomethingConcurrently(__attribute__((noescape)) SENDABLE void (^block)(void));
 
 
 
@@ -184,5 +199,17 @@ MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor(unsafe)"))) @pro
 @interface ClassWithAsync: NSObject <ProtocolWithAsync>
 - (void)instanceMethodWithCompletionHandler:(void (^)(void))completionHandler __attribute__((swift_async_name("instanceAsync()")));
 @end
+
+SENDABLE @interface SendableClass : NSObject @end
+
+NONSENDABLE @interface NonSendableClass : NSObject @end
+
+ASSUME_NONSENDABLE_BEGIN
+
+SENDABLE @interface AuditedSendable : NSObject @end
+@interface AuditedNonSendable : NSObject @end
+NONSENDABLE SENDABLE @interface AuditedBoth : NSObject @end
+
+ASSUME_NONSENDABLE_END
 
 #pragma clang assume_nonnull end
