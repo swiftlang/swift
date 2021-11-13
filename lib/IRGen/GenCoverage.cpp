@@ -66,14 +66,12 @@ void IRGenModule::emitCoverageMapping() {
       Files.push_back(M->getFile());
 
   auto remapper = getOptions().CoveragePrefixMap;
-  // Awkwardly munge absolute filenames into a vector of StringRefs.
+
   llvm::SmallVector<std::string, 8> FilenameStrs;
-  llvm::SmallVector<StringRef, 8> FilenameRefs;
   for (StringRef Name : Files) {
     llvm::SmallString<256> Path(Name);
     llvm::sys::fs::make_absolute(Path);
     FilenameStrs.push_back(remapper.remapPath(Path));
-    FilenameRefs.push_back(FilenameStrs.back());
   }
 
   // Encode the filenames.
@@ -81,7 +79,7 @@ void IRGenModule::emitCoverageMapping() {
   llvm::LLVMContext &Ctx = getLLVMContext();
   {
     llvm::raw_string_ostream OS(Filenames);
-    llvm::coverage::CoverageFilenamesSectionWriter(FilenameRefs).write(OS);
+    llvm::coverage::CoverageFilenamesSectionWriter(FilenameStrs).write(OS);
   }
   auto *FilenamesVal =
       llvm::ConstantDataArray::getString(Ctx, Filenames, false);
