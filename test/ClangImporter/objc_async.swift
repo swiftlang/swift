@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -disable-availability-checking  %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -disable-availability-checking  %s -verify -warn-concurrency
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -109,6 +109,18 @@ func testSendableInAsync() async {
     x = 42 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
   }
   print(x)
+}
+
+func testSendableClasses(sendable: SendableClass, nonSendable: NonSendableClass) async {
+  func takesSendable<T: Sendable>(_: T) {}
+
+  takesSendable(sendable)        // no-error
+  takesSendable(nonSendable)     // expected-FIXME-warning{{something about missing conformance}}
+
+  doSomethingConcurrently {
+    print(sendable)        // no-error
+    print(nonSendable)     // expected-warning{{cannot use parameter 'nonSendable' with a non-sendable type 'NonSendableClass' from concurrently-executed code}}
+  }
 }
 
 // Check import of attributes

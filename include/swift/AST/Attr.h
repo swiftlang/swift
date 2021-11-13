@@ -289,6 +289,9 @@ public:
 
     /// Whether this attribute is only valid when distributed is enabled.
     DistributedOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
+
+    /// Whether this attribute is valid on additional decls in ClangImporter.
+    OnAnyClangDecl = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 18),
   };
 
   LLVM_READNONE
@@ -2223,6 +2226,10 @@ public:
         return Attr;
     return nullptr;
   }
+
+  /// Returns the "winning" \c NonSendableAttr or \c SendableAttr in this
+  /// attribute list, or \c nullptr if there are none.
+  const DeclAttribute *getEffectiveSendableAttr() const;
 
 private:
   /// Predicate used to filter MatchingAttributeRange.

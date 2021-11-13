@@ -8495,6 +8495,16 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
                swiftAttr->getAttribute());
     }
   }
+
+  // Now that we've collected all @Sendable and @_nonSendable attributes, we
+  // can see if we should synthesize a Sendable conformance.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(MappedDecl)) {
+    auto sendability = nominal->getAttrs().getEffectiveSendableAttr();
+    if (isa_and_nonnull<SendableAttr>(sendability)) {
+      addSynthesizedProtocolAttrs(*this, nominal, {KnownProtocolKind::Sendable},
+                                  /*isUnchecked=*/true);
+    }
+  }
 }
 
 static bool isUsingMacroName(clang::SourceManager &SM,
