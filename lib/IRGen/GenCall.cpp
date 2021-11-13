@@ -1119,6 +1119,8 @@ namespace {
         return convertFloatingType(Ctx.getTargetInfo().getBFloat16Format());
       case clang::BuiltinType::Float128:
         return convertFloatingType(Ctx.getTargetInfo().getFloat128Format());
+      case clang::BuiltinType::Ibm128:
+        return convertFloatingType(Ctx.getTargetInfo().getIbm128Format());
 
       // nullptr_t -> void*
       case clang::BuiltinType::NullPtr:
