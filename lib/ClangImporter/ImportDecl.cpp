@@ -8605,12 +8605,7 @@ void ClangImporter::Implementation::importAttributes(
         if (SeenMainActorAttr) {
           // Cannot add main actor annotation twice. We'll keep the first
           // one and raise a warning about the duplicate.
-          auto &clangSrcMgr = getClangASTContext().getSourceManager();
-          ClangSourceBufferImporter &bufferImporter =
-              getBufferImporterForDiagnostics();
-          SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
-              clangSrcMgr, swiftAttr->getLocation());
-
+          HeaderLoc attrLoc(swiftAttr->getLocation());
           diagnose(attrLoc, diag::import_multiple_mainactor_attr,
                    swiftAttr->getAttribute(),
                    SeenMainActorAttr.getValue()->getAttribute());
@@ -8666,11 +8661,7 @@ void ClangImporter::Implementation::importAttributes(
 
       if (hadError) {
         // Complain about the unhandled attribute or modifier.
-        auto &clangSrcMgr = getClangASTContext().getSourceManager();
-        ClangSourceBufferImporter &bufferImporter =
-          getBufferImporterForDiagnostics();
-        SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
-          clangSrcMgr, swiftAttr->getLocation());
+        HeaderLoc attrLoc(swiftAttr->getLocation());
         diagnose(attrLoc, diag::clang_swift_attr_unhandled,
                  swiftAttr->getAttribute());
       }
@@ -9244,19 +9235,13 @@ ClangImporter::Implementation::importDeclForDeclContext(
   if (!contextDeclsWarnedAbout.insert(contextDecl).second)
     return nullptr;
 
-  auto convertLoc = [&](clang::SourceLocation clangLoc) {
-    return getBufferImporterForDiagnostics()
-      .resolveSourceLocation(getClangASTContext().getSourceManager(),
-                             clangLoc);
-  };
-
   auto getDeclName = [](const clang::Decl *D) -> StringRef {
     if (auto ND = dyn_cast<clang::NamedDecl>(D))
       return ND->getName();
     return "<anonymous>";
   };
 
-  SourceLoc loc = convertLoc(importingDecl->getLocation());
+  HeaderLoc loc(importingDecl->getLocation());
   diagnose(loc, diag::swift_name_circular_context_import,
            writtenName, getDeclName(importingDecl));
 
@@ -9264,7 +9249,7 @@ ClangImporter::Implementation::importDeclForDeclContext(
   for (auto entry : make_range(contextDeclsBeingImported.rbegin(), iter)) {
     auto otherDecl = std::get<0>(entry);
     auto otherWrittenName = std::get<1>(entry);
-    diagnose(convertLoc(otherDecl->getLocation()),
+    diagnose(HeaderLoc(otherDecl->getLocation()),
              diag::swift_name_circular_context_import_other,
              otherWrittenName, getDeclName(otherDecl));
   }
