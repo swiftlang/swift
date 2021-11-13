@@ -24,6 +24,10 @@
 namespace swift {
 namespace dependencies {
 
+/// Given a set of arguments to a print-target-info frontend tool query, produce the
+/// JSON target info.
+llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command);
+
 /// The high-level implementation of the dependency scanner that runs on
 /// an individual worker thread.
 class DependencyScanningTool {
