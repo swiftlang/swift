@@ -1456,10 +1456,25 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
       auto allFound = evaluateOrDefault(
           ctx.evaluator, CXXNamespaceMemberLookup({cast<EnumDecl>(decl), name}),
           {});
-      for (auto found : allFound)
-        Table.addMember(found);
-
       populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
+
+      // Bypass the regular member lookup table if we find something in
+      // the original C++ namespace. We don't want to store the C++ decl in the
+      // lookup table as the decl can be referenced  from multiple namespace
+      // declarations due to inline namespaces. We still merge in the other
+      // entries found in the lookup table, to support finding members in
+      // namespace extensions.
+      if (!allFound.empty()) {
+        auto known = Table.find(name);
+        if (known != Table.end()) {
+          auto swiftLookupResult = maybeFilterOutAttrImplements(
+              known->second, name, includeAttrImplements);
+          for (auto foundSwiftDecl : swiftLookupResult) {
+            allFound.push_back(foundSwiftDecl);
+          }
+        }
+        return allFound;
+      }
     } else if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
       auto allFound = evaluateOrDefault(
           ctx.evaluator,
