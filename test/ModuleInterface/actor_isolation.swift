@@ -15,6 +15,9 @@
 @available(SwiftStdlib 5.1, *)
 public actor SomeActor {
   nonisolated func maine() { }
+
+  // CHECK: nonisolated public func takesIsolated(other: isolated {{(Test.)?}}SomeActor)
+  public nonisolated func takesIsolated(other: isolated SomeActor) { }
 }
 
 // CHECK: @globalActor public struct SomeGlobalActor
