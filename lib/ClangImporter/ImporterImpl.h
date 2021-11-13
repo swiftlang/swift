@@ -1479,8 +1479,15 @@ public:
     D->setAccess(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);
+
+    // SwiftAttrs on ParamDecls are interpreted by applyParamAttributes().
+    if (!isa<ParamDecl>(D))
+      importSwiftAttrAttributes(D);
+
     return D;
   }
+
+  void importSwiftAttrAttributes(Decl *decl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
