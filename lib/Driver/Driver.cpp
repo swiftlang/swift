@@ -1157,7 +1157,8 @@ parseArgsUntil(const llvm::opt::OptTable& Opts,
     }
 
     unsigned Prev = Index;
-    Arg *A = Opts.ParseOneArg(*Args, Index, FlagsToInclude, FlagsToExclude);
+    std::unique_ptr<Arg> A = Opts.ParseOneArg(*Args, Index, FlagsToInclude,
+                                              FlagsToExclude);
     assert(Index > Prev && "Parser failed to consume argument.");
 
     // Check for missing argument error.
@@ -1169,7 +1170,7 @@ parseArgsUntil(const llvm::opt::OptTable& Opts,
       break;
     }
 
-    Args->append(A);
+    Args->append(A.release());
 
     if (CheckUntil && A->getOption().matches(UntilOption)) {
       if (Index < End)
