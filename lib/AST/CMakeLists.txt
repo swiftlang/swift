@@ -80,6 +80,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/KnuthBendix.cpp
   RequirementMachine/PropertyMap.cpp
   RequirementMachine/PropertyUnification.cpp
+  RequirementMachine/RequirementLowering.cpp
   RequirementMachine/RequirementMachine.cpp
   RequirementMachine/RequirementMachineRequests.cpp
   RequirementMachine/RewriteContext.cpp
