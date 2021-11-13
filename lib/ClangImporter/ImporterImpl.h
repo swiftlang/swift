@@ -317,6 +317,19 @@ public:
   explicit operator bool() const { return type.getPointer() != nullptr; }
 };
 
+/// Wraps a Clang source location with additional optional information used to
+/// resolve it for diagnostics.
+struct HeaderLoc {
+  clang::SourceLocation clangLoc;
+  SourceLoc fallbackLoc;
+  const clang::SourceManager *sourceMgr;
+
+  explicit HeaderLoc(clang::SourceLocation clangLoc,
+                     SourceLoc fallbackLoc = SourceLoc(),
+                     const clang::SourceManager *sourceMgr = nullptr)
+    : clangLoc(clangLoc), fallbackLoc(fallbackLoc), sourceMgr(sourceMgr) {}
+};
+
 /// Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader,
@@ -776,6 +789,31 @@ public:
     }
 
     SwiftContext.Diags.diagnose(loc, std::forward<Args>(args)...);
+  }
+
+  /// Emit a diagnostic at a clang source location, falling back to a Swift
+  /// location if the clang one is invalid.
+  ///
+  /// The diagnostic will appear in the header file rather than in a generated
+  /// interface. Use this to diagnose issues with declarations that are not
+  /// imported or that are not reflected in a generated interface.
+  template<typename ...Args>
+  void diagnose(HeaderLoc loc, Args &&...args) {
+    // If we're in the middle of pretty-printing, suppress diagnostics.
+    if (SwiftContext.Diags.isPrettyPrintingDecl()) {
+      return;
+    }
+
+    auto swiftLoc = loc.fallbackLoc;
+    if (loc.clangLoc.isValid()) {
+      auto &clangSrcMgr = loc.sourceMgr ? *loc.sourceMgr
+                        : getClangASTContext().getSourceManager();
+      auto &bufferImporter = getBufferImporterForDiagnostics();
+      swiftLoc = bufferImporter.resolveSourceLocation(clangSrcMgr,
+                                                      loc.clangLoc);
+    }
+
+    SwiftContext.Diags.diagnose(swiftLoc, std::forward<Args>(args)...);
   }
 
   /// Import the given Clang identifier into Swift.
