@@ -14,12 +14,7 @@ extern "C" {
 
 void initializeLibSwift();
 
-const char* experimental_regex_strawperson(const char *);
 }
 
 void initializeLibSwift() {}
-
-const char* experimental_regex_strawperson(const char *in) {
-  return nullptr;
-}
 

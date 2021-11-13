@@ -32,7 +32,6 @@ target_link_libraries(swiftParse PRIVATE
   swiftAST
   swiftSyntax
   swiftSyntaxParse
-  libswiftStub
 )
 
 add_dependencies(swiftParse swift-parse-syntax-generated-headers)

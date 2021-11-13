@@ -32,6 +32,10 @@
 
 // Regex parser delivered via libSwift
 #include "swift/Parse/ExperimentalRegexBridging.h"
+static ParseRegexStrawperson parseRegexStrawperson = nullptr;
+void Parser_registerParseRegexStrawperson(ParseRegexStrawperson fn) {
+  parseRegexStrawperson = fn;
+}
 
 #include <limits>
 
@@ -1804,9 +1808,10 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
   auto endLoc = Lexer::getSourceLoc(TokEnd);
 
   if (LangOpts.EnableExperimentalRegex) {
-    auto copy = std::string(TokStart, TokEnd-TokStart);
-    auto msg = experimental_regex_strawperson(copy.c_str());
-    if (msg != nullptr) {
+    if (parseRegexStrawperson) {
+      auto copy = std::string(TokStart, TokEnd-TokStart);
+      auto msg = parseRegexStrawperson(copy.c_str());
+      assert(msg != nullptr);
       Diags->diagnose(startLoc, diag::lex_experimental_regex_strawperson, msg);
     }
   }

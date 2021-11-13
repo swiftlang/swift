@@ -5,10 +5,16 @@
 extern "C" {
 #endif
 
-const char* experimental_regex_strawperson(const char *in);
+typedef const char *(* _Nonnull ParseRegexStrawperson)(const char *);
+
+void Parser_registerParseRegexStrawperson(ParseRegexStrawperson fn);
 
 #ifdef __cplusplus
 } // extern "C"
 #endif
 
 #endif // EXPERIMENTAL_REGEX_BRIDGING
+
+
+//const char* experimental_regex_strawperson(const char *in);
+

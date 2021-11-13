@@ -1,6 +1,5 @@
-//import ExperimentalRegexBridging
+import ExperimentalRegexBridging
 
-@_cdecl("experimental_regex_strawperson")
 public func experimental_regex_strawperson(
   _ s: UnsafePointer<CChar>
 ) -> UnsafePointer<CChar> {
@@ -12,4 +11,12 @@ public func experimental_regex_strawperson(
     ptr.initialize(from: $0, count: count)
     return UnsafePointer(ptr)
   }
+}
+
+public func register() {
+  registerSwiftPasses
+}
+
+public func registerParser() {
+  Parser_registerParseRegexpFn({ experimental_regex_strawperson })
 }
