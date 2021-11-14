@@ -169,6 +169,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
                                          //   value.
   P.addMoveOnlyChecker();                // Check noImplicitCopy isn't copied.
 
+  // Now that we have finished performing diagnostics that rely on lexical
+  // scopes, if lexical lifetimes are not enabled, eliminate lexical lfietimes.
+  if (!Options.EnableExperimentalLexicalLifetimes) {
+    P.addLexicalLifetimeEliminator();
+  }
+
   P.addOptimizeHopToExecutor();
   P.addMandatoryGenericSpecializer();
 
