@@ -107,6 +107,10 @@ ERROR(lex_unprintable_ascii_character,none,
       "unprintable ASCII character found in source file", ())
 ERROR(lex_invalid_utf8,none,
       "invalid UTF-8 found in source file", ())
+
+NOTE(lex_experimental_regex_strawperson,none,
+     "'%0'", (StringRef))
+
 ERROR(lex_single_quote_string,none,
       "single-quoted string literal found, use '\"'", ())
 ERROR(lex_invalid_curly_quote,none,

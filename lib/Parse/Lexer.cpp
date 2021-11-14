@@ -30,6 +30,13 @@
 // FIXME: Figure out if this can be migrated to LLVM.
 #include "clang/Basic/CharInfo.h"
 
+// Regex parser delivered via libSwift
+#include "swift/Parse/ExperimentalRegexBridging.h"
+static ParseRegexStrawperson parseRegexStrawperson = nullptr;
+void Parser_registerParseRegexStrawperson(ParseRegexStrawperson fn) {
+  parseRegexStrawperson = fn;
+}
+
 #include <limits>
 
 using namespace swift;
@@ -1788,12 +1795,26 @@ static void validateMultilineIndents(const Token &Str,
 
 /// Emit diagnostics for single-quote string and suggest replacement
 /// with double-quoted equivalent.
-static void diagnoseSingleQuoteStringLiteral(const char *TokStart,
-                                             const char *TokEnd,
-                                             DiagnosticEngine *D) {
+///
+/// Or, if we're in experimental regex mode, we will emit a custom
+/// error message instead, determined by the Swift library.
+void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
+                                             const char *TokEnd) {
   assert(*TokStart == '\'' && TokEnd[-1] == '\'');
-  if (!D)
+  if (!Diags) // or assert?
     return;
+
+  auto startLoc = Lexer::getSourceLoc(TokStart);
+  auto endLoc = Lexer::getSourceLoc(TokEnd);
+
+  if (LangOpts.EnableExperimentalRegex) {
+    if (parseRegexStrawperson) {
+      auto copy = std::string(TokStart, TokEnd-TokStart);
+      auto msg = parseRegexStrawperson(copy.c_str());
+      assert(msg != nullptr);
+      Diags->diagnose(startLoc, diag::lex_experimental_regex_strawperson, msg);
+    }
+  }
 
   SmallString<32> replacement;
   replacement.push_back('"');
@@ -1826,9 +1847,8 @@ static void diagnoseSingleQuoteStringLiteral(const char *TokStart,
   replacement.append(OutputPtr, Ptr - 1);
   replacement.push_back('"');
 
-  D->diagnose(Lexer::getSourceLoc(TokStart), diag::lex_single_quote_string)
-      .fixItReplaceChars(Lexer::getSourceLoc(TokStart),
-                         Lexer::getSourceLoc(TokEnd), replacement);
+  Diags->diagnose(startLoc, diag::lex_single_quote_string)
+      .fixItReplaceChars(startLoc, endLoc, replacement);
 }
 
 /// lexStringLiteral:
@@ -1895,7 +1915,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
   if (QuoteChar == '\'') {
     assert(!IsMultilineString && CustomDelimiterLen == 0 &&
            "Single quoted string cannot have custom delimitor, nor multiline");
-    diagnoseSingleQuoteStringLiteral(TokStart, CurPtr, Diags);
+    diagnoseSingleQuoteStringLiteral(TokStart, CurPtr);
   }
 
   if (wasErroneous)
