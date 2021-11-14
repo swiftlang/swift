@@ -12,9 +12,11 @@
 
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
+#include "swift/DependencyScan/StringUtils.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/TargetInfo.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -23,6 +25,36 @@
 
 namespace swift {
 namespace dependencies {
+
+llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command) {
+  // We must reset option occurences because we are handling an unrelated
+  // command-line to those possibly parsed parsed before using the same tool.
+  // We must do so because LLVM options parsing is done using a managed
+  // static `GlobalParser`.
+  llvm::cl::ResetAllOptionOccurrences();
+  // Parse arguments.
+  std::string CommandString;
+  for (const auto *c : Command) {
+    CommandString.append(c);
+    CommandString.append(" ");
+  }
+  SmallVector<const char *, 4> Args;
+  llvm::BumpPtrAllocator Alloc;
+  llvm::StringSaver Saver(Alloc);
+  llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
+  SourceManager dummySM;
+  DiagnosticEngine DE(dummySM);
+  CompilerInvocation Invocation;
+  if (Invocation.parseArgs(Args, DE)) {
+    return std::make_error_code(std::errc::invalid_argument);
+  }
+
+  // Store the result to a string.
+  std::string ResultStr;
+  llvm::raw_string_ostream StrOS(ResultStr);
+  swift::targetinfo::printTargetInfo(Invocation, StrOS);
+  return create_clone(ResultStr.c_str());
+}
 
 DependencyScanningTool::DependencyScanningTool()
     : SharedCache(std::make_unique<GlobalModuleDependenciesCache>()),
