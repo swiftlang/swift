@@ -2265,13 +2265,14 @@ ClangImporter::Implementation::exportSourceLoc(SourceLoc loc) {
 
 SourceLoc
 ClangImporter::Implementation::importSourceLoc(clang::SourceLocation loc) {
-  return getBufferImporterForDiagnostics().resolveSourceLocation(
-      getClangASTContext().getSourceManager(), loc);
+  // FIXME: Implement!
+  return SourceLoc();
 }
 
 SourceRange
 ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
-  return SourceRange(importSourceLoc(loc.getBegin()), importSourceLoc(loc.getEnd()));
+  // FIXME: Implement!
+  return SourceRange();
 }
 
 #pragma mark Importing names
