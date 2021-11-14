@@ -1,8 +1,10 @@
 import ExperimentalRegexBridging
 
 public func experimental_regex_strawperson(
-  _ s: UnsafePointer<CChar>
-) -> UnsafePointer<CChar> {
+  _ ptr: UnsafePointer<CChar>?
+) -> UnsafePointer<CChar>? {
+  guard let s = ptr else { return nil }
+
   let str = "Hello, \(String(cString:s))"
   let count = str.utf8.count + 1
   return str.withCString {
