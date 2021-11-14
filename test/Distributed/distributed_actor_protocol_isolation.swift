@@ -12,8 +12,11 @@ typealias DefaultActorTransport = AnyActorTransport
 
 protocol LocalProto {
   func local()
+  // expected-note@-1{{mark the protocol requirement 'local()' 'async throws' in order witness it with 'distributed' function declared in distributed actor 'DAD'}}
   func localAsync() async
+  // expected-note@-1{{mark the protocol requirement 'localAsync()' 'throws' in order witness it with 'distributed' function declared in distributed actor 'DAD'}}
   func localThrows() throws
+  // expected-note@-1{{mark the protocol requirement 'localThrows()' 'async' in order witness it with 'distributed' function declared in distributed actor 'DAD'}}
   func localAsyncThrows() async throws
 }
 
@@ -54,6 +57,21 @@ distributed actor DAL: LocalProto {
   // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this instance method not isolated to the actor}}
   func localAsyncThrows() async throws {}
   // expected-error@-1{{actor-isolated instance method 'localAsyncThrows()' cannot be used to satisfy a protocol requirement}}
+}
+
+distributed actor DAD: LocalProto {
+  distributed func local() {}
+  // expected-error@-1{{distributed actor-isolated distributed method 'local()' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'local()' to make this distributed method not isolated to the actor}}
+
+  distributed func localAsync() async {}
+  // expected-error@-1{{distributed actor-isolated distributed method 'localAsync()' cannot be used to satisfy a protocol requirement}}
+
+  distributed func localThrows() throws {}
+  // expected-error@-1{{distributed actor-isolated distributed method 'localThrows()' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this distributed method not isolated to the actor}}
+
+  distributed func localAsyncThrows() async throws {} // ok!
 }
 
 // ==== ------------------------------------------------------------------------
