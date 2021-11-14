@@ -12,8 +12,6 @@
 
 #include "swift/Reflection/MetadataSource.h"
 
-#include <sstream>
-
 using namespace swift;
 using namespace reflection;
 
