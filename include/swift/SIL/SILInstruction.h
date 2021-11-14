@@ -1949,6 +1949,10 @@ public:
   /// Whether the alloc_stack instruction corresponds to a source-level VarDecl.
   bool isLexical() const { return lexical; }
 
+  /// If this is a lexical borrow, eliminate the lexical bit. If this borrow
+  /// doesn't have a lexical bit, do not do anything.
+  void removeIsLexical() { lexical = false; }
+
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
     Optional<SILType> AuxVarType;
@@ -4032,6 +4036,10 @@ public:
   /// Whether the borrow scope introduced by this instruction corresponds to a
   /// source-level lexical scope.
   bool isLexical() const { return lexical; }
+
+  /// If this is a lexical borrow, eliminate the lexical bit. If this borrow
+  /// doesn't have a lexical bit, do not do anything.
+  void removeIsLexical() { lexical = false; }
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
