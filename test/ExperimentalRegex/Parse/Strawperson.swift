@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-regex
+// REQUIRES: libswift
 
 var s = 'abc'
 // expected-note@-1{{'Hello, 'abc''}}
