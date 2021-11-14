@@ -1039,8 +1039,23 @@ private:
   void mergeEquivalenceClasses(EquivalenceClass *equivClass1,
                                const EquivalenceClass *equivClass2);
 
-  /// Determine whether \p ty1 is a better resolved type than \p ty2.
-  static bool isBetterResolvedType(Type ty1, Type ty2);
+  /// The result of comparing two resolved types targeting a single equivalence
+  /// class, in terms of their relative impact on solving the system.
+  enum class ResolvedTypeComparisonResult {
+    /// The first resolved type is a better choice than the second one.
+    Better,
+
+    /// The first resolved type is an equivalent or worse choice than the
+    /// second one.
+    EquivalentOrWorse,
+
+    /// Both resolved types are concrete and mutually exclusive.
+    Ambiguity
+  };
+
+  /// Compare the given resolved types as targeting a single equivalence class,
+  /// in terms of the their relative impact on solving the system.
+  static ResolvedTypeComparisonResult compareResolvedTypes(Type ty1, Type ty2);
 };
 
 /// Captures the state needed to infer associated types.

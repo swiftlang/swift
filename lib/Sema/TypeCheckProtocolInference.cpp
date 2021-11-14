@@ -2222,13 +2222,27 @@ void TypeWitnessSystem::addTypeWitness(Identifier name, Type type) {
 
   auto &tyWitness = this->TypeWitnesses[name];
 
-  // Assume that the type resolves the type witness.
-  //
-  // If we already have a resolved type, keep going only if the new one is
-  // better.
-  if (tyWitness.EquivClass && tyWitness.EquivClass->getResolvedType()) {
-    if (!isBetterResolvedType(type, tyWitness.EquivClass->getResolvedType())) {
+  // Assume that the type resolves the equivalence class.
+  if (tyWitness.EquivClass) {
+    // Nothing else to do if the equivalence class had been marked as ambiguous.
+    if (tyWitness.EquivClass->isAmbiguous()) {
       return;
+    }
+
+    // If we already have a resolved type, keep going only if the new one is
+    // a better choice.
+    const Type currResolvedTy = tyWitness.EquivClass->getResolvedType();
+    if (currResolvedTy) {
+      switch (compareResolvedTypes(type, currResolvedTy)) {
+      case ResolvedTypeComparisonResult::Better:
+        break;
+      case ResolvedTypeComparisonResult::EquivalentOrWorse:
+        return;
+      case ResolvedTypeComparisonResult::Ambiguity:
+        // Mark the equivalence class as ambiguous and give up.
+        tyWitness.EquivClass->setAmbiguous();
+        return;
+      }
     }
   }
 
@@ -2374,14 +2388,27 @@ void TypeWitnessSystem::mergeEquivalenceClasses(
     return;
   }
 
-  // Merge the second resolved type into the first.
+  // Merge the second equivalence class into the first.
   if (equivClass1->getResolvedType() && equivClass2->getResolvedType()) {
-    if (isBetterResolvedType(equivClass2->getResolvedType(),
-                             equivClass1->getResolvedType())) {
+    switch (compareResolvedTypes(equivClass2->getResolvedType(),
+                                 equivClass1->getResolvedType())) {
+    case ResolvedTypeComparisonResult::Better:
       equivClass1->setResolvedType(equivClass2->getResolvedType());
+      break;
+    case ResolvedTypeComparisonResult::EquivalentOrWorse:
+      break;
+    case ResolvedTypeComparisonResult::Ambiguity:
+      equivClass1->setAmbiguous();
+      break;
     }
+  } else if (equivClass1->isAmbiguous()) {
+    // Ambiguity is retained.
   } else if (equivClass2->getResolvedType()) {
+    // Carry over the resolved type.
     equivClass1->setResolvedType(equivClass2->getResolvedType());
+  } else if (equivClass2->isAmbiguous()) {
+    // Carry over ambiguity.
+    equivClass1->setAmbiguous();
   }
 
   // Migrate members of the second equivalence class to the first.
@@ -2396,13 +2423,22 @@ void TypeWitnessSystem::mergeEquivalenceClasses(
   delete equivClass2;
 }
 
-bool TypeWitnessSystem::isBetterResolvedType(Type ty1, Type ty2) {
+TypeWitnessSystem::ResolvedTypeComparisonResult
+TypeWitnessSystem::compareResolvedTypes(Type ty1, Type ty2) {
   assert(ty1 && ty2);
-  assert(
-      (ty1->isTypeParameter() || ty2->isTypeParameter() || ty1->isEqual(ty2)) &&
-      "Ambigious concrete resolved type");
+  if (!ty1->isTypeParameter()) {
+    if (ty2->isTypeParameter()) {
+      // A concrete type is better than a type parameter.
+      return ResolvedTypeComparisonResult::Better;
+    } else if (!ty1->isEqual(ty2)) {
+      return ResolvedTypeComparisonResult::Ambiguity;
+    }
+  }
 
-  return !ty1->isTypeParameter() && ty2->isTypeParameter();
+  // Anything else is either equivalent (i.e. actually equal concrete types or
+  // type parameter vs. type parameter), or worse (i.e. type parameter vs.
+  // concrete type).
+  return ResolvedTypeComparisonResult::EquivalentOrWorse;
 }
 
 void ConformanceChecker::resolveTypeWitnesses() {

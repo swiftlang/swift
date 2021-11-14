@@ -81,14 +81,20 @@ protocol P7b: P7a where A == Bool {}
 // CHECK-NEXT: }
 struct S7: P7b {}
 
-// FIXME: Handle ambiguities.
-//protocol P8a where A == Never {
-//  associatedtype A
-//}
-//protocol P8b where A == Bool {
-//  associatedtype A
-//}
-//struct S8: P8a, P8b {}
+protocol P8a where A == Never {
+  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+}
+protocol P8b where A == Bool {
+  associatedtype A
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P8a: {
+  // CHECK-NEXT: A => (ambiguous),
+  // CHECK-NEXT: }
+  struct Conformer: P8a, P8b {}
+  // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P8a'}}
+  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P8b'}}
+}
 
 protocol P9a where A == Never {
   associatedtype A
@@ -427,19 +433,199 @@ do {
   struct Conformer2<B: Sequence>: P27c_2 where B.Element == Int {}
 }
 
-// FIXME: Handle ambiguities.
-//protocol P28a where A == Int {
-//  associatedtype A
-//}
-//protocol P28b where A == Bool {
-//  associatedtype A
-//}
-//protocol P28c where A == Never {
-//  associatedtype A
-//}
-//protocol Q28a: P28a, P28b {}
-//protocol Q28b: P28a, P28b, P28c {}
-//do {
-//  struct Conformer1: Q28a {}
-//  struct Conformer2: Q28b {}
-//}
+protocol P28a where A == Int {
+  associatedtype A // expected-note 2 {{protocol requires nested type 'A'; do you want to add it?}}
+}
+protocol P28b where A == Bool {
+  associatedtype A
+}
+protocol P28c where A == Never {
+  associatedtype A
+}
+protocol Q28a: P28a, P28b {}
+// expected-error@-1 {{'Self.A' cannot be equal to both 'Bool' and 'Int'}}
+// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+protocol Q28b: P28a, P28b, P28c {}
+// expected-error@-1 {{'Self.A' cannot be equal to both 'Bool' and 'Int'}}
+// expected-error@-2 {{'Self.A' cannot be equal to both 'Never' and 'Int'}}
+// expected-note@-3 {{same-type constraint 'Self.A' == 'Int' implied here}}
+// expected-note@-4 {{same-type constraint 'Self.A' == 'Int' implied here}}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer1 to P28a: {
+  // CHECK-NEXT: A => (ambiguous),
+  // CHECK-NEXT: }
+  struct Conformer1: Q28a {}
+  // expected-error@-1 {{type 'Conformer1' does not conform to protocol 'P28a'}}
+  // expected-error@-2 {{type 'Conformer1' does not conform to protocol 'P28b'}}
+
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer2 to P28a: {
+  // CHECK-NEXT: A => (ambiguous),
+  // CHECK-NEXT: }
+  struct Conformer2: Q28b {}
+  // expected-error@-1 {{type 'Conformer2' does not conform to protocol 'P28a'}}
+  // expected-error@-2 {{type 'Conformer2' does not conform to protocol 'P28b'}}
+  // expected-error@-3 {{type 'Conformer2' does not conform to protocol 'P28c'}}
+}
+
+protocol P29a where A == Int {
+  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+}
+protocol P29b where B == Never {
+  associatedtype B
+}
+protocol P29c where A == B {
+  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+}
+protocol Q29a: P29a, P29b, P29c {}
+// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
+// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+protocol Q29b: P29c, P29a, P29b {}
+// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
+// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer1 to P29a: {
+  // CHECK-NEXT: A => (ambiguous), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => (ambiguous), [[EQUIV_CLASS]]
+  // CHECK-NEXT: }
+  struct Conformer1: Q29a {}
+  // expected-error@-1 {{type 'Conformer1' does not conform to protocol 'P29a'}}
+  // expected-error@-2 {{type 'Conformer1' does not conform to protocol 'P29b'}}
+  // expected-error@-3 {{type 'Conformer1' does not conform to protocol 'P29c'}}
+
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer2 to P29c: {
+  // CHECK-NEXT: A => (ambiguous), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => (ambiguous), [[EQUIV_CLASS]]
+  // CHECK-NEXT: }
+  struct Conformer2: Q29b {}
+  // expected-error@-1 {{type 'Conformer2' does not conform to protocol 'P29a'}}
+  // expected-error@-2 {{type 'Conformer2' does not conform to protocol 'P29b'}}
+  // expected-error@-3 {{type 'Conformer2' does not conform to protocol 'P29c'}}
+}
+
+protocol P30a where A == Int {
+  associatedtype A
+}
+protocol P30b where A == Never {
+  associatedtype A
+}
+protocol P30c where A == B {
+  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+}
+protocol Q30: P30c, P30a, P30b {}
+// expected-error@-1 {{'Self.A' cannot be equal to both 'Never' and 'Int'}}
+// expected-note@-2 {{same-type constraint 'Self.A' == 'Int' implied here}}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P30c: {
+  // CHECK-NEXT: A => (ambiguous), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => (ambiguous), [[EQUIV_CLASS]]
+  // CHECK-NEXT: }
+  struct Conformer: Q30 {}
+  // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P30a'}}
+  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P30b'}}
+  // expected-error@-3 {{type 'Conformer' does not conform to protocol 'P30c'}}
+}
+
+protocol P31a where B == Int {
+  associatedtype B
+}
+protocol P31b where B == Never {
+  associatedtype B
+}
+protocol P31c where B == A {
+  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+}
+protocol Q31: P31c, P31a, P31b {}
+// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
+// expected-note@-2 {{same-type constraint 'Self.B' == 'Int' implied here}}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P31c: {
+  // CHECK-NEXT: A => (ambiguous), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => (ambiguous), [[EQUIV_CLASS]]
+  // CHECK-NEXT: }
+  struct Conformer: Q31 {}
+  // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P31a'}}
+  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P31b'}}
+  // expected-error@-3 {{type 'Conformer' does not conform to protocol 'P31c'}}
+}
+
+protocol P32a where A == Int {
+  associatedtype A
+}
+protocol P32b where A == Bool {
+  associatedtype A
+}
+protocol P32c where B == Void {
+  associatedtype B
+}
+protocol P32d where B == Never {
+  associatedtype B
+}
+protocol P32e where A == B {
+  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype B // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+}
+protocol Q32: P32e, P32a, P32b, P32c, P32d {}
+// expected-error@-1 {{'Self.B' cannot be equal to both 'Never' and 'Int'}}
+// expected-error@-2 {{'Self.B' cannot be equal to both 'Void' and 'Int'}}
+// expected-error@-3 {{'Self.A' cannot be equal to both 'Bool' and 'Int'}}
+// expected-note@-4 3 {{same-type constraint 'Self.A' == 'Int' implied here}}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P32e: {
+  // CHECK-NEXT: A => (ambiguous), [[EQUIV_CLASS:0x[0-9a-f]+]]
+  // CHECK-NEXT: B => (ambiguous), [[EQUIV_CLASS]]
+  // CHECK-NEXT: }
+  struct Conformer: Q32 {}
+  // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P32a'}}
+  // expected-error@-2 {{type 'Conformer' does not conform to protocol 'P32b'}}
+  // expected-error@-3 {{type 'Conformer' does not conform to protocol 'P32c'}}
+  // expected-error@-4 {{type 'Conformer' does not conform to protocol 'P32d'}}
+  // expected-error@-5 {{type 'Conformer' does not conform to protocol 'P32e'}}
+}
+
+protocol P33a where A == Int {
+  associatedtype A
+}
+protocol P33b where A == Int {
+  associatedtype A
+}
+protocol Q33: P33a, P33b {}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P33a: {
+  // CHECK-NEXT: A => Int,
+  // CHECK-NEXT: }
+  struct Conformer: Q33 {}
+}
+
+protocol P34a {
+  associatedtype A = Void
+}
+protocol P34b {
+  associatedtype A = Never
+}
+protocol Q34a: P34a, P34b {}
+protocol Q34b: P34b, P34a {}
+protocol Q34c: P34a, P34b {
+  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+}
+do {
+  // FIXME: should really be ambiguous (source-breaking)?
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer1 to P34a: {
+  // CHECK-NEXT: A => Void,
+  // CHECK-NEXT: }
+  struct Conformer1: Q34a {}
+
+  // FIXME: should really be ambiguous (source-breaking)?
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer2 to P34b: {
+  // CHECK-NEXT: A => Never,
+  // CHECK-NEXT: }
+  struct Conformer2: Q34b {}
+
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer3 to Q34c: {
+  // CHECK-NEXT: A => (unresolved){{$}}
+  // CHECK-NEXT: }
+  struct Conformer3: Q34c {} // expected-error {{type 'Conformer3' does not conform to protocol 'Q34c'}}
+}
