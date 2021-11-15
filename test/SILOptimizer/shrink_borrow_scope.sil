@@ -1,0 +1,400 @@
+// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s
+
+import Swift
+
+// =============================================================================
+// = DECLARATIONS                                                             {{
+// =============================================================================
+
+class C {
+    weak var d: D?
+}
+class D {}
+
+struct CDCase {
+    var c: C
+    var d: D
+}
+
+enum OneOfThree { case one, two, three }
+
+sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
+
+// =============================================================================
+// = DECLARATIONS                                                             }}
+// =============================================================================
+
+// =============================================================================
+// branching tests                                                            {{
+// =============================================================================
+
+// Hoist over br.
+// CHECK-LABEL: sil [ossa] @hoist_over_branch_1 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_branch_1'
+sil [ossa] @hoist_over_branch_1 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance: @owned $C):
+    %lifetime = begin_borrow %instance : $C
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+    br bl1
+bl1:
+    end_borrow %lifetime : $C
+    return %instance : $C
+}
+
+// Hoist over cond_br.
+// CHECK-LABEL: sil [ossa] @hoist_over_branch_2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         cond_br undef, [[BL1:bb[0-9]+]], [[BL2:bb[0-9]+]]
+// CHECK:       [[BL1]]:
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[BL2]]:
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_branch_2'
+sil [ossa] @hoist_over_branch_2 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance: @owned $C):
+    %lifetime = begin_borrow %instance : $C
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+    cond_br undef, bl1, bl2
+bl1:
+    end_borrow %lifetime : $C
+    br exit
+bl2:
+    end_borrow %lifetime : $C
+    br exit
+exit:
+    return %instance : $C
+}
+
+// Hoist over two brs.
+// CHECK-LABEL: sil [ossa] @hoist_over_branch_3 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         cond_br undef, [[BL1:bb[0-9]+]], [[BL2:bb[0-9]+]]
+// CHECK:       [[BL1]]:
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[BL2]]:
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_branch_3'
+sil [ossa] @hoist_over_branch_3 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance: @owned $C):
+    %lifetime = begin_borrow %instance : $C
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+    cond_br undef, bl1, bl2
+bl1:
+    br exit
+bl2:
+    br exit
+exit:
+    end_borrow %lifetime : $C
+    return %instance : $C
+}
+
+// Don't hoist over 1 / 2 brs.
+// CHECK-LABEL: sil [ossa] @hoist_over_branch_4 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         cond_br undef, [[BL1:bb[0-9]+]], [[BL2:bb[0-9]+]]
+// CHECK:       [[BL1]]:
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[BL2]]:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_branch_4'
+sil [ossa] @hoist_over_branch_4 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance: @owned $C):
+    %lifetime = begin_borrow %instance : $C
+    cond_br undef, bl1, bl2
+bl1:
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+    br exit
+bl2:
+    br exit
+exit:
+    end_borrow %lifetime : $C
+    return %instance : $C
+}
+
+// Hoist over switch_enum destinations.
+// CHECK-LABEL: sil [ossa] @hoist_over_branch_5 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C, [[CASE:%[^,]+]] : $OneOfThree):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[0-9]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         switch_enum [[CASE]] : $OneOfThree, case #OneOfThree.one!enumelt: [[ONE_DEST:bb[0-9]+]], case #OneOfThree.two!enumelt: [[TWO_DEST:bb[0-9]+]], case #OneOfThree.three!enumelt: [[THREE_DEST:bb[0-9]+]]
+// CHECK:       [[ONE_DEST]]:
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[TWO_DEST]]:
+// CHECK:         br [[EXIT]]
+// CHECK:       [[THREE_DEST]]:
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_branch_5'
+sil [ossa] @hoist_over_branch_5 : $(@owned C, OneOfThree) -> @owned C {
+entry(%instance: @owned $C, %case : $OneOfThree):
+    %lifetime = begin_borrow %instance : $C
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+    switch_enum %case : $OneOfThree, case #OneOfThree.one!enumelt: one_dest, case #OneOfThree.two!enumelt: two_dest, case #OneOfThree.three!enumelt: three_dest
+one_dest:
+    br exit
+two_dest:
+    br exit
+three_dest:
+    br exit
+exit:
+    end_borrow %lifetime : $C
+    return %instance : $C
+}
+
+// Don't hoist over transformation terminator which forwards ownership of 
+// borrowed value.
+// CHECK-LABEL: sil [ossa] @hoist_over_terminator_1 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $Optional<C>):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         switch_enum [[LIFETIME]] : $Optional<C>, case #Optional.some!enumelt: [[SOME_DEST:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_DEST:bb[0-9]+]]
+// CHECK:       [[SOME_DEST]]([[LIFETIME_2:%[^,]+]] : @guaranteed $C):
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[NONE_DEST]]:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_terminator_1'
+sil [ossa] @hoist_over_terminator_1 : $@convention(thin) (@owned Optional<C>) -> @owned Optional<C> {
+entry(%instance_c : @owned $Optional<C>):
+    %lifetime_c = begin_borrow %instance_c : $Optional<C>
+    switch_enum %lifetime_c : $Optional<C>, case #Optional.some!enumelt: some_dest, case #Optional.none!enumelt: none_dest
+
+some_dest(%lifetime_c_2 : @guaranteed $C):
+    br exit
+
+none_dest:
+    br exit
+
+exit:
+    end_borrow %lifetime_c : $Optional<C>
+    return %instance_c : $Optional<C>
+}
+
+// Hoist over brs but don't hoist over transformation terminator which forwards
+// ownership of guaranteed value which itself had forwarding ownership of the
+// original borrow.
+// CHECK-LABEL: sil [ossa] @hoist_over_terminator_2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[MAYBE:%[^,]+]] = enum $Optional<C>, #Optional.some!enumelt, [[LIFETIME]]
+// CHECK:         switch_enum [[MAYBE]] : $Optional<C>, case #Optional.some!enumelt: [[SOME_DEST:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_DEST:bb[0-9]+]] 
+// CHECK:       [[SOME_DEST]]([[LIFETIME_2:%[^,]+]] : @guaranteed $C):
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[BASIC_BLOCK3:bb[0-9]+]]
+// CHECK:       [[NONE_DEST]]:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[BASIC_BLOCK3]]
+// CHECK:       [[BASIC_BLOCK3]]:
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_terminator_2'
+sil [ossa] @hoist_over_terminator_2 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance_c : @owned $C):
+    %lifetime_c = begin_borrow %instance_c : $C
+    %maybe_c = enum $Optional<C>, #Optional.some!enumelt, %lifetime_c : $C
+    switch_enum %maybe_c : $Optional<C>, case #Optional.some!enumelt: some_dest, case #Optional.none!enumelt: none_dest
+
+some_dest(%lifetime_c_2 : @guaranteed $C):
+    br exit
+
+none_dest:
+    br exit
+
+exit:
+    end_borrow %lifetime_c : $C
+    return %instance_c : $C
+}
+
+// Hoist over transformation terminator which forwards ownership of guaranteed
+// value which itself had forwarding ownership of the original borrow.
+// CHECK-LABEL: sil [ossa] @hoist_over_terminator_3 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[MAYBE:%[^,]+]] = enum $Optional<C>, #Optional.some!enumelt, [[LIFETIME]]
+// CHECK:         switch_enum [[MAYBE]] : $Optional<C>, case #Optional.some!enumelt: [[SOME_DEST:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_DEST:bb[0-9]+]] 
+// CHECK:       [[SOME_DEST]]([[LIFETIME_2:%[^,]+]] : @guaranteed $C):
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[NONE_DEST]]:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_terminator_3'
+sil [ossa] @hoist_over_terminator_3 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance_c : @owned $C):
+    %lifetime_c = begin_borrow %instance_c : $C
+    %maybe_c = enum $Optional<C>, #Optional.some!enumelt, %lifetime_c : $C
+    switch_enum %maybe_c : $Optional<C>, case #Optional.some!enumelt: some_dest, case #Optional.none!enumelt: none_dest
+
+some_dest(%lifetime_c_2 : @guaranteed $C):
+    end_borrow %lifetime_c : $C
+    br exit
+
+none_dest:
+    end_borrow %lifetime_c : $C
+    br exit
+
+exit:
+    return %instance_c : $C
+}
+
+// Don't hoist over terminator that reborrows.
+// CHECK-LABEL: sil [ossa] @hoist_over_terminator_4 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         br [[WORK:bb[0-9]+]]([[LIFETIME]] : $C)
+// CHECK:       [[WORK]]([[LIFETIME_2:%[^,]+]] : @guaranteed $C):
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         end_borrow [[LIFETIME_2]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         end_borrow [[LIFETIME_2]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_terminator_4'
+sil [ossa] @hoist_over_terminator_4 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance_c : @owned $C):
+    %lifetime_c_0 = begin_borrow %instance_c : $C
+    br work(%lifetime_c_0 : $C)
+
+work(%lifetime_c : @guaranteed $C):
+    cond_br undef, left, right
+
+left:
+    end_borrow %lifetime_c : $C
+    br exit
+
+right:
+    end_borrow %lifetime_c : $C
+    br exit
+
+exit:
+    return %instance_c : $C
+}
+
+// =============================================================================
+// branching tests                                                            }}
+// =============================================================================
+
+// =============================================================================
+// loop tests                                                                 {{
+// =============================================================================
+// Don't hoist over loop without uses.
+// TODO: Eventually, we should hoist over such loops.
+// CHECK-LABEL: sil [ossa] @hoist_over_loop_1 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         br [[LOOP_HEADER:bb[0-9]+]]
+// CHECK:       [[LOOP_HEADER]]:
+// CHECK:         br [[LOOP_BODY:bb[0-9]+]]
+// CHECK:       [[LOOP_BODY]]:
+// CHECK:         br [[LOOP_LATCH:bb[0-9]+]]
+// CHECK:       [[LOOP_LATCH]]:
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[LOOP_BACKEDGE:bb[0-9]+]]
+// CHECK:       [[LOOP_BACKEDGE]]:
+// CHECK:         br [[LOOP_HEADER]]
+// CHECK:       [[EXIT]]:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_loop_1'
+sil [ossa] @hoist_over_loop_1 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance: @owned $C):
+    %lifetime = begin_borrow %instance : $C
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+    br loop_header
+loop_header:
+    br loop_body
+loop_body:
+    br loop_latch
+loop_latch:
+    cond_br undef, exit, loop_backedge
+loop_backedge:
+    br loop_header
+exit:
+    end_borrow %lifetime : $C
+    return %instance : $C
+}
+
+// Don't hoist over loop with uses.
+// CHECK-LABEL: sil [ossa] @hoist_over_loop_2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         br [[LOOP_HEADER:bb[0-9]+]]
+// CHECK:       [[LOOP_HEADER]]:
+// CHECK:         br [[LOOP_BODY:bb[0-9]+]]
+// CHECK:       [[LOOP_BODY]]:
+// CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
+// CHECK:         br [[LOOP_LATCH:bb[0-9]+]]
+// CHECK:       [[LOOP_LATCH]]:
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[LOOP_BACKEDGE:bb[0-9]+]]
+// CHECK:       [[LOOP_BACKEDGE]]:
+// CHECK:         br [[LOOP_HEADER]]
+// CHECK:       [[EXIT]]:
+// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         return [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'hoist_over_loop_2'
+sil [ossa] @hoist_over_loop_2 : $@convention(thin) (@owned C) -> @owned C {
+entry(%instance: @owned $C):
+    %lifetime = begin_borrow %instance : $C
+    br loop_header
+loop_header:
+    br loop_body
+loop_body:
+    %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %_ = apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
+    br loop_latch
+loop_latch:
+    cond_br undef, exit, loop_backedge
+loop_backedge:
+    br loop_header
+exit:
+    end_borrow %lifetime : $C
+    return %instance : $C
+}
+
+// =============================================================================
+// loop tests                                                                 }}
+// =============================================================================

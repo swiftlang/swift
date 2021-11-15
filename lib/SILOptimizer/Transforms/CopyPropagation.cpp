@@ -49,6 +49,7 @@
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/ShrinkBorrowScope.h"
 #include "llvm/ADT/SetVector.h"
 
 using namespace swift;
@@ -74,6 +75,9 @@ struct CanonicalDefWorklist {
 
   CanonicalDefWorklist(bool canonicalizeBorrows)
       : canonicalizeBorrows(canonicalizeBorrows) {}
+
+  // Update the worklist for the def corresponding to \p bbi, a BeginBorrow.
+  void updateForBorrow(BeginBorrowInst *bbi) { borrowedValues.insert(bbi); }
 
   // Update the worklist for the def corresponding to \p copy, which is usually
   // a CopyValue, but may be any owned value such as the operand of a
@@ -419,6 +423,8 @@ void CopyPropagation::run() {
     for (auto &i : bb) {
       if (auto *copy = dyn_cast<CopyValueInst>(&i)) {
         defWorklist.updateForCopy(copy);
+      } else if (auto *borrow = dyn_cast<BeginBorrowInst>(&i)) {
+        defWorklist.updateForBorrow(borrow);
       } else if (canonicalizeAll) {
         if (auto *destroy = dyn_cast<DestroyValueInst>(&i)) {
           defWorklist.updateForCopy(destroy->getOperand());
@@ -438,6 +444,7 @@ void CopyPropagation::run() {
     // and the source of the new destructure is added.
     changed |= convertExtractsToDestructures(defWorklist, deleter);
 
+    ShrinkBorrowScope borrowShrinker(deleter);
     // borrowCanonicalizer performs all modifications through deleter's
     // callbacks, so we don't need to explicitly check for changes.
     CanonicalizeBorrowScope borrowCanonicalizer(deleter);
@@ -481,6 +488,7 @@ void CopyPropagation::run() {
         break;
 
       BorrowedValue borrow(defWorklist.borrowedValues.pop_back_val());
+      borrowShrinker.shrinkBorrowScope(borrow);
       borrowCanonicalizer.canonicalizeBorrowScope(borrow);
       for (CopyValueInst *copy : borrowCanonicalizer.getUpdatedCopies()) {
         defWorklist.updateForCopy(copy);
