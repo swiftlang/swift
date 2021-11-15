@@ -1949,6 +1949,10 @@ public:
   /// Whether the alloc_stack instruction corresponds to a source-level VarDecl.
   bool isLexical() const { return lexical; }
 
+  /// If this is a lexical borrow, eliminate the lexical bit. If this borrow
+  /// doesn't have a lexical bit, do not do anything.
+  void removeIsLexical() { lexical = false; }
+
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
     Optional<SILType> AuxVarType;
@@ -4033,6 +4037,10 @@ public:
   /// source-level lexical scope.
   bool isLexical() const { return lexical; }
 
+  /// If this is a lexical borrow, eliminate the lexical bit. If this borrow
+  /// doesn't have a lexical bit, do not do anything.
+  void removeIsLexical() { lexical = false; }
+
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
 
@@ -4858,14 +4866,16 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
-/// BindMemoryInst -
-/// "bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T"
+/// "%token = bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T"
+///
 /// Binds memory at the raw pointer %0 to type $T with enough capacity
-/// to hold $1 values.
-class BindMemoryInst final :
-    public InstructionBaseWithTrailingOperands<
-                                          SILInstructionKind::BindMemoryInst,
-                                          BindMemoryInst, NonValueInstruction> {
+/// to hold %1 values.
+///
+/// %token is an opaque word representing the previously bound types of this
+/// memory region, before binding it to a contiguous region of type $T.
+class BindMemoryInst final : public InstructionBaseWithTrailingOperands<
+                                 SILInstructionKind::BindMemoryInst,
+                                 BindMemoryInst, SingleValueInstruction> {
   friend SILBuilder;
 
   SILType BoundType;
@@ -4875,10 +4885,11 @@ class BindMemoryInst final :
     SILFunction &F);
 
   BindMemoryInst(SILDebugLocation Loc, SILValue Base, SILValue Index,
-                 SILType BoundType,
+                 SILType BoundType, SILType TokenType,
                  ArrayRef<SILValue> TypeDependentOperands)
-    : InstructionBaseWithTrailingOperands(Base, Index, TypeDependentOperands,
-                                          Loc), BoundType(BoundType) {}
+      : InstructionBaseWithTrailingOperands(Base, Index, TypeDependentOperands,
+                                            Loc, TokenType),
+        BoundType(BoundType) {}
 
 public:
   enum { BaseOperIdx, IndexOperIdx, NumFixedOpers };
@@ -4896,6 +4907,38 @@ public:
   MutableArrayRef<Operand> getTypeDependentOperands() {
     return getAllOperands().slice(NumFixedOpers);
   }
+};
+
+/// "%out_token = rebind_memory
+///     %0 : $Builtin.RawPointer, %in_token : $Builtin.Word
+///
+/// Binds memory at the raw pointer %0 to the types abstractly represented by
+/// %in_token.
+///
+/// %in_token is itself the result of a bind_memory or rebind_memory and
+/// represents a previously cached set of bound types.
+///
+/// %out_token represents the previously bound types of this memory region,
+/// before binding it to %in_token.
+class RebindMemoryInst final : public SingleValueInstruction {
+  FixedOperandList<2> Operands;
+
+public:
+  enum { BaseOperIdx, InTokenOperIdx };
+
+  RebindMemoryInst(SILDebugLocation Loc, SILValue Base, SILValue InToken,
+                   SILType TokenType)
+      : SingleValueInstruction(SILInstructionKind::RebindMemoryInst, Loc,
+                               TokenType),
+        Operands{this, Base, InToken} {}
+
+public:
+  SILValue getBase() const { return getAllOperands()[BaseOperIdx].get(); }
+
+  SILValue getInToken() const { return getAllOperands()[InTokenOperIdx].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
 //===----------------------------------------------------------------------===//

@@ -3040,6 +3040,17 @@ public:
                     "bind_memory index must be a Word");
   }
 
+  void checkRebindMemoryInst(RebindMemoryInst *rbi) {
+    require(rbi->getBase()->getType().is<BuiltinRawPointerType>(),
+            "rebind_memory base be a RawPointer");
+    requireSameType(rbi->getInToken()->getType(),
+                    SILType::getBuiltinWordType(F.getASTContext()),
+                    "rebind_memory token must be a Builtin.Int64");
+    require(isa<BindMemoryInst>(rbi->getInToken())
+            || isa<RebindMemoryInst>(rbi->getInToken()),
+            "rebind_memory token must originate from bind_memory");
+  }
+
   void checkIndexAddrInst(IndexAddrInst *IAI) {
     require(IAI->getType().isAddress(), "index_addr must produce an address");
     requireSameType(

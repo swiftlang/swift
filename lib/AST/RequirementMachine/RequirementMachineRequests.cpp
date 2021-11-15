@@ -26,6 +26,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
+#include "RequirementLowering.h"
 #include <memory>
 #include <vector>
 
@@ -329,9 +330,19 @@ AbstractGenericSignatureRequestRQM::evaluate(
   SmallVector<Requirement, 4> requirements(
       baseSignature.getRequirements().begin(),
       baseSignature.getRequirements().end());
-  requirements.append(
-      addedRequirements.begin(),
-      addedRequirements.end());
+
+  // The requirements passed to this request may have been substituted,
+  // meaning the subject type might be a concrete type and not a type
+  // parameter.
+  //
+  // Also, the right hand side of conformance requirements here might be
+  // a protocol composition.
+  //
+  // Desugaring converts these kinds of requirements into "proper"
+  // requirements where the subject type is always a type parameter,
+  // which is what the RuleBuilder expects.
+  for (auto req : addedRequirements)
+    desugarRequirement(req, requirements);
 
   // Heap-allocate the requirement machine to save stack space.
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(

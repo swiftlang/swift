@@ -42,12 +42,6 @@
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
 #define NOMINMAX
 #include <windows.h>
-#else
-#include <sys/mman.h>
-// WASI doesn't support dynamic linking yet.
-#if !defined(__wasi__)
-#include <dlfcn.h>
-#endif // !defined(__wasi__)
 #endif
 #if SWIFT_PTRAUTH
 #include <ptrauth.h>
@@ -63,10 +57,6 @@ extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
 #include "ExistentialMetadataImpl.h"
 #include "swift/Runtime/Debug.h"
 #include "Private.h"
-
-#if defined(__APPLE__)
-#include <mach/vm_page_size.h>
-#endif
 
 #if SWIFT_OBJC_INTEROP
 #include "ObjCRuntimeGetImageNameFromClass.h"

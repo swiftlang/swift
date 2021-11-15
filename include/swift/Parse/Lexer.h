@@ -607,6 +607,15 @@ private:
   bool lexUnknown(bool EmitDiagnosticsIfToken);
 
   NulCharacterKind getNulCharacterKind(const char *Ptr) const;
+
+  /// Emit diagnostics for single-quote string and suggest replacement
+  /// with double-quoted equivalent.
+  ///
+  /// Or, if we're in strawperson mode, we will emit a custom
+  /// error message instead, determined by the Swift library.
+  void diagnoseSingleQuoteStringLiteral(const char *TokStart,
+                                        const char *TokEnd);
+
 };
 
 /// A lexer that can lex trivia into its pieces

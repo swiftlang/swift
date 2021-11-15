@@ -808,7 +808,7 @@ sil @testCopyArray : $@convention(thin) (_ContiguousArrayBuffer<AnyObject>, Buil
 bb0(%0 : $_ContiguousArrayBuffer<AnyObject>, %1 : $Builtin.Word, %2 : $Builtin.Word):
   %eltty = metatype $@thick AnyObject.Protocol
   %newptr = builtin "allocRaw"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.RawPointer
-  bind_memory %newptr : $Builtin.RawPointer, %1 : $Builtin.Word to $*AnyObject
+  %token = bind_memory %newptr : $Builtin.RawPointer, %1 : $Builtin.Word to $*AnyObject
   %storage = struct_extract %0 : $_ContiguousArrayBuffer<AnyObject>, #_ContiguousArrayBuffer._storage
   %elements = ref_tail_addr %storage : $__ContiguousArrayStorageBase, $AnyObject
   %eltptr = address_to_pointer %elements : $*AnyObject to $Builtin.RawPointer

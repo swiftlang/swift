@@ -41,7 +41,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#if defined(__CYGWIN__) || defined(__HAIKU__)
 #include <sstream>
+#endif
 #if defined(__OpenBSD__) || defined(__ANDROID__) || defined(__linux__) || defined(__wasi__) || defined(_WIN32)
 #include <locale.h>
 #if defined(_WIN32)
@@ -287,6 +289,7 @@ static bool swift_stringIsSignalingNaN(const char *nptr) {
   return false;
 }
 
+#if defined(__CYGWIN__) || defined(__HAIKU__)
 // This implementation should only be used on platforms without the
 // relevant strto* functions, such as Cygwin or Haiku.
 // Note that using this currently causes test failures.
@@ -307,6 +310,7 @@ T _swift_strto(const char *nptr, char **endptr) {
 
   return ParsedValue;
 }
+#endif
 
 #if defined(__OpenBSD__) || defined(_WIN32) || defined(__CYGWIN__) || defined(__HAIKU__)
 #define NEED_SWIFT_STRTOD_L

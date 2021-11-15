@@ -774,6 +774,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::BindMemoryInst:
+  case SILInstructionKind::RebindMemoryInst:
   case SILInstructionKind::MoveValueInst:
     return InlineCost::Free;
 

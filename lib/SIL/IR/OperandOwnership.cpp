@@ -138,6 +138,7 @@ OPERAND_OWNERSHIP(TrivialUse, AllocRefDynamic) // with tail operand
 OPERAND_OWNERSHIP(TrivialUse, BeginAccess)
 OPERAND_OWNERSHIP(TrivialUse, BeginUnpairedAccess)
 OPERAND_OWNERSHIP(TrivialUse, BindMemory)
+OPERAND_OWNERSHIP(TrivialUse, RebindMemory)
 OPERAND_OWNERSHIP(TrivialUse, CheckedCastAddrBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondFail)

@@ -471,6 +471,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_deserialization_recovery);
   }
 
+  // Experimental string processing
+  Opts.EnableExperimentalRegex |=
+      Args.hasArg(OPT_enable_experimental_regex);
+
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   Opts.CheckAPIAvailabilityOnly |=
