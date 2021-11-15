@@ -324,7 +324,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Method, "instance method");
   ENTRY(StaticMethod, "static method");
   ENTRY(ClassMethod, "class method");
-  ENTRY(DistributedMethod, "distributed method");
+  ENTRY(DistributedMethod, "distributed instance method");
   ENTRY(Getter, "getter");
   ENTRY(Setter, "setter");
   ENTRY(WillSet, "willSet observer");

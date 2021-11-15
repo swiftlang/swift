@@ -47,7 +47,12 @@ distributed actor DistributedActor_1 {
     ""
   }
 
-  distributed static func distributedStatic() {} // expected-error{{'distributed' functions cannot be 'static'}}
+  distributed static func distributedStatic() {} // expected-error{{'distributed' method cannot be 'static'}}
+  distributed class func distributedClass() {}
+  // expected-error@-1{{class methods are only allowed within classes; use 'static' to declare a static method}}
+  // expected-error@-2{{'distributed' method cannot be 'static'}} // TODO(distributed): should call out 'class' instead?
+
+  distributed private func distributedPrivate() {} //expected-error{{distributed instance method 'distributedPrivate()' cannot be 'private'}}
 
   func hello() {} // expected-note{{distributed actor-isolated instance method 'hello()' declared here}}
   func helloAsync() async {} // expected-note{{distributed actor-isolated instance method 'helloAsync()' declared here}}
@@ -63,10 +68,10 @@ distributed actor DistributedActor_1 {
   distributed func distIntString(int: Int, two: String) async throws -> (String) { "\(int) + \(two)" } // ok
 
   distributed func dist(notCodable: NotCodableValue) async throws {
-    // expected-error@-1 {{distributed function parameter 'notCodable' of type 'NotCodableValue' does not conform to 'Codable'}}
+    // expected-error@-1 {{distributed instance method parameter 'notCodable' of type 'NotCodableValue' does not conform to 'Codable'}}
   }
   distributed func distBadReturn(int: Int) async throws -> NotCodableValue {
-    // expected-error@-1 {{distributed function result type 'NotCodableValue' does not conform to 'Codable'}}
+    // expected-error@-1 {{distributed instance method result type 'NotCodableValue' does not conform to 'Codable'}}
     fatalError()
   }
 
@@ -77,7 +82,7 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
   distributed func distBadReturnGeneric<T: Sendable>(int: Int) async throws -> T {
-    // expected-error@-1 {{distributed function result type 'T' does not conform to 'Codable'}}
+    // expected-error@-1 {{distributed instance method result type 'T' does not conform to 'Codable'}}
     fatalError()
   }
 
@@ -88,7 +93,7 @@ distributed actor DistributedActor_1 {
     value
   }
   distributed func distBadGenericParam<T: Sendable>(int: T) async throws {
-    // expected-error@-1 {{distributed function parameter 'int' of type 'T' does not conform to 'Codable'}}
+    // expected-error@-1 {{distributed instance method parameter 'int' of type 'T' does not conform to 'Codable'}}
     fatalError()
   }
 
@@ -98,7 +103,7 @@ distributed actor DistributedActor_1 {
   static func staticMainActorFunc() -> String { "" } // ok
 
   static distributed func staticDistributedFunc() -> String {
-    // expected-error@-1{{'distributed' functions cannot be 'static'}}{10-21=}
+    // expected-error@-1{{'distributed' method cannot be 'static'}}{10-21=}
     fatalError()
   }
 
@@ -146,9 +151,9 @@ func test_outside(
   _ = DistributedActor_1.staticFunc()
 
   // ==== non-distributed functions
-  distributed.hello() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
-  _ = await distributed.helloAsync() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
-  _ = try await distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
+  distributed.hello() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+  _ = await distributed.helloAsync() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+  _ = try await distributed.helloAsyncThrows() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
 }
 
 // ==== Protocols and static (non isolated functions)

@@ -107,6 +107,13 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
 
   auto module = func->getParentModule();
 
+  if (func->getEffectiveAccess() == AccessLevel::FilePrivate) {
+    func->diagnose(diag::distributed_actor_func_private,
+                   func->getDescriptiveKind(), func->getName());
+    // TODO(distributed): fixit remove the 'private' from the declaration
+    return true;
+  }
+
   // --- Check parameters for 'Codable' conformance
   for (auto param : *func->getParameters()) {
     auto paramTy = func->mapTypeIntoContext(param->getInterfaceType());
@@ -142,7 +149,7 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   auto actorDecl = func->getParent()->getSelfNominalTypeDecl();
   assert(actorDecl && actorDecl->isDistributedActor());
 
-  // _remote function for a distributed function must not be implemented by end-users,
+  // _remote function for a distributed instance method must not be implemented by end-users,
   // it must be the specific implementation synthesized by the compiler.
   auto remoteFuncDecl = actorDecl->lookupDirectRemoteFunc(func);
   if (remoteFuncDecl && !remoteFuncDecl->isSynthesized()) {

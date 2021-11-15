@@ -4363,7 +4363,7 @@ NOTE(note_add_distributed_to_decl,none,
      "add 'distributed' to %0 to make this %1 witness the protocol requirement",
      (DeclName, DescriptiveDeclKind))
 NOTE(note_distributed_requirement_defined_here,none,
-     "distributed function requirement %0 declared here",
+     "distributed instance method requirement %0 declared here",
      (DeclName))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
@@ -4502,13 +4502,13 @@ NOTE(note_distributed_actor_isolated_method,none,
      "distributed actor-isolated %0 %1 declared here",
      (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_isolated_method,none,
-      "only 'distributed' functions can be called on a potentially remote distributed actor",
+      "only 'distributed' instance methods can be called on a potentially remote distributed actor",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
-      "distributed function parameter '%0' of type %1 does not conform to 'Codable'",
+      "distributed instance method parameter '%0' of type %1 does not conform to 'Codable'",
       (StringRef, Type))
 ERROR(distributed_actor_func_result_not_codable,none,
-      "distributed function result type %0 does not conform to 'Codable'",
+      "distributed instance method result type %0 does not conform to 'Codable'",
       (Type))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
       "distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
@@ -4519,6 +4519,9 @@ ERROR(nonisolated_distributed_actor_storage,none,
 ERROR(distributed_actor_func_nonisolated, none,
       "function %0 cannot be both 'nonisolated' and 'distributed'",
       (DeclName))
+ERROR(distributed_actor_func_private, none,
+      "%0 %1 cannot be 'private'",
+      (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_remote_func_is_not_static,none,
       "remote function %0 must be static.",
       (DeclName))
@@ -4628,7 +4631,7 @@ ERROR(actor_instance_property_wrapper,none,
       (Identifier, Identifier))
 
 ERROR(distributed_actor_func_defined_outside_of_distributed_actor,none,
-      "distributed function %0 is declared outside of an distributed actor",
+      "distributed instance method %0 is declared outside of an distributed actor",
       (DeclName))
 ERROR(distributed_actor_local_var,none,
       "'distributed' can not be applied to local variables",
@@ -4648,7 +4651,7 @@ ERROR(distributed_actor_not_actor_func,none,
       "'distributed' can only be applied to distributed actor async functions",
       ())
 ERROR(distributed_actor_func_static,none,
-      "'distributed' functions cannot be 'static'",
+      "'distributed' method cannot be 'static'",
       ())
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
       "'distributed' function can only be declared within 'distributed actor'",

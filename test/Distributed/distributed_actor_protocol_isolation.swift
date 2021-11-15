@@ -61,15 +61,15 @@ distributed actor DAL: LocalProto {
 
 distributed actor DAD: LocalProto {
   distributed func local() {}
-  // expected-error@-1{{distributed actor-isolated distributed method 'local()' cannot be used to satisfy a protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'local()' to make this distributed method not isolated to the actor}}
+  // expected-error@-1{{distributed actor-isolated distributed instance method 'local()' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'local()' to make this distributed instance method not isolated to the actor}}
 
   distributed func localAsync() async {}
-  // expected-error@-1{{distributed actor-isolated distributed method 'localAsync()' cannot be used to satisfy a protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated distributed instance method 'localAsync()' cannot be used to satisfy a protocol requirement}}
 
   distributed func localThrows() throws {}
-  // expected-error@-1{{distributed actor-isolated distributed method 'localThrows()' cannot be used to satisfy a protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this distributed method not isolated to the actor}}
+  // expected-error@-1{{distributed actor-isolated distributed instance method 'localThrows()' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this distributed instance method not isolated to the actor}}
 
   distributed func localAsyncThrows() async throws {} // ok!
 }
@@ -91,9 +91,9 @@ distributed actor DA2: DistProtoDistributedActor {
 }
 
 func testDA2(da: DA2) async throws {
-  da.local() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
-  await da.localAsync() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
-  try await da.localAsyncThrows() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
+  da.local() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+  await da.localAsync() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+  try await da.localAsyncThrows() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
 
   try await da.dist()
   try await da.distAsync()
