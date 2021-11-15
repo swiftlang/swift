@@ -4768,22 +4768,27 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     case SILInstructionKind::BindMemoryInst: {
       SILValue IndexVal;
-      Identifier ToToken;
-      SourceLoc ToLoc;
       SILType EltTy;
-      if (parseTypedValueRef(Val, B) ||
-          P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-          parseTypedValueRef(IndexVal, B) ||
-          parseSILIdentifier(ToToken, ToLoc, diag::expected_tok_in_sil_instr,
-                             "to") ||
-          parseSILType(EltTy) || parseSILDebugLocation(InstLoc, B))
+      if (parseTypedValueRef(Val, B)
+          || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
+          || parseTypedValueRef(IndexVal, B)
+          || parseVerbatim("to")
+          || parseSILType(EltTy)
+          || parseSILDebugLocation(InstLoc, B))
         return true;
 
-      if (ToToken.str() != "to") {
-        P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
-        return true;
-      }
       ResultVal = B.createBindMemory(InstLoc, Val, IndexVal, EltTy);
+      break;
+    }
+    case SILInstructionKind::RebindMemoryInst: {
+      SILValue InToken;
+      if (parseTypedValueRef(Val, B)
+          || parseVerbatim("to")
+          || parseTypedValueRef(InToken, B)
+          || parseSILDebugLocation(InstLoc, B))
+        return true;
+
+      ResultVal = B.createRebindMemory(InstLoc, Val, InToken);
       break;
     }
     case SILInstructionKind::ObjectInst:

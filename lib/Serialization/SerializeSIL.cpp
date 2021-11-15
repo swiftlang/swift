@@ -1956,6 +1956,21 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues);
     break;
   }
+  case SILInstructionKind::RebindMemoryInst: {
+    auto *RBI = cast<RebindMemoryInst>(&SI);
+    SILValue baseOperand = RBI->getBase();
+    SILValue inToken = RBI->getInToken();
+    SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILTwoOperandsLayout::Code], (unsigned)SI.getKind(),
+                                     /*attr*/0,
+        S.addTypeRef(baseOperand->getType().getASTType()),
+        (unsigned)baseOperand->getType().getCategory(),
+        addValueRef(baseOperand),
+        S.addTypeRef(inToken->getType().getASTType()),
+        (unsigned)inToken->getType().getCategory(),
+        addValueRef(inToken));
+    break;
+  }
   case SILInstructionKind::RefElementAddrInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::StructExtractInst:

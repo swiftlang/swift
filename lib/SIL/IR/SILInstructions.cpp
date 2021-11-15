@@ -1144,12 +1144,14 @@ CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
 BindMemoryInst *
 BindMemoryInst::create(SILDebugLocation Loc, SILValue Base, SILValue Index,
                        SILType BoundType, SILFunction &F) {
+  auto tokenTy = SILType::getBuiltinWordType(F.getASTContext());
   SmallVector<SILValue, 8> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, F, BoundType.getASTType());
+  collectTypeDependentOperands(TypeDependentOperands, F,
+                               BoundType.getASTType());
   auto Size = totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size() +
                                                NumFixedOpers);
   auto Buffer = F.getModule().allocateInst(Size, alignof(BindMemoryInst));
-  return ::new (Buffer) BindMemoryInst(Loc, Base, Index, BoundType,
+  return ::new (Buffer) BindMemoryInst(Loc, Base, Index, BoundType, tokenTy,
                                        TypeDependentOperands);
 }
 
