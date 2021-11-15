@@ -12,8 +12,10 @@
 
 import GenUtils
 
-// Note: If one ever updates this list, be it reordering bits adding new ones,
-// etc., please update the same list found in:
+// WARNING: The values below must be kept in-sync with the stdlib code that
+// retrieves these properties. If one should ever update this list below, be
+// it reordering bits, adding new properties, etc., please update the
+// stdlib code found at:
 // 'stdlib/public/core/UnicodeScalarProperties.swift'.
 internal struct BinProps: OptionSet {
   let rawValue: UInt64

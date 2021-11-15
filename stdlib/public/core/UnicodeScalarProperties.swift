@@ -55,8 +55,9 @@ extension Unicode.Scalar.Properties {
   // Unicode defined binary property of a scalar. For example, bit 8 represents
   // the 'isAlphabetic' property for scalars.
   //
-  // Note: If one ever updates this list, be it reordering bits adding new ones,
-  // etc., please update the same list found in:
+  // WARNING: The values below must be kept in-sync with the generation script.
+  // If one should ever update this list below, be it reordering bits, adding
+  // new properties, etc., please update the generation script found at:
   // 'utils/gen-unicode-data/Sources/GenScalarProps/BinProps.swift'.
   fileprivate struct _BinaryProperties: OptionSet {
     let rawValue: UInt64
