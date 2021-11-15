@@ -519,8 +519,8 @@ $\genericparam{S2}.\namesym{Iterator}.\namesym{Element}$, respectively.
 
 In order for this application of \texttt{==} to be valid, the type checker must prove two things:
 \begin{enumerate}
-\item first, $\genericparam{S1}.\namesym{Iterator}.\namesym{Element}$ and $\genericparam{S2}.\namesym{Iterator}.\namesym{Element}$ must be the same type;
-\item second, that either one or the other (since they're the same type!) must conform to $\proto{Equatable}$.
+\item $\genericparam{S1}.\namesym{Iterator}.\namesym{Element}$ and $\genericparam{S2}.\namesym{Iterator}.\namesym{Element}$ must be the same type;
+\item that either one or the other (since they're the same type!) must conform to $\proto{Equatable}$.
 \end{enumerate}
 Both facts can be proven as follows:
 \begin{itemize}
