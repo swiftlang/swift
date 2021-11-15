@@ -5441,6 +5441,13 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   auto eltType = getFromType();
   auto contextualType = getToType();
 
+  auto diagnoseAllOccurances = [&](Diag<Type, Type> diagnostic) {
+    assert(AffectedElements.size() > 1);
+    for (auto *element : AffectedElements) {
+      emitDiagnosticAt(element->getLoc(), diagnostic, eltType, contextualType);
+    }
+  };
+
   auto isFixedToDictionary = [&](ArrayExpr *anchor) {
     return llvm::any_of(getSolution().Fixes, [&](ConstraintFix *fix) {
       auto *fixAnchor = getAsExpr<ArrayExpr>(fix->getAnchor());
@@ -5453,8 +5460,10 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   Optional<InFlightDiagnostic> diagnostic;
   if (auto *AE = getAsExpr<ArrayExpr>(anchor)) {
     if (!(treatAsDictionary = isFixedToDictionary(AE))) {
-      if (diagnoseMergedLiteralElements())
+      if (AffectedElements.size() > 1) {
+        diagnoseAllOccurances(diag::cannot_convert_array_element);
         return true;
+      }
 
       diagnostic.emplace(emitDiagnostic(diag::cannot_convert_array_element,
                                         eltType, contextualType));
@@ -5464,15 +5473,27 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   if (treatAsDictionary || isExpr<DictionaryExpr>(anchor)) {
     auto eltLoc = locator->castLastElementTo<LocatorPathElt::TupleElement>();
     switch (eltLoc.getIndex()) {
-    case 0: // key
+    case 0: { // key
+      if (AffectedElements.size() > 1) {
+        diagnoseAllOccurances(diag::cannot_convert_dict_key);
+        return true;
+      }
+
       diagnostic.emplace(emitDiagnostic(diag::cannot_convert_dict_key, eltType,
                                         contextualType));
       break;
+    }
 
-    case 1: // value
+    case 1: { // value
+      if (AffectedElements.size() > 1) {
+        diagnoseAllOccurances(diag::cannot_convert_dict_value);
+        return true;
+      }
+
       diagnostic.emplace(emitDiagnostic(diag::cannot_convert_dict_value,
                                         eltType, contextualType));
       break;
+    }
 
     default:
       break;
@@ -5505,30 +5526,6 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     return false;
 
   (void)trySequenceSubsequenceFixIts(*diagnostic);
-  return true;
-}
-
-bool CollectionElementContextualFailure::diagnoseMergedLiteralElements() {
-  auto elementAnchor = simplifyLocatorToAnchor(getLocator());
-  if (!elementAnchor)
-    return false;
-
-  auto *typeVar = getRawType(elementAnchor)->getAs<TypeVariableType>();
-  if (!typeVar || !typeVar->getImpl().getAtomicLiteralKind())
-    return false;
-
-  // This element is a literal whose type variable could have been merged with others,
-  // but the conversion constraint to the array element type was only placed on one
-  // of them. So, we want to emit the error for each element whose type variable is in
-  // this equivalence class.
-  auto &cs = getConstraintSystem();
-  auto node = cs.getRepresentative(typeVar)->getImpl().getGraphNode();
-  for (const auto *typeVar : node->getEquivalenceClass()) {
-    auto anchor = typeVar->getImpl().getLocator()->getAnchor();
-    emitDiagnosticAt(constraints::getLoc(anchor), diag::cannot_convert_array_element,
-                     getFromType(), getToType());
-  }
-
   return true;
 }
 
