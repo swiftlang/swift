@@ -314,9 +314,10 @@ static SILValue createValueForEmptyTuple(SILType ty,
 static bool shouldAddLexicalLifetime(AllocStackInst *asi) {
   return asi->getFunction()->hasOwnership() &&
          asi->getFunction()
-             ->getModule()
-             .getASTContext()
-             .SILOpts.EnableExperimentalLexicalLifetimes &&
+                 ->getModule()
+                 .getASTContext()
+                 .SILOpts.LexicalLifetimes ==
+             LexicalLifetimesOption::ExperimentalLate &&
          asi->isLexical() &&
          !asi->getElementType().isTrivial(*asi->getFunction());
 }

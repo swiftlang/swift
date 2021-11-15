@@ -26,9 +26,11 @@ class LexicalLifetimeEliminatorPass : public SILFunctionTransform {
     if (fn->wasDeserializedCanonical())
       return;
 
-    // If we have experimental lexical lifetimes enabled, we do not want to run
-    // this pass since we want lexical lifetimes to exist later in the pipeline.
-    if (fn->getModule().getOptions().EnableExperimentalLexicalLifetimes)
+    // If we have experimental late lexical lifetimes enabled, we do not want to
+    // run this pass since we want lexical lifetimes to exist later in the
+    // pipeline.
+    if (fn->getModule().getOptions().LexicalLifetimes ==
+        LexicalLifetimesOption::ExperimentalLate)
       return;
 
     bool madeChange = false;

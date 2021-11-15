@@ -107,7 +107,13 @@ EnableExperimentalConcurrency("enable-experimental-concurrency",
 
 static llvm::cl::opt<bool> EnableExperimentalLexicalLifetimes(
     "enable-experimental-lexical-lifetimes",
-    llvm::cl::desc("Enable experimental lexical lifetimes."));
+    llvm::cl::desc("Enable experimental lexical lifetimes. Mutually exclusive "
+                   "with disable-lexical-lifetimes."));
+
+static llvm::cl::opt<bool> DisableLexicalLifetimes(
+    "disable-lexical-lifetimes",
+    llvm::cl::desc("Disable the default early lexical lifetimes. Mutually "
+                   "exclusive with enable-experimental-lexical-lifetimes"));
 
 static llvm::cl::opt<bool>
 EnableExperimentalMoveOnly("enable-experimental-move-only",
@@ -519,13 +525,23 @@ int main(int argc, char **argv) {
   SILOpts.EnableOSSAModules = EnableOSSAModules;
   SILOpts.EnableCopyPropagation = EnableCopyPropagation;
   SILOpts.DisableCopyPropagation = DisableCopyPropagation;
-  SILOpts.EnableExperimentalLexicalLifetimes =
-      EnableExperimentalLexicalLifetimes;
-  // Also enable lexical lifetimes if experimental move only is enabled. This is
-  // because move only depends on lexical lifetimes being enabled and it saved
-  // some typing ; ).
-  SILOpts.EnableExperimentalLexicalLifetimes |=
-    EnableExperimentalMoveOnly;
+
+  // Enable lexical lifetimes if it is set or if experimental move only is
+  // enabled. This is because move only depends on lexical lifetimes being
+  // enabled and it saved some typing ; ).
+  bool enableExperimentalLexicalLifetimes =
+      EnableExperimentalLexicalLifetimes | EnableExperimentalMoveOnly;
+  if (enableExperimentalLexicalLifetimes && DisableLexicalLifetimes) {
+    fprintf(
+        stderr,
+        "Error! Can not specify both -enable-experimental-lexical-lifetimes "
+        "and -disable-lexical-lifetimes!\n");
+    exit(-1);
+  }
+  if (enableExperimentalLexicalLifetimes)
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+  if (DisableLexicalLifetimes)
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::Off;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/SILOptions.h"
 #include "swift/Frontend/Frontend.h"
 
 #include "ArgsToFrontendOptionsConverter.h"
@@ -1430,12 +1431,22 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
-  Opts.EnableExperimentalLexicalLifetimes |=
-      Args.hasArg(OPT_enable_experimental_lexical_lifetimes);
   // If experimental move only is enabled, always enable lexical lifetime as
   // well. Move only depends on lexical lifetimes.
-  Opts.EnableExperimentalLexicalLifetimes |=
+  bool enableExperimentalLexicalLifetimes =
+      Args.hasArg(OPT_enable_experimental_lexical_lifetimes) ||
       Args.hasArg(OPT_enable_experimental_move_only);
+  // Error if both experimental lexical lifetimes and disable lexical lifetimes
+  // are both set.
+  if (enableExperimentalLexicalLifetimes &&
+      Args.hasArg(OPT_disable_lexical_lifetimes)) {
+    return true;
+  } else {
+    if (enableExperimentalLexicalLifetimes)
+      Opts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+    if (Args.hasArg(OPT_disable_lexical_lifetimes))
+      Opts.LexicalLifetimes = LexicalLifetimesOption::Off;
+  }
 
   Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
   Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
