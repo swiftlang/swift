@@ -367,7 +367,9 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING")
   endif()
 
-  list(APPEND result ${SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS})
+  set(extra_flags ${SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS})
+  separate_arguments(extra_flags)
+  list(APPEND result ${extra_flags})
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()

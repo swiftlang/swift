@@ -506,9 +506,13 @@ function(_compile_swift_files
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
 
-  list(APPEND swift_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
+  set(extra_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
+  separate_arguments(extra_flags)
+  list(APPEND swift_flags ${extra_flags})
 
-  list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
+  set(extra_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
+  separate_arguments(extra_flags)
+  list(APPEND swift_flags ${extra_flags})
 
   if(SWIFTFILE_OPT_FLAGS)
     list(APPEND swift_flags ${SWIFTFILE_OPT_FLAGS})
