@@ -1858,16 +1858,33 @@ public:
   }
 };
 
-class CollectionElementContextualMismatch final : public ContextualMismatch {
-  CollectionElementContextualMismatch(ConstraintSystem &cs, Type srcType,
-                                      Type dstType, ConstraintLocator *locator)
+class CollectionElementContextualMismatch final
+    : public ContextualMismatch,
+      private llvm::TrailingObjects<CollectionElementContextualMismatch,
+                                    Expr *> {
+  friend TrailingObjects;
+
+  unsigned NumElements;
+
+  CollectionElementContextualMismatch(ConstraintSystem &cs,
+                                      ArrayRef<Expr *> affectedElements,
+                                      Type srcType, Type dstType,
+                                      ConstraintLocator *locator)
       : ContextualMismatch(cs,
                            FixKind::IgnoreCollectionElementContextualMismatch,
-                           srcType, dstType, locator) {}
+                           srcType, dstType, locator),
+        NumElements(affectedElements.size()) {
+    std::uninitialized_copy(affectedElements.begin(), affectedElements.end(),
+                            getElementBuffer().begin());
+  }
 
 public:
   std::string getName() const override {
     return "fix collection element contextual mismatch";
+  }
+
+  ArrayRef<Expr *> getElements() const {
+    return {getTrailingObjects<Expr *>(), NumElements};
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
@@ -1878,6 +1895,11 @@ public:
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreCollectionElementContextualMismatch;
+  }
+
+private:
+  MutableArrayRef<Expr *> getElementBuffer() {
+    return {getTrailingObjects<Expr *>(), NumElements};
   }
 };
 
