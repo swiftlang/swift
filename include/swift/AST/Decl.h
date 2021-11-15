@@ -5300,6 +5300,9 @@ public:
   /// Returns true if the name is the self identifier and is implicit.
   bool isSelfParameter() const;
 
+  /// Check whether the variable is the "self" of an actor method.
+  bool isActorSelf() const;
+
   /// Determine whether this property will be part of the implicit memberwise
   /// initializer.
   ///

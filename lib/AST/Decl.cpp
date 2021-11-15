@@ -6042,6 +6042,20 @@ bool VarDecl::isSelfParameter() const {
   return false;
 }
 
+bool VarDecl::isActorSelf() const {
+  if (!isSelfParameter() && !isSelfParamCapture())
+    return false;
+
+  auto *dc = getDeclContext();
+  while (!dc->isTypeContext() && !dc->isModuleScopeContext())
+    dc = dc->getParent();
+
+  // Check if this `self` parameter belogs to an actor declaration or
+  // extension.
+  auto nominal = dc->getSelfNominalTypeDecl();
+  return nominal && nominal->isActor();
+}
+
 /// Whether the given variable is the backing storage property for
 /// a declared property that is either `lazy` or has an attached
 /// property wrapper.
