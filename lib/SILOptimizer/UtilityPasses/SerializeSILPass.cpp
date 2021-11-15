@@ -298,6 +298,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::SetDeallocatingInst:
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::BindMemoryInst:
+  case SILInstructionKind::RebindMemoryInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::EndBorrowInst:
