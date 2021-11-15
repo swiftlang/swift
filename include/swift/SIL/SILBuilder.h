@@ -1027,6 +1027,13 @@ public:
                                          boundType, getFunction()));
   }
 
+  RebindMemoryInst *createRebindMemory(SILLocation Loc, SILValue base,
+                                       SILValue inToken) {
+    auto tokenTy = SILType::getBuiltinWordType(F->getASTContext());
+    return insert(new (getModule()) RebindMemoryInst(getSILDebugLocation(Loc),
+                                                     base, inToken, tokenTy));
+  }
+
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
                                              SILType Ty,
                                              bool WithoutActuallyEscaping) {

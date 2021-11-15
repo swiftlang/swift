@@ -1351,6 +1351,15 @@ SILCloner<ImplClass>::visitBindMemoryInst(BindMemoryInst *Inst) {
                 getOpValue(Inst->getIndex()), getOpType(Inst->getBoundType())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitRebindMemoryInst(RebindMemoryInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createRebindMemory(getOpLocation(Inst->getLoc()),
+                                            getOpValue(Inst->getBase()),
+                                            getOpValue(Inst->getInToken())));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
