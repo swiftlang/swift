@@ -1760,6 +1760,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_concrete_type_metadata_mangled_name_accessors))
     Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
 
+  if (Args.hasArg(OPT_disable_standard_substitutions_in_reflection_mangling))
+    Opts.DisableStandardSubstitutionsInReflectionMangling = true;
+
   if (Args.hasArg(OPT_use_jit)) {
     Opts.UseJIT = true;
     if (const Arg *A = Args.getLastArg(OPT_dump_jit)) {
@@ -1995,32 +1998,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_llvm_vfe)) {
     Opts.VirtualFunctionElimination = true;
-
-    // FIXME(mracek): There are still some situations where we use mangled name
-    // without symbolic references, which means the dependency is not statically
-    // visible to the compiler/linker. Temporarily disable mangled accessors
-    // until we fix that.
-    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_enable_llvm_wme)) {
     Opts.WitnessMethodElimination = true;
-
-    // FIXME(mracek): There are still some situations where we use mangled name
-    // without symbolic references, which means the dependency is not statically
-    // visible to the compiler/linker. Temporarily disable mangled accessors
-    // until we fix that.
-    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_conditional_runtime_records)) {
     Opts.ConditionalRuntimeRecords = true;
-
-    // FIXME(mracek): There are still some situations where we use mangled name
-    // without symbolic references, which means the dependency is not statically
-    // visible to the compiler/linker. Temporarily disable mangled accessors
-    // until we fix that.
-    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_internalize_at_link)) {

@@ -98,7 +98,8 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // The short-substitution types in the standard library have compact
       // manglings already, and the runtime ought to have a lookup table for
       // them. Symbolic referencing would be wasteful.
-      if (type->getModuleContext()->hasStandardSubstitutions()
+      if (AllowStandardSubstitutions
+          && type->getModuleContext()->hasStandardSubstitutions()
           && Mangle::getStandardTypeSubst(
                type->getName().str(), AllowConcurrencyStandardSubstitutions)) {
         return false;
@@ -158,6 +159,11 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
     if (*runtimeCompatVersion < llvm::VersionTuple(5, 5))
       AllowConcurrencyStandardSubstitutions = false;
   }
+
+  llvm::SaveAndRestore<bool> savedAllowStandardSubstitutions(
+      AllowStandardSubstitutions);
+  if (IGM.getOptions().DisableStandardSubstitutionsInReflectionMangling)
+    AllowStandardSubstitutions = false;
 
   llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(
       AllowMarkerProtocols, false);
