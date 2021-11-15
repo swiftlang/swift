@@ -5562,24 +5562,43 @@ public:
 private:
   llvm::MutableArrayRef<Component> Components;
 
-public:
-  /// Create a new #keyPath expression.
-  KeyPathExpr(ASTContext &C,
-              SourceLoc keywordLoc, SourceLoc lParenLoc,
-              ArrayRef<Component> components,
-              SourceLoc rParenLoc,
-              bool isImplicit = false);
+  KeyPathExpr(SourceLoc startLoc, Expr *parsedRoot, Expr *parsedPath,
+              SourceLoc endLoc, bool hasLeadingDot, bool isObjC,
+              bool isImplicit);
 
+  /// Create a key path with unresolved root and path expressions.
   KeyPathExpr(SourceLoc backslashLoc, Expr *parsedRoot, Expr *parsedPath,
-              bool hasLeadingDot, bool isImplicit = false)
-      : Expr(ExprKind::KeyPath, isImplicit), StartLoc(backslashLoc),
-        EndLoc(parsedPath ? parsedPath->getEndLoc() : parsedRoot->getEndLoc()),
-        ParsedRoot(parsedRoot), ParsedPath(parsedPath),
-        HasLeadingDot(hasLeadingDot) {
-    assert((parsedRoot || parsedPath) &&
-           "keypath must have either root or path");
-    Bits.KeyPathExpr.IsObjC = false;
-  }
+              bool hasLeadingDot, bool isImplicit);
+
+  /// Create a key path with components.
+  KeyPathExpr(ASTContext &ctx, SourceLoc startLoc,
+              ArrayRef<Component> components, SourceLoc endLoc, bool isObjC,
+              bool isImplicit);
+
+public:
+  /// Create a new parsed Swift key path expression.
+  static KeyPathExpr *createParsed(ASTContext &ctx, SourceLoc backslashLoc,
+                                   Expr *parsedRoot, Expr *parsedPath,
+                                   bool hasLeadingDot);
+
+  /// Create a new parsed #keyPath expression.
+  static KeyPathExpr *createParsedPoundKeyPath(ASTContext &ctx,
+                                               SourceLoc keywordLoc,
+                                               SourceLoc lParenLoc,
+                                               ArrayRef<Component> components,
+                                               SourceLoc rParenLoc);
+
+  /// Create an implicit Swift key path expression with a set of resolved
+  /// components.
+  static KeyPathExpr *createImplicit(ASTContext &ctx, SourceLoc backslashLoc,
+                                     ArrayRef<Component> components,
+                                     SourceLoc endLoc);
+
+  /// Create an implicit Swift key path expression with a root and path
+  /// expression to be resolved.
+  static KeyPathExpr *createImplicit(ASTContext &ctx, SourceLoc backslashLoc,
+                                     Expr *parsedRoot, Expr *parsedPath,
+                                     bool hasLeadingDot);
 
   SourceLoc getLoc() const { return StartLoc; }
   SourceRange getSourceRange() const { return SourceRange(StartLoc, EndLoc); }

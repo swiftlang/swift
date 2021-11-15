@@ -2223,16 +2223,8 @@ namespace {
       auto *anchor = getAsExpr(memberLoc->getAnchor());
 
       auto makeKeyPath = [&](ArrayRef<Component> components) -> Expr * {
-        // Create a new implicit key path. We pass in anchor as the parsed path
-        // to set the end loc, but don't want to keep it as the parsed path,
-        // so clear it out after.
-        auto *kp = new (ctx) KeyPathExpr(/*backslashLoc*/ dotLoc,
-                                         /*parsedRoot*/ nullptr,
-                                         /*parsedPath*/ anchor,
-                                         /*hasLeadingDot*/ false,
-                                         /*isImplicit*/ true);
-        kp->setParsedPath(nullptr);
-        kp->setComponents(ctx, components);
+        auto *kp = KeyPathExpr::createImplicit(ctx, /*backslashLoc*/ dotLoc,
+                                               components, anchor->getEndLoc());
         kp->setType(keyPathTy);
         cs.cacheExprTypes(kp);
 
