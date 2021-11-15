@@ -634,6 +634,10 @@ def disable_debugger_shadow_copies : Flag<["-"], "disable-debugger-shadow-copies
 def disable_concrete_type_metadata_mangled_name_accessors : Flag<["-"], "disable-concrete-type-metadata-mangled-name-accessors">,
   HelpText<"Disable concrete type metadata access by mangled name">,
   Flags<[FrontendOption, HelpHidden]>;
+
+def disable_standard_substitutions_in_reflection_mangling : Flag<["-"], "disable-standard-substitutions-in-reflection-mangling">,
+  HelpText<"Disable referencing stdlib symbols via mangled names in reflection mangling">,
+  Flags<[FrontendOption, HelpHidden]>;
   
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
