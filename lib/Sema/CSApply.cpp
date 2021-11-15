@@ -679,6 +679,10 @@ namespace {
                                   LookUpConformanceInModule(cs.DC->getParentModule()));
     }
 
+    /// Determine whether the given reference is to a method on
+    /// a remote distributed actor in the given context.
+    bool isDistributedThunk(ConcreteDeclRef ref, Expr *context);
+
   public:
     /// Build a reference to the given declaration.
     Expr *buildDeclRef(SelectedOverload overload, DeclNameLoc loc,
@@ -7581,6 +7585,14 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setArgs(args);
     cs.setType(apply, fnType->getResult());
 
+    // If this is a call to a distributed method thunk, let's mark the
+    // call as implicitly throwing.
+    if (isDistributedThunk(callee, apply->getFn())) {
+      auto *FD = cast<AbstractFunctionDecl>(callee.getDecl());
+      if (!FD->hasThrows())
+        apply->setImplicitlyThrows(true);
+    }
+
     solution.setExprTypes(apply);
     Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
@@ -7656,6 +7668,90 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // Tail-recur to actually call the constructor.
   return finishApply(apply, openedType, locator, ctorLocator);
+}
+
+/// Determine whether this closure should be treated as Sendable.
+static bool isSendableClosure(ConstraintSystem &cs,
+                              const AbstractClosureExpr *closure) {
+  if (auto fnType = cs.getType(const_cast<AbstractClosureExpr *>(closure))
+                        ->getAs<FunctionType>()) {
+    if (fnType->isSendable())
+      return true;
+  }
+
+  return false;
+}
+
+bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
+  auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(ref.getDecl());
+  if (!(FD && FD->isInstanceMember() && FD->isDistributed()))
+    return false;
+
+  if (!isa<SelfApplyExpr>(context))
+    return false;
+
+  auto *actor = getReferencedParamOrCapture(
+      cast<SelfApplyExpr>(context)->getBase(),
+      [&](OpaqueValueExpr *opaqueValue) -> Expr * {
+        for (const auto &existential : OpenedExistentials) {
+          if (existential.OpaqueValue == opaqueValue)
+            return existential.ExistentialValue;
+        }
+        return nullptr;
+      });
+
+  if (!actor)
+    return false;
+
+  // If this is a method reference on an potentially isolated
+  // actor then it cannot be a remote thunk.
+  if (isPotentiallyIsolatedActor(actor, [&](ParamDecl *P) {
+        return P->isIsolated() ||
+               llvm::is_contained(solution.isolatedParams, P);
+      }))
+    return false;
+
+  bool isInAsyncLetInitializer = target && target->isAsyncLetInitializer();
+
+  auto isActorInitOrDeInitContext = [&](const DeclContext *dc) {
+    return ::isActorInitOrDeInitContext(
+        dc, [&](const AbstractClosureExpr *closure) {
+          return isSendableClosure(cs, closure);
+        });
+  };
+
+  switch (ActorIsolationRestriction::forDeclaration(ref, dc)) {
+  case ActorIsolationRestriction::CrossActorSelf: {
+    // Not a thunk if it's used in actor init or de-init.
+    if (!isInAsyncLetInitializer && isActorInitOrDeInitContext(dc))
+      return false;
+
+    // Here we know that the method could be used across actors
+    // and the actor it's used on is non-isolated, which means
+    // that it could be a thunk, so we have to be conservative
+    // about it.
+    return true;
+  }
+
+  case ActorIsolationRestriction::ActorSelf: {
+    // An instance member of an actor can be referenced from an actor's
+    // designated initializer or deinitializer.
+    if (actor->isActorSelf() && !isInAsyncLetInitializer) {
+      if (auto *fn = isActorInitOrDeInitContext(dc)) {
+        if (!(isa<ConstructorDecl>(fn) &&
+              cast<ConstructorDecl>(fn)->isConvenienceInit()))
+          return false;
+      }
+    }
+
+    // Call on a non-isolated actor in async context requires
+    // implicit thunk.
+    return isInAsyncLetInitializer || cs.isAsynchronousContext(dc);
+  }
+
+  default:
+    return false;
+  }
 }
 
 // Return the precedence-yielding parent of 'expr', along with the index of
@@ -8279,12 +8375,9 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
 
   // For an async let, wrap the initializer appropriately to make it a child
   // task.
-  if (auto patternBinding = target.getInitializationPatternBindingDecl()) {
-    if (patternBinding->isAsyncLet()) {
-      resultTarget.setExpr(
-          wrapAsyncLetInitializer(
-            cs, resultTarget.getAsExpr(), resultTarget.getDeclContext()));
-    }
+  if (target.isAsyncLetInitializer()) {
+    resultTarget.setExpr(wrapAsyncLetInitializer(
+        cs, resultTarget.getAsExpr(), resultTarget.getDeclContext()));
   }
 
   return resultTarget;
