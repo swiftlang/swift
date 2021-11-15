@@ -36,7 +36,6 @@ typedef __swift_stdlib_UProperty UProperty;
 typedef uint8_t UVersionInfo[U_MAX_VERSION_LENGTH];
 
 // Comparison and character property APIs
-UBool u_hasBinaryProperty(UChar32, UProperty);
 void u_charAge(UChar32, UVersionInfo);
 int32_t u_getIntPropertyValue(UChar32, UProperty);
 int32_t u_charName(UChar32, UCharNameChoice, char *, int32_t, UErrorCode *);
@@ -126,12 +125,6 @@ template <typename T, typename U> T *ptr_cast(U *p) {
 template <typename T, typename U> const T *ptr_cast(const U *p) {
   return static_cast<const T *>(static_cast<const void *>(p));
 }
-}
-
-__swift_stdlib_UBool
-__swift_stdlib_u_hasBinaryProperty(__swift_stdlib_UChar32 c,
-                                          __swift_stdlib_UProperty p) {
-  return u_hasBinaryProperty(c, static_cast<UProperty>(p));
 }
 
 void
