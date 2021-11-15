@@ -159,16 +159,17 @@ func emitCompAccessor(_ mph: Mph, into result: inout String) {
   
     auto count = array[0] >> 21;
   
-    __swift_uint32_t low = 1;
-    __swift_uint32_t high = count - 1;
+    auto lowerBoundIndex = 1;
+    auto endIndex = count;
+    auto upperBoundIndex = endIndex - 1;
   
-    while (high >= low) {
-      auto idx = low + (high - low) / 2;
+    while (upperBoundIndex >= lowerBoundIndex) {
+      auto index = lowerBoundIndex + (upperBoundIndex - lowerBoundIndex) / 2;
     
-      auto entry = array[idx];
+      auto entry = array[index];
     
       // Shift the range count out of the scalar.
-      auto lower = (entry << 15) >> 15;
+      auto lowerBoundScalar = (entry << 15) >> 15;
     
       bool isNegative = entry >> 31;
       auto rangeCount = (entry << 1) >> 18;
@@ -177,19 +178,19 @@ func emitCompAccessor(_ mph: Mph, into result: inout String) {
         rangeCount = -rangeCount;
       }
     
-      auto composed = lower + rangeCount;
+      auto composed = lowerBoundScalar + rangeCount;
     
-      if (x == lower) {
+      if (x == lowerBoundScalar) {
         return composed;
       }
     
-      if (x > lower) {
-        low = idx + 1;
+      if (x > lowerBoundScalar) {
+        lowerBoundIndex = index + 1;
         continue;
       }
     
-      if (x < lower) {
-        high = idx - 1;
+      if (x < lowerBoundScalar) {
+        upperBoundIndex = index - 1;
         continue;
       }
     }
