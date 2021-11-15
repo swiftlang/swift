@@ -44,25 +44,6 @@ STATISTIC(NumDuplicateSolutionStates,
 
 using namespace swift;
 
-AbstractTypeWitness AbstractTypeWitness::forFixed(AssociatedTypeDecl *assocType,
-                                                  Type type) {
-  return AbstractTypeWitness(AbstractTypeWitnessKind::Fixed, assocType, type,
-                             nullptr);
-}
-
-AbstractTypeWitness
-AbstractTypeWitness::forDefault(AssociatedTypeDecl *assocType, Type type,
-                                AssociatedTypeDecl *defaultedAssocType) {
-  return AbstractTypeWitness(AbstractTypeWitnessKind::Default, assocType, type,
-                             defaultedAssocType);
-}
-
-AbstractTypeWitness
-AbstractTypeWitness::forGenericParam(AssociatedTypeDecl *assocType, Type type) {
-  return AbstractTypeWitness(AbstractTypeWitnessKind::GenericParam, assocType,
-                             type, nullptr);
-}
-
 void InferredAssociatedTypesByWitness::dump() const {
   dump(llvm::errs(), 0);
 }
@@ -817,56 +798,7 @@ AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
   return results.size() == 1 ? results.front() : nullptr;
 }
 
-Type AssociatedTypeInference::computeFixedTypeWitness(
-                                            AssociatedTypeDecl *assocType) {
-  Type resultType;
-
-  // Look at all of the inherited protocols to determine whether they
-  // require a fixed type for this associated type.
-  for (auto conformedProto : adoptee->getAnyNominal()->getAllProtocols()) {
-    if (conformedProto != assocType->getProtocol() &&
-        !conformedProto->inheritsFrom(assocType->getProtocol()))
-      continue;
-
-    auto sig = conformedProto->getGenericSignature();
-
-    // FIXME: The RequirementMachine will assert on re-entrant construction.
-    // We should find a more principled way of breaking this cycle.
-    if (ctx.isRecursivelyConstructingRequirementMachine(sig.getCanonicalSignature()) ||
-        ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
-        conformedProto->isComputingRequirementSignature())
-      continue;
-
-    auto selfTy = conformedProto->getSelfInterfaceType();
-    if (!sig->requiresProtocol(selfTy, assocType->getProtocol()))
-      continue;
-
-    auto structuralTy = DependentMemberType::get(selfTy, assocType->getName());
-    const auto ty = sig.getCanonicalTypeInContext(structuralTy);
-
-    // A dependent member type with an identical base and name indicates that
-    // the protocol does not same-type constrain it in any way; move on to
-    // the next protocol.
-    if (auto *const memberTy = ty->getAs<DependentMemberType>()) {
-      if (memberTy->getBase()->isEqual(selfTy) &&
-          memberTy->getName() == assocType->getName())
-        continue;
-    }
-
-    if (!resultType) {
-      resultType = ty;
-      continue;
-    }
-
-    // FIXME: Bailing out on ambiguity.
-    if (!resultType->isEqual(ty))
-      return Type();
-  }
-
-  return resultType;
-}
-
-Optional<AbstractTypeWitness>
+Optional<std::pair<AssociatedTypeDecl *, Type>>
 AssociatedTypeInference::computeDefaultTypeWitness(
     AssociatedTypeDecl *assocType) const {
   // Go find a default definition.
@@ -882,8 +814,7 @@ AssociatedTypeInference::computeDefaultTypeWitness(
   if (defaultType->hasError())
     return None;
 
-  return AbstractTypeWitness::forDefault(assocType, defaultType,
-                                         defaultedAssocType);
+  return std::make_pair(defaultedAssocType, defaultType);
 }
 
 std::pair<Type, TypeDecl *>
@@ -912,29 +843,6 @@ AssociatedTypeInference::computeDerivedTypeWitness(
   }
 
   return result;
-}
-
-Optional<AbstractTypeWitness>
-AssociatedTypeInference::computeAbstractTypeWitness(
-    AssociatedTypeDecl *assocType) {
-  // We don't have a type witness for this associated type, so go
-  // looking for more options.
-  if (Type concreteType = computeFixedTypeWitness(assocType))
-    return AbstractTypeWitness::forFixed(assocType, concreteType);
-
-  // If we can form a default type, do so.
-  if (const auto &typeWitness = computeDefaultTypeWitness(assocType))
-    return typeWitness;
-
-  // If there is a generic parameter of the named type, use that.
-  if (auto genericSig = dc->getGenericSignatureOfContext()) {
-    for (auto gp : genericSig.getInnermostGenericParams()) {
-      if (gp->getName() == assocType->getName())
-        return AbstractTypeWitness::forGenericParam(assocType, gp);
-    }
-  }
-
-  return None;
 }
 
 void AssociatedTypeInference::collectAbstractTypeWitnesses(
@@ -970,9 +878,8 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
     }
 
     // If we find a default type definition, feed it to the system.
-    if (const auto &typeWitness = computeDefaultTypeWitness(assocType)) {
-      system.addDefaultTypeWitness(typeWitness->getType(),
-                                   typeWitness->getDefaultedAssocType());
+    if (const auto declAndType = computeDefaultTypeWitness(assocType)) {
+      system.addDefaultTypeWitness(declAndType->second, declAndType->first);
     } else {
       // As a last resort, look for a generic parameter that matches the name
       // of the associated type.
