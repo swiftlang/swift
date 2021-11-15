@@ -27,7 +27,7 @@ public func formatCollection<C: Collection>(
       result += "  "
     }
 
-    if rowLength + string.count + 1 > 80 {
+    if rowLength + string.count + 1 > 100 {
       result += "\n  "
 
       rowLength = 2
