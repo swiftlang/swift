@@ -2008,7 +2008,7 @@ void PreCheckExpression::resolveKeyPathExpr(KeyPathExpr *KPE) {
   std::reverse(components.begin(), components.end());
 
   KPE->setRootType(rootType);
-  KPE->resolveComponents(getASTContext(), components);
+  KPE->setComponents(getASTContext(), components);
 }
 
 Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {

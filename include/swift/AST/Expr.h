@@ -5592,10 +5592,9 @@ public:
     return Components;
   }
   
-  /// Resolve the components of an un-type-checked expr. This copies over the
-  /// components from the argument array.
-  void resolveComponents(ASTContext &C,
-                         ArrayRef<Component> resolvedComponents);
+  /// Set the key path components. This copies over the components from the
+  /// argument array.
+  void setComponents(ASTContext &C, ArrayRef<Component> newComponents);
 
   /// Indicates if the key path expression is composed by a single invalid
   /// component. e.g. missing component `\Root`

@@ -2001,20 +2001,20 @@ KeyPathExpr::KeyPathExpr(ASTContext &C, SourceLoc keywordLoc,
 }
 
 void
-KeyPathExpr::resolveComponents(ASTContext &C,
-                          ArrayRef<KeyPathExpr::Component> resolvedComponents) {
+KeyPathExpr::setComponents(ASTContext &C,
+                           ArrayRef<KeyPathExpr::Component> newComponents) {
   // Reallocate the components array if it needs to be.
-  if (Components.size() < resolvedComponents.size()) {
-    Components = C.Allocate<Component>(resolvedComponents.size());
+  if (Components.size() < newComponents.size()) {
+    Components = C.Allocate<Component>(newComponents.size());
     for (unsigned i : indices(Components)) {
       ::new ((void*)&Components[i]) Component{};
     }
   }
   
-  for (unsigned i : indices(resolvedComponents)) {
-    Components[i] = resolvedComponents[i];
+  for (unsigned i : indices(newComponents)) {
+    Components[i] = newComponents[i];
   }
-  Components = Components.slice(0, resolvedComponents.size());
+  Components = Components.slice(0, newComponents.size());
 }
 
 Optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {

@@ -2247,7 +2247,7 @@ namespace {
       case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
         buildKeyPathSubscriptComponent(overload, dotLoc, /*args=*/nullptr,
                                        componentLoc, components);
-        keyPath->resolveComponents(ctx, components);
+        keyPath->setComponents(ctx, components);
         cs.cacheExprTypes(keyPath);
         return keyPath;
       }
@@ -2328,7 +2328,7 @@ namespace {
       cs.cacheType(componentExpr);
 
       keyPath->setParsedPath(componentExpr);
-      keyPath->resolveComponents(ctx, components);
+      keyPath->setComponents(ctx, components);
       cs.cacheExprTypes(keyPath);
 
       // See whether there's an equivalent ObjC key path string we can produce
@@ -4894,7 +4894,7 @@ namespace {
       }
 
       // Set the resolved components, and cache their types.
-      E->resolveComponents(cs.getASTContext(), resolvedComponents);
+      E->setComponents(cs.getASTContext(), resolvedComponents);
       cs.cacheExprTypes(E);
 
       // See whether there's an equivalent ObjC key path string we can produce
