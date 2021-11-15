@@ -144,6 +144,9 @@ namespace swift {
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
 
+    /// Enable experimental string processing
+    bool EnableExperimentalRegex = false;
+
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
