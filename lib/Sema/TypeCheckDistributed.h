@@ -55,6 +55,9 @@ Type getDistributedActorIdentityType(NominalTypeDecl *actor);
 void diagnoseDistributedFunctionInNonDistributedActorProtocol(
   const ProtocolDecl *proto, InFlightDiagnostic &diag);
 
+/// Emit a FixIt suggesting to add Codable to the nominal type.
+void addCodableFixIt(const NominalTypeDecl *nominal, InFlightDiagnostic &diag);
+
 }
 
 

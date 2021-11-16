@@ -29,21 +29,21 @@ distributed enum SomeDistributedActor_3 { } // expected-error{{'distributed' mod
 
 @available(SwiftStdlib 5.6, *)
 struct SomeNotActorStruct_2 {
-  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 @available(SwiftStdlib 5.6, *)
 class SomeNotActorClass_3 {
-  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 @available(SwiftStdlib 5.6, *)
 actor SomeNotDistributedActor_4 {
-  distributed func notInDistActorAsyncThrowing() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func notInDistActorAsyncThrowing() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 protocol DP {
-  distributed func hello()  // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func hello()  // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 @available(SwiftStdlib 5.6, *)
@@ -58,7 +58,7 @@ protocol DPOK2: DPOK {
 
 @available(SwiftStdlib 5.6, *)
 enum SomeNotActorEnum_5 {
-  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 @available(SwiftStdlib 5.6, *)
