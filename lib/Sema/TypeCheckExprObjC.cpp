@@ -419,7 +419,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   // A successful check of an ObjC keypath shouldn't add or remove components,
   // currently.
   if (resolvedComponents.size() == expr->getComponents().size())
-    expr->resolveComponents(Context, resolvedComponents);
+    expr->setComponents(Context, resolvedComponents);
 
   // Check for an empty key-path string.
   auto keyPathString = keyPathOS.str();
