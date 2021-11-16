@@ -8,3 +8,7 @@ module OptimizerBridging {
   export *
 }
 
+module ExperimentalRegexBridging {
+  header "Parse/ExperimentalRegexBridging.h"
+  export *
+}

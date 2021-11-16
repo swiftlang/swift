@@ -47,7 +47,7 @@
 #include <execinfo.h>
 #endif
 
-#if defined(__APPLE__)
+#if SWIFT_STDLIB_HAS_ASL
 #include <asl.h>
 #elif defined(__ANDROID__)
 #include <android/log.h>
