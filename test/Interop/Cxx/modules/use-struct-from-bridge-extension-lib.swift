@@ -7,6 +7,9 @@
 //
 // REQUIRES: executable_test
 
+// https://bugs.swift.org/browse/SR-15488
+// REQUIRES: SR15488
+
 import StdlibUnittest
 import BridgeExtensionLib
 
