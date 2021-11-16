@@ -1618,7 +1618,7 @@ public:
         buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
-  llvm::hash_code hashExtension(llvm::hash_code code) const override;
+  void hashExtension(ExtensionHashBuilder &HBuilder) const override;
 
   std::unique_ptr<clang::ModuleFileExtensionWriter>
   createExtensionWriter(clang::ASTWriter &writer) override;
