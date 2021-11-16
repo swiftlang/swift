@@ -19,6 +19,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/SILOptions.h"
 #define DEBUG_TYPE "sil-passpipeline-plan"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/AST/ASTContext.h"
@@ -138,7 +139,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addSILSkippingChecker();
 #endif
 
-  if (Options.shouldOptimize() && !Options.EnableExperimentalLexicalLifetimes) {
+  if (Options.shouldOptimize() &&
+      Options.LexicalLifetimes != LexicalLifetimesOption::ExperimentalLate) {
     P.addDestroyHoisting();
   }
   P.addMandatoryInlining();
@@ -171,7 +173,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Now that we have finished performing diagnostics that rely on lexical
   // scopes, if lexical lifetimes are not enabled, eliminate lexical lfietimes.
-  if (!Options.EnableExperimentalLexicalLifetimes) {
+  if (Options.LexicalLifetimes != LexicalLifetimesOption::ExperimentalLate) {
     P.addLexicalLifetimeEliminator();
   }
 

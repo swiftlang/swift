@@ -578,10 +578,9 @@ void SILInlineCloner::postFixUp(SILFunction *calleeFunction) {
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
                                                  FullApplySite AI) {
-  auto enableLexicalLifetimes = Apply.getFunction()
-                                    ->getModule()
-                                    .getASTContext()
-                                    .SILOpts.EnableExperimentalLexicalLifetimes;
+  auto &mod = Apply.getFunction()->getModule();
+  auto enableLexicalLifetimes =
+      mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
   auto argOwnershipRequiresBorrow = [&]() {
     auto kind = callArg.getOwnershipKind();
     if (enableLexicalLifetimes) {

@@ -908,6 +908,22 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   return OS;
 }
 
+inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
+  switch (mod.getStage()) {
+  case SILStage::Raw:
+    // In Raw SIL, we support lexical lifetimes as long as lexical lifetimes is
+    // not turned off all the way.
+    return LexicalLifetimes != LexicalLifetimesOption::Off;
+  case SILStage::Canonical:
+    // In Canonical SIL, we only support lexical lifetimes when in experimental
+    // late mode.
+    return LexicalLifetimes == LexicalLifetimesOption::ExperimentalLate;
+  case SILStage::Lowered:
+    // We do not support OSSA in Lowered SIL, so this is always false.
+    return false;
+  }
+}
+
 /// Print a simple description of a SILModule for the request evaluator.
 void simple_display(llvm::raw_ostream &out, const SILModule *M);
 

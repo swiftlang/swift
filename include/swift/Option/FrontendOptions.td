@@ -255,9 +255,15 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
+def disable_lexical_lifetimes :
+  Flag<["-"], "disable-lexical-lifetimes">,
+  HelpText<"Disables early lexical lifetimes. Mutually exclusive with "
+           "-enable-experimental-lexical-lifetimes">;
+
 def enable_experimental_lexical_lifetimes :
   Flag<["-"], "enable-experimental-lexical-lifetimes">,
-  HelpText<"Enable experimental lexical lifetimes">;
+  HelpText<"Enable experimental lexical lifetimes. Mutually exclusive with "
+           "-disable-early-lexical-lifetimes">;
 
 def enable_experimental_move_only :
   Flag<["-"], "enable-experimental-move-only">,
