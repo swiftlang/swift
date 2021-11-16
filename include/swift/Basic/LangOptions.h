@@ -682,7 +682,7 @@ namespace swift {
 
     /// Enable experimental support for type inference through multi-statement
     /// closures.
-    bool EnableMultiStatementClosureInference = false;
+    bool EnableMultiStatementClosureInference = true;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
