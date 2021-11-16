@@ -128,6 +128,23 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
       // TODO: suggest a fixit to add Codable to the type?
       return true;
     }
+
+    if (param->isInOut()) {
+      param->diagnose(
+          diag::distributed_actor_func_inout,
+          func->getDescriptiveKind(), func->getName(),
+          param->getName()
+      ); // TODO(distributed): offer fixit to remove 'inout'
+      return true;
+    }
+
+    if (param->isVariadic()) {
+      param->diagnose(
+          diag::distributed_actor_func_variadic,
+          func->getDescriptiveKind(), func->getName(),
+          param->getName()
+      );
+    }
   }
 
   // --- Result type must be either void or a codable type

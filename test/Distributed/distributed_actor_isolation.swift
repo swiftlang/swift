@@ -75,6 +75,18 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
 
+  distributed func varargs(int: Int...) {
+    // expected-error@-1{{distributed instance method 'varargs(int:)' cannot declare variadic argument 'int'}}
+  }
+
+  distributed func closure(close: () -> String) {
+    // expected-error@-1{{distributed instance method parameter 'close' of type '() -> String' does not conform to 'Codable'}}
+  }
+
+  distributed func noInout(inNOut burger: inout String) {
+    // expected-error@-1{{distributed instance method 'noInout(inNOut:)' cannot declare 'inout' argument 'burger'}}
+  }
+
   distributed func distReturnGeneric<T: Codable & Sendable>(item: T) async throws -> T { // ok
     item
   }

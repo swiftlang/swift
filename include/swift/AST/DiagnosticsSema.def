@@ -4522,6 +4522,15 @@ ERROR(distributed_actor_func_nonisolated, none,
 ERROR(distributed_actor_func_private, none,
       "%0 %1 cannot be 'private'",
       (DescriptiveDeclKind, DeclName))
+ERROR(distributed_actor_func_inout, none,
+      "%0 %1 cannot declare 'inout' argument %2",
+      (DescriptiveDeclKind, DeclName, DeclName))
+ERROR(distributed_actor_func_closure, none,
+      "%0 %1 cannot declare closure arguments, as they cannot be serialized",
+      (DescriptiveDeclKind, DeclName))
+ERROR(distributed_actor_func_variadic, none,
+      "%0 %1 cannot declare variadic argument %2",
+      (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(distributed_actor_remote_func_is_not_static,none,
       "remote function %0 must be static.",
       (DeclName))
