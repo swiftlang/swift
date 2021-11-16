@@ -207,7 +207,7 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
 
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDelayImpl(unsigned long long delay,
+static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
                                                   Job *job) {
   assert(job && "no job provided");
 
