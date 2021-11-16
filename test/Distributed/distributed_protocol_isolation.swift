@@ -63,12 +63,12 @@ func outside_good(dp: SpecificDist) async throws {
 }
 
 func outside_good_generic<DP: DistProtocol>(dp: DP) async throws {
-  _ = dp.local() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
-  _ = await dp.local() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
+  _ = dp.local() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
+  _ = await dp.local() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   // the below warning is expected because we don't apply the "implicitly async" to the not-callable func
   // expected-warning@-2{{no 'async' operations occur within 'await' expression}}
 
-  _ = try dp.local() // expected-error{{only 'distributed' functions can be called on a potentially remote distributed actor}}
+  _ = try dp.local() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   // the below warning is expected because we don't apply the "implicitly throwing" to the not-callable func
   // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
 
@@ -111,11 +111,11 @@ distributed actor Nope1_StrictlyLocal: StrictlyLocal {
 }
 distributed actor Nope2_StrictlyLocal: StrictlyLocal {
   distributed func local() {}
-  // expected-error@-1{{actor-isolated instance method 'local()' cannot be used to satisfy a protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'local()' to make this instance method not isolated to the actor}}
+  // expected-error@-1{{actor-isolated distributed instance method 'local()' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'local()' to make this distributed instance method not isolated to the actor}}
   distributed func localThrows() throws {}
-  // expected-error@-1{{actor-isolated instance method 'localThrows()' cannot be used to satisfy a protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this instance method not isolated to the actor}}
+  // expected-error@-1{{actor-isolated distributed instance method 'localThrows()' cannot be used to satisfy a protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this distributed instance method not isolated to the actor}}
 }
 distributed actor OK_StrictlyLocal: StrictlyLocal {
   nonisolated func local() {}

@@ -38,7 +38,7 @@ distributed actor D4 {
 
 protocol P1: DistributedActor {
   distributed func dist() -> String
-  // expected-note@-1{{distributed function requirement 'dist()' declared here}}
+  // expected-note@-1{{distributed instance method requirement 'dist()' declared here}}
 }
 
 distributed actor D5: P1 {
