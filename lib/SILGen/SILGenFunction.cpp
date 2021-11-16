@@ -1005,6 +1005,25 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   // Start Main loop!
   FuncDecl *drainQueueFuncDecl = SGM.getAsyncMainDrainQueue();
+  if (!drainQueueFuncDecl) {
+    // If it doesn't exist, we can conjure one up instead of crashing
+    // @available(SwiftStdlib 5.5, *)
+    // @_silgen_name("swift_task_asyncMainDrainQueue")
+    // internal func _asyncMainDrainQueue() -> Never
+    ParameterList *emptyParams = ParameterList::createEmpty(getASTContext());
+    drainQueueFuncDecl = FuncDecl::createImplicit(
+        getASTContext(), StaticSpellingKind::None,
+        DeclName(
+          getASTContext(),
+          DeclBaseName(getASTContext().getIdentifier("_asyncMainDrainQueue")),
+          /*Arguments*/emptyParams),
+          {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
+          getASTContext().getNeverType(),
+          entryPoint.getDecl()->getModuleContext());
+    drainQueueFuncDecl->getAttrs().add(
+        new (getASTContext()) SILGenNameAttr("swift_task_asyncMainDrainQueue", /*implicit*/ true));
+  }
+
   SILFunction *drainQueueSILFunc = SGM.getFunction(
       SILDeclRef(drainQueueFuncDecl, SILDeclRef::Kind::Func), NotForDefinition);
   SILValue drainQueueFunc =
