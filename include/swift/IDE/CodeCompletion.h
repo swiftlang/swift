@@ -452,6 +452,8 @@ enum class SemanticContextKind : uint8_t {
 
   /// A declaration imported from other module.
   OtherModule,
+
+  MAX_VALUE = OtherModule
 };
 
 enum class CodeCompletionFlairBit: uint8_t {
@@ -564,6 +566,8 @@ enum class CodeCompletionOperatorKind : uint8_t {
   PipeEq,           // |=
   PipePipe,         // ||
   TildeEq,          // ~=
+
+  MAX_VALUE = TildeEq
 };
 
 enum class CodeCompletionKeywordKind : uint8_t {
@@ -612,12 +616,14 @@ enum class CompletionKind : uint8_t {
   TypeAttrBeginning,
 };
 
-enum class CodeCompletionDiagnosticSeverity: uint8_t {
+enum class CodeCompletionDiagnosticSeverity : uint8_t {
   None,
   Error,
   Warning,
   Remark,
   Note,
+
+  MAX_VALUE = Note
 };
 
 /// A single code completion result.
@@ -631,6 +637,8 @@ public:
     Pattern,
     Literal,
     BuiltinOperator,
+
+    MAX_VALUE = BuiltinOperator
   };
 
   /// Describes the relationship between the type of the completion results and
@@ -654,6 +662,8 @@ public:
 
     /// The result's type is identical to the type of the expected.
     Identical,
+
+    MAX_VALUE = Identical
   };
 
   enum class NotRecommendedReason : uint8_t {
@@ -665,6 +675,8 @@ public:
     InvalidAsyncContext,
     CrossActorReference,
     VariableUsedInOwnDefinition,
+
+    MAX_VALUE = VariableUsedInOwnDefinition
   };
 
 private:
@@ -692,6 +704,14 @@ private:
   ExpectedTypeRelation TypeDistance : 3;
   CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
   StringRef DiagnosticMessage;
+
+  // Assertions for limiting max values of enums.
+  static_assert(int(ResultKind::MAX_VALUE) < 1 << 3, "");
+  static_assert(int(CodeCompletionOperatorKind::MAX_VALUE) < 1 << 6, "");
+  static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
+  static_assert(int(NotRecommendedReason::MAX_VALUE) < 1 << 4, "");
+  static_assert(int(ExpectedTypeRelation::MAX_VALUE) < 1 << 3, "");
+  static_assert(int(CodeCompletionDiagnosticSeverity::MAX_VALUE) < 1 << 3, "");
 
 public:
   /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
