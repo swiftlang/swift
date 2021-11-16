@@ -12,10 +12,51 @@ static int compare_unsigned(unsigned lhs, unsigned rhs) {
 }
 
 namespace {
+enum EntryOrder {
+  creationOrder,
+  reverseCreationOrder
+};
+
 struct Entry {
   unsigned id;
   unsigned value;
   Entry *next;
+};
+
+class EntryFactory {
+  std::vector<std::unique_ptr<Entry>> entries;
+  unsigned nextID = 0;
+public:
+  Entry *create(unsigned value) {
+    auto entry = new Entry{nextID++, value, nullptr};
+    entries.emplace_back(entry);
+    return entry;
+  }
+
+  /// Sort the entries in this list.
+  ///
+  /// \param reverseCreationOrder - if true, then order equal-value
+  ///   nodes in the reverse of creation order; otherwise
+  ///   creator order of creation order
+  void sort(EntryOrder order) {
+    std::sort(entries.begin(), entries.end(),
+              [=](const std::unique_ptr<Entry> &lhs,
+                  const std::unique_ptr<Entry> &rhs) {
+      if (lhs->value != rhs->value) return lhs->value < rhs->value;
+      return order == creationOrder
+               ? lhs->id < rhs->id
+               : lhs->id > rhs->id;
+    });
+  }
+
+  void checkSameAs(Entry *list) {
+    for (auto &entry: entries) {
+      std::cout << "  " << list->value << " (" << list->id << ")\n";
+      assert(list == entry.get());
+      list = list->next;
+    };
+    assert(list == nullptr);
+  }
 };
 
 struct EntryListTraits {
@@ -25,6 +66,8 @@ struct EntryListTraits {
     return compare_unsigned(lhs->value, rhs->value);
   }
 };
+
+using EntryListMerger = ListMerger<Entry*, EntryListTraits>;
 
 enum Op {
   insert,
@@ -54,12 +97,12 @@ struct Instruction {
 
 template <class T>
 static std::ostream &operator<<(std::ostream &str, llvm::ArrayRef<T> list) {
-  str << "[";
+  str << "{";
   for (auto b = list.begin(), i = b, e = list.end(); i != e; ++i) {
     if (i != b) str << ", ";
     str << *i;
   }
-  str << "]";
+  str << "}";
   return str;
 }
 
@@ -68,12 +111,9 @@ static std::ostream &operator<<(std::ostream &str, const std::vector<T> &list) {
   return (str << llvm::makeArrayRef(list));
 }
 
-static void runTest(llvm::ArrayRef<Instruction> values) {
-  std::vector<std::unique_ptr<Entry>> entries;
-
-  ListMerger<Entry*, EntryListTraits> merger;
-
-  unsigned nextID = 0;
+static void runInsertAndMergeTest(llvm::ArrayRef<Instruction> values) {
+  EntryFactory entries;
+  EntryListMerger merger;
 
   // Between beginMerge and endMerge instructions, values don't get
   // inserted immediately: they build up into a separate list of items
@@ -86,8 +126,7 @@ static void runTest(llvm::ArrayRef<Instruction> values) {
     switch (inst.op) {
     case insert: {
       // Create the new entry.
-      Entry *entry = new Entry{nextID++, inst.value, nullptr};
-      entries.emplace_back(entry);
+      Entry *entry = entries.create(inst.value);
 
       // If we're building a merge list, append to the end of it.
       if (lastMergeEntry) {
@@ -121,38 +160,48 @@ static void runTest(llvm::ArrayRef<Instruction> values) {
   }
   assert(!lastMergeEntry && "ended while still building a merge list");
 
-  // Do a stable sort of the entries.
-  std::stable_sort(entries.begin(), entries.end(),
-                   [](const std::unique_ptr<Entry> &lhs,
-                      const std::unique_ptr<Entry> &rhs) {
-                     return (lhs->value < rhs->value);
-                   });
-
-  // Make sure that we end up with the same list.
-  auto list = merger.release();
-  for (auto &entry : entries) {
-    std::cout << "  " << list->value << " (" << list->id << ")\n";
-    assert(list == entry.get());
-    list = list->next;
-  }
-  assert(list == nullptr);
+  entries.sort(creationOrder);
+  entries.checkSameAs(merger.release());
 }
 
-int main() {
-  runTest({ 5, 0, 3, 0, 1, 0, 7 });
+static void runInsertAtFrontTest(llvm::ArrayRef<unsigned> values) {
+  EntryFactory entries;
+  EntryListMerger merger;
+  for (auto value: values) {
+    merger.insertAtFront(entries.create(value));
+  }
+  entries.sort(reverseCreationOrder);
+  entries.checkSameAs(merger.release());
+}
 
+static void runConcreteTests() {
+  runInsertAndMergeTest({ 5, 0, 3, 0, 1, 0, 7 });
+}
+
+namespace {
+struct TestConfig {
+  unsigned numTests;
+  unsigned numEntries;
+  unsigned maxValue;
+};
+
+}
+
+static void runInsertAndMergeTests(const TestConfig &config) {
   std::random_device randomDevice;
   std::default_random_engine e(randomDevice());
-  std::uniform_int_distribution<unsigned> dist(0, 20);
+  std::uniform_int_distribution<unsigned> valueDist(0, config.maxValue);
+  // Chance of entering or exiting a merge.
+  std::uniform_int_distribution<unsigned> mergeDist(0, 20);
 
   std::vector<Instruction> ins;
-  for (unsigned testN = 0; testN < 1000; ++testN) {
+  for (unsigned testN = 0; testN < config.numTests; ++testN) {
     ins.clear();
 
     const size_t noMerge = -1;
     size_t mergeStart = noMerge;
-    for (unsigned i = 0; i < 2000 || mergeStart != noMerge; ++i) {
-      if (dist(e) == 0) {
+    for (unsigned i = 0; i < config.numEntries || mergeStart != noMerge; ++i) {
+      if (mergeDist(e) == 0) {
         if (mergeStart != noMerge) {
           std::sort(ins.begin() + mergeStart, ins.end(),
                     [](const Instruction &lhs, const Instruction &rhs) {
@@ -165,11 +214,39 @@ int main() {
           mergeStart = ins.size();
         }
       } else {
-        ins.push_back(dist(e));
+        ins.push_back(valueDist(e));
       }
     }
 
-    std::cout << ins << std::endl;
-    runTest(ins);
+    std::cout << "runInsertAndMergeTest(" << ins << ");" << std::endl;
+    runInsertAndMergeTest(ins);
   }
+}
+
+static void runInsertAtFrontTests(const TestConfig &config) {
+  std::random_device randomDevice;
+  std::default_random_engine e(randomDevice());
+  std::uniform_int_distribution<unsigned> valueDist(0, config.maxValue);
+
+  std::vector<unsigned> ins;
+  for (unsigned testN = 0; testN < config.numTests; ++testN) {
+    ins.clear();
+    for (unsigned i = 0; i < config.numEntries; ++i) {
+      ins.push_back(valueDist(e));
+    }
+
+    std::cout << "runInsertAtFrontTest(" << ins << ");" << std::endl;
+    runInsertAtFrontTest(ins);
+  }
+}
+
+int main() {
+  TestConfig config = {
+    .numTests = 1000,
+    .numEntries = 2000,
+    .maxValue = 3
+  };
+  runConcreteTests();
+  runInsertAndMergeTests(config);
+  runInsertAtFrontTests(config);
 }
