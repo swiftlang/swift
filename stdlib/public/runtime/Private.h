@@ -24,7 +24,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(__APPLE__) && __has_include(<TargetConditionals.h>)
 #include <TargetConditionals.h>
 #endif
 
