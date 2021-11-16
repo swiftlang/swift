@@ -117,3 +117,16 @@ double _swift_stdlib_getNumericValue(__swift_uint32_t scalar) {
   auto valueIdx = _swift_stdlib_numeric_values_indices[scalarIdx];
   return _swift_stdlib_numeric_values[valueIdx];
 }
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const char *_swift_stdlib_getNameAlias(__swift_uint32_t scalar) {
+  auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
+                                                    _swift_stdlib_nameAlias,
+                                                  _swift_stdlib_nameAlias_ranks);
+
+  if (dataIdx == std::numeric_limits<__swift_intptr_t>::max()) {
+    return nullptr;
+  }
+
+  return _swift_stdlib_nameAlias_data[dataIdx];
+}

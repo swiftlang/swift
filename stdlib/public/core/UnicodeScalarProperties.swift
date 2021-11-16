@@ -1238,7 +1238,13 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Name_Alias" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var nameAlias: String? {
-    return _scalarName(__swift_stdlib_U_CHAR_NAME_ALIAS)
+    let nameAliasPtr = _swift_stdlib_getNameAlias(_scalar.value)
+
+    guard nameAliasPtr != nil else {
+      return nil
+    }
+
+    return String(cString: nameAliasPtr!)
   }
 }
 

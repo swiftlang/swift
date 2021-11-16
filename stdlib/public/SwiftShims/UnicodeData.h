@@ -73,6 +73,9 @@ __swift_uint8_t _swift_stdlib_getNumericType(__swift_uint32_t scalar);
 SWIFT_RUNTIME_STDLIB_INTERNAL
 double _swift_stdlib_getNumericValue(__swift_uint32_t scalar);
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const char *_swift_stdlib_getNameAlias(__swift_uint32_t);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
