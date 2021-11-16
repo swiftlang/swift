@@ -30,6 +30,17 @@
 
 namespace swift {
 
+enum class LexicalLifetimesOption : uint8_t {
+  // Do not insert any lexical lifetimes.
+  Off = 0,
+
+  // Insert lexical lifetimes and do not remove them until OSSA is lowered. This
+  // is experimental.
+  ExperimentalLate,
+};
+
+class SILModule;
+
 class SILOptions {
 public:
   /// Controls the aggressiveness of the performance inliner.
@@ -45,7 +56,7 @@ public:
   bool RemoveRuntimeAsserts = false;
 
   /// Enable experimental support for emitting defined borrow scopes.
-  bool EnableExperimentalLexicalLifetimes = false;
+  LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::Off;
 
   /// Force-run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
@@ -226,6 +237,12 @@ public:
   bool shouldOptimize() const {
     return OptMode > OptimizationMode::NoOptimization;
   }
+
+  /// Returns true if we support inserting lexical lifetimes given the current
+  /// SIL stage.
+  ///
+  /// Defined in SILModule.h.
+  bool supportsLexicalLifetimes(const SILModule &mod) const;
 };
 
 } // end namespace swift

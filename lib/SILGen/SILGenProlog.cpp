@@ -273,7 +273,8 @@ struct ArgumentInitHelper {
     SILValue value = argrv.getValue();
     SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
-      if (SGF.getASTContext().SILOpts.EnableExperimentalLexicalLifetimes &&
+      if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(
+              SGF.getModule()) &&
           value->getOwnershipKind() == OwnershipKind::Owned) {
         bool isNoImplicitCopy = false;
         if (auto *arg = dyn_cast<SILFunctionArgument>(value))
