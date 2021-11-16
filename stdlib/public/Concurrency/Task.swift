@@ -752,10 +752,12 @@ func _enqueueJobGlobal(_ task: Builtin.Job)
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
 @available(SwiftStdlib 5.1, *)
+@usableFromInline
 @_silgen_name("swift_task_asyncMainDrainQueue")
 internal func _asyncMainDrainQueue() -> Never
 
 @available(SwiftStdlib 5.1, *)
+@usableFromInline
 @_silgen_name("swift_task_getMainExecutor")
 internal func _getMainExecutor() -> Builtin.Executor
 
