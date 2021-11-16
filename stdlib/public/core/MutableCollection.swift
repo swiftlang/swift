@@ -191,21 +191,21 @@ where SubSequence: MutableCollection
   ///
   /// Often, the optimizer can eliminate bounds- and uniqueness-checks
   /// within an algorithm, but when that fails, invoking the same algorithm on
-  /// `body`'s argument lets you trade safety for speed.
+  /// `p` lets you trade safety for speed.
   ///
-  /// Successive calls to this method don't necessarily provide the same
-  /// pointer every time.
+  /// Successive calls to this method may provide a different pointer on each
+  /// call. Don't store `p` outside of this method.
   ///
-  /// This method makes no guarantees about the state of the collection if
-  /// the closure throws an error. Any changes made before the throw may
-  /// or may not be reflected in the collection. This is because the closure
-  /// could receive direct access to the collection's internal storage, or a
-  /// temporary copy. Therefore, the closure should always perform any
-  /// necessary cleanup.
+  /// Your closure should always perform any necessary cleanup, because the
+  /// method makes no guarantees about the state of the collection if the
+  /// closure throws an error. Your changes to the collection may be absent
+  /// from the collection after throwing the error, because the closure could
+  /// receive a temporary copy rather than direct access to the collection's
+  /// storage.
   ///
   /// - Parameter body: A closure that receives an in-out
   ///   `UnsafeMutableBufferPointer` to the collection's contiguous storage.
-  ///   Use the buffer pointer directly; do not replace it, because this leads
+  ///   Use the buffer pointer directly; don't replace it, because this leads
   ///   to a crash in all implementations of this method within the standard
   ///   library.
   /// - Returns: The value returned from `body`, unless the collection doesn't

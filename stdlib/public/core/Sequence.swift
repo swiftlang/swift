@@ -395,8 +395,8 @@ public protocol Sequence {
   /// must also guarantee that advancing the pointer by the distance to a
   /// slice's `startIndex` generates an equivalent buffer of its `SubSequence`.
   ///
-  /// Successive calls to this method don't necessarily provide the same
-  /// pointer every time.
+  /// Successive calls to this method may provide a different pointer on each
+  /// call. Don't store `p` outside of this method.
   ///
   /// - Parameter body: A closure that receives an `UnsafeBufferPointer` to
   /// the sequence's contiguous storage.
