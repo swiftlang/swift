@@ -21,6 +21,24 @@
 extern "C" {
 #endif
 
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+__swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
+                                         __swift_intptr_t levels,
+                                         const __swift_uint64_t * const *keys,
+                                         const __swift_uint16_t * const *ranks,
+                                         const __swift_uint16_t * const sizes);
+
+__swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
+                                              const __swift_uint64_t *bitArrays,
+                                              const __swift_uint16_t *ranks);
+
+//===----------------------------------------------------------------------===//
+// Normalization
+//===----------------------------------------------------------------------===//
+
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint16_t _swift_stdlib_getNormData(__swift_uint32_t scalar);
 
@@ -34,15 +52,17 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint32_t _swift_stdlib_getComposition(__swift_uint32_t x,
                                               __swift_uint32_t y);
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
-                                         __swift_intptr_t levels,
-                                         const __swift_uint64_t * const *keys,
-                                         const __swift_uint16_t * const *ranks,
-                                         const __swift_uint16_t * const sizes);
+//===----------------------------------------------------------------------===//
+// Grapheme Breaking
+//===----------------------------------------------------------------------===//
+
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar);
+
+//===----------------------------------------------------------------------===//
+// Unicode.Scalar.Properties
+//===----------------------------------------------------------------------===//
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar);
