@@ -27,6 +27,7 @@ namespace swift {
   class ApplyExpr;
   class AvailableAttr;
   class Expr;
+  class ClosureExpr;
   class InFlightDiagnostic;
   class Decl;
   class ProtocolConformanceRef;
@@ -232,7 +233,8 @@ diagnoseSubstitutionMapAvailability(SourceLoc loc,
 /// was emitted.
 bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
                               const Expr *call, const ExportContext &where,
-                              DeclAvailabilityFlags flags = None);
+                              DeclAvailabilityFlags flags = None,
+                              const ClosureExpr *singleExprClosure = nullptr);
 
 void diagnoseUnavailableOverride(ValueDecl *override,
                                  const ValueDecl *base,

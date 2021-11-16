@@ -2767,6 +2767,7 @@ class ExprAvailabilityWalker : public ASTWalker {
   ASTContext &Context;
   MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
+  SmallVector<ClosureExpr *, 4> singleExprClosureStack;
   const ExportContext &Where;
 
 public:
@@ -2847,6 +2848,18 @@ public:
                                E->getLoc(), Where);
     }
 
+    // multi-statement closures are collected by ExprWalker::rewriteFunction
+    // and checked by ExprWalker::processDelayed in CSApply.cpp.
+    // Single-statement closures only have the attributes checked
+    // by TypeChecker::checkClosureAttributes in that rewriteFunction.
+    // As a result, we never see single-statement closures as the decl context
+    // in out 'where' here. By keeping a stack of closures, we can see if
+    // we're inside of one of these closures and go from there.
+    if (ClosureExpr *closure = dyn_cast<ClosureExpr>(E)) {
+      if (closure->hasSingleExpressionBody())
+        singleExprClosureStack.push_back(closure);
+    }
+
     return visitChildren();
   }
 
@@ -2854,17 +2867,28 @@ public:
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
 
+    if (ClosureExpr *closure = dyn_cast<ClosureExpr>(E)) {
+      if (closure->hasSingleExpressionBody()) {
+        assert(closure == singleExprClosureStack.back() &&
+               "Popping wrong closure");
+        singleExprClosureStack.pop_back();
+      }
+    }
+
     return E;
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+
     // We end up here when checking the output of the result builder transform,
     // which includes closures that are not "separately typechecked" and yet
     // contain statements and declarations. We need to walk them recursively,
     // since these availability for these statements is not diagnosed from
     // typeCheckStmt() as usual.
-    diagnoseStmtAvailability(S, Where.getDeclContext(),
-                             /*walkRecursively=*/true);
+    DeclContext *dc = singleExprClosureStack.empty()
+                          ? Where.getDeclContext()
+                          : singleExprClosureStack.back();
+    diagnoseStmtAvailability(S, dc, /*walkRecursively=*/true);
     return std::make_pair(false, S);
   }
 
@@ -3043,8 +3067,8 @@ private:
 
     Flags &= DeclAvailabilityFlag::ForInout;
     Flags |= DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
-    if (diagnoseDeclAvailability(D, ReferenceRange, /*call*/nullptr,
-                                 Where, Flags))
+    if (diagnoseDeclAvailability(D, ReferenceRange, /*call*/ nullptr, Where,
+                                 Flags, nullptr))
       return;
   }
 };
@@ -3067,7 +3091,9 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
       return true;
   }
 
-  diagnoseDeclAvailability(D, R, call, Where, Flags);
+  const ClosureExpr *closure =
+      singleExprClosureStack.empty() ? nullptr : singleExprClosureStack.back();
+  diagnoseDeclAvailability(D, R, call, Where, Flags, closure);
 
   if (R.isValid()) {
     if (diagnoseSubstitutionMapAvailability(R.Start, declRef.getSubstitutions(),
@@ -3079,12 +3105,71 @@ bool ExprAvailabilityWalker::diagnoseDeclRefAvailability(
   return false;
 }
 
+/// Diagnose uses of API annotated '@unavailableFromAsync' when used from
+/// asynchronous contexts.
+/// Returns true if a diagnostic was emitted, false otherwise.
+static bool
+diagnoseDeclUnavailableFromAsync(const ValueDecl *D, SourceRange R,
+                                 const Expr *call, const ExportContext &Where,
+                                 const ClosureExpr *singleExprClosure) {
+  // FIXME: I don't think this is right, but I don't understand the issue well
+  //        enough to fix it properly. If the decl context is an abstract
+  //        closure, we need it to have a type assigned to it before we can
+  //        determine whether it is an asynchronous context. It will crash
+  //        when we go to check without one. In TypeChecker::typeCheckExpression
+  //        (TypeCheckConstraints.cpp:403), we apply a solution before calling
+  //        `performSyntacticDiagnosticsForTarget`, which eventually calls
+  //        down to this function. Under most circumstances, the context that
+  //        we're in is typechecked at that point and has a type assigned.
+  //        When working with specific result builders, the solution applied
+  //        results in an expression with an unset type. In these cases, the
+  //        application makes its way into `ConstraintSystem::applySolution` for
+  //        closures (CSClosure.cpp:1356). The type is computed, but is
+  //        squirreled away in the constrain system to be applied once the
+  //        checks (including this one) approve of the decls within the decl
+  //        context before applying the type to the expression. It might be
+  //        possible to drive the constraint solver through the availability
+  //        checker and into us so that we can ask for it, but that feels wrong
+  //        too.
+  //        This behavior is demonstrated by the first use of the `tuplify`
+  //        function in `testExistingPatternsInCaseStatements` in
+  //        `test/Constraints/result_builder.swift`.
+  const AbstractClosureExpr *declCtxAsExpr =
+      dyn_cast<AbstractClosureExpr>(Where.getDeclContext());
+  if (declCtxAsExpr && !declCtxAsExpr->getType()) {
+    return false;
+  }
+
+  // If we're directly in a sync closure, then we are not in an async context.
+  // If we're directly in a sync closure, or we're not in a closure and the
+  // outer context is not async, we are in a sync context.
+  const bool inSingleClosure = singleExprClosure;
+  const bool inSyncClosure =
+      inSingleClosure && !singleExprClosure->isAsyncContext();
+  const bool inSyncContext =
+      !inSingleClosure && !Where.getDeclContext()->isAsyncContext();
+  if (inSyncClosure || inSyncContext)
+    return false;
+  if (!D->getAttrs().hasAttribute<UnavailableFromAsyncAttr>())
+    return false;
+
+  ASTContext &ctx = Where.getDeclContext()->getASTContext();
+  SourceLoc diagLoc = call ? call->getLoc() : R.Start;
+  ctx.Diags
+      .diagnose(diagLoc, diag::async_unavailable_decl, D->getDescriptiveKind(),
+                D->getBaseName())
+      .warnUntilSwiftVersion(6);
+  D->diagnose(diag::decl_declared_here, D->getName());
+  return true;
+}
+
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
                                      const Expr *call,
                                      const ExportContext &Where,
-                                     DeclAvailabilityFlags Flags) {
+                                     DeclAvailabilityFlags Flags,
+                                     const ClosureExpr *singleExprClosure) {
   assert(!Where.isImplicit());
 
   // Generic parameters are always available.
@@ -3110,6 +3195,9 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   }
 
   if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
+    return true;
+
+  if (diagnoseDeclUnavailableFromAsync(D, R, call, Where, singleExprClosure))
     return true;
 
   // Make sure not to diagnose an accessor's deprecation if we already
@@ -3360,7 +3448,8 @@ class TypeReprAvailabilityWalker : public ASTWalker {
   bool checkComponentIdentTypeRepr(ComponentIdentTypeRepr *ITR) {
     if (auto *typeDecl = ITR->getBoundDecl()) {
       auto range = ITR->getNameLoc().getSourceRange();
-      if (diagnoseDeclAvailability(typeDecl, range, nullptr, where, flags))
+      if (diagnoseDeclAvailability(typeDecl, range, nullptr, where, flags,
+                                   nullptr))
         return true;
     }
 

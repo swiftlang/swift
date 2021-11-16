@@ -699,6 +699,12 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeConst,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   126)
 
+SIMPLE_DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
+  OnFunc | OnConstructor |
+  ABIStableToAdd | ABIStableToRemove |
+  APIBreakingToAdd | APIStableToRemove,
+  127)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 

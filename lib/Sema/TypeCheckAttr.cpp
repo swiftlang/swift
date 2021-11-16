@@ -270,6 +270,8 @@ public:
   void visitNonisolatedAttr(NonisolatedAttr *attr);
 
   void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
+
+  void visitUnavailableFromAsyncAttr(UnavailableFromAsyncAttr *attr);
 };
 
 } // end anonymous namespace
@@ -2081,8 +2083,8 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   }
 
   auto where = ExportContext::forDeclSignature(D);
-  diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr,
-                           where, None);
+  diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where, None,
+                           /*containingClosure*/ nullptr);
 
   auto *const func = FuncDecl::createImplicit(
       context, StaticSpellingKind::KeywordStatic,
@@ -5670,6 +5672,23 @@ void AttributeChecker::visitReasyncAttr(ReasyncAttr *attr) {
 
   diagnose(attr->getLocation(), diag::reasync_without_async_parameter);
   attr->setInvalid();
+}
+
+void AttributeChecker::visitUnavailableFromAsyncAttr(
+    UnavailableFromAsyncAttr *attr) {
+  if (DeclContext *dc = dyn_cast<DeclContext>(D)) {
+    if (dc->isAsyncContext()) {
+      if (ValueDecl *vd = dyn_cast<ValueDecl>(D)) {
+        D->getASTContext().Diags.diagnose(
+            D->getLoc(), diag::async_named_decl_must_be_available_from_async,
+            D->getDescriptiveKind(), vd->getName());
+      } else {
+        D->getASTContext().Diags.diagnose(
+            D->getLoc(), diag::async_decl_must_be_available_from_async,
+            D->getDescriptiveKind());
+      }
+    }
+  }
 }
 
 namespace {

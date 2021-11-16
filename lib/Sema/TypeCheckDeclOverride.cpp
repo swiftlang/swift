@@ -1559,6 +1559,7 @@ namespace  {
     UNINTERESTING_ATTR(InheritActorContext)
     UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(NoImplicitCopy)
+    UNINTERESTING_ATTR(UnavailableFromAsync)
 
     UNINTERESTING_ATTR(TypeSequence)
     UNINTERESTING_ATTR(CompileTimeConst)
