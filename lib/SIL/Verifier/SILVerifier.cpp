@@ -3046,9 +3046,6 @@ public:
     requireSameType(rbi->getInToken()->getType(),
                     SILType::getBuiltinWordType(F.getASTContext()),
                     "rebind_memory token must be a Builtin.Int64");
-    require(isa<BindMemoryInst>(rbi->getInToken())
-            || isa<RebindMemoryInst>(rbi->getInToken()),
-            "rebind_memory token must originate from bind_memory");
   }
 
   void checkIndexAddrInst(IndexAddrInst *IAI) {
