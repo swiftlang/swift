@@ -133,6 +133,99 @@ public:
     setLastInsertionPoint(newNode, /*known last of equals*/ true);
   }
 
+  /// Add a single node to this merger's current list.
+  ///
+  /// The next reference of the node will be overwritten and does not
+  /// need to be meaningful.
+  ///
+  /// The relative order of nodes in the current list will not change,
+  /// and if there are nodes in the current list which compare equal
+  /// to the new node, it will be inserted *before* them.
+  ///
+  /// This is useful for the pattern where nodes are naturally encountered
+  /// in the opposite of their desired order in the final list and
+  /// need to be reversed.  It generally doesn't make any sense to mix
+  /// this with calls to insert or merge on the same merger.
+  void insertAtFront(Node newNode) {
+    assert(newNode && "inserting a null node");
+
+    auto insertBetween = [newNode, this](Node prev, Node next) {
+      if (prev) {
+        assert(NodeTraits::getNext(prev) == next);
+        assert(NodeTraits::compare(prev, newNode) < 0);
+        NodeTraits::setNext(prev, newNode);
+      } else {
+        assert(root == next);
+        root = newNode;
+      }
+
+      assert(!next || NodeTraits::compare(newNode, next) <= 0);
+      NodeTraits::setNext(newNode, next);
+      setLastInsertionPoint(prev, /*known last of equals*/ true);
+    };
+
+    Node prev = Node();
+    Node cur = root;
+
+    // If we have a previous insertion point, check for the presumed-common
+    // case that we're inserting something that should immediately follow it.
+    if (auto lastIP = lastInsertionPoint) {
+      lastIP = findLastOfEqualsFromLastIP(lastIP);
+
+      // Compare against the next node after lastIP, if it exists.
+      if (Node nextAfterLastIP = NodeTraits::getNext(lastIP)) {
+        int comparison = NodeTraits::compare(nextAfterLastIP, newNode);
+
+        // If the new node compares equal to the next node, insert here.
+        if (comparison == 0) {
+          insertBetween(lastIP, nextAfterLastIP);
+          return;
+        }
+
+        // If the new node should follow the next node, start scanning
+        // after it.
+        if (comparison < 0) {
+          prev = nextAfterLastIP;
+          cur = NodeTraits::getNext(nextAfterLastIP);
+        }
+
+        // Otherwise, we'll need to scan from the beginning.
+
+      // If there is no next node, compare against the previous.
+      } else {
+        int comparison = NodeTraits::compare(lastIP, newNode);
+
+        // If the new node should follow the last node, we can
+        // insert here.
+        if (comparison < 0) {
+          insertBetween(lastIP, Node());
+          return;
+        }
+
+        // Otherwise, we'll need to scan from the beginning.
+      }
+    }
+
+    assert(!prev || NodeTraits::compare(prev, newNode) < 0);
+
+    // Scan forward, looking for a node which the new node must be
+    // inserted prior to.
+    // Invariant: prev < newNode, if prev exists
+    while (cur) {
+      // Compare the new node against the current IP.
+      int comparison = NodeTraits::compare(cur, newNode);
+
+      // If the new node isn't strictly greater than cur, insert here.
+      if (comparison >= 0) break;
+
+      // Otherwise, continue.
+      prev = cur;
+      cur = NodeTraits::getNext(prev);
+    }
+
+    insertBetween(prev, cur);
+  }
+
   /// Add a sorted list of nodes to this merger's current list.
   /// The list must be well-formed (i.e. appropriately terminated).
   ///
