@@ -19,7 +19,7 @@ internal func logFailedCheck(_ message: UnsafeRawPointer)
 /// Implementation class that holds the `UnsafeContinuation` instance for
 /// a `CheckedContinuation`.
 @available(SwiftStdlib 5.1, *)
-internal final class CheckedContinuationCanary {
+internal final class CheckedContinuationCanary: @unchecked Sendable {
   // The instance state is stored in tail-allocated raw memory, so that
   // we can atomically check the continuation state.
 
@@ -110,7 +110,7 @@ internal final class CheckedContinuationCanary {
 /// enough to obtain the extra checking without further source modification in
 /// most circumstances.
 @available(SwiftStdlib 5.1, *)
-public struct CheckedContinuation<T, E: Error>: @unchecked Sendable {
+public struct CheckedContinuation<T, E: Error> {
   private let canary: CheckedContinuationCanary
   
   /// Initialize a `CheckedContinuation` wrapper around an
@@ -174,6 +174,9 @@ public struct CheckedContinuation<T, E: Error>: @unchecked Sendable {
     }
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension CheckedContinuation: Sendable where T: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 extension CheckedContinuation {
