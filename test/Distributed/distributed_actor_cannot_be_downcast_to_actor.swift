@@ -23,7 +23,7 @@ distributed actor MA {
 
 @available(SwiftStdlib 5.6, *)
 func h(ma: MA) async {
-    // this would have been a bug, a non distributed function might have been called here,
+    // this would have been a bug, a non distributed instance method might have been called here,
     // so we must not allow for it, because if the actor was remote calling a non-distributed func
     // would result in a hard crash (as there is no local actor to safely call the function on).
     await g(a: ma) // expected-error{{global function 'g(a:)' requires that 'MA' conform to 'Actor'}}

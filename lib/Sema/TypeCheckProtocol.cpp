@@ -2873,7 +2873,7 @@ bool ConformanceChecker::checkActorIsolation(
     auto nominal = dyn_cast<NominalTypeDecl>(witness->getDeclContext());
     auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
     if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
-      // We can witness a distributed function in an extension, as long as
+      // We can witness a distributed instance method in an extension, as long as
       // that extension itself is on a DistributedActor type (including
       // protocols that inherit from DistributedActor, even if the protocol
       // requirement was not expressed in terms of distributed actors).
@@ -2887,7 +2887,7 @@ bool ConformanceChecker::checkActorIsolation(
       // requirement with a distributed function, because those are always
       // cross-actor.
       //
-      // If the distributed function is well-formed (passed checks) then it can
+      // If the distributed instance method is well-formed (passed checks) then it can
       // witness this requirement. I.e. since checks to the distributed function
       // passed, it can be called through this protocol.
       if (witnessFunc && witnessFunc->isDistributed()) {
@@ -3008,7 +3008,7 @@ bool ConformanceChecker::checkActorIsolation(
     auto nominal = dyn_cast<NominalTypeDecl>(witness->getDeclContext());
     auto witnessClass = dyn_cast<ClassDecl>(witness->getDeclContext());
     if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
-      // We can witness a distributed function in an extension, as long as
+      // We can witness a distributed instance method in an extension, as long as
       // that extension itself is on a DistributedActor type (including
       // protocols that inherit from DistributedActor, even if the protocol
       // requirement was not expressed in terms of distributed actors).
@@ -3021,7 +3021,7 @@ bool ConformanceChecker::checkActorIsolation(
       // requirement with a distributed function, because those are always
       // cross-actor.
       //
-      // If the distributed function is well-formed (passed checks) then it can
+      // If the distributed instance method is well-formed (passed checks) then it can
       // witness this requirement. I.e. since checks to the distributed function
       // passed, it can be called through this protocol.
       if (witnessFunc && witnessFunc->isDistributed()) {
