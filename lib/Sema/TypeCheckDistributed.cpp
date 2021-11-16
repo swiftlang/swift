@@ -154,7 +154,9 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
           diag::distributed_actor_func_inout,
           param->getName(),
           func->getDescriptiveKind(), func->getName()
-      ).fixItRemove(param->getSpecifierLoc()); // FIXME(distributed): does not seem to cause the fixit...? Is the Loc invalid...?
+      ).fixItRemove(SourceRange(param->getTypeSourceRangeForDiagnostics().Start,
+                                param->getTypeSourceRangeForDiagnostics().Start.getAdvancedLoc(1)));
+      // FIXME(distributed): the fixIt should be on param->getSpecifierLoc(), but that Loc is invalid for some reason?
       return true;
     }
 

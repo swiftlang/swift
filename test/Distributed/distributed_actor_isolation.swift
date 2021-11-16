@@ -84,7 +84,7 @@ distributed actor DistributedActor_1 {
   }
 
   distributed func noInout(inNOut burger: inout String) {
-    // expected-error@-1{{cannot declare 'inout' argument 'burger' in distributed instance method 'noInout(inNOut:)'}}
+    // expected-error@-1{{cannot declare 'inout' argument 'burger' in distributed instance method 'noInout(inNOut:)'}}{{43-49=}}
   }
 
   distributed func distReturnGeneric<T: Codable & Sendable>(item: T) async throws -> T { // ok
