@@ -27,6 +27,9 @@
 // FIXME(mracek): More work needed to get this to work on non-Apple platforms.
 // REQUIRES: VENDOR=apple
 
+// rdar://85476542 (https://ci.swift.org/job/oss-swift-incremental-ASAN-RA-macos/6089 failure)
+// UNSUPPORTED: asan
+
 #if LIBRARY
 
   // The only symbol that's actually used by client code
