@@ -296,6 +296,9 @@ public:
   /// Returns the kind of context this is.
   DeclContextKind getContextKind() const;
 
+  /// Returns whether this context asynchronous
+  bool isAsyncContext() const;
+
   /// Returns whether this context has value semantics.
   bool hasValueSemantics() const;
 

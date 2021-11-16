@@ -1204,6 +1204,32 @@ bool DeclContext::isClassConstrainedProtocolExtension() const {
   return false;
 }
 
+bool DeclContext::isAsyncContext() const {
+  switch (getContextKind()) {
+  case DeclContextKind::Initializer:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::ExtensionDecl:
+  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+  case DeclContextKind::GenericTypeDecl:
+    return false;
+  case DeclContextKind::AbstractClosureExpr:
+    return cast<AbstractClosureExpr>(this)->isBodyAsync();
+  case DeclContextKind::AbstractFunctionDecl: {
+    const AbstractFunctionDecl *function = cast<AbstractFunctionDecl>(this);
+    return function->hasAsync();
+  }
+  case DeclContextKind::SubscriptDecl: {
+    AccessorDecl *getter =
+        cast<SubscriptDecl>(this)->getAccessor(AccessorKind::Get);
+    return getter != nullptr && getter->hasAsync();
+  }
+  }
+  llvm_unreachable("Unhandled DeclContextKind switch");
+}
+
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   switch (dc->getContextKind()) {
   case DeclContextKind::Module:
