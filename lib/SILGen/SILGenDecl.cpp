@@ -540,7 +540,7 @@ public:
       address = value;
     SILLocation PrologueLoc(vd);
 
-    if (SGF.getASTContext().SILOpts.EnableExperimentalLexicalLifetimes &&
+    if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule()) &&
         value->getOwnershipKind() != OwnershipKind::None) {
       if (!SGF.getASTContext().LangOpts.EnableExperimentalMoveOnly) {
         value = SILValue(
@@ -1760,7 +1760,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
     return;
   }
 
-  if (!getASTContext().SILOpts.EnableExperimentalLexicalLifetimes ||
+  if (!getASTContext().SILOpts.supportsLexicalLifetimes(getModule()) ||
       Val->getOwnershipKind() == OwnershipKind::None) {
     B.emitDestroyValueOperation(silLoc, Val);
     return;
