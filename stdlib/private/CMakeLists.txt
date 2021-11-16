@@ -1,7 +1,3 @@
-if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
-  add_subdirectory(SwiftPrivate)
-endif()
-
 if(SWIFT_BUILD_SDK_OVERLAY)
   # SwiftPrivateThreadExtras makes use of Darwin/Glibc, which is part of the
   # SDK overlay. It can't be built separately from the SDK overlay.
@@ -11,6 +7,7 @@ if(SWIFT_BUILD_SDK_OVERLAY)
 endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+  add_subdirectory(SwiftPrivate)
   add_subdirectory(RuntimeUnittest)
   add_subdirectory(StdlibUnicodeUnittest)
   add_subdirectory(StdlibCollectionUnittest)
