@@ -24,44 +24,80 @@
 
 #include <chrono>
 #include <thread>
+#include "swift/Basic/ListMerger.h"
 
-static Job *JobQueue = nullptr;
+namespace {
 
-class DelayedJob {
-public:
-  Job *job;
-  unsigned long long when;
-  DelayedJob *next;
+struct JobQueueTraits {
+  static Job *&storage(Job *cur) {
+    return reinterpret_cast<Job*&>(cur->SchedulerPrivate[0]);
+  }
 
-  DelayedJob(Job *job, unsigned long long when) : job(job), when(when), next(nullptr) {}
+  static Job *getNext(Job *job) {
+    return storage(job);
+  }
+  static void setNext(Job *job, Job *next) {
+    storage(job) = next;
+  }
+  static int compare(Job *lhs, Job *rhs) {
+    return descendingPriorityOrder(lhs->getPriority(), rhs->getPriority());
+  }
+};
+using JobQueueMerger = ListMerger<Job*, JobQueueTraits>;
+
+using JobDeadline = std::chrono::time_point<std::chrono::steady_clock>;
+
+template <bool = (sizeof(JobDeadline) <= sizeof(void*) &&
+                  alignof(JobDeadline) <= alignof(void*))>
+struct JobDeadlineStorage;
+
+/// Specialization for when JobDeadline fits in SchedulerPrivate.
+template <>
+struct JobDeadlineStorage<true> {
+  static JobDeadline &storage(Job *job) {
+    return reinterpret_cast<JobDeadline&>(job->SchedulerPrivate[1]);
+  }
+  static JobDeadline get(Job *job) {
+    return storage(job);
+  }
+  static void set(Job *job, JobDeadline deadline) {
+    new(static_cast<void*>(&storage(job))) JobDeadline(deadline);
+  }
+  static void destroy(Job *job) {
+    storage(job).~JobDeadline();
+  }
 };
 
-static DelayedJob *DelayedJobQueue = nullptr;
+/// Specialization for when JobDeadline doesn't fit in SchedulerPrivate.
+template <>
+struct JobDeadlineStorage<false> {
+  static JobDeadline *&storage(Job *job) {
+    return reinterpret_cast<JobDeadline*&>(job->SchedulerPrivate[1]);
+  }
+  static JobDeadline get(Job *job) {
+    return *storage(job);
+  }
+  static void set(Job *job, JobDeadline deadline) {
+    storage(job) = new JobDeadline(deadline);
+  }
+  static void destroy(Job *job) {
+    delete storage(job);
+  }
+};
 
-/// Get the next-in-queue storage slot.
-static Job *&nextInQueue(Job *cur) {
-  return reinterpret_cast<Job*&>(cur->SchedulerPrivate[Job::NextWaitingTaskIndex]);
-}
+} // end anonymous namespace
+
+static Job *JobQueue = nullptr;
+static Job *DelayedJobQueue = nullptr;
 
 /// Insert a job into the cooperative global queue.
 SWIFT_CC(swift)
 static void swift_task_enqueueGlobalImpl(Job *job) {
   assert(job && "no job provided");
 
-  Job **position = &JobQueue;
-  while (auto cur = *position) {
-    // If we find a job with lower priority, insert here.
-    if (cur->getPriority() < newJob->getPriority()) {
-      nextInQueue(newJob) = cur;
-      *position = newJob;
-      return;
-    }
-
-    // Otherwise, keep advancing through the queue.
-    position = &nextInQueue(cur);
-  }
-  nextInQueue(newJob) = nullptr;
-  *position = newJob;
+  JobQueueMerger merger(JobQueue);
+  merger.insert(job);
+  JobQueue = merger.release();
 }
 
 /// Enqueues a task on the main executor.
@@ -72,60 +108,80 @@ static void swift_task_enqueueMainExecutorImpl(Job *job) {
   swift_task_enqueueGlobalImpl(job);
 }
 
-static unsigned long long currentNanos() {
-  auto now = std::chrono::steady_clock::now();
-  auto nowNanos = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
-  auto value = std::chrono::duration_cast<std::chrono::nanoseconds>(nowNanos.time_since_epoch());
-  return value.count();
-}
-
 /// Insert a job into the cooperative global queue with a delay.
 SWIFT_CC(swift)
 static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
-                                                  Job *job) {
-  assert(job && "no job provided");
+                                                  Job *newJob) {
+  assert(newJob && "no job provided");
 
-  DelayedJob **position = &DelayedJobQueue;
-  DelayedJob *newJob = new DelayedJob(job, currentNanos() + delay);
+  auto deadline = std::chrono::steady_clock::now()
+                + std::chrono::duration_cast<JobDeadline::duration>(
+                    std::chrono::nanoseconds(delay));
+  JobDeadlineStorage<>::set(newJob, deadline);
 
+  Job **position = &DelayedJobQueue;
   while (auto cur = *position) {
-    // If we find a job with lower priority, insert here.
-    if (cur->when > newJob->when) {
-      newJob->next = cur;
+    // If we find a job with a later deadline, insert here.
+    // Note that we maintain FIFO order.
+    if (deadline < JobDeadlineStorage<>::get(cur)) {
+      JobQueueTraits::setNext(newJob, cur);
       *position = newJob;
       return;
     }
 
     // Otherwise, keep advancing through the queue.
-    position = &cur->next;
+    position = &JobQueueTraits::storage(cur);
   }
+  JobQueueTraits::setNext(newJob, nullptr);
   *position = newJob;
+}
+
+/// Recognize jobs in the delayed-jobs queue that are ready to execute
+/// and move them to the primary queue.
+static void recognizeReadyDelayedJobs() {
+  // Process all the delayed jobs.
+  auto nextDelayedJob = DelayedJobQueue;
+  if (!nextDelayedJob) return;
+
+  auto now = std::chrono::steady_clock::now();
+  JobQueueMerger readyJobs(JobQueue);
+
+  // Pull jobs off of the delayed-jobs queue whose deadline has been
+  // reached, and add them to the ready queue.
+  while (nextDelayedJob &&
+         JobDeadlineStorage<>::get(nextDelayedJob) <= now) {
+    // Destroy the storage of the deadline in the job.
+    JobDeadlineStorage<>::destroy(nextDelayedJob);
+
+    auto next = JobQueueTraits::getNext(nextDelayedJob);
+    readyJobs.insert(nextDelayedJob);
+    nextDelayedJob = next;
+  }
+
+  JobQueue = readyJobs.release();
+  DelayedJobQueue = nextDelayedJob;
 }
 
 /// Claim the next job from the cooperative global queue.
 static Job *claimNextFromCooperativeGlobalQueue() {
-  // Check delayed jobs first
   while (true) {
-    if (auto delayedJob = DelayedJobQueue) {
-      if (delayedJob->when < currentNanos()) {
-        DelayedJobQueue = delayedJob->next;
-        auto job = delayedJob->job;
-        
-        delete delayedJob;
+    // Move any delayed jobs that are now ready into the primary queue.
+    recognizeReadyDelayedJobs();
 
-        return job;
-      }
-    }
+    // If there's a job in the primary queue, run it.
     if (auto job = JobQueue) {
-      JobQueue = nextInQueue(job);
+      JobQueue = JobQueueTraits::getNext(job);
       return job;
     }
-    // there are only delayed jobs left, but they are not ready,
-    // so we sleep until the first one is
+
+    // If there are only delayed jobs left, sleep until the next deadline.
+    // TODO: should the donator have some say in this?
     if (auto delayedJob = DelayedJobQueue) {
-      std::this_thread::sleep_for(std::chrono::nanoseconds(delayedJob->when - currentNanos()));
+      auto deadline = JobDeadlineStorage<>::get(delayedJob);
+      std::this_thread::sleep_until(deadline);
       continue;
     }
+
     return nullptr;
   }
 }
