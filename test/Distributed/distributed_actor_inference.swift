@@ -104,6 +104,6 @@ distributed actor BadValuesDistributedActor_7 {
   distributed subscript(nope: Int) -> Int { nope * 2 } // expected-error{{'distributed' modifier cannot be applied to this declaration}}
   distributed static let staticLetNope: Int = 13 // expected-error{{'distributed' modifier cannot be applied to this declaration}}
   distributed static var staticVarNope: Int { 13 } // expected-error{{'distributed' modifier cannot be applied to this declaration}}
-  distributed static func staticNope() async throws -> Int { 13 } // expected-error{{'distributed' functions cannot be 'static'}}
+  distributed static func staticNope() async throws -> Int { 13 } // expected-error{{'distributed' method cannot be 'static'}}
 }
 

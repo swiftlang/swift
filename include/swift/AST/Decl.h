@@ -169,6 +169,7 @@ enum class DescriptiveDeclKind : uint8_t {
   Method,
   StaticMethod,
   ClassMethod,
+  DistributedMethod,
   Getter,
   Setter,
   Addressor,

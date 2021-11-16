@@ -4367,7 +4367,7 @@ public:
   /// Is this application _implicitly_ required to be a throwing call?
   /// This can happen if the function is actually a proxy function invocation,
   /// which may throw, regardless of the target function throwing, e.g.
-  /// a distributed function call on a 'remote' actor, may throw due to network
+  /// a distributed instance method call on a 'remote' actor, may throw due to network
   /// issues reported by the transport, regardless if the actual target function
   /// can throw.
   bool implicitlyThrows() const {

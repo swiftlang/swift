@@ -599,7 +599,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     B.emitBlock(isRemoteBB);
 
     auto *selfTyDecl = FunctionDC->getParent()->getSelfNominalTypeDecl();
-    assert(selfTyDecl && "distributed function declared outside of actor");
+    assert(selfTyDecl && "distributed instance method declared outside of actor");
 
     auto remoteFnDecl = selfTyDecl->lookupDirectRemoteFunc(fd);
     assert(remoteFnDecl && "Could not find _remote_<dist_func_name> function");
