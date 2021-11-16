@@ -418,6 +418,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     Builder.createSwitchEnumAddr(Loc, outOptionalParam, nullptr, CaseBBs);
 
     Builder.setInsertionPoint(FailureBB->begin());
+    Builder.createDestroyAddr(Loc, Tmp);
     Builder.createDeallocStack(Loc, Tmp);
 
     Builder.setInsertionPoint(BridgeSuccessBB);
