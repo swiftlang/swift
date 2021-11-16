@@ -35,9 +35,6 @@
 
 using namespace swift;
 
-STATISTIC(NumOuterCopies, "number of copy_value instructions added for a "
-                          "borrow scope");
-
 //===----------------------------------------------------------------------===//
 //                           MARK: Local utilities
 //===----------------------------------------------------------------------===//
