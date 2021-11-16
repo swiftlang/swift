@@ -1437,16 +1437,6 @@ extension Unicode {
     /// meet the requirements of `decimal` will have numeric type `numeric`,
     /// and programs can treat `digit` and `numeric` equivalently.
     case numeric
-
-    internal init?(rawValue: __swift_stdlib_UNumericType) {
-      switch rawValue {
-      case __swift_stdlib_U_NT_NONE: return nil
-      case __swift_stdlib_U_NT_DECIMAL: self = .decimal
-      case __swift_stdlib_U_NT_DIGIT: self = .digit
-      case __swift_stdlib_U_NT_NUMERIC: self = .numeric
-      default: fatalError("Unknown numeric type \(rawValue)")
-      }
-    }
   }
 }
 
@@ -1470,11 +1460,18 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Numeric_Type" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var numericType: Unicode.NumericType? {
-    let rawValue = __swift_stdlib_UNumericType(
-      __swift_stdlib_UNumericType.RawValue(
-      __swift_stdlib_u_getIntPropertyValue(
-        icuValue, __swift_stdlib_UCHAR_NUMERIC_TYPE)))
-    return Unicode.NumericType(rawValue: rawValue)
+    let rawValue = _swift_stdlib_getNumericType(_scalar.value)
+
+    switch rawValue {
+    case 0:
+      return .numeric
+    case 1:
+      return .digit
+    case 2:
+      return .decimal
+    default:
+      return nil
+    }
   }
 
   /// The numeric value of the scalar.
@@ -1494,8 +1491,10 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Numeric_Value" property in the [Unicode
   /// Standard](http://www.unicode.org/versions/latest/).
   public var numericValue: Double? {
-    let icuNoNumericValue: Double = -123456789
-    let result = __swift_stdlib_u_getNumericValue(icuValue)
-    return result != icuNoNumericValue ? result : nil
+    guard numericType != nil else {
+      return nil
+    }
+
+    return _swift_stdlib_getNumericValue(_scalar.value)
   }
 }
