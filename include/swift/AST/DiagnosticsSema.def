@@ -4508,10 +4508,10 @@ ERROR(distributed_actor_func_param_not_codable,none,
       "distributed instance method parameter '%0' of type %1 does not conform to 'Codable'",
       (StringRef, Type))
 ERROR(distributed_actor_func_result_not_codable,none,
-      "distributed instance method result type %0 does not conform to 'Codable'",
-      (Type))
+      "%0 result type %0 does not conform to 'Codable'",
+      (DescriptiveDeclKind, Type))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
-      "distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
+      "distributed instance method's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
@@ -4532,7 +4532,7 @@ ERROR(distributed_actor_func_variadic, none,
       "%0 %1 cannot declare variadic argument %2",
       (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(distributed_actor_remote_func_is_not_static,none,
-      "remote function %0 must be static.",
+      "remote function %0 must be static",
       (DeclName))
 ERROR(distributed_actor_remote_func_is_not_async_throws,none,
       "remote function %0 must be 'async throws'.",

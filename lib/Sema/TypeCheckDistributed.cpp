@@ -155,6 +155,7 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
       if (diagnose)
         func->diagnose(
             diag::distributed_actor_func_result_not_codable,
+            func->getDescriptiveKind(),
             func->getResultInterfaceType()
         );
       // TODO: suggest a fixit to add Codable to the type?
