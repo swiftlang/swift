@@ -1095,6 +1095,10 @@ shouldBePartiallySpecialized(Type Replacement,
       if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype->getRoot())) {
         UsedArchetypes.insert(Primary);
       }
+
+      if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype->getRoot())) {
+        UsedArchetypes.insert(Seq);
+      }
     }
   });
 
@@ -1320,6 +1324,10 @@ void FunctionSignaturePartialSpecializer::collectUsedCallerArchetypes(
       if (auto Archetype = Ty->getAs<ArchetypeType>()) {
         if (auto Primary = dyn_cast<PrimaryArchetypeType>(Archetype->getRoot())) {
           UsedCallerArchetypes.insert(Primary);
+        }
+
+        if (auto Seq = dyn_cast<SequenceArchetypeType>(Archetype->getRoot())) {
+          UsedCallerArchetypes.insert(Seq);
         }
       }
     });

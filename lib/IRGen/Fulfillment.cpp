@@ -68,6 +68,7 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::SequenceArchetype:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     return true;

@@ -184,6 +184,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::SequenceArchetype:
     return cast<ArchetypeType>(type)->requiresClass();
   case TypeKind::Protocol:
     return cast<ProtocolType>(type)->requiresClass();
@@ -3062,6 +3063,9 @@ GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
   if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(root)) {
     return opaque->getGenericEnvironment();
   }
+  if (auto opaque = dyn_cast<SequenceArchetypeType>(root)) {
+    return opaque->getGenericEnvironment();
+  }
   llvm_unreachable("unhandled root archetype kind?!");
 }
 
@@ -3143,6 +3147,17 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
     OpaqueDecl(OpaqueDecl),
     Substitutions(Substitutions)
 {
+}
+
+SequenceArchetypeType::SequenceArchetypeType(
+    const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
+    ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
+    LayoutConstraint Layout)
+    : ArchetypeType(TypeKind::SequenceArchetype, Ctx,
+                    RecursiveTypeProperties::HasArchetype, InterfaceType,
+                    ConformsTo, Superclass, Layout),
+      Environment(GenericEnv) {
+  assert(cast<GenericTypeParamType>(InterfaceType.getPointer())->isTypeSequence());
 }
 
 GenericSignature OpaqueTypeArchetypeType::getBoundSignature() const {
@@ -3456,6 +3471,29 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
       alignof(PrimaryArchetypeType), arena);
 
   return CanPrimaryArchetypeType(::new (mem) PrimaryArchetypeType(
+      Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
+}
+
+CanSequenceArchetypeType
+SequenceArchetypeType::get(const ASTContext &Ctx,
+                           GenericEnvironment *GenericEnv,
+                           GenericTypeParamType *InterfaceType,
+                           SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                           Type Superclass, LayoutConstraint Layout) {
+  assert(!Superclass || Superclass->getClassOrBoundGenericClass());
+  assert(GenericEnv && "missing generic environment for archetype");
+
+  // Gather the set of protocol declarations to which this archetype conforms.
+  ProtocolType::canonicalizeProtocols(ConformsTo);
+
+  auto arena = AllocationArena::Permanent;
+  void *mem =
+      Ctx.Allocate(SequenceArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type,
+                                                           LayoutConstraint>(
+                       ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
+                   alignof(SequenceArchetypeType), arena);
+
+  return CanSequenceArchetypeType(::new (mem) SequenceArchetypeType(
       Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
@@ -4125,6 +4163,9 @@ static Type substType(Type derivedType,
     if (isa<PrimaryArchetypeType>(substOrig))
       return ErrorType::get(type);
 
+    if (isa<SequenceArchetypeType>(substOrig))
+      return ErrorType::get(type);
+
     // Opened existentials cannot be substituted in this manner,
     // but if they appear in the original type this is not an
     // error.
@@ -4534,6 +4575,7 @@ case TypeKind::Id:
 #include "swift/AST/TypeNodes.def"
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
+  case TypeKind::SequenceArchetype:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
@@ -5279,7 +5321,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
-  case TypeKind::OpaqueTypeArchetype: {
+  case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::SequenceArchetype: {
     auto archetype = cast<ArchetypeType>(type);
     auto layout = archetype->getLayoutConstraint();
     (void)layout;
