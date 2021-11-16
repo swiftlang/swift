@@ -2222,23 +2222,23 @@ namespace {
     Expr *buildKeyPathDynamicMemberArgExpr(BoundGenericType *keyPathTy,
                                            SourceLoc dotLoc,
                                            ConstraintLocator *memberLoc) {
+      using Component = KeyPathExpr::Component;
       auto &ctx = cs.getASTContext();
       auto *anchor = getAsExpr(memberLoc->getAnchor());
 
-      SmallVector<KeyPathExpr::Component, 2> components;
+      auto makeKeyPath = [&](ArrayRef<Component> components) -> Expr * {
+        auto *kp = KeyPathExpr::createImplicit(ctx, /*backslashLoc*/ dotLoc,
+                                               components, anchor->getEndLoc());
+        kp->setType(keyPathTy);
+        cs.cacheExprTypes(kp);
 
-      // Let's create a KeyPath expression and fill in "parsed path"
-      // after component is built.
-      auto *keyPath = new (ctx) KeyPathExpr(/*backslashLoc=*/dotLoc,
-                                            /*parsedRoot=*/nullptr,
-                                            /*parsedPath=*/anchor,
-                                            /*hasLeadingDot=*/false,
-                                            /*isImplicit=*/true);
-      // Type of the keypath expression we are forming is known
-      // in advance, so let's set it right away.
-      keyPath->setType(keyPathTy);
-      cs.cacheType(keyPath);
+        // See whether there's an equivalent ObjC key path string we can produce
+        // for interop purposes.
+        checkAndSetObjCKeyPathString(kp);
+        return kp;
+      };
 
+      SmallVector<Component, 2> components;
       auto *componentLoc = cs.getConstraintLocator(
           memberLoc,
           LocatorPathElt::KeyPathDynamicMember(keyPathTy->getAnyNominal()));
@@ -2251,95 +2251,44 @@ namespace {
       case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
         buildKeyPathSubscriptComponent(overload, dotLoc, /*args=*/nullptr,
                                        componentLoc, components);
-        keyPath->resolveComponents(ctx, components);
-        cs.cacheExprTypes(keyPath);
-        return keyPath;
+        return makeKeyPath(components);
       }
 
       default:
         break;
       }
 
-      // We can't reuse existing expression because type-check
-      // based diagnostics could hold the reference to original AST.
-      Expr *componentExpr = nullptr;
-      auto *dotExpr = new (ctx) KeyPathDotExpr(dotLoc);
-
-      // Determines whether this index is built to be used for
-      // one of the existing keypath components e.g. `\Lens<[Int]>.count`
-      // instead of a regular expression e.g. `lens[0]`.
-      bool forKeyPathComponent = false;
-      // Looks like keypath dynamic member lookup was used inside
-      // of a keypath expression e.g. `\Lens<[Int]>.count` where
-      // `count` is referenced using dynamic lookup.
       if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
+        // Looks like keypath dynamic member lookup was used inside
+        // of a keypath expression e.g. `\Lens<[Int]>.count` where
+        // `count` is referenced using dynamic lookup.
         auto kpElt = memberLoc->findFirst<LocatorPathElt::KeyPathComponent>();
         assert(kpElt && "no keypath component node");
-        auto &origComponent = KPE->getComponents()[kpElt->getIndex()];
+        auto &comp = KPE->getComponents()[kpElt->getIndex()];
 
-        using ComponentKind = KeyPathExpr::Component::Kind;
-        if (origComponent.getKind() == ComponentKind::UnresolvedProperty) {
-          anchor = new (ctx) UnresolvedDotExpr(
-              dotExpr, dotLoc, origComponent.getUnresolvedDeclName(),
-              DeclNameLoc(origComponent.getLoc()),
-              /*Implicit=*/true);
-        } else if (origComponent.getKind() ==
-                   ComponentKind::UnresolvedSubscript) {
-          anchor = SubscriptExpr::create(
-              ctx, dotExpr, origComponent.getSubscriptArgs(), ConcreteDeclRef(),
-              /*implicit=*/true, AccessSemantics::Ordinary);
+        if (comp.getKind() == Component::Kind::UnresolvedProperty) {
+          buildKeyPathPropertyComponent(overload, comp.getLoc(), componentLoc,
+                                        components);
+        } else if (comp.getKind() == Component::Kind::UnresolvedSubscript) {
+          buildKeyPathSubscriptComponent(overload, comp.getLoc(),
+                                         comp.getSubscriptArgs(), componentLoc,
+                                         components);
         } else {
           return nullptr;
         }
-
-        anchor->setType(simplifyType(overload.openedType));
-        cs.cacheType(anchor);
-        forKeyPathComponent = true;
+        return makeKeyPath(components);
       }
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-        componentExpr =
-            forKeyPathComponent
-                ? UDE
-                : new (ctx) UnresolvedDotExpr(dotExpr, dotLoc, UDE->getName(),
-                                              UDE->getNameLoc(),
-                                              /*Implicit=*/true);
-
         buildKeyPathPropertyComponent(overload, UDE->getLoc(), componentLoc,
                                       components);
       } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
-        componentExpr = SE;
-        // If this is not for a keypath component, we have to copy
-        // original subscript expression because expression based
-        // diagnostics might have a reference to it, so it couldn't
-        // be modified.
-        if (!forKeyPathComponent) {
-          componentExpr = SubscriptExpr::create(
-              ctx, dotExpr, SE->getArgs(),
-              SE->hasDecl() ? SE->getDecl() : ConcreteDeclRef(),
-              /*implicit=*/true, SE->getAccessSemantics());
-        }
-
         buildKeyPathSubscriptComponent(overload, SE->getLoc(), SE->getArgs(),
                                        componentLoc, components);
       } else {
         return nullptr;
       }
-
-      assert(componentExpr);
-      Type ty = simplifyType(cs.getType(anchor));
-      componentExpr->setType(ty);
-      cs.cacheType(componentExpr);
-
-      keyPath->setParsedPath(componentExpr);
-      keyPath->resolveComponents(ctx, components);
-      cs.cacheExprTypes(keyPath);
-
-      // See whether there's an equivalent ObjC key path string we can produce
-      // for interop purposes.
-      checkAndSetObjCKeyPathString(keyPath);
-
-      return keyPath;
+      return makeKeyPath(components);
     }
 
     /// Bridge the given value (which is an error type) to NSError.
@@ -4898,7 +4847,7 @@ namespace {
       }
 
       // Set the resolved components, and cache their types.
-      E->resolveComponents(cs.getASTContext(), resolvedComponents);
+      E->setComponents(cs.getASTContext(), resolvedComponents);
       cs.cacheExprTypes(E);
 
       // See whether there's an equivalent ObjC key path string we can produce
