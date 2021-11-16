@@ -24,8 +24,8 @@
 
 // REQUIRES: executable_test
 
-// Test disabled until LLVM GlobalDCE supports conditional references.
-// REQUIRES: rdar81868900
+// FIXME(mracek): More work needed to get this to work on non-Apple platforms.
+// REQUIRES: VENDOR=apple
 
 #if LIBRARY
 
