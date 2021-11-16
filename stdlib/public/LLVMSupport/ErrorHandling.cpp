@@ -15,13 +15,11 @@
 #include "llvm/ADT/StringRef.h"
 #include <cassert>
 #include <cstdlib>
+#include <cstdio>
 
 #if defined(_MSC_VER)
 # include <io.h>
 # include <fcntl.h>
-#else
-# include <stdio.h>
-# include <unistd.h>
 #endif
 
 #include <stdarg.h>
@@ -49,7 +47,8 @@ void error(const char *fmt, ...) {
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, buffer, strlen(buffer));
 #else
-  write(STDERR_FILENO, buffer, strlen(buffer));
+  fputs(buffer, stderr);
+  fflush(stderr);
 #endif
 }
 }

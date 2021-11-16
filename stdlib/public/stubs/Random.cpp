@@ -25,7 +25,6 @@
 #else
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
 #endif
 
 #if __has_include(<sys/random.h>)
