@@ -1,0 +1,15 @@
+# REQUIRES: standalone_build
+
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --swift-freestanding-is-darwin --verbose --cmake %cmake 2>&1| %FileCheck %s
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --swift-freestanding-is-darwin=1 --verbose --cmake %cmake 2>&1| %FileCheck %s
+
+# CHECK: cmake{{.*}} -DSWIFT_FREESTANDING_IS_DARWIN:BOOL=TRUE
+
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --verbose --cmake %cmake 2>&1| %FileCheck --check-prefix CHECK-NOT-DARWIN %s
+# RUN: %empty-directory(%t)
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --swift-freestanding-is-darwin=0 --verbose --cmake %cmake 2>&1| %FileCheck --check-prefix CHECK-NOT-DARWIN %s
+
+# CHECK-NOT-DARWIN: cmake{{.*}} -DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE

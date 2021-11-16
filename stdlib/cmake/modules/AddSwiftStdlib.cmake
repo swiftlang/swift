@@ -1689,6 +1689,7 @@ function(add_swift_target_library name)
     set(SWIFTLIB_TARGET_SDKS ${SWIFT_SDKS})
   endif()
   list_replace(SWIFTLIB_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_DARWIN_PLATFORMS}")
+  list(REMOVE_DUPLICATES SWIFTLIB_TARGET_SDKS)
 
   # All Swift code depends on the standard library, except for the standard
   # library itself.
