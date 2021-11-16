@@ -203,36 +203,6 @@ public:
         EPE->setSemanticExpr(nullptr);
       }
 
-      // If this expression represents keypath based dynamic member
-      // lookup, let's convert it back to the original form of
-      // member or subscript reference.
-      if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-        auto *args = SE->getArgs();
-        auto isImplicitKeyPathExpr = [](Expr *argExpr) -> bool {
-          if (auto *KP = dyn_cast<KeyPathExpr>(argExpr))
-            return KP->isImplicit();
-          return false;
-        };
-
-        if (SE->isImplicit() && args->isUnary() &&
-            args->front().getLabel() == C.Id_dynamicMember &&
-            isImplicitKeyPathExpr(args->front().getExpr())) {
-          auto *keyPathExpr = cast<KeyPathExpr>(args->front().getExpr());
-          auto *componentExpr = keyPathExpr->getParsedPath();
-
-          if (auto *UDE = dyn_cast<UnresolvedDotExpr>(componentExpr)) {
-            UDE->setBase(SE->getBase());
-            return {true, UDE};
-          }
-
-          if (auto *subscript = dyn_cast<SubscriptExpr>(componentExpr)) {
-            subscript->setBase(SE->getBase());
-            return {true, subscript};
-          }
-          llvm_unreachable("unknown keypath component type");
-        }
-      }
-
       // If this is a closure, only walk into its children if they
       // are type-checked in the context of the enclosing expression.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
