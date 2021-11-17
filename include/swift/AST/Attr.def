@@ -695,6 +695,12 @@ SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   124)
 
+SIMPLE_DECL_ATTR(_predatesConcurrency, PredatesConcurrency,
+  OnFunc | OnConstructor | OnProtocol | OnGenericType | OnVar | OnSubscript |
+  OnEnumElement | UserInaccessible |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  125)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 

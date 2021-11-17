@@ -2743,6 +2743,10 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
           diag::global_actor_non_unsafe_init, globalActorType);
     }
 
+    // If the declaration predates concurrency, it has unsafe actor isolation.
+    if (decl->predatesConcurrency())
+      isUnsafe = true;
+
     return ActorIsolation::forGlobalActor(
         globalActorType->mapTypeOutOfContext(), isUnsafe);
   }
@@ -4028,6 +4032,35 @@ static Type applyUnsafeConcurrencyToParameterType(
                                .withGlobalActor(globalActor));
 }
 
+/// Strip concurrency from the type of the given parameter.
+static Type stripConcurrencyFromParameterType(
+    Type paramType, bool dropGlobalActor) {
+  // Look through optionals.
+  if (Type optionalObject = paramType->getOptionalObjectType()) {
+    Type newOptionalObject =
+        stripConcurrencyFromParameterType(optionalObject, dropGlobalActor);
+    if (optionalObject->isEqual(newOptionalObject))
+      return paramType;
+
+    return OptionalType::get(newOptionalObject);
+  }
+
+  // For function types, strip off Sendable and possibly the global actor.
+  if (auto fnType = paramType->getAs<FunctionType>()) {
+    auto extInfo = fnType->getExtInfo().withConcurrent(false);
+    if (dropGlobalActor)
+      extInfo = extInfo.withGlobalActor(Type());
+    auto newFnType = FunctionType::get(
+        fnType->getParams(), fnType->getResult(), extInfo);
+    if (newFnType->isEqual(paramType))
+      return paramType;
+
+    return newFnType;
+  }
+
+  return paramType;
+}
+
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.
 bool swift::isDispatchQueueOperationName(StringRef name) {
@@ -4061,8 +4094,8 @@ static bool hasKnownUnsafeSendableFunctionParams(AbstractFunctionDecl *func) {
   return false;
 }
 
-/// Apply @_unsafeSendable and @_unsafeMainActor to the parameters of the
-/// given function.
+/// Adjust a function type for @_unsafeSendable, @_unsafeMainActor, and
+/// @_predatesConcurrency.
 static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     AnyFunctionType *fnType, ValueDecl *funcOrEnum,
     bool inConcurrencyContext, unsigned numApplies, bool isMainDispatchQueue) {
@@ -4085,6 +4118,9 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   auto paramDecls = func->getParameters();
   assert(typeParams.size() == paramDecls->size());
   bool knownUnsafeParams = hasKnownUnsafeSendableFunctionParams(func);
+  bool stripConcurrency =
+      funcOrEnum->predatesConcurrency() &&
+      !inConcurrencyContext;
   for (unsigned index : indices(typeParams)) {
     auto param = typeParams[index];
     auto paramDecl = (*paramDecls)[index];
@@ -4093,19 +4129,28 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     // @MainActor. @Sendable occurs only in concurrency contents, while
     // @MainActor occurs in concurrency contexts or those where we have an
     // application.
-    bool isSendable =
+    bool addSendable =
         (paramDecl->getAttrs().hasAttribute<UnsafeSendableAttr>() ||
          knownUnsafeParams) &&
         inConcurrencyContext;
-    bool isMainActor =
+    bool addMainActor =
         (paramDecl->getAttrs().hasAttribute<UnsafeMainActorAttr>() ||
          (isMainDispatchQueue && knownUnsafeParams)) &&
         (inConcurrencyContext || numApplies >= 1);
+    Type newParamType = param.getPlainType();
+    if (addSendable || addMainActor) {
+      newParamType = applyUnsafeConcurrencyToParameterType(
+        param.getPlainType(), addSendable, addMainActor);
+    } else if (stripConcurrency) {
+      newParamType = stripConcurrencyFromParameterType(
+          param.getPlainType(), numApplies == 0);
+    }
 
-    if (!isSendable && !isMainActor) {
+    if (!newParamType || newParamType->isEqual(param.getPlainType())) {
       // If any prior parameter has changed, record this one.
       if (!newTypeParams.empty())
         newTypeParams.push_back(param);
+
       continue;
     }
 
@@ -4116,8 +4161,6 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     }
 
     // Transform the parameter type.
-    Type newParamType = applyUnsafeConcurrencyToParameterType(
-        param.getPlainType(), isSendable, isMainActor);
     newTypeParams.push_back(param.withType(newParamType));
   }
 

@@ -1505,6 +1505,7 @@ namespace  {
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
+    UNINTERESTING_ATTR(PredatesConcurrency)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
