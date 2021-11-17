@@ -44,6 +44,9 @@ extern unsigned long long swift_reflection_classIsSwiftMask;
 ///     first attempted fix to use the right AsyncTask layout.
 /// 1 - Indicates that swift_reflection_iterateAsyncTaskAllocations has been
 ///     actually fixed to use the right AsyncTask layout.
+/// 2 - swift_reflection_iterateAsyncTaskAllocations has been replaced by
+///     swift_reflection_asyncTaskSlabPointer and
+///     swift_reflection_asyncTaskSlabAllocations.
 SWIFT_REMOTE_MIRROR_LINKAGE extern uint32_t swift_reflection_libraryVersion;
 
 /// Get the metadata version supported by the Remote Mirror library.
@@ -395,33 +398,40 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
     SwiftReflectionContextRef ContextRef,
     swift_metadataAllocationBacktraceIterator Call, void *ContextPtr);
 
-/// Allocation iterator passed to swift_reflection_iterateAsyncTaskAllocations
-typedef void (*swift_asyncTaskAllocationIterator)(
-    swift_reflection_ptr_t AllocationPtr, unsigned Count,
-    swift_async_task_allocation_chunk_t Chunks[], void *ContextPtr);
-
-/// Iterate over the allocations associated with the given async task object.
+/// Get the first allocation slab for a given async task object.
 /// This object must have an isa value equal to
 /// _swift_concurrency_debug_asyncTaskMetadata.
 ///
-/// Calls the passed in Call function for each allocation associated with the
-/// async task object. The function is passed the allocation pointer and an
-/// array of chunks. Each chunk consists of a start, length, and kind for that
-/// chunk of the allocated memory. Any regions of the allocation that are not
-/// covered by a chunk are unallocated or garbage. The chunk array is valid only
-/// for the duration of the call.
+/// It is possible that the async task object hasn't allocated a slab yet, in
+/// which case the slab pointer will be NULL. If non-NULL, the returned slab
+/// pointer may be a separate heap allocation, or it may be interior to some
+/// allocation used by the task.
+SWIFT_REMOTE_MIRROR_LINKAGE
+swift_async_task_slab_return_t
+swift_reflection_asyncTaskSlabPointer(SwiftReflectionContextRef ContextRef,
+                                      swift_reflection_ptr_t AsyncTaskPtr);
+
+/// Iterate over the allocations in the given async task allocator slab.
+/// This allocation must have an "isa" value (scare quotes because it's not a
+/// real object) equal to _swift_concurrency_debug_asyncTaskSlabMetadata.
 ///
-/// An async task may have more than one allocation associated with it, so the
-/// function may be called more than once. It may also have no allocations, in
-/// which case the function is not called.
+/// Calls the passed in Call function for each allocation in the slab. The
+/// function is passed the allocation pointer and an array of chunks. Each chunk
+/// consists of a start, length, and kind for that chunk of the allocated
+/// memory. Any regions of the allocation that are not covered by a chunk are
+/// unallocated or garbage. The chunk array is valid only for the duration of
+/// the call.
+///
+/// A slab may be part of a chain of slabs, so the
+/// function may be called more than once.
 ///
 /// Returns NULL on success. On error, returns a pointer to a C string
 /// describing the error. This pointer remains valid until the next
 /// swift_reflection call on the given context.
 SWIFT_REMOTE_MIRROR_LINKAGE
-const char *swift_reflection_iterateAsyncTaskAllocations(
-    SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t AsyncTaskPtr,
-    swift_asyncTaskAllocationIterator Call, void *ContextPtr);
+swift_async_task_slab_allocations_return_t
+swift_reflection_asyncTaskSlabAllocations(SwiftReflectionContextRef ContextRef,
+                                          swift_reflection_ptr_t SlabPtr);
 
 #ifdef __cplusplus
 } // extern "C"
