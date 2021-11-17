@@ -872,15 +872,16 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Age" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var age: Unicode.Version? {
-    var versionInfo: __swift_stdlib_UVersionInfo = (0, 0, 0, 0)
-    withUnsafeMutablePointer(to: &versionInfo) { tuplePtr in
-      tuplePtr.withMemoryRebound(to: UInt8.self, capacity: 4) {
-        versionInfoPtr in
-        __swift_stdlib_u_charAge(icuValue, versionInfoPtr)
-      }
+    let age = _swift_stdlib_getAge(_scalar.value)
+
+    if age == .max {
+      return nil
     }
-    guard versionInfo.0 != 0 else { return nil }
-    return (major: Int(versionInfo.0), minor: Int(versionInfo.1))
+
+    let major = age & 0xFF
+    let minor = (age & 0xFF00) >> 8
+
+    return (major: Int(major), minor: Int(minor))
   }
 }
 

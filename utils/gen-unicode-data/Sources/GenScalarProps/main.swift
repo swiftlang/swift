@@ -20,6 +20,7 @@ func generateScalarProps() {
   generateNameAliasProp(into: &result)
   generateMappingProps(into: &result)
   generateNameProp(into: &result)
+  generateAgeProp(into: &result)
   
   write(result, to: "../../stdlib/public/stubs/UnicodeScalarProps.cpp")
 }

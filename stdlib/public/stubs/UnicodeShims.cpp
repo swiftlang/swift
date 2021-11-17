@@ -36,7 +36,6 @@ typedef __swift_stdlib_UProperty UProperty;
 typedef uint8_t UVersionInfo[U_MAX_VERSION_LENGTH];
 
 // Comparison and character property APIs
-void u_charAge(UChar32, UVersionInfo);
 int32_t u_getIntPropertyValue(UChar32, UProperty);
 }
 
@@ -57,21 +56,6 @@ int32_t u_getIntPropertyValue(UChar32, UProperty);
 #pragma clang diagnostic pop
 
 #endif
-
-namespace {
-template <typename T, typename U> T *ptr_cast(U *p) {
-  return static_cast<T *>(static_cast<void *>(p));
-}
-template <typename T, typename U> const T *ptr_cast(const U *p) {
-  return static_cast<const T *>(static_cast<const void *>(p));
-}
-}
-
-void
-__swift_stdlib_u_charAge(__swift_stdlib_UChar32 c,
-                                __swift_stdlib_UVersionInfo versionInfo) {
-  return u_charAge(c, versionInfo);
-}
 
 __swift_int32_t
 __swift_stdlib_u_getIntPropertyValue(__swift_stdlib_UChar32 c,
