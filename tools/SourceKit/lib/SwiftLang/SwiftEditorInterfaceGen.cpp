@@ -634,8 +634,9 @@ void SwiftLangSupport::editorOpenTypeInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager()->initCompilerInvocation(Invocation, Args, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager()->initCompilerInvocation(
+          Invocation, Args, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), StringRef(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -674,8 +675,9 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
-                                                     CI.getDiags(), Error)) {
+  if (getASTManager()->initCompilerInvocationNoInputs(
+          Invocation, Args, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -740,7 +742,7 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(
     SourceKitCancellationToken CancellationToken,
     std::shared_ptr<EditorConsumer> Consumer) {
   std::string Error;
-  auto Invocation = ASTMgr->getInvocation(Args, SourceName, Error);
+  auto Invocation = ASTMgr->getTypecheckInvocation(Args, SourceName, Error);
   if (!Invocation) {
     Consumer->handleRequestError(Error.c_str());
     return;
@@ -769,8 +771,9 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   std::string Error;
 
   ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : llvm::None;
-  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, SwiftArgs,
-                                                     CI.getDiags(), Error)) {
+  if (getASTManager()->initCompilerInvocationNoInputs(
+          Invocation, SwiftArgs, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -819,8 +822,9 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager()->initCompilerInvocation(Invocation, Args, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager()->initCompilerInvocation(
+          Invocation, Args, FrontendOptions::ActionType::Typecheck,
+          CI.getDiags(), StringRef(), Error)) {
     return Receiver(RequestResult<InterfaceDocInfo>::fromError(Error));
   }
 

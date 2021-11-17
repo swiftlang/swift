@@ -303,10 +303,12 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   bool Failed = true;
   if (IsModuleIndexing) {
     Failed = getASTManager()->initCompilerInvocationNoInputs(
-        Invocation, Args, CI.getDiags(), Error);
+        Invocation, Args, FrontendOptions::ActionType::Typecheck, CI.getDiags(),
+        Error);
   } else {
     Failed = getASTManager()->initCompilerInvocation(
-        Invocation, Args, CI.getDiags(), InputFile, Error);
+        Invocation, Args, FrontendOptions::ActionType::Typecheck, CI.getDiags(),
+        InputFile, Error);
   }
   if (Failed) {
     IdxConsumer.failed(Error);
