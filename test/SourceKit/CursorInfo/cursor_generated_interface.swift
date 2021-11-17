@@ -13,9 +13,6 @@
 // source information or not. If we have source information, we should also
 // output it.
 
-// Disabled due to CI failures on watchsimulator-i386 and macosx-x86_64 (https://ci.swift.org/job/swift-PR-macos/29960/console)
-// REQUIRES: rdar85423858
-
 //--- use.swift
 
 import LibA
