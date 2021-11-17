@@ -4505,25 +4505,34 @@ ERROR(distributed_actor_isolated_method,none,
       "only 'distributed' instance methods can be called on a potentially remote distributed actor",
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
-      "distributed instance method parameter '%0' of type %1 does not conform to 'Codable'",
-      (StringRef, Type))
+      "parameter '%0' of type %1 in %2 does not conform to '%3'",
+      (StringRef, Type, DescriptiveDeclKind, StringRef))
 ERROR(distributed_actor_func_result_not_codable,none,
-      "distributed instance method result type %0 does not conform to 'Codable'",
-      (Type))
+      "result type %0 of %1 does not conform to '%2'",
+      (Type, DescriptiveDeclKind, StringRef))
 ERROR(distributed_actor_remote_func_implemented_manually,none,
-      "distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
+      "distributed instance method's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))
 ERROR(nonisolated_distributed_actor_storage,none,
       "'nonisolated' can not be applied to distributed actor stored properties",
       ())
 ERROR(distributed_actor_func_nonisolated, none,
-      "function %0 cannot be both 'nonisolated' and 'distributed'",
+      "cannot declare method %0 as both 'nonisolated' and 'distributed'",
       (DeclName))
 ERROR(distributed_actor_func_private, none,
       "%0 %1 cannot be 'private'",
       (DescriptiveDeclKind, DeclName))
+ERROR(distributed_actor_func_inout, none,
+      "cannot declare 'inout' argument %0 in %1 %2",
+      (DeclName, DescriptiveDeclKind, DeclName))
+ERROR(distributed_actor_func_closure, none,
+      "%0 %1 cannot declare closure arguments, as they cannot be serialized",
+      (DescriptiveDeclKind, DeclName))
+ERROR(distributed_actor_func_variadic, none,
+      "cannot declare variadic argument %0 in %1 %2",
+      (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_remote_func_is_not_static,none,
-      "remote function %0 must be static.",
+      "remote function %0 must be static",
       (DeclName))
 ERROR(distributed_actor_remote_func_is_not_async_throws,none,
       "remote function %0 must be 'async throws'.",
@@ -4654,7 +4663,7 @@ ERROR(distributed_actor_func_static,none,
       "'distributed' method cannot be 'static'",
       ())
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
-      "'distributed' function can only be declared within 'distributed actor'",
+      "'distributed' method can only be declared within 'distributed actor'",
       ())
 ERROR(distributed_actor_designated_ctor_must_have_one_transport_param,none,
       "designated distributed actor initializer %0 must accept exactly one "

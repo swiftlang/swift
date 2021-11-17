@@ -38,12 +38,12 @@ distributed actor DA {
   }
 
   nonisolated distributed func nonisolatedDistributed() async {
-    // expected-error@-1{{function 'nonisolatedDistributed()' cannot be both 'nonisolated' and 'distributed'}}{{3-15=}}
+    // expected-error@-1{{cannot declare method 'nonisolatedDistributed()' as both 'nonisolated' and 'distributed'}}{{3-15=}}
     fatalError()
   }
 
   distributed nonisolated func distributedNonisolated() async {
-    // expected-error@-1{{function 'distributedNonisolated()' cannot be both 'nonisolated' and 'distributed'}}{{15-27=}}
+    // expected-error@-1{{cannot declare method 'distributedNonisolated()' as both 'nonisolated' and 'distributed'}}{{15-27=}}
     fatalError()
   }
 

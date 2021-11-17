@@ -29,21 +29,21 @@ distributed enum SomeDistributedActor_3 { } // expected-error{{'distributed' mod
 
 @available(SwiftStdlib 5.6, *)
 struct SomeNotActorStruct_2 {
-  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 @available(SwiftStdlib 5.6, *)
 class SomeNotActorClass_3 {
-  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 @available(SwiftStdlib 5.6, *)
 actor SomeNotDistributedActor_4 {
-  distributed func notInDistActorAsyncThrowing() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func notInDistActorAsyncThrowing() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 protocol DP {
-  distributed func hello()  // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func hello()  // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 @available(SwiftStdlib 5.6, *)
@@ -58,7 +58,7 @@ protocol DPOK2: DPOK {
 
 @available(SwiftStdlib 5.6, *)
 enum SomeNotActorEnum_5 {
-  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+  distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' method can only be declared within 'distributed actor'}}
 }
 
 @available(SwiftStdlib 5.6, *)
@@ -68,9 +68,9 @@ distributed actor SomeDistributedActor_6 {
 
 @available(SwiftStdlib 5.6, *)
 distributed actor SomeDistributedActor_7 {
-  distributed func dont_1() async throws -> Int { 42 } // expected-error{{distributed function's 'dont_1' remote counterpart '_remote_dont_1' cannot not be implemented manually.}}
-  distributed func dont_2() async throws -> Int { 42 } // expected-error{{distributed function's 'dont_2' remote counterpart '_remote_dont_2' cannot not be implemented manually.}}
-  distributed func dont_3() async throws -> Int { 42 } // expected-error{{distributed function's 'dont_3' remote counterpart '_remote_dont_3' cannot not be implemented manually.}}
+  distributed func dont_1() async throws -> Int { 42 } // expected-error{{distributed instance method's 'dont_1' remote counterpart '_remote_dont_1' cannot not be implemented manually.}}
+  distributed func dont_2() async throws -> Int { 42 } // expected-error{{distributed instance method's 'dont_2' remote counterpart '_remote_dont_2' cannot not be implemented manually.}}
+  distributed func dont_3() async throws -> Int { 42 } // expected-error{{distributed instance method's 'dont_3' remote counterpart '_remote_dont_3' cannot not be implemented manually.}}
 }
 
 @available(SwiftStdlib 5.6, *)
