@@ -123,6 +123,8 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING@" == "TRUE":
 config.swift_freestanding_is_darwin = "@SWIFT_FREESTANDING_IS_DARWIN@" == "TRUE"
 config.swift_enable_dispatch = "@SWIFT_ENABLE_DISPATCH@" == "TRUE"
 config.swift_stdlib_enable_objc_interop = "@SWIFT_STDLIB_ENABLE_OBJC_INTEROP@" == "TRUE"
+# Configured in DarwinSDKs.cmake
+config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
 
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
