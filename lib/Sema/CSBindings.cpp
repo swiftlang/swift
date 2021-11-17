@@ -1010,7 +1010,8 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
           }
         }
 
-        return type->is<StructType>() || type->is<EnumType>();
+        return type->is<StructType>() || type->is<EnumType>() ||
+               type->is<BuiltinType>();
       })) {
     // Result type of subscript could be l-value so we can't bind it early.
     if (!TypeVar->getImpl().isSubscriptResultType() &&
