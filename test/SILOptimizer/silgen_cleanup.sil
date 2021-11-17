@@ -26,6 +26,12 @@ struct UInt8 {
   var _value : Builtin.Int8
 }
 
+// =============================================================================
+// Test splitAggregateLoad
+//
+// Required for exclusivity diagnostics that are consistent across -Onone / -O
+// =============================================================================
+
 // CHECK-LABEL: sil [ossa] @struct_extract_load_to_load_struct_element_addr
 // CHECK: bb0([[IN:%[0-9]+]] : $*UInt8):
 // CHECK-NEXT:  [[IN_GEP:%[0-9]+]] = struct_element_addr [[IN]] : $*UInt8, #UInt8._value
@@ -187,6 +193,36 @@ bb0(%0 : $*X1):
   return %result : $(Int, Builtin.NativeObject, Builtin.NativeObject)
 }
 
+sil private [ossa] @testLoadWithDebugInfo : $@convention(thin) (@inout_aliasable X1) -> (Int, @owned Builtin.NativeObject, @owned Builtin.NativeObject) {
+bb0(%0 : $*X1):
+  %access = begin_access [read] [unknown] %0 : $*X1
+  %load = load [copy] %access : $*X1
+  debug_value %load : $Int, let, name "x1"
+  end_access %access : $*X1
+
+  %borrowa = begin_borrow %load : $X1
+  %a = struct_extract %borrowa : $X1, #X1.a
+  end_borrow %borrowa : $X1
+
+  %borrow1 = begin_borrow %load : $X1
+  %o1 = struct_extract %borrow1 : $X1, #X1.obj1
+  %copy1 = copy_value %o1 : $Builtin.NativeObject
+  end_borrow %borrow1 : $X1
+
+  %borrow2 = begin_borrow %load : $X1
+  %o2 = struct_extract %borrow2 : $X1, #X1.obj2
+  %copy2 = copy_value %o2 : $Builtin.NativeObject
+  end_borrow %borrow2 : $X1
+
+  destroy_value %load : $X1
+
+  %result = tuple (%a : $Int, %copy1 : $Builtin.NativeObject, %copy2 : $Builtin.NativeObject)
+  return %result : $(Int, Builtin.NativeObject, Builtin.NativeObject)
+}
+
+// =============================================================================
+// Test broadenSingleElementStores
+// =============================================================================
 
 struct X2 {
   @_hasStorage @_hasInitialValue var obj: Builtin.NativeObject { get set }
@@ -216,6 +252,10 @@ bb0(%0 : $*X3, %1 : @guaranteed $Builtin.NativeObject):
   %12 = tuple ()
   return %12 : $()
 }
+
+// =============================================================================
+// Test simple copy and borrow elimination
+// =============================================================================
 
 // We used to hit a memory error on this test.
 //
