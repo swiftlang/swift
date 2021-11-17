@@ -83,6 +83,10 @@ __swift_int32_t _swift_stdlib_getMapping(__swift_uint32_t scalar,
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const __swift_uint32_t *_swift_stdlib_getSpecialMapping(__swift_uint32_t scalar);
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
+                                             __swift_uint8_t *buffer);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

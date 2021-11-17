@@ -189,3 +189,71 @@ const __swift_uint32_t *_swift_stdlib_getSpecialMapping(__swift_uint32_t scalar)
 
   return _swift_stdlib_special_mappings_data + index;
 }
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
+                                             __swift_uint8_t *buffer) {
+  auto setOffset = _swift_stdlib_names_scalar_sets[scalar >> 7];
+
+  if (setOffset == std::numeric_limits<__swift_uint16_t>::max()) {
+    return 0;
+  }
+
+  auto scalarIndex = (setOffset << 7) + (scalar & ((1 << 7) - 1));
+  auto scalarOffset = _swift_stdlib_names_scalars[scalarIndex];
+
+  if (scalarOffset == 0) {
+    return 0;
+  }
+
+  __swift_uint32_t nextScalarOffset = 0;
+  int i = 1;
+
+  // Look for the next scalar who has a name and their position in the names
+  // array. This tells us exactly how many bytes our name takes up.
+  while (nextScalarOffset == 0) {
+    nextScalarOffset = _swift_stdlib_names_scalars[scalarIndex + i];
+    i += 1;
+  }
+
+  auto nameSize = nextScalarOffset - scalarOffset;
+
+  int c = 0;
+
+  for (__swift_uint32_t i = 0; i < nameSize; i += 1) {
+    __swift_uint16_t wordIndex = (__swift_uint16_t) _swift_stdlib_names[
+      scalarOffset + i
+    ];
+
+    // If our word index is 0xFF, then it means our word index is larger than a
+    // byte, so the next two bytes will compose the 16 bit index.
+    if (wordIndex == 0xFF) {
+      i += 1;
+      auto firstPart = _swift_stdlib_names[scalarOffset + i];
+      wordIndex = firstPart;
+
+      i += 1;
+      auto secondPart = _swift_stdlib_names[scalarOffset + i];
+      wordIndex |= secondPart << 8;
+    }
+
+    auto wordOffset = _swift_stdlib_word_indices[wordIndex];
+
+    auto word = _swift_stdlib_words + wordOffset;
+
+    // The last character in a word has the 7th bit set.
+    while (*word < 0x80) {
+      buffer[c++] = *word++;
+    }
+
+    buffer[c++] = *word & 0x7F;
+
+    buffer[c++] = ' ';
+  }
+
+  // Remove the trailing space.
+  c -= 1;
+
+  // The return value is the number of initialized bytes.
+  return c;
+}

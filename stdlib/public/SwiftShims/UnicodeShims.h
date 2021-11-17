@@ -280,13 +280,6 @@ __swift_int32_t
     __swift_stdlib_u_getIntPropertyValue(__swift_stdlib_UChar32,
                                          __swift_stdlib_UProperty);
 
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t __swift_stdlib_u_charName(
-    __swift_stdlib_UChar32 code, __swift_stdlib_UCharNameChoice nameChoice,
-    char *_Nullable buffer, __swift_int32_t bufferLength,
-    __swift_stdlib_UErrorCode *pErrorCode);
-
-
 #ifdef __cplusplus
 } // extern "C"
 #endif

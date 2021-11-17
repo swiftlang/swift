@@ -1179,34 +1179,90 @@ extension Unicode.Scalar.Properties {
 }
 
 extension Unicode.Scalar.Properties {
+  internal func _hangulName() -> String {
+    // T = Hangul tail consonants
+    let T: (base: UInt32, count: UInt32) = (base: 0x11A7, count: 28)
+    // N = Number of precomposed Hangul syllables that start with the same
+    //     leading consonant. (There is no base for N).
+    let N: (base: UInt32, count: UInt32) = (base: 0x0, count: 588)
+    // S = Hangul precomposed syllables
+    let S: (base: UInt32, count: UInt32) = (base: 0xAC00, count: 11172)
 
-  internal func _scalarName(
-    _ choice: __swift_stdlib_UCharNameChoice
-  ) -> String? {
-    var error = __swift_stdlib_U_ZERO_ERROR
-    let count = Int(__swift_stdlib_u_charName(icuValue, choice, nil, 0, &error))
-    guard count > 0 else { return nil }
+    let hangulLTable = ["G", "GG", "N", "D", "DD", "R", "M", "B", "BB", "S",
+                        "SS", "", "J", "JJ", "C", "K", "T", "P", "H"]
 
-    // ICU writes a trailing null, so we have to save room for it as well.
-    let array = Array<UInt8>(unsafeUninitializedCapacity: count + 1) {
-      buffer, initializedCount in
-      var error = __swift_stdlib_U_ZERO_ERROR
-      let correctSize = __swift_stdlib_u_charName(
-        icuValue,
-        choice,
-        UnsafeMutableRawPointer(buffer.baseAddress._unsafelyUnwrappedUnchecked)
-          .assumingMemoryBound(to: Int8.self),
-        Int32(buffer.count),
-        &error)
-      guard error.isSuccess else {
-        fatalError("Unexpected error case-converting Unicode scalar.")
-      }
-      _internalInvariant(count == correctSize, "inconsistent ICU behavior")
-      initializedCount = count + 1
+    let hangulVTable = ["A", "AE", "YA", "YAE", "EO", "E", "YEO", "YE", "O",
+                        "WA", "WAE", "OE", "YO", "U", "WEO", "WE", "WI", "YU",
+                        "EU", "YI", "I"]
+
+    let hangulTTable = ["", "G", "GG", "GS", "N", "NJ", "NH", "D", "L", "LG",
+                        "LM", "LB", "LS", "LT", "LP", "LH", "M", "B", "BS", "S",
+                        "SS", "NG", "J", "C", "K", "T", "P", "H"]
+
+    let sIdx = _scalar.value &- S.base
+    let lIdx = Int(sIdx / N.count)
+    let vIdx = Int((sIdx % N.count) / T.count)
+    let tIdx = Int(sIdx % T.count)
+
+    let scalarName = hangulLTable[lIdx] + hangulVTable[vIdx] + hangulTTable[tIdx]
+    return "HANGUL SYLLABLE \(scalarName)"
+  }
+
+  // Used to potentially return a name who can either be represented in a large
+  // range or algorithmetically. A good example are the Hangul names. Instead of
+  // storing those names, we can define an algorithm to generate the name.
+  internal func _fastScalarName() -> String? {
+    // Define a couple algorithmetic names below.
+
+    // Hangul Syllable *
+    if (0xAC00 ... 0xD7A3).contains(_scalar.value) {
+      return _hangulName()
     }
-    return array.withUnsafeBufferPointer { buffer in
-      String._fromASCII(UnsafeBufferPointer(rebasing: buffer[..<count]))
+
+    // Variation Selector-17 through Variation Selector-256
+    if (0xE0100 ... 0xE01EF).contains(_scalar.value) {
+      return "VARIATION SELECTOR-\(_scalar.value - 0xE0100 + 17)"
     }
+
+    let scalarName = String(_scalar.value, radix: 16, uppercase: true)
+
+    // CJK Unified Ideograph-*
+    if (0x3400 ... 0x4DBF).contains(_scalar.value) ||
+       (0x4E00 ... 0x9FFF).contains(_scalar.value) ||
+       (0x20000 ... 0x2A6DF).contains(_scalar.value) ||
+       (0x2A700 ... 0x2B738).contains(_scalar.value) ||
+       (0x2B740 ... 0x2B81D).contains(_scalar.value) ||
+       (0x2B820 ... 0x2CEA1).contains(_scalar.value) ||
+       (0x2CEB0 ... 0x2EBE0).contains(_scalar.value) ||
+       (0x2F800 ... 0x2FA1D).contains(_scalar.value) ||
+       (0x30000 ... 0x3134A).contains(_scalar.value) {
+      return "CJK UNIFIED IDEOGRAPH-\(scalarName)"
+    }
+
+    // CJK Compatibility Ideograph-*
+    if (0xF900 ... 0xFA6D).contains(_scalar.value) ||
+       (0xFA70 ... 0xFAD9).contains(_scalar.value) {
+      return "CJK COMPATIBILITY IDEOGRAPH-\(scalarName)"
+    }
+
+    // Tangut Ideograph-*
+    if (0x17000 ... 0x187F7).contains(_scalar.value) ||
+       (0x18D00 ... 0x18D08).contains(_scalar.value) {
+      return "TANGUT IDEOGRAPH-\(scalarName)"
+    }
+
+    // Khitan Small Script Character-*
+    if (0x18B00 ... 0x18CD5).contains(_scalar.value) {
+      return "KHITAN SMALL SCRIPT CHARACTER-\(scalarName)"
+    }
+
+    // Nushu Character-*
+    if (0x1B170 ... 0x1B2FB).contains(_scalar.value) {
+      return "NUSHU CHARACTER-\(scalarName)"
+    }
+
+    // Otherwise, go look it up.
+    return nil
   }
 
   /// The published name of the scalar.
@@ -1218,7 +1274,16 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Name" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var name: String? {
-    return _scalarName(__swift_stdlib_U_UNICODE_CHAR_NAME)
+    if let fastName = _fastScalarName() {
+      return fastName
+    }
+
+    // The longest name that Unicode defines is 88 characters long.
+    let name = String(_uninitializedCapacity: 90) { buffer in
+      _swift_stdlib_getScalarName(_scalar.value, buffer.baseAddress)
+    }
+
+    return name.isEmpty ? nil : name
   }
 
   /// The normative formal alias of the scalar.
