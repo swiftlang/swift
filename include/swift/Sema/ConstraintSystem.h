@@ -4748,6 +4748,12 @@ private:
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify a BindTupleOfFunctionParams constraint.
+  SolutionKind
+  simplifyBindTupleOfFunctionParamsConstraint(Type first, Type second,
+                                              TypeMatchOptions flags,
+                                              ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
       Type type1, Type type2,

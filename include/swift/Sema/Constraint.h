@@ -213,6 +213,12 @@ enum class ConstraintKind : char {
   /// one type - type variable representing type of a node, other side is
   /// the AST node to infer the type for.
   ClosureBodyElement,
+  /// Do not add new uses of this, it only exists to retain compatibility for
+  /// rdar://85263844.
+  ///
+  /// Binds the RHS type to a tuple of the params of a function typed LHS. Note
+  /// this discards function parameter flags.
+  BindTupleOfFunctionParams
 };
 
 /// Classification of the different kinds of constraints.
@@ -685,6 +691,7 @@ public:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::Defaultable:
+    case ConstraintKind::BindTupleOfFunctionParams:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Disjunction:

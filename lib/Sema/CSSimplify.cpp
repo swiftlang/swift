@@ -1700,6 +1700,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::BindTupleOfFunctionParams:
     llvm_unreachable("Not a conversion");
   }
 
@@ -1839,6 +1840,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::BindTupleOfFunctionParams:
     return true;
   }
 
@@ -2250,6 +2252,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::BindTupleOfFunctionParams:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -5337,6 +5340,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PropertyWrapper:
     case ConstraintKind::ClosureBodyElement:
+    case ConstraintKind::BindTupleOfFunctionParams:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -6308,6 +6312,19 @@ ConstraintSystem::simplifyConstructionConstraint(
                              fnLocator, 
                              ConstraintLocator::ConstructorMember));
 
+  // HACK: Bind the function's parameter list as a tuple to a type variable.
+  // This only exists to preserve compatibility with rdar://85263844, as it can
+  // affect the prioritization of bindings, which can affect behavior for tuple
+  // matching as tuple subtyping is currently a *weaker* constraint than tuple
+  // conversion.
+  if (!getASTContext().isSwiftVersionAtLeast(6)) {
+    auto paramTypeVar = createTypeVariable(
+        getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
+        TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape);
+    addConstraint(ConstraintKind::BindTupleOfFunctionParams, memberType,
+                  paramTypeVar, locator);
+  }
+
   addConstraint(ConstraintKind::ApplicableFunction, fnType, memberType,
                 fnLocator);
 
@@ -7128,6 +7145,59 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
 
   // Equate it to the other type in the constraint.
   addConstraint(ConstraintKind::Bind, objectTy, second, locator);
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyBindTupleOfFunctionParamsConstraint(
+    Type first, Type second, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto simplified = simplifyType(first);
+  auto simplifiedCopy = simplified;
+
+  unsigned unwrapCount = 0;
+  if (shouldAttemptFixes()) {
+    while (auto objectTy = simplified->getOptionalObjectType()) {
+      simplified = objectTy;
+
+      // Track how many times we do this so that we can record a fix for each.
+      ++unwrapCount;
+    }
+
+    if (simplified->isPlaceholder()) {
+      if (auto *typeVar = second->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+      return SolutionKind::Solved;
+    }
+  }
+
+  if (simplified->isTypeVariableOrMember()) {
+    if (!flags.contains(TMF_GenerateConstraints))
+      return SolutionKind::Unsolved;
+
+    addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::BindTupleOfFunctionParams,
+                           simplified, second, getConstraintLocator(locator)));
+    return SolutionKind::Solved;
+  }
+
+  auto *funcTy = simplified->getAs<FunctionType>();
+  if (!funcTy)
+    return SolutionKind::Error;
+
+  auto tupleTy =
+      AnyFunctionType::composeTuple(getASTContext(), funcTy->getParams(),
+                                    /*wantParamFlags*/ false);
+
+  addConstraint(ConstraintKind::Bind, tupleTy, second,
+                locator.withPathElement(ConstraintLocator::FunctionArgument));
+
+  if (unwrapCount > 0) {
+    auto *fix = ForceOptional::create(*this, simplifiedCopy, second,
+                                      getConstraintLocator(locator));
+    if (recordFix(fix, /*impact=*/unwrapCount))
+      return SolutionKind::Error;
+  }
   return SolutionKind::Solved;
 }
 
@@ -12046,6 +12116,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyUnresolvedMemberChainBaseConstraint(first, second, subflags,
                                                        locator);
 
+  case ConstraintKind::BindTupleOfFunctionParams:
+    return simplifyBindTupleOfFunctionParamsConstraint(first, second, subflags,
+                                                       locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -12588,6 +12662,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyClosureBodyElementConstraint(
         constraint.getClosureElement(), constraint.getElementContext(),
         /*flags=*/None, constraint.getLocator());
+
+  case ConstraintKind::BindTupleOfFunctionParams:
+    return simplifyBindTupleOfFunctionParamsConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), /*flags*/ None,
+        constraint.getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
