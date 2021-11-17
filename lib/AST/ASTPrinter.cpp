@@ -5397,6 +5397,10 @@ public:
     }
   }
 
+  void visitSequenceArchetypeType(SequenceArchetypeType *T) {
+    printArchetypeCommon(T, T->getInterfaceType()->getDecl());
+  }
+
   void visitGenericTypeParamType(GenericTypeParamType *T) {
     if (T->getDecl() == nullptr) {
       // If we have an alternate name for this type, use it.
