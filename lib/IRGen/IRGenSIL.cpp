@@ -6788,9 +6788,15 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
 // bind_memory and rebind_memory are no-ops because Swift TBAA info is not
 // lowered to LLVM IR TBAA, and the output token is ignored except for
 // verification.
-void IRGenSILFunction::visitBindMemoryInst(swift::BindMemoryInst *) {}
+void IRGenSILFunction::visitBindMemoryInst(swift::BindMemoryInst *i) {
+  LoweredValue &token = getUndefLoweredValue(i->getType());
+  setLoweredValue(i, std::move(token));
+}
 
-void IRGenSILFunction::visitRebindMemoryInst(swift::RebindMemoryInst *) {}
+void IRGenSILFunction::visitRebindMemoryInst(swift::RebindMemoryInst *i) {
+  LoweredValue &token = getUndefLoweredValue(i->getType());
+  setLoweredValue(i, std::move(token));
+}
 
 void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   SILType addrTy = i->getOperand()->getType();
