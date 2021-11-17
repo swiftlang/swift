@@ -4,12 +4,20 @@ SYNTAX_BUILDABLE_EXPRESSIBLE_AS_CONFORMANCES = {
         'MemberDeclListItem',
         'SyntaxBuildable'
     ],
-    'StmtBuildable': [
-        'CodeBlockItem',
-        'SyntaxBuildable'
-    ],
     'ExprList': [
         'ConditionElement',
+        'SyntaxBuildable'
+    ],
+    'IdentifierPattern': [
+        'PatternBuildable'
+    ],
+    'SimpleTypeIdentifier': [
+        'TypeAnnotation',
+        'TypeBuildable',
+        'TypeExpr'
+    ],
+    'StmtBuildable': [
+        'CodeBlockItem',
         'SyntaxBuildable'
     ]
 }
