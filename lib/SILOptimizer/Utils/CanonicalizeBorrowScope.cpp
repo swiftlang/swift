@@ -35,6 +35,9 @@
 
 using namespace swift;
 
+STATISTIC(NumOuterCopies, "number of copy_value instructions added for a "
+                          "borrow scope");
+
 //===----------------------------------------------------------------------===//
 //                           MARK: Local utilities
 //===----------------------------------------------------------------------===//
@@ -591,6 +594,7 @@ protected:
     scope.recordOuterCopy(copy);
 
     ++NumCopiesGenerated;
+    ++NumOuterCopies;
     LLVM_DEBUG(llvm::dbgs() << "  Outer copy " << *copy);
 
     return copy;
