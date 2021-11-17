@@ -6027,6 +6027,27 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
+/// Determine whether this conformance is implied by another conformance
+/// to a protocol that predated concurrency.
+static bool isImpliedByConformancePredatingConcurrency(
+    NormalProtocolConformance *conformance) {
+  if (conformance->getSourceKind() != ConformanceEntryKind::Implied)
+    return false;
+
+  auto implied = conformance->getImplyingConformance();
+  if (!implied)
+    return false;
+
+  auto impliedProto = implied->getProtocol();
+  if (impliedProto->predatesConcurrency() ||
+      impliedProto->isSpecificProtocol(KnownProtocolKind::Error) ||
+      impliedProto->isSpecificProtocol(KnownProtocolKind::CodingKey))
+    return true;
+
+  // Recurse to look further.
+  return isImpliedByConformancePredatingConcurrency(implied);
+}
+
 void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto *const dc = idc->getAsGenericContext();
   auto *sf = dc->getParentSourceFile();
@@ -6052,8 +6073,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   ProtocolConformance *SendableConformance = nullptr;
   bool sendableConformanceIsUnchecked = false;
-  ProtocolConformance *errorConformance = nullptr;
-  ProtocolConformance *codingKeyConformance = nullptr;
+  bool sendableConformancePredatesConcurrency = false;
   bool anyInvalid = false;
   for (auto conformance : conformances) {
     // Check and record normal conformances.
@@ -6086,6 +6106,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       if (auto normal = conformance->getRootNormalConformance()) {
         if (normal->isUnchecked())
           sendableConformanceIsUnchecked = true;
+        else if (isImpliedByConformancePredatingConcurrency(normal))
+          sendableConformancePredatesConcurrency = true;
       }
     } else if (proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
@@ -6115,17 +6137,13 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     } else if (proto->isSpecificProtocol(
                    KnownProtocolKind::UnsafeSendable)) {
       sendableConformanceIsUnchecked = true;
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
-      errorConformance = conformance;
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
-      codingKeyConformance = conformance;
     }
   }
 
   // Check constraints of Sendable.
   if (SendableConformance && !sendableConformanceIsUnchecked) {
     SendableCheck check = SendableCheck::Explicit;
-    if (errorConformance || codingKeyConformance)
+    if (sendableConformancePredatesConcurrency)
       check = SendableCheck::ImpliedByStandardProtocol;
     else if (SendableConformance->getSourceKind() ==
                  ConformanceEntryKind::Synthesized)

@@ -75,3 +75,23 @@ func testCallsWithAsync() async {
   c.f() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 }
+
+// ---------------------------------------------------------------------------
+// Protocols that inherit Sendable and predate concurrency.
+// ---------------------------------------------------------------------------
+@_predatesConcurrency protocol P: Sendable { }
+protocol Q: P { }
+
+class NS { } // expected-note{{class 'NS' does not conform to the 'Sendable' protocol}}
+
+struct S1: P {
+  var ns: NS
+}
+
+struct S2: Q {
+  var ns: NS
+}
+
+struct S3: Q, Sendable {
+  var ns: NS // expected-error{{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-sendable type 'NS'}}
+}
