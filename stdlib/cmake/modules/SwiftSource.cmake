@@ -502,6 +502,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-disable-autolinking-runtime-compatibility-concurrency")
   endif()
 
+  if(NOT SWIFT_STDLIB_SHORT_MANGLING_LOOKUPS)
+    list(APPEND swift_flags "-Xfrontend" "-disable-standard-substitutions-in-reflection-mangling")
+  endif()
+
   if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-warn-swift3-objc-inference-complete")
   endif()
@@ -513,6 +517,8 @@ function(_compile_swift_files
   if(SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK)
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
+
+  list(APPEND swift_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
 

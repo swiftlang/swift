@@ -87,6 +87,23 @@ func test_unsafeThrowingContinuations() async throws {
   // TODO: Potentially could offer some warnings if we know that a continuation was resumed or escaped at all in a closure?
 }
 
+// ==== Sendability ------------------------------------------------------------
+class NotSendable { }
+// expected-note@-1{{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+
+@available(SwiftStdlib 5.1, *)
+func test_nonsendableContinuation() async throws {
+  let _: NotSendable = try await withUnsafeThrowingContinuation { continuation in
+    continuation.resume(returning: NotSendable())
+  }
+
+  let _: NotSendable = try await withUnsafeThrowingContinuation { continuation in
+    Task {
+      continuation.resume(returning: NotSendable()) // expected-warning{{cannot use parameter 'continuation' with a non-sendable type 'UnsafeContinuation<NotSendable, Error>' from concurrently-executed code}}
+    }
+  }
+}
+
 // ==== Detached Tasks ---------------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)

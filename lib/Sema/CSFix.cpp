@@ -1128,8 +1128,8 @@ RemoveReturn *RemoveReturn::create(ConstraintSystem &cs, Type resultTy,
 
 bool CollectionElementContextualMismatch::diagnose(const Solution &solution,
                                                    bool asNote) const {
-  CollectionElementContextualFailure failure(solution, getFromType(),
-                                             getToType(), getLocator());
+  CollectionElementContextualFailure failure(
+      solution, getElements(), getFromType(), getToType(), getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -1137,8 +1137,31 @@ CollectionElementContextualMismatch *
 CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
                                             Type dstType,
                                             ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      CollectionElementContextualMismatch(cs, srcType, dstType, locator);
+  // It's common for a single literal element to represent types of other
+  // literal elements of the same kind, let's check whether that is the case
+  // here and record all of the affected positions.
+
+  SmallVector<Expr *, 4> affected;
+  {
+    if (auto *elementLoc = getAsExpr(simplifyLocatorToAnchor(locator))) {
+      auto *typeVar = cs.getType(elementLoc)->getAs<TypeVariableType>();
+      if (typeVar && typeVar->getImpl().getAtomicLiteralKind()) {
+        const auto *node =
+            cs.getRepresentative(typeVar)->getImpl().getGraphNode();
+        for (auto *typeVar : node->getEquivalenceClass()) {
+          auto *locator = typeVar->getImpl().getLocator();
+          if (auto *eltLoc = getAsExpr(simplifyLocatorToAnchor(locator)))
+            affected.push_back(eltLoc);
+        }
+      }
+    }
+  }
+
+  unsigned size = totalSizeToAlloc<Expr *>(affected.size());
+  void *mem = cs.getAllocator().Allocate(
+      size, alignof(CollectionElementContextualMismatch));
+  return new (mem) CollectionElementContextualMismatch(cs, affected, srcType,
+                                                       dstType, locator);
 }
 
 bool DefaultGenericArgument::coalesceAndDiagnose(

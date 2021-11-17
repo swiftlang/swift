@@ -13,6 +13,7 @@
 #ifndef SWIFT_STDLIB_SHIMS_UNICODEDATA_H
 #define SWIFT_STDLIB_SHIMS_UNICODEDATA_H
 
+#include "SwiftStdbool.h"
 #include "SwiftStdint.h"
 #include "Visibility.h"
 
@@ -42,6 +43,9 @@ __swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar);
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar);
 
 #ifdef __cplusplus
 } // extern "C"

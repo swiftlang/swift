@@ -328,6 +328,26 @@ bool isDispatchQueueOperationName(StringRef name);
 /// \returns true if an error occurred.
 bool checkSendableConformance(
     ProtocolConformance *conformance, SendableCheck check);
+
+/// Check whether we are in an actor's initializer or deinitializer.
+/// \returns nullptr iff we are not in such a declaration. Otherwise,
+///          returns a pointer to the declaration.
+AbstractFunctionDecl const *isActorInitOrDeInitContext(
+    const DeclContext *dc,
+    llvm::function_ref<bool(const AbstractClosureExpr *)> isSendable);
+
+/// Find the directly-referenced parameter or capture of a parameter for
+/// for the given expression.
+VarDecl *getReferencedParamOrCapture(
+    Expr *expr,
+    llvm::function_ref<Expr *(OpaqueValueExpr *)> getExistentialValue);
+
+/// Check whether given variable references to a potentially
+/// isolated actor.
+bool isPotentiallyIsolatedActor(
+    VarDecl *var, llvm::function_ref<bool(ParamDecl *)> isIsolated =
+                      [](ParamDecl *P) { return P->isIsolated(); });
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */

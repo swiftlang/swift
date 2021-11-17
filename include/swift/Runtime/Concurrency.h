@@ -670,8 +670,11 @@ void swift_task_enqueue(Job *job, ExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobal(Job *job);
 
+/// A count in nanoseconds.
+using JobDelay = unsigned long long;
+
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDelay(unsigned long long delay, Job *job);
+void swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job);
 
 /// Enqueue the given job on the main executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

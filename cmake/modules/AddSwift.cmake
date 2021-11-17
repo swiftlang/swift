@@ -798,6 +798,7 @@ function(add_libswift name)
   # Create a static libswift library containing all module object files.
   add_library(${name} STATIC ${all_obj_files})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+  set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
 endfunction()
 
 macro(add_swift_tool_subdirectory name)

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/SILOptions.h"
 #include "swift/Frontend/Frontend.h"
 
 #include "ArgsToFrontendOptionsConverter.h"
@@ -1430,12 +1431,22 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
-  Opts.EnableExperimentalLexicalLifetimes |=
-      Args.hasArg(OPT_enable_experimental_lexical_lifetimes);
   // If experimental move only is enabled, always enable lexical lifetime as
   // well. Move only depends on lexical lifetimes.
-  Opts.EnableExperimentalLexicalLifetimes |=
+  bool enableExperimentalLexicalLifetimes =
+      Args.hasArg(OPT_enable_experimental_lexical_lifetimes) ||
       Args.hasArg(OPT_enable_experimental_move_only);
+  // Error if both experimental lexical lifetimes and disable lexical lifetimes
+  // are both set.
+  if (enableExperimentalLexicalLifetimes &&
+      Args.hasArg(OPT_disable_lexical_lifetimes)) {
+    return true;
+  } else {
+    if (enableExperimentalLexicalLifetimes)
+      Opts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+    if (Args.hasArg(OPT_disable_lexical_lifetimes))
+      Opts.LexicalLifetimes = LexicalLifetimesOption::Off;
+  }
 
   Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
   Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
@@ -1760,6 +1771,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_concrete_type_metadata_mangled_name_accessors))
     Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
 
+  if (Args.hasArg(OPT_disable_standard_substitutions_in_reflection_mangling))
+    Opts.DisableStandardSubstitutionsInReflectionMangling = true;
+
   if (Args.hasArg(OPT_use_jit)) {
     Opts.UseJIT = true;
     if (const Arg *A = Args.getLastArg(OPT_dump_jit)) {
@@ -1995,32 +2009,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_llvm_vfe)) {
     Opts.VirtualFunctionElimination = true;
-
-    // FIXME(mracek): There are still some situations where we use mangled name
-    // without symbolic references, which means the dependency is not statically
-    // visible to the compiler/linker. Temporarily disable mangled accessors
-    // until we fix that.
-    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_enable_llvm_wme)) {
     Opts.WitnessMethodElimination = true;
-
-    // FIXME(mracek): There are still some situations where we use mangled name
-    // without symbolic references, which means the dependency is not statically
-    // visible to the compiler/linker. Temporarily disable mangled accessors
-    // until we fix that.
-    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_conditional_runtime_records)) {
     Opts.ConditionalRuntimeRecords = true;
-
-    // FIXME(mracek): There are still some situations where we use mangled name
-    // without symbolic references, which means the dependency is not statically
-    // visible to the compiler/linker. Temporarily disable mangled accessors
-    // until we fix that.
-    Opts.DisableConcreteTypeMetadataMangledNameAccessors = true;
   }
 
   if (Args.hasArg(OPT_internalize_at_link)) {

@@ -1761,15 +1761,18 @@ public:
 /// let _: [Int] = ["hello"]
 /// ```
 class CollectionElementContextualFailure final : public ContextualFailure {
+  SmallVector<Expr *, 4> AffectedElements;
+
 public:
-  CollectionElementContextualFailure(const Solution &solution, Type eltType,
-                                     Type contextualType,
+  CollectionElementContextualFailure(const Solution &solution,
+                                     ArrayRef<Expr *> affectedElements,
+                                     Type eltType, Type contextualType,
                                      ConstraintLocator *locator)
-      : ContextualFailure(solution, eltType, contextualType, locator) {}
+      : ContextualFailure(solution, eltType, contextualType, locator) {
+    AffectedElements.append(affectedElements.begin(), affectedElements.end());
+  }
 
   bool diagnoseAsError() override;
-
-  bool diagnoseMergedLiteralElements();
 };
 
 class MissingContextualConformanceFailure final : public ContextualFailure {

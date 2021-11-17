@@ -25,8 +25,6 @@
 #include <string.h>
 #if defined(_WIN32)
 #include <io.h>
-#else
-#include <unistd.h>
 #endif
 #include <stdarg.h>
 
@@ -312,7 +310,8 @@ reportNow(uint32_t flags, const char *message)
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
 #else
-  write(STDERR_FILENO, message, strlen(message));
+  fputs(message, stderr);
+  fflush(stderr);
 #endif
 #if SWIFT_STDLIB_HAS_ASL
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);

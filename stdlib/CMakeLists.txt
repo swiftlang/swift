@@ -75,6 +75,12 @@ endif()
 # NOTE: Some of these variables are also initialized in StandaloneOverlay.cmake
 # so that interfaces are emitted when overlays are separately built.
 
+set(SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS "" CACHE STRING
+    "Extra flags to pass when compiling swift stdlib files")
+
+set(SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS "" CACHE STRING
+    "Extra flags to pass when compiling C/C++ stdlib files")
+
 option(SWIFT_STDLIB_STABLE_ABI
        "Should stdlib be built with stable ABI (library evolution, resilience)."
        "${SWIFT_STDLIB_STABLE_ABI_default}")

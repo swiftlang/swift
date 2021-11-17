@@ -34,7 +34,7 @@ public struct UnownedJob: Sendable {
 
 @available(SwiftStdlib 5.1, *)
 @frozen
-public struct UnsafeContinuation<T, E: Error>: Sendable {
+public struct UnsafeContinuation<T, E: Error> {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
   @_alwaysEmitIntoClient
@@ -105,6 +105,9 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
 #endif
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension UnsafeContinuation: Sendable where T: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 extension UnsafeContinuation {

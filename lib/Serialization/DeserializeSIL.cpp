@@ -2130,6 +2130,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getSILType(Ty, (SILValueCategory)TyCategory, Fn));
     break;
   }
+  case SILInstructionKind::RebindMemoryInst: {
+    assert(RecordKind == SIL_TWO_OPERANDS && "Layout should be TwoOperands.");
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    ResultInst = Builder.createRebindMemory(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        getLocalValue(ValID2,
+                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+    break;
+  }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::StructExtractInst: {
     // Use SILOneValueOneOperandLayout.

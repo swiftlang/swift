@@ -3985,12 +3985,40 @@ bind_memory
 
   sil-instruction ::= 'bind_memory' sil-operand ',' sil-operand 'to' sil-type
 
-  bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T
+  %token = bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T
   // %0 must be of $Builtin.RawPointer type
   // %1 must be of $Builtin.Word type
+  // %token is an opaque $Builtin.Word representing the previously bound types
+  // for this memory region.
 
 Binds memory at ``Builtin.RawPointer`` value ``%0`` to type ``$T`` with enough
 capacity to hold ``%1`` values. See SE-0107: UnsafeRawPointer.
+
+Produces a opaque token representing the previous memory state. For
+memory binding semantics, this state includes the type that the memory
+was previously bound to. The token cannot, however, be used to
+retrieve a metatype. It's value is only meaningful to the Swift
+runtime for typed pointer verification.
+
+rebind_memory
+`````````````
+
+::
+
+  sil-instruction ::= 'rebind_memory' sil-operand ' 'to' sil-value
+
+  %out_token = rebind_memory %0 : $Builtin.RawPointer to %in_token
+  // %0 must be of $Builtin.RawPointer type
+  // %in_token represents a cached set of bound types from a prior memory state.
+  // %out_token is an opaque $Builtin.Word representing the previously bound
+  // types for this memory region.
+
+This instruction's semantics are identical to ``bind_memory``, except
+that the types to which memory will be bound, and the extent of the
+memory region is unknown at compile time. Instead, the bound-types are
+represented by a token that was produced by a prior memory binding
+operation. ``%in_token`` must be the result of bind_memory or
+rebind_memory.
 
 begin_access
 ````````````

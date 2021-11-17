@@ -1987,34 +1987,81 @@ OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   return type->castTo<OpenedArchetypeType>();
 }
 
-KeyPathExpr::KeyPathExpr(ASTContext &C, SourceLoc keywordLoc,
-                         SourceLoc lParenLoc, ArrayRef<Component> components,
-                         SourceLoc rParenLoc, bool isImplicit)
-    : Expr(ExprKind::KeyPath, isImplicit), StartLoc(keywordLoc),
-      LParenLoc(lParenLoc), EndLoc(rParenLoc),
-      Components(C.AllocateUninitialized<Component>(components.size())) {
-  // Copy components into the AST context.
-  std::uninitialized_copy(components.begin(), components.end(),
-                          Components.begin());
+KeyPathExpr::KeyPathExpr(SourceLoc startLoc, Expr *parsedRoot,
+                         Expr *parsedPath, SourceLoc endLoc, bool hasLeadingDot,
+                         bool isObjC, bool isImplicit)
+    : Expr(ExprKind::KeyPath, isImplicit), StartLoc(startLoc), EndLoc(endLoc),
+      ParsedRoot(parsedRoot), ParsedPath(parsedPath),
+      HasLeadingDot(hasLeadingDot) {
+  assert(!(isObjC && (parsedRoot || parsedPath)) &&
+         "Obj-C key paths should only have components");
+  Bits.KeyPathExpr.IsObjC = isObjC;
+}
 
-  Bits.KeyPathExpr.IsObjC = true;
+KeyPathExpr::KeyPathExpr(SourceLoc backslashLoc, Expr *parsedRoot,
+                         Expr *parsedPath, bool hasLeadingDot, bool isImplicit)
+    : KeyPathExpr(backslashLoc, parsedRoot, parsedPath,
+                  parsedPath ? parsedPath->getEndLoc()
+                             : parsedRoot->getEndLoc(),
+                  hasLeadingDot, /*isObjC*/ false, isImplicit) {
+  assert((parsedRoot || parsedPath) &&
+         "Key path must have either root or path");
+}
+
+KeyPathExpr::KeyPathExpr(ASTContext &ctx, SourceLoc startLoc,
+                         ArrayRef<Component> components, SourceLoc endLoc,
+                         bool isObjC, bool isImplicit)
+    : KeyPathExpr(startLoc, /*parsedRoot*/ nullptr, /*parsedPath*/ nullptr,
+                  endLoc, /*hasLeadingDot*/ false, isObjC, isImplicit) {
+  assert(!components.empty());
+  Components = ctx.AllocateCopy(components);
+}
+
+KeyPathExpr *KeyPathExpr::createParsedPoundKeyPath(
+    ASTContext &ctx, SourceLoc keywordLoc, SourceLoc lParenLoc,
+    ArrayRef<Component> components, SourceLoc rParenLoc) {
+  return new (ctx) KeyPathExpr(ctx, keywordLoc, components, rParenLoc,
+                               /*isObjC*/ true, /*isImplicit*/ false);
+}
+
+KeyPathExpr *KeyPathExpr::createParsed(ASTContext &ctx, SourceLoc backslashLoc,
+                                       Expr *parsedRoot, Expr *parsedPath,
+                                       bool hasLeadingDot) {
+  return new (ctx) KeyPathExpr(backslashLoc, parsedRoot, parsedPath,
+                               hasLeadingDot, /*isImplicit*/ false);
+}
+
+KeyPathExpr *KeyPathExpr::createImplicit(ASTContext &ctx,
+                                         SourceLoc backslashLoc,
+                                         ArrayRef<Component> components,
+                                         SourceLoc endLoc) {
+  return new (ctx) KeyPathExpr(ctx, backslashLoc, components, endLoc,
+                               /*isObjC*/ false, /*isImplicit*/ true);
+}
+
+KeyPathExpr *KeyPathExpr::createImplicit(ASTContext &ctx,
+                                         SourceLoc backslashLoc,
+                                         Expr *parsedRoot, Expr *parsedPath,
+                                         bool hasLeadingDot) {
+  return new (ctx) KeyPathExpr(backslashLoc, parsedRoot, parsedPath,
+                               hasLeadingDot, /*isImplicit*/ true);
 }
 
 void
-KeyPathExpr::resolveComponents(ASTContext &C,
-                          ArrayRef<KeyPathExpr::Component> resolvedComponents) {
+KeyPathExpr::setComponents(ASTContext &C,
+                           ArrayRef<KeyPathExpr::Component> newComponents) {
   // Reallocate the components array if it needs to be.
-  if (Components.size() < resolvedComponents.size()) {
-    Components = C.Allocate<Component>(resolvedComponents.size());
+  if (Components.size() < newComponents.size()) {
+    Components = C.Allocate<Component>(newComponents.size());
     for (unsigned i : indices(Components)) {
       ::new ((void*)&Components[i]) Component{};
     }
   }
   
-  for (unsigned i : indices(resolvedComponents)) {
-    Components[i] = resolvedComponents[i];
+  for (unsigned i : indices(newComponents)) {
+    Components[i] = newComponents[i];
   }
-  Components = Components.slice(0, resolvedComponents.size());
+  Components = Components.slice(0, newComponents.size());
 }
 
 Optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {

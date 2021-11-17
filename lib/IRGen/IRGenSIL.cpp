@@ -1265,6 +1265,7 @@ public:
   void visitDestroyAddrInst(DestroyAddrInst *i);
 
   void visitBindMemoryInst(BindMemoryInst *i);
+  void visitRebindMemoryInst(RebindMemoryInst *i);
 
   void visitCondFailInst(CondFailInst *i);
   
@@ -6786,9 +6787,12 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   }
 }
 
-// This is a no-op because we do not lower Swift TBAA info to LLVM IR, and it
-// does not produce any values.
+// bind_memory and rebind_memory are no-ops because Swift TBAA info is not
+// lowered to LLVM IR TBAA, and the output token is ignored except for
+// verification.
 void IRGenSILFunction::visitBindMemoryInst(swift::BindMemoryInst *) {}
+
+void IRGenSILFunction::visitRebindMemoryInst(swift::RebindMemoryInst *) {}
 
 void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   SILType addrTy = i->getOperand()->getType();

@@ -578,10 +578,9 @@ void SILInlineCloner::postFixUp(SILFunction *calleeFunction) {
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
                                                  FullApplySite AI) {
-  auto enableLexicalLifetimes = Apply.getFunction()
-                                    ->getModule()
-                                    .getASTContext()
-                                    .SILOpts.EnableExperimentalLexicalLifetimes;
+  auto &mod = Apply.getFunction()->getModule();
+  auto enableLexicalLifetimes =
+      mod.getASTContext().SILOpts.supportsLexicalLifetimes(mod);
   auto argOwnershipRequiresBorrow = [&]() {
     auto kind = callArg.getOwnershipKind();
     if (enableLexicalLifetimes) {
@@ -774,6 +773,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::BindMemoryInst:
+  case SILInstructionKind::RebindMemoryInst:
   case SILInstructionKind::MoveValueInst:
     return InlineCost::Free;
 

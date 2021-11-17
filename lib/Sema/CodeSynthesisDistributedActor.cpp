@@ -179,7 +179,7 @@ static AbstractFunctionDecl *addImplicitDistributedActorRemoteFunction(
       new (C) NonisolatedAttr(/*IsImplicit=*/true));
 
   // users should never have to access this function directly;
-  // it is only invoked from our distributed function thunk if the actor is remote.
+  // it is only invoked from our distributed instance method thunk if the actor is remote.
   remoteFuncDecl->setUserAccessible(false);
   remoteFuncDecl->setSynthesized();
 

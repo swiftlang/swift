@@ -32,7 +32,6 @@
 #include <errno.h>
 #endif
 #include <sys/resource.h>
-#include <unistd.h>
 #endif
 #include <climits>
 #include <clocale>
