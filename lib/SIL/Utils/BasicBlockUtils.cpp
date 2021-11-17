@@ -404,6 +404,16 @@ void DeadEndBlocks::updateForReachableBlock(SILBasicBlock *reachableBB) {
   propagateNewlyReachableBlocks(numReachable);
 }
 
+void DeadEndBlocks::updateForNewBlock(SILBasicBlock *newBB) {
+  if (!didComputeValue)
+    return;
+
+  assert(reachableBlocks.count(newBB) == 0);
+  unsigned numReachable = reachableBlocks.size();
+  reachableBlocks.insert(newBB);
+  propagateNewlyReachableBlocks(numReachable);
+}
+
 bool DeadEndBlocks::triviallyEndsInUnreachable(SILBasicBlock *block) {
   // Handle the case where a single "unreachable" block (e.g. containing a call
   // to fatalError()), is jumped to from multiple source blocks.
