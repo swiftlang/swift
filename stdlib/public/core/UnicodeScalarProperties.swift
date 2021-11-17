@@ -748,69 +748,68 @@ extension Unicode.Scalar.Properties {
 
 /// Case mapping properties.
 extension Unicode.Scalar.Properties {
-  // The type of ICU case conversion functions.
-  internal typealias _U_StrToX = (
-    /* dest */ UnsafeMutablePointer<__swift_stdlib_UChar>,
-    /* destCapacity */ Int32,
-    /* src */ UnsafePointer<__swift_stdlib_UChar>,
-    /* srcLength */ Int32,
-    /* locale */ UnsafePointer<Int8>,
-    /* pErrorCode */ UnsafeMutablePointer<__swift_stdlib_UErrorCode>
-  ) -> Int32
+  fileprivate enum _CaseMapping: UInt8 {
+    case uppercase
+    case lowercase
+    case titlecase
+  }
 
-  /// Applies the given ICU string mapping to the scalar.
-  ///
-  /// This function attempts first to write the mapping into a stack-based
-  /// UTF-16 buffer capable of holding 16 code units, which should be enough for
-  /// all current case mappings. In the event more space is needed, it will be
-  /// allocated on the heap.
-  internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
-    // Allocate 16 code units on the stack.
-    var fixedArray = _FixedArray16<UInt16>(allZeros: ())
-    let count: Int = fixedArray.withUnsafeMutableBufferPointer { buf in
-      return _scalar.withUTF16CodeUnits { utf16 in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        let correctSize = u_strTo(
-          buf.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(buf.count),
-          utf16.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(utf16.count),
-          "",
-          &err)
-        guard err.isSuccess else {
-          fatalError("Unexpected error case-converting Unicode scalar.")
+  fileprivate func _getMapping(_ mapping: _CaseMapping) -> String {
+    // First, check if our scalar has a special mapping where it's mapped to
+    // more than 1 scalar.
+    let specialMappingPtr = _swift_stdlib_getSpecialMapping(_scalar.value)
+
+    if let specialMapping = specialMappingPtr {
+      func readSpecialMapping(_ ptr: UnsafePointer<UInt32>) -> String {
+        let count = Int(ptr.pointee)
+
+        if count == 0 {
+          return "\(_scalar)"
         }
-        return Int(correctSize)
-      }
-    }
-    if _fastPath(count <= 16) {
-      fixedArray.count = count
-      return fixedArray.withUnsafeBufferPointer {
-        String._uncheckedFromUTF16($0)
-      }
-    }
-    // Allocate `count` code units on the heap.
-    let array = Array<UInt16>(unsafeUninitializedCapacity: count) {
-      buf, initializedCount in
-      _scalar.withUTF16CodeUnits { utf16 in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        let correctSize = u_strTo(
-          buf.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(buf.count),
-          utf16.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(utf16.count),
-          "",
-          &err)
-        guard err.isSuccess else {
-          fatalError("Unexpected error case-converting Unicode scalar.")
+
+        var result = ""
+
+        for i in 0 ..< count {
+          result += "\(Unicode.Scalar(_unchecked: ptr[1 + i]))"
         }
-        _internalInvariant(count == correctSize, "inconsistent ICU behavior")
-        initializedCount = count
+
+        return result
+      }
+
+      switch mapping {
+      case .uppercase:
+        return readSpecialMapping(specialMapping)
+
+      case .lowercase:
+        let upperCount = Int(specialMapping.pointee)
+
+        return readSpecialMapping(specialMapping + upperCount + 1)
+
+      case .titlecase:
+        let upperCount = Int(specialMapping.pointee)
+        let lowerPtr = specialMapping + upperCount + 1
+        let lowerCount = Int(lowerPtr.pointee)
+
+        return readSpecialMapping(lowerPtr + lowerCount + 1)
       }
     }
-    return array.withUnsafeBufferPointer {
-      String._uncheckedFromUTF16($0)
+
+    // If we did not have a special mapping, check if we have a direct scalar
+    // to scalar mapping.
+    let mappingDistance = _swift_stdlib_getMapping(
+      _scalar.value,
+      mapping.rawValue
+    )
+
+    if mappingDistance != 0 {
+      let scalar = Unicode.Scalar(
+        _unchecked: UInt32(Int(_scalar.value) &+ Int(mappingDistance))
+      )
+      return "\(scalar)"
     }
+
+    // We did not have any mapping. Return the scalar as is.
+    return "\(_scalar)"
   }
 
   /// The lowercase mapping of the scalar.
@@ -824,7 +823,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Lowercase_Mapping" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var lowercaseMapping: String {
-    return _applyMapping(__swift_stdlib_u_strToLower)
+    _getMapping(.lowercase)
   }
 
   /// The titlecase mapping of the scalar.
@@ -838,9 +837,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Titlecase_Mapping" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var titlecaseMapping: String {
-    return _applyMapping { ptr, cap, src, len, locale, err in
-      return __swift_stdlib_u_strToTitle(ptr, cap, src, len, nil, locale, err)
-    }
+    _getMapping(.titlecase)
   }
 
   /// The uppercase mapping of the scalar.
@@ -854,7 +851,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Uppercase_Mapping" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var uppercaseMapping: String {
-    return _applyMapping(__swift_stdlib_u_strToUpper)
+    _getMapping(.uppercase)
   }
 }
 

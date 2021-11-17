@@ -849,41 +849,13 @@ extension String {
       }
     }
 
-    // TODO(String performance): Try out incremental case-conversion rather than
-    // make UTF-16 array beforehand
-    let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
-      (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
-      var length: Int = 0
-      let result = Array<UInt16>(unsafeUninitializedCapacity: uChars.count) {
-        buffer, initializedCount in
-        var error = __swift_stdlib_U_ZERO_ERROR
-        length = Int(truncatingIfNeeded:
-          __swift_stdlib_u_strToLower(
-            buffer.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(buffer.count),
-            uChars.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(uChars.count),
-            "",
-            &error))
-        initializedCount = min(length, uChars.count)
-      }
-      if length > uChars.count {
-        var error = __swift_stdlib_U_ZERO_ERROR
-        return Array<UInt16>(unsafeUninitializedCapacity: length) {
-          buffer, initializedCount in
-          __swift_stdlib_u_strToLower(
-            buffer.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(buffer.count),
-            uChars.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(uChars.count),
-            "",
-            &error)
-          initializedCount = length
-        }
-      }
-      return result
+    var result = ""
+
+    for scalar in unicodeScalars {
+      result += scalar.properties.lowercaseMapping
     }
-    return codeUnits.withUnsafeBufferPointer { String._uncheckedFromUTF16($0) }
+
+    return result
   }
 
   /// Returns an uppercase version of the string.
@@ -910,41 +882,13 @@ extension String {
       }
     }
 
-    // TODO(String performance): Try out incremental case-conversion rather than
-    // make UTF-16 array beforehand
-    let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
-      (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
-      var length: Int = 0
-      let result = Array<UInt16>(unsafeUninitializedCapacity: uChars.count) {
-        buffer, initializedCount in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        length = Int(truncatingIfNeeded:
-          __swift_stdlib_u_strToUpper(
-            buffer.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(buffer.count),
-            uChars.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(uChars.count),
-            "",
-            &err))
-        initializedCount = min(length, uChars.count)
-      }
-      if length > uChars.count {
-        var err = __swift_stdlib_U_ZERO_ERROR
-        return Array<UInt16>(unsafeUninitializedCapacity: length) {
-          buffer, initializedCount in
-          __swift_stdlib_u_strToUpper(
-            buffer.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(buffer.count),
-            uChars.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(uChars.count),
-            "",
-            &err)
-          initializedCount = length
-        }
-      }
-      return result
+    var result = ""
+
+    for scalar in unicodeScalars {
+      result += scalar.properties.uppercaseMapping
     }
-    return codeUnits.withUnsafeBufferPointer { String._uncheckedFromUTF16($0) }
+
+    return result
   }
 
   /// Creates an instance from the description of a given

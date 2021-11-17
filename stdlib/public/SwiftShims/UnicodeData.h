@@ -74,7 +74,14 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 double _swift_stdlib_getNumericValue(__swift_uint32_t scalar);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-const char *_swift_stdlib_getNameAlias(__swift_uint32_t);
+const char *_swift_stdlib_getNameAlias(__swift_uint32_t scalar);
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_int32_t _swift_stdlib_getMapping(__swift_uint32_t scalar,
+                                         __swift_uint8_t mapping);
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const __swift_uint32_t *_swift_stdlib_getSpecialMapping(__swift_uint32_t scalar);
 
 #ifdef __cplusplus
 } // extern "C"

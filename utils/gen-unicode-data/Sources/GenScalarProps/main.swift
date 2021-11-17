@@ -18,6 +18,7 @@ func generateScalarProps() {
   generateBinaryProps(into: &result)
   genericNumericProps(into: &result)
   generateNameAliasProp(into: &result)
+  generateMappingProps(into: &result)
   
   write(result, to: "../../stdlib/public/stubs/UnicodeScalarProps.cpp")
 }

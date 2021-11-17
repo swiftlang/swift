@@ -13,6 +13,7 @@
 #include "UnicodeScalarProps.h"
 #include "../SwiftShims/UnicodeData.h"
 #include <limits>
+#include <iostream>
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar) {
@@ -80,11 +81,11 @@ __swift_uint8_t _swift_stdlib_getNumericType(__swift_uint32_t scalar) {
 
     auto entry = _swift_stdlib_numeric_type[idx];
 
-    auto lowerBoundScalar = (entry << 21) >> 21;
+    auto lowerBoundScalar = (entry << 11) >> 11;
     auto rangeCount = (entry << 3) >> 24;
     auto upperBoundScalar = lowerBoundScalar + rangeCount;
 
-    auto numericType = (__swift_uint8_t) entry >> 29;
+    auto numericType = (__swift_uint8_t)(entry >> 29);
 
     if (scalar >= lowerBoundScalar && scalar <= upperBoundScalar) {
       return numericType;
@@ -129,4 +130,62 @@ const char *_swift_stdlib_getNameAlias(__swift_uint32_t scalar) {
   }
 
   return _swift_stdlib_nameAlias_data[dataIdx];
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_int32_t _swift_stdlib_getMapping(__swift_uint32_t scalar,
+                                         __swift_uint8_t mapping) {
+  auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
+                                                    _swift_stdlib_mappings,
+                                                  _swift_stdlib_mappings_ranks);
+
+  if (dataIdx == std::numeric_limits<__swift_intptr_t>::max()) {
+    return 0;
+  }
+
+  auto mappings = _swift_stdlib_mappings_data_indices[dataIdx];
+
+  __swift_uint8_t mappingIdx;
+
+  switch (mapping) {
+    // Uppercase
+    case 0:
+      mappingIdx = mappings & 0xFF;
+      break;
+
+    // Lowercase
+    case 1:
+      mappingIdx = (mappings & 0xFF00) >> 8;
+      break;
+
+    // Titlecase
+    case 2:
+      mappingIdx = (mappings & 0xFF0000) >> 16;
+      break;
+
+    // Unknown mapping
+    default:
+      return 0;
+  }
+
+  if (mappingIdx == 0xFF) {
+    return 0;
+  }
+
+  return _swift_stdlib_mappings_data[mappingIdx];
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const __swift_uint32_t *_swift_stdlib_getSpecialMapping(__swift_uint32_t scalar) {
+  auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
+                                                 _swift_stdlib_special_mappings,
+                                          _swift_stdlib_special_mappings_ranks);
+
+  if (dataIdx == std::numeric_limits<__swift_intptr_t>::max()) {
+    return nullptr;
+  }
+
+  auto index = _swift_stdlib_special_mappings_data_indices[dataIdx];
+
+  return _swift_stdlib_special_mappings_data + index;
 }
