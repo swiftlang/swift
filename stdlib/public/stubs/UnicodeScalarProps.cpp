@@ -13,7 +13,6 @@
 #include "UnicodeScalarProps.h"
 #include "../SwiftShims/UnicodeData.h"
 #include <limits>
-#include <iostream>
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar) {
@@ -294,4 +293,42 @@ __swift_uint16_t _swift_stdlib_getAge(__swift_uint32_t scalar) {
   // array.
   // Return the max here to indicate that we couldn't find one.
   return std::numeric_limits<__swift_uint16_t>::max();
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint8_t _swift_stdlib_getGeneralCategory(__swift_uint32_t scalar) {
+  auto lowerBoundIndex = 0;
+  auto endIndex = 3968;
+  auto upperBoundIndex = endIndex - 1;
+
+  while (upperBoundIndex >= lowerBoundIndex) {
+    auto idx = lowerBoundIndex + (upperBoundIndex - lowerBoundIndex) / 2;
+
+    auto entry = _swift_stdlib_generalCategory[idx];
+
+    auto lowerBoundScalar = (entry << 43) >> 43;
+    auto rangeCount = entry >> 32;
+    auto upperBoundScalar = lowerBoundScalar + rangeCount;
+
+    auto generalCategory = (__swift_uint8_t)((entry << 32) >> 32 >> 21);
+
+    if (scalar >= lowerBoundScalar && scalar <= upperBoundScalar) {
+      return generalCategory;
+    }
+
+    if (scalar > upperBoundScalar) {
+      lowerBoundIndex = idx + 1;
+      continue;
+    }
+
+    if (scalar < lowerBoundScalar) {
+      upperBoundIndex = idx - 1;
+      continue;
+    }
+  }
+
+  // If we made it out here, then our scalar was not found in the composition
+  // array.
+  // Return the max here to indicate that we couldn't find one.
+  return std::numeric_limits<__swift_uint8_t>::max();
 }

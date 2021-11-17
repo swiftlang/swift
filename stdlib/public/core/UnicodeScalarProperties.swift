@@ -26,11 +26,6 @@ extension Unicode.Scalar {
     internal init(_ scalar: Unicode.Scalar) {
       self._scalar = scalar
     }
-
-    // Provide the value as UChar32 to make calling the ICU APIs cleaner
-    internal var icuValue: __swift_stdlib_UChar32 {
-      return __swift_stdlib_UChar32(bitPattern: self._scalar._value)
-    }
   }
 
   /// Properties of this scalar defined by the Unicode standard.
@@ -1106,38 +1101,38 @@ extension Unicode {
     /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
     case unassigned
 
-    internal init(rawValue: __swift_stdlib_UCharCategory) {
+    internal init(rawValue: UInt8) {
       switch rawValue {
-      case __swift_stdlib_U_UNASSIGNED: self = .unassigned
-      case __swift_stdlib_U_UPPERCASE_LETTER: self = .uppercaseLetter
-      case __swift_stdlib_U_LOWERCASE_LETTER: self = .lowercaseLetter
-      case __swift_stdlib_U_TITLECASE_LETTER: self = .titlecaseLetter
-      case __swift_stdlib_U_MODIFIER_LETTER: self = .modifierLetter
-      case __swift_stdlib_U_OTHER_LETTER: self = .otherLetter
-      case __swift_stdlib_U_NON_SPACING_MARK: self = .nonspacingMark
-      case __swift_stdlib_U_ENCLOSING_MARK: self = .enclosingMark
-      case __swift_stdlib_U_COMBINING_SPACING_MARK: self = .spacingMark
-      case __swift_stdlib_U_DECIMAL_DIGIT_NUMBER: self = .decimalNumber
-      case __swift_stdlib_U_LETTER_NUMBER: self = .letterNumber
-      case __swift_stdlib_U_OTHER_NUMBER: self = .otherNumber
-      case __swift_stdlib_U_SPACE_SEPARATOR: self = .spaceSeparator
-      case __swift_stdlib_U_LINE_SEPARATOR: self = .lineSeparator
-      case __swift_stdlib_U_PARAGRAPH_SEPARATOR: self = .paragraphSeparator
-      case __swift_stdlib_U_CONTROL_CHAR: self = .control
-      case __swift_stdlib_U_FORMAT_CHAR: self = .format
-      case __swift_stdlib_U_PRIVATE_USE_CHAR: self = .privateUse
-      case __swift_stdlib_U_SURROGATE: self = .surrogate
-      case __swift_stdlib_U_DASH_PUNCTUATION: self = .dashPunctuation
-      case __swift_stdlib_U_START_PUNCTUATION: self = .openPunctuation
-      case __swift_stdlib_U_END_PUNCTUATION: self = .closePunctuation
-      case __swift_stdlib_U_CONNECTOR_PUNCTUATION: self = .connectorPunctuation
-      case __swift_stdlib_U_OTHER_PUNCTUATION: self = .otherPunctuation
-      case __swift_stdlib_U_MATH_SYMBOL: self = .mathSymbol
-      case __swift_stdlib_U_CURRENCY_SYMBOL: self = .currencySymbol
-      case __swift_stdlib_U_MODIFIER_SYMBOL: self = .modifierSymbol
-      case __swift_stdlib_U_OTHER_SYMBOL: self = .otherSymbol
-      case __swift_stdlib_U_INITIAL_PUNCTUATION: self = .initialPunctuation
-      case __swift_stdlib_U_FINAL_PUNCTUATION: self = .finalPunctuation
+      case 0: self = .uppercaseLetter
+      case 1: self = .lowercaseLetter
+      case 2: self = .titlecaseLetter
+      case 3: self = .modifierLetter
+      case 4: self = .otherLetter
+      case 5: self = .nonspacingMark
+      case 6: self = .spacingMark
+      case 7: self = .enclosingMark
+      case 8: self = .decimalNumber
+      case 9: self = .letterNumber
+      case 10: self = .otherNumber
+      case 11: self = .connectorPunctuation
+      case 12: self = .dashPunctuation
+      case 13: self = .openPunctuation
+      case 14: self = .closePunctuation
+      case 15: self = .initialPunctuation
+      case 16: self = .finalPunctuation
+      case 17: self = .otherPunctuation
+      case 18: self = .mathSymbol
+      case 19: self = .currencySymbol
+      case 20: self = .modifierSymbol
+      case 21: self = .otherSymbol
+      case 22: self = .spaceSeparator
+      case 23: self = .lineSeparator
+      case 24: self = .paragraphSeparator
+      case 25: self = .control
+      case 26: self = .format
+      case 27: self = .surrogate
+      case 28: self = .privateUse
+      case 29: self = .unassigned
       default: fatalError("Unknown general category \(rawValue)")
       }
     }
@@ -1171,10 +1166,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "General_Category" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var generalCategory: Unicode.GeneralCategory {
-    let rawValue = __swift_stdlib_UCharCategory(
-      __swift_stdlib_UCharCategory.RawValue(
-      __swift_stdlib_u_getIntPropertyValue(
-        icuValue, __swift_stdlib_UCHAR_GENERAL_CATEGORY)))
+    let rawValue = _swift_stdlib_getGeneralCategory(_scalar.value)
     return Unicode.GeneralCategory(rawValue: rawValue)
   }
 }

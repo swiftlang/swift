@@ -271,11 +271,6 @@ typedef __swift_uint16_t __swift_stdlib_UChar;
 typedef __swift_uint8_t
     __swift_stdlib_UVersionInfo[__SWIFT_STDLIB_U_MAX_VERSION_LENGTH];
 
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t
-    __swift_stdlib_u_getIntPropertyValue(__swift_stdlib_UChar32,
-                                         __swift_stdlib_UProperty);
-
 #ifdef __cplusplus
 } // extern "C"
 #endif

@@ -34,9 +34,6 @@ typedef __swift_stdlib_UProperty UProperty;
 
 #define U_MAX_VERSION_LENGTH 4
 typedef uint8_t UVersionInfo[U_MAX_VERSION_LENGTH];
-
-// Comparison and character property APIs
-int32_t u_getIntPropertyValue(UChar32, UProperty);
 }
 
 #else
@@ -56,12 +53,6 @@ int32_t u_getIntPropertyValue(UChar32, UProperty);
 #pragma clang diagnostic pop
 
 #endif
-
-__swift_int32_t
-__swift_stdlib_u_getIntPropertyValue(__swift_stdlib_UChar32 c,
-                                            __swift_stdlib_UProperty p) {
-  return u_getIntPropertyValue(c, static_cast<UProperty>(p));
-}
 
 // Force an autolink with ICU
 #if defined(__MACH__)

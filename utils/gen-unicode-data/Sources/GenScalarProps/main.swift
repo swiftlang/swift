@@ -21,6 +21,7 @@ func generateScalarProps() {
   generateMappingProps(into: &result)
   generateNameProp(into: &result)
   generateAgeProp(into: &result)
+  generateGeneralCategory(into: &result)
   
   write(result, to: "../../stdlib/public/stubs/UnicodeScalarProps.cpp")
 }
