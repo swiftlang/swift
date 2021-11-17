@@ -26,6 +26,7 @@ extension S4 where T == (outer: Int, y: Int) {
     // generate constraints for it, it continues to compile. We should fix
     // tuple subtyping for Swift 6 mode to not accept label mismatches.
     self.init(arr.map { (inner: $0, y: $0) })
+    // expected-warning@-1 {{tuple conversion from '(inner: Int, y: Int)' to '(outer: Int, y: Int)' mismatches labels}}
   }
 }
 

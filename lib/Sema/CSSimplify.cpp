@@ -1620,6 +1620,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       }
     }
 
+    auto hasLabelMismatch = false;
     for (unsigned i = 0, n = tuple1->getNumElements(); i != n; ++i) {
       const auto &elt1 = tuple1->getElement(i);
       const auto &elt2 = tuple2->getElement(i);
@@ -1641,6 +1642,11 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
           // used at some other position.
           if (elt2.hasName() && tuple1->getNamedElementId(elt2.getName()) != -1)
             return getTypeMatchFailure(locator);
+
+          // If both elements have names and they mismatch, make a note of it
+          // so we can emit a warning.
+          if (elt1.hasName() && elt2.hasName())
+            hasLabelMismatch = true;
         }
       }
 
@@ -1656,6 +1662,13 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
         return result;
     }
 
+    if (hasLabelMismatch) {
+      // If we had a label mismatch, emit a warning. This is something we
+      // shouldn't permit, as it's more permissive than what a conversion would
+      // allow. Ideally we'd turn this into an error in Swift 6 mode.
+      recordFix(AllowTupleLabelMismatch::create(
+          *this, tuple1, tuple2, getConstraintLocator(locator)));
+    }
     return getTypeMatchSuccess();
   }
 
@@ -12031,6 +12044,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::DropThrowsAttribute:
   case FixKind::DropAsyncAttribute:
   case FixKind::AllowSwiftToCPointerConversion:
+  case FixKind::AllowTupleLabelMismatch:
     llvm_unreachable("handled elsewhere");
   }
 

@@ -7867,6 +7867,12 @@ bool InvalidWeakAttributeUse::diagnoseAsError() {
   return true;
 }
 
+bool TupleLabelMismatchWarning::diagnoseAsError() {
+  emitDiagnostic(diag::tuple_label_mismatch_warning, getFromType(), getToType())
+      .highlight(getSourceRange());
+  return true;
+}
+
 bool SwiftToCPointerConversionInInvalidContext::diagnoseAsError() {
   auto argInfo = getFunctionArgApplyInfo(getLocator());
   if (!argInfo)
