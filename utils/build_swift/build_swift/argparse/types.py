@@ -139,9 +139,10 @@ class ClangVersionType(RegexType):
     """
 
     ERROR_MESSAGE = ('Invalid version value, must be '
-                     '"MAJOR.MINOR.PATCH" or "MAJOR.MINOR.PATCH.PATCH"')
+                     '"MAJOR.MINOR.PATCH", "MAJOR.MINOR.PATCH.PATCH"'
+                     ', or "MAJOR.MINOR.PATCH.PATCH.PATCH".')
 
-    VERSION_REGEX = r'^(\d+)\.(\d+)\.(\d+)(\.(\d+))?$'
+    VERSION_REGEX = r'^(\d+)\.(\d+)\.(\d+)(\.(\d+))?(\.(\d+))?$'
 
     def __init__(self):
         super(ClangVersionType, self).__init__(
