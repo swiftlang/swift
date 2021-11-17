@@ -48,7 +48,7 @@ static void enqueueGlobal(Job *job,
   // Add the job after (i.e. before in execution order) all jobs
   // with lower priority.
   for (auto i = globalQueue.begin(), e = globalQueue.end(); i != e; ++i) {
-    if (job->getPriority() <= (*i)->getPriority()) {
+    if (descendingPriorityOrder((*i)->getPriority(), job->getPriority()) <= 0) {
       globalQueue.insert(i, job);
       return;
     }
@@ -156,6 +156,19 @@ template <class Fn>
 static AsyncTask *createTask(JobPriority priority, Fn &&fn) {
   return createTaskWithContext<AsyncContext, Fn>(priority, std::move(fn))
            .first;
+}
+
+template <class Fn>
+static AsyncTask *createAndEnqueueTask(JobPriority priority,
+                                       TestActor *actor,
+                                       Fn &&fn) {
+  auto task = createTaskWithContext<AsyncContext, Fn>(priority, std::move(fn))
+           .first;
+  if (actor)
+    swift_task_enqueue(task, ExecutorRef::forDefaultActor(actor));
+  else
+    swift_task_enqueueGlobal(task);
+  return task;
 }
 
 template <class Context, class Fn>
@@ -312,7 +325,7 @@ TEST(ActorTest, actorContention) {
 
         parkTask(task, context,
           [](Context *context) SWIFT_CC(swiftasync) {
-            EXPECT_PROGRESS(3);
+            EXPECT_PROGRESS(2);
             auto executor = swift_task_getCurrentExecutor();
             EXPECT_FALSE(executor.isGeneric());
             EXPECT_EQ(ExecutorRef::forDefaultActor(context->get<1>()),
@@ -336,7 +349,7 @@ TEST(ActorTest, actorContention) {
     auto task1 = createTaskStoring(JobPriority::Background,
                                    (AsyncTask*) nullptr, actor,
       [](Context *context) SWIFT_CC(swiftasync) {
-        EXPECT_PROGRESS(2);
+        EXPECT_PROGRESS(3);
         auto executor = swift_task_getCurrentExecutor();
         EXPECT_FALSE(executor.isGeneric());
         EXPECT_EQ(ExecutorRef::forDefaultActor(context->get<1>()),
@@ -359,5 +372,117 @@ TEST(ActorTest, actorContention) {
     swift_task_enqueue(task1, ExecutorRef::forDefaultActor(actor));
 
     EXPECT_PROGRESS(0);
+  });
+}
+
+TEST(ActorTest, actorPriority) {
+  run([] {
+    auto actor = createActor();
+
+    createAndEnqueueTask(JobPriority::Background, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(4);
+      return context->ResumeParent(context);
+    });
+
+    createAndEnqueueTask(JobPriority::Utility, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(1);
+      return context->ResumeParent(context);
+    });
+
+    createAndEnqueueTask(JobPriority::Background, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(5);
+      finishTest();
+      return context->ResumeParent(context);
+    });
+
+    createAndEnqueueTask(JobPriority::Utility, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(2);
+      return context->ResumeParent(context);
+    });
+
+    createAndEnqueueTask(JobPriority::Default, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(0);
+      return context->ResumeParent(context);
+    });
+
+    createAndEnqueueTask(JobPriority::Utility, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(3);
+      return context->ResumeParent(context);
+    });
+  });
+}
+
+TEST(ActorTest, actorPriority2) {
+  run([] {
+    auto actor = createActor();
+
+    createAndEnqueueTask(JobPriority::Background, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(7);
+      return context->ResumeParent(context);
+    });
+
+    createAndEnqueueTask(JobPriority::Utility, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(1);
+
+      createAndEnqueueTask(JobPriority::Utility, actor,
+                           [=](AsyncContext *context) {
+        EXPECT_PROGRESS(5);
+        return context->ResumeParent(context);
+      });
+
+      createAndEnqueueTask(JobPriority::Default, actor,
+                           [](AsyncContext *context) {
+        EXPECT_PROGRESS(2);
+        return context->ResumeParent(context);
+      });
+
+      return context->ResumeParent(context);
+    });
+
+    createAndEnqueueTask(JobPriority::Background, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(8);
+      return context->ResumeParent(context);
+    });
+
+    createAndEnqueueTask(JobPriority::Utility, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(3);
+
+      createAndEnqueueTask(JobPriority::Background, actor,
+                           [=](AsyncContext *context) {
+        EXPECT_PROGRESS(9);
+        finishTest();
+        return context->ResumeParent(context);
+      });
+
+      createAndEnqueueTask(JobPriority::Utility, actor,
+                           [=](AsyncContext *context) {
+        EXPECT_PROGRESS(6);
+        return context->ResumeParent(context);
+      });
+
+      return context->ResumeParent(context);
+    });
+
+    createAndEnqueueTask(JobPriority::Default, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(0);
+      return context->ResumeParent(context);
+    });
+
+    createAndEnqueueTask(JobPriority::Utility, actor,
+                         [=](AsyncContext *context) {
+      EXPECT_PROGRESS(4);
+      return context->ResumeParent(context);
+    });
   });
 }
