@@ -293,6 +293,7 @@ namespace sil_block {
                      BC_AVAIL_TUPLE, // availability for weak linking
                      BCFixed<1>,  // is dynamically replacable
                      BCFixed<1>,  // exact self class
+                     BCFixed<1>,  // is distributed
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      GenericSignatureIDField,

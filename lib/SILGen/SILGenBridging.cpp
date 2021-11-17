@@ -1523,7 +1523,8 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
                                               F.isSerialized(),
                                               ProfileCounter(),
                                               IsThunk,
-                                              IsNotDynamic);
+                                              IsNotDynamic,
+                                              IsNotDistributed);
   
   auto closureRef = B.createFunctionRef(loc, closure);
   
