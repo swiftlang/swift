@@ -69,6 +69,24 @@ void swift::diagnoseDistributedFunctionInNonDistributedActorProtocol(
   }
 }
 
+
+/// Add Fix-It text for the given nominal type to adopt Codable.
+///
+/// Useful when 'Codable' is the 'SerializationRequirement' and a non-Codable
+/// function parameter or return value type is detected.
+void swift::addCodableFixIt(
+    const NominalTypeDecl *nominal, InFlightDiagnostic &diag) {
+  if (nominal->getInherited().empty()) {
+    SourceLoc fixItLoc = nominal->getBraces().Start;
+    diag.fixItInsert(fixItLoc, ": Codable");
+  } else {
+    ASTContext &ctx = nominal->getASTContext();
+    SourceLoc fixItLoc = nominal->getInherited().back().getSourceRange().End;
+    fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
+    diag.fixItInsert(fixItLoc, ", Codable");
+  }
+}
+
 // ==== ------------------------------------------------------------------------
 
 bool IsDistributedActorRequest::evaluate(
@@ -119,14 +137,35 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
     auto paramTy = func->mapTypeIntoContext(param->getInterfaceType());
     if (TypeChecker::conformsToProtocol(paramTy, encodableType, module).isInvalid() ||
         TypeChecker::conformsToProtocol(paramTy, decodableType, module).isInvalid()) {
-      if (diagnose)
-        func->diagnose(
+      if (diagnose) {
+        auto diag = func->diagnose(
             diag::distributed_actor_func_param_not_codable,
-            param->getArgumentName().str(),
-            param->getInterfaceType()
-        );
-      // TODO: suggest a fixit to add Codable to the type?
+            param->getArgumentName().str(), param->getInterfaceType(),
+            func->getDescriptiveKind(), "Codable");
+        if (auto paramNominalTy = paramTy->getAnyNominal()) {
+          addCodableFixIt(paramNominalTy, diag);
+        } // else, no nominal type to suggest the fixit for, e.g. a closure
+      }
       return true;
+    }
+
+    if (param->isInOut()) {
+      param->diagnose(
+          diag::distributed_actor_func_inout,
+          param->getName(),
+          func->getDescriptiveKind(), func->getName()
+      ).fixItRemove(SourceRange(param->getTypeSourceRangeForDiagnostics().Start,
+                                param->getTypeSourceRangeForDiagnostics().Start.getAdvancedLoc(1)));
+      // FIXME(distributed): the fixIt should be on param->getSpecifierLoc(), but that Loc is invalid for some reason?
+      return true;
+    }
+
+    if (param->isVariadic()) {
+      param->diagnose(
+          diag::distributed_actor_func_variadic,
+          param->getName(),
+          func->getDescriptiveKind(), func->getName()
+      );
     }
   }
 
@@ -135,12 +174,16 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
   if (!resultType->isVoid()) {
     if (TypeChecker::conformsToProtocol(resultType, decodableType, module).isInvalid() ||
         TypeChecker::conformsToProtocol(resultType, encodableType, module).isInvalid()) {
-      if (diagnose)
-        func->diagnose(
+      if (diagnose) {
+        auto diag = func->diagnose(
             diag::distributed_actor_func_result_not_codable,
-            func->getResultInterfaceType()
+            func->getResultInterfaceType(), func->getDescriptiveKind(),
+            "Codable" // Codable is a typealias, easier to diagnose like that
         );
-      // TODO: suggest a fixit to add Codable to the type?
+        if (auto resultNominalType = resultType->getAnyNominal()) {
+          addCodableFixIt(resultNominalType, diag);
+        }
+      }
       return true;
     }
   }

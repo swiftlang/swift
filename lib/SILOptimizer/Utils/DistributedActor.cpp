@@ -68,7 +68,6 @@ void emitActorTransportWitnessCall(
   ProtocolConformanceRef transportConfRef;
 
   // If the transport is an existential open it.
-  bool openedExistential = false;
   if (transportASTType->isAnyExistentialType()) {
     OpenedArchetypeType *opened;
     transportASTType =
@@ -76,7 +75,6 @@ void emitActorTransportWitnessCall(
     transport = B.createOpenExistentialAddr(
         loc, transport, F.getLoweredType(transportASTType),
         OpenedExistentialAccess::Immutable);
-    openedExistential = true;
   }
 
   if (transportASTType->isTypeParameter() ||
