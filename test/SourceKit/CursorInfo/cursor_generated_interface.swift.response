@@ -1,0 +1,15 @@
+import LibA.Sub
+import LibB
+import LibC
+import LibD
+import SwiftOnoneSupport
+
+open class AObjcType {
+}
+public class ASwiftType {
+
+    public func aTypes(swift: LibA.ASwiftType, objc: AObjcType, sub: ASubType)
+
+    public func others(b: LibB.BType, c: LibC.CType, d: DType)
+}
+
