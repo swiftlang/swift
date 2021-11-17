@@ -409,11 +409,15 @@ extension String {
   @inline(never) // slow-path
   private static func _fromNonContiguousUnsafeBitcastUTF8Repairing<
     C: Collection
-  >(_ input: C) -> (result: String, repairsMade: Bool) {
+  >(_ input: C) -> String {
     _internalInvariant(C.Element.self == UInt8.self)
-    return Array(input).withUnsafeBufferPointer {
-      let raw = UnsafeRawBufferPointer($0)
-      return String._fromUTF8Repairing(raw.bindMemory(to: UInt8.self))
+    return String(_uninitializedCapacity: input.count) { buffer in
+      var i = 0
+      for codeUnit in input {
+          buffer[i] = unsafeBitCast(codeUnit, to: UInt8.self)
+          i += 1
+      }
+      return input.count
     }
   }
 
@@ -469,7 +473,7 @@ extension String {
       return
     }
 
-    self = String._fromNonContiguousUnsafeBitcastUTF8Repairing(codeUnits).0
+    self = String._fromNonContiguousUnsafeBitcastUTF8Repairing(codeUnits)
   }
 
   /// Creates a new string with the specified capacity in UTF-8 code units, and
@@ -529,6 +533,7 @@ extension String {
     )
   }
 
+  @usableFromInline
   @inline(__always)
   internal init(
     _uninitializedCapacity capacity: Int,
