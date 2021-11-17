@@ -33,7 +33,12 @@
 
 using namespace swift;
 
+// STATISTIC uses the default DEBUG_TYPE.
+#define DEBUG_TYPE CanonicalizeInstruction::defaultDebugType
+STATISTIC(NumSimplified, "Number of instructions simplified");
+
 // Tracing within the implementation can also be activiated by the pass.
+#undef DEBUG_TYPE
 #define DEBUG_TYPE pass.debugType
 
 // Vtable anchor.
