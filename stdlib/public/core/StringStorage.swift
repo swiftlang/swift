@@ -457,7 +457,7 @@ extension __StringStorage {
   // The unused capacity available for appending. Note that this excludes the
   // required nul-terminator.
   //
-  // NOTE: Callers who wish to mutate this storage should enfore nul-termination
+  // NOTE: Callers who wish to mutate this storage should enforce nul-termination
   //
   // TODO: Refactoring or removing. Excluding the last byte is awkward.
   @inline(__always)
