@@ -107,13 +107,6 @@ bool swift::checkDistributedFunction(FuncDecl *func, bool diagnose) {
 
   auto module = func->getParentModule();
 
-  if (func->getEffectiveAccess() == AccessLevel::FilePrivate) {
-    func->diagnose(diag::distributed_actor_func_private,
-                   func->getDescriptiveKind(), func->getName());
-    // TODO(distributed): fixit remove the 'private' from the declaration
-    return true;
-  }
-
   // --- Check parameters for 'Codable' conformance
   for (auto param : *func->getParameters()) {
     auto paramTy = func->mapTypeIntoContext(param->getInterfaceType());
