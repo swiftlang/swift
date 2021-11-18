@@ -1372,7 +1372,7 @@ public:
       // For now, we won't try to walk the allocations in the slab, we'll just
       // provide the whole thing as one big chunk.
       size_t HeaderSize =
-          llvm::alignTo(sizeof(*Slab), llvm::Align(alignof(std::max_align_t)));
+          llvm::alignTo(sizeof(*Slab), llvm::Align(MaximumAlignment));
       AsyncTaskAllocationChunk Chunk;
 
       Chunk.Start = SlabPtr + HeaderSize;
