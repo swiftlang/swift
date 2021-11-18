@@ -131,12 +131,6 @@ public:
     ChunkKind Kind;
   };
 
-  struct AsyncTaskSlabInfo {
-    StoredPointer NextSlab;
-    StoredSize SlabSize;
-    std::vector<AsyncTaskAllocationChunk> Chunks;
-  };
-
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader), *this)
   {}
@@ -1352,45 +1346,44 @@ public:
     return llvm::None;
   }
 
-  std::pair<llvm::Optional<std::string>, AsyncTaskSlabInfo>
-  asyncTaskSlabAllocations(StoredPointer SlabPtr) {
-    using StackAllocator = StackAllocator<Runtime>;
-    auto SlabBytes = getReader().readBytes(
-        RemoteAddress(SlabPtr), sizeof(typename StackAllocator::Slab));
-    auto Slab = reinterpret_cast<const typename StackAllocator::Slab *>(
-        SlabBytes.get());
-    if (!Slab)
-      return {std::string("failure reading slab"), {}};
-
-    // For now, we won't try to walk the allocations in the slab, we'll just
-    // provide the whole thing as one big chunk.
-    size_t HeaderSize =
-        llvm::alignTo(sizeof(*Slab), llvm::Align(alignof(std::max_align_t)));
-    AsyncTaskAllocationChunk Chunk;
-
-    Chunk.Start = SlabPtr + HeaderSize;
-    Chunk.Length = Slab->CurrentOffset;
-    Chunk.Kind = AsyncTaskAllocationChunk::ChunkKind::Unknown;
-
-    // Total slab size is the slab's capacity plus the slab struct itself.
-    StoredPointer SlabSize = Slab->Capacity + sizeof(*Slab);
-
-    return {llvm::None, {Slab->Next, SlabSize, {Chunk}}};
-  }
-
-  std::pair<llvm::Optional<std::string>, StoredPointer>
-  asyncTaskSlabPtr(StoredPointer AsyncTaskPtr) {
+  llvm::Optional<std::string> iterateAsyncTaskAllocations(
+      StoredPointer AsyncTaskPtr,
+      std::function<void(StoredPointer, unsigned, AsyncTaskAllocationChunk[])>
+          Call) {
     using AsyncTask = AsyncTask<Runtime>;
+    using StackAllocator = StackAllocator<Runtime>;
 
     auto AsyncTaskBytes =
         getReader().readBytes(RemoteAddress(AsyncTaskPtr), sizeof(AsyncTask));
     auto *AsyncTaskObj =
         reinterpret_cast<const AsyncTask *>(AsyncTaskBytes.get());
     if (!AsyncTaskObj)
-      return {std::string("failure reading async task"), 0};
+      return std::string("failure reading async task");
 
     StoredPointer SlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
-    return {llvm::None, SlabPtr};
+    while (SlabPtr) {
+      auto SlabBytes = getReader().readBytes(
+          RemoteAddress(SlabPtr), sizeof(typename StackAllocator::Slab));
+      auto Slab = reinterpret_cast<const typename StackAllocator::Slab *>(
+          SlabBytes.get());
+      if (!Slab)
+        return std::string("failure reading slab");
+
+      // For now, we won't try to walk the allocations in the slab, we'll just
+      // provide the whole thing as one big chunk.
+      size_t HeaderSize =
+          llvm::alignTo(sizeof(*Slab), llvm::Align(alignof(std::max_align_t)));
+      AsyncTaskAllocationChunk Chunk;
+
+      Chunk.Start = SlabPtr + HeaderSize;
+      Chunk.Length = Slab->CurrentOffset;
+      Chunk.Kind = AsyncTaskAllocationChunk::ChunkKind::Unknown;
+      Call(SlabPtr, 1, &Chunk);
+
+      SlabPtr = Slab->Next;
+    }
+
+    return llvm::None;
   }
 
 private:
