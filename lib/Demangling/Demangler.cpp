@@ -91,10 +91,8 @@ static bool isRequirement(Node::Kind kind) {
 // Public utility functions    //
 //////////////////////////////////
 
-LLVM_ATTRIBUTE_NORETURN void swift::Demangle::failAssert(const char *file,
-                                                         unsigned line,
-                                                         NodePointer node,
-                                                         const char *expr) {
+void swift::Demangle::failAssert(const char *file, unsigned line,
+                                 NodePointer node, const char *expr) {
   fprintf(stderr, "%s:%u: assertion failed for Node %p: %s", file, line, node,
           expr);
   abort();
