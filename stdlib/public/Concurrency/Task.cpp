@@ -68,10 +68,6 @@ using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 using TaskGroup = swift::TaskGroup;
 
-Metadata swift::TaskAllocatorSlabMetadata;
-const void *const swift::_swift_concurrency_debug_asyncTaskSlabMetadata =
-    &TaskAllocatorSlabMetadata;
-
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
   switch (queueHead.getStatus()) {
