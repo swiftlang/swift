@@ -51,8 +51,8 @@ namespace swift {
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
 
-LLVM_NODISCARD void failAssert(const char *file, unsigned line,
-                               NodePointer node, const char *expr);
+LLVM_ATTRIBUTE_NORETURN void failAssert(const char *file, unsigned line,
+                                        NodePointer node, const char *expr);
 
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle

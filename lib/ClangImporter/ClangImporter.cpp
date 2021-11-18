@@ -2206,8 +2206,8 @@ ClangImporter::Implementation::Implementation(
       EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
-      BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       BuffersForDiagnostics(ctx.SourceMgr),
+      BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       platformAvailability(ctx.LangOpts), nameImporter(),
       DisableSourceImport(ctx.ClangImporterOpts.DisableSourceImport),
       DWARFImporter(dwarfImporterDelegate) {}
