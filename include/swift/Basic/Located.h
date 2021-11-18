@@ -55,7 +55,7 @@ bool operator ==(const Located<T> &lhs, const Located<T> &rhs) {
 
 namespace llvm {
 
-template <typename T> struct DenseMapInfo;
+template <typename T, typename Enable> struct DenseMapInfo;
 
 template<typename T>
 struct DenseMapInfo<swift::Located<T>> {
