@@ -667,31 +667,31 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
 }
 
 bool
-ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
-                                          ProtocolDecl *decl) const {
-  // ObjC protocols can always be existential.
+ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *decl) const {
+  // ObjC protocols do not require `any`.
   if (decl->isObjC())
-    return true;
+    return false;
 
   for (auto member : decl->getMembers()) {
-    // Existential types cannot be used if the protocol has an associated type.
+    // Existential types require `any` if the protocol has an associated type.
     if (isa<AssociatedTypeDecl>(member))
-      return false;
+      return true;
 
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
       if (!decl->isAvailableInExistential(valueMember))
-        return false;
+        return true;
     }
   }
 
-  // Check whether all of the inherited protocols support existential types.
+  // Check whether any of the inherited protocols require `any`.
   for (auto proto : decl->getInheritedProtocols()) {
-    if (!proto->existentialTypeSupported())
-      return false;
+    if (proto->existentialRequiresAny())
+      return true;
   }
 
-  return true;
+  return false;
 }
 
 bool

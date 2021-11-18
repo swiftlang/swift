@@ -287,10 +287,10 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine whether we are allowed to refer to an existential type conforming
-/// to this protocol.
-class ExistentialTypeSupportedRequest :
-    public SimpleRequest<ExistentialTypeSupportedRequest,
+/// Determine whether an existential type conforming to this protocol
+/// requires the \c any syntax.
+class ExistentialRequiresAnyRequest :
+    public SimpleRequest<ExistentialRequiresAnyRequest,
                          bool(ProtocolDecl *),
                          RequestFlags::SeparatelyCached> {
 public:

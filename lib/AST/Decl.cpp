@@ -5266,9 +5266,9 @@ bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
   return true;
 }
 
-bool ProtocolDecl::existentialTypeSupported() const {
+bool ProtocolDecl::existentialRequiresAny() const {
   return evaluateOrDefault(getASTContext().evaluator,
-    ExistentialTypeSupportedRequest{const_cast<ProtocolDecl *>(this)}, true);
+    ExistentialRequiresAnyRequest{const_cast<ProtocolDecl *>(this)}, true);
 }
 
 StringRef ProtocolDecl::getObjCRuntimeName(

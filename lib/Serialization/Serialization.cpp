@@ -3630,7 +3630,7 @@ public:
                                const_cast<ProtocolDecl *>(proto)
                                  ->requiresClass(),
                                proto->isObjC(),
-                               proto->existentialTypeSupported(),
+                               proto->existentialRequiresAny(),
                                rawAccessLevel, numInherited,
                                inheritedAndDependencyTypes);
 
