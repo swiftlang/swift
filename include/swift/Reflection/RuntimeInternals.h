@@ -86,7 +86,6 @@ struct StackAllocator {
   bool FirstSlabIsPreallocated;
 
   struct Slab {
-    typename Runtime::StoredPointer Metadata;
     typename Runtime::StoredPointer Next;
     uint32_t Capacity;
     uint32_t CurrentOffset;

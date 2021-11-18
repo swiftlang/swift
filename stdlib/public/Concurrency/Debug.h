@@ -32,10 +32,6 @@ const void *const _swift_concurrency_debug_jobMetadata;
 SWIFT_EXPORT_FROM(swift_Concurrency)
 const void *const _swift_concurrency_debug_asyncTaskMetadata;
 
-/// A fake metadata pointer placed at the start of async task slab allocations.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-const void *const _swift_concurrency_debug_asyncTaskSlabMetadata;
-
 } // namespace swift
 
 #endif
