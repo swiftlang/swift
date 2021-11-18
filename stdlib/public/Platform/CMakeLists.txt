@@ -42,12 +42,12 @@ set(swiftDarwin_common_options
       DEPENDS ${darwin_depends})
 
 
-if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" AND
+if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING|CROSSCOMPILE" AND
    ${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
 
   set(swiftDarwin_common_bootstrapping_options
       ${swiftDarwin_common_options}
-      SHARED
+      STATIC
       IS_STDLIB
       SDK ${SWIFT_HOST_VARIANT_SDK}
       ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
@@ -69,6 +69,10 @@ if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" AND
       ${swiftDarwin_common_bootstrapping_options}
       FILE_DEPENDS ${b1_deps}
       BOOTSTRAPPING 1)
+endif()
+
+if(NOT SWIFT_BUILD_SDK_OVERLAY AND NOT SWIFT_BUILD_TEST_SUPPORT_MODULES)
+  return()
 endif()
 
 add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}

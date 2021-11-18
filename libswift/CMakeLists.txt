@@ -20,44 +20,54 @@ else()
 
   add_subdirectory(Sources)
 
-  if(${LIBSWIFT_BUILD_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE-WITH-HOSTLIBS")
+  set(bs1_libs)
+  set(final_libs)
+  if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING|CROSSCOMPILE")
+    set(bs1_libs ${bs1_libs} swiftCore-bootstrapping0-static)
+    set(final_libs ${final_libs} swiftCore-bootstrapping1-static)
+    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS swiftCore-bootstrapping1-static)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      set(bs1_libs ${bs1_libs} swiftOnoneSupport-bootstrapping0-static)
+      set(final_libs ${final_libs} swiftOnoneSupport-bootstrapping1-static)
+      set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS swiftSwiftOnoneSupport-bootstrapping1-static)
+    endif()
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+      set(bs1_libs ${bs1_libs} swiftDarwin-bootstrapping0-static)
+      set(final_libs ${final_libs} swiftDarwin-bootstrapping1-static)
+      set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS swiftDarwin-bootstrapping1-static)
+    endif()
+  endif()
+
+
+  if(${LIBSWIFT_BUILD_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE.*")
 
     if (NOT SWIFT_EXEC_FOR_LIBSWIFT)
       message(FATAL_ERROR "Need a swift toolchain for building libswift")
     endif()
-
+ 
     add_libswift("libswift"
-      SWIFT_EXEC "${SWIFT_EXEC_FOR_LIBSWIFT}")
+      SWIFT_EXEC "${SWIFT_EXEC_FOR_LIBSWIFT}"
+      DEPENDS ${final_libs})
+
+    target_link_libraries(libswift PUBLIC ${final_libs})
 
   elseif(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
-
-    set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0)
-    set(b1_deps swift-frontend-bootstrapping1 symlink-headers-bootstrapping1)
-    if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
-      set(b0_deps ${b0_deps} swiftCore-bootstrapping0)
-      set(b1_deps ${b1_deps} swiftCore-bootstrapping1)
-      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(b0_deps ${b0_deps} swiftOnoneSupport-bootstrapping0)
-        set(b1_deps ${b1_deps} swiftOnoneSupport-bootstrapping1)
-      endif()
-      if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-        set(b0_deps ${b0_deps} swiftDarwin-bootstrapping0)
-        set(b1_deps ${b1_deps} swiftDarwin-bootstrapping1)
-      endif()
-    endif()
 
     # Bootstrapping - stage 1, using the compiler from level 0
 
     add_libswift("libswift-bootstrapping1"
       SWIFT_EXEC "${CMAKE_BINARY_DIR}/bootstrapping0/bin/swiftc"
-      DEPENDS ${b0_deps}
+      DEPENDS swift-frontend-bootstrapping0 symlink-headers-bootstrapping0 ${bs1_libs}
       BOOTSTRAPPING 1)
 
     # The final build, using the compiler from stage 1
 
     add_libswift("libswift"
         SWIFT_EXEC "${CMAKE_BINARY_DIR}/bootstrapping1/bin/swiftc"
-        DEPENDS ${b1_deps})
+        DEPENDS swift-frontend-bootstrapping0 symlink-headers-bootstrapping0 ${final_libs})
+
+    target_link_libraries(libswift-bootstrapping1 PUBLIC ${bs1_libs})
+    target_link_libraries(libswift PUBLIC ${final_libs})
 
     if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
       file(GLOB module_dirs "${CMAKE_BINARY_DIR}/bootstrapping*/lib/swift/macosx/*.swiftmodule")
@@ -69,5 +79,7 @@ else()
   else()
     message(FATAL_ERROR "Unknown LIBSWIFT_BUILD_MODE '${LIBSWIFT_BUILD_MODE}'")
   endif()
+
+  set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS libswift)
 endif()
 

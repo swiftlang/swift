@@ -1,3 +1,4 @@
+
 set(sources
   AssertionReporting.h
   CoreFoundationShims.h
@@ -83,19 +84,21 @@ endif()
 # First extract the "version" used for Clang's resource directory.
 string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
   "${LLVM_PACKAGE_VERSION}")
+if(SWIFT_COMPILER_IS_MSVC_LIKE)
+  execute_process(COMMAND ${CMAKE_C_COMPILER} /clang:-print-resource-dir
+    OUTPUT_VARIABLE host_clang_headers_location
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
+else()
+  execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir
+    OUTPUT_VARIABLE host_clang_headers_location
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
+endif()
+
 if(NOT SWIFT_INCLUDE_TOOLS AND
    (SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG))
-  if(SWIFT_COMPILER_IS_MSVC_LIKE)
-    execute_process(COMMAND ${CMAKE_C_COMPILER} /clang:-print-resource-dir
-      OUTPUT_VARIABLE clang_headers_location
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      ERROR_QUIET)
-  else()
-    execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir
-      OUTPUT_VARIABLE clang_headers_location
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      ERROR_QUIET)
-  endif()
+  set(clang_headers_location "${host_clang_headers_location}")
   message(STATUS "Using clang Resource Directory: ${clang_headers_location}")
 else()
   set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION}")
@@ -156,7 +159,7 @@ if(NOT SWIFT_BUILT_STANDALONE)
   endforeach()
 endif()
 
-if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
+if(${LIBSWIFT_BUILD_MODE} MATCHES "CROSSCOMPILE|BOOTSTRAPPING.*")
   foreach(bootstrapping "0" "1")
     get_bootstrapping_path(outdir ${SWIFTLIB_DIR} ${bootstrapping})
     set(target_name "symlink-headers-bootstrapping${bootstrapping}")
@@ -169,7 +172,7 @@ if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
           ${output_dir} "${outdir}/shims"
         COMMAND
           "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
-          "${clang_headers_location}"
+          "${host_clang_headers_location}"
           "${outdir}/clang"
 
         CUSTOM_TARGET_NAME ${target_name}

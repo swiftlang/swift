@@ -487,7 +487,9 @@ function(_compile_swift_files
   endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)
-    list(APPEND swift_flags "-autolink-force-load")
+    if("${SWIFTFILE_BOOTSTRAPPING}" STREQUAL "")
+      list(APPEND swift_flags "-autolink-force-load")
+    endif()
   endif()
 
   # Don't need to link runtime compatibility libraries for older runtimes 
@@ -538,6 +540,7 @@ function(_compile_swift_files
   set(interface_file_static)
 
   get_bootstrapping_path(lib_dir ${SWIFTLIB_DIR} "${SWIFTFILE_BOOTSTRAPPING}")
+  get_bootstrapping_path(static_lib_dir ${SWIFTSTATICLIB_DIR} "${SWIFTFILE_BOOTSTRAPPING}")
 
   if(NOT SWIFTFILE_IS_MAIN)
     # Determine the directory where the module file should be placed.
@@ -553,7 +556,7 @@ function(_compile_swift_files
 
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
 
-    set(module_dir_static "${SWIFTSTATICLIB_DIR}/${library_subdir}")
+    set(module_dir_static "${static_lib_dir}/${library_subdir}")
     set(module_base_static "${module_dir_static}/${SWIFTFILE_MODULE_NAME}")
 
     set(module_triple ${SWIFT_SDK_${library_subdir_sdk}_ARCH_${SWIFTFILE_ARCHITECTURE}_MODULE})
@@ -690,11 +693,11 @@ function(_compile_swift_files
   else()
     set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
 
-    get_bootstrapping_path(swift_compiler_tool
-        "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}"
-        "${SWIFTFILE_BOOTSTRAPPING}")
+    if(NOT ${SWIFTFILE_BOOTSTRAPPING} STREQUAL "" AND NOT ${LIBSWIFT_BUILD_MODE} MATCHES "CROSSCOMPILE.*")
+      get_bootstrapping_path(swift_compiler_tool
+          "${swift_compiler_tool}"
+          "${SWIFTFILE_BOOTSTRAPPING}")
 
-    if(NOT ${SWIFTFILE_BOOTSTRAPPING} STREQUAL "")
       set(target_suffix "-bootstrapping${SWIFTFILE_BOOTSTRAPPING}")
     endif()
 
@@ -704,7 +707,7 @@ function(_compile_swift_files
   endif()
 
   set(swift_compiler_tool_dep)
-  if(SWIFT_INCLUDE_TOOLS)
+  if(SWIFT_INCLUDE_TOOLS AND NOT ${LIBSWIFT_BUILD_MODE} MATCHES "CROSSCOMPILE.*")
     # Depend on the binary itself, in addition to the symlink.
     set(swift_compiler_tool_dep "swift-frontend${target_suffix}")
   endif()
@@ -724,23 +727,6 @@ function(_compile_swift_files
   set(main_command "-c")
   if (SWIFT_CHECK_INCREMENTAL_COMPILATION)
     set(swift_compiler_tool "${SWIFT_SOURCE_DIR}/utils/check-incremental" "${swift_compiler_tool}")
-  endif()
-
-  if(SWIFTFILE_IS_STDLIB)
-    get_bootstrapping_swift_lib_dir(bs_lib_dir "${SWIFTFILE_BOOTSTRAPPING}")
-    if(bs_lib_dir)
-      # When building the stdlib with libswift bootstrapping, the compiler needs
-      # to pick up the stdlib from the previous bootstrapping stage, because the
-      # stdlib in the current stage is not built yet.
-      if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
-        set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "DYLD_LIBRARY_PATH=${bs_lib_dir}")
-      elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
-        set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "LD_LIBRARY_PATH=${bs_lib_dir}")
-      else()
-        message(FATAL_ERROR "TODO: bootstrapping support for ${SWIFT_HOST_VARIANT_SDK}")
-      endif()
-    endif()
-
   endif()
 
   if (SWIFT_REPORT_STATISTICS)

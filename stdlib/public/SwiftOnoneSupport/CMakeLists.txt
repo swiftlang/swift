@@ -10,10 +10,10 @@ set(swiftOnoneSupport_common_options
   SWIFT_COMPILE_FLAGS "-parse-stdlib" "-Xllvm" "-sil-inline-generics=false" "-Xfrontend" "-validate-tbd-against-ir=none" "-Xfrontend" "-check-onone-completeness" "-Xfrontend" "-disable-access-control" "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND ${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND ${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING|CROSSCOMPILE")
 
   set(swiftOnoneSupport_common_bootstrapping_options
-    SHARED
+    STATIC
     ${swiftOnoneSupport_common_options}
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}

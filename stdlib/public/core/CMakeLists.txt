@@ -338,41 +338,13 @@ set(swiftCore_common_options
 set(swiftCore_common_dependencies
     copy_shim_headers "${SWIFTLIB_DIR}/shims" ${GROUP_INFO_JSON_FILE})
 
-if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
+if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING|CROSSCOMPILE")
 
   set(b0_deps symlink-headers-bootstrapping0)
   set(b1_deps symlink-headers-bootstrapping1)
 
-  if(SWIFT_PATH_TO_LIBICU_BUILD)
-    foreach(bootstrapping "0" "1")
-      # Need to symlink the libicu libraries to be able to run
-      # the bootstrapping compiler with a custom library path.
-      get_bootstrapping_path(output_dir
-          "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" "${bootstrapping}")
-      if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-        message("TODO: support for copying ICU libraries on Windows")
-      endif()
-      set(target "symlink-icu-bootstrapping${bootstrapping}")
-      add_custom_target(${target})
-      add_custom_command(TARGET ${target} POST_BUILD
-       COMMAND
-          "${CMAKE_COMMAND}" "-E" "make_directory" "${output_dir}"
-        COMMAND
-          "ln" "-s" "-f" "${SWIFT_PATH_TO_LIBICU_BUILD}/lib/libicu*" "."
-        WORKING_DIRECTORY "${output_dir}"
-        COMMENT "symlink ICU libraries for bootstrapping stage ${bootstrapping}")
-    endforeach()
-    set(b0_deps ${b0_deps} symlink-icu-bootstrapping0)
-    set(b1_deps ${b1_deps} symlink-icu-bootstrapping1)
-  endif()
-
-  list(FIND SWIFT_STDLIB_LIBRARY_BUILD_TYPES "SHARED" index_of_shared)
-  if(index_of_shared EQUAL -1)
-    message(FATAL_ERROR "bootstrapping requires SHARED stdlib build type")
-  endif()
-
   set(swiftCore_common_bootstrapping_options
-                    SHARED
+                    STATIC
                     ${swiftCore_common_options}
                     SDK ${SWIFT_HOST_VARIANT_SDK}
                     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}

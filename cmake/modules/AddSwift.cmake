@@ -738,6 +738,8 @@ function(add_libswift name)
       # The compiler will instead pick up the stdlib from the SDK.
       get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
       set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
+    elseif(${LIBSWIFT_BUILD_MODE} STREQUAL "CROSSCOMPILE")
+      set(sdk_option ${sdk_option} "-resource-dir" "${build_dir}/../bootstrapping1/lib/swift")
     endif()
   endif()
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
@@ -789,7 +791,6 @@ function(add_libswift name)
   # Create a static libswift library containing all module object files.
   add_library(${name} STATIC ${all_obj_files})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
-  set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
 endfunction()
 
 macro(add_swift_tool_subdirectory name)
@@ -917,19 +918,7 @@ function(add_swift_host_tool executable)
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
-      elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
-        # Pick up the built libswiftCompatibility<n>.a libraries
-        _link_built_compatibility_libs(${executable})
-
-        # At build time link against the built swift libraries from the
-        # previous bootstrapping stage.
-        get_bootstrapping_swift_lib_dir(bs_lib_dir "${ASHT_BOOTSTRAPPING}")
-        target_link_directories(${executable} PRIVATE ${bs_lib_dir})
-
-        # At runtime link against the built swift libraries from the current
-        # bootstrapping stage.
-        list(APPEND RPATH_LIST "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-      else()
+      elseif(NOT LIBSWIFT_BUILD_MODE MATCHES "CROSSCOMPILE|BOOTSTRAPPING")
         message(FATAL_ERROR "Unknown LIBSWIFT_BUILD_MODE '${LIBSWIFT_BUILD_MODE}'")
       endif()
 
@@ -991,24 +980,19 @@ function(add_swift_host_tool executable)
         INSTALL_RPATH  "${host_lib_dir}")
 
     elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
-      # At build time link against the built swift libraries from the
-      # previous bootstrapping stage.
       if (NOT "${ASHT_BOOTSTRAPPING}" STREQUAL "0")
-        get_bootstrapping_swift_lib_dir(bs_lib_dir "${ASHT_BOOTSTRAPPING}")
-        target_link_directories(${executable} PRIVATE ${bs_lib_dir})
         target_link_libraries(${executable} PRIVATE ${swiftrt})
-        target_link_libraries(${executable} PRIVATE "swiftCore")
+        if(SWIFT_PATH_TO_LIBICU_BUILD)
+          set(icu_dir "${SWIFT_PATH_TO_LIBICU_BUILD}/lib")
+          target_link_libraries(${executable} PRIVATE
+            ${icu_dir}/libicui18nswift.a
+            ${icu_dir}/libicuucswift.a
+            ${icu_dir}/libicudataswift.a)
+        endif()
       endif()
-
-      # At runtime link against the built swift libraries from the current
-      # bootstrapping stage.
-      set_target_properties(${executable} PROPERTIES
-        BUILD_WITH_INSTALL_RPATH YES
-        INSTALL_RPATH  "$ORIGIN/../lib/swift/${SWIFT_SDK_LINUX_LIB_SUBDIR}")
-
     elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
       message(FATAL_ERROR "LIBSWIFT_BUILD_MODE 'BOOTSTRAPPING-WITH-HOSTLIBS' not supported on Linux")
-    else()
+    elseif(NOT LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
       message(FATAL_ERROR "Unknown LIBSWIFT_BUILD_MODE '${LIBSWIFT_BUILD_MODE}'")
     endif()
   endif()
