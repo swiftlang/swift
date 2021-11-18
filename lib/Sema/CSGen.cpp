@@ -1527,6 +1527,19 @@ namespace {
         auto methodTy =
             CS.createTypeVariable(memberTypeLoc, TVO_CanBindToNoEscape);
 
+        // HACK: Bind the function's parameter list as a tuple to a type
+        // variable. This only exists to preserve compatibility with
+        // rdar://85263844, as it can affect the prioritization of bindings,
+        // which can affect behavior for tuple matching as tuple subtyping is
+        // currently a *weaker* constraint than tuple conversion.
+        if (!CS.getASTContext().isSwiftVersionAtLeast(6)) {
+          auto paramTypeVar = CS.createTypeVariable(
+              CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument),
+              TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape);
+          CS.addConstraint(ConstraintKind::BindTupleOfFunctionParams, methodTy,
+                           paramTypeVar, CS.getConstraintLocator(expr));
+        }
+
         CS.addValueMemberConstraint(
             baseTy, expr->getName(), methodTy, CurDC,
             expr->getFunctionRefKind(),
