@@ -175,21 +175,6 @@ set(SWIFT_COMPILER_VERSION "" CACHE STRING
 set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
 
-# Which default linker to use. Prefer LLVM_USE_LINKER if it set, otherwise use
-# our own defaults. This should only be possible in a unified (not stand alone)
-# build environment.
-if(LLVM_USE_LINKER)
-  set(SWIFT_USE_LINKER_default "${LLVM_USE_LINKER}")
-elseif(CMAKE_SYSTEM_NAME STREQUAL Windows AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
-  set(SWIFT_USE_LINKER_default "lld")
-elseif(CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  set(SWIFT_USE_LINKER_default "")
-else()
-  set(SWIFT_USE_LINKER_default "gold")
-endif()
-set(SWIFT_USE_LINKER ${SWIFT_USE_LINKER_default} CACHE STRING
-    "Build Swift with a non-default linker")
-
 option(SWIFT_DISABLE_DEAD_STRIPPING
       "Turn off Darwin-specific dead stripping for Swift host tools." FALSE)
 
@@ -308,8 +293,8 @@ set(SWIFT_ANDROID_API_LEVEL "" CACHE STRING
 
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
-set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
-  "The GCC version to use when building for Android. Currently only 4.9 is supported.")
+set(SWIFT_ANDROID_NDK_CLANG_VERSION "12.0.8" CACHE STRING
+  "The Clang version to use when building for Android.")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
 
@@ -747,6 +732,23 @@ set(SWIFT_HOST_VARIANT_SDK "${SWIFT_HOST_VARIANT_SDK_default}" CACHE STRING
     "Deployment sdk for Swift host tools (the compiler).")
 set(SWIFT_HOST_VARIANT_ARCH "${SWIFT_HOST_VARIANT_ARCH_default}" CACHE STRING
     "Deployment arch for Swift host tools (the compiler).")
+
+# Which default linker to use. Prefer LLVM_USE_LINKER if it set, otherwise use
+# our own defaults. This should only be possible in a unified (not stand alone)
+# build environment.
+if(LLVM_USE_LINKER)
+  set(SWIFT_USE_LINKER_default "${LLVM_USE_LINKER}")
+elseif(${SWIFT_HOST_VARIANT_SDK} STREQUAL ANDROID)
+  set(SWIFT_USE_LINKER_default "lld")
+elseif(CMAKE_SYSTEM_NAME STREQUAL Windows AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+  set(SWIFT_USE_LINKER_default "lld")
+elseif(CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  set(SWIFT_USE_LINKER_default "")
+else()
+  set(SWIFT_USE_LINKER_default "gold")
+endif()
+set(SWIFT_USE_LINKER ${SWIFT_USE_LINKER_default} CACHE STRING
+    "Build Swift with a non-default linker")
 
 #
 # Enable additional warnings.

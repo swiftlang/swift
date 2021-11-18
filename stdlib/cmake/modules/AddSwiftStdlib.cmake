@@ -94,12 +94,9 @@ function(_add_target_variant_c_compile_link_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    # lld can handle targeting the android build.  However, if lld is not
-    # enabled, then fallback to the linker included in the android NDK.
-    if(NOT SWIFT_USE_LINKER STREQUAL "lld")
-      swift_android_tools_path(${CFLAGS_ARCH} tools_path)
-      list(APPEND result "-B" "${tools_path}")
-    endif()
+    # Make sure the Android NDK lld is used.
+    swift_android_tools_path(${CFLAGS_ARCH} tools_path)
+    list(APPEND result "-B" "${tools_path}")
   endif()
 
   if("${CFLAGS_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -407,8 +404,8 @@ function(_add_target_variant_link_flags)
     MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
     list(APPEND link_libraries "pthread" "dl")
-    if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "armv6|armv7|i686")
-      list(APPEND link_libraries PRIVATE "atomic")
+    if("${LFLAGS_ARCH}" MATCHES "armv6|armv7|i686")
+      list(APPEND link_libraries "atomic")
     endif()
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND link_libraries "pthread")
@@ -437,6 +434,9 @@ function(_add_target_variant_link_flags)
     list(APPEND link_libraries "dl" "log")
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
+    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+      list(APPEND result "-resource-dir=${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/${SWIFT_ANDROID_NDK_CLANG_VERSION}")
+    endif()
 
     # link against the custom C++ library
     swift_android_cxx_libraries_for_arch(${LFLAGS_ARCH} cxx_link_libraries)
@@ -446,11 +446,6 @@ function(_add_target_variant_link_flags)
     list(APPEND link_libraries
       ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_I18N}
       ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_UC})
-
-    swift_android_libgcc_for_arch_cross_compile(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
-    foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
-      list(APPEND library_search_directories ${path})
-    endforeach()
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
     # generator leaves the intermediate object file in a place where it will not
@@ -478,10 +473,17 @@ function(_add_target_variant_link_flags)
   endif()
 
   if(SWIFT_USE_LINKER AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
-      list(APPEND result "-fuse-ld=${SWIFT_USE_LINKER}.exe")
+    # The linker is normally chosen based on the host, but the Android NDK only
+    # uses lld now.
+    if("${LFLAGS_SDK}" STREQUAL "ANDROID")
+      set(linker "lld")
     else()
-      list(APPEND result "-fuse-ld=${SWIFT_USE_LINKER}")
+      set(linker "${SWIFT_USE_LINKER}")
+    endif()
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+      list(APPEND result "-fuse-ld=${linker}.exe")
+    else()
+      list(APPEND result "-fuse-ld=${linker}")
     endif()
   endif()
 
