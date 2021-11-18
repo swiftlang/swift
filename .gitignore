@@ -40,6 +40,9 @@ docs/_build
 # Visual Studio metadata
 .vs
 
+# Visual Studio Code Configurations
+.vscode
+
 # clangd
 .cache
 .clangd
