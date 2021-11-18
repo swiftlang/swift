@@ -381,7 +381,7 @@ void IRGenModule::addVTableTypeMetadata(
     vis = VCallVisibility::VCallVisibilityLinkageUnit;
   }
 
-  auto relptrSize = DataLayout.getTypeAllocSize(Int32Ty).getValue();
+  auto relptrSize = DataLayout.getTypeAllocSize(Int32Ty).getKnownMinValue();
   setVCallVisibility(var, vis,
                      std::make_pair(minOffset, maxOffset + relptrSize));
 }
