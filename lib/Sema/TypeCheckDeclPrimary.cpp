@@ -1696,7 +1696,7 @@ public:
 
     DeclVisitor<DeclChecker>::visit(decl);
 
-    TypeChecker::checkUnsupportedProtocolType(decl);
+    TypeChecker::checkExistentialTypes(decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       auto &Context = getASTContext();
