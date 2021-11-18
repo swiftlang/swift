@@ -274,7 +274,7 @@ _tryCastFromClassToObjCBridgeable(
 
   // The extra byte is for the tag on the T?
   const std::size_t inlineValueSize = 3 * sizeof(void*);
-  alignas(std::max_align_t) char inlineBuffer[inlineValueSize + 1];
+  alignas(MaximumAlignment) char inlineBuffer[inlineValueSize + 1];
   void *optDestBuffer;
   if (destType->getValueWitnesses()->getStride() <= inlineValueSize) {
     // Use the inline buffer.
