@@ -179,6 +179,7 @@ public:
   }
 
   void visitFinalAttr(FinalAttr *attr);
+  void visitCompileTimeConstAttr(CompileTimeConstAttr *attr) {}
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);

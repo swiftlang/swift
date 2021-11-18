@@ -1842,6 +1842,10 @@ bool Traversal::visitIsolatedTypeRepr(IsolatedTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
 bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
   return doIt(T->getConstraint());
 }

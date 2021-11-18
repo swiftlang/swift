@@ -75,6 +75,7 @@ namespace swift {
   constexpr size_t SILFunctionAlignInBits = 2;
   constexpr size_t ASTContextAlignInBits = 2;
   constexpr size_t TypeVariableAlignInBits = 4;
+  constexpr size_t StoredDefaultArgumentAlignInBits = 4;
 
   // Well, this is the *minimum* pointer alignment; it's going to be 3 on
   // 64-bit targets, but that doesn't matter.

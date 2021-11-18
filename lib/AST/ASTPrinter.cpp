@@ -3309,6 +3309,9 @@ static void printParameterFlags(ASTPrinter &printer,
 
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
+
+  if (flags.isCompileTimeConst())
+    printer.printKeyword("_const", options, " ");
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {

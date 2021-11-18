@@ -1865,6 +1865,8 @@ namespace {
                                            TypeResolutionOptions options);
     NeverNullType resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
                                           TypeResolutionOptions options);
+    NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
+                                                  TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -1977,7 +1979,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Isolated:
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
-
+  case TypeReprKind::CompileTimeConst:
+      return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
+                                             options);
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
@@ -2720,6 +2724,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     bool isolated = false;
+    bool compileTimeConst = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
         switch (specifierRepr->getKind()) {
@@ -2737,6 +2742,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           continue;
         case TypeReprKind::Isolated:
           isolated = true;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        case TypeReprKind::CompileTimeConst:
+          compileTimeConst = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         default:
@@ -2763,7 +2772,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative);
+        isolated, noDerivative, compileTimeConst);
     elements.emplace_back(ty, Identifier(), paramFlags,
                           inputRepr->getElementName(i));
   }
@@ -3490,6 +3499,13 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
   }
 
   return type;
+}
+
+NeverNullType
+TypeResolver::resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
+                                              TypeResolutionOptions options) {
+  // TODO: more diagnotics
+  return resolveType(repr->getBase(), options);
 }
 
 NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,

@@ -5356,7 +5356,7 @@ class ParamDecl : public VarDecl {
 
   TypeRepr *TyRepr = nullptr;
 
-  struct alignas(1 << DeclAlignInBits) StoredDefaultArgument {
+  struct alignas(1 << StoredDefaultArgumentAlignInBits) StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
 
     /// Stores the context for the default argument as well as a bit to
@@ -5380,10 +5380,13 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
+
+    /// Whether or not this parameter is '_const'.
+    IsCompileTimeConst = 1 << 3,
   };
 
   /// The default value, if any, along with flags.
-  llvm::PointerIntPair<StoredDefaultArgument *, 3, OptionSet<Flags>>
+  llvm::PointerIntPair<StoredDefaultArgument *, 4, OptionSet<Flags>>
       DefaultValueAndFlags;
 
   friend class ParamSpecifierRequest;
@@ -5550,6 +5553,17 @@ public:
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsIsolated
                                       : flags - Flags::IsIsolated);
+  }
+
+  /// Whether or not this parameter is marked with '_const'.
+  bool isCompileTimeConst() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsCompileTimeConst);
+  }
+
+  void setCompileTimeConst(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsCompileTimeConst
+                                      : flags - Flags::IsCompileTimeConst);
   }
 
   /// Does this parameter reject temporary pointer conversions?

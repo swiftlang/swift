@@ -3143,12 +3143,14 @@ public:
     bool isVariadic;
     bool isAutoClosure;
     bool isIsolated;
+    bool isCompileTimeConst;
     uint8_t rawDefaultArg;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
+                                         isCompileTimeConst,
                                          rawDefaultArg);
 
     auto argName = MF.getIdentifier(argNameID);
@@ -3184,6 +3186,7 @@ public:
     param->setVariadic(isVariadic);
     param->setAutoClosure(isAutoClosure);
     param->setIsolated(isIsolated);
+    param->setCompileTimeConst(isCompileTimeConst);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -5344,12 +5347,13 @@ public:
       IdentifierID labelID;
       IdentifierID internalLabelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated;
+      bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated, isCompileTimeConst;
       bool isNoDerivative;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(
           scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
-          isNonEphemeral, rawOwnership, isIsolated, isNoDerivative);
+          isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
+          isCompileTimeConst);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -5363,7 +5367,8 @@ public:
       params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
                                              isNonEphemeral, *ownership,
-                                             isIsolated, isNoDerivative),
+                                             isIsolated, isNoDerivative,
+                                             isCompileTimeConst),
                           MF.getIdentifier(internalLabelID));
     }
 
