@@ -82,6 +82,7 @@ extension ActorTransport {
   func resolve<Act>(
     anyIdentity identity: AnyActorIdentity, as actorType: Act.Type
   ) throws -> Act? where Act: DistributedActor {
+    // TODO(distributed): don't crash but just throw nicely here
     return try resolve(identity.underlying as! Identity, as: actorType)
   }
 

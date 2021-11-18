@@ -31,8 +31,192 @@ bool DerivedConformance::canDeriveDistributedActor(
 }
 
 /******************************************************************************/
-/******************************* RESOLVE FUNCTION *****************************/
+/******************************* FUNCTIONS ************************************/
 /******************************************************************************/
+
+// === Codable / Decode --------------------------------------------------------
+
+
+/// Synthesizes the body for
+///
+/// ```
+/// nonisolated public func encode(to encoder: Encoder) throws {
+///   var container = encoder.singleValueContainer()
+///   try container.encode(self.id)
+/// }
+/// ```
+///
+/// \param initDecl The function decl whose body to synthesize.
+static std::pair<BraceStmt *, bool>
+createDistributedActor_encode_toDecoder_body(AbstractFunctionDecl *initDecl, void *) {
+  auto *funcDC = cast<DeclContext>(initDecl);
+  auto &C = funcDC->getASTContext();
+
+  SmallVector<ASTNode, 4> statements;
+
+  auto decoderParam = initDecl->getParameters()->get(0);
+  auto *decoderExpr = new (C) DeclRefExpr(ConcreteDeclRef(decoderParam),
+                                          DeclNameLoc(), /*Implicit=*/true);
+
+  auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
+
+  auto *assignActorSelf = new (C) AssignExpr(
+      selfRef, SourceLoc(), decoderExpr, /*Implicit=*/true);
+  statements.push_back(assignActorSelf);
+  // end-of-FIXME: this must be checking with the transport instead
+
+  auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
+                                 /*implicit=*/true);
+
+  return { body, /*isTypeChecked=*/false };
+}
+
+
+static FuncDecl *deriveDistributedActor_encode(DerivedConformance &derived) {
+  auto decl = dyn_cast<ClassDecl>(derived.Nominal);
+  assert(decl->isDistributedActor());
+
+  auto &C = decl->getASTContext();
+  auto addressType = getDistributedActorIdentityType(decl);
+  auto encoderType = C.getEncoderType();
+
+  auto mkParam = [&](Identifier argName, Identifier paramName, Type ty) -> ParamDecl* {
+    auto *param = new (C) ParamDecl(SourceLoc(),
+                                    SourceLoc(), argName,
+                                    SourceLoc(), paramName, decl);
+    param->setImplicit();
+    param->setSpecifier(ParamSpecifier::Default);
+    param->setInterfaceType(ty);
+    return param;
+  };
+
+  // (to encoder: Encoder)
+  auto *params = ParameterList::create(
+      C,
+      /*LParenLoc=*/SourceLoc(),
+      /*params=*/{ mkParam(C.Id_to, C.Id_encoder, encoderType) },
+      /*RParenLoc=*/SourceLoc()
+  );
+
+  // Func name: encode(to:)
+  DeclName name(C, C.Id_encode, params);
+
+  // Expected type: (Self) -> (Encoder) throws -> ()
+  auto *encodeDecl =
+      FuncDecl::createImplicit(C, StaticSpellingKind::None,
+                               name, SourceLoc(),
+                               /*async=*/false,
+                               /*throws=*/true,
+                               /*genericParams=*/nullptr,
+                               params,
+                               /*returnType*/decl->getDeclaredInterfaceType(),
+                               decl);
+  encodeDecl->setImplicit();
+  encodeDecl->setSynthesized();
+  encodeDecl->setBodySynthesizer(&createDistributedActor_encode_toDecoder_body);
+
+
+  encodeDecl->copyFormalAccessFrom(decl, /*sourceIsParentContext=*/true);
+
+  derived.addMembersToConformanceContext({encodeDecl});
+  return encodeDecl;
+}
+
+// === Codable / init(from:) ---------------------------------------------------
+
+/// Synthesizes the body for
+///
+/// ```
+///  nonisolated public init(from decoder: Decoder) throws {
+///   guard let transport = decoder.userInfo[.actorTransportKey] as? Transport else {
+///     throw DistributedActorCodingError(message:
+///       "Missing Transport (for key .actorTransportKey) " +
+///       "in Decoder.userInfo, while decoding \(Self.self).")
+///   }
+///
+///   let id: Identity = try transport.decodeIdentity(from: decoder)
+///   self = try Self.resolve(id, using: transport)
+/// }
+/// ```
+///
+/// \param initDecl The function decl whose body to synthesize.
+static std::pair<BraceStmt *, bool>
+createDistributedActor_init_fromDecoder_body(AbstractFunctionDecl *initDecl, void *) {
+  auto *funcDC = cast<DeclContext>(initDecl);
+  auto &C = funcDC->getASTContext();
+
+  SmallVector<ASTNode, 4> statements;
+
+  auto decoderParam = initDecl->getParameters()->get(0);
+  auto *decoderExpr = new (C) DeclRefExpr(ConcreteDeclRef(decoderParam),
+                                          DeclNameLoc(), /*Implicit=*/true);
+
+  auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
+
+  auto *assignActorSelf = new (C) AssignExpr(
+    selfRef, SourceLoc(), decoderExpr, /*Implicit=*/true);
+  statements.push_back(assignActorSelf);
+  // end-of-FIXME: this must be checking with the transport instead
+
+  auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
+                                 /*implicit=*/true);
+
+  return { body, /*isTypeChecked=*/false };
+}
+
+  /// Synthesizes the
+  ///
+  /// ```
+  /// init(resolve address: ActorAddress, using transport: ActorTransport) throws
+  /// ```
+  ///
+  /// Decodable initializer.
+static ConstructorDecl *deriveDistributedActor_init_fromDecoder(DerivedConformance &derived) {
+    auto decl = dyn_cast<ClassDecl>(derived.Nominal);
+    assert(decl->isDistributedActor());
+    auto &C = decl->getASTContext();
+
+    // Expected type: (Self) -> (Decoder) -> (Self)
+    //
+    // Param: (from decoder: Decoder)
+    auto decoderTy = C.getDecoderDecl()->getDeclaredInterfaceType();
+    auto *addressParamDecl = new (C) ParamDecl(
+        SourceLoc(), SourceLoc(), C.Id_from,
+        SourceLoc(), C.Id_decoder, decl);
+    addressParamDecl->setImplicit();
+    addressParamDecl->setSpecifier(ParamSpecifier::Default);
+    addressParamDecl->setInterfaceType(decoderTy);
+
+    auto *paramList = ParameterList::create(
+        C,
+        /*LParenLoc=*/SourceLoc(),
+        /*params=*/{addressParamDecl},
+        /*RParenLoc=*/SourceLoc()
+    );
+
+    // Func name: init(from:)
+    DeclName name(C, DeclBaseName::createConstructor(), paramList);
+
+    auto *initDecl =
+        new (C) ConstructorDecl(name, SourceLoc(),
+                                /*Failable=*/false, SourceLoc(),
+                                /*Async=*/false, SourceLoc(),
+                                /*Throws=*/true, SourceLoc(),
+                                paramList,
+                                /*GenericParams=*/nullptr, decl);
+    initDecl->setImplicit();
+    initDecl->setSynthesized();
+    initDecl->setBodySynthesizer(&createDistributedActor_init_fromDecoder_body);
+
+    auto *nonIsoAttr = new (C) NonisolatedAttr(/*IsImplicit*/true);
+    initDecl->getAttrs().add(nonIsoAttr);
+
+    initDecl->copyFormalAccessFrom(decl, /*sourceIsParentContext=*/true);
+
+    return initDecl;
+}
+
+// === Resolve -----------------------------------------------------------------
 
 /// Synthesizes the
 ///
@@ -121,6 +305,30 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
       new (C) NonisolatedAttr(/*IsImplicit=*/true));
+
+  // ====
+  // If the Identity is Codable, the distributed actor is also Codable
+  auto encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
+  auto decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
+
+  fprintf(stderr, "[%s:%d] (%s) DERIVE ID...\n", __FILE__, __LINE__, __FUNCTION__);
+
+//  if (auto identityNominal = propertyType->getAnyNominal()) {
+//  fprintf(stderr, "[%s:%d] (%s) IDENTITY IS...\n", __FILE__, __LINE__, __FUNCTION__);
+//    identityNominal->dump();
+//
+//    auto conformances = identityNominal->getAllConformances();
+//    if (identityNominal->lookupConformance(encodableProto, conformances)) {
+//        fprintf(stderr, "[%s:%d] (%s) IDENTITY IS ENCODABLE...\n", __FILE__, __LINE__, __FUNCTION__);
+//      // Identity is Encodable, synthesize the impl for this distributed actor
+//      deriveDistributedActor_encode(derived);
+//    }
+//    if (identityNominal->lookupConformance(decodableProto, conformances)) {
+//        fprintf(stderr, "[%s:%d] (%s) IDENTITY IS DECODABLE...\n", __FILE__, __LINE__, __FUNCTION__);
+//      // Identity is Encodable, synthesize the impl for this distributed actor
+//      deriveDistributedActor_init_fromDecoder(derived);
+//    }
+//  }
 
   derived.addMembersToConformanceContext({ propDecl, pbDecl });
   return propDecl;

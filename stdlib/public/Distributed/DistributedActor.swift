@@ -35,7 +35,7 @@ public protocol AnyActor: Sendable, AnyObject {}
 /// distributed actor.
 @available(SwiftStdlib 5.6, *)
 public protocol DistributedActor:
-    AnyActor, Identifiable, Hashable, Codable {
+    AnyActor, Identifiable, Hashable {
     /// The type of transport used to communicate with actors of this type.
     associatedtype Transport: ActorTransport
 
@@ -99,8 +99,15 @@ extension CodingUserInfoKey {
   public static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_transport")!
 }
 
+/// A 'DistributedActor' that is also 'Codable'.
+///
+/// Note that 'distributed actor' declarations those 'Identity' is 'Codable',
+/// automatically gain a Codable conformance.
 @available(SwiftStdlib 5.6, *)
-extension DistributedActor {
+public typealias CodableDistributedActor = DistributedActor & Codable
+
+@available(SwiftStdlib 5.6, *)
+extension DistributedActor where Identity: Codable {
   nonisolated public init(from decoder: Decoder) throws {
     guard let transport = decoder.userInfo[.actorTransportKey] as? Transport else {
       throw DistributedActorCodingError(message:
@@ -146,7 +153,7 @@ extension DistributedActor {
 
 /// Uniquely identifies a distributed actor, and enables sending messages and identifying remote actors.
 @available(SwiftStdlib 5.6, *)
-public protocol ActorIdentity: Sendable, Hashable, Codable {}
+public protocol ActorIdentity: Sendable, Hashable {}
 
 @available(SwiftStdlib 5.6, *)
 public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomStringConvertible {
@@ -154,7 +161,7 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomString
   public let underlying: Any
   @usableFromInline let _hashInto: (inout Hasher) -> ()
   @usableFromInline let _equalTo: (Any) -> Bool
-  @usableFromInline let _encodeTo: (Encoder) throws -> ()
+//  @usableFromInline let _encodeTo: (Encoder) throws -> ()
   @usableFromInline let _description: () -> String
 
   public init<ID>(_ identity: ID) where ID: ActorIdentity {
@@ -171,9 +178,9 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomString
       }
       return identity == rhs
     }
-    _encodeTo = { encoder in
-      try identity.encode(to: encoder)
-    }
+//    _encodeTo = { encoder in
+//      try identity.encode(to: encoder)
+//    }
     _description = { () in
       "\(identity)"
     }
@@ -189,9 +196,9 @@ public struct AnyActorIdentity: ActorIdentity, @unchecked Sendable, CustomString
     self = try transport.decodeAnyIdentity(from: decoder)
   }
 
-  public func encode(to encoder: Encoder) throws {
-    try _encodeTo(encoder)
-  }
+//  public func encode(to encoder: Encoder) throws {
+//    try _encodeTo(encoder)
+//  }
 
   public var description: String {
     "\(Self.self)(\(self._description()))"

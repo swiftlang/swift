@@ -1235,15 +1235,44 @@ LookupConformanceInModuleRequest::evaluate(
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominal->lookupConformance(protocol, conformances)) {
-    if (!protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
-      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
-
-    // Try to infer Sendable conformance.
-    GetImplicitSendableRequest cvRequest{nominal};
-    if (auto conformance = evaluateOrDefault(
-            ctx.evaluator, cvRequest, nullptr)) {
-      conformances.clear();
-      conformances.push_back(conformance);
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      // Try to infer Sendable conformance.
+      GetImplicitSendableRequest cvRequest{nominal};
+      if (auto conformance = evaluateOrDefault(
+              ctx.evaluator, cvRequest, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
+    } else if (nominal->isDistributedActor() &&
+               protocol->isSpecificProtocol(KnownProtocolKind::Encodable)) {
+      // TODO(distributed): handling must be smarter here somehow
+      // Try to infer Codable conformance.
+      fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest Encodable\n", __FILE__, __LINE__, __FUNCTION__);
+      GetDistributedActorImplicitCodableRequest cvRequest{
+          nominal, KnownProtocolKind::Encodable};
+      if (auto conformance = evaluateOrDefault(
+              ctx.evaluator, cvRequest, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
+    } else if (nominal->isDistributedActor() &&
+               protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
+      // TODO(distributed): handling must be smarter here somehow
+      // Try to infer Codable conformance.
+      fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest Decodable\n", __FILE__, __LINE__, __FUNCTION__);
+      GetDistributedActorImplicitCodableRequest cvRequest{
+          nominal, KnownProtocolKind::Decodable};
+      if (auto conformance = evaluateOrDefault(
+              ctx.evaluator, cvRequest, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
+      } else {
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+      }
     } else {
       return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
     }

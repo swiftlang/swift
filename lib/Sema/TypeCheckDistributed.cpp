@@ -110,6 +110,86 @@ bool IsDistributedActorRequest::evaluate(
 
 // ==== ------------------------------------------------------------------------
 
+NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *nominal, KnownProtocolKind protoKind) const {
+  fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest EVALUATE\n", __FILE__, __LINE__, __FUNCTION__);
+  assert(protoKind == KnownProtocolKind::Encodable ||
+         protoKind == KnownProtocolKind::Decodable);
+
+  // We only synthesize for specific distributed actor types
+  auto classDecl = dyn_cast<ClassDecl>(nominal);
+  if (classDecl && !classDecl->isDistributedActor())
+    return nullptr;
+
+  // We only synthesize if the Identity conforms to the protoKind
+  auto identityTy = getDistributedActorIdentityType(classDecl);
+  identityTy->dump();
+  auto identityNominal = identityTy->getAnyNominal();
+  if (identityNominal) {
+    identityNominal->dump();
+  }
+
+  // Check whether we can infer conformance at all.
+  if (auto *file = dyn_cast<FileUnit>(nominal->getModuleScopeContext())) {
+    switch (file->getKind()) {
+    case FileUnitKind::Source:
+      // Check what kind of source file we have.
+      if (auto sourceFile = nominal->getParentSourceFile()) {
+        switch (sourceFile->Kind) {
+        case SourceFileKind::Interface:
+          // Interfaces have explicitly called-out Sendable conformances.
+          return nullptr;
+
+        case SourceFileKind::Library:
+        case SourceFileKind::Main:
+        case SourceFileKind::SIL:
+          break;
+        }
+      }
+      break;
+
+    case FileUnitKind::Builtin:
+    case FileUnitKind::SerializedAST:
+    case FileUnitKind::Synthesized:
+      // Explicitly-handled modules don't infer Sendable conformances.
+      return nullptr;
+
+    case FileUnitKind::ClangModule:
+    case FileUnitKind::DWARFModule:
+      // Infer conformances for imported modules.
+      break;
+    }
+  } else {
+    return nullptr;
+  }
+
+  // Local function to form the implicit conformance.
+  auto formConformance =
+      [&](ProtocolDecl *proto) -> NormalProtocolConformance * {
+    ASTContext &ctx = nominal->getASTContext();
+    if (!proto)
+      return nullptr;
+
+    DeclContext *conformanceDC = nominal;
+    auto conformance = ctx.getConformance(
+        nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
+        conformanceDC, ProtocolConformanceState::Incomplete,
+        /*isUnchecked=*/false);
+    conformance->setSourceKindAndImplyingConformance(
+        ConformanceEntryKind::Synthesized, nullptr);
+
+    nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
+    return conformance;
+  };
+
+  ASTContext &ctx = nominal->getASTContext();
+  auto conformance = formConformance(ctx.getProtocol(protoKind));
+  fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest EVALUATE DONE\n", __FILE__, __LINE__, __FUNCTION__);
+  return conformance;
+}
+
+// ==== ------------------------------------------------------------------------
+
 /// Check whether the function is a proper distributed function
 ///
 /// \param diagnose Whether to emit a diagnostic when a problem is encountered.
