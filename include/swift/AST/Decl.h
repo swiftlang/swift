@@ -532,11 +532,11 @@ protected:
     /// Whether the existential of this protocol conforms to itself.
     ExistentialConformsToSelf : 1,
 
-    /// Whether the \c ExistentialTypeSupported bit is valid.
-    ExistentialTypeSupportedValid : 1,
+    /// Whether the \c ExistentialRequiresAny bit is valid.
+    ExistentialRequiresAnyValid : 1,
 
-    /// Whether the existential of this protocol can be represented.
-    ExistentialTypeSupported : 1,
+    /// Whether the existential of this protocol must be spelled with \c any.
+    ExistentialRequiresAny : 1,
 
     /// True if the protocol has requirements that cannot be satisfied (e.g.
     /// because they could not be imported from Objective-C).
@@ -4230,19 +4230,19 @@ class ProtocolDecl final : public NominalTypeDecl {
     Bits.ProtocolDecl.ExistentialConformsToSelf = result;
   }
 
-  /// Returns the cached result of \c existentialTypeSupported or \c None if it
+  /// Returns the cached result of \c existentialRequiresAny or \c None if it
   /// hasn't yet been computed.
-  Optional<bool> getCachedExistentialTypeSupported() {
-    if (Bits.ProtocolDecl.ExistentialTypeSupportedValid)
-      return Bits.ProtocolDecl.ExistentialTypeSupported;
+  Optional<bool> getCachedExistentialRequiresAny() {
+    if (Bits.ProtocolDecl.ExistentialRequiresAnyValid)
+      return Bits.ProtocolDecl.ExistentialRequiresAny;
 
     return None;
   }
 
-  /// Caches the result of \c existentialTypeSupported
-  void setCachedExistentialTypeSupported(bool supported) {
-    Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
-    Bits.ProtocolDecl.ExistentialTypeSupported = supported;
+  /// Caches the result of \c existentialRequiresAny
+  void setCachedExistentialRequiresAny(bool requiresAny) {
+    Bits.ProtocolDecl.ExistentialRequiresAnyValid = true;
+    Bits.ProtocolDecl.ExistentialRequiresAny = requiresAny;
   }
 
   bool hasLazyRequirementSignature() const {
@@ -4258,7 +4258,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class RequirementSignatureRequestRQM;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
-  friend class ExistentialTypeSupportedRequest;
+  friend class ExistentialRequiresAnyRequest;
   friend class InheritedProtocolsRequest;
   
 public:
@@ -4347,11 +4347,10 @@ public:
   /// contain 'Self' in 'parameter' or 'other' position.
   bool isAvailableInExistential(const ValueDecl *decl) const;
 
-  /// Determine whether we are allowed to refer to an existential type
-  /// conforming to this protocol. This is only permitted if the types of
-  /// all the members do not contain any associated types, and do not
-  /// contain 'Self' in 'parameter' or 'other' position.
-  bool existentialTypeSupported() const;
+  /// Determine whether an existential type must be explicitly prefixed
+  /// with \c any. \c any is required if any of the members contain
+  /// an associated type, or if \c Self appears in non-covariant position.
+  bool existentialRequiresAny() const;
 
   /// Returns a list of protocol requirements that must be assessed to
   /// determine a concrete's conformance effect polymorphism kind.

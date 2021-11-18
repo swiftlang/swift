@@ -250,28 +250,28 @@ void ExistentialConformsToSelfRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// existentialTypeSupported computation.
+// existentialRequiresAny computation.
 //----------------------------------------------------------------------------//
 
-void ExistentialTypeSupportedRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+void ExistentialRequiresAnyRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
   diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
 }
 
-void ExistentialTypeSupportedRequest::noteCycleStep(DiagnosticEngine &diags) const {
+void ExistentialRequiresAnyRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto requirement = std::get<0>(getStorage());
   diags.diagnose(requirement, diag::kind_declname_declared_here,
                  DescriptiveDeclKind::Protocol, requirement->getName());
 }
 
-Optional<bool> ExistentialTypeSupportedRequest::getCachedResult() const {
+Optional<bool> ExistentialRequiresAnyRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
-  return decl->getCachedExistentialTypeSupported();
+  return decl->getCachedExistentialRequiresAny();
 }
 
-void ExistentialTypeSupportedRequest::cacheResult(bool value) const {
+void ExistentialRequiresAnyRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
-  decl->setCachedExistentialTypeSupported(value);
+  decl->setCachedExistentialRequiresAny(value);
 }
 
 //----------------------------------------------------------------------------//
