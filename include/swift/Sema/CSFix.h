@@ -376,6 +376,9 @@ enum class FixKind : uint8_t {
   /// Ignore a type mismatch between deduced element type and externally
   /// imposed one.
   IgnoreCollectionElementContextualMismatch,
+
+  /// Produce a warning for a tuple label mismatch.
+  AllowTupleLabelMismatch,
 };
 
 class ConstraintFix {
@@ -2799,6 +2802,27 @@ public:
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() ==
            FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype;
+  }
+};
+
+/// Emit a warning for mismatched tuple labels.
+class AllowTupleLabelMismatch final : public ContextualMismatch {
+  AllowTupleLabelMismatch(ConstraintSystem &cs, Type fromType, Type toType,
+                          ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowTupleLabelMismatch, fromType,
+                           toType, locator, /*warning*/ true) {}
+
+public:
+  std::string getName() const override { return "allow tuple label mismatch"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowTupleLabelMismatch *create(ConstraintSystem &cs, Type fromType,
+                                         Type toType,
+                                         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowTupleLabelMismatch;
   }
 };
 
