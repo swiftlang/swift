@@ -53,7 +53,7 @@ extension AsyncSequence {
   @inlinable
   public __consuming func prefix(
     while predicate: @escaping (Element) async throws -> Bool
-  ) rethrows -> AsyncThrowingPrefixWhileSequence<Self> {
+  ) -> AsyncThrowingPrefixWhileSequence<Self> {
     return AsyncThrowingPrefixWhileSequence(self, predicate: predicate)
   }
 }
