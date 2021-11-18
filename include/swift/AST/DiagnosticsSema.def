@@ -4519,9 +4519,6 @@ ERROR(nonisolated_distributed_actor_storage,none,
 ERROR(distributed_actor_func_nonisolated, none,
       "cannot declare method %0 as both 'nonisolated' and 'distributed'",
       (DeclName))
-ERROR(distributed_actor_func_private, none,
-      "%0 %1 cannot be 'private'",
-      (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_func_inout, none,
       "cannot declare 'inout' argument %0 in %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
