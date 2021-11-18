@@ -2620,6 +2620,16 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Emit a warning for mismatched tuple labels.
+class TupleLabelMismatchWarning final : public ContextualFailure {
+public:
+  TupleLabelMismatchWarning(const Solution &solution, Type fromType,
+                            Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose situations where Swift -> C pointer implicit conversion
 /// is attempted on a Swift function instead of one imported from C header.
 ///

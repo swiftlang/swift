@@ -2024,6 +2024,20 @@ AllowNonOptionalWeak *AllowNonOptionalWeak::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) AllowNonOptionalWeak(cs, locator);
 }
 
+AllowTupleLabelMismatch *
+AllowTupleLabelMismatch::create(ConstraintSystem &cs, Type fromType,
+                                Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowTupleLabelMismatch(cs, fromType, toType, locator);
+}
+
+bool AllowTupleLabelMismatch::diagnose(const Solution &solution,
+                                       bool asNote) const {
+  TupleLabelMismatchWarning warning(solution, getFromType(), getToType(),
+                                    getLocator());
+  return warning.diagnose(asNote);
+}
+
 bool AllowSwiftToCPointerConversion::diagnose(const Solution &solution,
                                               bool asNote) const {
   SwiftToCPointerConversionInInvalidContext failure(solution, getLocator());
