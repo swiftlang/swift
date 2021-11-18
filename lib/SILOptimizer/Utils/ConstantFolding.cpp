@@ -20,6 +20,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/Statistic.h"
