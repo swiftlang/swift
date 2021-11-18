@@ -3927,15 +3927,15 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 
 namespace {
 
-class UnsupportedProtocolVisitor
-  : public TypeReprVisitor<UnsupportedProtocolVisitor>, public ASTWalker
+class ExistentialTypeVisitor
+  : public TypeReprVisitor<ExistentialTypeVisitor>, public ASTWalker
 {
   ASTContext &Ctx;
   bool checkStatements;
   bool hitTopStmt;
     
 public:
-  UnsupportedProtocolVisitor(ASTContext &ctx, bool checkStatements)
+  ExistentialTypeVisitor(ASTContext &ctx, bool checkStatements)
     : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) { }
 
   bool walkToTypeReprPre(TypeRepr *T) override {
@@ -3990,60 +3990,60 @@ public:
 
 } // end anonymous namespace
 
-void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
+void TypeChecker::checkExistentialTypes(Decl *decl) {
   if (!decl || decl->isInvalid())
     return;
 
   auto &ctx = decl->getASTContext();
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(decl)) {
-    checkUnsupportedProtocolType(ctx, protocolDecl->getTrailingWhereClause());
+    checkExistentialTypes(ctx, protocolDecl->getTrailingWhereClause());
   } else if (auto *genericDecl = dyn_cast<GenericTypeDecl>(decl)) {
-    checkUnsupportedProtocolType(ctx, genericDecl->getGenericParams());
-    checkUnsupportedProtocolType(ctx, genericDecl->getTrailingWhereClause());
+    checkExistentialTypes(ctx, genericDecl->getGenericParams());
+    checkExistentialTypes(ctx, genericDecl->getTrailingWhereClause());
   } else if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-    checkUnsupportedProtocolType(ctx, assocType->getTrailingWhereClause());
+    checkExistentialTypes(ctx, assocType->getTrailingWhereClause());
   } else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl)) {
-    checkUnsupportedProtocolType(ctx, extDecl->getTrailingWhereClause());
+    checkExistentialTypes(ctx, extDecl->getTrailingWhereClause());
   } else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(decl)) {
-    checkUnsupportedProtocolType(ctx, subscriptDecl->getGenericParams());
-    checkUnsupportedProtocolType(ctx, subscriptDecl->getTrailingWhereClause());
+    checkExistentialTypes(ctx, subscriptDecl->getGenericParams());
+    checkExistentialTypes(ctx, subscriptDecl->getTrailingWhereClause());
   } else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (!isa<AccessorDecl>(funcDecl)) {
-      checkUnsupportedProtocolType(ctx, funcDecl->getGenericParams());
-      checkUnsupportedProtocolType(ctx, funcDecl->getTrailingWhereClause());
+      checkExistentialTypes(ctx, funcDecl->getGenericParams());
+      checkExistentialTypes(ctx, funcDecl->getTrailingWhereClause());
     }
   }
 
   if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl))
     return;
 
-  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/false);
+  ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/false);
   decl->walk(visitor);
 }
 
-void TypeChecker::checkUnsupportedProtocolType(ASTContext &ctx, Stmt *stmt) {
+void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt) {
   if (!stmt)
     return;
 
-  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/true);
+  ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/true);
   stmt->walk(visitor);
 }
 
-void TypeChecker::checkUnsupportedProtocolType(
+void TypeChecker::checkExistentialTypes(
     ASTContext &ctx, TrailingWhereClause *whereClause) {
   if (whereClause == nullptr)
     return;
 
-  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/false);
+  ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/false);
   visitor.visitRequirements(whereClause->getRequirements());
 }
 
-void TypeChecker::checkUnsupportedProtocolType(
+void TypeChecker::checkExistentialTypes(
     ASTContext &ctx, GenericParamList *genericParams) {
   if (genericParams  == nullptr)
     return;
 
-  UnsupportedProtocolVisitor visitor(ctx, /*checkStatements=*/false);
+  ExistentialTypeVisitor visitor(ctx, /*checkStatements=*/false);
   visitor.visitRequirements(genericParams->getRequirements());
 }
 
