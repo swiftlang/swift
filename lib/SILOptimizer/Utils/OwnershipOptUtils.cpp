@@ -555,7 +555,10 @@ extendOverBorrowScopeAndConsume(SILValue ownedValue) {
   // Populate the reborrowedPhis vector.
   analyzeExtendedScope();
 
-  InstructionDeleter deleter(callbacks);
+  // Warning: don't use the original callbacks in this function after creating a
+  // deleter.
+  InstModCallbacks tempCallbacks = callbacks;
+  InstructionDeleter deleter(std::move(tempCallbacks));
 
   // Generate and map the phis with undef operands first, in case of recursion.
   auto undef = SILUndef::get(ownedValue->getType(), *ownedValue->getFunction());

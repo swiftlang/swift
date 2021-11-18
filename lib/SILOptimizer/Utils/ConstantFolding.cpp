@@ -1654,6 +1654,7 @@ ConstantFolder::processWorkList() {
         InvalidateInstructions = true;
         instToDelete->eraseFromParent();
       });
+  InstructionDeleter deleter(std::move(callbacks));
 
   // An out parameter array that we use to return new simplified results from
   // constantFoldInstruction.
@@ -1677,7 +1678,7 @@ ConstantFolder::processWorkList() {
           // Schedule users for constant folding.
           WorkList.insert(AssertConfInt);
           // Delete the call.
-          eliminateDeadInstruction(BI, callbacks);
+          eliminateDeadInstruction(BI, deleter.getCallbacks());
           continue;
         }
 
@@ -1686,7 +1687,7 @@ ConstantFolder::processWorkList() {
         if (isApplyOfBuiltin(*BI, BuiltinValueKind::CondUnreachable)) {
           assert(BI->use_empty() && "use of conditionallyUnreachable?!");
           recursivelyDeleteTriviallyDeadInstructions(BI, /*force*/ true,
-                                                     callbacks);
+                                                     deleter.getCallbacks());
           InvalidateInstructions = true;
           continue;
         }
@@ -1698,7 +1699,7 @@ ConstantFolder::processWorkList() {
         SILBuilderWithScope B(I);
         auto tru = B.createIntegerLiteral(apply->getLoc(), apply->getType(), 1);
         apply->replaceAllUsesWith(tru);
-        eliminateDeadInstruction(I, callbacks);
+        eliminateDeadInstruction(I, deleter.getCallbacks());
         WorkList.insert(tru);
         InvalidateInstructions = true;
       }
@@ -1747,7 +1748,7 @@ ConstantFolder::processWorkList() {
       if (constantFoldGlobalStringTablePointerBuiltin(cast<BuiltinInst>(I),
                                                       EnableDiagnostics)) {
         // Here, the builtin instruction got folded, so clean it up.
-        eliminateDeadInstruction(I, callbacks);
+        eliminateDeadInstruction(I, deleter.getCallbacks());
       }
       continue;
     }
@@ -1763,7 +1764,7 @@ ConstantFolder::processWorkList() {
                                              sli->getValue());
           WorkList.insert(cfi);
           recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true,
-                                                     callbacks);
+                                                     deleter.getCallbacks());
         }
       }
       continue;
@@ -1773,7 +1774,7 @@ ConstantFolder::processWorkList() {
       if (constantFoldIsConcrete(cast<BuiltinInst>(I))) {
         // Here, the builtin instruction got folded, so clean it up.
         recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true,
-                                                   callbacks);
+                                                   deleter.getCallbacks());
       }
       continue;
     }
@@ -1796,7 +1797,7 @@ ConstantFolder::processWorkList() {
             SILType::getBuiltinIntegerType(1, builder.getASTContext()), val);
         BI->replaceAllUsesWith(inst);
 
-        eliminateDeadInstruction(I, callbacks);
+        eliminateDeadInstruction(I, deleter.getCallbacks());
         continue;
       }
     }
@@ -1817,7 +1818,6 @@ ConstantFolder::processWorkList() {
     }
 
     // Go through all users of the constant and try to fold them.
-    InstructionDeleter deleter(callbacks);
     for (auto Result : I->getResults()) {
       for (auto *Use : Result->getUses()) {
         SILInstruction *User = Use->getUser();
