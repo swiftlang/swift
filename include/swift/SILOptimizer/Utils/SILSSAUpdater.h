@@ -14,7 +14,7 @@
 #define SWIFT_SIL_SILSSAUPDATER_H
 
 #include "llvm/Support/Allocator.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 

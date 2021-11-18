@@ -14,6 +14,7 @@ target_sources(swiftSILOptimizer PRIVATE
   Existential.cpp
   GenericCloner.cpp
   Generics.cpp
+  InstructionDeleter.cpp
   InstOptUtils.cpp
   KeyPathProjector.cpp
   LoadStoreOptUtils.cpp
