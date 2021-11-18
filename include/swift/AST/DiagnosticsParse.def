@@ -1719,6 +1719,10 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
       "parameters as original function generic signature '%1'",
       (StringRef, StringRef))
 
+WARNING(warn_attr_unsafe_removed,none,
+        "'%0' attribute has been removed in favor of @_predatesConcurrency",
+        (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------

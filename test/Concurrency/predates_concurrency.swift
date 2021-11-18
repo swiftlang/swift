@@ -95,3 +95,12 @@ struct S2: Q {
 struct S3: Q, Sendable {
   var ns: NS // expected-error{{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-sendable type 'NS'}}
 }
+
+// ---------------------------------------------------------------------------
+// Historical attribute names do nothing (but are permitted)
+// ---------------------------------------------------------------------------
+func aFailedExperiment(@_unsafeSendable _ body: @escaping () -> Void) { }
+// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of @_predatesConcurrency}}
+
+func anothingFailedExperiment(@_unsafeMainActor _ body: @escaping () -> Void) { }
+// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of @_predatesConcurrency}}

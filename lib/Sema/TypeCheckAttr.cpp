@@ -114,8 +114,6 @@ public:
   IGNORED_ATTR(NonSendable)
   IGNORED_ATTR(AtRethrows)
   IGNORED_ATTR(AtReasync)
-  IGNORED_ATTR(UnsafeSendable)
-  IGNORED_ATTR(UnsafeMainActor)
   IGNORED_ATTR(ImplicitSelfCapture)
   IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Isolated)

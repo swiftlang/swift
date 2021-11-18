@@ -4129,13 +4129,9 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     // @MainActor. @Sendable occurs only in concurrency contents, while
     // @MainActor occurs in concurrency contexts or those where we have an
     // application.
-    bool addSendable =
-        (paramDecl->getAttrs().hasAttribute<UnsafeSendableAttr>() ||
-         knownUnsafeParams) &&
-        inConcurrencyContext;
+    bool addSendable = knownUnsafeParams && inConcurrencyContext;
     bool addMainActor =
-        (paramDecl->getAttrs().hasAttribute<UnsafeMainActorAttr>() ||
-         (isMainDispatchQueue && knownUnsafeParams)) &&
+        (isMainDispatchQueue && knownUnsafeParams) &&
         (inConcurrencyContext || numApplies >= 1);
     Type newParamType = param.getPlainType();
     if (addSendable || addMainActor) {

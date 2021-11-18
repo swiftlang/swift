@@ -635,15 +635,8 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   APIBreakingToAdd | APIStableToRemove,
   112)
 
-CONTEXTUAL_SIMPLE_DECL_ATTR(_unsafeSendable, UnsafeSendable,
-  OnParam | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  113)
-
-CONTEXTUAL_SIMPLE_DECL_ATTR(_unsafeMainActor, UnsafeMainActor,
-  OnParam | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
-  114)
+// 113 was experimental _unsafeSendable and is now unused
+// 114 was experimental _unsafeMainActor and is now unused
 
 SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
   OnParam | UserInaccessible |
