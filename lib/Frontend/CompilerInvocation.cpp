@@ -473,8 +473,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   // Experimental string processing
-  Opts.EnableExperimentalRegex |=
-      Args.hasArg(OPT_enable_experimental_regex);
+  Opts.EnableExperimentalStringProcessing |=
+      Args.hasArg(OPT_enable_experimental_string_processing);
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
