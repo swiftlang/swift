@@ -87,7 +87,7 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SCCIterator.h"
@@ -1028,7 +1028,7 @@ static bool extendOwnership(BeginAccessInst *parentInst,
 static bool
 mergeAccesses(SILFunction *F, PostDominanceInfo *postDomTree,
               const AccessConflictAndMergeAnalysis::MergeablePairs &mergePairs,
-              InstModCallbacks &callbacks, DeadEndBlocks &deBlocks) {
+              DeadEndBlocks &deBlocks) {
 
   if (mergePairs.empty()) {
     LLVM_DEBUG(llvm::dbgs() << "Skipping SCC Analysis...\n");
@@ -1064,7 +1064,7 @@ mergeAccesses(SILFunction *F, PostDominanceInfo *postDomTree,
   // begin_access instruction. We store (begin_access %2 -> begin_access %1)
   // to re-map a merged begin_access to it's replaced instruction.
   llvm::DenseMap<BeginAccessInst *, BeginAccessInst *> oldToNewMap;
-  InstructionDeleter deleter(callbacks);
+  InstructionDeleter deleter;
 
   while (!workPairs.empty()) {
     auto curr = workPairs.pop_back_val();
@@ -1162,8 +1162,7 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
         getAnalysis<PostDominanceAnalysis>();
     PostDominanceInfo *postDomTree = postDomAnalysis->get(F);
     DeadEndBlocks *deBlocks = deBlocksAnalysis->get(F);
-    InstModCallbacks callbacks;
-    if (mergeAccesses(F, postDomTree, result.mergePairs, callbacks, *deBlocks))
+    if (mergeAccesses(F, postDomTree, result.mergePairs, *deBlocks))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };

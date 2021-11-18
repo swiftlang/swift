@@ -34,6 +34,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_UPDATINGINSTRUCTIONITERATOR_H
 #define SWIFT_SILOPTIMIZER_UTILS_UPDATINGINSTRUCTIONITERATOR_H
 
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
