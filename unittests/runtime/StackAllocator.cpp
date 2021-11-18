@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "../../stdlib/public/runtime/StackAllocator.h"
-#include "swift/ABI/Metadata.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
@@ -23,13 +22,10 @@ static constexpr size_t fitsIntoSlab = slabCapacity - 16;
 static constexpr size_t twoFitIntoSlab = slabCapacity / 2 - 32;
 static constexpr size_t exceedsSlab = slabCapacity + 16;
 
-static Metadata SlabMetadata;
-
 TEST(StackAllocatorTest, withPreallocatedSlab) {
 
   char firstSlab[firstSlabBufferCapacity];
-  StackAllocator<slabCapacity, &SlabMetadata> allocator(
-      firstSlab, firstSlabBufferCapacity);
+  StackAllocator<slabCapacity> allocator(firstSlab, firstSlabBufferCapacity);
 
   char *mem1 = (char *)allocator.alloc(fitsIntoFirstSlab);
   EXPECT_EQ(allocator.getNumAllocatedSlabs(), 0);
@@ -74,7 +70,7 @@ TEST(StackAllocatorTest, withoutPreallocatedSlab) {
 
   constexpr size_t slabCapacity = 256;
 
-  StackAllocator<slabCapacity, &SlabMetadata> allocator;
+  StackAllocator<slabCapacity> allocator;
 
   size_t fitsIntoSlab = slabCapacity - 16;
   size_t twoFitIntoSlab = slabCapacity / 2 - 32;
