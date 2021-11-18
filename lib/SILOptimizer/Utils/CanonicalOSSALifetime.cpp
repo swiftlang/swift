@@ -80,7 +80,6 @@ llvm::Statistic swift::NumCopiesGenerated = {
 STATISTIC(NumDestroysEliminated,
           "number of destroy_value instructions removed");
 STATISTIC(NumDestroysGenerated, "number of destroy_value instructions created");
-STATISTIC(NumUnknownUsers, "number of functions with unknown users");
 
 //===----------------------------------------------------------------------===//
 //                           MARK: General utilities

@@ -67,7 +67,7 @@ void (*swift::swift_task_enqueueGlobal_hook)(
 
 SWIFT_CC(swift)
 void (*swift::swift_task_enqueueGlobalWithDelay_hook)(
-    unsigned long long delay, Job *job,
+    JobDelay delay, Job *job,
     swift_task_enqueueGlobalWithDelay_original original) = nullptr;
 
 SWIFT_CC(swift)
@@ -91,8 +91,7 @@ void swift::swift_task_enqueueGlobal(Job *job) {
     swift_task_enqueueGlobalImpl(job);
 }
 
-void swift::swift_task_enqueueGlobalWithDelay(unsigned long long delay,
-                                              Job *job) {
+void swift::swift_task_enqueueGlobalWithDelay(JobDelay delay, Job *job) {
   if (swift_task_enqueueGlobalWithDelay_hook)
     swift_task_enqueueGlobalWithDelay_hook(
         delay, job, swift_task_enqueueGlobalWithDelayImpl);

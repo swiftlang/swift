@@ -25,6 +25,14 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
+bool BindingSet::forClosureResult() const {
+  return Info.TypeVar->getImpl().isClosureResultType();
+}
+
+bool BindingSet::forGenericParameter() const {
+  return bool(Info.TypeVar->getImpl().getGenericParameter());
+}
+
 bool BindingSet::canBeNil() const {
   auto &ctx = CS.getASTContext();
   return Literals.count(
@@ -1010,7 +1018,8 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
           }
         }
 
-        return type->is<StructType>() || type->is<EnumType>();
+        return type->is<StructType>() || type->is<EnumType>() ||
+               type->is<BuiltinType>();
       })) {
     // Result type of subscript could be l-value so we can't bind it early.
     if (!TypeVar->getImpl().isSubscriptResultType() &&

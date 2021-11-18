@@ -1801,14 +1801,15 @@ const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Get the primary archetype.
-  auto primary = dyn_cast<PrimaryArchetypeType>(t->getRoot());
-  
+  auto root = t->getRoot();
+
   // If there is no primary (IOW, it's an opened archetype), the archetype is
   // an exemplar.
-  if (!primary) return t;
-  
+  if (!isa<PrimaryArchetypeType>(root) && !isa<VariadicSequenceType>(root))
+    return t;
+
   // Retrieve the generic environment of the archetype.
-  auto genericEnv = primary->getGenericEnvironment();
+  auto genericEnv = root->getGenericEnvironment();
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
@@ -2103,6 +2104,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
   case TypeKind::OpaqueTypeArchetype:
+  case TypeKind::SequenceArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::Class:
   case TypeKind::Enum:
@@ -2557,8 +2559,10 @@ void IRGenFunction::setDynamicSelfMetadata(CanType selfClass,
 
 #ifndef NDEBUG
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
-  auto primary = dyn_cast<PrimaryArchetypeType>(arch->getRoot());
-  if (!primary) return true;
+  auto primary = arch->getRoot();
+  if (!isa<PrimaryArchetypeType>(primary) &&
+      !isa<SequenceArchetypeType>(primary))
+    return true;
   auto genericEnv = primary->getGenericEnvironment();
 
   // Dig out the canonical generic environment.

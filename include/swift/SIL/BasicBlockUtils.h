@@ -91,8 +91,11 @@ public:
   /// the set of reachable blocks.
   void updateForReachableBlock(SILBasicBlock *reachableBB);
 
+  /// Add new blocks to the set of reachable blocks.
+  void updateForNewBlock(SILBasicBlock *newBB);
+
   const SILFunction *getFunction() const { return f; }
-  
+
   /// Performs a simple check if \p block (or its single successor) ends in an
   /// "unreachable".
   ///

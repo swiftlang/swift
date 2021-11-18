@@ -26,6 +26,6 @@ func crash(_ p: P, payload: [UInt8]) throws {
     p.foo(arr: arr, data: []).and(result: (id, arr))
   }.then { args0 in
     let (parentID, args1) = args0
-    p.bar(root: parentID, from: p).and(args1)
+    p.bar(root: parentID, from: p).and(result: args1)
   }.whenFailure { _ in }
 }

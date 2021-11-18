@@ -698,6 +698,7 @@ namespace RuntimeConstants {
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
+  const auto WillReturn = llvm::Attribute::WillReturn;
 
 #ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
   const auto NoEffect = RuntimeEffect::NoEffect;

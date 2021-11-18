@@ -2387,6 +2387,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::EndCOWMutationInst:
   case SILInstructionKind::BeginUnpairedAccessInst:
   case SILInstructionKind::BindMemoryInst:
+  case SILInstructionKind::RebindMemoryInst:
   case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::CopyBlockInst:

@@ -22,7 +22,7 @@ actor LocalActor_1 {
   var mutable: String = ""
 
   distributed func nope() {
-    // expected-error@-1{{'distributed' function can only be declared within 'distributed actor'}}
+    // expected-error@-1{{'distributed' method can only be declared within 'distributed actor'}}
   }
 }
 
@@ -66,11 +66,23 @@ distributed actor DistributedActor_1 {
   distributed func distIntString(int: Int, two: String) async throws -> (String) { "\(int) + \(two)" } // ok
 
   distributed func dist(notCodable: NotCodableValue) async throws {
-    // expected-error@-1 {{distributed instance method parameter 'notCodable' of type 'NotCodableValue' does not conform to 'Codable'}}
+    // expected-error@-1 {{parameter 'notCodable' of type 'NotCodableValue' in distributed instance method does not conform to 'Codable'}}
   }
   distributed func distBadReturn(int: Int) async throws -> NotCodableValue {
-    // expected-error@-1 {{distributed instance method result type 'NotCodableValue' does not conform to 'Codable'}}
+    // expected-error@-1 {{result type 'NotCodableValue' of distributed instance method does not conform to 'Codable'}}
     fatalError()
+  }
+
+  distributed func varargs(int: Int...) {
+    // expected-error@-1{{cannot declare variadic argument 'int' in distributed instance method 'varargs(int:)'}}
+  }
+
+  distributed func closure(close: () -> String) {
+    // expected-error@-1{{parameter 'close' of type '() -> String' in distributed instance method does not conform to 'Codable'}}
+  }
+
+  distributed func noInout(inNOut burger: inout String) {
+    // expected-error@-1{{cannot declare 'inout' argument 'burger' in distributed instance method 'noInout(inNOut:)'}}{{43-49=}}
   }
 
   distributed func distReturnGeneric<T: Codable & Sendable>(item: T) async throws -> T { // ok
@@ -80,7 +92,7 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
   distributed func distBadReturnGeneric<T: Sendable>(int: Int) async throws -> T {
-    // expected-error@-1 {{distributed instance method result type 'T' does not conform to 'Codable'}}
+    // expected-error@-1 {{result type 'T' of distributed instance method does not conform to 'Codable'}}
     fatalError()
   }
 
@@ -91,7 +103,7 @@ distributed actor DistributedActor_1 {
     value
   }
   distributed func distBadGenericParam<T: Sendable>(int: T) async throws {
-    // expected-error@-1 {{distributed instance method parameter 'int' of type 'T' does not conform to 'Codable'}}
+    // expected-error@-1 {{parameter 'int' of type 'T' in distributed instance method does not conform to 'Codable'}}
     fatalError()
   }
 

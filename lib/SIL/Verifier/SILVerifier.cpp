@@ -86,8 +86,8 @@ static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  auto root = dyn_cast<PrimaryArchetypeType>(A->getRoot());
-  if (!root)
+  auto root = A->getRoot();
+  if (!isa<PrimaryArchetypeType>(root) && !isa<SequenceArchetypeType>(root))
     return true;
   if (isa<OpenedArchetypeType>(A->getRoot()))
     return true;
@@ -3046,9 +3046,6 @@ public:
     requireSameType(rbi->getInToken()->getType(),
                     SILType::getBuiltinWordType(F.getASTContext()),
                     "rebind_memory token must be a Builtin.Int64");
-    require(isa<BindMemoryInst>(rbi->getInToken())
-            || isa<RebindMemoryInst>(rbi->getInToken()),
-            "rebind_memory token must originate from bind_memory");
   }
 
   void checkIndexAddrInst(IndexAddrInst *IAI) {

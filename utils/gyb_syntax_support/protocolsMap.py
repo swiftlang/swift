@@ -1,18 +1,23 @@
-SYNTAX_BUILDABLE_EXPRESSIBLE_BY_CONFORMANCES = {
-    'ExpressibleByConditionElement': [
-        'ExpressibleByConditionElementList'
+SYNTAX_BUILDABLE_EXPRESSIBLE_AS_CONFORMANCES = {
+    'DeclBuildable': [
+        'CodeBlockItem',
+        'MemberDeclListItem',
+        'SyntaxBuildable'
     ],
-    'ExpressibleByDeclBuildable': [
-        'ExpressibleByCodeBlockItem',
-        'ExpressibleByMemberDeclListItem',
-        'ExpressibleBySyntaxBuildable'
+    'ExprList': [
+        'ConditionElement',
+        'SyntaxBuildable'
     ],
-    'ExpressibleByStmtBuildable': [
-        'ExpressibleByCodeBlockItem',
-        'ExpressibleBySyntaxBuildable'
+    'IdentifierPattern': [
+        'PatternBuildable'
     ],
-    'ExpressibleByExprList': [
-        'ExpressibleByConditionElement',
-        'ExpressibleBySyntaxBuildable'
+    'SimpleTypeIdentifier': [
+        'TypeAnnotation',
+        'TypeBuildable',
+        'TypeExpr'
+    ],
+    'StmtBuildable': [
+        'CodeBlockItem',
+        'SyntaxBuildable'
     ]
 }
