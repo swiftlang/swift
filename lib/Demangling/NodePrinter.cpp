@@ -183,7 +183,7 @@ public:
   }
 
 private:
-  static const unsigned MaxDepth = 1024;
+  static const unsigned MaxDepth = 768;
 
   /// Called when the node tree in valid.
   ///
