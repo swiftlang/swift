@@ -1293,6 +1293,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       // type ::= archetype
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
+    case TypeKind::SequenceArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
 
     case TypeKind::OpaqueTypeArchetype: {

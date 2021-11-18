@@ -463,7 +463,8 @@ bool MissingConformanceFailure::diagnoseAsError() {
       }
 
       bool hasFix = false;
-      forEachExprInConstraintSystem(caseExpr, [&](Expr *expr) -> Expr * {
+      auto &cs = getConstraintSystem();
+      cs.forEachExpr(caseExpr, [&](Expr *expr) -> Expr * {
         hasFix |= anchors.count(expr);
         return hasFix ? nullptr : expr;
       });
@@ -3591,7 +3592,8 @@ bool MissingMemberFailure::diagnoseAsError() {
 
     bool hasUnresolvedPattern = false;
     if (auto *E = getAsExpr(anchor)) {
-      forEachExprInConstraintSystem(const_cast<Expr *>(E), [&](Expr *expr) {
+      auto &cs = getConstraintSystem();
+      cs.forEachExpr(const_cast<Expr *>(E), [&](Expr *expr) {
         hasUnresolvedPattern |= isa<UnresolvedPatternExpr>(expr);
         return hasUnresolvedPattern ? nullptr : expr;
       });
@@ -7864,6 +7866,12 @@ bool InvalidWeakAttributeUse::diagnoseAsError() {
         .fixItInsertAfter(typeRange.End, ")?");
   }
 
+  return true;
+}
+
+bool TupleLabelMismatchWarning::diagnoseAsError() {
+  emitDiagnostic(diag::tuple_label_mismatch_warning, getFromType(), getToType())
+      .highlight(getSourceRange());
   return true;
 }
 

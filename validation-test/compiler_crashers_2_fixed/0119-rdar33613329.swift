@@ -17,7 +17,7 @@ struct M<L : P, R> {
   }
 }
 
-protocol P { // expected-note {{where 'Self' = 'M<WritableKeyPath<X, Int>, R>'}}
+protocol P { // expected-note {{where 'Self' = 'M<WritableKeyPath<X, Int>, Int>'}}
   associatedtype A
   associatedtype B
 
@@ -42,5 +42,4 @@ extension WritableKeyPath : P {
 struct X { var y: Int = 0 }
 var x = X()
 x ~> \X.y ≈> { a in a += 1; return 3 }
-// expected-error@-1 {{referencing operator function '~>' on 'P' requires that 'M<WritableKeyPath<X, Int>, R>' conform to 'P'}}
-// expected-error@-2 {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}}
+//expected-error@-1 {{referencing operator function '~>' on 'P' requires that 'M<WritableKeyPath<X, Int>, Int>' conform to 'P'}}

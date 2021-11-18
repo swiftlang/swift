@@ -338,6 +338,14 @@ public:
 
   TypeVariableType *getTypeVariable() const { return Info.TypeVar; }
 
+  /// Check whether this binding set belongs to a type variable
+  /// that represents a result type of a closure.
+  bool forClosureResult() const;
+
+  /// Check whether this binding set belongs to a type variable
+  /// that represents a generic parameter.
+  bool forGenericParameter() const;
+
   bool canBeNil() const;
 
   /// If this type variable doesn't have any viable bindings, or

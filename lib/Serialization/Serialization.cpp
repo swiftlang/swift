@@ -4462,6 +4462,20 @@ public:
                                           rootTypeID, interfaceTypeID);
   }
 
+  void visitSequenceArchetypeType(const SequenceArchetypeType *archetypeTy) {
+    using namespace decls_block;
+    auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
+
+    GenericSignatureID sigID = S.addGenericSignatureRef(sig);
+    auto interfaceType =
+        archetypeTy->getInterfaceType()->castTo<GenericTypeParamType>();
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[SequenceArchetypeTypeLayout::Code];
+    SequenceArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                            sigID, interfaceType->getDepth(),
+                                            interfaceType->getIndex());
+  }
+
   void visitGenericTypeParamType(const GenericTypeParamType *genericParam) {
     using namespace decls_block;
 
@@ -4846,6 +4860,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpaqueArchetypeTypeLayout>();
   registerDeclTypeAbbr<NestedArchetypeTypeLayout>();
+  registerDeclTypeAbbr<SequenceArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
