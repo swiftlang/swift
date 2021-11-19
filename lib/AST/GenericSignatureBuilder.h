@@ -338,7 +338,8 @@ private:
   /// \returns the requirement source for the resolved conformance, or nullptr
   /// if the conformance could not be resolved.
   const RequirementSource *resolveConcreteConformance(ResolvedType type,
-                                                      ProtocolDecl *proto);
+                                                      ProtocolDecl *proto,
+                                                      bool explicitConformance);
 
   /// Retrieve the constraint source conformance for the superclass constraint
   /// of the given potential archetype (if present) to the given protocol.
@@ -347,7 +348,8 @@ private:
   ///
   /// \param proto The protocol to which we are establishing conformance.
   const RequirementSource *resolveSuperConformance(ResolvedType type,
-                                                   ProtocolDecl *proto);
+                                                   ProtocolDecl *proto,
+                                                   bool explicitConformance);
 
 public:
   /// Add a new conformance requirement specifying that the given
