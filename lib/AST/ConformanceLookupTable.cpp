@@ -904,8 +904,6 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
           // Set the conformance loader to the loader stashed inside
           // the attribute.
           normalConf->setLazyLoader(attr->getLazyLoader(), /*context=*/0);
-          if (attr->isUnchecked())
-            normalConf->setUnchecked();
           break;
         }
       }

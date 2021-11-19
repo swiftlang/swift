@@ -18,12 +18,14 @@
 
 namespace swift {
 
+class SourceFile;
+
 /// A container for synthesized declarations, attached to a `SourceFile`.
 ///
 /// Currently, only module-level synthesized declarations are supported.
 class SynthesizedFileUnit final : public FileUnit {
   /// The parent source file.
-  FileUnit &FU;
+  SourceFile &SF;
 
   /// Synthesized top level declarations.
   TinyPtrVector<Decl *> TopLevelDecls;
@@ -34,11 +36,11 @@ class SynthesizedFileUnit final : public FileUnit {
   mutable Identifier PrivateDiscriminator;
 
 public:
-  SynthesizedFileUnit(FileUnit &FU);
+  SynthesizedFileUnit(SourceFile &SF);
   ~SynthesizedFileUnit() = default;
 
   /// Returns the parent source file.
-  FileUnit &getFileUnit() const { return FU; }
+  SourceFile &getSourceFile() const { return SF; }
 
   /// Add a synthesized top-level declaration.
   void addTopLevelDecl(Decl *D) { TopLevelDecls.push_back(D); }
