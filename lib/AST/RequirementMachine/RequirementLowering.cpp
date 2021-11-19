@@ -210,6 +210,115 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
     result.push_back({req, loc, /*wasInferred=*/false});
 }
 
+namespace {
+
+/// AST walker that infers requirements from type representations.
+struct InferRequirementsWalker : public TypeWalker {
+  ModuleDecl *module;
+  SmallVector<Requirement, 2> reqs;
+
+  explicit InferRequirementsWalker(ModuleDecl *module) : module(module) {}
+
+  Action walkToTypePre(Type ty) override {
+    // Unbound generic types are the result of recovered-but-invalid code, and
+    // don't have enough info to do any useful substitutions.
+    if (ty->is<UnboundGenericType>())
+      return Action::Stop;
+
+    return Action::Continue;
+  }
+
+  Action walkToTypePost(Type ty) override {
+    // Infer from generic typealiases.
+    if (auto typeAlias = dyn_cast<TypeAliasType>(ty.getPointer())) {
+      auto decl = typeAlias->getDecl();
+      auto subMap = typeAlias->getSubstitutionMap();
+      for (const auto &rawReq : decl->getGenericSignature().getRequirements()) {
+        if (auto req = rawReq.subst(subMap))
+          desugarRequirement(*req, reqs);
+      }
+
+      return Action::Continue;
+    }
+
+    // Infer requirements from `@differentiable` function types.
+    // For all non-`@noDerivative` parameter and result types:
+    // - `@differentiable`, `@differentiable(_forward)`, or
+    //   `@differentiable(reverse)`: add `T: Differentiable` requirement.
+    // - `@differentiable(_linear)`: add
+    //   `T: Differentiable`, `T == T.TangentVector` requirements.
+    if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
+      auto &ctx = module->getASTContext();
+      auto *differentiableProtocol =
+          ctx.getProtocol(KnownProtocolKind::Differentiable);
+      if (differentiableProtocol && fnTy->isDifferentiable()) {
+        auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
+          Requirement req(RequirementKind::Conformance, type,
+                          protocol->getDeclaredInterfaceType());
+          desugarRequirement(req, reqs);
+        };
+        auto addSameTypeConstraint = [&](Type firstType,
+                                         AssociatedTypeDecl *assocType) {
+          auto *protocol = assocType->getProtocol();
+          auto *module = protocol->getParentModule();
+          auto conf = module->lookupConformance(firstType, protocol);
+          auto secondType = conf.getAssociatedType(
+              firstType, assocType->getDeclaredInterfaceType());
+          Requirement req(RequirementKind::SameType, firstType, secondType);
+          desugarRequirement(req, reqs);
+        };
+        auto *tangentVectorAssocType =
+            differentiableProtocol->getAssociatedType(ctx.Id_TangentVector);
+        auto addRequirements = [&](Type type, bool isLinear) {
+          addConformanceConstraint(type, differentiableProtocol);
+          if (isLinear)
+            addSameTypeConstraint(type, tangentVectorAssocType);
+        };
+        auto constrainParametersAndResult = [&](bool isLinear) {
+          for (auto &param : fnTy->getParams())
+            if (!param.isNoDerivative())
+              addRequirements(param.getPlainType(), isLinear);
+          addRequirements(fnTy->getResult(), isLinear);
+        };
+        // Add requirements.
+        constrainParametersAndResult(fnTy->getDifferentiabilityKind() ==
+                                     DifferentiabilityKind::Linear);
+      }
+    }
+
+    if (!ty->isSpecialized())
+      return Action::Continue;
+
+    // Infer from generic nominal types.
+    auto decl = ty->getAnyNominal();
+    if (!decl) return Action::Continue;
+
+    // FIXME: The GSB and the request evaluator both detect a cycle here if we
+    // force a recursive generic signature.  We should look into moving cycle
+    // detection into the generic signature request(s) - see rdar://55263708
+    if (!decl->hasComputedGenericSignature())
+      return Action::Continue;
+
+    auto genericSig = decl->getGenericSignature();
+    if (!genericSig)
+      return Action::Continue;
+
+    /// Retrieve the substitution.
+    auto subMap = ty->getContextSubstitutionMap(module, decl);
+
+    // Handle the requirements.
+    // FIXME: Inaccurate TypeReprs.
+    for (const auto &rawReq : genericSig.getRequirements()) {
+      if (auto req = rawReq.subst(subMap))
+        desugarRequirement(*req, reqs);
+    }
+
+    return Action::Continue;
+  }
+};
+
+}
+
 /// Infer requirements from applications of BoundGenericTypes to type
 /// parameters. For example, given a function declaration
 ///
@@ -220,7 +329,14 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
 void swift::rewriting::inferRequirements(
     Type type, SourceLoc loc, ModuleDecl *module,
     SmallVectorImpl<StructuralRequirement> &result) {
-  // FIXME: Implement
+  if (!type)
+    return;
+
+  InferRequirementsWalker walker(module);
+  type.walk(walker);
+
+  for (const auto &req : walker.reqs)
+    result.push_back({req, loc, /*wasInferred=*/true});
 }
 
 /// Desugar a requirement and perform requirement inference if requested
