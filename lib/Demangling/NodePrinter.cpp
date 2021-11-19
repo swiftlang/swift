@@ -559,6 +559,7 @@ private:
     case Node::Kind::ProtocolConformanceRefInProtocolModule:
     case Node::Kind::ProtocolConformanceRefInOtherModule:
     case Node::Kind::DistributedThunk:
+    case Node::Kind::DistributedMethodAccessor:
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionImpl:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
@@ -1995,6 +1996,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::DistributedThunk:
     if (!Options.ShortenThunk) {
       Printer << "distributed thunk for ";
+    }
+    return nullptr;
+  case Node::Kind::DistributedMethodAccessor:
+    if (!Options.ShortenThunk) {
+      Printer << "distributed method accessor for ";
     }
     return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:

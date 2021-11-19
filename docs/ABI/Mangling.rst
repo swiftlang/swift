@@ -218,6 +218,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
   global ::= global 'TE'                 // distributed actor thunk
+  global ::= global 'TF'                 // distributed method accessor
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
   global ::= global 'Tu'                 // async function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function

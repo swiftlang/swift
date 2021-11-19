@@ -1611,6 +1611,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::DirectMethodReferenceAttribute:
       case Node::Kind::MergedFunction:
       case Node::Kind::DistributedThunk:
+      case Node::Kind::DistributedMethodAccessor:
       case Node::Kind::DynamicallyReplaceableFunctionKey:
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
@@ -2245,6 +2246,12 @@ ManglingError Remangler::mangleMergedFunction(Node *node, unsigned depth) {
 ManglingError
 Remangler::mangleDistributedThunk(Node *node, unsigned depth) {
   Buffer << "TE";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleDistributedMethodAccessor(Node *node, unsigned depth) {
+  Buffer << "TF";
   return ManglingError::Success;
 }
 

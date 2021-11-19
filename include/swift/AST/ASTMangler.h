@@ -104,6 +104,7 @@ public:
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
     DistributedThunk,
+    DistributedMethodAccessor
   };
 
   ASTMangler(bool DWARFMangling = false)
