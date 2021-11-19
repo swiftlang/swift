@@ -294,6 +294,9 @@ struct AsyncTask::PrivateStorage {
   /// state.
   uintptr_t ExclusivityAccessSet[2] = {0, 0};
 
+  /// The top 32 bits of the task ID. The bottom 32 bits are in Job::Id.
+  uint32_t Id;
+
   PrivateStorage(JobFlags flags)
       : Status(ActiveTaskStatus(flags)), Local(TaskLocal::Storage()) {}
 
