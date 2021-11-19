@@ -4037,34 +4037,6 @@ static Type applyUnsafeConcurrencyToParameterType(
                                .withGlobalActor(globalActor));
 }
 
-/// Strip concurrency from the given type.
-static Type stripConcurrencyFromType(Type type, bool dropGlobalActor) {
-  // Look through optionals.
-  if (Type optionalObject = type->getOptionalObjectType()) {
-    Type newOptionalObject =
-        stripConcurrencyFromType(optionalObject, dropGlobalActor);
-    if (optionalObject->isEqual(newOptionalObject))
-      return type;
-
-    return OptionalType::get(newOptionalObject);
-  }
-
-  // For function types, strip off Sendable and possibly the global actor.
-  if (auto fnType = type->getAs<FunctionType>()) {
-    auto extInfo = fnType->getExtInfo().withConcurrent(false);
-    if (dropGlobalActor)
-      extInfo = extInfo.withGlobalActor(Type());
-    auto newFnType = FunctionType::get(
-        fnType->getParams(), fnType->getResult(), extInfo);
-    if (newFnType->isEqual(type))
-      return type;
-
-    return newFnType;
-  }
-
-  return type;
-}
-
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.
 bool swift::isDispatchQueueOperationName(StringRef name) {
@@ -4112,7 +4084,7 @@ Type swift::adjustVarTypeForConcurrency(
     isLValue = true;
   }
 
-  type = stripConcurrencyFromType(type, /*dropGlobalActor=*/true);
+  type = type->stripConcurrency(/*recurse=*/false, /*dropGlobalActor=*/true);
 
   if (isLValue)
     type = LValueType::get(type);
@@ -4164,8 +4136,8 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
       newParamType = applyUnsafeConcurrencyToParameterType(
         param.getPlainType(), addSendable, addMainActor);
     } else if (stripConcurrency) {
-      newParamType = stripConcurrencyFromType(
-          param.getPlainType(), numApplies == 0);
+      newParamType = param.getPlainType()->stripConcurrency(
+          /*recurse=*/false, /*dropGlobalActor=*/numApplies == 0);
     }
 
     if (!newParamType || newParamType->isEqual(param.getPlainType())) {
@@ -4189,8 +4161,8 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   // Compute the new result type.
   Type newResultType = fnType->getResult();
   if (stripConcurrency) {
-    newResultType = stripConcurrencyFromType(
-        newResultType, /*dropGlobalActor=*/true);
+    newResultType = newResultType->stripConcurrency(
+        /*recurse=*/false, /*dropGlobalActor=*/true);
 
     if (!newResultType->isEqual(fnType->getResult()) && newTypeParams.empty()) {
       newTypeParams.append(typeParams.begin(), typeParams.end());
