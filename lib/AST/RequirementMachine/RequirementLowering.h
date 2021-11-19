@@ -93,12 +93,15 @@ struct RuleBuilder {
 
   RuleBuilder(RewriteContext &ctx, bool dump) : Context(ctx), Dump(dump) {}
   void addRequirements(ArrayRef<Requirement> requirements);
+  void addRequirements(ArrayRef<StructuralRequirement> requirements);
   void addProtocols(ArrayRef<const ProtocolDecl *> proto);
   void addProtocol(const ProtocolDecl *proto,
                    bool initialComponent);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
+                      const ProtocolDecl *proto);
+  void addRequirement(const StructuralRequirement &req,
                       const ProtocolDecl *proto);
   void collectRulesFromReferencedProtocols();
 };

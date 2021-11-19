@@ -86,6 +86,9 @@ class RequirementMachine final {
   void initWithAbstractRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements);
+  void initWithWrittenRequirements(
+      ArrayRef<GenericTypeParamType *> genericParams,
+      ArrayRef<StructuralRequirement> requirements);
 
   bool isComplete() const;
 

@@ -257,6 +257,44 @@ void RequirementMachine::initWithAbstractRequirements(
   }
 }
 
+/// Build a requirement machine from a set of generic parameters and
+/// structural requirements.
+///
+/// This must only be called exactly once, before any other operations are
+/// performed on this requirement machine.
+///
+/// Used by InferredGenericSignatureRequest.
+void RequirementMachine::initWithWrittenRequirements(
+    ArrayRef<GenericTypeParamType *> genericParams,
+    ArrayRef<StructuralRequirement> requirements) {
+  Params.append(genericParams.begin(), genericParams.end());
+
+  FrontendStatsTracer tracer(Stats, "build-rewrite-system");
+
+  if (Dump) {
+    llvm::dbgs() << "Adding generic parameters:";
+    for (auto *paramTy : genericParams)
+      llvm::dbgs() << " " << Type(paramTy);
+    llvm::dbgs() << "\n";
+  }
+
+  // Collect the top-level requirements, and all transtively-referenced
+  // protocol requirement signatures.
+  RuleBuilder builder(Context, Dump);
+  builder.addRequirements(requirements);
+
+  // Add the initial set of rewrite rules to the rewrite system.
+  System.initialize(/*recordLoops=*/true,
+                    std::move(builder.PermanentRules),
+                    std::move(builder.RequirementRules));
+
+  computeCompletion(RewriteSystem::AllowInvalidRequirements);
+
+  if (Dump) {
+    llvm::dbgs() << "}\n";
+  }
+}
+
 /// Attempt to obtain a confluent rewrite system by iterating the Knuth-Bendix
 /// completion procedure together with property map construction until fixed
 /// point.

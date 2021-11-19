@@ -692,6 +692,21 @@ void RuleBuilder::addRequirements(ArrayRef<Requirement> requirements) {
     addRequirement(req, /*proto=*/nullptr);
 }
 
+void RuleBuilder::addRequirements(ArrayRef<StructuralRequirement> requirements) {
+  // Collect all protocols transitively referenced from these requirements.
+  for (auto req : requirements) {
+    if (req.req.getKind() == RequirementKind::Conformance) {
+      addProtocol(req.req.getProtocolDecl(), /*initialComponent=*/false);
+    }
+  }
+
+  collectRulesFromReferencedProtocols();
+
+  // Add rewrite rules for all top-level requirements.
+  for (const auto &req : requirements)
+    addRequirement(req, /*proto=*/nullptr);
+}
+
 void RuleBuilder::addProtocols(ArrayRef<const ProtocolDecl *> protos) {
   // Collect all protocols transitively referenced from this connected component
   // of the protocol dependency graph.
@@ -849,6 +864,12 @@ void RuleBuilder::addRequirement(const Requirement &req,
   RequirementRules.emplace_back(subjectTerm, constraintTerm);
 }
 
+void RuleBuilder::addRequirement(const StructuralRequirement &req,
+                                 const ProtocolDecl *proto) {
+  // FIXME: Preserve source location information for diagnostics.
+  addRequirement(req.req.getCanonical(), proto);
+}
+
 /// Record information about a protocol if we have no seen it yet.
 void RuleBuilder::addProtocol(const ProtocolDecl *proto,
                               bool initialComponent) {
@@ -902,10 +923,8 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
     // we can trigger the computation of the requirement signatures of the
     // next component recursively.
     if (ProtocolMap[proto]) {
-      // FIXME: Keep source location information around for redundancy
-      // diagnostics.
       for (auto req : proto->getStructuralRequirements())
-        addRequirement(req.req.getCanonical(), proto);
+        addRequirement(req, proto);
 
       for (auto req : proto->getTypeAliasRequirements())
         addRequirement(req.getCanonical(), proto);
