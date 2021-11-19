@@ -34,8 +34,7 @@ public protocol AnyActor: Sendable, AnyObject {}
 /// The 'DistributedActor' protocol provides the core functionality of any
 /// distributed actor.
 @available(SwiftStdlib 5.6, *)
-public protocol DistributedActor:
-    AnyActor, Identifiable, Hashable {
+public protocol DistributedActor: AnyActor, Identifiable, Hashable {
     /// The type of transport used to communicate with actors of this type.
     associatedtype Transport: ActorTransport
 

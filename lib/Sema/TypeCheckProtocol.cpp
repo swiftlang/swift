@@ -6518,6 +6518,10 @@ TypeWitnessRequest::evaluate(Evaluator &eval,
   ConformanceChecker checker(requirement->getASTContext(), conformance,
                              MissingWitnesses);
   checker.resolveSingleTypeWitness(requirement);
+  fprintf(stderr, "[%s:%d] (%s) conformance: \n", __FILE__, __LINE__, __FUNCTION__);
+  conformance->dump();
+  fprintf(stderr, "[%s:%d] (%s) requirement: \n", __FILE__, __LINE__, __FUNCTION__);
+  requirement->dump();
   checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
   // FIXME: ConformanceChecker and the other associated WitnessCheckers have
   // an extremely convoluted caching scheme that doesn't fit nicely into the

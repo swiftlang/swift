@@ -1249,11 +1249,11 @@ LookupConformanceInModuleRequest::evaluate(
       }
     }
 
-    if (nominal->isDistributedActor() &&
-               protocol->isSpecificProtocol(KnownProtocolKind::Encodable)) {
+    if (nominal->isDistributedActor()) {
       // TODO(distributed): handling must be smarter here somehow
       // Try to infer Codable conformance.
-      fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest Encodable\n", __FILE__, __LINE__, __FUNCTION__);
+      fprintf(stderr, "[%s:%d] (%s) [%s] SHOULD BECOME Encodable?\n", __FILE__, __LINE__, __FUNCTION__,
+              nominal->getNameStr().str().c_str());
       GetDistributedActorImplicitCodableRequest cvRequest{
           nominal, KnownProtocolKind::Encodable};
       if (auto conformance = evaluateOrDefault(
@@ -1266,11 +1266,11 @@ LookupConformanceInModuleRequest::evaluate(
       }
     }
 
-    if (nominal->isDistributedActor() &&
-               protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
+    if (nominal->isDistributedActor()) {
       // TODO(distributed): handling must be smarter here somehow
       // Try to infer Codable conformance.
-      fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest Decodable\n", __FILE__, __LINE__, __FUNCTION__);
+      fprintf(stderr, "[%s:%d] (%s) [%s] SHOULD BECOME Decodable?\n", __FILE__, __LINE__, __FUNCTION__,
+              nominal->getNameStr().str().c_str());
       GetDistributedActorImplicitCodableRequest cvRequest{
           nominal, KnownProtocolKind::Decodable};
       if (auto conformance = evaluateOrDefault(
@@ -1286,6 +1286,8 @@ LookupConformanceInModuleRequest::evaluate(
     }
   }
 
+  fprintf(stderr, "[%s:%d] (%s) conformances.size = %d\n", __FILE__, __LINE__, __FUNCTION__,
+          conformances.size());
   assert(!conformances.empty());
 
   // If we have multiple conformances, first try to filter out any that are
@@ -1297,7 +1299,11 @@ LookupConformanceInModuleRequest::evaluate(
     SmallVector<ProtocolConformance *, 2> availableConformances;
 
     for (auto *conformance : conformances) {
+      fprintf(stderr, "[%s:%d] (%s) CHECK AVAILABLE CONF %s\n", __FILE__, __LINE__, __FUNCTION__,
+                conformance->getType()->getAnyNominal()->getName().str().str().c_str());
       if (conformance->getDeclContext()->isAlwaysAvailableConformanceContext())
+        fprintf(stderr, "[%s:%d] (%s) ADD AVAILABLE CONF %s\n", __FILE__, __LINE__, __FUNCTION__,
+                conformance->getType()->getAnyNominal()->getName().str().str().c_str());
         availableConformances.push_back(conformance);
     }
 

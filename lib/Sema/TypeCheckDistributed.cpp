@@ -128,13 +128,24 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
   auto identityTy = getDistributedActorIdentityType(classDecl);
   auto identityNominal = identityTy->getAnyNominal();
   if (identityNominal) {
-    fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest EVALUATE FOR %s\n", __FILE__, __LINE__, __FUNCTION__,
+    fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest EVALUATE FOR [%s]\n", __FILE__, __LINE__, __FUNCTION__,
             identityNominal->getName().str().str().c_str());
   }
 
   auto identityConformsToProto = false;
   SmallVector<ProtocolConformance *, 2> conformances;
   conformances = identityNominal->getAllConformances();
+
+  fprintf(stderr, "[%s:%d] (%s)    [%s]'s WANTS conformance: %s \n", __FILE__, __LINE__, __FUNCTION__,
+          nominal->getNameStr().str().c_str(),
+          proto->getNameStr().str().c_str()
+          );
+  for (auto c: conformances) {
+    fprintf(stderr, "[%s:%d] (%s)    [%s]'s identity has conformance: %s \n", __FILE__, __LINE__, __FUNCTION__,
+            nominal->getNameStr().str().c_str(),
+            c->getProtocol()->getNameStr().str().c_str());
+  }
+
   if (!identityNominal->lookupConformance(proto, conformances)) {
     fprintf(stderr, "[%s:%d] (%s) Identity = %s DOES NOT conform to %s\n", __FILE__, __LINE__, __FUNCTION__,
             identityNominal->getName().str().str().c_str(),
@@ -151,6 +162,7 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
         switch (sourceFile->Kind) {
         case SourceFileKind::Interface:
           // Interfaces have explicitly called-out Sendable conformances.
+          fprintf(stderr, "[%s:%d] (%s) return \n", __FILE__, __LINE__, __FUNCTION__);
           return nullptr;
 
         case SourceFileKind::Library:
@@ -165,6 +177,7 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
     case FileUnitKind::SerializedAST:
     case FileUnitKind::Synthesized:
       // Explicitly-handled modules don't infer Sendable conformances.
+      fprintf(stderr, "[%s:%d] (%s) return \n", __FILE__, __LINE__, __FUNCTION__);
       return nullptr;
 
     case FileUnitKind::ClangModule:
@@ -173,14 +186,17 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
       break;
     }
   } else {
+    fprintf(stderr, "[%s:%d] (%s) return \n", __FILE__, __LINE__, __FUNCTION__);
     return nullptr;
   }
 
   // Local function to form the implicit conformance.
   auto formConformance =
       [&](ProtocolDecl *proto) -> NormalProtocolConformance * {
-    if (!proto)
+    if (!proto) {
+      fprintf(stderr, "[%s:%d] (%s) return \n", __FILE__, __LINE__, __FUNCTION__);
       return nullptr;
+    }
 
     DeclContext *conformanceDC = nominal;
     auto conformance = ctx.getConformance(
@@ -191,6 +207,8 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
         ConformanceEntryKind::Synthesized, nullptr);
 
     nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
+    fprintf(stderr, "[%s:%d] (%s) return conf %s\n", __FILE__, __LINE__, __FUNCTION__,
+            conformance->getProtocol()->getNameStr().str().c_str());
     return conformance;
   };
 

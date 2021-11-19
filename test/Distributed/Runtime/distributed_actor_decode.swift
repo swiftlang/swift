@@ -9,7 +9,7 @@
 
 import _Distributed
 
-distributed actor DA {
+distributed actor SpecificCodableDistributedActor {
   typealias Transport = CodableFakeTransport
   // typealias Identity = ActorAddress // FIXME(distributed): does not actually have any impact
 }
@@ -187,15 +187,15 @@ class TestDecoder: Decoder {
 func test() {
   let transport = CodableFakeTransport()
 
-  // NO_CHECK: assign type:DA, address:ActorAddress(address: "xxx")
-  let da = DA(transport: transport)
+  // NO_CHECK: assign type:SpecificCodableDistributedActor, address:ActorAddress(address: "xxx")
+  let da = SpecificCodableDistributedActor(transport: transport)
 
-  // CHECK: DA is Encodable = true
-  print("DA is Encodable = \(DA.self is Encodable)")
-  // CHECK: DA is Decodable = true
-  print("DA is Decodable = \(DA.self is Decodable)")
-  // CHECK: DA is Codable = true
-  print("DA is Codable = \(DA.self is Codable)")
+  // CHECK: SpecificCodableDistributedActor is Encodable = true
+  print("SpecificCodableDistributedActor is Encodable = \(SpecificCodableDistributedActor.self is Encodable)")
+  // CHECK: SpecificCodableDistributedActor is Decodable = true
+  print("SpecificCodableDistributedActor is Decodable = \(SpecificCodableDistributedActor.self is Decodable)")
+  // CHECK: SpecificCodableDistributedActor is Codable = true
+  print("SpecificCodableDistributedActor is Codable = \(SpecificCodableDistributedActor.self is Codable)")
 
   // NO_CHECK: encode: ActorAddress(ActorAddress(address: "xxx"))
   // NO_CHECK: CodableFakeTransport.decodeIdentity from:main.TestDecoder
@@ -204,9 +204,9 @@ func test() {
 //
 //  // NO_CHECK: decode String -> xxx
 //  // NO_CHECK: decode ActorAddress -> ActorAddress(address: "xxx")
-//  let da2 = try! DA(from: TestDecoder(encoder: encoder, transport: transport, data: data))
+//  let da2 = try! SpecificCodableDistributedActor(from: TestDecoder(encoder: encoder, transport: transport, data: data))
 //
-//  // NO_CHECK: decoded da2: DA(ActorAddress(address: "xxx"))
+//  // NO_CHECK: decoded da2: SpecificCodableDistributedActor(ActorAddress(address: "xxx"))
 //  print("decoded da2: \(da2)")
 }
 

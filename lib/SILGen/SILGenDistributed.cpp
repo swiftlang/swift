@@ -59,8 +59,8 @@ static SILValue emitActorPropertyReference(
 /// \param prop the property to be initialized.
 /// \param value the value to use when initializing the property.
 static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
-                               SILValue actorSelf,
-                               VarDecl* prop, SILValue value, bool destroyTheCopyPlease) {
+                               SILValue actorSelf, VarDecl *prop,
+                               SILValue value) {
   fprintf(stderr, "[%s:%d] (%s) initialize property: %s \n", __FILE__, __LINE__, __FUNCTION__, prop->getNameStr().str().c_str());
 
   Type formalType = SGF.F.mapTypeIntoContext(prop->getInterfaceType());
@@ -155,7 +155,7 @@ static void emitTransportInit(SILGenFunction &SGF,
   assert(var);
 
   fprintf(stderr, "[%s:%d] (%s) emit transport init ... property...\n", __FILE__, __LINE__, __FUNCTION__);
-  initializeProperty(SGF, loc, actorSelf.getValue(), var, transportArg, /*destroyTheCopyPlease=*/false);
+  initializeProperty(SGF, loc, actorSelf.getValue(), var, transportArg);
 }
 
 /// Emits the distributed actor's identity (`id`) initialization.
@@ -200,7 +200,7 @@ static void emitIdentityInit(SILGenFunction &SGF, ConstructorDecl *ctor,
 
   // --- initialize the property.
   fprintf(stderr, "[%s:%d] (%s) emit identity init... property...\n", __FILE__, __LINE__, __FUNCTION__);
-  initializeProperty(SGF, loc, borrowedSelfArg.getValue(), var, temp, /*destroyTheCopyPlease=*/false);
+  initializeProperty(SGF, loc, borrowedSelfArg.getValue(), var, temp);
 
   fprintf(stderr, "[%s:%d] (%s) -----------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   fprintf(stderr, "[%s:%d] (%s) -----------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
@@ -427,16 +427,13 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
     auto classDecl = dc->getSelfClassDecl();
     
     fprintf(stderr, "[%s:%d] (%s) emit dist factory... [id] resolve...\n", __FILE__, __LINE__, __FUNCTION__);
-    initializeProperty(*this, loc, remote,
-                       lookupProperty(classDecl, C.Id_id),
-                       identityArg,
-                       /*destroyTheCopyPlease=*/false);
+    initializeProperty(*this, loc, remote, lookupProperty(classDecl, C.Id_id),
+                       identityArg);
 
     fprintf(stderr, "[%s:%d] (%s) emit dist factory... [transport] resolve...\n", __FILE__, __LINE__, __FUNCTION__);
     initializeProperty(*this, loc, remote,
                        lookupProperty(classDecl, C.Id_actorTransport),
-                       transportArg,
-                       /*destroyTheCopyPlease=*/false);
+                       transportArg);
 
     // ==== Branch to return the fully initialized remote instance
     B.createBranch(loc, returnBB, {remote});
