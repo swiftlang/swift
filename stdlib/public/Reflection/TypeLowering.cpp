@@ -672,6 +672,12 @@ public:
     return true;
   }
 
+  void makeZero() {
+    for (unsigned i = 0; i < size; ++i) {
+      mask[i] = 0;
+    }
+  }
+
   void complement() {
     for (unsigned i = 0; i < size; ++i) {
       mask[i] = ~mask[i];
