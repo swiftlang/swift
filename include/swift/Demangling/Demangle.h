@@ -243,7 +243,8 @@ public:
     return getChild(getNumChildren() - 1);
   }
   NodePointer getChild(size_t index) const {
-    assert(getNumChildren() > index);
+    if (index >= getNumChildren())
+      return nullptr;
     return begin()[index];
   }
 

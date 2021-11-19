@@ -90,6 +90,22 @@ func dumpMetadataCacheNodes(
   }
 }
 
+func dumpArrays(
+  context: SwiftReflectionContextRef,
+  inspector: Inspector
+) throws {
+  print("Address","Size","Count","Is Class", separator: "\t")
+  inspector.enumerateMallocs(callback: { (pointer, size) in
+    let metadata = swift_reflection_ptr_t(swift_reflection_metadataForObject(context, UInt(pointer)))
+    guard metadata != 0 else { return }
+    guard context.isAContiguousArray(metadata: metadata) else { return }
+    let isClass = context.isAContiguousArrayOfClassElementType(metadata: metadata)
+    let count = context.arrayCount(array: pointer, reader: inspector.read)
+    let countStr = count.map({ String($0) }) ?? "<unknown>"
+    print("\(hex: pointer)\t\(size)\t\(countStr)\t\(isClass)")
+  })
+}
+
 func printBacktrace(
   style: Backtrace.Style?,
   for ptr: swift_reflection_ptr_t,
@@ -152,6 +168,7 @@ struct SwiftInspect: ParsableCommand {
       DumpRawMetadata.self,
       DumpGenericMetadata.self,
       DumpCacheNodes.self,
+      DumpArrays.self,
     ])
 }
 
@@ -237,6 +254,20 @@ struct DumpCacheNodes: ParsableCommand {
     try withReflectionContext(nameOrPid: options.nameOrPid) {
       try dumpMetadataCacheNodes(context: $0,
                                  inspector: $1)
+    }
+  }
+}
+
+struct DumpArrays: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "Print the target's metadata cache nodes.")
+
+  @OptionGroup()
+  var options: UniversalOptions
+
+  func run() throws {
+    try withReflectionContext(nameOrPid: options.nameOrPid) {
+      try dumpArrays(context: $0, inspector: $1)
     }
   }
 }

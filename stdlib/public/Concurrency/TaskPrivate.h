@@ -270,8 +270,9 @@ public:
 
 /// The size of an allocator slab.
 static constexpr size_t SlabCapacity = 1000;
+extern Metadata TaskAllocatorSlabMetadata;
 
-using TaskAllocator = StackAllocator<SlabCapacity>;
+using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata>;
 
 /// Private storage in an AsyncTask object.
 struct AsyncTask::PrivateStorage {
