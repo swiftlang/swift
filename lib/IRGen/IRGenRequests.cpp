@@ -68,9 +68,10 @@ TinyPtrVector<FileUnit *> IRGenDescriptor::getFilesToEmit() const {
   TinyPtrVector<FileUnit *> files;
   files.push_back(primary);
 
-  if (auto *synthesizedFile = primary->getSynthesizedFile())
-    files.push_back(synthesizedFile);
-
+  if (auto *SF = dyn_cast<SourceFile>(primary)) {
+    if (auto *synthesizedFile = SF->getSynthesizedFile())
+      files.push_back(synthesizedFile);
+  }
   return files;
 }
 

@@ -1203,8 +1203,10 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
     visitFile(singleFile);
 
     // Visit synthesized file, if it exists.
-    if (auto *synthesizedFile = singleFile->getSynthesizedFile())
-      visitFile(synthesizedFile);
+    if (auto *SF = dyn_cast<SourceFile>(singleFile)) {
+      if (auto *synthesizedFile = SF->getSynthesizedFile())
+        visitFile(synthesizedFile);
+    }
     return;
   }
 

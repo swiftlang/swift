@@ -3932,8 +3932,6 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
       auto inherits = ctx.AllocateCopy(makeArrayRef(
           InheritedEntry(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
                          /*isUnchecked*/true)));
-      // If you change the use of AtLoc in the ExtensionDecl, make sure you
-      // update isNonSendableExtension() in ASTPrinter.
       auto extension = ExtensionDecl::create(ctx, attrMakingUnavailable->AtLoc,
                                              nullptr, inherits,
                                              nominal->getModuleScopeContext(),
@@ -3948,8 +3946,8 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
       nominal->addExtension(extension);
 
       // Make it accessible to getTopLevelDecls()
-      if (auto file = dyn_cast<FileUnit>(nominal->getModuleScopeContext()))
-        file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
+      if (auto sf = dyn_cast<SourceFile>(nominal->getModuleScopeContext()))
+        sf->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
 
       conformanceDC = extension;
     }
@@ -3964,6 +3962,9 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
     return conformance;
   };
+
+  if (auto nonSendable = nominal->getAttrs().getAttribute<NonSendableAttr>())
+    return formConformance(nonSendable);
 
   // A non-protocol type with a global actor is implicitly Sendable.
   if (nominal->getGlobalActorAttr()) {
@@ -3983,12 +3984,6 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
     // Form the implicit conformance to Sendable.
     return formConformance(nullptr);
-  }
-
-  if (auto attr = nominal->getAttrs().getEffectiveSendableAttr()) {
-    assert(!isa<SendableAttr>(attr) &&
-           "Conformance should have been added by SynthesizedProtocolAttr!");
-    return formConformance(cast<NonSendableAttr>(attr));
   }
 
   // Only structs and enums can get implicit Sendable conformances by

@@ -1769,24 +1769,6 @@ bool ShouldPrintChecker::shouldPrint(const Pattern *P,
   return ShouldPrint;
 }
 
-bool isNonSendableExtension(const Decl *D) {
-  ASTContext &ctx = D->getASTContext();
-
-  const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D);
-  if (!ED || !ED->getAttrs().isUnavailable(ctx))
-    return false;
-
-  auto nonSendable =
-      ED->getExtendedNominal()->getAttrs().getEffectiveSendableAttr();
-  if (!isa_and_nonnull<NonSendableAttr>(nonSendable))
-    return false;
-
-  // GetImplicitSendableRequest::evaluate() creates its extension with the
-  // attribute's AtLoc, so this is a good way to quickly check if the extension
-  // was synthesized for an '@_nonSendable' attribute.
-  return ED->getLocFromSource() == nonSendable->AtLoc;
-}
-
 bool ShouldPrintChecker::shouldPrint(const Decl *D,
                                      const PrintOptions &Options) {
   #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
@@ -1809,18 +1791,15 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     return false;
   }
 
-  // Optionally skip these checks for extensions synthesized for '@_nonSendable'
-  if (!Options.AlwaysPrintNonSendableExtensions || !isNonSendableExtension(D)) {
-    if (Options.SkipImplicit && D->isImplicit()) {
-      const auto &IgnoreList = Options.TreatAsExplicitDeclList;
-      if (!llvm::is_contained(IgnoreList, D))
+  if (Options.SkipImplicit && D->isImplicit()) {
+    const auto &IgnoreList = Options.TreatAsExplicitDeclList;
+    if (std::find(IgnoreList.begin(), IgnoreList.end(), D) == IgnoreList.end())
         return false;
-    }
-
-    if (Options.SkipUnavailable &&
-        D->getAttrs().isUnavailable(D->getASTContext()))
-      return false;
   }
+
+  if (Options.SkipUnavailable &&
+      D->getAttrs().isUnavailable(D->getASTContext()))
+    return false;
 
   if (Options.ExplodeEnumCaseDecls) {
     if (isa<EnumElementDecl>(D))
@@ -5927,7 +5906,6 @@ swift::getInheritedForPrinting(
   // Collect synthesized conformances.
   auto &ctx = decl->getASTContext();
   llvm::SetVector<ProtocolDecl *> protocols;
-  llvm::TinyPtrVector<ProtocolDecl *> uncheckedProtocols;
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     if (auto *proto = ctx.getProtocol(attr->getProtocolKind())) {
       // The SerialExecutor conformance is only synthesized on the root
@@ -5940,14 +5918,11 @@ swift::getInheritedForPrinting(
           cast<EnumDecl>(decl)->hasRawType())
         continue;
       protocols.insert(proto);
-      if (attr->isUnchecked())
-        uncheckedProtocols.push_back(proto);
     }
   }
 
   for (size_t i = 0; i < protocols.size(); i++) {
     auto proto = protocols[i];
-    bool isUnchecked = llvm::is_contained(uncheckedProtocols, proto);
 
     if (!options.shouldPrint(proto)) {
       // If private stdlib protocols are skipped and this is a private stdlib
@@ -5958,14 +5933,12 @@ swift::getInheritedForPrinting(
           proto->isPrivateStdlibDecl(!options.SkipUnderscoredStdlibProtocols)) {
         auto inheritedProtocols = proto->getInheritedProtocols();
         protocols.insert(inheritedProtocols.begin(), inheritedProtocols.end());
-        if (isUnchecked)
-          copy(inheritedProtocols, std::back_inserter(uncheckedProtocols));
       }
       continue;
     }
 
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                       isUnchecked});
+                       /*isUnchecked=*/false});
   }
 }
 

@@ -605,7 +605,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
   106)
 
 SIMPLE_DECL_ATTR(Sendable, Sendable,
-  OnFunc | OnConstructor | OnAccessor | OnAnyClangDecl |
+  OnFunc | OnConstructor | OnAccessor |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   107)
