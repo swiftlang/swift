@@ -56,6 +56,7 @@ LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building built
 LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building builtin", true)
 LANGUAGE_FEATURE(BuiltinMove, 0, "Builtin.move()", true)
 LANGUAGE_FEATURE(BuiltinCopy, 0, "Builtin.copy()", true)
+LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc", true)
 LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability", true)
 
 #undef LANGUAGE_FEATURE
