@@ -7,9 +7,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// FIXME(distributed): remote functions dont seem to work on windows?
-// XFAIL: OS=windows-msvc
-
 import _Distributed
 
 distributed actor LocalWorker {
