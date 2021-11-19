@@ -145,7 +145,7 @@ namespace swift {
     version::Version PackageDescriptionVersion;
 
     /// Enable experimental string processing
-    bool EnableExperimentalRegex = false;
+    bool EnableExperimentalStringProcessing = false;
 
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
