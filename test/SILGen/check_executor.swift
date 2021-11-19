@@ -15,7 +15,7 @@ import _Concurrency
 
 func takeClosure(_ fn: @escaping () -> Int) { }
 
-func takeUnsafeMainActorClosure(@_unsafeMainActor _ fn: @escaping () -> Int) { }
+@_predatesConcurrency func takeUnsafeMainActorClosure(_ fn: @MainActor @escaping () -> Int) { }
 
 public actor MyActor {
   var counter = 0

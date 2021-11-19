@@ -310,6 +310,15 @@ checkGlobalActorAttributes(
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);
 
+/// Adjust the type of the variable for concurrency.
+Type adjustVarTypeForConcurrency(Type type, VarDecl *var, DeclContext *dc);
+
+/// Adjust the function type of a function / subscript / enum case for
+/// concurrency.
+AnyFunctionType *adjustFunctionTypeForConcurrency(
+    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue);
+
 /// Adjust the given function type to account for concurrency-specific
 /// attributes whose affect on the type might differ based on context.
 /// This includes adjustments for unsafe parameter attributes like
