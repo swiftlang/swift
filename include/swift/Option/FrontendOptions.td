@@ -472,6 +472,10 @@ def enable_experimental_structural_opaque_types :
   Flag<["-"], "enable-experimental-structural-opaque-types">,
   HelpText<"Enable experimental support for structural opaque result types">;
 
+def enable_explicit_existential_types :
+  Flag<["-"], "enable-explicit-existential-types">,
+  HelpText<"Enable experimental support for explicit existential types">;
+
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
