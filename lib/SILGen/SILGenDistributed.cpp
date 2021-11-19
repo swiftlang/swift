@@ -60,9 +60,8 @@ static SILValue emitActorPropertyReference(
 /// \param value the value to use when initializing the property.
 static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
                                SILValue actorSelf,
-                               VarDecl* prop, SILValue value) {
-  fprintf(stderr, "[%s:%d] (%s) initialize property:::: \n", __FILE__, __LINE__, __FUNCTION__);
-  prop->dump();
+                               VarDecl* prop, SILValue value, bool destroyTheCopyPlease) {
+  fprintf(stderr, "[%s:%d] (%s) initialize property: %s \n", __FILE__, __LINE__, __FUNCTION__, prop->getNameStr().str().c_str());
 
   Type formalType = SGF.F.mapTypeIntoContext(prop->getInterfaceType());
   SILType loweredType = SGF.getLoweredType(formalType);
@@ -72,14 +71,30 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
   if (loweredType.isAddressOnly(SGF.F)) {
     SGF.B.createCopyAddr(loc, value, fieldAddr, IsNotTake, IsInitialization);
   } else {
+    Optional<SILValue> trivialCopyValue;
     if (value->getType().isAddress()) {
       value = SGF.B.createTrivialLoadOr(
-          loc, value, LoadOwnershipQualifier::Copy);
+          loc, value, LoadOwnershipQualifier::Take);
+      trivialCopyValue = value;
+
+      fprintf(stderr, "[%s:%d] (%s) COPY VALUE IS:\n", __FILE__, __LINE__, __FUNCTION__);
+      value->dump();
     }
 
+
     value = SGF.B.emitCopyValueOperation(loc, value);
+    fprintf(stderr, "[%s:%d] (%s) COPY VALUE IS:\n", __FILE__, __LINE__, __FUNCTION__);
+    value->dump();
     SGF.B.emitStoreValueOperation(
         loc, value, fieldAddr, StoreOwnershipQualifier::Init);
+
+//    if (trivialCopyValue && destroyTheCopyPlease) {
+      fprintf(stderr, "[%s:%d] (%s) SHOULD WE DEST DESTROY????\n", __FILE__, __LINE__, __FUNCTION__);
+    if (trivialCopyValue) {
+      fprintf(stderr, "[%s:%d] (%s) DEST DESTROY\n", __FILE__, __LINE__, __FUNCTION__);
+      SGF.B.createDestroyValue(loc, *trivialCopyValue);
+//      dest->dump();
+    }
   }
 }
 
@@ -140,7 +155,7 @@ static void emitTransportInit(SILGenFunction &SGF,
   assert(var);
 
   fprintf(stderr, "[%s:%d] (%s) emit transport init ... property...\n", __FILE__, __LINE__, __FUNCTION__);
-  initializeProperty(SGF, loc, actorSelf.getValue(), var, transportArg);
+  initializeProperty(SGF, loc, actorSelf.getValue(), var, transportArg, /*destroyTheCopyPlease=*/false);
 }
 
 /// Emits the distributed actor's identity (`id`) initialization.
@@ -185,7 +200,7 @@ static void emitIdentityInit(SILGenFunction &SGF, ConstructorDecl *ctor,
 
   // --- initialize the property.
   fprintf(stderr, "[%s:%d] (%s) emit identity init... property...\n", __FILE__, __LINE__, __FUNCTION__);
-  initializeProperty(SGF, loc, borrowedSelfArg.getValue(), var, temp);
+  initializeProperty(SGF, loc, borrowedSelfArg.getValue(), var, temp, /*destroyTheCopyPlease=*/false);
 
   fprintf(stderr, "[%s:%d] (%s) -----------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
   fprintf(stderr, "[%s:%d] (%s) -----------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
@@ -414,12 +429,14 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
     fprintf(stderr, "[%s:%d] (%s) emit dist factory... [id] resolve...\n", __FILE__, __LINE__, __FUNCTION__);
     initializeProperty(*this, loc, remote,
                        lookupProperty(classDecl, C.Id_id),
-                       identityArg);
+                       identityArg,
+                       /*destroyTheCopyPlease=*/false);
 
     fprintf(stderr, "[%s:%d] (%s) emit dist factory... [transport] resolve...\n", __FILE__, __LINE__, __FUNCTION__);
     initializeProperty(*this, loc, remote,
                        lookupProperty(classDecl, C.Id_actorTransport),
-                       transportArg);
+                       transportArg,
+                       /*destroyTheCopyPlease=*/false);
 
     // ==== Branch to return the fully initialized remote instance
     B.createBranch(loc, returnBB, {remote});

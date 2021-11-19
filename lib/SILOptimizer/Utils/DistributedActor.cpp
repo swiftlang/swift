@@ -149,6 +149,9 @@ SILInstruction* emitActorTransportWitnessCall(
     apply = B.createApply(loc, witnessMethod, subs, allArgs);
   }
 
+  fprintf(stderr, "[%s:%d] (%s) THE APPLY\n", __FILE__, __LINE__, __FUNCTION__);
+  apply->dump();
+
   // Local function to emit a cleanup after the call.
   auto emitCleanup = [&](llvm::function_ref<void(SILBuilder &builder)> fn) {
     if (tryTargets) {
@@ -170,10 +173,20 @@ SILInstruction* emitActorTransportWitnessCall(
     emitCleanup([&](SILBuilder & builder) {
       auto value = builder.emitLoadValueOperation(
           loc, *temporaryTransportBuffer, LoadOwnershipQualifier::Take);
+      fprintf(stderr, "[%s:%d] (%s) LOAD HERE\n", __FILE__, __LINE__, __FUNCTION__);
+      value->dump();
       builder.emitDestroyValueOperation(loc, value);
       builder.createDeallocStack(loc, *temporaryTransportBuffer);
     });
   }
+
+  fprintf(stderr, "[%s:%d] (%s) ==================================== \n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ==================================== \n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ==================================== \n", __FILE__, __LINE__, __FUNCTION__);
+  F.dump();
+  fprintf(stderr, "[%s:%d] (%s) ==================================== \n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ==================================== \n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ==================================== \n", __FILE__, __LINE__, __FUNCTION__);
 
   return apply;
 }
