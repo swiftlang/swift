@@ -570,7 +570,10 @@ bool ArgsToFrontendOptionsConverter::computeModuleAliases() {
 }
 
 bool ArgsToFrontendOptionsConverter::computeModuleName() {
-  assert(Opts.ModuleAliasMap.empty() && "Module name must be computed before computing module aliases");
+  // Module name must be computed before computing module
+  // aliases. Instead of asserting, clearing ModuleAliasMap
+  // here since it can be called redundantly in batch-mode
+  Opts.ModuleAliasMap.clear();
 
   const Arg *A = Args.getLastArg(options::OPT_module_name);
   if (A) {
