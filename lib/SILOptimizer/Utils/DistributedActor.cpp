@@ -52,7 +52,7 @@ SILArgument *findFirstActorTransportArg(SILFunction &F) {
   return nullptr;
 }
 
-void emitActorTransportWitnessCall(
+SILInstruction* emitActorTransportWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName,
     SILValue transport, SILType actorType, ArrayRef<SILValue> args,
     Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets) {
@@ -174,6 +174,8 @@ void emitActorTransportWitnessCall(
       builder.createDeallocStack(loc, *temporaryTransportBuffer);
     });
   }
+
+  return apply;
 }
 
 void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,

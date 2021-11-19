@@ -30,6 +30,7 @@ class SILFunction;
 class SILLocation;
 class SILType;
 class SILValue;
+class SILInstruction;
 
 /// Finds the first `ActorTransport`-compatible parameter of the given function.
 /// \returns nullptr if the function does not have such a parameter.
@@ -44,7 +45,7 @@ SILArgument *findFirstActorTransportArg(SILFunction &F);
 /// \param args The arguments provided to the call, not including the transport.
 /// \param tryTargets For a call that can throw, the normal and error basic
 /// blocks that the call will branch to.
-void emitActorTransportWitnessCall(
+SILInstruction* emitActorTransportWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName,
     SILValue transport, SILType actorType, llvm::ArrayRef<SILValue> args,
     llvm::Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets =
