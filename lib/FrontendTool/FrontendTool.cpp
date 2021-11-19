@@ -1532,7 +1532,7 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
       return;
 
     SerializationOptions serializationOpts =
-        Invocation.computeSerializationOptions(outs, Instance.getMainModule());
+        Invocation.computeSerializationOptions(outs);
 
     // Infer if this is an emit-module job part of an incremental build,
     // vs a partial emit-module job (with primary files) or other kinds.

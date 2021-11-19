@@ -136,7 +136,7 @@ CompilerInvocation::getPrivateModuleInterfaceOutputPathForWholeModule() const {
 }
 
 SerializationOptions CompilerInvocation::computeSerializationOptions(
-    const SupplementaryOutputPaths &outs, const ModuleDecl *module) const {
+    const SupplementaryOutputPaths &outs) const {
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;

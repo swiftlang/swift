@@ -836,11 +836,6 @@ public:
 
   /// Returns an approximation of whether the given module could be
   /// redistributed and consumed by external clients.
-  ///
-  /// FIXME: The scope of this computation should be limited entirely to
-  /// RenamedDeclRequest. Unfortunately, it has been co-opted to support the
-  /// \c SerializeOptionsForDebugging hack. Once this information can be
-  /// transferred from module files to the dSYMs, remove this.
   bool isExternallyConsumed() const;
 
   SourceRange getSourceRange() const { return SourceRange(); }

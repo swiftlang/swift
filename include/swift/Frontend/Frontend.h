@@ -392,12 +392,8 @@ public:
   /// Given the current configuration of this frontend invocation, a set of
   /// supplementary output paths, and a module, compute the appropriate set of
   /// serialization options.
-  ///
-  /// FIXME: The \p module parameter supports the
-  /// \c SerializeOptionsForDebugging hack.
   SerializationOptions
-  computeSerializationOptions(const SupplementaryOutputPaths &outs,
-                              const ModuleDecl *module) const;
+  computeSerializationOptions(const SupplementaryOutputPaths &outs) const;
 };
 
 /// A class which manages the state and execution of the compiler.
