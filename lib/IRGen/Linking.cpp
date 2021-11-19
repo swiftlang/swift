@@ -492,10 +492,17 @@ std::string LinkEntity::mangleAsString() const {
     Result.append("Tu");
     return Result;
   }
-  case Kind::PartialApplyForwarder:
+  case Kind::PartialApplyForwarder: {
     std::string Result;
     Result = std::string(static_cast<llvm::Function *>(Pointer)->getName());
     return Result;
+  }
+
+  case Kind::DistributedMethodAccessor: {
+    std::string Result(getSILFunction()->getName());
+    Result.append("TF");
+    return Result;
+  }
   }
   llvm_unreachable("bad entity kind!");
 }
@@ -795,6 +802,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::KnownAsyncFunctionPointer:
     return SILLinkage::PublicExternal;
   case Kind::PartialApplyForwarder:
+  case Kind::DistributedMethodAccessor:
     return SILLinkage::Private;
   }
   llvm_unreachable("bad link entity kind");
@@ -885,6 +893,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
   case Kind::PartialApplyForwarder:
   case Kind::KnownAsyncFunctionPointer:
+  case Kind::DistributedMethodAccessor:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -1092,7 +1101,8 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     return false;
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::DynamicallyReplaceableFunctionVariable:
-  case Kind::SILFunction: {
+  case Kind::SILFunction:
+  case Kind::DistributedMethodAccessor: {
     return getSILFunction()->isWeakImported();
   }
 
@@ -1330,6 +1340,11 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
         .getDeclContextForEmission();
+
+  case Kind::DistributedMethodAccessor: {
+    auto *methodDC = getSILFunction()->getDeclContext();
+    return methodDC->getParentModule();
+  }
   }
   llvm_unreachable("invalid decl kind");
 }

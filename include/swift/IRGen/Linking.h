@@ -481,6 +481,9 @@ class LinkEntity {
     /// name is known.
     /// The pointer is a const char* of the name.
     KnownAsyncFunctionPointer,
+
+    /// The pointer is SILFunction*
+    DistributedMethodAccessor,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -1263,6 +1266,15 @@ public:
     return entity;
   }
 
+  static LinkEntity forDistributedMethodAccessor(SILFunction *method) {
+    LinkEntity entity;
+    entity.Pointer = method;
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::DistributedMethodAccessor));
+    return entity;
+  }
+
   LinkEntity getUnderlyingEntityForAsyncFunctionPointer() const {
     LinkEntity entity;
     entity.Pointer = Pointer;
@@ -1341,7 +1353,8 @@ public:
     return getKind() == Kind::AsyncFunctionPointer ||
            getKind() == Kind::DynamicallyReplaceableFunctionVariable ||
            getKind() == Kind::DynamicallyReplaceableFunctionKey ||
-           getKind() == Kind::SILFunction;
+           getKind() == Kind::SILFunction ||
+           getKind() == Kind::DistributedMethodAccessor;
   }
 
   SILFunction *getSILFunction() const {

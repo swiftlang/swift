@@ -19,6 +19,7 @@
 #include "BitPatternBuilder.h"
 #include "ClassTypeInfo.h"
 #include "ExtraInhabitants.h"
+#include "GenDecl.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -26,8 +27,11 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "ScalarPairTypeInfo.h"
-#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ExtInfo.h"
+#include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/IRGen/Linking.h"
+#include "swift/SIL/SILFunction.h"
 
 using namespace swift;
 using namespace irgen;
@@ -53,3 +57,79 @@ llvm::Value *irgen::emitDistributedActorInitializeRemote(
 
   return result;
 }
+
+namespace {
+
+class DistributedAccessor {
+  IRGenFunction &IGF;
+
+  /// Underlying distributed method for this accessor.
+  SILFunction *Method;
+
+public:
+  DistributedAccessor(IRGenFunction &IGF, SILFunction *method);
+
+  void emit();
+};
+
+} // end namespace
+
+llvm::Function *
+IRGenModule::getAddrOfDistributedMethodAccessor(SILFunction *F,
+                                                ForDefinition_t forDefinition) {
+  auto entity = LinkEntity::forDistributedMethodAccessor(F);
+
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition)
+      updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  auto getParamForArguments = [&]() {
+    auto ptrType = Context.getUnsafeRawPointerType();
+    return SILParameterInfo(ptrType->getCanonicalType(),
+                            ParameterConvention::Direct_Guaranteed);
+  };
+
+
+  // `self` of the distributed actor is going to be passed as an argument
+  // to this accessor function.
+  auto extInfo = SILExtInfoBuilder()
+    .withRepresentation(SILFunctionTypeRepresentation::Thick)
+    .build();
+
+  // Accessor gets argument value buffer and a reference to `self` of
+  // the actor and produces a call to the distributed thunk.
+  auto accessorType = SILFunctionType::get(
+      /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
+      ParameterConvention::Direct_Guaranteed,
+      {getParamForArguments()},
+      /*Yields=*/{},
+      /*Results=*/{},
+      /*ErrorResult=*/None,
+      /*patternSubs=*/SubstitutionMap(),
+      /*invocationSubs=*/SubstitutionMap(), Context);
+
+  Signature signature = getSignature(accessorType);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+
+  return createFunction(*this, link, signature);
+}
+
+void IRGenModule::emitDistributedMethodAccessor(SILFunction *method) {
+  assert(method->isDistributed());
+
+  auto *f = getAddrOfDistributedMethodAccessor(method, ForDefinition);
+  if (!f->isDeclaration())
+    return;
+
+  IRGenFunction IGF(*this, f);
+  DistributedAccessor(IGF, method).emit();
+}
+
+DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
+                                         SILFunction *method)
+    : IGF(IGF), Method(method) {}
+
+void DistributedAccessor::emit() { IGF.Builder.CreateRetVoid(); }
