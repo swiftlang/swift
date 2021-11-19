@@ -6108,6 +6108,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
           sendableConformanceIsUnchecked = true;
         else if (isImpliedByConformancePredatingConcurrency(normal))
           sendableConformancePredatesConcurrency = true;
+        else if (isa<InheritedProtocolConformance>(conformance))
+          sendableConformanceIsUnchecked = true;
       }
     } else if (proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
