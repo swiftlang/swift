@@ -60,6 +60,7 @@ internal func _byteCountForTemporaryAllocation<T>(
 ///   `byteCount` bytes of memory.
 @_alwaysEmitIntoClient @_transparent
 internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
+#if compiler(>=5.5) && $BuiltinStackAlloc
   // PRECONDITIONS: Non-positive alignments are nonsensical, as are
   // non-power-of-two alignments.
   if _isComputed(alignment) {
@@ -94,6 +95,9 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
     return false
   }
   return swift_stdlib_isStackAllocationSafe(byteCount, alignment)
+#else
+  fatalError("unsupported compiler")
+#endif
 }
 
 /// Provides scoped access to a raw buffer pointer with the specified byte count
@@ -142,6 +146,7 @@ internal func _withUnsafeTemporaryAllocation<T, R>(
   // notice and complain.)
   let result: R
   
+#if compiler(>=5.5) && $BuiltinStackAlloc
   let stackAddress = Builtin.stackAlloc(
     capacity._builtinWordValue,
     MemoryLayout<T>.stride._builtinWordValue,
@@ -160,6 +165,9 @@ internal func _withUnsafeTemporaryAllocation<T, R>(
     Builtin.stackDealloc(stackAddress)
     throw error
   }
+#else
+  fatalError("unsupported compiler")
+#endif
 }
 
 // MARK: - Public interface
