@@ -475,8 +475,8 @@ def disable_deserialization_recovery :
   Flag<["-"], "disable-deserialization-recovery">,
   HelpText<"Don't attempt to recover from missing xrefs (etc) in swiftmodules">;
 
-def enable_experimental_regex :
-  Flag<["-"], "enable-experimental-regex">,
+def enable_experimental_string_processing :
+  Flag<["-"], "enable-experimental-string-processing">,
   HelpText<"Enable experimental string processing">;
 
 def disable_availability_checking : Flag<["-"],
