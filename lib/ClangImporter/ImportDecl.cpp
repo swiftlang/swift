@@ -160,15 +160,17 @@ createVarWithPattern(ASTContext &ctx, DeclContext *dc, Identifier name, Type ty,
   return {var, patternBinding};
 }
 
-static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
+static FuncDecl *createFuncOrAccessor(ClangImporter::Implementation &impl,
+                                      SourceLoc funcLoc,
                                       Optional<AccessorInfo> accessorInfo,
                                       DeclName name, SourceLoc nameLoc,
                                       GenericParamList *genericParams,
                                       ParameterList *bodyParams, Type resultTy,
                                       bool async, bool throws, DeclContext *dc,
                                       ClangNode clangNode) {
+  FuncDecl *decl;
   if (accessorInfo) {
-    return AccessorDecl::create(ctx, funcLoc,
+    decl = AccessorDecl::create(impl.SwiftContext, funcLoc,
                                 /*accessorKeywordLoc*/ SourceLoc(),
                                 accessorInfo->Kind, accessorInfo->Storage,
                                 /*StaticLoc*/ SourceLoc(),
@@ -178,10 +180,12 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                 genericParams, bodyParams,
                                 resultTy, dc, clangNode);
   } else {
-    return FuncDecl::createImported(ctx, funcLoc, name, nameLoc, async, throws,
-                                    bodyParams, resultTy, genericParams, dc,
-                                    clangNode);
+    decl = FuncDecl::createImported(impl.SwiftContext, funcLoc, name, nameLoc,
+                                    async, throws, bodyParams, resultTy,
+                                    genericParams, dc, clangNode);
   }
+  impl.importSwiftAttrAttributes(decl);
+  return decl;
 }
 
 static void makeComputed(AbstractStorageDecl *storage,
@@ -1468,10 +1472,12 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 static void addSynthesizedProtocolAttrs(
     ClangImporter::Implementation &Impl,
     NominalTypeDecl *nominal,
-    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs) {
+    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
+    bool isUnchecked = false) {
   for (auto kind : synthesizedProtocolAttrs) {
     nominal->getAttrs().add(new (Impl.SwiftContext)
-                                 SynthesizedProtocolAttr(kind, &Impl));
+                                 SynthesizedProtocolAttr(kind, &Impl,
+                                                         isUnchecked));
   }
 }
 
@@ -4099,7 +4105,7 @@ namespace {
         auto resultTy = importedType.getType();
 
         FuncDecl *func =
-            createFuncOrAccessor(Impl.SwiftContext, loc, accessorInfo, name,
+            createFuncOrAccessor(Impl, loc, accessorInfo, name,
                                  nameLoc, genericParams, bodyParams, resultTy,
                                  /*async=*/false, /*throws=*/false, dc,
                                  clangNode);
@@ -4911,7 +4917,7 @@ namespace {
         }
       }
 
-      auto result = createFuncOrAccessor(Impl.SwiftContext,
+      auto result = createFuncOrAccessor(Impl,
                                          /*funcLoc*/ SourceLoc(), accessorInfo,
                                          importedName.getDeclName(),
                                          /*nameLoc*/ SourceLoc(),
@@ -8399,6 +8405,140 @@ Optional<bool> swift::importer::isMainActorAttr(
   return None;
 }
 
+void
+ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
+  auto ClangDecl =
+      dyn_cast_or_null<clang::NamedDecl>(MappedDecl->getClangDecl());
+  if (!ClangDecl)
+    return;
+
+  // Subscripts are special-cased since there isn't a 1:1 mapping
+  // from its accessor(s) to the subscript declaration.
+  if (isa<SubscriptDecl>(MappedDecl))
+    return;
+
+  if (auto maybeDefinition = getDefinitionForClangTypeDecl(ClangDecl))
+    if (maybeDefinition.getValue())
+      ClangDecl = cast<clang::NamedDecl>(maybeDefinition.getValue());
+
+  Optional<const clang::SwiftAttrAttr *> SeenMainActorAttr;
+  PatternBindingInitializer *initContext = nullptr;
+
+  //
+  // __attribute__((swift_attr("attribute")))
+  //
+  for (auto swiftAttr : ClangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
+    // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
+    // point at which to do name lookup for imported entities.
+    if (auto isMainActor = isMainActorAttr(SwiftContext, swiftAttr)) {
+      bool isUnsafe = *isMainActor;
+
+      if (SeenMainActorAttr) {
+        // Cannot add main actor annotation twice. We'll keep the first
+        // one and raise a warning about the duplicate.
+        HeaderLoc attrLoc(swiftAttr->getLocation());
+        diagnose(attrLoc, diag::import_multiple_mainactor_attr,
+                 swiftAttr->getAttribute(),
+                 SeenMainActorAttr.getValue()->getAttribute());
+        continue;
+      }
+
+      if (Type mainActorType = SwiftContext.getMainActorType()) {
+        auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
+        auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
+        attr->setArgIsUnsafe(isUnsafe);
+        MappedDecl->getAttrs().add(attr);
+        SeenMainActorAttr = swiftAttr;
+      }
+
+      continue;
+    }
+
+    // Hard-code @actorIndependent, until Objective-C clients start
+    // using nonisolated.
+    if (swiftAttr->getAttribute() == "@actorIndependent") {
+      auto attr = new (SwiftContext) NonisolatedAttr(/*isImplicit=*/true);
+      MappedDecl->getAttrs().add(attr);
+      continue;
+    }
+
+    // Dig out a buffer with the attribute text.
+    unsigned bufferID = getClangSwiftAttrSourceBuffer(
+        swiftAttr->getAttribute());
+
+    // Dig out a source file we can use for parsing.
+    auto &sourceFile = getClangSwiftAttrSourceFile(
+        *MappedDecl->getDeclContext()->getParentModule());
+
+    // Spin up a parser.
+    swift::Parser parser(
+        bufferID, sourceFile, &SwiftContext.Diags, nullptr, nullptr);
+    // Prime the lexer.
+    parser.consumeTokenWithoutFeedingReceiver();
+
+    bool hadError = false;
+    SourceLoc atLoc;
+    if (parser.consumeIf(tok::at_sign, atLoc)) {
+      hadError = parser.parseDeclAttribute(
+          MappedDecl->getAttrs(), atLoc, initContext,
+          /*isFromClangAttribute=*/true).isError();
+    } else {
+      SourceLoc staticLoc;
+      StaticSpellingKind staticSpelling;
+      hadError = parser.parseDeclModifierList(
+          MappedDecl->getAttrs(), staticLoc, staticSpelling,
+          /*isFromClangAttribute=*/true);
+    }
+
+    if (hadError) {
+      // Complain about the unhandled attribute or modifier.
+      HeaderLoc attrLoc(swiftAttr->getLocation());
+      diagnose(attrLoc, diag::clang_swift_attr_unhandled,
+               swiftAttr->getAttribute());
+    }
+  }
+
+  // The rest of this concerns '@Sendable' and '@_nonSendable`. These don't
+  // affect typealiases, even when there's an underlying nominal type in clang.
+  if (isa<TypeAliasDecl>(MappedDecl))
+    return;
+
+  // Some types have an implicit '@Sendable' attribute.
+  if (ClangDecl->hasAttr<clang::SwiftNewTypeAttr>() ||
+      ClangDecl->hasAttr<clang::EnumExtensibilityAttr>() ||
+      ClangDecl->hasAttr<clang::FlagEnumAttr>() ||
+      ClangDecl->hasAttr<clang::NSErrorDomainAttr>())
+    MappedDecl->getAttrs().add(
+                          new (SwiftContext) SendableAttr(/*isImplicit=*/true));
+
+  // 'Error' conforms to 'Sendable', so error wrappers have to be 'Sendable'
+  // and it doesn't make sense for the 'Code' enum to be non-'Sendable'.
+  if (ClangDecl->hasAttr<clang::NSErrorDomainAttr>()) {
+    // If any @_nonSendable attributes are running the show, invalidate and
+    // diagnose them.
+    while (NonSendableAttr *attr = dyn_cast_or_null<NonSendableAttr>(
+                           MappedDecl->getAttrs().getEffectiveSendableAttr())) {
+      assert(attr->Specificity == NonSendableKind::Specific &&
+             "didn't we just add an '@Sendable' that should beat this "
+             "'@_nonSendable(_assumed)'?");
+      attr->setInvalid();
+      diagnose(HeaderLoc(ClangDecl->getLocation()),
+               diag::clang_error_code_must_be_sendable,
+               ClangDecl->getNameAsString());
+    }
+  }
+
+  // Now that we've collected all @Sendable and @_nonSendable attributes, we
+  // can see if we should synthesize a Sendable conformance.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(MappedDecl)) {
+    auto sendability = nominal->getAttrs().getEffectiveSendableAttr();
+    if (isa_and_nonnull<SendableAttr>(sendability)) {
+      addSynthesizedProtocolAttrs(*this, nominal, {KnownProtocolKind::Sendable},
+                                  /*isUnchecked=*/true);
+    }
+  }
+}
+
 static bool isUsingMacroName(clang::SourceManager &SM,
                              clang::SourceLocation loc,
                              StringRef MacroName) {
@@ -8438,8 +8578,6 @@ void ClangImporter::Implementation::importAttributes(
 
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
-  PatternBindingInitializer *initContext = nullptr;
-  Optional<const clang::SwiftAttrAttr *> SeenMainActorAttr;
   bool AnyUnavailable = MappedDecl->getAttrs().isUnavailable(C);
   for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
        AE = ClangDecl->attr_end(); AI != AE; ++AI) {
@@ -8594,88 +8732,8 @@ void ClangImporter::Implementation::importAttributes(
       MappedDecl->getAttrs().add(AvAttr);
     }
 
-    // __attribute__((swift_attr("attribute")))
-    //
-    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(*AI)) {
-      // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
-      // point at which to do name lookup for imported entities.
-      if (auto isMainActor = isMainActorAttr(SwiftContext, swiftAttr)) {
-        bool isUnsafe = *isMainActor;
-
-        if (SeenMainActorAttr) {
-          // Cannot add main actor annotation twice. We'll keep the first
-          // one and raise a warning about the duplicate.
-          auto &clangSrcMgr = getClangASTContext().getSourceManager();
-          ClangSourceBufferImporter &bufferImporter =
-              getBufferImporterForDiagnostics();
-          SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
-              clangSrcMgr, swiftAttr->getLocation());
-
-          diagnose(attrLoc, diag::import_multiple_mainactor_attr,
-                   swiftAttr->getAttribute(),
-                   SeenMainActorAttr.getValue()->getAttribute());
-          continue;
-        }
-
-        if (Type mainActorType = SwiftContext.getMainActorType()) {
-          auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
-          auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
-          attr->setArgIsUnsafe(isUnsafe);
-          MappedDecl->getAttrs().add(attr);
-          SeenMainActorAttr = swiftAttr;
-        }
-
-        continue;
-      }
-
-      // Hard-code @actorIndependent, until Objective-C clients start
-      // using nonisolated.
-      if (swiftAttr->getAttribute() == "@actorIndependent") {
-        auto attr = new (SwiftContext) NonisolatedAttr(/*isImplicit=*/true);
-        MappedDecl->getAttrs().add(attr);
-        continue;
-      }
-
-      // Dig out a buffer with the attribute text.
-      unsigned bufferID = getClangSwiftAttrSourceBuffer(
-          swiftAttr->getAttribute());
-
-      // Dig out a source file we can use for parsing.
-      auto &sourceFile = getClangSwiftAttrSourceFile(
-          *MappedDecl->getDeclContext()->getParentModule());
-
-      // Spin up a parser.
-      swift::Parser parser(
-          bufferID, sourceFile, &SwiftContext.Diags, nullptr, nullptr);
-      // Prime the lexer.
-      parser.consumeTokenWithoutFeedingReceiver();
-
-      bool hadError = false;
-      SourceLoc atLoc;
-      if (parser.consumeIf(tok::at_sign, atLoc)) {
-        hadError = parser.parseDeclAttribute(
-            MappedDecl->getAttrs(), atLoc, initContext,
-            /*isFromClangAttribute=*/true).isError();
-      } else {
-        SourceLoc staticLoc;
-        StaticSpellingKind staticSpelling;
-        hadError = parser.parseDeclModifierList(
-            MappedDecl->getAttrs(), staticLoc, staticSpelling,
-            /*isFromClangAttribute=*/true);
-      }
-
-      if (hadError) {
-        // Complain about the unhandled attribute or modifier.
-        auto &clangSrcMgr = getClangASTContext().getSourceManager();
-        ClangSourceBufferImporter &bufferImporter =
-          getBufferImporterForDiagnostics();
-        SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
-          clangSrcMgr, swiftAttr->getLocation());
-        diagnose(attrLoc, diag::clang_swift_attr_unhandled,
-                 swiftAttr->getAttribute());
-      }
-      continue;
-    }
+    // __attribute__((swift_attr("attribute"))) are handled by
+    // importSwiftAttrAttributes(). Other attributes are ignored.
   }
 
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
@@ -9244,19 +9302,13 @@ ClangImporter::Implementation::importDeclForDeclContext(
   if (!contextDeclsWarnedAbout.insert(contextDecl).second)
     return nullptr;
 
-  auto convertLoc = [&](clang::SourceLocation clangLoc) {
-    return getBufferImporterForDiagnostics()
-      .resolveSourceLocation(getClangASTContext().getSourceManager(),
-                             clangLoc);
-  };
-
   auto getDeclName = [](const clang::Decl *D) -> StringRef {
     if (auto ND = dyn_cast<clang::NamedDecl>(D))
       return ND->getName();
     return "<anonymous>";
   };
 
-  SourceLoc loc = convertLoc(importingDecl->getLocation());
+  HeaderLoc loc(importingDecl->getLocation());
   diagnose(loc, diag::swift_name_circular_context_import,
            writtenName, getDeclName(importingDecl));
 
@@ -9264,7 +9316,7 @@ ClangImporter::Implementation::importDeclForDeclContext(
   for (auto entry : make_range(contextDeclsBeingImported.rbegin(), iter)) {
     auto otherDecl = std::get<0>(entry);
     auto otherWrittenName = std::get<1>(entry);
-    diagnose(convertLoc(otherDecl->getLocation()),
+    diagnose(HeaderLoc(otherDecl->getLocation()),
              diag::swift_name_circular_context_import_other,
              otherWrittenName, getDeclName(otherDecl));
   }
