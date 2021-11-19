@@ -11,7 +11,7 @@ import _Distributed
 
 distributed actor DA {
   typealias Transport = CodableFakeTransport
-  // typealias Identity = ActorAddress // FIXME: does not actually have any impact
+  // typealias Identity = ActorAddress // FIXME(distributed): does not actually have any impact
 }
 
 // ==== Fake Transport ---------------------------------------------------------

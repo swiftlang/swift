@@ -16,7 +16,7 @@ import _Concurrency
 @available(SwiftStdlib 5.6, *)
 public protocol ActorTransport: Sendable {
   /// The identity used by actors that communicate via this transport
-  associatedtype Identity: ActorIdentity = AnyActorIdentity
+  associatedtype Identity: ActorIdentity
 
   // ==== ---------------------------------------------------------------------
   // - MARK: Resolving actors by identity

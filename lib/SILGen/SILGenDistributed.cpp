@@ -61,6 +61,9 @@ static SILValue emitActorPropertyReference(
 static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
                                SILValue actorSelf,
                                VarDecl* prop, SILValue value) {
+  fprintf(stderr, "[%s:%d] (%s) initialize property:::: \n", __FILE__, __LINE__, __FUNCTION__);
+  prop->dump();
+
   Type formalType = SGF.F.mapTypeIntoContext(prop->getInterfaceType());
   SILType loweredType = SGF.getLoweredType(formalType);
 
@@ -135,7 +138,8 @@ static void emitTransportInit(SILGenFunction &SGF,
   SILValue transportArg = findFirstActorTransportArg(SGF.F);
   VarDecl *var = lookupProperty(classDecl, C.Id_actorTransport);
   assert(var);
-      
+
+  fprintf(stderr, "[%s:%d] (%s) emit transport init ... property...\n", __FILE__, __LINE__, __FUNCTION__);
   initializeProperty(SGF, loc, actorSelf.getValue(), var, transportArg);
 }
 
@@ -174,8 +178,24 @@ static void emitIdentityInit(SILGenFunction &SGF, ConstructorDecl *ctor,
       B, loc, C.Id_assignIdentity, transport, SGF.getLoweredType(selfTy),
       { temp, selfMetatypeValue });
 
+
+  fprintf(stderr, "[%s:%d] (%s) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n", __FILE__, __LINE__, __FUNCTION__);
+  F.dump();
+  fprintf(stderr, "[%s:%d] (%s) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n", __FILE__, __LINE__, __FUNCTION__);
+
   // --- initialize the property.
+  fprintf(stderr, "[%s:%d] (%s) emit identity init... property...\n", __FILE__, __LINE__, __FUNCTION__);
   initializeProperty(SGF, loc, borrowedSelfArg.getValue(), var, temp);
+
+  fprintf(stderr, "[%s:%d] (%s) -----------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) -----------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  F.dump();
+  fprintf(stderr, "[%s:%d] (%s) -----------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) -----------------------------------\n", __FILE__, __LINE__, __FUNCTION__);
+
+//  auto value = B.emitLoadValueOperation(loc, tempForId, LoadOwnershipQualifier::Take);
+//  B.emitDestructureValueOperation(loc, temp);
+//  // B.createDeallocStack(loc, tempForId);
 }
 
 namespace {
@@ -207,7 +227,7 @@ public:
 };
 } // end anonymous namespace
 
-void SILGenFunction::emitDistActorImplicitPropertyInits(
+void SILGenFunction::emitDistributedActorImplicitPropertyInits(
     ConstructorDecl *ctor, ManagedValue selfArg) {
   // Only designated initializers should perform this initialization.
   assert(ctor->isDesignatedInit());
@@ -391,10 +411,12 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
     auto *dc = fd->getDeclContext();
     auto classDecl = dc->getSelfClassDecl();
     
+    fprintf(stderr, "[%s:%d] (%s) emit dist factory... [id] resolve...\n", __FILE__, __LINE__, __FUNCTION__);
     initializeProperty(*this, loc, remote,
                        lookupProperty(classDecl, C.Id_id),
                        identityArg);
 
+    fprintf(stderr, "[%s:%d] (%s) emit dist factory... [transport] resolve...\n", __FILE__, __LINE__, __FUNCTION__);
     initializeProperty(*this, loc, remote,
                        lookupProperty(classDecl, C.Id_actorTransport),
                        transportArg);

@@ -112,9 +112,12 @@ bool IsDistributedActorRequest::evaluate(
 
 NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal, KnownProtocolKind protoKind) const {
-  fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest EVALUATE\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest EVALUATE, nominal = %s\n", __FILE__, __LINE__, __FUNCTION__,
+          nominal->getNameStr().str().c_str());
   assert(protoKind == KnownProtocolKind::Encodable ||
          protoKind == KnownProtocolKind::Decodable);
+  ASTContext &ctx = nominal->getASTContext();
+  auto proto = ctx.getProtocol(protoKind);
 
   // We only synthesize for specific distributed actor types
   auto classDecl = dyn_cast<ClassDecl>(nominal);
@@ -123,10 +126,20 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
 
   // We only synthesize if the Identity conforms to the protoKind
   auto identityTy = getDistributedActorIdentityType(classDecl);
-  identityTy->dump();
   auto identityNominal = identityTy->getAnyNominal();
   if (identityNominal) {
-    identityNominal->dump();
+    fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest EVALUATE FOR %s\n", __FILE__, __LINE__, __FUNCTION__,
+            identityNominal->getName().str().str().c_str());
+  }
+
+  auto identityConformsToProto = false;
+  SmallVector<ProtocolConformance *, 2> conformances;
+  conformances = identityNominal->getAllConformances();
+  if (!identityNominal->lookupConformance(proto, conformances)) {
+    fprintf(stderr, "[%s:%d] (%s) Identity = %s DOES NOT conform to %s\n", __FILE__, __LINE__, __FUNCTION__,
+            identityNominal->getName().str().str().c_str(),
+            proto->getNameStr().str().c_str());
+    return nullptr;
   }
 
   // Check whether we can infer conformance at all.
@@ -166,7 +179,6 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
   // Local function to form the implicit conformance.
   auto formConformance =
       [&](ProtocolDecl *proto) -> NormalProtocolConformance * {
-    ASTContext &ctx = nominal->getASTContext();
     if (!proto)
       return nullptr;
 
@@ -182,8 +194,7 @@ NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
     return conformance;
   };
 
-  ASTContext &ctx = nominal->getASTContext();
-  auto conformance = formConformance(ctx.getProtocol(protoKind));
+  auto conformance = formConformance(proto);
   fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest EVALUATE DONE\n", __FILE__, __LINE__, __FUNCTION__);
   return conformance;
 }

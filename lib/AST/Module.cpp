@@ -1240,12 +1240,16 @@ LookupConformanceInModuleRequest::evaluate(
       GetImplicitSendableRequest cvRequest{nominal};
       if (auto conformance = evaluateOrDefault(
               ctx.evaluator, cvRequest, nullptr)) {
+        fprintf(stderr, "[%s:%d] (%s) ADD CONFORMANCE SENDABLE TO %s\n", __FILE__, __LINE__, __FUNCTION__,
+                nominal->getName().str().str().c_str());
         conformances.clear();
         conformances.push_back(conformance);
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
-    } else if (nominal->isDistributedActor() &&
+    }
+
+    if (nominal->isDistributedActor() &&
                protocol->isSpecificProtocol(KnownProtocolKind::Encodable)) {
       // TODO(distributed): handling must be smarter here somehow
       // Try to infer Codable conformance.
@@ -1254,12 +1258,15 @@ LookupConformanceInModuleRequest::evaluate(
           nominal, KnownProtocolKind::Encodable};
       if (auto conformance = evaluateOrDefault(
               ctx.evaluator, cvRequest, nullptr)) {
-        conformances.clear();
+        fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest ADD CONFORMANCE Encodable TO %s\n", __FILE__, __LINE__, __FUNCTION__,
+                nominal->getName().str().str().c_str());
         conformances.push_back(conformance);
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
-    } else if (nominal->isDistributedActor() &&
+    }
+
+    if (nominal->isDistributedActor() &&
                protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
       // TODO(distributed): handling must be smarter here somehow
       // Try to infer Codable conformance.
@@ -1268,7 +1275,8 @@ LookupConformanceInModuleRequest::evaluate(
           nominal, KnownProtocolKind::Decodable};
       if (auto conformance = evaluateOrDefault(
               ctx.evaluator, cvRequest, nullptr)) {
-        conformances.clear();
+        fprintf(stderr, "[%s:%d] (%s) GetDistributedActorImplicitCodableRequest ADD CONFORMANCE Decodable TO %s\n", __FILE__, __LINE__, __FUNCTION__,
+                nominal->getName().str().str().c_str());
         conformances.push_back(conformance);
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
