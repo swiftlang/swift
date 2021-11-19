@@ -34,8 +34,21 @@ class Requirement;
 
 namespace rewriting {
 
-void
-desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
+// Entry points used by AbstractGenericSignatureRequest and
+// InferredGenericSignatureRequest; see RequiremetnLowering.cpp for
+// documentation
+// comments.
+
+void desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
+
+void inferRequirements(Type type, SourceLoc loc,
+                       SmallVectorImpl<StructuralRequirement> &result);
+
+void realizeRequirement(Requirement req, RequirementRepr *reqRepr, bool infer,
+                        SmallVectorImpl<StructuralRequirement> &result);
+
+void realizeInheritedRequirements(TypeDecl *decl, Type type, bool infer,
+                                  SmallVectorImpl<StructuralRequirement> &result);
 
 /// A utility class for bulding rewrite rules from the top-level requirements
 /// of a generic signature.

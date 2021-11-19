@@ -210,13 +210,24 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
     result.push_back({req, loc, wasInferred});
 }
 
-static void inferRequirements(Type type, SourceLoc loc,
-                              SmallVectorImpl<StructuralRequirement> &result) {
+/// Infer requirements from applications of BoundGenericTypes to type
+/// parameters. For example, given a function declaration
+///
+///     func union<T>(_ x: Set<T>, _ y: Set<T>)
+///
+/// We automatically infer 'T : Hashable' from the fact that 'struct Set'
+/// declares a Hashable requirement on its generic parameter.
+void swift::rewriting::inferRequirements(
+    Type type, SourceLoc loc,
+    SmallVectorImpl<StructuralRequirement> &result) {
   // FIXME: Implement
 }
 
-static void realizeRequirement(Requirement req, RequirementRepr *reqRepr, bool infer,
-                               SmallVectorImpl<StructuralRequirement> &result) {
+/// Desugar a requirement and perform requirement inference if requested
+/// to obtain zero or more structural requirements.
+void swift::rewriting::realizeRequirement(
+    Requirement req, RequirementRepr *reqRepr, bool infer,
+    SmallVectorImpl<StructuralRequirement> &result) {
   auto firstType = req.getFirstType();
   if (infer) {
     auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
@@ -269,8 +280,11 @@ static void realizeRequirement(Requirement req, RequirementRepr *reqRepr, bool i
   }
 }
 
-static void realizeInheritedRequirements(TypeDecl *decl, Type type, bool infer,
-                               SmallVectorImpl<StructuralRequirement> &result) {
+/// Collect structural requirements written in the inheritance clause of an
+/// AssociatedTypeDecl or GenericTypeParamDecl.
+void swift::rewriting::realizeInheritedRequirements(
+    TypeDecl *decl, Type type, bool infer,
+    SmallVectorImpl<StructuralRequirement> &result) {
   auto &ctx = decl->getASTContext();
   auto inheritedTypes = decl->getInherited();
 
