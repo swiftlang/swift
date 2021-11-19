@@ -213,6 +213,12 @@ enum class ConstraintKind : char {
   /// one type - type variable representing type of a node, other side is
   /// the AST node to infer the type for.
   ClosureBodyElement,
+  /// Do not add new uses of this, it only exists to retain compatibility for
+  /// rdar://85263844.
+  ///
+  /// Binds the RHS type to a tuple of the params of a function typed LHS. Note
+  /// this discards function parameter flags.
+  BindTupleOfFunctionParams
 };
 
 /// Classification of the different kinds of constraints.
@@ -436,6 +442,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       ASTNode Element;
       /// Contextual information associated with the element (if any).
       ContextualTypeInfo Context;
+      /// Identifies whether result of this node is unused.
+      bool IsDiscarded;
     } ClosureElement;
   };
 
@@ -489,7 +497,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a closure body element constraint.
-  Constraint(ASTNode node, ContextualTypeInfo context,
+  Constraint(ASTNode node, ContextualTypeInfo context, bool isDiscarded,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
@@ -579,12 +587,14 @@ public:
 
   static Constraint *createClosureBodyElement(ConstraintSystem &cs,
                                               ASTNode node,
-                                              ConstraintLocator *locator);
+                                              ConstraintLocator *locator,
+                                              bool isDiscarded = false);
 
   static Constraint *createClosureBodyElement(ConstraintSystem &cs,
                                               ASTNode node,
                                               ContextualTypeInfo context,
-                                              ConstraintLocator *locator);
+                                              ConstraintLocator *locator,
+                                              bool isDiscarded = false);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -685,6 +695,7 @@ public:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::Defaultable:
+    case ConstraintKind::BindTupleOfFunctionParams:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Disjunction:
@@ -848,6 +859,11 @@ public:
   ContextualTypeInfo getElementContext() const {
     assert(Kind == ConstraintKind::ClosureBodyElement);
     return ClosureElement.Context;
+  }
+
+  bool isDiscardedElement() const {
+    assert(Kind == ConstraintKind::ClosureBodyElement);
+    return ClosureElement.IsDiscarded;
   }
 
   /// For an applicable function constraint, retrieve the trailing closure

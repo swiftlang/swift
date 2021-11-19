@@ -213,14 +213,6 @@ namespace {
       }
 
       if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
-        if (auto *overload = dyn_cast<OverloadedDeclRefExpr>(binaryExpr->getFn())) {
-          // Don't walk into nil coalescing operators. Attempting to favor
-          // based on operand types is wrong for this operator.
-          auto identifier = overload->getDecls().front()->getBaseIdentifier();
-          if (identifier.isNilCoalescingOperator())
-            return { false, expr };
-        }
-
         LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
       }  
       
@@ -292,10 +284,24 @@ namespace {
   
   /// For a given expression, given information that is global to the
   /// expression, attempt to derive a favored type for it.
-  bool computeFavoredTypeForExpr(Expr *expr, ConstraintSystem &CS) {
+  void computeFavoredTypeForExpr(Expr *expr, ConstraintSystem &CS) {
     LinkedTypeInfo lti;
 
     expr->walk(LinkedExprAnalyzer(lti, CS));
+
+    // Check whether we can proceed with favoring.
+    if (llvm::any_of(lti.binaryExprs, [](const BinaryExpr *op) {
+          auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(op->getFn());
+          if (!ODRE)
+            return false;
+
+          // Attempting to favor based on operand types is wrong for
+          // nil-coalescing operator.
+          auto identifier = ODRE->getDecls().front()->getBaseIdentifier();
+          return identifier.isNilCoalescingOperator();
+        })) {
+      return;
+    }
 
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
@@ -371,13 +377,9 @@ namespace {
       };
 
       simplifyBinOpExprTyVars();
-
-      return true;
     }
-
-    return false;
   }
-  
+
   /// Determine whether the given parameter type and argument should be
   /// "favored" because they match exactly.
   bool isFavoredParamAndArg(ConstraintSystem &CS, Type paramTy, Type argTy,
@@ -1525,6 +1527,19 @@ namespace {
         auto methodTy =
             CS.createTypeVariable(memberTypeLoc, TVO_CanBindToNoEscape);
 
+        // HACK: Bind the function's parameter list as a tuple to a type
+        // variable. This only exists to preserve compatibility with
+        // rdar://85263844, as it can affect the prioritization of bindings,
+        // which can affect behavior for tuple matching as tuple subtyping is
+        // currently a *weaker* constraint than tuple conversion.
+        if (!CS.getASTContext().isSwiftVersionAtLeast(6)) {
+          auto paramTypeVar = CS.createTypeVariable(
+              CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument),
+              TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape);
+          CS.addConstraint(ConstraintKind::BindTupleOfFunctionParams, methodTy,
+                           paramTypeVar, CS.getConstraintLocator(expr));
+        }
+
         CS.addValueMemberConstraint(
             baseTy, expr->getName(), methodTy, CurDC,
             expr->getFunctionRefKind(),
@@ -2090,7 +2105,7 @@ namespace {
         // If this is a multi-statement closure, let's mark result
         // as potential hole right away.
         return Type(CS.createTypeVariable(
-            resultLocator, shouldTypeCheckInEnclosingExpression(closure)
+            resultLocator, CS.participatesInInference(closure)
                                ? 0
                                : TVO_CanBindToHole));
       }();
@@ -2612,7 +2627,7 @@ namespace {
       // genreation only if closure is going to participate
       // in the type-check. This allows us to delay validation of
       // multi-statement closures until body is opened.
-      if (shouldTypeCheckInEnclosingExpression(closure) &&
+      if (CS.participatesInInference(closure) &&
           collectVarRefs.hasErrorExprs) {
         return Type();
       }

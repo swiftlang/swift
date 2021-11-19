@@ -124,7 +124,8 @@ public:
     HasTypeVariable      = 0x01,
 
     /// This type expression contains a context-dependent archetype, either a
-    /// PrimaryArchetypeType or OpenedArchetypeType.
+    /// \c PrimaryArchetypeType, \c OpenedArchetypeType, or
+    /// \c SequenceArchetype.
     HasArchetype         = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
@@ -5683,6 +5684,50 @@ CanArchetypeType getParent() const {
 }
 END_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
 
+/// An archetype that represents an opaque element of a type sequence in context.
+///
+/// \code
+/// struct Foo<@_typeSequence Ts> { var xs: @_typeSequence Ts }
+/// func foo<@_typeSequence T>(_ xs: T...) where T: P {  }
+/// \endcode
+class SequenceArchetypeType final
+    : public ArchetypeType,
+      private ArchetypeTrailingObjects<SequenceArchetypeType> {
+  friend TrailingObjects;
+  friend ArchetypeType;
+
+  GenericEnvironment *Environment;
+
+public:
+  /// getNew - Create a new sequence archetype with the given name.
+  ///
+  /// The ConformsTo array will be minimized then copied into the ASTContext
+  /// by this routine.
+  static CanTypeWrapper<SequenceArchetypeType>
+  get(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
+      GenericTypeParamType *InterfaceType,
+      SmallVectorImpl<ProtocolDecl *> &ConformsTo, Type Superclass,
+      LayoutConstraint Layout);
+
+  /// Retrieve the generic environment in which this archetype resides.
+  GenericEnvironment *getGenericEnvironment() const { return Environment; }
+
+  GenericTypeParamType *getInterfaceType() const {
+    return cast<GenericTypeParamType>(InterfaceType.getPointer());
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SequenceArchetype;
+  }
+
+private:
+  SequenceArchetypeType(const ASTContext &Ctx, GenericEnvironment *GenericEnv,
+                        Type InterfaceType, ArrayRef<ProtocolDecl *> ConformsTo,
+                        Type Superclass, LayoutConstraint Layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(SequenceArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(SequenceArchetypeType, ArchetypeType)
+
 template<typename Type>
 const Type *ArchetypeType::getSubclassTrailingObjects() const {
   if (auto contextTy = dyn_cast<PrimaryArchetypeType>(this)) {
@@ -5695,6 +5740,9 @@ const Type *ArchetypeType::getSubclassTrailingObjects() const {
     return openedTy->getTrailingObjects<Type>();
   }
   if (auto childTy = dyn_cast<NestedArchetypeType>(this)) {
+    return childTy->getTrailingObjects<Type>();
+  }
+  if (auto childTy = dyn_cast<SequenceArchetypeType>(this)) {
     return childTy->getTrailingObjects<Type>();
   }
   llvm_unreachable("unhandled ArchetypeType subclass?");

@@ -19,6 +19,8 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
@@ -26,9 +28,10 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -118,9 +121,14 @@ namespace {
 class OutlinePattern {
 protected:
   SILOptFunctionBuilder &FuncBuilder;
+  InstModCallbacks callbacks;
+  DeadEndBlocks *deBlocks;
 
 public:
-  OutlinePattern(SILOptFunctionBuilder &FuncBuilder) : FuncBuilder(FuncBuilder) {}
+  OutlinePattern(SILOptFunctionBuilder &FuncBuilder,
+                 InstModCallbacks callbacks,
+                 DeadEndBlocks *deBlocks)
+      : FuncBuilder(FuncBuilder), callbacks(callbacks), deBlocks(deBlocks) {}
 
   /// Match the instruction sequence.
   virtual bool matchInstSequence(SILBasicBlock::iterator I) = 0;
@@ -233,7 +241,10 @@ public:
   std::pair<SILFunction *, SILBasicBlock::iterator>
   outline(SILModule &M) override;
 
-  BridgedProperty(SILOptFunctionBuilder &FuncBuilder) : OutlinePattern(FuncBuilder) {
+  BridgedProperty(SILOptFunctionBuilder &FuncBuilder,
+                  InstModCallbacks callbacks,
+                  DeadEndBlocks *deBlocks)
+      : OutlinePattern(FuncBuilder, callbacks, deBlocks) {
     clearState();
   }
 
@@ -352,7 +363,9 @@ BridgedProperty::outline(SILModule &M) {
   auto *OutlinedEntryBB = StartBB->split(SILBasicBlock::iterator(FirstInst));
   auto *OldMergeBB = switchInfo.Br->getDestBB();
   auto *NewTailBB = OldMergeBB->split(OldMergeBB->begin());
-
+  if (deBlocks) {
+    deBlocks->updateForNewBlock(NewTailBB);
+  }
   // Call the outlined function.
   {
     SILBuilder Builder(StartBB);
@@ -900,8 +913,11 @@ namespace {
 //
 // bb3(%32 : $Optional<String>):
 class BridgedReturn {
+  DeadEndBlocks *deBlocks;
   SwitchInfo switchInfo;
 public:
+  BridgedReturn(DeadEndBlocks *deBlocks) : deBlocks(deBlocks) {}
+
   bool match(ApplyInst *BridgedCall) {
     switchInfo = SwitchInfo();
     auto *SwitchBB = BridgedCall->getParent();
@@ -941,7 +957,10 @@ void BridgedReturn::outline(SILFunction *Fun, ApplyInst *NewOutlinedCall) {
   auto *OutlinedEntryBB = StartBB->split(SILBasicBlock::iterator(switchInfo.SwitchEnum));
   auto *OldMergeBB = switchInfo.Br->getDestBB();
   auto *NewTailBB = OldMergeBB->split(OldMergeBB->begin());
-	auto Loc = switchInfo.SwitchEnum->getLoc();
+  if (deBlocks) {
+    deBlocks->updateForNewBlock(NewTailBB);
+  }
+  auto Loc = switchInfo.SwitchEnum->getLoc();
 
   {
     SILBuilder Builder(StartBB);
@@ -992,8 +1011,10 @@ public:
   std::pair<SILFunction *, SILBasicBlock::iterator>
   outline(SILModule &M) override;
 
-  ObjCMethodCall(SILOptFunctionBuilder &FuncBuilder)
-      : OutlinePattern(FuncBuilder) {}
+  ObjCMethodCall(SILOptFunctionBuilder &FuncBuilder,
+                 InstModCallbacks callbacks,
+                 DeadEndBlocks *deBlocks)
+      : OutlinePattern(FuncBuilder, callbacks, deBlocks), BridgedReturn(deBlocks) {}
   ~ObjCMethodCall();
 
 private:
@@ -1043,7 +1064,12 @@ ObjCMethodCall::outline(SILModule &M) {
     for (auto Arg : BridgedCall->getArguments()) {
       if (BridgedArgIdx < BridgedArguments.size() &&
           BridgedArguments[BridgedArgIdx].Idx == OrigSigIdx) {
-        Args.push_back(BridgedArguments[BridgedArgIdx].bridgedValue());
+        auto bridgedArgValue = BridgedArguments[BridgedArgIdx].bridgedValue();
+        if (bridgedArgValue.getOwnershipKind() == OwnershipKind::Guaranteed) {
+          bridgedArgValue = makeGuaranteedValueAvailable(
+              bridgedArgValue, BridgedCall, *deBlocks);
+        }
+        Args.push_back(bridgedArgValue);
         ++BridgedArgIdx;
       } else {
         // Otherwise, use the original type convention.
@@ -1263,9 +1289,11 @@ public:
     return nullptr;
   }
 
-  OutlinePatterns(SILOptFunctionBuilder &FuncBuilder)
-      : BridgedPropertyPattern(FuncBuilder),
-        ObjCMethodCallPattern(FuncBuilder) {}
+  OutlinePatterns(SILOptFunctionBuilder &FuncBuilder,
+                  InstModCallbacks callbacks,
+                  DeadEndBlocks *deBlocks)
+      : BridgedPropertyPattern(FuncBuilder, callbacks, deBlocks),
+        ObjCMethodCallPattern(FuncBuilder, callbacks, deBlocks) {}
   ~OutlinePatterns() {}
 
   OutlinePatterns(const OutlinePatterns&) = delete;
@@ -1277,9 +1305,11 @@ public:
 /// Perform outlining on the function and return any newly created outlined
 /// functions.
 bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
-                SmallVectorImpl<SILFunction *> &FunctionsAdded) {
+                SmallVectorImpl<SILFunction *> &FunctionsAdded,
+                InstModCallbacks callbacks = InstModCallbacks(),
+                DeadEndBlocks *deBlocks = nullptr) {
   BasicBlockWorklist Worklist(Fun->getEntryBlock());
-  OutlinePatterns patterns(FuncBuilder);
+  OutlinePatterns patterns(FuncBuilder, callbacks, deBlocks);
   bool changed = false;
 
   // Traverse the function.
@@ -1329,9 +1359,21 @@ public:
       Fun->dump();
     }
 
+    DeadEndBlocksAnalysis *deBlocksAnalysis =
+        PM->getAnalysis<DeadEndBlocksAnalysis>();
+    DeadEndBlocks *deBlocks = deBlocksAnalysis->get(Fun);
+    InstModCallbacks callbacks;
+
     SILOptFunctionBuilder FuncBuilder(*this);
     SmallVector<SILFunction *, 16> FunctionsAdded;
-    bool Changed = tryOutline(FuncBuilder, Fun, FunctionsAdded);
+    bool Changed = false;
+
+    if (Fun->hasOwnership()) {
+      Changed =
+          tryOutline(FuncBuilder, Fun, FunctionsAdded, callbacks, deBlocks);
+    } else {
+      Changed = tryOutline(FuncBuilder, Fun, FunctionsAdded);
+    }
 
     if (!FunctionsAdded.empty()) {
       // Notify the pass manager of any new functions we outlined.

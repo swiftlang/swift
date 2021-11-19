@@ -25,6 +25,14 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
+bool BindingSet::forClosureResult() const {
+  return Info.TypeVar->getImpl().isClosureResultType();
+}
+
+bool BindingSet::forGenericParameter() const {
+  return bool(Info.TypeVar->getImpl().getGenericParameter());
+}
+
 bool BindingSet::canBeNil() const {
   auto &ctx = CS.getASTContext();
   return Literals.count(
@@ -1379,6 +1387,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::KeyPath:
   case ConstraintKind::ClosureBodyElement:
   case ConstraintKind::Conjunction:
+  case ConstraintKind::BindTupleOfFunctionParams:
     // Constraints from which we can't do anything.
     break;
 

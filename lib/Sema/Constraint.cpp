@@ -77,6 +77,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::BindTupleOfFunctionParams:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -161,6 +162,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::ClosureBodyElement:
+  case ConstraintKind::BindTupleOfFunctionParams:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -256,13 +258,14 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
 }
 
 Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
-                       ConstraintLocator *locator,
+                       bool isDiscarded, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(ConstraintKind::ClosureBodyElement), TheFix(nullptr),
       HasRestriction(false), IsActive(false), IsDisabled(false),
       IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       IsIsolated(false),
-      NumTypeVariables(typeVars.size()), ClosureElement{node, context},
+      NumTypeVariables(typeVars.size()), ClosureElement{node, context,
+                                                        isDiscarded},
       Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
@@ -303,6 +306,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::BindTupleOfFunctionParams:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::ApplicableFunction:
@@ -340,7 +344,8 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
                   getLocator());
 
   case ConstraintKind::ClosureBodyElement:
-    return createClosureBodyElement(cs, getClosureElement(), getLocator());
+    return createClosureBodyElement(cs, getClosureElement(), getLocator(),
+                                    isDiscardedElement());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -503,6 +508,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     Out << " can default to ";
     break;
 
+  case ConstraintKind::BindTupleOfFunctionParams:
+    Out << " bind tuple of function params to ";
+    break;
+
   case ConstraintKind::Disjunction:
     llvm_unreachable("disjunction handled above");
   case ConstraintKind::Conjunction:
@@ -663,6 +672,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::BindTupleOfFunctionParams:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);
     break;
@@ -1004,18 +1014,21 @@ Constraint *Constraint::createApplicableFunction(
 
 Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
                                                  ASTNode node,
-                                                 ConstraintLocator *locator) {
-  return createClosureBodyElement(cs, node, ContextualTypeInfo(), locator);
+                                                 ConstraintLocator *locator,
+                                                 bool isDiscarded) {
+  return createClosureBodyElement(cs, node, ContextualTypeInfo(), locator,
+                                  isDiscarded);
 }
 
 Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
                                                  ASTNode node,
                                                  ContextualTypeInfo context,
-                                                 ConstraintLocator *locator) {
+                                                 ConstraintLocator *locator,
+                                                 bool isDiscarded) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(node, context, locator, typeVars);
+  return new (mem) Constraint(node, context, isDiscarded, locator, typeVars);
 }
 
 Optional<TrailingClosureMatching>
