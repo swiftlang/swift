@@ -2866,6 +2866,10 @@ static bool usesFeatureImplicitSelfCapture(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinStackAlloc(Decl *decl) {
+  return false;
+}
+
 /// Determine the set of "new" features used on a given declaration.
 ///
 /// Note: right now, all features we check for are "new". At some point, we'll
