@@ -48,14 +48,17 @@ static bool
 validateModule(llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
                swift::serialization::ValidationInfo &info,
                swift::serialization::ExtendedValidationInfo &extendedInfo) {
+  llvm::SmallVector<swift::SerializationOptions::FileDependency, 16> deps;
   info = swift::serialization::validateSerializedAST(data, requiresOSSAModules,
-                                                     &extendedInfo);
+                                                     &extendedInfo,
+                                                     &deps);
   if (info.status != swift::serialization::Status::Valid) {
     llvm::outs() << "error: validateSerializedAST() failed\n";
     return false;
   }
 
   swift::CompilerInvocation CI;
+  CI.getSearchPathOptions().LoadSerializedSearchPathsForDebugging = true;
   if (CI.loadFromSerializedAST(data) != swift::serialization::Status::Valid) {
     llvm::outs() << "error: loadFromSerializedAST() failed\n";
     return false;
@@ -75,6 +78,16 @@ validateModule(llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
       llvm::outs() << "- -Xcc options:";
       for (llvm::StringRef option : extendedInfo.getExtraClangImporterOptions())
         llvm::outs() << " " << option;
+      llvm::outs() << "\n";
+    }
+    if (!extendedInfo.getSerializedSearchPaths().empty()) {
+      llvm::outs() << "- Serialized search paths:";
+      for (const auto &path : extendedInfo.getSerializedSearchPaths()) {
+        llvm::outs() << "\n";
+        llvm::outs() << " " << path.Path
+                     << (path.IsFramework ? " (framework)" : "")
+                     << (path.IsSystem ? " (system)" : "");
+      }
       llvm::outs() << "\n";
     }
   }
@@ -311,6 +324,7 @@ int main(int argc, char **argv) {
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.getLangOptions().EnableMemoryBufferImporter = true;
   Invocation.getSILOptions().EnableOSSAModules = EnableOSSAModules;
+  Invocation.getSearchPathOptions().LoadSerializedSearchPathsForDebugging = true;
 
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);
