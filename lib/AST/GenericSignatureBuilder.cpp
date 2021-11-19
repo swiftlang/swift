@@ -1916,10 +1916,12 @@ bool EquivalenceClass::recordConformanceConstraint(
 
     // If there is a concrete type that resolves this conformance requirement,
     // record the conformance.
-    if (!builder.resolveConcreteConformance(type, proto)) {
+    bool explicitConformance = !source->isDerivedRequirement();
+
+    if (!builder.resolveConcreteConformance(type, proto, explicitConformance)) {
       // Otherwise, determine whether there is a superclass constraint where the
       // superclass conforms to this protocol.
-      (void)builder.resolveSuperConformance(type, proto);
+      (void)builder.resolveSuperConformance(type, proto, explicitConformance);
     }
   }
 
@@ -2324,7 +2326,8 @@ void GenericSignatureBuilder::addConditionalRequirements(
 
 const RequirementSource *
 GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
-                                                    ProtocolDecl *proto) {
+                                                    ProtocolDecl *proto,
+                                                    bool explicitConformance) {
   auto equivClass = type.getEquivalenceClass(*this);
   auto concrete = equivClass->concreteType;
   if (!concrete) return nullptr;
@@ -2378,21 +2381,22 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
   equivClass->recordConformanceConstraint(*this, type, proto, concreteSource);
 
   // Only infer conditional requirements from explicit sources.
-  bool hasExplicitSource = llvm::any_of(
+  bool explicitConcreteType = llvm::any_of(
       equivClass->concreteTypeConstraints,
       [](const ConcreteConstraint &constraint) {
         return !constraint.source->isDerivedRequirement();
       });
 
-  if (hasExplicitSource) {
+  if (explicitConformance || explicitConcreteType) {
     addConditionalRequirements(conformance, /*inferForModule=*/nullptr);
   }
 
   return concreteSource;
 }
-const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
-                                                        ResolvedType type,
-                                                        ProtocolDecl *proto) {
+const RequirementSource *
+GenericSignatureBuilder::resolveSuperConformance(ResolvedType type,
+                                                 ProtocolDecl *proto,
+                                                 bool explicitConformance) {
   // Get the superclass constraint.
   auto equivClass = type.getEquivalenceClass(*this);
   Type superclass = equivClass->superclass;
@@ -2418,14 +2422,13 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   equivClass->recordConformanceConstraint(*this, type, proto, superclassSource);
 
   // Only infer conditional requirements from explicit sources.
-  bool hasExplicitSource = llvm::any_of(
-    equivClass->superclassConstraints,
-    [](const ConcreteConstraint &constraint) {
-      return (!constraint.source->isDerivedRequirement() &&
-              constraint.source->getLoc().isValid());
-    });
+  bool explicitSuperclass = llvm::any_of(
+      equivClass->superclassConstraints,
+      [](const ConcreteConstraint &constraint) {
+        return !constraint.source->isDerivedRequirement();
+      });
 
-  if (hasExplicitSource) {
+  if (explicitConformance || explicitSuperclass) {
     addConditionalRequirements(conformance, /*inferForModule=*/nullptr);
   }
 
@@ -4410,7 +4413,13 @@ bool GenericSignatureBuilder::updateSuperclass(
   // when the superclass constraint changes.
   auto updateSuperclassConformances = [&] {
     for (const auto &conforms : equivClass->conformsTo) {
-      (void)resolveSuperConformance(type, conforms.first);
+      bool explicitConformance = std::find_if(
+          conforms.second.begin(),
+          conforms.second.end(),
+          [](const Constraint<ProtocolDecl *> &constraint) {
+            return !constraint.source->isDerivedRequirement();
+          }) != conforms.second.end();
+      (void)resolveSuperConformance(type, conforms.first, explicitConformance);
     }
 
     // Eagerly resolve any existing nested types to their concrete forms (others
@@ -4809,8 +4818,15 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
                                  equivClass2->concreteTypeConstraints.begin(),
                                  equivClass2->concreteTypeConstraints.end());
 
-    for (const auto &conforms : equivClass->conformsTo)
-      (void)resolveConcreteConformance(T1, conforms.first);
+    for (const auto &conforms : equivClass->conformsTo) {
+      bool explicitConformance = std::find_if(
+          conforms.second.begin(),
+          conforms.second.end(),
+          [](const Constraint<ProtocolDecl *> &constraint) {
+            return !constraint.source->isDerivedRequirement();
+          }) != conforms.second.end();
+      (void)resolveConcreteConformance(T1, conforms.first, explicitConformance);
+    }
   }
 
   // Make T1 the representative of T2, merging the equivalence classes.
@@ -4946,7 +4962,13 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   // Make sure the concrete type fulfills the conformance requirements of
   // this equivalence class.
   for (const auto &conforms : equivClass->conformsTo) {
-    if (!resolveConcreteConformance(type, conforms.first))
+    bool explicitConformance = std::find_if(
+        conforms.second.begin(),
+        conforms.second.end(),
+        [](const Constraint<ProtocolDecl *> &constraint) {
+          return !constraint.source->isDerivedRequirement();
+        }) != conforms.second.end();
+    if (!resolveConcreteConformance(type, conforms.first, explicitConformance))
       return ConstraintResult::Conflicting;
   }
 
