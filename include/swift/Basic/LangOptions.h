@@ -489,8 +489,14 @@ namespace swift {
     RequirementMachineMode RequirementMachineProtocolSignatures =
         RequirementMachineMode::Disabled;
 
-    /// Enable the new experimental generic signature minimization algorithm.
-    RequirementMachineMode RequirementMachineGenericSignatures =
+    /// Enable the new experimental generic signature minimization algorithm
+    /// for abstract generic signatures.
+    RequirementMachineMode RequirementMachineAbstractSignatures =
+        RequirementMachineMode::Disabled;
+
+    /// Enable the new experimental generic signature minimization algorithm
+    /// for user-written generic signatures.
+    RequirementMachineMode RequirementMachineInferredSignatures =
         RequirementMachineMode::Disabled;
 
     /// Sets the target we are building for and updates platform conditions

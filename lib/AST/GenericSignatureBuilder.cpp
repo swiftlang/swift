@@ -8612,7 +8612,7 @@ AbstractGenericSignatureRequest::evaluate(
         GenericSignatureWithError());
   };
 
-  switch (ctx.LangOpts.RequirementMachineGenericSignatures) {
+  switch (ctx.LangOpts.RequirementMachineAbstractSignatures) {
   case RequirementMachineMode::Disabled:
     return buildViaGSB();
 

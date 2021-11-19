@@ -624,7 +624,11 @@ def requirement_machine_protocol_signatures_EQ : Joined<["-"], "requirement-mach
   Flags<[FrontendOption]>,
   HelpText<"Control usage of experimental protocol requirement signature minimization: 'on', 'off', or 'verify'">;
 
-def requirement_machine_generic_signatures_EQ : Joined<["-"], "requirement-machine-generic-signatures=">,
+def requirement_machine_abstract_signatures_EQ : Joined<["-"], "requirement-machine-abstract-signatures=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', or 'verify'">;
+
+def requirement_machine_inferred_signatures_EQ : Joined<["-"], "requirement-machine-inferred-signatures=">,
   Flags<[FrontendOption]>,
   HelpText<"Control usage of experimental generic signature minimization: 'on', 'off', or 'verify'">;
 

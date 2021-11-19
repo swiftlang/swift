@@ -864,7 +864,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
-  if (auto A = Args.getLastArg(OPT_requirement_machine_generic_signatures_EQ)) {
+  if (auto A = Args.getLastArg(OPT_requirement_machine_abstract_signatures_EQ)) {
     auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
         .Case("off", RequirementMachineMode::Disabled)
         .Case("on", RequirementMachineMode::Enabled)
@@ -872,7 +872,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         .Default(None);
 
     if (value)
-      Opts.RequirementMachineGenericSignatures = *value;
+      Opts.RequirementMachineAbstractSignatures = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+
+  if (auto A = Args.getLastArg(OPT_requirement_machine_inferred_signatures_EQ)) {
+    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
+        .Case("off", RequirementMachineMode::Disabled)
+        .Case("on", RequirementMachineMode::Enabled)
+        .Case("verify", RequirementMachineMode::Verify)
+        .Default(None);
+
+    if (value)
+      Opts.RequirementMachineInferredSignatures = *value;
     else
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
