@@ -67,3 +67,30 @@ struct S4<Base> where Base : P1, Base.Element: P1 {
     _ = index.map({ _ = $0 })
   }
 }
+
+struct T0<X> {}
+
+extension T0: P1 where X: P1 {
+  typealias Element = X.Element
+  typealias Index = T0<X.Index>
+}
+
+struct T1<X, Y>: P1 where X: P1 {
+  typealias Element = Y
+  typealias Index = X.Index
+}
+
+struct T2<X> where X: P1, X.Element: P1 {
+  let field: X.Element.Index
+}
+
+struct T3<X> where X: P1 {
+  func callee(_: T2<T1<X, T0<X>>>) {}
+
+  // CHECK-LABEL: {{^}}sil {{.*}}2T3{{.*}}6caller{{.*}}F :
+  // CHECK: @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3, τ_0_4, τ_0_5 where τ_0_0 == T1<τ_0_1, T0<τ_0_4>>, τ_0_1 : P1, τ_0_1 == τ_0_3, τ_0_2 == T0<τ_0_4>, τ_0_4 : P1, τ_0_4 == τ_0_5> (T2<T1<τ_0_1, T0<τ_0_4>>>) -> () for <T1<X, T0<X>>, X, T0<X>, X, X, X>
+  func caller() {
+    _ = { (x: T2<T1<X, T0<X>>>) in callee(x) }
+  }
+}
+
