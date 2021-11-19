@@ -4032,33 +4032,32 @@ static Type applyUnsafeConcurrencyToParameterType(
                                .withGlobalActor(globalActor));
 }
 
-/// Strip concurrency from the type of the given parameter.
-static Type stripConcurrencyFromParameterType(
-    Type paramType, bool dropGlobalActor) {
+/// Strip concurrency from the given type.
+static Type stripConcurrencyFromType(Type type, bool dropGlobalActor) {
   // Look through optionals.
-  if (Type optionalObject = paramType->getOptionalObjectType()) {
+  if (Type optionalObject = type->getOptionalObjectType()) {
     Type newOptionalObject =
-        stripConcurrencyFromParameterType(optionalObject, dropGlobalActor);
+        stripConcurrencyFromType(optionalObject, dropGlobalActor);
     if (optionalObject->isEqual(newOptionalObject))
-      return paramType;
+      return type;
 
     return OptionalType::get(newOptionalObject);
   }
 
   // For function types, strip off Sendable and possibly the global actor.
-  if (auto fnType = paramType->getAs<FunctionType>()) {
+  if (auto fnType = type->getAs<FunctionType>()) {
     auto extInfo = fnType->getExtInfo().withConcurrent(false);
     if (dropGlobalActor)
       extInfo = extInfo.withGlobalActor(Type());
     auto newFnType = FunctionType::get(
         fnType->getParams(), fnType->getResult(), extInfo);
-    if (newFnType->isEqual(paramType))
-      return paramType;
+    if (newFnType->isEqual(type))
+      return type;
 
     return newFnType;
   }
 
-  return paramType;
+  return type;
 }
 
 /// Determine whether the given name is that of a DispatchQueue operation that
@@ -4094,18 +4093,42 @@ static bool hasKnownUnsafeSendableFunctionParams(AbstractFunctionDecl *func) {
   return false;
 }
 
+Type swift::adjustVarTypeForConcurrency(
+    Type type, VarDecl *var, DeclContext *dc) {
+  if (!var->predatesConcurrency())
+    return type;
+
+  if (contextUsesConcurrencyFeatures(dc))
+    return type;
+
+  bool isLValue = false;
+  if (auto *lvalueType = type->getAs<LValueType>()) {
+    type = lvalueType->getObjectType();
+    isLValue = true;
+  }
+
+  type = stripConcurrencyFromType(type, /*dropGlobalActor=*/true);
+
+  if (isLValue)
+    type = LValueType::get(type);
+
+  return type;
+}
+
 /// Adjust a function type for @_unsafeSendable, @_unsafeMainActor, and
 /// @_predatesConcurrency.
 static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
-    AnyFunctionType *fnType, ValueDecl *funcOrEnum,
+    AnyFunctionType *fnType, ValueDecl *decl,
     bool inConcurrencyContext, unsigned numApplies, bool isMainDispatchQueue) {
-  // Only functions can have @_unsafeSendable/@_unsafeMainActor parameters.
-  auto func = dyn_cast<AbstractFunctionDecl>(funcOrEnum);
-  if (!func)
+  // Functions/subscripts/enum elements have function types to adjust.
+  auto func = dyn_cast_or_null<AbstractFunctionDecl>(decl);
+  auto subscript = dyn_cast_or_null<SubscriptDecl>(decl);
+
+  if (!func && !subscript)
     return fnType;
 
   AnyFunctionType *outerFnType = nullptr;
-  if (func->hasImplicitSelfDecl()) {
+  if (func && func->hasImplicitSelfDecl()) {
     outerFnType = fnType;
     fnType = outerFnType->getResult()->castTo<AnyFunctionType>();
 
@@ -4115,15 +4138,13 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
 
   SmallVector<AnyFunctionType::Param, 4> newTypeParams;
   auto typeParams = fnType->getParams();
-  auto paramDecls = func->getParameters();
+  auto paramDecls = func ? func->getParameters() : subscript->getIndices();
   assert(typeParams.size() == paramDecls->size());
-  bool knownUnsafeParams = hasKnownUnsafeSendableFunctionParams(func);
+  bool knownUnsafeParams = func && hasKnownUnsafeSendableFunctionParams(func);
   bool stripConcurrency =
-      funcOrEnum->predatesConcurrency() &&
-      !inConcurrencyContext;
+      decl->predatesConcurrency() && !inConcurrencyContext;
   for (unsigned index : indices(typeParams)) {
     auto param = typeParams[index];
-    auto paramDecl = (*paramDecls)[index];
 
     // Determine whether the resulting parameter should be @Sendable or
     // @MainActor. @Sendable occurs only in concurrency contents, while
@@ -4138,7 +4159,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
       newParamType = applyUnsafeConcurrencyToParameterType(
         param.getPlainType(), addSendable, addMainActor);
     } else if (stripConcurrency) {
-      newParamType = stripConcurrencyFromParameterType(
+      newParamType = stripConcurrencyFromType(
           param.getPlainType(), numApplies == 0);
     }
 
@@ -4160,14 +4181,25 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
     newTypeParams.push_back(param.withType(newParamType));
   }
 
+  // Compute the new result type.
+  Type newResultType = fnType->getResult();
+  if (stripConcurrency) {
+    newResultType = stripConcurrencyFromType(
+        newResultType, /*dropGlobalActor=*/true);
+
+    if (!newResultType->isEqual(fnType->getResult()) && newTypeParams.empty()) {
+      newTypeParams.append(typeParams.begin(), typeParams.end());
+    }
+  }
+
   // If we didn't change any parameters, we're done.
-  if (newTypeParams.empty()) {
+  if (newTypeParams.empty() && newResultType->isEqual(fnType->getResult())) {
     return outerFnType ? outerFnType : fnType;
   }
 
   // Rebuild the (inner) function type.
   fnType = FunctionType::get(
-      newTypeParams, fnType->getResult(), fnType->getExtInfo());
+      newTypeParams, newResultType, fnType->getExtInfo());
 
   if (!outerFnType)
     return fnType;
@@ -4184,39 +4216,41 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
 }
 
 AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
-    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc,
+    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
     unsigned numApplies, bool isMainDispatchQueue) {
   // Apply unsafe concurrency features to the given function type.
   fnType = applyUnsafeConcurrencyToFunctionType(
-      fnType, funcOrEnum, contextUsesConcurrencyFeatures(dc), numApplies,
+      fnType, decl, contextUsesConcurrencyFeatures(dc), numApplies,
       isMainDispatchQueue);
 
   Type globalActorType;
-  switch (auto isolation = getActorIsolation(funcOrEnum)) {
-  case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance:
-  case ActorIsolation::Independent:
-  case ActorIsolation::Unspecified:
-    return fnType;
-
-  case ActorIsolation::GlobalActorUnsafe:
-    // Only treat as global-actor-qualified within code that has adopted
-    // Swift Concurrency features.
-    if (!contextUsesConcurrencyFeatures(dc))
+  if (decl) {
+    switch (auto isolation = getActorIsolation(decl)) {
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::DistributedActorInstance:
+    case ActorIsolation::Independent:
+    case ActorIsolation::Unspecified:
       return fnType;
 
-    LLVM_FALLTHROUGH;
+    case ActorIsolation::GlobalActorUnsafe:
+      // Only treat as global-actor-qualified within code that has adopted
+      // Swift Concurrency features.
+      if (!contextUsesConcurrencyFeatures(dc))
+        return fnType;
 
-  case ActorIsolation::GlobalActor:
-    globalActorType = isolation.getGlobalActor();
-    break;
+      LLVM_FALLTHROUGH;
+
+    case ActorIsolation::GlobalActor:
+      globalActorType = isolation.getGlobalActor();
+      break;
+    }
   }
 
   // If there's no implicit "self" declaration, apply the global actor to
   // the outermost function type.
-  bool hasImplicitSelfDecl = isa<EnumElementDecl>(funcOrEnum) ||
-      (isa<AbstractFunctionDecl>(funcOrEnum) &&
-       cast<AbstractFunctionDecl>(funcOrEnum)->hasImplicitSelfDecl());
+  bool hasImplicitSelfDecl = decl && (isa<EnumElementDecl>(decl) ||
+      (isa<AbstractFunctionDecl>(decl) &&
+       cast<AbstractFunctionDecl>(decl)->hasImplicitSelfDecl()));
   if (!hasImplicitSelfDecl) {
     return fnType->withExtInfo(
         fnType->getExtInfo().withGlobalActor(globalActorType));

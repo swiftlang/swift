@@ -9,8 +9,18 @@
 
 struct X {
   @_predatesConcurrency func unsafelyDoEverythingClosure(_ closure: @MainActor @Sendable () -> Void) { }
+
+  @_predatesConcurrency var sendableVar: @Sendable () -> Void
+  @_predatesConcurrency var mainActorVar: @MainActor () -> Void
+
+  @_predatesConcurrency
+  subscript(_: @MainActor () -> Void) -> (@Sendable () -> Void) { {} }
+
+  @_predatesConcurrency
+  static subscript(statically _: @MainActor () -> Void) -> (@Sendable () -> Void) { { } }
 }
 
+@MainActor func onMainActor() { }
 
 func testInAsync(x: X) async {
   let _: Int = unsafelySendableClosure // expected-error{{type '(@Sendable () -> Void) -> ()'}}
@@ -19,6 +29,12 @@ func testInAsync(x: X) async {
   let _: Int = x.unsafelyDoEverythingClosure // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '(X) -> (@MainActor @Sendable () -> Void) -> ()'}}
   let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+
+  let _: Int = x.sendableVar // expected-error{{type '@Sendable () -> Void'}}
+  let _: Int = x.mainActorVar // expected-error{{type '@MainActor () -> Void'}}
+
+  let _: Int = x[{ onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
+  let _: Int = X[statically: { onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
 }
 
 func testElsewhere(x: X) {
@@ -28,9 +44,11 @@ func testElsewhere(x: X) {
   let _: Int = x.unsafelyDoEverythingClosure // expected-error{{type '(() -> Void) -> ()'}}
   let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '(X) -> (() -> Void) -> ()'}}
   let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '(() -> Void) -> ()'}}
+  let _: Int = x.sendableVar // expected-error{{type '() -> Void'}}
+  let _: Int = x.mainActorVar // expected-error{{type '() -> Void'}}
+  let _: Int = x[{ onMainActor() }] // expected-error{{type '() -> Void'}}
+  let _: Int = X[statically: { onMainActor() }] // expected-error{{type '() -> Void'}}
 }
-
-@MainActor func onMainActor() { }
 
 @MainActor @_predatesConcurrency func onMainActorAlways() { }
 

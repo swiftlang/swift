@@ -1107,6 +1107,9 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
+  // Adjust the type for concurrency.
+  requestedType = adjustVarTypeForConcurrency(requestedType, value, UseDC);
+
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
   if (!wantInterfaceType && requestedType->hasArchetype()) {
@@ -1757,7 +1760,11 @@ ConstraintSystem::getTypeOfMemberReference(
                               ->castTo<AnyFunctionType>()->getParams();
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      refType = FunctionType::get(indices, elementTy, info);
+      auto *refFnType = FunctionType::get(indices, elementTy, info);
+
+      refType = adjustFunctionTypeForConcurrency(
+          refFnType, subscript, useDC, /*numApplies=*/1,
+          /*isMainDispatchQueue=*/false);
     } else {
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
                                            locator,
@@ -2051,7 +2058,9 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
                        ->castTo<AnyFunctionType>()->getParams();
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      type = FunctionType::get(indices, elementTy, info);
+      type = adjustFunctionTypeForConcurrency(
+          FunctionType::get(indices, elementTy, info),
+          subscript, useDC, /*numApplies=*/1, /*isMainDispatchQueue=*/false);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(var, overload.getBaseType(), useDC)) {
@@ -2059,6 +2068,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       } else if (type->hasDynamicSelfType()) {
         type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
       }
+      type = adjustVarTypeForConcurrency(type, var, useDC);
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
@@ -2087,7 +2097,10 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
         }
       }
 
-      type = type->castTo<FunctionType>()->getResult();
+      type = adjustFunctionTypeForConcurrency(
+          type->castTo<FunctionType>(),
+          subscript, useDC, /*numApplies=*/2, /*isMainDispatchQueue=*/false)
+        ->getResult();
     }
   }
 
