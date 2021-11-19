@@ -381,7 +381,7 @@ void IRGenModule::addVTableTypeMetadata(
     vis = VCallVisibility::VCallVisibilityLinkageUnit;
   }
 
-  auto relptrSize = DataLayout.getTypeAllocSize(Int32Ty).getValue();
+  auto relptrSize = DataLayout.getTypeAllocSize(Int32Ty).getKnownMinValue();
   setVCallVisibility(var, vis,
                      std::make_pair(minOffset, maxOffset + relptrSize));
 }
@@ -4980,10 +4980,8 @@ namespace {
         auto candidate = IGF.IGM.getAddrOfTypeMetadata(type);
         auto call = IGF.Builder.CreateCall(IGF.IGM.getGetForeignTypeMetadataFn(),
                                            {request.get(IGF), candidate});
-        call->addAttribute(llvm::AttributeList::FunctionIndex,
-                           llvm::Attribute::NoUnwind);
-        call->addAttribute(llvm::AttributeList::FunctionIndex,
-                           llvm::Attribute::ReadNone);
+        call->addFnAttr(llvm::Attribute::NoUnwind);
+        call->addFnAttr(llvm::Attribute::ReadNone);
 
         return MetadataResponse::handle(IGF, request, call);
       });

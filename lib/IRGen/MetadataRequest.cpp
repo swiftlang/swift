@@ -612,8 +612,7 @@ static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
          cacheVariable});
     call->setDoesNotThrow();
     call->setCallingConv(IGF.IGM.SwiftCC);
-    call->addAttribute(llvm::AttributeList::FunctionIndex,
-                       llvm::Attribute::ReadNone);
+    call->addFnAttr(llvm::Attribute::ReadNone);
     return MetadataResponse::handle(IGF, request, call);
   }
   }
@@ -1831,8 +1830,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   accessor->setDoesNotThrow();
   // Don't inline cache functions, since doing so has little impact on
   // overall performance.
-  accessor->addAttribute(llvm::AttributeList::FunctionIndex,
-                         llvm::Attribute::NoInline);
+  accessor->addFnAttr(llvm::Attribute::NoInline);
   // Accessor functions don't need frame pointers.
   IGM.setHasNoFramePointer(accessor);
 
@@ -2051,10 +2049,9 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
   auto call = Builder.CreateCall(accessFunction, callArgs);
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
-  call->addAttribute(llvm::AttributeList::FunctionIndex,
-                     allocatedArgsBuffer
-                       ? llvm::Attribute::InaccessibleMemOrArgMemOnly
-                       : llvm::Attribute::ReadNone);
+  call->addFnAttr(allocatedArgsBuffer
+                      ? llvm::Attribute::InaccessibleMemOrArgMemOnly
+                      : llvm::Attribute::ReadNone);
 
   // If we allocated a buffer for the arguments, end its lifetime.
   if (allocatedArgsBuffer)
@@ -2110,8 +2107,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
     }
     call->setDoesNotThrow();
     call->setCallingConv(IGM.SwiftCC);
-    call->addAttribute(llvm::AttributeList::FunctionIndex,
-                         llvm::Attribute::ReadOnly);
+    call->addFnAttr(llvm::Attribute::ReadOnly);
     result = call;
   } else {
     static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,

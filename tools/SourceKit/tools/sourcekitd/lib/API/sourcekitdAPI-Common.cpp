@@ -189,12 +189,12 @@ void sourcekitd::printResponse(sourcekitd_response_t Resp, raw_ostream &OS) {
     printVariant(sourcekitd_response_get_value(Resp), OS);
 }
 
-static void fatal_error_handler(void *user_data, const std::string& reason,
+static void fatal_error_handler(void *user_data, const char *reason,
                                 bool gen_crash_diag) {
   // Write the result out to stderr avoiding errs() because raw_ostreams can
   // call report_fatal_error.
   // FIXME: Put the error message in the crash report.
-  fprintf(stderr, "SOURCEKITD FATAL ERROR: %s\n", reason.c_str());
+  fprintf(stderr, "SOURCEKITD FATAL ERROR: %s\n", reason);
   ::abort();
 }
 

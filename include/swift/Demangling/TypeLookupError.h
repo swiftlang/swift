@@ -20,7 +20,7 @@
 
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/Runtime/Portability.h"
-#include <string.h>
+#include <string>
 
 namespace swift {
 
