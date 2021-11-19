@@ -373,6 +373,8 @@ InferredGenericSignatureRequestRQM::evaluate(
         bool allowConcreteGenericParams) const {
   GenericSignature parentSig(parentSigImpl);
 
+  auto &ctx = parentModule->getASTContext();
+
   SmallVector<GenericTypeParamType *, 4> genericParams(
       parentSig.getGenericParams().begin(),
       parentSig.getGenericParams().end());
@@ -383,7 +385,7 @@ InferredGenericSignatureRequestRQM::evaluate(
 
   const auto visitRequirement = [&](const Requirement &req,
                                     RequirementRepr *reqRepr) {
-    realizeRequirement(req, reqRepr, /*infer=*/true, requirements);
+    realizeRequirement(req, reqRepr, parentModule, requirements);
     return false;
   };
 
@@ -411,7 +413,7 @@ InferredGenericSignatureRequestRQM::evaluate(
                              ->castTo<GenericTypeParamType>();
         genericParams.push_back(gpType);
 
-        realizeInheritedRequirements(gpDecl, gpType, /*infer=*/true,
+        realizeInheritedRequirements(gpDecl, gpType, parentModule,
                                      requirements);
       }
 
@@ -438,7 +440,7 @@ InferredGenericSignatureRequestRQM::evaluate(
     auto *typeRepr = sourcePair.getTypeRepr();
     auto loc = typeRepr ? typeRepr->getStartLoc() : SourceLoc();
 
-    inferRequirements(sourcePair.getType(), loc, requirements);
+    inferRequirements(sourcePair.getType(), loc, parentModule, requirements);
   }
 
   // Finish by adding any remaining requirements. This is used to introduce
@@ -449,7 +451,7 @@ InferredGenericSignatureRequestRQM::evaluate(
 
   // Heap-allocate the requirement machine to save stack space.
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
-      parentModule->getASTContext().getRewriteContext()));
+      ctx.getRewriteContext()));
 
   machine->initWithWrittenRequirements(genericParams, requirements);
 

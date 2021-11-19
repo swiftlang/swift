@@ -186,7 +186,7 @@ swift::rewriting::desugarRequirement(Requirement req,
 //
 
 static void realizeTypeRequirement(Type subjectType, Type constraintType,
-                                   SourceLoc loc, bool wasInferred,
+                                   SourceLoc loc,
                                    SmallVectorImpl<StructuralRequirement> &result) {
   // Check whether we have a reasonable constraint type at all.
   if (!constraintType->isExistentialType() &&
@@ -207,7 +207,7 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
 
   // Add source location information.
   for (auto req : reqs)
-    result.push_back({req, loc, wasInferred});
+    result.push_back({req, loc, /*wasInferred=*/false});
 }
 
 /// Infer requirements from applications of BoundGenericTypes to type
@@ -218,7 +218,7 @@ static void realizeTypeRequirement(Type subjectType, Type constraintType,
 /// We automatically infer 'T : Hashable' from the fact that 'struct Set'
 /// declares a Hashable requirement on its generic parameter.
 void swift::rewriting::inferRequirements(
-    Type type, SourceLoc loc,
+    Type type, SourceLoc loc, ModuleDecl *module,
     SmallVectorImpl<StructuralRequirement> &result) {
   // FIXME: Implement
 }
@@ -226,13 +226,14 @@ void swift::rewriting::inferRequirements(
 /// Desugar a requirement and perform requirement inference if requested
 /// to obtain zero or more structural requirements.
 void swift::rewriting::realizeRequirement(
-    Requirement req, RequirementRepr *reqRepr, bool infer,
+    Requirement req, RequirementRepr *reqRepr,
+    ModuleDecl *moduleForInference,
     SmallVectorImpl<StructuralRequirement> &result) {
   auto firstType = req.getFirstType();
-  if (infer) {
+  if (moduleForInference) {
     auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
                              : SourceLoc());
-    inferRequirements(firstType, firstLoc, result);
+    inferRequirements(firstType, firstLoc, moduleForInference, result);
   }
 
   auto loc = (reqRepr ? reqRepr->getSeparatorLoc() : SourceLoc());
@@ -241,14 +242,13 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
     auto secondType = req.getSecondType();
-    if (infer) {
+    if (moduleForInference) {
       auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
                                 : SourceLoc());
-      inferRequirements(secondType, secondLoc, result);
+      inferRequirements(secondType, secondLoc, moduleForInference, result);
     }
 
-    realizeTypeRequirement(firstType, secondType, loc, /*wasInferred=*/false,
-                           result);
+    realizeTypeRequirement(firstType, secondType, loc, result);
     break;
   }
 
@@ -264,10 +264,10 @@ void swift::rewriting::realizeRequirement(
 
   case RequirementKind::SameType: {
     auto secondType = req.getSecondType();
-    if (infer) {
+    if (moduleForInference) {
       auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
                                 : SourceLoc());
-      inferRequirements(secondType, secondLoc, result);
+      inferRequirements(secondType, secondLoc, moduleForInference, result);
     }
 
     SmallVector<Requirement, 2> reqs;
@@ -283,7 +283,7 @@ void swift::rewriting::realizeRequirement(
 /// Collect structural requirements written in the inheritance clause of an
 /// AssociatedTypeDecl or GenericTypeParamDecl.
 void swift::rewriting::realizeInheritedRequirements(
-    TypeDecl *decl, Type type, bool infer,
+    TypeDecl *decl, Type type, ModuleDecl *moduleForInference,
     SmallVectorImpl<StructuralRequirement> &result) {
   auto &ctx = decl->getASTContext();
   auto inheritedTypes = decl->getInherited();
@@ -298,12 +298,11 @@ void swift::rewriting::realizeInheritedRequirements(
 
     auto *typeRepr = inheritedTypes[index].getTypeRepr();
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
-    if (infer) {
-      inferRequirements(inheritedType, loc, result);
+    if (moduleForInference) {
+      inferRequirements(inheritedType, loc, moduleForInference, result);
     }
 
-    realizeTypeRequirement(type, inheritedType, loc, /*wasInferred=*/false,
-                           result);
+    realizeTypeRequirement(type, inheritedType, loc, result);
   }
 }
 
@@ -319,12 +318,13 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   auto selfTy = proto->getSelfInterfaceType();
 
   realizeInheritedRequirements(proto, selfTy,
-                               /*infer=*/false, result);
+                               /*moduleForInference=*/nullptr, result);
 
   // Add requirements from the protocol's own 'where' clause.
   WhereClauseOwner(proto).visitRequirements(TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
-        realizeRequirement(req, reqRepr, /*infer=*/false, result);
+        realizeRequirement(req, reqRepr,
+                           /*moduleForInference=*/nullptr, result);
         return false;
       });
 
@@ -343,14 +343,17 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   for (auto assocTypeDecl : proto->getAssociatedTypeMembers()) {
     // Add requirements placed directly on this associated type.
     auto assocType = assocTypeDecl->getDeclaredInterfaceType();
-    realizeInheritedRequirements(assocTypeDecl, assocType, /*infer=*/false,
+    realizeInheritedRequirements(assocTypeDecl, assocType,
+                                 /*moduleForInference=*/nullptr,
                                  result);
 
     // Add requirements from this associated type's where clause.
     WhereClauseOwner(assocTypeDecl).visitRequirements(
         TypeResolutionStage::Structural,
         [&](const Requirement &req, RequirementRepr *reqRepr) {
-          realizeRequirement(req, reqRepr, /*infer=*/false, result);
+          realizeRequirement(req, reqRepr,
+                             /*moduleForInference=*/nullptr,
+                             result);
           return false;
         });
   }

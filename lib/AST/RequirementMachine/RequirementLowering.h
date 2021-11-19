@@ -41,13 +41,15 @@ namespace rewriting {
 
 void desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
 
-void inferRequirements(Type type, SourceLoc loc,
+void inferRequirements(Type type, SourceLoc loc, ModuleDecl *module,
                        SmallVectorImpl<StructuralRequirement> &result);
 
-void realizeRequirement(Requirement req, RequirementRepr *reqRepr, bool infer,
+void realizeRequirement(Requirement req, RequirementRepr *reqRepr,
+                        ModuleDecl *moduleForInference,
                         SmallVectorImpl<StructuralRequirement> &result);
 
-void realizeInheritedRequirements(TypeDecl *decl, Type type, bool infer,
+void realizeInheritedRequirements(TypeDecl *decl, Type type,
+                                  ModuleDecl *moduleForInference,
                                   SmallVectorImpl<StructuralRequirement> &result);
 
 /// A utility class for bulding rewrite rules from the top-level requirements
