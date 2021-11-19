@@ -4623,6 +4623,9 @@ WARNING(unnecessary_any,none,
 ERROR(any_not_existential,none,
        "'any' has no effect on %select{concrete type|type parameter}0 %1",
        (bool, Type))
+ERROR(existential_requires_any,none,
+      "protocol %0 as a type must be explicitly marked as 'any'",
+      (Identifier))
 ERROR(explicit_existential_not_supported,none,
        "explicit 'any' not supported; use frontend flag "
        "-enable-explicit-existential-types to enable this feature",

@@ -3968,6 +3968,10 @@ public:
     // Arbitrary protocol constraints are OK on opaque types.
     if (isa<OpaqueReturnTypeRepr>(T))
       return false;
+
+    // Arbitrary protocol constraints are okay for 'any' types.
+    if (isa<ExistentialTypeRepr>(T))
+      return false;
     
     visit(T);
     return true;
@@ -3991,7 +3995,36 @@ public:
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T) {
-    return;
+    if (T->isInvalid() || !Ctx.LangOpts.EnableExplicitExistentialTypes)
+      return;
+
+    auto comp = T->getComponentRange().back();
+    if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
+      if (proto->existentialRequiresAny()) {
+        Ctx.Diags.diagnose(comp->getNameLoc(),
+                           diag::existential_requires_any,
+                           proto->getName());
+      }
+    } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
+      auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
+      type.findIf([&](Type type) -> bool {
+        if (T->isInvalid())
+          return false;
+        if (type->isExistentialType()) {
+          auto layout = type->getExistentialLayout();
+          for (auto *proto : layout.getProtocols()) {
+            auto *protoDecl = proto->getDecl();
+            if (!protoDecl->existentialRequiresAny())
+              continue;
+
+            Ctx.Diags.diagnose(comp->getNameLoc(),
+                               diag::existential_requires_any,
+                               protoDecl->getName());
+          }
+        }
+        return false;
+      });
+    }
   }
 
   void visitRequirements(ArrayRef<RequirementRepr> reqts) {
