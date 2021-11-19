@@ -122,7 +122,7 @@ public struct Substring: Sendable {
 }
 
 extension Substring {
-  /// Returns the underlying string from which this Substring was derived.
+  /// Returns the underlying string from which this substring was derived.
   @_alwaysEmitIntoClient
   public var base: String { return _slice.base }
 
