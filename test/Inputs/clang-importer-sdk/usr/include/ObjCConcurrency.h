@@ -5,29 +5,7 @@
 
 #define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
 
-#ifdef __SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS
-  #define SENDABLE __attribute__((__swift_attr__("@Sendable")))
-  #define NONSENDABLE __attribute__((__swift_attr__("@_nonSendable")))
-  #define ASSUME_NONSENDABLE_BEGIN _Pragma("clang attribute ASSUME_NONSENDABLE.push (__attribute__((swift_attr(\"@_nonSendable(_assumed)\"))), apply_to = any(objc_interface, record, enum))")
-  #define ASSUME_NONSENDABLE_END _Pragma("clang attribute ASSUME_NONSENDABLE.pop")
-#else
-  // If we take this #else, we should see minor failures of some subtests,
-  // but not systematic failures of everything that uses this header.
-  #define SENDABLE
-  #define NONSENDABLE
-  #define ASSUME_NONSENDABLE_BEGIN
-  #define ASSUME_NONSENDABLE_END
-#endif
-
-#define NS_ENUM(_type, _name) enum _name : _type _name; \
-  enum __attribute__((enum_extensibility(open))) _name : _type
-#define NS_OPTIONS(_type, _name) enum _name : _type _name; \
-  enum __attribute__((enum_extensibility(open), flag_enum)) _name : _type
-#define NS_ERROR_ENUM(_type, _name, _domain)  \
-  enum _name : _type _name; enum __attribute__((ns_error_domain(_domain))) _name : _type
-#define NS_STRING_ENUM __attribute((swift_newtype(enum)))
-#define NS_EXTENSIBLE_STRING_ENUM __attribute__((swift_wrapper(struct)))
-
+#define NS_EXTENSIBLE_STRING_ENUM __attribute__((swift_wrapper(struct)));
 typedef NSString *Flavor NS_EXTENSIBLE_STRING_ENUM;
 
 @protocol ServiceProvider
@@ -188,7 +166,7 @@ __attribute__((__swift_attr__("@MainActor(unsafe)")))
 @end
 
 // Do something concurrently, but without escaping.
-void doSomethingConcurrently(__attribute__((noescape)) SENDABLE void (^block)(void));
+void doSomethingConcurrently(__attribute__((noescape)) __attribute__((swift_attr("@Sendable"))) void (^block)(void));
 
 
 
@@ -206,46 +184,5 @@ MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor(unsafe)"))) @pro
 @interface ClassWithAsync: NSObject <ProtocolWithAsync>
 - (void)instanceMethodWithCompletionHandler:(void (^)(void))completionHandler __attribute__((swift_async_name("instanceAsync()")));
 @end
-
-SENDABLE @interface SendableClass : NSObject @end
-
-NONSENDABLE @interface NonSendableClass : NSObject @end
-
-ASSUME_NONSENDABLE_BEGIN
-
-SENDABLE @interface AuditedSendable : NSObject @end
-@interface AuditedNonSendable : NSObject @end
-NONSENDABLE SENDABLE @interface AuditedBoth : NSObject @end
-
-typedef NS_ENUM(unsigned, SendableEnum) {
-  SendableEnumFoo, SendableEnumBar
-};
-typedef NS_ENUM(unsigned, NonSendableEnum) {
-  NonSendableEnumFoo, NonSendableEnumBar
-} NONSENDABLE;
-
-typedef NS_OPTIONS(unsigned, SendableOptions) {
-  SendableOptionsFoo = 1 << 0, SendableOptionsBar = 1 << 1
-};
-typedef NS_OPTIONS(unsigned, NonSendableOptions) {
-  NonSendableOptionsFoo = 1 << 0, NonSendableOptionsBar = 1 << 1
-} NONSENDABLE;
-
-NSString *SendableErrorDomain, *NonSendableErrorDomain;
-typedef NS_ERROR_ENUM(unsigned, SendableErrorCode, SendableErrorDomain) {
-  SendableErrorCodeFoo, SendableErrorCodeBar
-};
-typedef NS_ERROR_ENUM(unsigned, NonSendableErrorCode, NonSendableErrorDomain) {
-  NonSendableErrorCodeFoo, NonSendableErrorCodeBar
-} NONSENDABLE;
-// expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-sendable because Swift errors are always sendable}}
-
-typedef NSString *SendableStringEnum NS_STRING_ENUM;
-typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE;
-
-typedef NSString *SendableStringStruct NS_EXTENSIBLE_STRING_ENUM;
-typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE;
-
-ASSUME_NONSENDABLE_END
 
 #pragma clang assume_nonnull end
