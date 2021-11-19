@@ -6,6 +6,5 @@ target_link_libraries(swift-dependency-tool
                       PRIVATE
                         swiftAST
                         swiftParse
-                        swiftClangImporter
-                        swiftSema)
+                        swiftClangImporter)
 

@@ -909,28 +909,6 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
 void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
   // FIXME: Should this do extra access control filtering?
   FORWARD(getDisplayDecls, (Results));
-
-  // Force Sendable on all types, which might synthesize some extensions.
-  // FIXME: We can remove this if @_nonSendable stops creating extensions.
-  for (auto result : Results) {
-    if (auto NTD = dyn_cast<NominalTypeDecl>(result))
-      (void)swift::isSendableType(const_cast<ModuleDecl *>(this),
-                                  NTD->getDeclaredInterfaceType());
-  }
-
-  // Re-add anything from synthesized file units...
-  auto oldCutoff = Results.size();
-  for (auto file : getFiles())
-    if (auto synthFile = dyn_cast<SynthesizedFileUnit>(file))
-      synthFile->getDisplayDecls(Results);
-
-  // And then remove anything that was already in the results.
-  auto oldResults = makeArrayRef(Results).take_front(oldCutoff);
-  auto uniqueEnd = std::remove_if(Results.begin() + oldCutoff, Results.end(),
-                                   [&](auto result) {
-    return llvm::is_contained(oldResults, result);
-  });
-  Results.erase(uniqueEnd, Results.end());
 }
 
 ProtocolConformanceRef
