@@ -629,3 +629,245 @@ do {
   // CHECK-NEXT: }
   struct Conformer3: Q34c {} // expected-error {{type 'Conformer3' does not conform to protocol 'Q34c'}}
 }
+
+protocol P35 {
+  associatedtype A
+  associatedtype B = Array<C>
+  associatedtype C = Array<D>
+  associatedtype D = Array<A>
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P35: {
+  // CHECK-NEXT: B => Array<Self.C>,
+  // CHECK-NEXT: C => Array<Self.D>,
+  // CHECK-NEXT: D => Array<Self.A>,
+  // CHECK-NEXT: }
+  struct Conformer: P35 {
+    typealias A = Never
+  }
+  // CHECK-LABEL: Abstract type witness system for conformance of ConformerGeneric<A> to P35: {
+  // CHECK-NEXT: A => A,
+  // CHECK-NEXT: B => Array<Self.C>,
+  // CHECK-NEXT: C => Array<Self.D>,
+  // CHECK-NEXT: D => Array<Self.A>,
+  // CHECK-NEXT: }
+  struct ConformerGeneric<A>: P35 {}
+}
+
+struct G36<S: P36> {}
+protocol P36 {
+  // FIXME: Don't create and expose malformed types like 'G36<Never>' -- check
+  // non-dependent type witnesses first.
+  // expected-note@+1 {{default type 'G36<Never>' for associated type 'A' (from protocol 'P36') does not conform to 'P36'}}
+  associatedtype A: P36 = G36<B>
+  associatedtype B: P36 = Never
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P36: {
+  // CHECK-NEXT: A => G36<Self.B>,
+  // CHECK-NEXT: B => Never,
+  // CHECK-NEXT: }
+  struct Conformer: P36 {} // expected-error {{type 'Conformer' does not conform to protocol 'P36'}}
+}
+
+protocol P37a {
+  associatedtype A
+}
+protocol P37b {
+  associatedtype B : P37a
+  associatedtype C where C == B.A
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer1<C> to P37b: {
+  // CHECK-NEXT: C => Self.B.A,
+  // CHECK-NEXT: }
+  struct Conformer1<C>: P37b {
+    struct Inner: P37a { typealias A = C }
+
+    typealias B = Inner
+  }
+
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer2<T> to P37b: {
+  // CHECK-NEXT: C => Self.B.A,
+  // CHECK-NEXT: }
+  struct Conformer2<T>: P37b {
+    struct Inner: P37a { typealias A = T }
+
+    typealias B = Inner
+  }
+}
+
+protocol P38a {
+  associatedtype A
+}
+protocol P38b {
+  associatedtype B
+}
+protocol P38c: P38a, P38b where A == B {}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer<T> to P38b: {
+  // CHECK-NEXT: B => Self.A,
+  // CHECK-NEXT: }
+  struct Conformer<T>: P38c {
+    typealias A = Self
+  }
+}
+
+protocol P39 {
+  associatedtype A: P39
+  associatedtype B = A.C
+  associatedtype C = Never
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P39: {
+  // CHECK-NEXT: B => Self.A.C,
+  // CHECK-NEXT: C => Never,
+  // CHECK-NEXT: }
+  struct Conformer: P39 {
+    typealias A = Self
+  }
+}
+
+protocol P40a {
+  associatedtype A
+  associatedtype B = (A, A)
+}
+protocol P40b: P40a {
+  override associatedtype A = Int
+}
+protocol P40c: P40b {
+  override associatedtype A
+  override associatedtype B
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P40c: {
+  // CHECK-NEXT: A => Int,
+  // CHECK-NEXT: B => (Self.A, Self.A),
+  // CHECK-NEXT: }
+  struct Conformer: P40c {}
+}
+
+protocol P41 {
+  associatedtype A where A == B.A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype B: P41 = Self // expected-note {{protocol requires nested type 'B'; do you want to add it?}}
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer to P41: {
+  // CHECK-NEXT: A => Self.B.A,
+  // CHECK-NEXT: B => Self,
+  // CHECK-NEXT: }
+  struct Conformer: P41 {} // expected-error{{type 'Conformer' does not conform to protocol 'P41'}}
+}
+
+protocol P42a {
+  associatedtype B: P42b
+}
+protocol P42b: P42a {
+  associatedtype A = B.A
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer<B> to P42b: {
+  // CHECK-NEXT: A => Self.B.A,
+  // CHECK-NEXT: }
+
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer<B> to P42a: {
+  // CHECK-NEXT: B => B,
+  // CHECK-NEXT: }
+  struct Conformer<B: P42b>: P42b {}
+}
+
+protocol P43a {
+  associatedtype A: P43a
+  associatedtype B
+}
+protocol P43b: P43a {
+  associatedtype C where C == A.B
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer<B> to P43b: {
+  // CHECK-NEXT: C => Self.A.B,
+  // CHECK-NEXT: }
+
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer<B> to P43a: {
+  // CHECK-NEXT: B => B,
+  // CHECK-NEXT: }
+  struct Conformer<B: P43a>: P43b {
+    typealias A = Conformer<B.A>
+  }
+}
+
+protocol P44 {
+  associatedtype A: P44
+  associatedtype B
+  associatedtype C where C == A.B
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer1<T> to P44: {
+  // CHECK-NEXT: C => Self.A.B,
+  // CHECK-NEXT: }
+  struct Conformer1<T: P44>: P44 {
+    typealias B = T.A
+    typealias A = Conformer1<T.A>
+  }
+
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer2<B> to P44: {
+  // CHECK-NEXT: B => B,
+  // CHECK-NEXT: C => Self.A.B,
+  // CHECK-NEXT: }
+  struct Conformer2<B: P44>: P44 {
+    typealias A = Conformer2<B.A>
+  }
+
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer3<B> to P44: {
+  // CHECK-NEXT: B => B,
+  // CHECK-NEXT: C => Self.A.B,
+  // CHECK-NEXT: }
+  struct Conformer3<B>: P44 {
+    typealias A = Conformer3<Int>
+  }
+}
+
+protocol P45 {
+  associatedtype A
+  associatedtype B: P45 = Conformer45<D>
+  associatedtype C where C == B.A
+  associatedtype D = Never
+}
+// CHECK-LABEL: Abstract type witness system for conformance of Conformer45<A> to P45: {
+// CHECK-NEXT: A => A,
+// CHECK-NEXT: B => Conformer45<Self.D>,
+// CHECK-NEXT: C => Self.B.A,
+// CHECK-NEXT: D => Never,
+// CHECK-NEXT: }
+struct Conformer45<A>: P45 {}
+
+protocol P46 {
+  associatedtype A: P46
+  associatedtype B
+  associatedtype C where C == A.B
+
+  func method(_: B)
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Conformer<T> to P46: {
+  // CHECK-NEXT: C => Self.A.B,
+  // CHECK-NEXT: }
+  struct Conformer<T: P46>: P46 {
+    typealias A = Conformer<T.A>
+
+    func method(_: T) {}
+  }
+}
+
+
+protocol P47 {
+  associatedtype A
+}
+do {
+  // CHECK-LABEL: Abstract type witness system for conformance of Outer<A>.Inner to P47: {
+  // CHECK-NEXT: A => A,
+  // CHECK-NEXT: }
+  struct Outer<A> {
+    struct Inner: P47 {}
+  }
+}

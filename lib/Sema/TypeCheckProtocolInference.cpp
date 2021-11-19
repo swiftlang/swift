@@ -886,8 +886,7 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
       if (auto genericSig = dc->getGenericSignatureOfContext()) {
         for (auto *gp : genericSig.getInnermostGenericParams()) {
           if (gp->getName() == assocType->getName()) {
-            system.addTypeWitness(assocType->getName(),
-                                  dc->mapTypeIntoContext(gp));
+            system.addTypeWitness(assocType->getName(), gp);
           }
         }
       }
@@ -1153,39 +1152,130 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
 
   // Check each abstract type witness against the generic requirements on the
   // corresponding associated type.
+  //
+  // FIXME: Consider checking non-dependent type witnesses first. Checking in
+  // default order can lead to the creation and exposure of malformed types in
+  // diagnostics. For example, we would diagnose that 'G<Never>' (!) does not
+  // conform to 'Sequence' in the below.
+  //
+  // struct G<S: Sequence> {}
+  // protocol P {
+  //   associatedtype A: Sequence = G<B>
+  //   associatedtype B: Sequence = Never
+  // }
   const auto substOptions = getSubstOptionsWithCurrentTypeWitnesses();
   for (auto *const assocType : unresolvedAssocTypes) {
     Type type = system.getResolvedTypeWitness(assocType->getName());
+    // Replace type parameters with other known or tentative type witnesses.
     if (type->hasTypeParameter()) {
-      // Replace type parameters with other known or tentative type witnesses.
-      type = type.subst(
-          [&](SubstitutableType *type) {
-            if (type->isEqual(proto->getSelfInterfaceType()))
-              return adoptee;
-
-            return Type();
-          },
-          LookUpConformanceInModule(dc->getParentModule()), substOptions);
-
-      // If the substitution produced an error, give up.
-      if (type->hasError())
-        return assocType;
-
       // FIXME: We should find a better way to detect and reason about these
-      // cyclic solutions.
-      // If mapping into context yields an error, or we still have a type
-      // parameter despite not having a generic environment, then a type
-      // parameter was sent to a tentative type witness that itself is a type
-      // parameter, and the solution is cyclic, e.g { A := B.A, B := A.B };
-      // bail out in these cases.
-      if (dc->isGenericContext()) {
-        type = dc->mapTypeIntoContext(type);
+      // cyclic solutions so that we can spot them earlier and express them in
+      // diagnostics.
+      llvm::SmallPtrSet<AssociatedTypeDecl *, 4> circularityCheck;
+      circularityCheck.insert(assocType);
 
-        if (type->hasError())
-          return assocType;
-      } else if (type->hasTypeParameter()) {
+      std::function<Type(Type)> substCurrentTypeWitnesses;
+      substCurrentTypeWitnesses = [&](Type ty) -> Type {
+        if (auto *gp = ty->getAs<GenericTypeParamType>()) {
+          if (isa<ProtocolDecl>(gp->getDecl()->getDeclContext()->getAsDecl())) {
+            return adoptee;
+          }
+
+          return ty;
+        }
+
+        auto *const dmt = ty->getAs<DependentMemberType>();
+        if (!dmt) {
+          return ty;
+        }
+
+        const auto substBase =
+            dmt->getBase().transform(substCurrentTypeWitnesses);
+        if (!substBase) {
+          return nullptr;
+        }
+
+        // If the transformed base has the same nominal as the adoptee, we may
+        // need to look up a tentative type witness. Otherwise, just substitute
+        // the base.
+        if (substBase->getAnyNominal() != adoptee->getAnyNominal()) {
+          return dmt->substBaseType(dc->getParentModule(), substBase);
+        }
+
+        auto *assocTy = dmt->getAssocType();
+        assert(
+            assocTy &&
+            "found structural DependentMemberType in tentative type witness");
+
+        // Intercept recursive solutions.
+        if (!circularityCheck.insert(assocTy).second) {
+          return nullptr;
+        }
+        SWIFT_DEFER { circularityCheck.erase(dmt->getAssocType()); };
+
+        if (assocTy->getProtocol() == proto) {
+          // We have the associated type we need.
+        } else if (proto->inheritsFrom(assocTy->getProtocol())) {
+          // See if there is an associated type with the same name in our
+          // protocol. If there isn't, keep the original associated type:
+          // we'll be falling back to a base substitution.
+          if (auto *decl = proto->getAssociatedType(assocTy->getName())) {
+            assocTy = decl;
+          }
+        }
+
+        // Find the type witness for this associated type.
+        Type tyWitness;
+        if (assocTy->getProtocol() == proto && typeWitnesses.count(assocTy)) {
+          tyWitness = typeWitnesses.begin(assocTy)->first;
+
+          // A tentative type witness may contain a 'Self'-rooted type
+          // parameter,
+          // FIXME: or a weird concrete-type-rooted dependent member type
+          // coming from inference via a value witness. Make sure we sort these
+          // out so that we don't break any subst() invariants.
+          if (tyWitness->hasTypeParameter() ||
+              tyWitness->hasDependentMember()) {
+            tyWitness = tyWitness.transform(substCurrentTypeWitnesses);
+          }
+
+          if (tyWitness) {
+            // HACK: Those inferred via value witnesses are eagerly mapped into
+            // context. For now, do the same for abstract type witnesses and
+            // handle archetypes.
+            if (tyWitness->hasArchetype()) {
+              tyWitness = tyWitness->mapTypeOutOfContext();
+            }
+
+            // If the transformed base is specialized, apply substitutions.
+            if (tyWitness->hasTypeParameter()) {
+              const auto conf = dc->getParentModule()->lookupConformance(
+                  substBase, assocTy->getProtocol(), /*allowMissing=*/true);
+              if (auto *specialized = dyn_cast<SpecializedProtocolConformance>(
+                      conf.getConcrete())) {
+                tyWitness = tyWitness.subst(specialized->getSubstitutionMap());
+              }
+            }
+          }
+        } else {
+          // The associated type has a recorded type witness, or comes from a
+          // different, possibly unrelated protocol; fall back to a base
+          // substitution to find the type witness.
+          tyWitness =
+              DependentMemberType::get(proto->getSelfInterfaceType(), assocTy)
+                  ->substBaseType(dc->getParentModule(), substBase);
+        }
+
+        return tyWitness;
+      };
+
+      type = type.transform(substCurrentTypeWitnesses);
+
+      // If substitution failed, give up.
+      if (!type || type->hasError())
         return assocType;
-      }
+
+      type = dc->mapTypeIntoContext(type);
     }
 
     if (const auto failed =
