@@ -698,7 +698,7 @@ public:
   void initialize(bool isDistributedRemote = false) {
     auto flags = Flags();
     flags.setIsDistributedRemote(isDistributedRemote);
-    new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
+    new (&CurrentState) swift::atomic<State>(State{JobRef(), flags});
     JobStorageHeapObject.metadata = nullptr;
   }
 
