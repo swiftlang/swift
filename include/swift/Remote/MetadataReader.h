@@ -187,7 +187,7 @@ private:
 
   using ContextDescriptorRef =
       RemoteRef<const TargetContextDescriptor<Runtime>>;
-  using OwnedContextDescriptorRef = MemoryReader::ReadBytesResult;
+  using OwnedContextDescriptorRef = std::unique_ptr<const void, delete_with_free>;
 
   /// A reference to a context descriptor that may be in an unloaded image.
   class ParentContextDescriptorRef {
@@ -1051,12 +1051,13 @@ public:
       case ContextDescriptorKind::Module:
         sizeEstimate = sizeof(TargetModuleContextDescriptor<Runtime>);
         break;
-      case ContextDescriptorKind::Extension:
-        sizeEstimate = sizeof(TargetExtensionContextDescriptor<Runtime>);
-        break;
 
       // For types that use trailing objects, ask the trailing object logic to
       // look at what we have so far and tell us whether we're done or not.
+      case ContextDescriptorKind::Extension: {
+        sizeEstimate = TargetExtensionContextDescriptor<Runtime>::totalSizeOfPartialObject(buffer, available);
+        break;
+      }
       case ContextDescriptorKind::Anonymous: {
         sizeEstimate = TargetAnonymousContextDescriptor<Runtime>::totalSizeOfPartialObject(buffer, available);
         break;
@@ -1093,10 +1094,10 @@ public:
     // data.
 
     // Insert the final object into the descriptor cache and return it
-    auto descriptor
-      = reinterpret_cast<TargetContextDescriptor<Runtime> *>(buffer);
-    ContextDescriptorCache.insert(
-        std::make_pair(address, std::move(readResult)));
+    OwnedContextDescriptorRef readResult(buffer);
+    ContextDescriptorCache.emplace(address, std::move(readResult));
+    auto descriptor =
+      reinterpret_cast<const TargetContextDescriptor<Runtime> *>(buffer);
     return ContextDescriptorRef(address, descriptor);
   }
   
