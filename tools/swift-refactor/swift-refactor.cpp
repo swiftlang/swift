@@ -128,6 +128,10 @@ static llvm::cl::opt<bool> EnableExperimentalConcurrency(
     "enable-experimental-concurrency",
     llvm::cl::desc("Whether to enable experimental concurrency or not"));
 
+static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
+    "enable-experimental-string-processing",
+    llvm::cl::desc("Whether to enable experimental string processing or not"));
+
 static llvm::cl::opt<std::string>
     SDK("sdk", llvm::cl::desc("Path to the SDK to build against"));
 
@@ -310,6 +314,9 @@ int main(int argc, char *argv[]) {
 
   if (options::EnableExperimentalConcurrency)
     Invocation.getLangOptions().EnableExperimentalConcurrency = true;
+
+  if (options::EnableExperimentalStringProcessing)
+    Invocation.getLangOptions().EnableExperimentalStringProcessing = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
