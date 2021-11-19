@@ -25,6 +25,7 @@
 #include "RequirementLowering.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -343,6 +344,258 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   return ctx.AllocateCopy(result);
 }
 
+ArrayRef<Requirement>
+TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
+                                       ProtocolDecl *proto) const {
+  // @objc protocols don't have associated types, so all of the below
+  // becomes a trivial no-op.
+  if (proto->isObjC())
+    return ArrayRef<Requirement>();
+
+  assert(!proto->hasLazyRequirementSignature());
+
+  SmallVector<Requirement, 2> result;
+
+  auto &ctx = proto->getASTContext();
+
+  // In Verify mode, the GenericSignatureBuilder will emit the same diagnostics.
+  bool emitDiagnostics =
+    (ctx.LangOpts.RequirementMachineProtocolSignatures ==
+     RequirementMachineMode::Enabled);
+
+  // Collect all typealiases from inherited protocols recursively.
+  llvm::MapVector<Identifier, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
+  for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
+    for (auto req : inheritedProto->getMembers()) {
+      if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
+        // Ignore generic typealiases.
+        if (auto typeAliasReq = dyn_cast<TypeAliasDecl>(typeReq))
+          if (typeAliasReq->isGeneric())
+            continue;
+
+        inheritedTypeDecls[typeReq->getName()].push_back(typeReq);
+      }
+    }
+  }
+
+  auto getStructuralType = [](TypeDecl *typeDecl) -> Type {
+    if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (typealias->getUnderlyingTypeRepr() != nullptr) {
+        auto type = typealias->getStructuralType();
+        if (auto *aliasTy = cast<TypeAliasType>(type.getPointer()))
+          return aliasTy->getSinglyDesugaredType();
+        return type;
+      }
+      return typealias->getUnderlyingType();
+    }
+
+    return typeDecl->getDeclaredInterfaceType();
+  };
+
+  // An inferred same-type requirement between the two type declarations
+  // within this protocol or a protocol it inherits.
+  auto recordInheritedTypeRequirement = [&](TypeDecl *first, TypeDecl *second) {
+    desugarSameTypeRequirement(getStructuralType(first),
+                               getStructuralType(second), result);
+  };
+
+  // Local function to find the insertion point for the protocol's "where"
+  // clause, as well as the string to start the insertion ("where" or ",");
+  auto getProtocolWhereLoc = [&]() -> Located<const char *> {
+    // Already has a trailing where clause.
+    if (auto trailing = proto->getTrailingWhereClause())
+      return { ", ", trailing->getRequirements().back().getSourceRange().End };
+
+    // Inheritance clause.
+    return { " where ", proto->getInherited().back().getSourceRange().End };
+  };
+
+  // Retrieve the set of requirements that a given associated type declaration
+  // produces, in the form that would be seen in the where clause.
+  const auto getAssociatedTypeReqs = [&](const AssociatedTypeDecl *assocType,
+                                         const char *start) {
+    std::string result;
+    {
+      llvm::raw_string_ostream out(result);
+      out << start;
+      interleave(assocType->getInherited(), [&](TypeLoc inheritedType) {
+        out << assocType->getName() << ": ";
+        if (auto inheritedTypeRepr = inheritedType.getTypeRepr())
+          inheritedTypeRepr->print(out);
+        else
+          inheritedType.getType().print(out);
+      }, [&] {
+        out << ", ";
+      });
+
+      if (const auto whereClause = assocType->getTrailingWhereClause()) {
+        if (!assocType->getInherited().empty())
+          out << ", ";
+
+        whereClause->print(out, /*printWhereKeyword*/false);
+      }
+    }
+    return result;
+  };
+
+  // Retrieve the requirement that a given typealias introduces when it
+  // overrides an inherited associated type with the same name, as a string
+  // suitable for use in a where clause.
+  auto getConcreteTypeReq = [&](TypeDecl *type, const char *start) {
+    std::string result;
+    {
+      llvm::raw_string_ostream out(result);
+      out << start;
+      out << type->getName() << " == ";
+      if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
+        if (auto underlyingTypeRepr = typealias->getUnderlyingTypeRepr())
+          underlyingTypeRepr->print(out);
+        else
+          typealias->getUnderlyingType().print(out);
+      } else {
+        type->print(out);
+      }
+    }
+    return result;
+  };
+
+  for (auto assocTypeDecl : proto->getAssociatedTypeMembers()) {
+    // Check whether we inherited any types with the same name.
+    auto knownInherited =
+      inheritedTypeDecls.find(assocTypeDecl->getName());
+    if (knownInherited == inheritedTypeDecls.end()) continue;
+
+    bool shouldWarnAboutRedeclaration =
+      emitDiagnostics &&
+      !assocTypeDecl->getAttrs().hasAttribute<NonOverrideAttr>() &&
+      !assocTypeDecl->getAttrs().hasAttribute<OverrideAttr>() &&
+      !assocTypeDecl->hasDefaultDefinitionType() &&
+      (!assocTypeDecl->getInherited().empty() ||
+        assocTypeDecl->getTrailingWhereClause() ||
+        ctx.LangOpts.WarnImplicitOverrides);
+    for (auto inheritedType : knownInherited->second) {
+      // If we have inherited associated type...
+      if (auto inheritedAssocTypeDecl =
+            dyn_cast<AssociatedTypeDecl>(inheritedType)) {
+        // Complain about the first redeclaration.
+        if (shouldWarnAboutRedeclaration) {
+          auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
+          auto fixItWhere = getProtocolWhereLoc();
+          ctx.Diags.diagnose(assocTypeDecl,
+                             diag::inherited_associated_type_redecl,
+                             assocTypeDecl->getName(),
+                             inheritedFromProto->getDeclaredInterfaceType())
+            .fixItInsertAfter(
+                      fixItWhere.Loc,
+                      getAssociatedTypeReqs(assocTypeDecl, fixItWhere.Item))
+            .fixItRemove(assocTypeDecl->getSourceRange());
+
+          ctx.Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
+                             inheritedAssocTypeDecl->getName());
+
+          shouldWarnAboutRedeclaration = false;
+        }
+
+        continue;
+      }
+
+      if (emitDiagnostics) {
+        // We inherited a type; this associated type will be identical
+        // to that typealias.
+        auto inheritedOwningDecl =
+            inheritedType->getDeclContext()->getSelfNominalTypeDecl();
+        ctx.Diags.diagnose(assocTypeDecl,
+                           diag::associated_type_override_typealias,
+                           assocTypeDecl->getName(),
+                           inheritedOwningDecl->getDescriptiveKind(),
+                           inheritedOwningDecl->getDeclaredInterfaceType());
+      }
+
+      recordInheritedTypeRequirement(assocTypeDecl, inheritedType);
+    }
+
+    inheritedTypeDecls.erase(knownInherited);
+  }
+
+  // Check all remaining inherited type declarations to determine if
+  // this protocol has a non-associated-type type with the same name.
+  inheritedTypeDecls.remove_if(
+    [&](const std::pair<Identifier, TinyPtrVector<TypeDecl *>> &inherited) {
+      const auto name = inherited.first;
+      for (auto found : proto->lookupDirect(name)) {
+        // We only want concrete type declarations.
+        auto type = dyn_cast<TypeDecl>(found);
+        if (!type || isa<AssociatedTypeDecl>(type)) continue;
+
+        // Ignore nominal types. They're always invalid declarations.
+        if (isa<NominalTypeDecl>(type))
+          continue;
+
+        // ... from the same module as the protocol.
+        if (type->getModuleContext() != proto->getModuleContext()) continue;
+
+        // Ignore types defined in constrained extensions; their equivalence
+        // to the associated type would have to be conditional, which we cannot
+        // model.
+        if (auto ext = dyn_cast<ExtensionDecl>(type->getDeclContext())) {
+          if (ext->isConstrainedExtension()) continue;
+        }
+
+        // We found something.
+        bool shouldWarnAboutRedeclaration = emitDiagnostics;
+
+        for (auto inheritedType : inherited.second) {
+          // If we have inherited associated type...
+          if (auto inheritedAssocTypeDecl =
+                dyn_cast<AssociatedTypeDecl>(inheritedType)) {
+            // Infer a same-type requirement between the typealias' underlying
+            // type and the inherited associated type.
+            recordInheritedTypeRequirement(inheritedAssocTypeDecl, type);
+
+            // Warn that one should use where clauses for this.
+            if (shouldWarnAboutRedeclaration) {
+              auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
+              auto fixItWhere = getProtocolWhereLoc();
+              ctx.Diags.diagnose(type,
+                                 diag::typealias_override_associated_type,
+                                 name,
+                                 inheritedFromProto->getDeclaredInterfaceType())
+                .fixItInsertAfter(fixItWhere.Loc,
+                                  getConcreteTypeReq(type, fixItWhere.Item))
+                .fixItRemove(type->getSourceRange());
+              ctx.Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
+                                 inheritedAssocTypeDecl->getName());
+
+              shouldWarnAboutRedeclaration = false;
+            }
+
+            continue;
+          }
+
+          // Two typealiases that should be the same.
+          recordInheritedTypeRequirement(inheritedType, type);
+        }
+
+        // We can remove this entry.
+        return true;
+      }
+
+      return false;
+  });
+
+  // Infer same-type requirements among inherited type declarations.
+  for (auto &entry : inheritedTypeDecls) {
+    if (entry.second.size() < 2) continue;
+
+    auto firstDecl = entry.second.front();
+    for (auto otherDecl : ArrayRef<TypeDecl *>(entry.second).slice(1)) {
+      recordInheritedTypeRequirement(firstDecl, otherDecl);
+    }
+  }
+
+  return ctx.AllocateCopy(result);
+}
+
 ArrayRef<ProtocolDecl *>
 ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *proto) const {
@@ -635,11 +888,13 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
     // we can trigger the computation of the requirement signatures of the
     // next component recursively.
     if (ProtocolMap[proto]) {
-      for (auto req : proto->getStructuralRequirements()) {
-        // FIXME: Keep source location information around for redundancy
-        // diagnostics.
+      // FIXME: Keep source location information around for redundancy
+      // diagnostics.
+      for (auto req : proto->getStructuralRequirements())
         addRequirement(req.req.getCanonical(), proto);
-      }
+
+      for (auto req : proto->getTypeAliasRequirements())
+        addRequirement(req.getCanonical(), proto);
     } else {
       for (auto req : proto->getRequirementSignature())
         addRequirement(req.getCanonical(), proto);

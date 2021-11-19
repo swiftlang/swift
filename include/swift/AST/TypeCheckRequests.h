@@ -387,6 +387,25 @@ public:
   bool isCached() const { return true; }
 };
 
+class TypeAliasRequirementsRequest :
+    public SimpleRequest<TypeAliasRequirementsRequest,
+                         ArrayRef<Requirement>(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Requirement>
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 class ProtocolDependenciesRequest :
     public SimpleRequest<ProtocolDependenciesRequest,
                          ArrayRef<ProtocolDecl *>(ProtocolDecl *),

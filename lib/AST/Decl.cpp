@@ -5260,6 +5260,13 @@ ProtocolDecl::getStructuralRequirements() const {
                None);
 }
 
+ArrayRef<Requirement>
+ProtocolDecl::getTypeAliasRequirements() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               TypeAliasRequirementsRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
+
 ArrayRef<ProtocolDecl *>
 ProtocolDecl::getProtocolDependencies() const {
   return evaluateOrDefault(getASTContext().evaluator,

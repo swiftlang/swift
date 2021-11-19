@@ -4225,6 +4225,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class StructuralRequirementsRequest;
+  friend class TypeAliasRequirementsRequest;
   friend class ProtocolDependenciesRequest;
   friend class RequirementSignatureRequest;
   friend class RequirementSignatureRequestRQM;
@@ -4420,6 +4421,11 @@ public:
   /// requirements. Almost everywhere else should use getRequirementSignature()
   /// instead.
   ArrayRef<StructuralRequirement> getStructuralRequirements() const;
+
+  /// Retrieve same-type requirements implied by protocol typealiases with the
+  /// same name as associated types, and diagnose cases that are better expressed
+  /// via a 'where' clause.
+  ArrayRef<Requirement> getTypeAliasRequirements() const;
 
   /// Get the list of protocols appearing on the right hand side of conformance
   /// requirements. Computed from the structural requirements, above.

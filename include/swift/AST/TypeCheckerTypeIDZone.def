@@ -227,6 +227,9 @@ SWIFT_REQUEST(TypeChecker, RequirementRequest,
 SWIFT_REQUEST(TypeChecker, StructuralRequirementsRequest,
               ArrayRef<StructuralRequirement>(ProtocolDecl *), Cached,
               HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, TypeAliasRequirementsRequest,
+              ArrayRef<Requirement>(ProtocolDecl *), Cached,
+              HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, ProtocolDependenciesRequest,
               ArrayRef<ProtocolDecl *>(ProtocolDecl *), Cached,
               HasNearestLocation)
