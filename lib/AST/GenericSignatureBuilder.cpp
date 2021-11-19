@@ -8649,121 +8649,164 @@ InferredGenericSignatureRequest::evaluate(
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,
         bool allowConcreteGenericParams) const {
-      
-  GenericSignatureBuilder builder(parentModule->getASTContext());
-      
-  // If there is a parent context, add the generic parameters and requirements
-  // from that context.
-  builder.addGenericSignature(parentSig);
+  auto buildViaGSB = [&]() {
+    GenericSignatureBuilder builder(parentModule->getASTContext());
+        
+    // If there is a parent context, add the generic parameters and requirements
+    // from that context.
+    builder.addGenericSignature(parentSig);
 
-  DeclContext *lookupDC = nullptr;
+    DeclContext *lookupDC = nullptr;
 
-  const auto visitRequirement = [&](const Requirement &req,
-                                    RequirementRepr *reqRepr) {
-    const auto source = FloatingRequirementSource::forExplicit(
-      reqRepr->getSeparatorLoc());
+    const auto visitRequirement = [&](const Requirement &req,
+                                      RequirementRepr *reqRepr) {
+      const auto source = FloatingRequirementSource::forExplicit(
+        reqRepr->getSeparatorLoc());
 
-    // If we're extending a protocol and adding a redundant requirement,
-    // for example, `extension Foo where Self: Foo`, then emit a
-    // diagnostic.
+      // If we're extending a protocol and adding a redundant requirement,
+      // for example, `extension Foo where Self: Foo`, then emit a
+      // diagnostic.
 
-    if (auto decl = lookupDC->getAsDecl()) {
-      if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
-        auto extType = extDecl->getDeclaredInterfaceType();
-        auto extSelfType = extDecl->getSelfInterfaceType();
-        auto reqLHSType = req.getFirstType();
-        auto reqRHSType = req.getSecondType();
+      if (auto decl = lookupDC->getAsDecl()) {
+        if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
+          auto extType = extDecl->getDeclaredInterfaceType();
+          auto extSelfType = extDecl->getSelfInterfaceType();
+          auto reqLHSType = req.getFirstType();
+          auto reqRHSType = req.getSecondType();
 
-        if (extType->isExistentialType() &&
-            reqLHSType->isEqual(extSelfType) &&
-            reqRHSType->isEqual(extType)) {
+          if (extType->isExistentialType() &&
+              reqLHSType->isEqual(extSelfType) &&
+              reqRHSType->isEqual(extType)) {
 
-          auto &ctx = extDecl->getASTContext();
-          ctx.Diags.diagnose(extDecl->getLoc(),
-                             diag::protocol_extension_redundant_requirement,
-                             extType->getString(),
-                             extSelfType->getString(),
-                             reqRHSType->getString());
+            auto &ctx = extDecl->getASTContext();
+            ctx.Diags.diagnose(extDecl->getLoc(),
+                               diag::protocol_extension_redundant_requirement,
+                               extType->getString(),
+                               extSelfType->getString(),
+                               reqRHSType->getString());
+          }
         }
+      }
+
+      builder.addRequirement(req, reqRepr, source, nullptr,
+                              lookupDC->getParentModule());
+      return false;
+    };
+
+    if (genericParams) {
+      // Extensions never have a parent signature.
+      if (genericParams->getOuterParameters())
+        assert(parentSig == nullptr);
+
+      // Type check the generic parameters, treating all generic type
+      // parameters as dependent, unresolved.
+      SmallVector<GenericParamList *, 2> gpLists;
+      for (auto *outerParams = genericParams;
+           outerParams != nullptr;
+           outerParams = outerParams->getOuterParameters()) {
+        gpLists.push_back(outerParams);
+      }
+
+      // The generic parameter lists MUST appear from innermost to outermost.
+      // We walk them backwards to order outer requirements before
+      // inner requirements.
+      for (auto &genericParams : llvm::reverse(gpLists)) {
+        assert(genericParams->size() > 0 &&
+               "Parsed an empty generic parameter list?");
+
+        // First, add the generic parameters to the generic signature builder.
+        // Do this before checking the inheritance clause, since it may
+        // itself be dependent on one of these parameters.
+        for (const auto param : *genericParams)
+          builder.addGenericParameter(param);
+
+        // Add the requirements for each of the generic parameters to the builder.
+        // Now, check the inheritance clauses of each parameter.
+        for (const auto param : *genericParams)
+          builder.addGenericParameterRequirements(param);
+
+        // Determine where and how to perform name lookup.
+        lookupDC = genericParams->begin()[0]->getDeclContext();
+
+        // Add the requirements clause to the builder.
+        WhereClauseOwner(lookupDC, genericParams)
+          .visitRequirements(TypeResolutionStage::Structural,
+                             visitRequirement);
       }
     }
 
-    builder.addRequirement(req, reqRepr, source, nullptr,
-                            lookupDC->getParentModule());
-    return false;
+    if (whereClause) {
+      lookupDC = whereClause.dc;
+      std::move(whereClause).visitRequirements(
+          TypeResolutionStage::Structural, visitRequirement);
+    }
+        
+    /// Perform any remaining requirement inference.
+    for (auto sourcePair : inferenceSources) {
+      auto *typeRepr = sourcePair.getTypeRepr();
+      auto source =
+        FloatingRequirementSource::forInferred(
+          typeRepr ? typeRepr->getStartLoc() : SourceLoc());
+
+      builder.inferRequirements(*parentModule,
+                                sourcePair.getType(),
+                                source);
+    }
+    
+    // Finish by adding any remaining requirements.
+    auto source =
+      FloatingRequirementSource::forInferred(SourceLoc());
+        
+    for (const auto &req : addedRequirements)
+      builder.addRequirement(req, source, parentModule);
+
+    bool hadError = builder.hadAnyError();
+    auto result = std::move(builder).computeGenericSignature(
+        allowConcreteGenericParams);
+    return GenericSignatureWithError(result, hadError);
   };
 
-  if (genericParams) {
-    // Extensions never have a parent signature.
-    if (genericParams->getOuterParameters())
-      assert(parentSig == nullptr);
+  auto &ctx = parentModule->getASTContext();
 
-    // Type check the generic parameters, treating all generic type
-    // parameters as dependent, unresolved.
-    SmallVector<GenericParamList *, 2> gpLists;
-    for (auto *outerParams = genericParams;
-         outerParams != nullptr;
-         outerParams = outerParams->getOuterParameters()) {
-      gpLists.push_back(outerParams);
+  auto buildViaRQM = [&]() {
+    return evaluateOrDefault(
+        ctx.evaluator,
+        InferredGenericSignatureRequestRQM{
+          parentModule,
+          parentSig,
+          genericParams,
+          whereClause,
+          addedRequirements,
+          inferenceSources,
+          allowConcreteGenericParams},
+        GenericSignatureWithError());
+  };
+
+  switch (ctx.LangOpts.RequirementMachineInferredSignatures) {
+  case RequirementMachineMode::Disabled:
+    return buildViaGSB();
+
+  case RequirementMachineMode::Enabled:
+    return buildViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = buildViaRQM();
+    auto gsbResult = buildViaGSB();
+
+    if (!rqmResult.getPointer() && !gsbResult.getPointer())
+      return gsbResult;
+
+    if (!rqmResult.getPointer()->isEqual(gsbResult.getPointer())) {
+      llvm::errs() << "RequirementMachine generic signature minimization is broken:\n";
+      llvm::errs() << "RequirementMachine says:      " << rqmResult.getPointer() << "\n";
+      llvm::errs() << "GenericSignatureBuilder says: " << gsbResult.getPointer() << "\n";
+
+      abort();
     }
 
-    // The generic parameter lists MUST appear from innermost to outermost.
-    // We walk them backwards to order outer requirements before
-    // inner requirements.
-    for (auto &genericParams : llvm::reverse(gpLists)) {
-      assert(genericParams->size() > 0 &&
-             "Parsed an empty generic parameter list?");
-
-      // First, add the generic parameters to the generic signature builder.
-      // Do this before checking the inheritance clause, since it may
-      // itself be dependent on one of these parameters.
-      for (const auto param : *genericParams)
-        builder.addGenericParameter(param);
-
-      // Add the requirements for each of the generic parameters to the builder.
-      // Now, check the inheritance clauses of each parameter.
-      for (const auto param : *genericParams)
-        builder.addGenericParameterRequirements(param);
-
-      // Determine where and how to perform name lookup.
-      lookupDC = genericParams->begin()[0]->getDeclContext();
-
-      // Add the requirements clause to the builder.
-      WhereClauseOwner(lookupDC, genericParams)
-        .visitRequirements(TypeResolutionStage::Structural,
-                           visitRequirement);
-    }
+    return gsbResult;
   }
-
-  if (whereClause) {
-    lookupDC = whereClause.dc;
-    std::move(whereClause).visitRequirements(
-        TypeResolutionStage::Structural, visitRequirement);
   }
-      
-  /// Perform any remaining requirement inference.
-  for (auto sourcePair : inferenceSources) {
-    auto *typeRepr = sourcePair.getTypeRepr();
-    auto source =
-      FloatingRequirementSource::forInferred(
-        typeRepr ? typeRepr->getStartLoc() : SourceLoc());
-
-    builder.inferRequirements(*parentModule,
-                              sourcePair.getType(),
-                              source);
-  }
-  
-  // Finish by adding any remaining requirements.
-  auto source =
-    FloatingRequirementSource::forInferred(SourceLoc());
-      
-  for (const auto &req : addedRequirements)
-    builder.addRequirement(req, source, parentModule);
-
-  bool hadError = builder.hadAnyError();
-  auto result = std::move(builder).computeGenericSignature(
-      allowConcreteGenericParams);
-  return GenericSignatureWithError(result, hadError);
 }
 
 ArrayRef<Requirement>
