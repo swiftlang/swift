@@ -124,7 +124,7 @@ class ObjCTest {
 #endif
 
 // HEADER: struct TestError : _BridgedStoredNSError {
-// HEADER:   enum Code : Int32, _ErrorCodeProtocol {
+// HEADER:   enum Code : Int32, _ErrorCodeProtocol, @unchecked Sendable {
 // HEADER:     init?(rawValue: Int32)
 // HEADER:     var rawValue: Int32 { get }
 // HEADER:     typealias _ErrorType = TestError
@@ -136,7 +136,7 @@ class ObjCTest {
 // HEADER: func getErr() -> TestError.Code
 
 // HEADER-NO-PRIVATE: struct TestError : CustomNSError, Hashable, Error {
-// HEADER-NO-PRIVATE:   enum Code : Int32, Equatable {
+// HEADER-NO-PRIVATE:   enum Code : Int32, @unchecked Sendable, Equatable {
 // HEADER-NO-PRIVATE:     init?(rawValue: Int32)
 // HEADER-NO-PRIVATE:     var rawValue: Int32 { get }
 // HEADER-NO-PRIVATE:     typealias _ErrorType = TestError

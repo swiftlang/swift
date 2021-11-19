@@ -605,7 +605,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
   106)
 
 SIMPLE_DECL_ATTR(Sendable, Sendable,
-  OnFunc | OnConstructor | OnAccessor |
+  OnFunc | OnConstructor | OnAccessor | OnAnyClangDecl |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   107)
@@ -635,15 +635,8 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   APIBreakingToAdd | APIStableToRemove,
   112)
 
-CONTEXTUAL_SIMPLE_DECL_ATTR(_unsafeSendable, UnsafeSendable,
-  OnParam | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  113)
-
-CONTEXTUAL_SIMPLE_DECL_ATTR(_unsafeMainActor, UnsafeMainActor,
-  OnParam | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
-  114)
+// 113 was experimental _unsafeSendable and is now unused
+// 114 was experimental _unsafeMainActor and is now unused
 
 SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
   OnParam | UserInaccessible |
@@ -694,6 +687,12 @@ SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
   OnAbstractFunction | OnSubscript | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   124)
+
+SIMPLE_DECL_ATTR(_predatesConcurrency, PredatesConcurrency,
+  OnFunc | OnConstructor | OnProtocol | OnGenericType | OnVar | OnSubscript |
+  OnEnumElement | UserInaccessible |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  125)
 
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
