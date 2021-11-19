@@ -718,6 +718,11 @@ Optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
                            None);
 }
 
+bool Decl::predatesConcurrency() const {
+  return getAttrs().hasAttribute<PredatesConcurrencyAttr>();
+}
+
+
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   auto braceStmt = getBody();

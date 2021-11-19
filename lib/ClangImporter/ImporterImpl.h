@@ -685,19 +685,6 @@ public:
     decl->setImplicitlyUnwrappedOptional(true);
   }
 
-  void recordUnsafeConcurrencyForDecl(
-      ValueDecl *decl, bool isUnsafeSendable, bool isUnsafeMainActor) {
-    if (isUnsafeSendable) {
-      decl->getAttrs().add(
-          new (SwiftContext) UnsafeSendableAttr(/*implicit=*/true));
-    }
-
-    if (isUnsafeMainActor) {
-      decl->getAttrs().add(
-          new (SwiftContext) UnsafeMainActorAttr(/*implicit=*/true));
-    }
-  }
-
   /// Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
     return Instance->getASTContext();
@@ -848,8 +835,7 @@ public:
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
 
-  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type,
-                            bool &isUnsafeSendable, bool &isUnsafeMainActor);
+  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.

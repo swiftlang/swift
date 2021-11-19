@@ -4,7 +4,6 @@
 #pragma clang assume_nonnull begin
 
 #define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
-#define MAIN_ACTOR_UNSAFE __attribute__((__swift_attr__("@_unsafeMainActor")))
 
 #define NS_EXTENSIBLE_STRING_ENUM __attribute__((swift_wrapper(struct)));
 typedef NSString *Flavor NS_EXTENSIBLE_STRING_ENUM;
@@ -86,7 +85,7 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)asyncImportSame:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(void)asyncImportSame:(NSString *)operation replyTo:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
 
--(void)overridableButRunsOnMainThreadWithCompletionHandler:(MAIN_ACTOR_UNSAFE void (^ _Nullable)(NSString *))completion;
+-(void)overridableButRunsOnMainThreadWithCompletionHandler:(MAIN_ACTOR void (^ _Nullable)(NSString *))completion __attribute__((swift_attr("@_predatesConcurrency")));
 - (void)obtainClosureWithCompletionHandler:(void (^)(void (^_Nullable)(void),
                                                      NSError *_Nullable,
                                                      BOOL))completionHandler
@@ -171,7 +170,7 @@ void doSomethingConcurrently(__attribute__((noescape)) __attribute__((swift_attr
 
 
 
-void doSomethingConcurrentlyButUnsafe(__attribute__((noescape)) __attribute__((swift_attr("@_unsafeSendable"))) void (^block)(void));
+void doSomethingConcurrentlyButUnsafe(__attribute__((noescape)) __attribute__((swift_attr("@Sendable"))) void (^block)(void)) __attribute__((swift_attr("@_predatesConcurrency")));
 
 
 MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor(unsafe)"))) @protocol TripleMainActor

@@ -883,6 +883,9 @@ public:
   /// but should behave like a top-level declaration. This is used by lldb.
   void setHoisted(bool hoisted = true) { Bits.Decl.Hoisted = hoisted; }
 
+  /// Whether this declaration predates the introduction of concurrency.
+  bool predatesConcurrency() const;
+
 public:
   bool escapedFromIfConfig() const {
     return Bits.Decl.EscapedFromIfConfig;
