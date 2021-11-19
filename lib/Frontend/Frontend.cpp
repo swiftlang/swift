@@ -157,15 +157,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   if (!getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;
 
-  // Options contain information about the developer's computer,
-  // so only serialize them if the module isn't going to be shipped to
-  // the public.
-  serializationOpts.SerializeOptionsForDebugging =
-      opts.SerializeOptionsForDebugging.getValueOr(
-          !module->isExternallyConsumed());
-
-  if (serializationOpts.SerializeOptionsForDebugging &&
-      opts.DebugPrefixSerializedDebuggingOptions) {
+  if (opts.DebugPrefixSerializedDebuggingOptions) {
     serializationOpts.DebuggingOptionsPrefixMap =
         getIRGenOptions().DebugPrefixMap;
     auto &remapper = serializationOpts.DebuggingOptionsPrefixMap;

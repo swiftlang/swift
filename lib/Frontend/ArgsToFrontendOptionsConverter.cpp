@@ -260,12 +260,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
     Opts.AccessNotesPath = A->getValue();
 
-  if (const Arg *A = Args.getLastArg(OPT_serialize_debugging_options,
-                                     OPT_no_serialize_debugging_options)) {
-    Opts.SerializeOptionsForDebugging =
-        A->getOption().matches(OPT_serialize_debugging_options);
-  }
-
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
