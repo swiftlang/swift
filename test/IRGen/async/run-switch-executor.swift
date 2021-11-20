@@ -9,7 +9,6 @@
 
 // FIXME: both of these should work, need to figure out why
 // UNSUPPORTED: CPU=arm64e
-// UNSUPPORTED: OS=windows-msvc
 
 // REQUIRES: rdar72893124
 
