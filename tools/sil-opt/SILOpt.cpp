@@ -181,6 +181,25 @@ static llvm::cl::opt<std::string>
 Target("target", llvm::cl::desc("target triple"),
        llvm::cl::init(llvm::sys::getDefaultTargetTriple()));
 
+// This primarily determines semantics of debug information. The compiler does
+// not directly expose a "preserve debug info mode". It is derived from the
+// optimization level. At -Onone, all debug info must be preserved. At higher
+// levels, debug info cannot change the compiler output.
+//
+// Diagnostics should be "equivalent" at all levels. For example, programs that
+// compile at -Onone should compile at -O. However, it is difficult to guarantee
+// identical diagnostic output given the changes in SIL caused by debug info
+// preservation.
+static llvm::cl::opt<OptimizationMode> OptModeFlag(
+    "opt-mode", llvm::cl::desc("optimization mode"),
+    llvm::cl::values(clEnumValN(OptimizationMode::NoOptimization, "none",
+                                "preserve debug info"),
+                     clEnumValN(OptimizationMode::ForSize, "size",
+                                "ignore debug info, reduce size"),
+                     clEnumValN(OptimizationMode::ForSpeed, "speed",
+                                "ignore debug info, reduce runtime")),
+    llvm::cl::init(OptimizationMode::NotSet));
+
 static llvm::cl::opt<OptGroup> OptimizationGroup(
     llvm::cl::desc("Predefined optimization groups:"),
     llvm::cl::values(
@@ -485,8 +504,6 @@ int main(int argc, char **argv) {
   SILOpts.VerifyNone = SILVerifyNone;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
-  if (OptimizationGroup != OptGroup::Diagnostics)
-    SILOpts.OptMode = OptimizationMode::ForSpeed;
   SILOpts.VerifySILOwnership = !DisableSILOwnershipVerifier;
   SILOpts.OptRecordFile = RemarksFilename;
   SILOpts.OptRecordPasses = RemarksPasses;
@@ -546,6 +563,18 @@ int main(int argc, char **argv) {
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
   if (!EnableLexicalBorrowScopes)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::Off;
+
+  if (OptModeFlag == OptimizationMode::NotSet) {
+    if (OptimizationGroup == OptGroup::Diagnostics)
+      SILOpts.OptMode = OptimizationMode::NoOptimization;
+    else
+      SILOpts.OptMode = OptimizationMode::ForSpeed;
+  } else {
+    SILOpts.OptMode = OptModeFlag;
+  }
+
+  // Note: SILOpts must be set before the CompilerInstance is initializer below
+  // based on Invocation.
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
