@@ -414,6 +414,14 @@ broadenSingleElementStores(StoreInst *storeInst,
 /// copy. The only way to guarantee the lifetime of a variable is to use a
 /// borrow scope--copy/destroy is insufficient by itself.
 ///
+/// FIXME: This removes debug_value instructions aggressively as part of
+/// SILGenCleanup. Instead, debug_values should be canonicalized before copy
+/// elimination so that we never see the pattern:
+///   %b = begin_borrow
+///   %c = copy %b
+///   end_borrow %b
+///   debug_value %c
+///
 /// FIXME: Technically this should be guarded by a compiler flag like
 /// -enable-copy-propagation until SILGen protects scoped variables by
 /// borrow scopes.
@@ -423,9 +431,12 @@ eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
 
   // Eliminate copies that only have destroy_value uses.
   SmallVector<DestroyValueInst *, 8> destroys;
-  for (auto *use : getNonDebugUses(cvi)) {
+  for (Operand *use : cvi->getUses()) {
     if (auto *dvi = dyn_cast<DestroyValueInst>(use->getUser())) {
       destroys.push_back(dvi);
+      continue;
+    }
+    if (!pass.preserveDebugInfo && isa<DebugValueInst>(use->getUser())) {
       continue;
     }
     return next;
@@ -434,9 +445,7 @@ eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
   while (!destroys.empty()) {
     next = killInstruction(destroys.pop_back_val(), next, pass);
   }
-
-  next = killInstAndIncidentalUses(cvi, next, pass);
-  return next;
+  return killInstAndIncidentalUses(cvi, next, pass);
 }
 
 /// Unlike dead copy elimination, dead borrows can be safely removed because the
@@ -538,8 +547,11 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   // If we have ownership and are not in raw SIL, eliminate unneeded forwarding
   // insts. We don't do this in raw SIL as not to disturb the codegen read by
   // diagnostics.
+  //
+  // TODO: fix tryEliminateUnneededForwardingInst to handle debug uses.
   auto *fn = inst->getFunction();
-  if (fn->hasOwnership() && fn->getModule().getStage() != SILStage::Raw) {
+  if (!preserveDebugInfo && fn->hasOwnership()
+      && fn->getModule().getStage() != SILStage::Raw) {
     if (OwnershipForwardingMixin::isa(inst))
       if (auto newNext = tryEliminateUnneededForwardingInst(inst, *this))
         return *newNext;
