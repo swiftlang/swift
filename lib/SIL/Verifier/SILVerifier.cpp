@@ -4048,6 +4048,24 @@ public:
                   CBI->getOperand().getOwnershipKind()),
               "failure dest block argument must have ownership compatible with "
               "the checked_cast_br operand");
+
+      // Do not allow for checked_cast_br to forward guaranteed ownership if the
+      // source type is an AnyObject.
+      //
+      // EXPLANATION: A checked_cast_br from an AnyObject may return a different
+      // object. This occurs for instance if one has an AnyObject that is a
+      // boxed AnyHashable (ClassType). This breaks with the guarantees of
+      // checked_cast_br guaranteed, so we ban it.
+      require(!CBI->getOperand()->getType().isAnyObject() ||
+                  CBI->getOperand().getOwnershipKind() !=
+                      OwnershipKind::Guaranteed,
+              "checked_cast_br with an AnyObject typed source cannot forward "
+              "guaranteed ownership");
+      require(CBI->isDirectlyForwarding() ||
+                  CBI->getOperand().getOwnershipKind() !=
+                      OwnershipKind::Guaranteed,
+              "If checked_cast_br is not directly forwarding, it can not have "
+              "guaranteed ownership");
     } else {
       require(CBI->getFailureBB()->args_empty(),
               "Failure dest of checked_cast_br must not take any argument in "

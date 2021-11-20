@@ -1057,16 +1057,40 @@ public:
 /// initializes the kind field on our object is run before our constructor runs.
 class OwnershipForwardingMixin {
   ValueOwnershipKind ownershipKind;
+  bool directlyForwards;
 
 protected:
   OwnershipForwardingMixin(SILInstructionKind kind,
-                           ValueOwnershipKind ownershipKind)
-      : ownershipKind(ownershipKind) {
+                           ValueOwnershipKind ownershipKind,
+                           bool isDirectlyForwarding = true)
+      : ownershipKind(ownershipKind), directlyForwards(isDirectlyForwarding) {
     assert(isa(kind) && "Invalid subclass?!");
     assert(ownershipKind && "invalid forwarding ownership");
+    assert((directlyForwards || ownershipKind != OwnershipKind::Guaranteed) &&
+           "Non directly forwarding instructions can not forward guaranteed "
+           "ownership");
   }
 
 public:
+  /// If an instruction is directly forwarding, then any operand op whose
+  /// ownership it forwards into a result r must have the property that op and r
+  /// are "rc identical". This means that they are representing the same set of
+  /// underlying lifetimes (plural b/c of aggregates).
+  ///
+  /// An instruction that is not directly forwarding, can not have guaranteed
+  /// ownership since without direct forwarding, there isn't necessarily any
+  /// connection in between the operand's lifetime and the value's lifetime.
+  ///
+  /// An example of this is checked_cast_br where when performing the following:
+  ///
+  ///   __SwiftValue(AnyHashable(Klass())) to OtherKlass()
+  ///
+  /// we will look through the __SwiftValue(AnyHashable(X)) any just cast Klass
+  /// to OtherKlass. This means that the result argument would no longer be
+  /// rc-identical to the operand and default case and thus we can not propagate
+  /// forward any form of guaranteed ownership.
+  bool isDirectlyForwarding() const { return directlyForwards; }
+
   /// Forwarding ownership is determined by the forwarding instruction's
   /// constant ownership attribute. If forwarding ownership is owned, then the
   /// instruction moves an owned operand to its result, ending its lifetime. If
@@ -1081,6 +1105,9 @@ public:
     return ownershipKind;
   }
   void setForwardingOwnershipKind(ValueOwnershipKind newKind) {
+    assert((isDirectlyForwarding() || newKind != OwnershipKind::Guaranteed) &&
+           "Non directly forwarding instructions can not forward guaranteed "
+           "ownership");
     ownershipKind = newKind;
   }
 
@@ -7927,9 +7954,10 @@ class OwnershipForwardingTermInst : public TermInst,
 protected:
   OwnershipForwardingTermInst(SILInstructionKind kind,
                               SILDebugLocation debugLoc,
-                              ValueOwnershipKind ownershipKind)
+                              ValueOwnershipKind ownershipKind,
+                              bool isDirectlyForwarding = true)
       : TermInst(kind, debugLoc),
-        OwnershipForwardingMixin(kind, ownershipKind) {
+        OwnershipForwardingMixin(kind, ownershipKind, isDirectlyForwarding) {
     assert(classof(kind));
   }
 
@@ -8909,7 +8937,13 @@ class CheckedCastBranchInst final
                         ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, SuccessBB, FailureBB,
-            Target1Count, Target2Count, forwardingOwnershipKind),
+            Target1Count, Target2Count, forwardingOwnershipKind,
+            // We are always directly forwarding unless we are casting an
+            // AnyObject. This is b/c an AnyObject could contain a boxed
+            // AnyObject(Class()) that we unwrap as part of the cast. In such a
+            // case, we would return a different value and potentially end the
+            // lifetime of the operand value.
+            !Operand->getType().isAnyObject()),
         DestLoweredTy(DestLoweredTy), DestFormalTy(DestFormalTy),
         IsExact(IsExact) {}
 
