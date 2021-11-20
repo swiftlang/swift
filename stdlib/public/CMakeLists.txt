@@ -119,6 +119,11 @@ if(SWIFT_BUILD_STDLIB)
   if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
     add_subdirectory(Distributed)
   endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+    add_subdirectory(MatchingEngine)
+    add_subdirectory(StringProcessing)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)

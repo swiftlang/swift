@@ -51,7 +51,6 @@
 
 #if defined(__GLIBCXX__) && __GLIBCXX__ < 20160726
 #include <stddef.h>
-namespace std { using ::max_align_t; }
 #endif
 
 using namespace swift;

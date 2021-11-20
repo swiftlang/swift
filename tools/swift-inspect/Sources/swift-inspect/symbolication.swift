@@ -70,6 +70,14 @@ enum Sym {
   static let task_stop_peeking: @convention(c) (task_t) -> kern_return_t =
     symbol(symbolicationHandle, "task_stop_peeking")
 
+  typealias vm_range_recorder_t =
+    @convention(c) (task_t, UnsafeMutableRawPointer?, CUnsignedInt,
+                    UnsafeMutablePointer<vm_range_t>, CUnsignedInt) -> Void
+  static let task_enumerate_malloc_blocks:
+    @convention(c) (task_t, UnsafeMutableRawPointer?, CUnsignedInt, vm_range_recorder_t)
+      -> Void =
+    symbol(symbolicationHandle, "task_enumerate_malloc_blocks")
+
   static let CSSymbolicatorForeachSymbolOwnerAtTime:
     @convention(c) (CSSymbolicatorRef, CSMachineTime, @convention(block) (CSSymbolOwnerRef) -> Void) -> UInt =
       symbol(coreSymbolicationHandle, "CSSymbolicatorForeachSymbolOwnerAtTime")
@@ -195,4 +203,13 @@ func task_peek_string(
 
 func task_stop_peeking(_ task: task_t) {
   _ = Sym.task_stop_peeking(task)
+}
+
+func task_enumerate_malloc_blocks(
+  _ task: task_t,
+  _ context: UnsafeMutableRawPointer?,
+  _ type_mask: CUnsignedInt,
+  _ recorder: Sym.vm_range_recorder_t
+) {
+  Sym.task_enumerate_malloc_blocks(task, context, type_mask, recorder)
 }

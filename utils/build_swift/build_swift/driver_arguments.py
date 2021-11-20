@@ -1188,8 +1188,7 @@ def create_argument_parser():
 
     option('--enable-experimental-differentiable-programming', toggle_true,
            default=True,
-           help='Enable experimental Swift differentiable programming language'
-                ' features.')
+           help='Enable experimental Swift differentiable programming.')
 
     option('--enable-experimental-concurrency', toggle_true,
            default=True,
@@ -1198,6 +1197,10 @@ def create_argument_parser():
     option('--enable-experimental-distributed', toggle_true,
            default=True,
            help='Enable experimental Swift distributed actors.')
+
+    option('--enable-experimental-string-processing', toggle_true,
+           default=True,
+           help='Enable experimental Swift string processing.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

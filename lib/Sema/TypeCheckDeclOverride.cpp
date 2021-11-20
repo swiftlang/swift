@@ -1505,6 +1505,7 @@ namespace  {
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
+    UNINTERESTING_ATTR(PredatesConcurrency)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
@@ -1554,8 +1555,6 @@ namespace  {
 
     UNINTERESTING_ATTR(AtReasync)
     UNINTERESTING_ATTR(Nonisolated)
-    UNINTERESTING_ATTR(UnsafeSendable)
-    UNINTERESTING_ATTR(UnsafeMainActor)
     UNINTERESTING_ATTR(ImplicitSelfCapture)
     UNINTERESTING_ATTR(InheritActorContext)
     UNINTERESTING_ATTR(Isolated)

@@ -395,14 +395,14 @@ public:
   ///
   /// This is used to atomically perform a waiting task completion.
   bool statusCompletePendingReadyWaiting(GroupStatus &old) {
-    return status.compare_exchange_weak(
+    return status.compare_exchange_strong(
       old.status, old.completingPendingReadyWaiting().status,
       /*success*/ std::memory_order_relaxed,
       /*failure*/ std::memory_order_relaxed);
   }
 
   bool statusCompletePendingReady(GroupStatus &old) {
-    return status.compare_exchange_weak(
+    return status.compare_exchange_strong(
       old.status, old.completingPendingReady().status,
       /*success*/ std::memory_order_relaxed,
       /*failure*/ std::memory_order_relaxed);
@@ -589,7 +589,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
       assert(assumed.pendingTasks() && "offered to group with no pending tasks!");
       // We are the "first" completed task to arrive,
       // and since there is a task waiting we immediately claim and complete it.
-      if (waitQueue.compare_exchange_weak(
+      if (waitQueue.compare_exchange_strong(
           waitingTask, nullptr,
           /*success*/ std::memory_order_release,
           /*failure*/ std::memory_order_acquire) &&
@@ -756,7 +756,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
 
     auto assumedStatus = assumed.status;
     auto newStatus = TaskGroupImpl::GroupStatus{assumedStatus};
-    if (status.compare_exchange_weak(
+    if (status.compare_exchange_strong(
         assumedStatus, newStatus.completingPendingReadyWaiting().status,
         /*success*/ std::memory_order_relaxed,
         /*failure*/ std::memory_order_acquire)) {
@@ -822,7 +822,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
       waitingTask->flagAsSuspended();
     }
     // Put the waiting task at the beginning of the wait queue.
-    if (waitQueue.compare_exchange_weak(
+    if (waitQueue.compare_exchange_strong(
         waitHead, waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {

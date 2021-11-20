@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-regex
+// RUN: %target-typecheck-verify-swift -enable-experimental-string-processing
 // REQUIRES: libswift
 
 var s = 'abc'

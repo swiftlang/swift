@@ -3080,6 +3080,17 @@ ParserStatus Parser::parseDeclAttribute(
     return makeParserSuccess();
   }
 
+  // @_unsafeSendable and @_unsafeMainActor have been removed; warn about them.
+  if (DK == DAK_Count &&
+      (Tok.getText() == "_unsafeSendable" ||
+       Tok.getText() == "_unsafeMainActor")) {
+    StringRef attrName = Tok.getText();
+    SourceLoc attrLoc = consumeToken();
+    diagnose(AtLoc, diag::warn_attr_unsafe_removed, attrName)
+      .fixItRemove(SourceRange(AtLoc, attrLoc));
+    return makeParserSuccess();
+  }
+
   if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK)) {
     parseNewDeclAttribute(Attributes, AtLoc, DK, isFromClangAttribute);
     return makeParserSuccess();

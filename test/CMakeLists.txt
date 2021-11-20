@@ -200,6 +200,7 @@ normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_BACK_DEPLOY_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
 normalize_boolean_spelling(SWIFT_ENABLE_MACCATALYST)
 normalize_boolean_spelling(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
 normalize_boolean_spelling(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
@@ -390,6 +391,10 @@ foreach(SDK ${SWIFT_SDKS})
 
         if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
           list(APPEND LIT_ARGS "--param" "distributed")
+        endif()
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
+          list(APPEND LIT_ARGS "--param" "string_processing")
         endif()
 
         foreach(test_subset ${TEST_SUBSETS})

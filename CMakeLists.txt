@@ -450,6 +450,10 @@ option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
   "Enable experimental distributed actors and functions"
   FALSE)
 
+option(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING
+  "Enable experimental string processing"
+  FALSE)
+
 option(SWIFT_ENABLE_DISPATCH
   "Enable use of libdispatch"
   TRUE)
@@ -1002,6 +1006,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Differentiable Programming Support: ${SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING}")
   message(STATUS "Concurrency Support: ${SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY}")
   message(STATUS "Distributed Support: ${SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED}")
+  message(STATUS "String Processing Support: ${SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")

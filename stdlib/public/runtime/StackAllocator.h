@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Debug.h"
 #include "llvm/Support/Alignment.h"
 #include <cstddef>
@@ -30,7 +31,7 @@ namespace swift {
 ///
 /// StackAllocator performs fast allocation and deallocation of memory by
 /// implementing a bump-pointer allocation strategy.
-/// 
+///
 /// This isn't strictly a bump-pointer allocator as it uses backing slabs of
 /// memory rather than relying on a boundless contiguous heap. However, it has
 /// bump-pointer semantics in that it is a monotonically growing pool of memory
@@ -45,7 +46,10 @@ namespace swift {
 /// It's possible to place the first slab into pre-allocated memory.
 ///
 /// The SlabCapacity specifies the capacity for newly allocated slabs.
-template <size_t SlabCapacity>
+///
+/// SlabMetadataPtr specifies a fake metadata pointer to place at the beginning
+/// of slab allocations, so analysis tools can identify them.
+template <size_t SlabCapacity, Metadata *SlabMetadataPtr>
 class StackAllocator {
 private:
 
@@ -67,7 +71,7 @@ private:
   bool firstSlabIsPreallocated;
 
   /// The minimal alignment of allocated memory.
-  static constexpr size_t alignment = alignof(std::max_align_t);
+  static constexpr size_t alignment = MaximumAlignment;
   
   /// If set to true, memory allocations are checked for buffer overflows and
   /// use-after-free, similar to guard-malloc.
@@ -86,6 +90,10 @@ private:
   /// This struct is actually just the slab header. The slab buffer is tail
   /// allocated after Slab.
   struct Slab {
+    /// A fake metadata pointer that analysis tools can use to identify slab
+    /// allocations.
+    const void *metadata;
+
     /// A single linked list of all allocated slabs.
     Slab *next = nullptr;
 
@@ -95,7 +103,8 @@ private:
 
     // Here starts the tail allocated memory buffer of the slab.
 
-    Slab(size_t newCapacity) : capacity(newCapacity) {
+    Slab(size_t newCapacity)
+        : metadata(SlabMetadataPtr), capacity(newCapacity) {
       assert((size_t)capacity == newCapacity && "capacity overflow");
     }
 

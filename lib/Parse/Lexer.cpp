@@ -1807,7 +1807,7 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
   auto startLoc = Lexer::getSourceLoc(TokStart);
   auto endLoc = Lexer::getSourceLoc(TokEnd);
 
-  if (LangOpts.EnableExperimentalRegex) {
+  if (LangOpts.EnableExperimentalStringProcessing) {
     if (parseRegexStrawperson) {
       auto copy = std::string(TokStart, TokEnd-TokStart);
       auto msg = parseRegexStrawperson(copy.c_str());

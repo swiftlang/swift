@@ -34,6 +34,7 @@
 #include "swift/Runtime/ThreadLocalStorage.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
+#include "swift/Basic/ListMerger.h"
 #ifndef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
 #include "llvm/Config/config.h"
 #else
@@ -699,7 +700,7 @@ public:
   void initialize(bool isDistributedRemote = false) {
     auto flags = Flags();
     flags.setIsDistributedRemote(isDistributedRemote);
-    new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
+    new (&CurrentState) swift::atomic<State>(State{JobRef(), flags});
     JobStorageHeapObject.metadata = nullptr;
   }
 
@@ -1112,6 +1113,22 @@ void DefaultActorImpl::OverrideJobCache::commit() {
   }
 }
 
+namespace {
+
+struct JobQueueTraits {
+  static Job *getNext(Job *job) {
+    return getNextJobInQueue(job).getAsPreprocessedJob();
+  }
+  static void setNext(Job *job, Job *next) {
+    setNextJobInQueue(job, JobRef::getPreprocessed(next));
+  }
+  static int compare(Job *lhs, Job *rhs) {
+    return descendingPriorityOrder(lhs->getPriority(), rhs->getPriority());
+  }
+};
+
+} // end anonymous namespace
+
 /// Preprocess the prefix of the actor's queue that hasn't already
 /// been preprocessed:
 ///
@@ -1130,7 +1147,8 @@ static Job *preprocessQueue(JobRef first,
   if (!first.needsPreprocessing())
     return first.getAsPreprocessedJob();
 
-  Job *firstNewJob = nullptr;
+  using ListMerger = swift::ListMerger<Job*, JobQueueTraits>;
+  ListMerger newJobs;
 
   while (first != previousFirst) {
     // If we find something that doesn't need preprocessing, it must've
@@ -1162,27 +1180,20 @@ static Job *preprocessQueue(JobRef first,
     // jobs; since enqueue() always adds jobs to the front, reversing
     // the order effectively makes the actor queue FIFO, which is what
     // we want.
-    // FIXME: but we should also sort by priority
     auto job = first.getAsJob();
     first = getNextJobInQueue(job);
-    setNextJobInQueue(job, JobRef::getPreprocessed(firstNewJob));
-    firstNewJob = job;
+    newJobs.insertAtFront(job);
   }
 
   // If there are jobs already in the queue, put the new jobs at the end.
+  auto firstNewJob = newJobs.release();
   if (!firstNewJob) {
     firstNewJob = previousFirstNewJob;
   } else if (previousFirstNewJob) {
-    auto cur = previousFirstNewJob;
-    while (true) {
-      auto next = getNextJobInQueue(cur).getAsPreprocessedJob();
-      if (!next) {
-        setNextJobInQueue(cur, JobRef::getPreprocessed(firstNewJob));
-        break;
-      }
-      cur = next;
-    }
-    firstNewJob = previousFirstNewJob;
+    // Merge the jobs we just processed into the existing job list.
+    ListMerger merge(previousFirstNewJob);
+    merge.merge(firstNewJob);
+    firstNewJob = merge.release();
   }
 
   return firstNewJob;

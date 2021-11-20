@@ -8,6 +8,11 @@ struct EquatableBox<T : Equatable> {
   func withArray<U>(_: U) where T == Array<U> {}
 }
 
+struct EquatableSequenceBox<T : Sequence> where T.Element : Equatable {
+  // CHECK: Generic signature: <T, U where T == Array<Array<U>>, U : Equatable>
+  func withArrayArray<U>(_: U) where T == Array<Array<U>> {}
+}
+
 
 // A very elaborate invalid example (see comment in mergeP1AndP2())
 struct G<T> {}

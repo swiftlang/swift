@@ -33,6 +33,7 @@ def parse_args():
          - swift-refactor
          - temp-dir
          - enable-experimental-concurrency (sent to both)
+         - enable-experimental-string-processing (sent to both)
          - I (sent to both)
          - sdk (sent to both)
          - target (sent to both)
@@ -75,6 +76,14 @@ def parse_args():
         '''
     )
     parser.add_argument(
+        '-enable-experimental-string-processing',
+        action='store_true',
+        help='''
+        Whether to enable experimental string processing in both swift-refactor
+        and swift-frontend
+        '''
+    )
+    parser.add_argument(
         '-I',
         action='append',
         help='Add a directory to the import search path'
@@ -103,6 +112,8 @@ def main():
     extra_both_args = []
     if args.enable_experimental_concurrency:
         extra_both_args.append('-enable-experimental-concurrency')
+    if args.enable_experimental_string_processing:
+        extra_both_args.append('-enable-experimental-string-processing')
     if args.I:
         for path in args.I:
             extra_both_args += ['-I', path]

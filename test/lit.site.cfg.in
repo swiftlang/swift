@@ -138,6 +138,8 @@ if "@SWIFT_BACK_DEPLOY_CONCURRENCY@" == "TRUE":
     config.available_features.add('back_deploy_concurrency')
 if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
     config.available_features.add('distributed')
+if "@SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING@" == "TRUE":
+    config.available_features.add('string_processing')
 
 # Let the main config do the real work.
 if config.test_exec_root is None:
