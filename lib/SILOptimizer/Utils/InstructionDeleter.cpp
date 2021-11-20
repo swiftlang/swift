@@ -19,13 +19,13 @@
 using namespace swift;
 
 static bool hasOnlyIncidentalUses(SILInstruction *inst,
-                                  bool disallowDebugUses = false) {
+                                  bool preserveDebugInfo = false) {
   for (SILValue result : inst->getResults()) {
     for (Operand *use : result->getUses()) {
       SILInstruction *user = use->getUser();
       if (!isIncidentalUse(user))
         return false;
-      if (disallowDebugUses && user->isDebugInstruction())
+      if (preserveDebugInfo && user->isDebugInstruction())
         return false;
     }
   }
@@ -161,9 +161,9 @@ bool InstructionDeleter::trackIfDead(SILInstruction *inst) {
 }
 
 void InstructionDeleter::forceTrackAsDead(SILInstruction *inst) {
-  bool disallowDebugUses = inst->getFunction()->getEffectiveOptimizationMode()
+  bool preserveDebugInfo = inst->getFunction()->getEffectiveOptimizationMode()
                            <= OptimizationMode::NoOptimization;
-  assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
+  assert(hasOnlyIncidentalUses(inst, preserveDebugInfo));
   getCallbacks().notifyWillBeDeleted(inst);
   deadInstructions.insert(inst);
 }
@@ -274,17 +274,16 @@ bool InstructionDeleter::deleteIfDead(SILInstruction *inst) {
 
 void InstructionDeleter::forceDeleteAndFixLifetimes(SILInstruction *inst) {
   SILFunction *fun = inst->getFunction();
-  bool disallowDebugUses =
+  bool preserveDebugInfo =
       fun->getEffectiveOptimizationMode() <= OptimizationMode::NoOptimization;
-  assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
+  assert(hasOnlyIncidentalUses(inst, preserveDebugInfo));
   deleteWithUses(inst, /*fixLifetimes*/ fun->hasOwnership());
 }
 
 void InstructionDeleter::forceDelete(SILInstruction *inst) {
-  bool disallowDebugUses =
-      inst->getFunction()->getEffectiveOptimizationMode() <=
-      OptimizationMode::NoOptimization;
-  assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
+  bool preserveDebugInfo = inst->getFunction()->getEffectiveOptimizationMode()
+                           <= OptimizationMode::NoOptimization;
+  assert(hasOnlyIncidentalUses(inst, preserveDebugInfo));
   deleteWithUses(inst, /*fixLifetimes*/ false);
 }
 
