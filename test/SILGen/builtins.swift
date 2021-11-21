@@ -33,7 +33,7 @@ func load_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins12load_raw_pod{{[_0-9a-zA-Z]*}}F
 func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.Int64
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [align=1] $*Builtin.Int64
   // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.loadRaw(x)
@@ -41,7 +41,7 @@ func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins12load_raw_obj{{[_0-9a-zA-Z]*}}F
 func load_raw_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [align=1] $*Builtin.NativeObject
   // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.loadRaw(x)

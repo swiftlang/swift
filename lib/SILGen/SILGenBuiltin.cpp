@@ -101,7 +101,8 @@ static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &SGF,
                                           SGFContext C,
                                           IsTake_t isTake,
                                           bool isStrict,
-                                          bool isInvariant) {
+                                          bool isInvariant,
+                                          llvm::MaybeAlign align) {
   assert(substitutions.getReplacementTypes().size() == 1 &&
          "load should have single substitution");
   assert(args.size() == 1 && "load should have a single argument");
@@ -113,9 +114,12 @@ static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &SGF,
   SILType loadedType = rvalueTL.getLoweredType();
 
   // Convert the pointer argument to a SIL address.
+  //
+  // Default to an unaligned pointer. This can be optimized in the presence of
+  // Builtin.assumeAlignment.
   SILValue addr = SGF.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
                                                loadedType.getAddressType(),
-                                               isStrict, isInvariant);
+                                               isStrict, isInvariant, align);
   // Perform the load.
   return SGF.emitLoad(loc, addr, rvalueTL, C, isTake);
 }
@@ -125,9 +129,11 @@ static ManagedValue emitBuiltinLoad(SILGenFunction &SGF,
                                     SubstitutionMap substitutions,
                                     ArrayRef<ManagedValue> args,
                                     SGFContext C) {
+  // Regular loads assume natural alignment.
   return emitBuiltinLoadOrTake(SGF, loc, substitutions, args,
                                C, IsNotTake,
-                               /*isStrict*/ true, /*isInvariant*/ false);
+                               /*isStrict*/ true, /*isInvariant*/ false,
+                               llvm::MaybeAlign());
 }
 
 static ManagedValue emitBuiltinLoadRaw(SILGenFunction &SGF,
@@ -135,9 +141,11 @@ static ManagedValue emitBuiltinLoadRaw(SILGenFunction &SGF,
                                        SubstitutionMap substitutions,
                                        ArrayRef<ManagedValue> args,
                                        SGFContext C) {
+  // Raw loads cannot assume alignment.
   return emitBuiltinLoadOrTake(SGF, loc, substitutions, args,
                                C, IsNotTake,
-                               /*isStrict*/ false, /*isInvariant*/ false);
+                               /*isStrict*/ false, /*isInvariant*/ false,
+                               llvm::MaybeAlign(1));
 }
 
 static ManagedValue emitBuiltinLoadInvariant(SILGenFunction &SGF,
@@ -145,9 +153,11 @@ static ManagedValue emitBuiltinLoadInvariant(SILGenFunction &SGF,
                                              SubstitutionMap substitutions,
                                              ArrayRef<ManagedValue> args,
                                              SGFContext C) {
+  // Regular loads assume natural alignment.
   return emitBuiltinLoadOrTake(SGF, loc, substitutions, args,
                                C, IsNotTake,
-                               /*isStrict*/ false, /*isInvariant*/ true);
+                               /*isStrict*/ false, /*isInvariant*/ true,
+                               llvm::MaybeAlign());
 }
 
 static ManagedValue emitBuiltinTake(SILGenFunction &SGF,
@@ -155,9 +165,11 @@ static ManagedValue emitBuiltinTake(SILGenFunction &SGF,
                                     SubstitutionMap substitutions,
                                     ArrayRef<ManagedValue> args,
                                     SGFContext C) {
+  // Regular loads assume natural alignment.
   return emitBuiltinLoadOrTake(SGF, loc, substitutions, args,
                                C, IsTake,
-                               /*isStrict*/ true, /*isInvariant*/ false);
+                               /*isStrict*/ true, /*isInvariant*/ false,
+                               llvm::MaybeAlign());
 }
 
 /// Specialized emitter for Builtin.destroy.
