@@ -15,8 +15,9 @@ let x = 2
 // Definition + Read of x
 var y = x + 1
 // CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:14swift_ide_test1ySivp | Def | rel: 0
-// CHECK: [[@LINE-2]]:9 | variable/Swift | x | s:14swift_ide_test1xSivp | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:11 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiyS2i_SitFZ | Ref,Call,RelRec | rel: 1
+// CHECK: [[@LINE-2]]:9 | variable/Swift | x | s:14swift_ide_test1xSivp | Ref,Read,RelCont | rel: 1
+// CHECK: [[@LINE-3]]:11 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiyS2i_SitFZ | Ref,Call,RelRec,RelCont | rel: 2
+// CHECK-NEXT: RelCont | variable/Swift | y | s:14swift_ide_test1ySivp
 // CHECK-NEXT: RelRec | struct/Swift | Int | s:Si
 
 // Read of x + Write of y
@@ -96,7 +97,7 @@ func aCaller() {
 }
 
 let aRef = aCalledFunction
-// CHECK: [[@LINE-1]]:12 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF | Ref | rel: 0
+// CHECK: [[@LINE-1]]:12 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF | Ref,RelCont | rel: 1
 
 // RelationChildOf, Implicit
 struct AStruct {
@@ -328,8 +329,8 @@ extension ExtendMe where Self: Whatever {}
 // CHECK: [[@LINE-1]]:32 | protocol/Swift | Whatever | [[Whatever_USR]] | Ref | rel: 0
 
 var anInstance = AClass(x: 1)
-// CHECK: [[@LINE-1]]:18 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref | rel: 0
-// CHECK: [[@LINE-2]]:18 | constructor/Swift | init(x:) | s:14swift_ide_test6AClassC1xACSi_tcfc | Ref,Call | rel: 0
+// CHECK: [[@LINE-1]]:18 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelCont | rel: 1
+// CHECK: [[@LINE-2]]:18 | constructor/Swift | init(x:) | s:14swift_ide_test6AClassC1xACSi_tcfc | Ref,Call,RelCont | rel: 1
 
 anInstance.y.x = anInstance.y.x
 // CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCvp | Ref,Read | rel: 0
@@ -352,8 +353,8 @@ anInstance.z[1] = anInstance.z[0]
 // CHECK: [[@LINE-4]]:30 | instance-property/Swift | z | s:14swift_ide_test6AClassC1zSaySiGvp | Ref,Read,Writ | rel: 0
 
 let otherInstance = AStruct(x: 1)
-// CHECK: [[@LINE-1]]:29 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref | rel: 0
-// CHECK: [[@LINE-2]]:21 | struct/Swift | AStruct | [[AStruct_USR]] | Ref | rel: 0
+// CHECK: [[@LINE-1]]:29 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref,RelCont | rel: 1
+// CHECK: [[@LINE-2]]:21 | struct/Swift | AStruct | [[AStruct_USR]] | Ref,RelCont | rel: 1
 
 _ = AStruct.init(x:)
 // CHECK: [[@LINE-1]]:18 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref | rel: 0
@@ -369,7 +370,7 @@ let _ = anInstance[0]
 
 let aSubInstance: AClass = ASubClass(x: 1)
 // CHECK: [[@LINE-1]]:5 | variable/Swift | aSubInstance | s:14swift_ide_test12aSubInstanceAA6AClassCvp | Def | rel: 0
-// CHECK: [[@LINE-2]]:28 | class/Swift | ASubClass | s:14swift_ide_test9ASubClassC | Ref | rel: 0
+// CHECK: [[@LINE-2]]:28 | class/Swift | ASubClass | s:14swift_ide_test9ASubClassC | Ref,RelCont | rel: 1
 
 // Dynamic, RelationReceivedBy
 let _ = aSubInstance.foo()
@@ -380,47 +381,6 @@ let _ = aSubInstance.foo()
 // RelationContainedBy
 let contained = 2
 // CHECK: [[@LINE-1]]:5 | variable/Swift | contained | s:14swift_ide_test9containedSivp | Def | rel: 0
-
-func containing() {
-// CHECK: [[@LINE-1]]:6 | function/Swift | containing() | s:14swift_ide_test10containingyyF | Def | rel: 0
-  let _ = contained
-  // CHECK: [[@LINE-1]]:11 | variable/Swift | contained | s:14swift_ide_test9containedSivp | Ref,Read,RelCont | rel: 1
-  // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-
-  var x = contained
-  // CHECK: [[@LINE-1]]:11 | variable/Swift | contained | s:14swift_ide_test9containedSivp | Ref,Read,RelCont | rel: 1
-  // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-
-  struct LocalStruct {
-    var i: AClass = AClass(x: contained)
-    // CHECK: [[@LINE-1]]:12 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelCont | rel: 1
-    // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-    // CHECK: [[@LINE-3]]:21 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelCont | rel: 1
-    // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-    // CHECK: [[@LINE-5]]:31 | variable/Swift | contained | s:14swift_ide_test9containedSivp | Ref,Read,RelCont | rel: 1
-    // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-
-    init(i _: AClass) {}
-    // CHECK: [[@LINE-1]]:15 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelCont | rel: 1
-    // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-
-    func inner() -> Int {
-      let _: AClass = AClass(x: contained)
-      // CHECK: [[@LINE-1]]:14 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelCont | rel: 1
-      // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-      // CHECK: [[@LINE-3]]:23 | class/Swift | AClass | s:14swift_ide_test6AClassC | Ref,RelCont | rel: 1
-      // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-      // CHECK: [[@LINE-5]]:33 | variable/Swift | contained | s:14swift_ide_test9containedSivp | Ref,Read,RelCont | rel: 1
-      // CHECK-NEXT: RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-
-      aCalledFunction(a: 1, b: &z)
-      // CHECK: [[@LINE-1]]:7 | function/Swift | aCalledFunction(a:b:) | s:14swift_ide_test15aCalledFunction1a1bySi_SiztF | Ref,Call,RelCall,RelCont | rel: 1
-      // CHECK-NEXT: RelCall,RelCont | function/Swift | containing() | s:14swift_ide_test10containingyyF
-
-      return contained
-    }
-  }
-}
 
 protocol ProtRoot {
   func fooCommon()
@@ -433,7 +393,7 @@ protocol ProtRoot {
 protocol ProtDerived : ProtRoot {
   func fooCommon()
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedP9fooCommonyyF | Def,Dyn,RelChild,RelOver | rel: 2
-  
+
   func bar1()
   func bar2()
   func bar3(_ : Int)
