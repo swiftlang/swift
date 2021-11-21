@@ -54,7 +54,42 @@ class C <MemberDeclBlock>{<MemberDeclListItem><FunctionDecl>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><FunctionCallExpr><IdentifierExpr>type</IdentifierExpr>(<TupleExprElement>of: <IdentifierExpr>a</IdentifierExpr></TupleExprElement>)</FunctionCallExpr>.self</MemberAccessExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><IdentifierExpr>a</IdentifierExpr>.`self`</MemberAccessExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
     _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><IdentifierExpr>A </IdentifierExpr><ArrowExpr>-> </ArrowExpr><MemberAccessExpr><IdentifierExpr>B</IdentifierExpr>.C</MemberAccessExpr><BinaryOperatorExpr><</BinaryOperatorExpr><PostfixUnaryExpr><IdentifierExpr>Int</IdentifierExpr>></PostfixUnaryExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
-    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><ArrayExpr>[<ArrayElement><SequenceExpr><TupleExpr>(<TupleExprElement><IdentifierExpr>A</IdentifierExpr></TupleExprElement>) </TupleExpr><ArrowExpr>throws -> </ArrowExpr><IdentifierExpr>B</IdentifierExpr></SequenceExpr></ArrayElement>]</ArrayExpr>()</FunctionCallExpr></SequenceExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><ArrayExpr>[<ArrayElement><SequenceExpr><TupleExpr>(<TupleExprElement><IdentifierExpr>A</IdentifierExpr></TupleExprElement>) </TupleExpr><ArrowExpr>throws -> </ArrowExpr><IdentifierExpr>B</IdentifierExpr></SequenceExpr></ArrayElement>]</ArrayExpr>()</FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ArrayExpr>[<IfConfigDecl><IfConfigClause>
+      #if <IdentifierExpr>CONDITIONAL</IdentifierExpr><ArrayElement><FunctionCallExpr><IdentifierExpr>
+        bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>, </ArrayElement><ArrayElement><FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>,</ArrayElement></IfConfigClause>
+      #endif</IfConfigDecl><IfConfigDecl><IfConfigClause>
+      #if <IdentifierExpr>CONDITIONAL_2</IdentifierExpr><ArrayElement><FunctionCallExpr><IdentifierExpr>
+        bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>2</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>, </ArrayElement><ArrayElement><FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>3</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>,</ArrayElement></IfConfigClause>
+      #endif</IfConfigDecl>
+    ]</ArrayExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><DictionaryExpr>[<IfConfigDecl><IfConfigClause>
+      #if <IdentifierExpr>CONDITIONAL</IdentifierExpr><IfConfigDecl><IfConfigClause>
+        #if <IdentifierExpr>CONDITIONAL2</IdentifierExpr><DictionaryElement><StringLiteralExpr>
+          "<StringSegment>a</StringSegment>"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>, </DictionaryElement><DictionaryElement><StringLiteralExpr>"<StringSegment>b</StringSegment>"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>,</DictionaryElement></IfConfigClause><IfConfigClause>
+        #else</IfConfigClause>
+        #endif</IfConfigDecl></IfConfigClause><IfConfigClause>
+      #else<DictionaryElement><StringLiteralExpr>
+        "<StringSegment>c</StringSegment>"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>, </DictionaryElement><DictionaryElement><StringLiteralExpr>"<StringSegment>d</StringSegment>"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>,</DictionaryElement></IfConfigClause>
+      #endif</IfConfigDecl>
+    ]</DictionaryExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ArrayExpr>[<IfConfigDecl><IfConfigClause>
+      #if <PrefixOperatorExpr>!<IdentifierExpr>CONDITIONAL</IdentifierExpr></PrefixOperatorExpr><IfConfigDecl><IfConfigClause>
+        #if <IdentifierExpr>CONDITIONAL2</IdentifierExpr></IfConfigClause><IfConfigClause>
+        #elseif <IdentifierExpr>CONDITIONAL3</IdentifierExpr><ArrayElement><FunctionCallExpr><IdentifierExpr>
+          bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>, </ArrayElement><ArrayElement><FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>,</ArrayElement></IfConfigClause>
+        #endif</IfConfigDecl></IfConfigClause><IfConfigClause>
+      #else<ArrayElement><FunctionCallExpr><IdentifierExpr>
+        bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>, </ArrayElement><ArrayElement><FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>,</ArrayElement></IfConfigClause>
+      #endif</IfConfigDecl>
+    ]</ArrayExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+    _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><DictionaryExpr>[<IfConfigDecl><IfConfigClause>
+      #if <PrefixOperatorExpr>!<IdentifierExpr>CONDITIONAL</IdentifierExpr></PrefixOperatorExpr><DictionaryElement><StringLiteralExpr>
+        "<StringSegment>a</StringSegment>"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>, </DictionaryElement><DictionaryElement><StringLiteralExpr>"<StringSegment>b</StringSegment>"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>,</DictionaryElement></IfConfigClause><IfConfigClause>
+      #else<DictionaryElement><StringLiteralExpr>
+        "<StringSegment>c</StringSegment>"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>, </DictionaryElement><DictionaryElement><StringLiteralExpr>"<StringSegment>d</StringSegment>"</StringLiteralExpr>: <FunctionCallExpr><IdentifierExpr>bar3</IdentifierExpr>(<TupleExprElement>a:<IntegerLiteralExpr>1</IntegerLiteralExpr></TupleExprElement>)</FunctionCallExpr>,</DictionaryElement></IfConfigClause>
+      #endif</IfConfigDecl>
+    ]</DictionaryExpr></SequenceExpr>
   }</CodeBlock></FunctionDecl></MemberDeclListItem><MemberDeclListItem><FunctionDecl>
   func boolAnd<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Bool </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{ <ReturnStmt>return <SequenceExpr><BooleanLiteralExpr>true </BooleanLiteralExpr><BinaryOperatorExpr>&& </BinaryOperatorExpr><BooleanLiteralExpr>false </BooleanLiteralExpr></SequenceExpr></ReturnStmt>}</CodeBlock></FunctionDecl></MemberDeclListItem><MemberDeclListItem><FunctionDecl>
   func boolOr<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Bool </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{ <ReturnStmt>return <SequenceExpr><BooleanLiteralExpr>true </BooleanLiteralExpr><BinaryOperatorExpr>|| </BinaryOperatorExpr><BooleanLiteralExpr>false </BooleanLiteralExpr></SequenceExpr></ReturnStmt>}</CodeBlock></FunctionDecl></MemberDeclListItem><MemberDeclListItem><FunctionDecl>

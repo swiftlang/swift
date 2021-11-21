@@ -55,6 +55,41 @@ class C {
     _ = a.`self`
     _ = A -> B.C<Int>
     _ = [(A) throws -> B]()
+    _ = [
+      #if CONDITIONAL
+        bar3(a:1), bar3(a:1),
+      #endif
+      #if CONDITIONAL_2
+        bar3(a:2), bar3(a:3),
+      #endif
+    ]
+    _ = [
+      #if CONDITIONAL
+        #if CONDITIONAL2
+          "a": bar3(a:1), "b": bar3(a:1),
+        #else
+        #endif
+      #else
+        "c": bar3(a:1), "d": bar3(a:1),
+      #endif
+    ]
+    _ = [
+      #if !CONDITIONAL
+        #if CONDITIONAL2
+        #elseif CONDITIONAL3
+          bar3(a:1), bar3(a:1),
+        #endif
+      #else
+        bar3(a:1), bar3(a:1),
+      #endif
+    ]
+    _ = [
+      #if !CONDITIONAL
+        "a": bar3(a:1), "b": bar3(a:1),
+      #else
+        "c": bar3(a:1), "d": bar3(a:1),
+      #endif
+    ]
   }
   func boolAnd() -> Bool { return true && false }
   func boolOr() -> Bool { return true || false }
