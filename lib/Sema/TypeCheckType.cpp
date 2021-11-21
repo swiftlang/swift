@@ -1931,7 +1931,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   // Strip the "is function input" bits unless this is a type that knows about
   // them.
-  if (!isa<SpecifierTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
+  if (options.is(TypeResolverContext::FunctionInput) &&
+      !isa<SpecifierTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
       !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
       !isa<IdentTypeRepr>(repr) &&
       !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr)) {
@@ -2049,7 +2050,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     }
 
     auto *existential = cast<ExistentialTypeRepr>(repr);
-    return resolveType(existential->getConstraint(), options);
+    return resolveExistentialType(existential, options);
   }
 
   case TypeReprKind::NamedOpaqueReturn:
@@ -3363,6 +3364,14 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     return ErrorType::get(getASTContext());
   }
 
+  bool isConstraintType = (result->is<ProtocolType>() ||
+                           result->is<ProtocolCompositionType>());
+  if (isConstraintType &&
+      getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+      options.isConstraintImplicitExistential()) {
+    return ExistentialType::get(result);
+  }
+
   // Hack to apply context-specific @escaping to a typealias with an underlying
   // function type.
   if (result->is<FunctionType>())
@@ -3542,6 +3551,9 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericTypeAliasDecl:
   case TypeResolverContext::GenericRequirement:
+  case TypeResolverContext::SameTypeRequirement:
+  case TypeResolverContext::ProtocolMetatypeBase:
+  case TypeResolverContext::MetatypeBase:
   case TypeResolverContext::ImmediateOptionalTypeArgument:
   case TypeResolverContext::InExpression:
   case TypeResolverContext::EditorPlaceholderExpr:
@@ -3684,7 +3696,8 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   };
 
   for (auto tyR : repr->getTypes()) {
-    auto ty = resolveType(tyR, options.withoutContext());
+    auto ty = resolveType(tyR,
+        options.withContext(TypeResolverContext::GenericRequirement));
     if (ty->hasError()) return ty;
 
     auto nominalDecl = ty->getAnyNominal();
@@ -3721,19 +3734,27 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
   // In user-written types, AnyObject constraints always refer to the
   // AnyObject type in the standard library.
-  return ProtocolCompositionType::get(getASTContext(), Members,
-                                      /*HasExplicitAnyObject=*/false);
+  auto composition =
+      ProtocolCompositionType::get(getASTContext(), Members,
+                                   /*HasExplicitAnyObject=*/false);
+  if (getASTContext().LangOpts.EnableExplicitExistentialTypes &&
+      options.isConstraintImplicitExistential()) {
+    composition = ExistentialType::get(composition);
+  }
+  return composition;
 }
 
 NeverNullType
 TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
                                      TypeResolutionOptions options) {
-  auto constraintType = resolveType(repr->getConstraint(), options);
+  auto constraintType = resolveType(repr->getConstraint(),
+      options.withContext(TypeResolverContext::GenericRequirement));
+  if (constraintType->is<ExistentialMetatypeType>())
+    return constraintType;
 
   auto anyStart = repr->getAnyLoc();
   auto anyEnd = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, anyStart);
-  if (!constraintType->isExistentialType() &&
-      !constraintType->is<ExistentialMetatypeType>()) {
+  if (!constraintType->isExistentialType()) {
     diagnose(repr->getLoc(), diag::any_not_existential,
              constraintType->isTypeParameter(),
              constraintType)
@@ -3754,7 +3775,8 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
 NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
                                                 TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
-  auto ty = resolveType(repr->getBase(), options.withoutContext());
+  auto ty = resolveType(repr->getBase(),
+      options.withContext(TypeResolverContext::MetatypeBase));
   if (ty->hasError()) {
     return ErrorType::get(getASTContext());
   }
@@ -3775,7 +3797,8 @@ NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
 NeverNullType
 TypeResolver::buildMetatypeType(MetatypeTypeRepr *repr, Type instanceType,
                                 Optional<MetatypeRepresentation> storedRepr) {
-  if (instanceType->isAnyExistentialType()) {
+  if (instanceType->isAnyExistentialType() &&
+      !instanceType->is<ExistentialType>()) {
     // TODO: diagnose invalid representations?
     return ExistentialMetatypeType::get(instanceType, storedRepr);
   } else {
@@ -3786,7 +3809,8 @@ TypeResolver::buildMetatypeType(MetatypeTypeRepr *repr, Type instanceType,
 NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
                                                 TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
-  auto ty = resolveType(repr->getBase(), options.withoutContext());
+  auto ty = resolveType(repr->getBase(),
+      options.withContext(TypeResolverContext::ProtocolMetatypeBase));
   if (ty->hasError()) {
     return ErrorType::get(getASTContext());
   }
