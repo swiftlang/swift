@@ -739,6 +739,10 @@ function(add_libswift name)
       get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
       set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../bootstrapping0/lib/swift")
     endif()
+  elseif(${LIBSWIFT_BUILD_MODE} STREQUAL "CROSSCOMPILE")
+    set(sdk_option "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+    get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
+    set(sdk_option ${sdk_option} "-resource-dir" "${swift_exec_bin_dir}/../lib/swift")
   endif()
   get_versioned_target_triple(target ${SWIFT_HOST_VARIANT_SDK}
       ${SWIFT_HOST_VARIANT_ARCH} "${deployment_version}")
@@ -973,22 +977,28 @@ function(add_swift_host_tool executable)
       BUILD_WITH_INSTALL_RPATH YES
       INSTALL_RPATH "${RPATH_LIST}")
 
-  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX" AND ASHT_HAS_LIBSWIFT AND LIBSWIFT_BUILD_MODE)
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND ASHT_HAS_LIBSWIFT AND LIBSWIFT_BUILD_MODE)
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-    if(LIBSWIFT_BUILD_MODE STREQUAL "HOSTTOOLS")
+    if(${LIBSWIFT_BUILD_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
       # At build time and and run time, link against the swift libraries in the
       # installed host toolchain.
       get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_LIBSWIFT} DIRECTORY)
       get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
-      set(host_lib_dir "${swift_dir}/lib/swift/linux")
+      set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 
       target_link_libraries(${executable} PRIVATE ${swiftrt})
       target_link_libraries(${executable} PRIVATE "swiftCore")
 
       target_link_directories(${executable} PRIVATE ${host_lib_dir})
-      set_target_properties(${executable} PROPERTIES
-        BUILD_WITH_INSTALL_RPATH YES
-        INSTALL_RPATH  "${host_lib_dir}")
+      if(LIBSWIFT_BUILD_MODE STREQUAL "HOSTTOOLS")
+        set_target_properties(${executable} PROPERTIES
+          BUILD_WITH_INSTALL_RPATH YES
+          INSTALL_RPATH  "${host_lib_dir}")
+      else()
+        set_target_properties(${executable} PROPERTIES
+          BUILD_WITH_INSTALL_RPATH YES
+          INSTALL_RPATH  "$ORIGIN/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      endif()
 
     elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
       # At build time link against the built swift libraries from the
@@ -1004,7 +1014,7 @@ function(add_swift_host_tool executable)
       # bootstrapping stage.
       set_target_properties(${executable} PROPERTIES
         BUILD_WITH_INSTALL_RPATH YES
-        INSTALL_RPATH  "$ORIGIN/../lib/swift/${SWIFT_SDK_LINUX_LIB_SUBDIR}")
+        INSTALL_RPATH  "$ORIGIN/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 
     elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
       message(FATAL_ERROR "LIBSWIFT_BUILD_MODE 'BOOTSTRAPPING-WITH-HOSTLIBS' not supported on Linux")
