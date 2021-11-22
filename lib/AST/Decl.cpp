@@ -763,6 +763,10 @@ void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
   getBody()->setLastElement(NewBody);
 }
 
+bool AbstractStorageDecl::isCompileTimeConst() const {
+  return getAttrs().hasAttribute<CompileTimeConstAttr>();
+}
+
 bool AbstractStorageDecl::isTransparent() const {
   return getAttrs().hasAttribute<TransparentAttr>();
 }

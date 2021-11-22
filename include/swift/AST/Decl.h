@@ -4583,6 +4583,7 @@ public:
   void setStatic(bool IsStatic) {
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
+  bool isCompileTimeConst() const;
 
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;

@@ -627,6 +627,11 @@ swift::matchWitness(
     if (reqASD->isStatic() != witnessASD->isStatic())
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
 
+    // Check that the compile-time constness matches.
+    if (reqASD->isCompileTimeConst() && !witnessASD->isCompileTimeConst()) {
+      return RequirementMatch(witness, MatchKind::CompileTimeConstConflict);
+    }
+
     // If the requirement is settable and the witness is not, reject it.
     if (reqASD->isSettable(req->getDeclContext()) &&
         !witnessASD->isSettable(witness->getDeclContext()))
@@ -2566,7 +2571,16 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
                          diag);
     break;
   }
-
+  case MatchKind::CompileTimeConstConflict: {
+    auto witness = match.Witness;
+    auto missing = !witness->getAttrs().getAttribute<CompileTimeConstAttr>();
+    auto diag = diags.diagnose(witness, diag::protocol_witness_const_conflict,
+                   missing);
+    if (missing) {
+      diag.fixItInsert(witness->getAttributeInsertionLoc(true), "_const");
+    }
+    break;
+  }
   case MatchKind::StaticNonStaticConflict: {
     auto witness = match.Witness;
     auto diag = diags.diagnose(witness, diag::protocol_witness_static_conflict,
