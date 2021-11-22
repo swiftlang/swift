@@ -722,6 +722,9 @@ ERROR(cannot_return_value_from_void_func,none,
 NOTE(add_return_type_note,none,
      "did you mean to add a return type?", ())
 
+ERROR(expect_compile_time_const,none,
+      "expect a compile-time constant literal", ())
+
 //------------------------------------------------------------------------------
 // MARK: Import Resolution
 //------------------------------------------------------------------------------

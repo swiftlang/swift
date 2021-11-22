@@ -1981,6 +1981,11 @@ public:
     return withValueOwnership(isInout ? ValueOwnership::InOut
                                       : ValueOwnership::Default);
   }
+
+  ParameterTypeFlags withCompileTimeConst(bool isConst) const {
+    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeConst
+                                      : value | ParameterTypeFlags::CompileTimeConst);
+  }
   
   ParameterTypeFlags withShared(bool isShared) const {
     return withValueOwnership(isShared ? ValueOwnership::Shared

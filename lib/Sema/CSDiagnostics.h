@@ -1753,6 +1753,14 @@ public:
   bool diagnoseAsError() override;
 };
 
+class NotCompileTimeConstFailure final : public FailureDiagnostic {
+public:
+  NotCompileTimeConstFailure(const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a contextual mismatch between expected collection element type
 /// and the one provided (e.g. source of the assignment or argument to a call)
 /// e.g.:

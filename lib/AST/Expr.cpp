@@ -198,6 +198,13 @@ Expr *Expr::getSemanticsProvidingExpr() {
   return this;
 }
 
+bool Expr:: isSemanticallyConstExpr() const {
+  if (auto *LE = dyn_cast<LiteralExpr>(getSemanticsProvidingExpr())) {
+    return LE->getKind() != ExprKind::InterpolatedStringLiteral;
+  }
+  return false;
+}
+
 Expr *Expr::getValueProvidingExpr() {
   Expr *E = getSemanticsProvidingExpr();
 
