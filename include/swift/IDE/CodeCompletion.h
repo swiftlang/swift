@@ -313,7 +313,7 @@ private:
 
   /// If true, then this chunk is an annotation that is included only
   /// for exposition and may not be inserted in the editor buffer.
-  unsigned IsAnnotation : 1;
+  bool IsAnnotation;
 
   StringRef Text;
 
@@ -680,18 +680,18 @@ public:
   };
 
 private:
-  ResultKind Kind : 3;
+  ResultKind Kind;
   unsigned AssociatedKind : 8;
-  CodeCompletionOperatorKind KnownOperatorKind : 6;
-  SemanticContextKind SemanticContext : 3;
+  CodeCompletionOperatorKind KnownOperatorKind;
+  SemanticContextKind SemanticContext;
   unsigned char Flair : 8;
-  NotRecommendedReason NotRecommended : 4;
-  bool IsSystem : 1;
+  NotRecommendedReason NotRecommended;
+  bool IsSystem;
 
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
   /// editor buffer.
-  unsigned NumBytesToErase : 7;
+  unsigned NumBytesToErase;
 
 public:
   static const unsigned MaxNumBytesToErase = 127;
@@ -701,8 +701,8 @@ private:
   StringRef ModuleName;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
-  ExpectedTypeRelation TypeDistance : 3;
-  CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
+  ExpectedTypeRelation TypeDistance;
+  CodeCompletionDiagnosticSeverity DiagnosticSeverity;
   StringRef DiagnosticMessage;
 
   // Assertions for limiting max values of enums.
