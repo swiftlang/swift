@@ -355,7 +355,13 @@ public struct UnsafeRawPointer: _Pointer, Sendable {
         & (UInt(MemoryLayout<T>.alignment) - 1)),
       "load from misaligned raw pointer")
 
-    return Builtin.loadRaw((self + offset)._rawValue)
+    let rawPointer = (self + offset)._rawValue
+
+    // TODO: to support misaligned raw loads, simply remove this assumption.
+    let alignedPointer =
+      Builtin.assumeAlignment(rawPointer,
+                              MemoryLayout<T>.alignment._builtinWordValue)
+    return Builtin.loadRaw(alignedPointer)
   }
 
 }
@@ -901,7 +907,13 @@ public struct UnsafeMutableRawPointer: _Pointer, Sendable {
         & (UInt(MemoryLayout<T>.alignment) - 1)),
       "load from misaligned raw pointer")
 
-    return Builtin.loadRaw((self + offset)._rawValue)
+    let rawPointer = (self + offset)._rawValue
+
+    // TODO: to support misaligned raw loads, simply remove this assumption.
+    let alignedPointer =
+      Builtin.assumeAlignment(rawPointer,
+                              MemoryLayout<T>.alignment._builtinWordValue)
+    return Builtin.loadRaw(alignedPointer)
   }
 
   /// Stores the given value's bytes into raw memory at the specified offset.
