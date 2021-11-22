@@ -31,18 +31,33 @@ else()
 
   elseif(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
 
+    set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0)
+    set(b1_deps swift-frontend-bootstrapping1 symlink-headers-bootstrapping1)
+    if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
+      set(b0_deps ${b0_deps} swiftCore-bootstrapping0)
+      set(b1_deps ${b1_deps} swiftCore-bootstrapping1)
+      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(b0_deps ${b0_deps} swiftOnoneSupport-bootstrapping0)
+        set(b1_deps ${b1_deps} swiftOnoneSupport-bootstrapping1)
+      endif()
+      if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+        set(b0_deps ${b0_deps} swiftDarwin-bootstrapping0)
+        set(b1_deps ${b1_deps} swiftDarwin-bootstrapping1)
+      endif()
+    endif()
+
     # Bootstrapping - stage 1, using the compiler from level 0
 
     add_libswift("libswift-bootstrapping1"
       SWIFT_EXEC "${CMAKE_BINARY_DIR}/bootstrapping0/bin/swiftc"
-      DEPENDS "bootstrapping0-all"
+      DEPENDS ${b0_deps}
       BOOTSTRAPPING 1)
 
     # The final build, using the compiler from stage 1
 
     add_libswift("libswift"
         SWIFT_EXEC "${CMAKE_BINARY_DIR}/bootstrapping1/bin/swiftc"
-        DEPENDS "bootstrapping1-all")
+        DEPENDS ${b1_deps})
 
     if(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
       file(GLOB module_dirs "${CMAKE_BINARY_DIR}/bootstrapping*/lib/swift/macosx/*.swiftmodule")
