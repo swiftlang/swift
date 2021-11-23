@@ -18,6 +18,7 @@
 
 #include "BitPatternBuilder.h"
 #include "Callee.h"
+#include "CallEmission.h"
 #include "ClassTypeInfo.h"
 #include "ExtraInhabitants.h"
 #include "GenDecl.h"
@@ -231,7 +232,31 @@ void DistributedAccessor::emit() {
   // so it could be forwarded to the distributed method.
   auto arguments = computeArguments(argBuffer);
 
-  IGF.Builder.CreateRetVoid();
+  // Step two, let's form and emit a call to the distributed method
+  // using computed argument explosion.
+  {
+    auto fnType = Method->getLoweredFunctionType();
+    GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
+
+    Explosion result;
+
+    auto callee = getCalleeForDistributedMethod(actorSelf);
+    auto emission =
+        getCallEmission(IGF, callee.getSwiftContext(), std::move(callee));
+
+    emission->begin();
+    emission->setArgs(arguments, /*isOutlined=*/false,
+                      /*witnessMetadata=*/nullptr);
+    emission->emitToExplosion(result, /*isOutlined=*/false);
+    emission->end();
+
+    if (result.empty()) {
+      IGF.Builder.CreateRetVoid();
+      return;
+    }
+
+    // TODO: Emit result if method has one or more.
+  }
 }
 
 FunctionPointer DistributedAccessor::getPointerToMethod() const {
