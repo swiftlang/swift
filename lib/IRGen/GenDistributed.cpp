@@ -109,14 +109,16 @@ IRGenModule::getAddrOfDistributedMethodAccessor(SILFunction *F,
     .withRepresentation(SILFunctionTypeRepresentation::Thick)
     .build();
 
+  auto methodTy = F->getLoweredFunctionType();
   // Accessor gets argument value buffer and a reference to `self` of
-  // the actor and produces a call to the distributed thunk.
+  // the actor and produces a call to the distributed thunk forwarding
+  // its result(s) out.
   auto accessorType = SILFunctionType::get(
       /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
       ParameterConvention::Direct_Guaranteed,
       {getParamForArguments()},
       /*Yields=*/{},
-      /*Results=*/{},
+      /*Results=*/methodTy->getResults(),
       /*ErrorResult=*/None,
       /*patternSubs=*/SubstitutionMap(),
       /*invocationSubs=*/SubstitutionMap(), Context);
@@ -221,6 +223,10 @@ Explosion DistributedAccessor::computeArguments(llvm::Value *argumentBuffer) {
 }
 
 void DistributedAccessor::emit() {
+  auto methodTy = Method->getLoweredFunctionType();
+  SILFunctionConventions conv(methodTy, IGF.getSILModule());
+  TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
+
   auto params = IGF.collectParameters();
 
   // UnsafeRawPointer that holds all of the argument values
@@ -235,8 +241,7 @@ void DistributedAccessor::emit() {
   // Step two, let's form and emit a call to the distributed method
   // using computed argument explosion.
   {
-    auto fnType = Method->getLoweredFunctionType();
-    GenericContextScope scope(IGM, fnType->getInvocationGenericSignature());
+    GenericContextScope scope(IGM, methodTy->getInvocationGenericSignature());
 
     Explosion result;
 
@@ -255,7 +260,10 @@ void DistributedAccessor::emit() {
       return;
     }
 
-    // TODO: Emit result if method has one or more.
+    auto resultTy = conv.getSILResultType(expansionContext);
+    IGF.emitScalarReturn(resultTy, resultTy, result,
+                         /*swiftCCReturn=*/false,
+                         /*isOutlined=*/false);
   }
 }
 
