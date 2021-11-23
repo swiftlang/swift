@@ -453,11 +453,8 @@ namespace {
           Bridgeability::None);
 
       // If this is imported as a reference type, ignore the pointer.
-      if (const clang::RecordType *pointee =
-              pointeeQualType->getAsStructureType()) {
-        if (pointeeType && pointeeType->isForeignReferenceType())
-          return {pointeeType, ImportHint::OtherPointer};
-      }
+      if (pointeeType && pointeeType->isForeignReferenceType())
+        return {pointeeType, ImportHint::OtherPointer};
 
       // If the pointed-to type is unrepresentable in Swift, or its C
       // alignment is greater than the maximum Swift alignment, import as

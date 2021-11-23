@@ -40,12 +40,12 @@ struct PassContext {
     if instruction is FullApplySite {
       PassContext_notifyChanges(passContext, callsChanged)
     }
-    if instruction is TermInst {
+    if getAsTermInst(instruction) != nil {
       PassContext_notifyChanges(passContext, branchesChanged)
     }
     PassContext_notifyChanges(passContext, instructionsChanged)
 
-    PassContext_eraseInstruction(passContext, instruction.bridged)
+    PassContext_eraseInstruction(passContext, instruction)
   }
   
   func setOperand(of instruction: Instruction, at index : Int, to value: Value) {
@@ -54,7 +54,7 @@ struct PassContext {
     }
     PassContext_notifyChanges(passContext, instructionsChanged)
 
-    SILInstruction_setOperand(instruction.bridged, index, value.bridged)
+    SILInstruction_setOperand(instruction, index, value)
   }
 }
 
@@ -70,25 +70,26 @@ struct FunctionPass {
   }
 
   func run(_ bridgedCtxt: BridgedFunctionPassCtxt) {
-    let function = bridgedCtxt.function.function
+    let function = bridgedCtxt.function
     let context = PassContext(passContext: bridgedCtxt.passContext)
     runFunction(function, context)
   }
 }
 
-struct InstructionPass<InstType: Instruction> {
+struct InstructionPass {
 
   let name: String
-  let runFunction: (InstType, PassContext) -> ()
+  let runFunction: (Instruction, PassContext) -> ()
 
   public init(name: String,
-              _ runFunction: @escaping (InstType, PassContext) -> ()) {
+              _ runFunction: @escaping (Instruction, PassContext) -> ()) {
     self.name = name
     self.runFunction = runFunction
   }
 
   func run(_ bridgedCtxt: BridgedInstructionPassCtxt) {
-    let inst = bridgedCtxt.instruction.getAs(InstType.self)
+    // TODO: this just needs to be a bridged cast function. 
+    let inst = bridgedCtxt.instruction
     let context = PassContext(passContext: bridgedCtxt.passContext)
     runFunction(inst, context)
   }

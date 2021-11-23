@@ -58,34 +58,6 @@ inline const SILDebugScope *getSILDebugScope(BridgedLocation loc) {
   return reinterpret_cast<SILDebugLocation *>(&loc)->getScope();
 }
 
-inline SILType getSILType(BridgedType ty) {
-  return SILType::getFromOpaqueValue(ty.typePtr);
-}
-
-inline SILNode *castToSILNode(BridgedNode node) {
-  return static_cast<SILNode *>(node.obj);
-}
-
-inline SILValue castToSILValue(BridgedValue value) {
-  return static_cast<ValueBase *>(value.obj);
-}
-
-inline SILType castToSILType(BridgedType type) {
-  return SILType::getFromOpaqueValue(type.typePtr);
-}
-
-template <class I = SILInstruction> I *castToInst(BridgedInstruction inst) {
-  return cast<I>(static_cast<SILNode *>(inst.obj)->castToInstruction());
-}
-
-inline SILBasicBlock *castToBasicBlock(BridgedBasicBlock block) {
-  return static_cast<SILBasicBlock *>(block.obj);
-}
-
-inline SILFunction *castToFunction(BridgedFunction function) {
-  return static_cast<SILFunction *>(function.obj);
-}
-
 inline SILGlobalVariable *castToGlobal(BridgedGlobalVar global) {
   return static_cast<SILGlobalVariable *>(global.obj);
 }

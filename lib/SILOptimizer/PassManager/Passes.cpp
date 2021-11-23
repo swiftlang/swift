@@ -236,10 +236,10 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
       return;
     }
   }
-  if (!f->isBridged()) {
-    llvm::errs() << "SILFunction metatype is not registered\n";
-    abort();
-  }
+//  if (!f->isBridged()) {
+//    llvm::errs() << "SILFunction metatype is not registered\n";
+//    abort();
+//  }
   runFunction({{f}, {passManager->getLibswiftPassInvocation()}});
 }
 

@@ -1173,8 +1173,8 @@ void PassContext_notifyChanges(BridgedPassContext passContext,
 }
 
 void PassContext_eraseInstruction(BridgedPassContext passContext,
-                                   BridgedInstruction inst) {
-  castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
+                                   SILInstruction *inst) {
+  castToPassInvocation(passContext)->eraseInstruction(inst);
 }
 
 SwiftInt PassContext_isSwift51RuntimeAvailable(BridgedPassContext context) {

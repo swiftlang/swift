@@ -2432,23 +2432,28 @@ namespace {
     }
 
     Decl *VisitNamespaceDecl(const clang::NamespaceDecl *decl) {
-      DeclContext *dc = nullptr;
-      // If this is a top-level namespace, don't put it in the module we're
-      // importing, put it in the "__ObjC" module that is implicitly imported.
-      if (!decl->getParent()->isNamespace())
-        dc = Impl.ImportedHeaderUnit;
-      else {
-        // This is a nested namespace, so just lookup it's parent normally.
-        auto parentNS = cast<clang::NamespaceDecl>(decl->getParent());
-        auto parent =
-            Impl.importDecl(parentNS, getVersion(), /*UseCanonicalDecl*/ false);
-        dc = cast<EnumDecl>(parent);
-      }
+//      DeclContext *dc = nullptr;
+//      // If this is a top-level namespace, don't put it in the module we're
+//      // importing, put it in the "__ObjC" module that is implicitly imported.
+//      if (!decl->getParent()->isNamespace())
+//        dc = Impl.ImportedHeaderUnit;
+//      else {
+//        // This is a nested namespace, so just lookup it's parent normally.
+//        auto parentNS = cast<clang::NamespaceDecl>(decl->getParent());
+//        auto parent =
+//            Impl.importDecl(parentNS, getVersion(), /*UseCanonicalDecl*/ false);
+//        dc = cast<EnumDecl>(parent);
+//      }
 
       ImportedName importedName;
       std::tie(importedName, std::ignore) = importFullName(decl);
       // If we don't have a name for this declaration, bail. We can't import it.
       if (!importedName)
+        return nullptr;
+      
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
+      if (!dc)
         return nullptr;
 
       auto *enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
@@ -9795,8 +9800,12 @@ static void loadAllMembersOfRecordDecl(NominalTypeDecl *recordDecl) {
       continue;
 
     for (auto found : recordDecl->lookupDirect(name)) {
-      if (addedMembers.insert(found).second)
-        recordDecl->addMember(found);
+      if (addedMembers.insert(found).second) {
+        // TODO:
+        // assert(found->getDeclContext()->getAsDecl() == recordDecl);
+        if (found->getDeclContext()->getAsDecl() == recordDecl)
+          recordDecl->addMember(found);
+      }
     }
   }
 }

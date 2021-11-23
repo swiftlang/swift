@@ -12,51 +12,39 @@
 
 import SILBridging
 
-final public class Function : CustomStringConvertible {
+public typealias Function = swift.SILFunction
+
+extension Function : CustomStringConvertible {
   public var name: String {
-    return SILFunction_getName(bridged).string
+    return SILFunction_getName(self).string
   }
 
   final public var description: String {
-    var s = SILFunction_debugDescription(bridged)
+    var s = SILFunction_debugDescription(self)
     return String(cString: s.c_str())
   }
 
-  public var entryBlock: BasicBlock {
-    SILFunction_firstBlock(bridged).block!
-  }
+  public var entryBlock: BasicBlock { SILFunction_firstBlock(self)! }
 
   public var blocks : List<BasicBlock> {
-    return List(startAt: SILFunction_firstBlock(bridged).block)
-  }
-
-  public var reverseBlocks : ReverseList<BasicBlock> {
-    return ReverseList(startAt: SILFunction_lastBlock(bridged).block)
+    return List(startAt: entryBlock)
   }
 
   public var arguments: LazyMapSequence<ArgumentArray, FunctionArgument> {
-    entryBlock.arguments.lazy.map { $0 as! FunctionArgument }
+    entryBlock.arguments.lazy.map { getAsSILFunctionArgument(getAsValue($0))! }
   }
   
   public var numIndirectResultArguments: Int {
-    SILFunction_numIndirectResultArguments(bridged)
+    SILFunction_numIndirectResultArguments(self)
   }
   
   public var hasSelfArgument: Bool {
-    SILFunction_getSelfArgumentIndex(bridged) >= 0
+    SILFunction_getSelfArgumentIndex(self) >= 0
   }
   
   public var selfArgumentIndex: Int {
-    let selfIdx = SILFunction_getSelfArgumentIndex(bridged)
+    let selfIdx = SILFunction_getSelfArgumentIndex(self)
     assert(selfIdx >= 0)
     return selfIdx
   }
-
-  public var bridged: BridgedFunction { BridgedFunction(obj: SwiftObject(self)) }
-}
-
-// Bridging utilities
-
-extension BridgedFunction {
-  public var function: Function { obj.getAs(Function.self) }
 }

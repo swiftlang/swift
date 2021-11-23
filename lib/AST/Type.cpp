@@ -5518,9 +5518,7 @@ TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
 }
 
 bool TypeBase::isForeignReferenceType() {
-  if (auto *classDecl = lookThroughAllOptionalTypes()->getClassOrBoundGenericClass())
-    return classDecl->isForeignReferenceType();
-  return false;
+  return getCanonicalType().isForeignReferenceType();
 }
 
 bool CanType::isForeignReferenceType() {

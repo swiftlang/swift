@@ -16,30 +16,27 @@ import SILBridging
 //                       Instruction base classes
 //===----------------------------------------------------------------------===//
 
-public class Instruction : ListNode, CustomStringConvertible, Hashable {
-  final public var next: Instruction? {
-    SILInstruction_next(bridged).instruction
-  }
+public typealias Instruction = swift.SILInstruction
 
-  final public var previous: Instruction? {
-    SILInstruction_previous(bridged).instruction
-  }
+extension swift.SILInstruction : ListNode, CustomStringConvertible {
+  final public var next: Instruction? { SILInstruction_next(self) }
+
+  final public var previous: Instruction? { SILInstruction_previous(self) }
 
   final public var block: BasicBlock {
-    SILInstruction_getParent(bridged).block
+    SILInstruction_getParent(self)
   }
 
   final public var description: String {
-    var s = SILNode_debugDescription(bridgedNode)
+    var s = SILInstruction_debugDescription(self)
     return String(cString: s.c_str())
   }
   
   final public var operands: OperandArray {
-    return OperandArray(opArray: SILInstruction_getOperands(bridged))
+    return OperandArray(opArray: SILInstruction_getOperands(self))
   }
   
-  fileprivate var resultCount: Int { 0 }
-  fileprivate func getResult(index: Int) -> Value { fatalError() }
+  fileprivate var resultCount: Int { Int(getNumResults()) }
 
   public struct Results : RandomAccessCollection {
     fileprivate let inst: Instruction
@@ -47,7 +44,7 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
 
     public var startIndex: Int { 0 }
     public var endIndex: Int { numResults }
-    public subscript(_ index: Int) -> Value { inst.getResult(index: index) }
+    public subscript(_ index: Int) -> Value { getAsValue(inst.getResult(UInt32(index)))! }
   }
 
   final public var results: Results {
@@ -55,17 +52,15 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   }
 
   final public var location: Location {
-    return Location(bridgedLocation: SILInstruction_getLocation(bridged))
+    return Location(bridgedLocation: SILInstruction_getLocation(self))
   }
 
-  public var mayTrap: Bool { false }
-
   final public var mayHaveSideEffects: Bool {
-    return mayTrap || mayWriteToMemory
+    return mayTrap() || mayWriteToMemory
   }
 
   final public var mayReadFromMemory: Bool {
-    switch SILInstruction_getMemBehavior(bridged) {
+    switch SILInstruction_getMemBehavior(self) {
       case MayReadBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
         return true
       default:
@@ -74,7 +69,7 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   }
 
   final public var mayWriteToMemory: Bool {
-    switch SILInstruction_getMemBehavior(bridged) {
+    switch SILInstruction_getMemBehavior(self) {
       case MayWriteBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
         return true
       default:
@@ -83,75 +78,13 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   }
 
   final public var mayReadOrWriteMemory: Bool {
-    switch SILInstruction_getMemBehavior(bridged) {
+    switch SILInstruction_getMemBehavior(self) {
       case MayReadBehavior, MayWriteBehavior, MayReadWriteBehavior,
            MayHaveSideEffectsBehavior:
         return true
       default:
         return false
     }
-  }
-
-  public static func ==(lhs: Instruction, rhs: Instruction) -> Bool {
-    lhs === rhs
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(ObjectIdentifier(self))
-  }
-
-  public var bridged: BridgedInstruction {
-    BridgedInstruction(obj: SwiftObject(self))
-  }
-  var bridgedNode: BridgedNode { BridgedNode(obj: SwiftObject(self)) }
-}
-
-extension BridgedInstruction {
-  public var instruction: Instruction { obj.getAs(Instruction.self) }
-  public func getAs<T: Instruction>(_ instType: T.Type) -> T { obj.getAs(T.self) }
-}
-
-extension OptionalBridgedInstruction {
-  var instruction: Instruction? { obj.getAs(Instruction.self) }
-}
-
-public class SingleValueInstruction : Instruction, Value {
-  final public var definingInstruction: Instruction? { self }
-
-  fileprivate final override var resultCount: Int { 1 }
-  fileprivate final override func getResult(index: Int) -> Value { self }
-}
-
-public final class MultipleValueInstructionResult : Value {
-  final public var description: String {
-    var s = SILNode_debugDescription(bridgedNode)
-    return String(cString: s.c_str())
-  }
-
-  public var instruction: Instruction {
-    MultiValueInstResult_getParent(bridged).instruction
-  }
-
-  public var definingInstruction: Instruction? { instruction }
-
-  var bridged: BridgedMultiValueResult {
-    BridgedMultiValueResult(obj: SwiftObject(self))
-  }
-  var bridgedNode: BridgedNode { BridgedNode(obj: SwiftObject(self)) }
-}
-
-extension BridgedMultiValueResult {
-  var result: MultipleValueInstructionResult {
-    obj.getAs(MultipleValueInstructionResult.self)
-  }
-}
-
-public class MultipleValueInstruction : Instruction {
-  fileprivate final override var resultCount: Int {
-    return MultipleValueInstruction_getNumResults(bridged)
-  }
-  fileprivate final override func getResult(index: Int) -> Value {
-    MultipleValueInstruction_getResult(bridged, index).result
   }
 }
 
@@ -169,12 +102,11 @@ extension UnaryInstruction {
 //                             no-value instructions
 //===----------------------------------------------------------------------===//
 
-/// Used for all non-value instructions which are not implemented here, yet.
-/// See registerBridgedClass() in SILBridgingUtils.cpp.
-final public class UnimplementedInstruction : Instruction {
-}
+extension swift.StoreInst {
+  final public var operands: OperandArray {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))
+  }
 
-final public class StoreInst : Instruction {
   public var sourceOperand: Operand { return operands[0] }
   public var destinationOperand: Operand { return operands[1] }
   public var source: Value { return sourceOperand.value }
@@ -185,289 +117,161 @@ final public class StoreInst : Instruction {
     case unqualified = 0, initialize = 1, assign = 2, trivial = 3
   }
   public var destinationOwnership: StoreOwnership {
-    StoreOwnership(rawValue: StoreInst_getStoreOwnership(bridged))!
+    StoreOwnership(rawValue: StoreInst_getStoreOwnership(self))!
   }
 }
 
-final public class CopyAddrInst : Instruction {
+extension swift.CopyAddrInst {
+  final public var operands: OperandArray {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))
+  }
+
   public var sourceOperand: Operand { return operands[0] }
   public var destinationOperand: Operand { return operands[1] }
   public var source: Value { return sourceOperand.value }
   public var destination: Value { return destinationOperand.value }
 }
 
-final public class EndAccessInst : Instruction, UnaryInstruction {
-  public var beginAccess: BeginAccessInst {
-    return operand as! BeginAccessInst
+extension swift.EndAccessInst {
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
+  }
+  
+  public var beginAccess: swift.BeginAccessInst {
+    return getAsBeginAccessInst(operand)!
   }
 }
 
-final public class EndBorrowInst : Instruction, UnaryInstruction {}
+extension swift.EndBorrowInst {}
 
-final public class DeallocStackInst : Instruction, UnaryInstruction {
-  public var allocstack: AllocStackInst {
-    return operand as! AllocStackInst
+extension swift.CondFailInst {
+  public var message: String { CondFailInst_getMessage(self).string }
+  
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
+  }
+  
+  final public var location: Location {
+    return Location(bridgedLocation: SILInstruction_getLocation(getAsSILInstruction(self)))
+  }
+  
+  final public var next: Instruction? { SILInstruction_next(getAsSILInstruction(self)) }
+
+  final public var previous: Instruction? { SILInstruction_previous(getAsSILInstruction(self)) }
+}
+
+extension swift.UnconditionalCheckedCastAddrInst {}
+
+public protocol RefCountingInst { }
+
+extension swift.StrongRetainInst : RefCountingInst {
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
+  }
+
+  final public var next: Instruction? { SILInstruction_next(getAsSILInstruction(self)) }
+
+  final public var previous: Instruction? { SILInstruction_previous(getAsSILInstruction(self)) }
+}
+
+extension swift.RetainValueInst : RefCountingInst { }
+
+extension swift.StrongReleaseInst : RefCountingInst {
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
   }
 }
 
-final public class CondFailInst : Instruction, UnaryInstruction {
-  public override var mayTrap: Bool { true }
-
-  public var message: String { CondFailInst_getMessage(bridged).string }
-}
-
-final public class FixLifetimeInst : Instruction, UnaryInstruction {}
-
-final public class DebugValueInst : Instruction, UnaryInstruction {}
-
-final public class UnconditionalCheckedCastAddrInst : Instruction {
-  public override var mayTrap: Bool { true }
-}
-
-final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
-
-final public class DeallocRefInst : Instruction, UnaryInstruction {}
-
-public class RefCountingInst : Instruction, UnaryInstruction {}
-
-final public class StrongRetainInst : RefCountingInst {
-}
-
-final public class RetainValueInst : RefCountingInst {
-}
-
-final public class StrongReleaseInst : RefCountingInst {
-}
-
-final public class ReleaseValueInst : RefCountingInst {
-}
-
-final public class DestroyValueInst : Instruction, UnaryInstruction {}
-
-final public class DestroyAddrInst : Instruction, UnaryInstruction {}
-
-final public class UnimplementedRefCountingInst : RefCountingInst {}
+extension swift.ReleaseValueInst : RefCountingInst { }
 
 //===----------------------------------------------------------------------===//
 //                           single-value instructions
 //===----------------------------------------------------------------------===//
 
-/// Used for all SingleValueInstructions which are not implemented here, yet.
-/// See registerBridgedClass() in SILBridgingUtils.cpp.
-final public class UnimplementedSingleValueInst : SingleValueInstruction {
-}
-
-final public class LoadInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class LoadBorrowInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class BuiltinInst : SingleValueInstruction {}
-
-final public class UpcastInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class UncheckedRefCastInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class RawPointerToRefInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class AddressToPointerInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class IndexAddrInst : SingleValueInstruction {}
-
-final public
-class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class OpenExistentialBoxInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class OpenExistentialBoxValueInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class OpenExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class ValueMetatypeInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class ExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {}
-
-public class GlobalAccessInst : SingleValueInstruction {
-  final public var global: GlobalVariable {
-    GlobalAccessInst_getGlobal(bridged).globalVar
+extension swift.UpcastInst {
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
   }
 }
 
-final public class GlobalAddrInst : GlobalAccessInst {}
-
-final public class GlobalValueInst : GlobalAccessInst {}
-
-final public class TupleInst : SingleValueInstruction {
+extension swift.UncheckedRefCastInst {
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
+  }
 }
 
-final public class TupleExtractInst : SingleValueInstruction, UnaryInstruction {
-  public var fieldIndex: Int { TupleExtractInst_fieldIndex(bridged) }
+extension swift.RawPointerToRefInst {
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
+  }
 }
 
-final public
-class TupleElementAddrInst : SingleValueInstruction, UnaryInstruction {
-  public var fieldIndex: Int { TupleElementAddrInst_fieldIndex(bridged) }
+extension swift.AddressToPointerInst {
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
+  }
 }
 
-final public class StructInst : SingleValueInstruction {
+extension swift.InitExistentialRefInst {
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
+  }
 }
 
-final public class StructExtractInst : SingleValueInstruction, UnaryInstruction {
-  public var fieldIndex: Int { StructExtractInst_fieldIndex(bridged) }
+extension swift.TupleExtractInst {
+  public var fieldIndex: Int { TupleExtractInst_fieldIndex(self) }
+  
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
+  }
 }
 
-final public
-class StructElementAddrInst : SingleValueInstruction, UnaryInstruction {
-  public var fieldIndex: Int { StructElementAddrInst_fieldIndex(bridged) }
+extension swift.TupleElementAddrInst {
+  public var fieldIndex: Int { TupleElementAddrInst_fieldIndex(self) }
 }
 
-final public class EnumInst : SingleValueInstruction {
-  public var caseIndex: Int { EnumInst_caseIndex(bridged) }
+extension swift.StructExtractInst {
+  public var fieldIndex: Int { StructExtractInst_fieldIndex(self) }
+}
+
+extension swift.StructElementAddrInst {
+  public var fieldIndex: Int { StructElementAddrInst_fieldIndex(self) }
+}
+
+extension swift.EnumInst {
+  final public var operands: OperandArray {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))
+  }
+
+  public var caseIndex: Int { EnumInst_caseIndex(self) }
   
   public var operand: Value? { operands.first?.value }
 }
 
-final public
-class UncheckedEnumDataInst : SingleValueInstruction, UnaryInstruction {
-  public var caseIndex: Int { UncheckedEnumDataInst_caseIndex(bridged) }
+extension swift.UncheckedEnumDataInst {
+  public var caseIndex: Int { UncheckedEnumDataInst_caseIndex(self) }
 }
 
-final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction {
-  public var fieldIndex: Int { RefElementAddrInst_fieldIndex(bridged) }
+extension swift.RefElementAddrInst {
+  public var fieldIndex: Int { RefElementAddrInst_fieldIndex(self) }
 }
 
-final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
-  public override var mayTrap: Bool { true }
+extension swift.ConvertFunctionInst {
+  final public var operand: Value {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))[0].value
+  }
 }
 
-final public
-class UnconditionalCheckedCastValueInst : SingleValueInstruction,
-                                          UnaryInstruction {
-  public override var mayTrap: Bool { true }
-}
-
-final public
-class ConvertFunctionInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class ThinToThickFunctionInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class ObjCExistentialMetatypeToObjectInst : SingleValueInstruction,
-                                            UnaryInstruction {}
-
-final public
-class ObjCMetatypeToObjectInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class ValueToBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class BridgeObjectToRefInst : SingleValueInstruction,
-                                           UnaryInstruction {}
-
-final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class CopyValueInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction {}
-
-final public
-class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class PartialApplyInst : SingleValueInstruction, ApplySite {
-  public var numArguments: Int { PartialApplyInst_numArguments(bridged) }
-}
-
-final public class ApplyInst : SingleValueInstruction, FullApplySite {
-  public var numArguments: Int { ApplyInst_numArguments(bridged) }
-  
-  public var singleDirectResult: Value? { self }
-}
-
-final public class ClassMethodInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class SuperMethodInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class ObjCMethodInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class ObjCSuperMethodInst : SingleValueInstruction, UnaryInstruction {}
-
-final public class WitnessMethodInst : SingleValueInstruction {}
-
-
-//===----------------------------------------------------------------------===//
-//                      single-value allocation instructions
-//===----------------------------------------------------------------------===//
-
-public protocol Allocation : AnyObject { }
-
-final public class AllocStackInst : SingleValueInstruction, Allocation {
-}
-
-final public class AllocRefInst : SingleValueInstruction, Allocation {
-}
-
-final public class AllocRefDynamicInst : SingleValueInstruction, Allocation {
-}
-
-final public class AllocBoxInst : SingleValueInstruction, Allocation {
-}
-
-final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation {
+extension swift.PartialApplyInst {
+  public var numArguments: Int { PartialApplyInst_numArguments(self) }
 }
 
 //===----------------------------------------------------------------------===//
 //                            multi-value instructions
 //===----------------------------------------------------------------------===//
 
-final public class BeginCOWMutationInst : MultipleValueInstruction,
-                                          UnaryInstruction {
-  public var uniquenessResult: Value { return getResult(index: 0) }
-  public var bufferResult: Value { return getResult(index: 1) }
-}
-
-final public class DestructureStructInst : MultipleValueInstruction {
-}
-
-final public class DestructureTupleInst : MultipleValueInstruction {
-}
-
-final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
-  public var numArguments: Int { BeginApplyInst_numArguments(bridged) }
+extension swift.BeginApplyInst {
+  public var numArguments: Int { BeginApplyInst_numArguments(self) }
   
   public var singleDirectResult: Value? { nil }
 }
@@ -476,62 +280,56 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
 //                            terminator instructions
 //===----------------------------------------------------------------------===//
 
-public class TermInst : Instruction {
-  final public var successors: SuccessorArray {
-    SuccessorArray(succArray: TermInst_getSuccessors(bridged))
+extension swift.TermInst {
+  public var successors: SuccessorArray {
+    return SuccessorArray(succArray: TermInst_getSuccessors(self))
+  }
+  
+  final public var operands: OperandArray {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))
   }
 }
 
-final public class UnreachableInst : TermInst {
-}
+extension swift.TryApplyInst {
+  public var successors: SuccessorArray {
+    return SuccessorArray(succArray: TermInst_getSuccessors(getAsTermInst(getAsSILInstruction(self))!))
+  }
 
-final public class ReturnInst : TermInst, UnaryInstruction {
-}
-
-final public class ThrowInst : TermInst, UnaryInstruction {
-}
-
-final public class YieldInst : TermInst {
-}
-
-final public class UnwindInst : TermInst {
-}
-
-final public class TryApplyInst : TermInst, FullApplySite {
-  public var numArguments: Int { TryApplyInst_numArguments(bridged) }
+  public var numArguments: Int { TryApplyInst_numArguments(self) }
   
   public var normalBlock: BasicBlock { successors[0] }
   public var errorBlock: BasicBlock { successors[1] }
   
-  public var singleDirectResult: Value? { normalBlock.arguments[0] }
+  public var singleDirectResult: Value? { getAsValue(normalBlock.arguments[0]) }
 }
 
-final public class BranchInst : TermInst {
-  public var targetBlock: BasicBlock { BranchInst_getTargetBlock(bridged).block }
+extension swift.BranchInst {
+  public var targetBlock: BasicBlock { BranchInst_getTargetBlock(self) }
   
   public func getArgument(for operand: Operand) -> Argument {
     return targetBlock.arguments[operand.index]
   }
 }
 
-final public class CondBranchInst : TermInst {
-}
+extension swift.SwitchEnumInst {
+  public var successors: SuccessorArray {
+    return SuccessorArray(succArray: TermInst_getSuccessors(getAsTermInst(getAsSILInstruction(self))!))
+  }
 
-final public class SwitchValueInst : TermInst {
-}
-
-final public class SwitchEnumInst : TermInst {
+  final public var operands: OperandArray {
+    return OperandArray(opArray: SILInstruction_getOperands(getAsSILInstruction(self)))
+  }
 
   public var enumOp: Value { operands[0].value }
 
   public struct CaseIndexArray : RandomAccessCollection {
-    fileprivate let switchEnum: SwitchEnumInst
+    fileprivate let switchEnum: swift.SwitchEnumInst
 
     public var startIndex: Int { return 0 }
-    public var endIndex: Int { SwitchEnumInst_getNumCases(switchEnum.bridged) }
+    public var endIndex: Int { SwitchEnumInst_getNumCases(switchEnum) }
 
     public subscript(_ index: Int) -> Int {
-      SwitchEnumInst_getCaseIndex(switchEnum.bridged, index)
+      SwitchEnumInst_getCaseIndex(switchEnum, index)
     }
   }
 
@@ -553,22 +351,3 @@ final public class SwitchEnumInst : TermInst {
     cases.first(where: { $0.1 == forSuccessor })?.0
   }
 }
-
-final public class SwitchEnumAddrInst : TermInst {
-}
-
-final public class DynamicMethodBranchInst : TermInst {
-}
-
-final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
-}
-
-final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
-}
-
-final public class CheckedCastAddrBranchInst : TermInst, UnaryInstruction {
-}
-
-final public class CheckedCastValueBranchInst : TermInst, UnaryInstruction {
-}
-

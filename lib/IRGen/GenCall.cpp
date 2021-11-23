@@ -2260,7 +2260,7 @@ public:
     if (fnConv.getNumDirectSILResults() == 1
         && (fnConv.getDirectSILResults().begin()->getConvention()
             == ResultConvention::Autoreleased)) {
-      result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
+//      result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
     }
 
     auto origFnType = getCallee().getOrigFunctionType();

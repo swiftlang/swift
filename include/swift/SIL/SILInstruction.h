@@ -317,7 +317,9 @@ SILInstructionResultArray::getReversedValues() const {
 /// to a SILNode without knowing which SILInstruction sub-class it is.
 /// Note that casting a SILInstruction to a SILNode cannot be done implicitly,
 /// but only with an LLVM `cast` or with SILInstruction::asSILNode().
-class SILInstruction : public llvm::ilist_node<SILInstruction> {
+class __attribute__((swift_attr("import_as_ref"))) SILInstruction
+  : public llvm::ilist_node<SILInstruction> {
+
   friend llvm::ilist_traits<SILInstruction>;
   friend llvm::ilist_traits<SILBasicBlock>;
   friend SILBasicBlock;
@@ -792,7 +794,8 @@ inline SILNodePointer::SILNodePointer(const SILInstruction *inst) :
 
 /// The base class for all instructions, which are not SingleValueInstructions:
 /// NonValueInstruction and MultipleValueInstruction.
-class NonSingleValueInstruction : public SILInstruction, public SILNode {
+class __attribute__((swift_attr("import_as_ref"))) NonSingleValueInstruction
+: public SILInstruction, public SILNode {
   friend struct SILNodeOffsetChecker;
 public:
   NonSingleValueInstruction(SILInstructionKind kind, SILDebugLocation loc)
@@ -959,7 +962,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 /// Because this instruction is both a SILInstruction and a ValueBase,
 /// both of which inherit from SILNode, it introduces the need for
 /// some care when working with SILNodes.  See the comment on SILNode.
-class SingleValueInstruction : public SILInstruction, public ValueBase {
+class __attribute__((swift_attr("import_as_ref"))) SingleValueInstruction
+: public SILInstruction, public ValueBase {
   friend class SILInstruction;
   friend struct SILNodeOffsetChecker;
 
@@ -1100,7 +1104,8 @@ public:
 ///
 /// The ownership kind is set on construction and afterwards must be changed
 /// explicitly using setOwnershipKind().
-class FirstArgOwnershipForwardingSingleValueInst
+class __attribute__((swift_attr("import_as_ref")))
+FirstArgOwnershipForwardingSingleValueInst
     : public SingleValueInstruction,
       public OwnershipForwardingMixin {
 protected:
@@ -1130,7 +1135,8 @@ public:
 /// An ownership forwarding single value that has a preferred operand of owned
 /// but if its inputs are all none can have OwnershipKind::None as a result. We
 /// assume that we always forward from operand 0.
-class OwnedFirstArgForwardingSingleValueInst
+class __attribute__((swift_attr("import_as_ref")))
+OwnedFirstArgForwardingSingleValueInst
     : public FirstArgOwnershipForwardingSingleValueInst {
 protected:
   OwnedFirstArgForwardingSingleValueInst(SILInstructionKind kind,
@@ -1169,7 +1175,8 @@ public:
 
 /// An instruction that forwards guaranteed or none ownership. Assumed to always
 /// forward from Operand(0) -> Result(0).
-class GuaranteedFirstArgForwardingSingleValueInst
+class __attribute__((swift_attr("import_as_ref")))
+GuaranteedFirstArgForwardingSingleValueInst
     : public FirstArgOwnershipForwardingSingleValueInst {
 protected:
   GuaranteedFirstArgForwardingSingleValueInst(
@@ -1232,7 +1239,8 @@ FirstArgOwnershipForwardingSingleValueInst::classof(SILInstructionKind kind) {
   }
 }
 
-class AllArgOwnershipForwardingSingleValueInst
+class __attribute__((swift_attr("import_as_ref")))
+AllArgOwnershipForwardingSingleValueInst
     : public SingleValueInstruction,
       public OwnershipForwardingMixin {
 protected:
@@ -1273,7 +1281,8 @@ public:
 ///
 /// *NOTE* We want this to be a pure abstract class that does not add /any/ size
 /// to subclasses.
-class MultipleValueInstructionResult : public ValueBase {
+class __attribute__((swift_attr("import_as_ref")))
+MultipleValueInstructionResult : public ValueBase {
   /// Return the parent instruction of this result.
   MultipleValueInstruction *getParentImpl() const;
 
@@ -1352,7 +1361,8 @@ SILInstructionResultArray::SILInstructionResultArray(ArrayRef<Result> results)
 }
 
 /// An instruction that may produce an arbitrary number of values.
-class MultipleValueInstruction : public NonSingleValueInstruction {
+class __attribute__((swift_attr("import_as_ref"))) MultipleValueInstruction
+: public NonSingleValueInstruction {
   friend class SILInstruction;
   friend class SILInstructionResultArray;
 
@@ -1499,7 +1509,8 @@ public:
 };
 
 /// A subclass of SILInstruction which does not produce any values.
-class NonValueInstruction : public NonSingleValueInstruction {
+class __attribute__((swift_attr("import_as_ref"))) NonValueInstruction
+: public NonSingleValueInstruction {
 public:
   NonValueInstruction(SILInstructionKind kind, SILDebugLocation loc)
     : NonSingleValueInstruction(kind, loc) {}
@@ -1877,7 +1888,8 @@ protected:
 
 /// Abstract base class for allocation instructions, like alloc_stack, alloc_box
 /// and alloc_ref, etc.
-class AllocationInst : public SingleValueInstruction {
+class __attribute__((swift_attr("import_as_ref"))) AllocationInst
+: public SingleValueInstruction {
 protected:
   AllocationInst(SILInstructionKind Kind, SILDebugLocation DebugLoc, SILType Ty)
       : SingleValueInstruction(Kind, DebugLoc, Ty) {}
@@ -2018,7 +2030,8 @@ public:
 ///
 /// The first NumTailTypes operands are counts for the tail allocated
 /// elements, the remaining operands are opened archetype operands.
-class AllocRefInstBase : public AllocationInst {
+class __attribute__((swift_attr("import_as_ref"))) AllocRefInstBase
+: public AllocationInst {
 protected:
 
   AllocRefInstBase(SILInstructionKind Kind,
@@ -2075,7 +2088,7 @@ public:
 /// returned uninitialized.
 /// Optionally, the allocated instance contains space for one or more tail-
 /// allocated arrays.
-class AllocRefInst final
+class __attribute__((swift_attr("import_as_ref"))) AllocRefInst final
     : public InstructionBaseWithTrailingOperands<
                                                SILInstructionKind::AllocRefInst,
                                                AllocRefInst,
@@ -2117,7 +2130,7 @@ public:
 /// instance is returned uninitialized.
 /// Optionally, the allocated instance contains space for one or more tail-
 /// allocated arrays.
-class AllocRefDynamicInst final
+class __attribute__((swift_attr("import_as_ref"))) AllocRefDynamicInst final
     : public InstructionBaseWithTrailingOperands<
                                         SILInstructionKind::AllocRefDynamicInst,
                                         AllocRefDynamicInst,
@@ -2162,7 +2175,7 @@ public:
 /// pointer with Builtin.NativeObject type.  The second return value
 /// is an address pointing to the contained element. The contained
 /// element is uninitialized.
-class AllocBoxInst final
+class __attribute__((swift_attr("import_as_ref"))) AllocBoxInst final
     : public InstructionBaseWithTrailingOperands<
                                            SILInstructionKind::AllocBoxInst,
                                            AllocBoxInst, AllocationInst, char> {
@@ -2211,7 +2224,7 @@ public:
 /// pointer, which has the existential type.  The second return value
 /// is an address pointing to the contained element. The contained
 /// value is uninitialized.
-class AllocExistentialBoxInst final
+class __attribute__((swift_attr("import_as_ref"))) AllocExistentialBoxInst final
     : public InstructionBaseWithTrailingOperands<
                                    SILInstructionKind::AllocExistentialBoxInst,
                                    AllocExistentialBoxInst, AllocationInst> {
@@ -2704,7 +2717,7 @@ public:
 };
 
 /// ApplyInst - Represents the full application of a function value.
-class ApplyInst final
+class __attribute__((swift_attr("import_as_ref"))) ApplyInst final
     : public InstructionBase<SILInstructionKind::ApplyInst,
                              ApplyInstBase<ApplyInst, SingleValueInstruction>>,
       public llvm::TrailingObjects<ApplyInst, Operand> {
@@ -2729,7 +2742,7 @@ class ApplyInst final
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
 /// application of a function value.
-class PartialApplyInst final
+class __attribute__((swift_attr("import_as_ref"))) PartialApplyInst final
     : public InstructionBase<SILInstructionKind::PartialApplyInst,
                              ApplyInstBase<PartialApplyInst,
                                            SingleValueInstruction>>,
@@ -2776,7 +2789,7 @@ class AbortApplyInst;
 
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
-class BeginApplyInst final
+class __attribute__((swift_attr("import_as_ref"))) BeginApplyInst final
     : public InstructionBase<SILInstructionKind::BeginApplyInst,
                              ApplyInstBase<BeginApplyInst,
                                            MultipleValueInstruction>>,
@@ -2833,7 +2846,7 @@ public:
 };
 
 /// AbortApplyInst - Unwind the full application of a yield_once coroutine.
-class AbortApplyInst
+class __attribute__((swift_attr("import_as_ref"))) AbortApplyInst
     : public UnaryInstructionBase<SILInstructionKind::AbortApplyInst,
                                   NonValueInstruction> {
   friend SILBuilder;
@@ -2856,7 +2869,7 @@ public:
 
 /// EndApplyInst - Resume the full application of a yield_once coroutine
 /// normally.
-class EndApplyInst
+class __attribute__((swift_attr("import_as_ref"))) EndApplyInst
     : public UnaryInstructionBase<SILInstructionKind::EndApplyInst,
                                   NonValueInstruction> {
   friend SILBuilder;
@@ -2882,7 +2895,8 @@ public:
 //===----------------------------------------------------------------------===//
 
 /// Abstract base class for literal instructions.
-class LiteralInst : public SingleValueInstruction {
+class __attribute__((swift_attr("import_as_ref"))) LiteralInst
+: public SingleValueInstruction {
 protected:
   LiteralInst(SILInstructionKind Kind, SILDebugLocation DebugLoc, SILType Ty)
       : SingleValueInstruction(Kind, DebugLoc, Ty) {}
@@ -2944,7 +2958,8 @@ public:
 };
 
 /// FunctionRefInst - Represents a reference to a SIL function.
-class FunctionRefInst : public FunctionRefBaseInst {
+class __attribute__((swift_attr("import_as_ref"))) FunctionRefInst
+: public FunctionRefBaseInst {
   friend SILBuilder;
 
   /// Construct a FunctionRefInst.
@@ -2964,7 +2979,8 @@ public:
   }
 };
 
-class DynamicFunctionRefInst : public FunctionRefBaseInst {
+class __attribute__((swift_attr("import_as_ref"))) DynamicFunctionRefInst
+: public FunctionRefBaseInst {
   friend SILBuilder;
 
   /// Construct a DynamicFunctionRefInst.
@@ -2981,7 +2997,8 @@ public:
   }
 };
 
-class PreviousDynamicFunctionRefInst : public FunctionRefBaseInst {
+class __attribute__((swift_attr("import_as_ref"))) PreviousDynamicFunctionRefInst
+: public FunctionRefBaseInst {
   friend SILBuilder;
 
   /// Construct a PreviousDynamicFunctionRefInst.
@@ -3506,7 +3523,7 @@ public:
 /// in order to set up a suspension.
 /// The continuation must be consumed by an AwaitAsyncContinuation instruction locally,
 /// and must dynamically be resumed exactly once during the program's ensuing execution.
-class GetAsyncContinuationInstBase
+class __attribute__((swift_attr("import_as_ref"))) GetAsyncContinuationInstBase
     : public SingleValueInstruction
 {
 protected:
@@ -3534,7 +3551,7 @@ public:
 };
 
 /// Accesses the continuation for an async task, to prepare a primitive suspend operation.
-class GetAsyncContinuationInst final
+class __attribute__((swift_attr("import_as_ref"))) GetAsyncContinuationInst final
     : public InstructionBase<SILInstructionKind::GetAsyncContinuationInst,
                              GetAsyncContinuationInstBase>
 {
@@ -3557,7 +3574,7 @@ public:
 ///
 /// This variation of the instruction additionally takes an operand for the address of the
 /// buffer that receives the incoming value when the continuation is resumed.
-class GetAsyncContinuationAddrInst final
+class __attribute__((swift_attr("import_as_ref"))) GetAsyncContinuationAddrInst final
     : public UnaryInstructionBase<SILInstructionKind::GetAsyncContinuationAddrInst,
                                   GetAsyncContinuationInstBase>
 {
@@ -3572,7 +3589,7 @@ class GetAsyncContinuationAddrInst final
 
 /// Begins a suspension point and enqueues the continuation to the executor
 /// which is bound to the operand actor.
-class HopToExecutorInst
+class __attribute__((swift_attr("import_as_ref"))) HopToExecutorInst
     : public UnaryInstructionBase<SILInstructionKind::HopToExecutorInst,
                                   NonValueInstruction>
 {
@@ -3591,7 +3608,7 @@ public:
 };
 
 /// Extract the ex that the code is executing on the operand executor already.
-class ExtractExecutorInst
+class __attribute__((swift_attr("import_as_ref"))) ExtractExecutorInst
     : public UnaryInstructionBase<SILInstructionKind::ExtractExecutorInst,
                                   SingleValueInstruction>
 {
@@ -3606,7 +3623,7 @@ public:
 };
 
 /// Instantiates a key path object.
-class KeyPathInst final
+class __attribute__((swift_attr("import_as_ref"))) KeyPathInst final
     : public InstructionBase<SILInstructionKind::KeyPathInst,
                              SingleValueInstruction>,
       private llvm::TrailingObjects<KeyPathInst, Operand> {
@@ -3652,7 +3669,7 @@ public:
 
 /// Represents an invocation of builtin functionality provided by the code
 /// generator.
-class BuiltinInst final
+class __attribute__((swift_attr("import_as_ref"))) BuiltinInst final
     : public InstructionBaseWithTrailingOperands<
                                    SILInstructionKind::BuiltinInst, BuiltinInst,
                                    SingleValueInstruction> {
@@ -3722,7 +3739,7 @@ public:
   
 /// Initializes a SIL global variable. Only valid once, before any
 /// usages of the global via GlobalAddrInst.
-class AllocGlobalInst
+class __attribute__((swift_attr("import_as_ref"))) AllocGlobalInst
     : public InstructionBase<SILInstructionKind::AllocGlobalInst,
                              NonValueInstruction> {
   friend SILBuilder;
@@ -3742,7 +3759,8 @@ public:
 };
 
 /// The base class for global_addr and global_value.
-class GlobalAccessInst : public LiteralInst {
+class __attribute__((swift_attr("import_as_ref"))) GlobalAccessInst
+    : public LiteralInst {
   SILGlobalVariable *Global;
 
 protected:
@@ -3762,7 +3780,7 @@ public:
 
 /// Gives the address of a SIL global variable. Only valid after an
 /// AllocGlobalInst.
-class GlobalAddrInst
+class __attribute__((swift_attr("import_as_ref"))) GlobalAddrInst
     : public InstructionBase<SILInstructionKind::GlobalAddrInst,
                              GlobalAccessInst> {
   friend SILBuilder;
@@ -3780,7 +3798,7 @@ public:
 };
 
 /// Creates a base address for offset calculations.
-class BaseAddrForOffsetInst
+class __attribute__((swift_attr("import_as_ref"))) BaseAddrForOffsetInst
     : public InstructionBase<SILInstructionKind::BaseAddrForOffsetInst,
                              LiteralInst> {
   friend SILBuilder;
@@ -3797,7 +3815,7 @@ public:
 ///
 /// The referenced global variable must be a statically initialized object.
 /// TODO: in future we might support global variables in general.
-class GlobalValueInst
+class __attribute__((swift_attr("import_as_ref"))) GlobalValueInst
     : public InstructionBase<SILInstructionKind::GlobalValueInst,
                              GlobalAccessInst> {
   friend SILBuilder;
@@ -3808,7 +3826,7 @@ class GlobalValueInst
 
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
 /// by an IntegerLiteralExpr.
-class IntegerLiteralInst final
+class __attribute__((swift_attr("import_as_ref"))) IntegerLiteralInst final
     : public InstructionBase<SILInstructionKind::IntegerLiteralInst,
                              LiteralInst>,
       private llvm::TrailingObjects<IntegerLiteralInst, llvm::APInt::WordType> {
@@ -3834,7 +3852,7 @@ public:
 
 /// FloatLiteralInst - Encapsulates a floating point constant, as defined
 /// originally by a FloatLiteralExpr.
-class FloatLiteralInst final
+class __attribute__((swift_attr("import_as_ref"))) FloatLiteralInst final
     : public InstructionBase<SILInstructionKind::FloatLiteralInst,
                              LiteralInst>,
       private llvm::TrailingObjects<FloatLiteralInst, llvm::APInt::WordType> {
@@ -3862,7 +3880,7 @@ public:
 /// StringLiteralInst - Encapsulates a string constant, as defined originally by
 /// a StringLiteralExpr.  This produces the address of the string data as a
 /// Builtin.RawPointer.
-class StringLiteralInst final
+class __attribute__((swift_attr("import_as_ref"))) StringLiteralInst final
     : public InstructionBase<SILInstructionKind::StringLiteralInst,
                              LiteralInst>,
       private llvm::TrailingObjects<StringLiteralInst, char> {
@@ -3921,7 +3939,7 @@ enum class LoadOwnershipQualifier {
 static_assert(2 == SILNode::NumLoadOwnershipQualifierBits, "Size mismatch");
 
 /// LoadInst - Represents a load from a memory location.
-class LoadInst
+class __attribute__((swift_attr("import_as_ref"))) LoadInst
   : public UnaryInstructionBase<SILInstructionKind::LoadInst,
                                 SingleValueInstruction>
 {
@@ -3958,7 +3976,7 @@ enum class StoreOwnershipQualifier {
 static_assert(2 == SILNode::NumStoreOwnershipQualifierBits, "Size mismatch");
 
 /// StoreInst - Represents a store from a memory location.
-class StoreInst
+class __attribute__((swift_attr("import_as_ref"))) StoreInst
     : public InstructionBase<SILInstructionKind::StoreInst,
                              NonValueInstruction>,
       public CopyLikeInstruction {
@@ -3990,7 +4008,7 @@ class EndBorrowInst;
 
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.
-class LoadBorrowInst :
+class __attribute__((swift_attr("import_as_ref"))) LoadBorrowInst :
     public UnaryInstructionBase<SILInstructionKind::LoadBorrowInst,
                                 SingleValueInstruction> {
   friend class SILBuilder;
@@ -4013,7 +4031,7 @@ inline auto LoadBorrowInst::getEndBorrows() const -> EndBorrowRange {
 
 /// Represents the begin scope of a borrowed value. Must be paired with an
 /// end_borrow instruction in its use-def list.
-class BeginBorrowInst
+class __attribute__((swift_attr("import_as_ref"))) BeginBorrowInst
     : public UnaryInstructionBase<SILInstructionKind::BeginBorrowInst,
                                   SingleValueInstruction> {
   friend class SILBuilder;
@@ -4059,7 +4077,7 @@ inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
 /// address. Must be paired with an end_borrow in its use-def list.
-class StoreBorrowInst
+class __attribute__((swift_attr("import_as_ref"))) StoreBorrowInst
     : public InstructionBase<SILInstructionKind::StoreBorrowInst,
                              SingleValueInstruction>,
       public CopyLikeInstruction {
@@ -4087,7 +4105,7 @@ public:
 ///
 ///   2. If %src is an address, it is undefined behavior for %src to be
 ///   destroyed or written to.
-class EndBorrowInst
+class __attribute__((swift_attr("import_as_ref"))) EndBorrowInst
     : public UnaryInstructionBase<SILInstructionKind::EndBorrowInst,
                                   NonValueInstruction> {
   friend class SILBuilder;
@@ -4190,7 +4208,7 @@ class EndAccessInst;
 
 /// Begins an access scope. Must be paired with an end_access instruction
 /// along every path.
-class BeginAccessInst
+class __attribute__((swift_attr("import_as_ref"))) BeginAccessInst
     : public UnaryInstructionBase<SILInstructionKind::BeginAccessInst,
                                   SingleValueInstruction> {
   friend class SILBuilder;
@@ -4267,7 +4285,7 @@ public:
 };
 
 /// Represents the end of an access scope.
-class EndAccessInst
+class __attribute__((swift_attr("import_as_ref"))) EndAccessInst
     : public UnaryInstructionBase<SILInstructionKind::EndAccessInst,
                                   NonValueInstruction> {
   friend class SILBuilder;
@@ -4310,7 +4328,7 @@ inline auto BeginAccessInst::getEndAccesses() const -> EndAccessRange {
 ///
 /// This should only be used in materializeForSet, and eventually it should
 /// be removed entirely.
-class BeginUnpairedAccessInst
+class __attribute__((swift_attr("import_as_ref"))) BeginUnpairedAccessInst
     : public InstructionBase<SILInstructionKind::BeginUnpairedAccessInst,
                              NonValueInstruction> {
   friend class SILBuilder;
@@ -4393,7 +4411,7 @@ public:
 };
 
 /// Ends an unpaired access.
-class EndUnpairedAccessInst
+class __attribute__((swift_attr("import_as_ref"))) EndUnpairedAccessInst
     : public UnaryInstructionBase<SILInstructionKind::EndUnpairedAccessInst,
                                   NonValueInstruction> {
   friend class SILBuilder;
@@ -4487,7 +4505,7 @@ public:
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in
 /// Raw SIL.
-class AssignInst
+class __attribute__((swift_attr("import_as_ref"))) AssignInst
     : public AssignInstBase<SILInstructionKind::AssignInst, 2> {
   friend SILBuilder;
 
@@ -4508,7 +4526,7 @@ public:
 /// AssignByWrapperInst - Represents an abstract assignment via a wrapper,
 /// which may either be an initialization or a store sequence.  This is only
 /// valid in Raw SIL.
-class AssignByWrapperInst
+class __attribute__((swift_attr("import_as_ref"))) AssignByWrapperInst
     : public AssignInstBase<SILInstructionKind::AssignByWrapperInst, 4> {
   friend SILBuilder;
 
@@ -4551,7 +4569,7 @@ public:
 /// Indicates that a memory location is uninitialized at this point and needs to
 /// be initialized by the end of the function and before any escape point for
 /// this instruction. This is only valid in Raw SIL.
-class MarkUninitializedInst
+class __attribute__((swift_attr("import_as_ref"))) MarkUninitializedInst
     : public UnaryInstructionBase<SILInstructionKind::MarkUninitializedInst,
                                   OwnedFirstArgForwardingSingleValueInst> {
   friend SILBuilder;
@@ -4624,7 +4642,7 @@ public:
 /// MarkFunctionEscape - Represents the escape point of set of variables due to
 /// a function definition which uses the variables.  This is only valid in Raw
 /// SIL.
-class MarkFunctionEscapeInst final
+class __attribute__((swift_attr("import_as_ref"))) MarkFunctionEscapeInst final
     : public InstructionBaseWithTrailingOperands<
                                   SILInstructionKind::MarkFunctionEscapeInst,
                                   MarkFunctionEscapeInst, NonValueInstruction> {
@@ -4654,7 +4672,7 @@ public:
 
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
-class DebugValueInst final
+class __attribute__((swift_attr("import_as_ref"))) DebugValueInst final
     : public UnaryInstructionBase<SILInstructionKind::DebugValueInst,
                                   NonValueInstruction>,
       private SILDebugVariableSupplement,
@@ -4802,7 +4820,7 @@ public:
 /// \param lvalue The SILValue representing the address to
 ///        use for the load.
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-class Load##Name##Inst \
+class __attribute__((swift_attr("import_as_ref"))) Load##Name##Inst \
     : public LoadReferenceInstBase<SILInstructionKind::Load##Name##Inst> { \
   friend SILBuilder; \
   Load##Name##Inst(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake) \
@@ -4814,7 +4832,7 @@ class Load##Name##Inst \
 /// This is only required for address-only scenarios; for loadable
 /// references, it's better to use a ref_to_##name and a store.
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-class Store##Name##Inst \
+class __attribute__((swift_attr("import_as_ref"))) Store##Name##Inst \
     : public StoreReferenceInstBase<SILInstructionKind::Store##Name##Inst> { \
   friend SILBuilder; \
   Store##Name##Inst(SILDebugLocation loc, SILValue src, SILValue dest, \
@@ -4828,7 +4846,7 @@ class Store##Name##Inst \
 ///   %1 = load %src
 ///   store %1 to %dest
 /// but a copy instruction must be used for address-only types.
-class CopyAddrInst
+class __attribute__((swift_attr("import_as_ref"))) CopyAddrInst
     : public InstructionBase<SILInstructionKind::CopyAddrInst,
                              NonValueInstruction>,
       public CopyLikeInstruction {
@@ -4873,7 +4891,8 @@ public:
 ///
 /// %token is an opaque word representing the previously bound types of this
 /// memory region, before binding it to a contiguous region of type $T.
-class BindMemoryInst final : public InstructionBaseWithTrailingOperands<
+class __attribute__((swift_attr("import_as_ref"))) BindMemoryInst final
+    : public InstructionBaseWithTrailingOperands<
                                  SILInstructionKind::BindMemoryInst,
                                  BindMemoryInst, SingleValueInstruction> {
   friend SILBuilder;
@@ -4948,7 +4967,7 @@ public:
 /// ConversionInst - Abstract class representing instructions that convert
 /// values.
 ///
-class ConversionInst : public SingleValueInstruction {
+class __attribute__((swift_attr("import_as_ref"))) ConversionInst : public SingleValueInstruction {
 protected:
   ConversionInst(SILInstructionKind Kind, SILDebugLocation DebugLoc, SILType Ty)
       : SingleValueInstruction(Kind, DebugLoc, Ty) {}
@@ -4967,8 +4986,9 @@ public:
 /// instruction's construction.
 ///
 /// The first operand is the ownership equivalent source.
-class OwnershipForwardingConversionInst : public ConversionInst,
-                                          public OwnershipForwardingMixin {
+class __attribute__((swift_attr("import_as_ref"))) OwnershipForwardingConversionInst
+  : public ConversionInst,
+    public OwnershipForwardingMixin {
 protected:
   OwnershipForwardingConversionInst(SILInstructionKind kind,
                                     SILDebugLocation debugLoc, SILType ty,
@@ -5008,7 +5028,7 @@ public:
 
 /// ConvertFunctionInst - Change the type of a function value without
 /// affecting how it will codegen.
-class ConvertFunctionInst final
+class __attribute__((swift_attr("import_as_ref"))) ConvertFunctionInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::ConvertFunctionInst, ConvertFunctionInst,
           OwnershipForwardingConversionInst> {
@@ -5056,7 +5076,7 @@ public:
 
 /// ConvertEscapeToNoEscapeInst - Change the type of a escaping function value
 /// to a trivial function type (@noescape T -> U).
-class ConvertEscapeToNoEscapeInst final
+class __attribute__((swift_attr("import_as_ref"))) ConvertEscapeToNoEscapeInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::ConvertEscapeToNoEscapeInst,
           ConvertEscapeToNoEscapeInst, ConversionInst> {
@@ -5094,7 +5114,7 @@ public:
 
 /// ThinFunctionToPointerInst - Convert a thin function pointer to a
 /// Builtin.RawPointer.
-class ThinFunctionToPointerInst
+class __attribute__((swift_attr("import_as_ref"))) ThinFunctionToPointerInst
   : public UnaryInstructionBase<SILInstructionKind::ThinFunctionToPointerInst,
                                 ConversionInst>
 {
@@ -5107,7 +5127,7 @@ class ThinFunctionToPointerInst
 
 /// PointerToThinFunctionInst - Convert a Builtin.RawPointer to a thin
 /// function pointer.
-class PointerToThinFunctionInst final
+class __attribute__((swift_attr("import_as_ref"))) PointerToThinFunctionInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::PointerToThinFunctionInst,
           PointerToThinFunctionInst,
@@ -5126,9 +5146,10 @@ class PointerToThinFunctionInst final
 };
 
 /// UpcastInst - Perform a conversion of a class instance to a supertype.
-class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
-                             SILInstructionKind::UpcastInst, UpcastInst,
-                             OwnershipForwardingConversionInst> {
+class __attribute__((swift_attr("import_as_ref"))) UpcastInst final
+  : public UnaryInstructionWithTypeDependentOperandsBase<
+             SILInstructionKind::UpcastInst, UpcastInst,
+             OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   UpcastInst(SILDebugLocation DebugLoc, SILValue Operand,
@@ -5145,7 +5166,7 @@ class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
 };
 
 /// AddressToPointerInst - Convert a SIL address to a Builtin.RawPointer value.
-class AddressToPointerInst
+class __attribute__((swift_attr("import_as_ref"))) AddressToPointerInst
   : public UnaryInstructionBase<SILInstructionKind::AddressToPointerInst,
                                 ConversionInst>
 {
@@ -5156,7 +5177,7 @@ class AddressToPointerInst
 };
 
 /// PointerToAddressInst - Convert a Builtin.RawPointer value to a SIL address.
-class PointerToAddressInst
+class __attribute__((swift_attr("import_as_ref"))) PointerToAddressInst
   : public UnaryInstructionBase<SILInstructionKind::PointerToAddressInst,
                                 ConversionInst>
 {
@@ -5198,7 +5219,7 @@ public:
 
 /// Convert a heap object reference to a different type without any runtime
 /// checks.
-class UncheckedRefCastInst final
+class __attribute__((swift_attr("import_as_ref"))) UncheckedRefCastInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::UncheckedRefCastInst, UncheckedRefCastInst,
           OwnershipForwardingConversionInst> {
@@ -5218,7 +5239,7 @@ class UncheckedRefCastInst final
 };
 
 /// Convert a value's binary representation to a trivial type of the same size.
-class UncheckedTrivialBitCastInst final
+class __attribute__((swift_attr("import_as_ref"))) UncheckedTrivialBitCastInst final
   : public UnaryInstructionWithTypeDependentOperandsBase<
                                 SILInstructionKind::UncheckedTrivialBitCastInst,
                                 UncheckedTrivialBitCastInst,
@@ -5238,7 +5259,7 @@ class UncheckedTrivialBitCastInst final
 };
   
 /// Bitwise copy a value into another value of the same size or smaller.
-class UncheckedBitwiseCastInst final
+class __attribute__((swift_attr("import_as_ref"))) UncheckedBitwiseCastInst final
   : public UnaryInstructionWithTypeDependentOperandsBase<
                                 SILInstructionKind::UncheckedBitwiseCastInst,
                                 UncheckedBitwiseCastInst,
@@ -5257,7 +5278,7 @@ class UncheckedBitwiseCastInst final
 };
 
 /// Bitwise copy a value into another value of the same size.
-class UncheckedValueCastInst final
+class __attribute__((swift_attr("import_as_ref"))) UncheckedValueCastInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::UncheckedValueCastInst, UncheckedValueCastInst,
           OwnershipForwardingConversionInst> {
@@ -5278,7 +5299,7 @@ class UncheckedValueCastInst final
 
 /// Build a Builtin.BridgeObject from a heap object reference by bitwise-or-ing
 /// in bits from a word.
-class RefToBridgeObjectInst
+class __attribute__((swift_attr("import_as_ref"))) RefToBridgeObjectInst
     : public InstructionBase<SILInstructionKind::RefToBridgeObjectInst,
                              OwnershipForwardingConversionInst> {
   friend SILBuilder;
@@ -5298,7 +5319,7 @@ public:
 };
 
 /// Extract the heap object reference from a BridgeObject.
-class ClassifyBridgeObjectInst
+class __attribute__((swift_attr("import_as_ref"))) ClassifyBridgeObjectInst
   : public UnaryInstructionBase<SILInstructionKind::ClassifyBridgeObjectInst,
                                 SingleValueInstruction>
 {
@@ -5310,7 +5331,7 @@ class ClassifyBridgeObjectInst
 };
 
 /// Extract the heap object reference from a BridgeObject.
-class BridgeObjectToRefInst
+class __attribute__((swift_attr("import_as_ref"))) BridgeObjectToRefInst
     : public UnaryInstructionBase<SILInstructionKind::BridgeObjectToRefInst,
                                   OwnershipForwardingConversionInst> {
   friend SILBuilder;
@@ -5322,7 +5343,7 @@ class BridgeObjectToRefInst
 
 /// Sets the BridgeObject to a tagged pointer representation holding its
 /// operands
-class ValueToBridgeObjectInst
+class __attribute__((swift_attr("import_as_ref"))) ValueToBridgeObjectInst
     : public UnaryInstructionBase<SILInstructionKind::ValueToBridgeObjectInst,
                                   ConversionInst> {
   friend SILBuilder;
@@ -5333,7 +5354,7 @@ class ValueToBridgeObjectInst
 };
 
 /// Retrieve the bit pattern of a BridgeObject.
-class BridgeObjectToWordInst
+class __attribute__((swift_attr("import_as_ref"))) BridgeObjectToWordInst
   : public UnaryInstructionBase<SILInstructionKind::BridgeObjectToWordInst,
                                 ConversionInst>
 {
@@ -5345,7 +5366,7 @@ class BridgeObjectToWordInst
 };
 
 /// RefToRawPointer - Convert a reference type to a Builtin.RawPointer.
-class RefToRawPointerInst
+class __attribute__((swift_attr("import_as_ref"))) RefToRawPointerInst
   : public UnaryInstructionBase<SILInstructionKind::RefToRawPointerInst,
                                 ConversionInst>
 {
@@ -5356,7 +5377,7 @@ class RefToRawPointerInst
 };
 
 /// RawPointerToRefInst - Convert a Builtin.RawPointer to a reference type.
-class RawPointerToRefInst
+class __attribute__((swift_attr("import_as_ref"))) RawPointerToRefInst
   : public UnaryInstructionBase<SILInstructionKind::RawPointerToRefInst,
                                 ConversionInst>
 {
@@ -5369,14 +5390,14 @@ class RawPointerToRefInst
 /// Transparent reference storage to underlying reference type conversion.
 /// This does nothing at runtime; it just changes the formal type.
 #define LOADABLE_REF_STORAGE(Name, ...) \
-class RefTo##Name##Inst \
+class __attribute__((swift_attr("import_as_ref"))) RefTo##Name##Inst \
     : public UnaryInstructionBase<SILInstructionKind::RefTo##Name##Inst, \
                                   ConversionInst> { \
   friend SILBuilder; \
   RefTo##Name##Inst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty) \
       : UnaryInstructionBase(DebugLoc, Operand, Ty) {} \
 }; \
-class Name##ToRefInst \
+class __attribute__((swift_attr("import_as_ref"))) Name##ToRefInst \
   : public UnaryInstructionBase<SILInstructionKind::Name##ToRefInst, \
                                 ConversionInst> { \
   friend SILBuilder; \
@@ -5387,7 +5408,7 @@ class Name##ToRefInst \
 
 /// ThinToThickFunctionInst - Given a thin function reference, adds a null
 /// context to convert the value to a thick function type.
-class ThinToThickFunctionInst final
+class __attribute__((swift_attr("import_as_ref"))) ThinToThickFunctionInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::ThinToThickFunctionInst, ThinToThickFunctionInst,
           OwnershipForwardingConversionInst> {
@@ -5417,7 +5438,7 @@ public:
 
 /// Given a thick metatype value, produces an Objective-C metatype
 /// value.
-class ThickToObjCMetatypeInst
+class __attribute__((swift_attr("import_as_ref"))) ThickToObjCMetatypeInst
   : public UnaryInstructionBase<SILInstructionKind::ThickToObjCMetatypeInst,
                                 ConversionInst>
 {
@@ -5430,7 +5451,7 @@ class ThickToObjCMetatypeInst
 
 /// Given an Objective-C metatype value, produces a thick metatype
 /// value.
-class ObjCToThickMetatypeInst
+class __attribute__((swift_attr("import_as_ref"))) ObjCToThickMetatypeInst
   : public UnaryInstructionBase<SILInstructionKind::ObjCToThickMetatypeInst,
                                 ConversionInst>
 {
@@ -5442,7 +5463,7 @@ class ObjCToThickMetatypeInst
 };
 
 /// Given an Objective-C metatype value, convert it to an AnyObject value.
-class ObjCMetatypeToObjectInst
+class __attribute__((swift_attr("import_as_ref"))) ObjCMetatypeToObjectInst
   : public UnaryInstructionBase<SILInstructionKind::ObjCMetatypeToObjectInst,
                                 ConversionInst>
 {
@@ -5455,7 +5476,7 @@ class ObjCMetatypeToObjectInst
 
 /// Given an Objective-C existential metatype value, convert it to an AnyObject
 /// value.
-class ObjCExistentialMetatypeToObjectInst
+class __attribute__((swift_attr("import_as_ref"))) ObjCExistentialMetatypeToObjectInst
   : public UnaryInstructionBase<SILInstructionKind::ObjCExistentialMetatypeToObjectInst,
                                 ConversionInst>
 {
@@ -5467,7 +5488,7 @@ class ObjCExistentialMetatypeToObjectInst
 };
 
 /// Return the Objective-C Protocol class instance for a protocol.
-class ObjCProtocolInst
+class __attribute__((swift_attr("import_as_ref"))) ObjCProtocolInst
     : public InstructionBase<SILInstructionKind::ObjCProtocolInst,
                              SingleValueInstruction> {
   friend SILBuilder;
@@ -5486,7 +5507,7 @@ public:
 
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
-class UnconditionalCheckedCastInst final
+class __attribute__((swift_attr("import_as_ref"))) UnconditionalCheckedCastInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::UnconditionalCheckedCastInst,
           UnconditionalCheckedCastInst, OwnershipForwardingConversionInst> {
@@ -5517,7 +5538,8 @@ public:
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 /// The result of the checked cast is left in the destination.
-class UnconditionalCheckedCastValueInst final
+class __attribute__((swift_attr("import_as_ref")))
+UnconditionalCheckedCastValueInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::UnconditionalCheckedCastValueInst,
           UnconditionalCheckedCastValueInst, ConversionInst> {
@@ -5549,7 +5571,8 @@ public:
 };
 
 /// StructInst - Represents a constructed loadable struct.
-class StructInst final : public InstructionBaseWithTrailingOperands<
+class __attribute__((swift_attr("import_as_ref"))) StructInst final
+  : public InstructionBaseWithTrailingOperands<
                              SILInstructionKind::StructInst, StructInst,
                              AllArgOwnershipForwardingSingleValueInst> {
   friend SILBuilder;
@@ -5639,7 +5662,8 @@ public:
 
 /// RefCountingInst - An abstract class of instructions which
 /// manipulate the reference count of their object operand.
-class RefCountingInst : public NonValueInstruction {
+class __attribute__((swift_attr("import_as_ref"))) RefCountingInst
+  : public NonValueInstruction {
 public:
   /// The atomicity of a reference counting operation to be used.
   enum class Atomicity : bool {
@@ -5674,7 +5698,7 @@ public:
 };
 
 /// RetainValueInst - Copies a loadable value.
-class RetainValueInst
+class __attribute__((swift_attr("import_as_ref"))) RetainValueInst
     : public UnaryInstructionBase<SILInstructionKind::RetainValueInst,
                                   RefCountingInst> {
   friend SILBuilder;
@@ -5687,7 +5711,7 @@ class RetainValueInst
 };
 
 /// RetainValueAddrInst - Copies a loadable value by address.
-class RetainValueAddrInst
+class __attribute__((swift_attr("import_as_ref"))) RetainValueAddrInst
     : public UnaryInstructionBase<SILInstructionKind::RetainValueAddrInst,
                                   RefCountingInst> {
   friend SILBuilder;
@@ -5700,7 +5724,7 @@ class RetainValueAddrInst
 };
 
 /// ReleaseValueInst - Destroys a loadable value.
-class ReleaseValueInst
+class __attribute__((swift_attr("import_as_ref"))) ReleaseValueInst
     : public UnaryInstructionBase<SILInstructionKind::ReleaseValueInst,
                                   RefCountingInst> {
   friend SILBuilder;
@@ -5713,7 +5737,7 @@ class ReleaseValueInst
 };
 
 /// ReleaseValueInst - Destroys a loadable value by address.
-class ReleaseValueAddrInst
+class __attribute__((swift_attr("import_as_ref"))) ReleaseValueAddrInst
     : public UnaryInstructionBase<SILInstructionKind::ReleaseValueAddrInst,
                                   RefCountingInst> {
   friend SILBuilder;
@@ -5728,7 +5752,7 @@ class ReleaseValueAddrInst
 /// Copies a loadable value in an unmanaged, unbalanced way. Only meant for use
 /// in ownership qualified SIL. Please do not use this EVER unless you are
 /// implementing a part of the stdlib called Unmanaged.
-class UnmanagedRetainValueInst
+class __attribute__((swift_attr("import_as_ref"))) UnmanagedRetainValueInst
     : public UnaryInstructionBase<SILInstructionKind::UnmanagedRetainValueInst,
                                   RefCountingInst> {
   friend SILBuilder;
@@ -5743,7 +5767,7 @@ class UnmanagedRetainValueInst
 /// Destroys a loadable value in an unmanaged, unbalanced way. Only meant for
 /// use in ownership qualified SIL. Please do not use this EVER unless you are
 /// implementing a part of the stdlib called Unmanaged.
-class UnmanagedReleaseValueInst
+class __attribute__((swift_attr("import_as_ref"))) UnmanagedReleaseValueInst
     : public UnaryInstructionBase<SILInstructionKind::UnmanagedReleaseValueInst,
                                   RefCountingInst> {
   friend SILBuilder;
@@ -5757,7 +5781,7 @@ class UnmanagedReleaseValueInst
 
 /// Transfers ownership of a loadable value to the current autorelease
 /// pool. Unmanaged, so it is ignored from an ownership balancing perspective.
-class UnmanagedAutoreleaseValueInst
+class __attribute__((swift_attr("import_as_ref"))) UnmanagedAutoreleaseValueInst
     : public UnaryInstructionBase<SILInstructionKind::UnmanagedAutoreleaseValueInst,
                                   RefCountingInst> {
   friend SILBuilder;
@@ -5770,7 +5794,7 @@ class UnmanagedAutoreleaseValueInst
 };
 
 /// Transfers ownership of a loadable value to the current autorelease pool.
-class AutoreleaseValueInst
+class __attribute__((swift_attr("import_as_ref"))) AutoreleaseValueInst
     : public UnaryInstructionBase<SILInstructionKind::AutoreleaseValueInst,
                                   RefCountingInst> {
   friend SILBuilder;
@@ -5786,7 +5810,7 @@ class AutoreleaseValueInst
 ///
 /// This is the same operation what's done by a strong_release immediately
 /// before it calls the deallocator of the object.
-class SetDeallocatingInst
+class __attribute__((swift_attr("import_as_ref"))) SetDeallocatingInst
     : public UnaryInstructionBase<SILInstructionKind::SetDeallocatingInst,
                                   RefCountingInst> {
   friend SILBuilder;
@@ -5802,7 +5826,8 @@ class SetDeallocatingInst
 ///
 /// This instruction can only appear at the end of a gobal variable's
 /// static initializer list.
-class ObjectInst final : public InstructionBaseWithTrailingOperands<
+class __attribute__((swift_attr("import_as_ref"))) ObjectInst final
+  : public InstructionBaseWithTrailingOperands<
                              SILInstructionKind::ObjectInst, ObjectInst,
                              FirstArgOwnershipForwardingSingleValueInst> {
   friend SILBuilder;
@@ -5848,7 +5873,8 @@ public:
 };
 
 /// TupleInst - Represents a constructed loadable tuple.
-class TupleInst final : public InstructionBaseWithTrailingOperands<
+class __attribute__((swift_attr("import_as_ref"))) TupleInst final
+  : public InstructionBaseWithTrailingOperands<
                             SILInstructionKind::TupleInst, TupleInst,
                             AllArgOwnershipForwardingSingleValueInst> {
   friend SILBuilder;
@@ -5923,7 +5949,7 @@ public:
 
 /// Represents a loadable enum constructed from one of its
 /// elements.
-class EnumInst
+class __attribute__((swift_attr("import_as_ref"))) EnumInst
     : public InstructionBase<SILInstructionKind::EnumInst,
                              FirstArgOwnershipForwardingSingleValueInst> {
   friend SILBuilder;
@@ -5961,7 +5987,7 @@ public:
 
 /// Unsafely project the data for an enum case out of an enum without checking
 /// the tag.
-class UncheckedEnumDataInst
+class __attribute__((swift_attr("import_as_ref"))) UncheckedEnumDataInst
     : public UnaryInstructionBase<SILInstructionKind::UncheckedEnumDataInst,
                                   FirstArgOwnershipForwardingSingleValueInst> {
   friend SILBuilder;
@@ -5998,7 +6024,7 @@ public:
 
 /// Projects the address of the data for a case inside an uninitialized enum in
 /// order to initialize the payload for that case.
-class InitEnumDataAddrInst
+class __attribute__((swift_attr("import_as_ref"))) InitEnumDataAddrInst
   : public UnaryInstructionBase<SILInstructionKind::InitEnumDataAddrInst,
                                 SingleValueInstruction>
 {
@@ -6016,7 +6042,7 @@ public:
 
 /// InjectEnumAddrInst - Tags an enum as containing a case. The data for
 /// that case, if any, must have been written into the enum first.
-class InjectEnumAddrInst
+class __attribute__((swift_attr("import_as_ref"))) InjectEnumAddrInst
   : public UnaryInstructionBase<SILInstructionKind::InjectEnumAddrInst,
                                 NonValueInstruction>
 {
@@ -6034,7 +6060,7 @@ public:
 
 /// Invalidate an enum value and take ownership of its payload data
 /// without moving it in memory.
-class UncheckedTakeEnumDataAddrInst
+class __attribute__((swift_attr("import_as_ref"))) UncheckedTakeEnumDataAddrInst
   : public UnaryInstructionBase<SILInstructionKind::UncheckedTakeEnumDataAddrInst,
                                 SingleValueInstruction>
 {
@@ -6112,7 +6138,7 @@ public:
 
 /// Common base class for the select_enum and select_enum_addr instructions,
 /// which select one of a set of possible results based on the case of an enum.
-class SelectEnumInstBase
+class __attribute__((swift_attr("import_as_ref"))) SelectEnumInstBase
     : public SelectInstBase<SelectEnumInstBase, EnumElementDecl *> {
   // Tail-allocated after the operands is an array of `NumCases`
   // EnumElementDecl* pointers, referencing the case discriminators for each
@@ -6191,8 +6217,9 @@ public:
 };
 
 /// A select enum inst that produces a static OwnershipKind.
-class OwnershipForwardingSelectEnumInstBase : public SelectEnumInstBase,
-                                              public OwnershipForwardingMixin {
+class __attribute__((swift_attr("import_as_ref"))) OwnershipForwardingSelectEnumInstBase
+  : public SelectEnumInstBase,
+    public OwnershipForwardingMixin {
 protected:
   OwnershipForwardingSelectEnumInstBase(
       SILInstructionKind kind, SILDebugLocation debugLoc, SILType type,
@@ -6224,7 +6251,7 @@ public:
 };
 
 /// Select one of a set of values based on the case of an enum.
-class SelectEnumInst final
+class __attribute__((swift_attr("import_as_ref"))) SelectEnumInst final
     : public InstructionBaseWithTrailingOperands<
           SILInstructionKind::SelectEnumInst, SelectEnumInst,
           OwnershipForwardingSelectEnumInstBase, EnumElementDecl *> {
@@ -6256,7 +6283,7 @@ private:
 };
 
 /// Select one of a set of values based on the case of an enum.
-class SelectEnumAddrInst final
+class __attribute__((swift_attr("import_as_ref"))) SelectEnumAddrInst final
     : public InstructionBaseWithTrailingOperands<
           SILInstructionKind::SelectEnumAddrInst, SelectEnumAddrInst,
           SelectEnumInstBase, EnumElementDecl *> {
@@ -6289,7 +6316,7 @@ class SelectEnumAddrInst final
 ///
 /// There is 'the' operand, followed by pairs of operands for each case,
 /// followed by an optional default operand.
-class SelectValueInst final
+class __attribute__((swift_attr("import_as_ref"))) SelectValueInst final
     : public InstructionBaseWithTrailingOperands<
           SILInstructionKind::SelectValueInst, SelectValueInst,
           SelectInstBase<SelectValueInst, SILValue, SingleValueInstruction>> {
@@ -6331,7 +6358,7 @@ public:
 
 /// MetatypeInst - Represents the production of an instance of a given metatype
 /// named statically.
-class MetatypeInst final
+class __attribute__((swift_attr("import_as_ref"))) MetatypeInst final
     : public InstructionBaseWithTrailingOperands<
                                          SILInstructionKind::MetatypeInst,
                                          MetatypeInst, SingleValueInstruction> {
@@ -6357,7 +6384,7 @@ public:
 };
 
 /// Represents loading a dynamic metatype from a value.
-class ValueMetatypeInst
+class __attribute__((swift_attr("import_as_ref"))) ValueMetatypeInst
   : public UnaryInstructionBase<SILInstructionKind::ValueMetatypeInst,
                                 SingleValueInstruction>
 {
@@ -6369,7 +6396,7 @@ class ValueMetatypeInst
 
 /// ExistentialMetatype - Represents loading a dynamic metatype from an
 /// existential container.
-class ExistentialMetatypeInst
+class __attribute__((swift_attr("import_as_ref"))) ExistentialMetatypeInst
   : public UnaryInstructionBase<SILInstructionKind::ExistentialMetatypeInst,
                                 SingleValueInstruction>
 {
@@ -6381,7 +6408,7 @@ class ExistentialMetatypeInst
 };
 
 /// Extract a numbered element out of a value of tuple type.
-class TupleExtractInst
+class __attribute__((swift_attr("import_as_ref"))) TupleExtractInst
     : public UnaryInstructionBase<SILInstructionKind::TupleExtractInst,
                                   GuaranteedFirstArgForwardingSingleValueInst> {
   friend SILBuilder;
@@ -6414,7 +6441,7 @@ public:
 };
 
 /// Derive the address of a numbered element from the address of a tuple.
-class TupleElementAddrInst
+class __attribute__((swift_attr("import_as_ref"))) TupleElementAddrInst
   : public UnaryInstructionBase<SILInstructionKind::TupleElementAddrInst,
                                 SingleValueInstruction>
 {
@@ -6525,7 +6552,7 @@ private:
 };
 
 /// Extract a physical, fragile field out of a value of struct type.
-class StructExtractInst
+class __attribute__((swift_attr("import_as_ref"))) StructExtractInst
     : public UnaryInstructionBase<
           SILInstructionKind::StructExtractInst,
           FieldIndexCacheBase<GuaranteedFirstArgForwardingSingleValueInst>> {
@@ -6553,7 +6580,7 @@ public:
 };
 
 /// Derive the address of a physical field from the address of a struct.
-class StructElementAddrInst
+class __attribute__((swift_attr("import_as_ref"))) StructElementAddrInst
     : public UnaryInstructionBase<SILInstructionKind::StructElementAddrInst,
                                   FieldIndexCacheBase<SingleValueInstruction>> {
   friend SILBuilder;
@@ -6570,7 +6597,7 @@ public:
 
 /// RefElementAddrInst - Derive the address of a named element in a reference
 /// type instance.
-class RefElementAddrInst
+class __attribute__((swift_attr("import_as_ref"))) RefElementAddrInst
     : public UnaryInstructionBase<SILInstructionKind::RefElementAddrInst,
                                   FieldIndexCacheBase<SingleValueInstruction>> {
   friend SILBuilder;
@@ -6598,7 +6625,7 @@ public:
 
 /// RefTailAddrInst - Derive the address of the first element of the first
 /// tail-allocated array in a reference type instance.
-class RefTailAddrInst
+class __attribute__((swift_attr("import_as_ref"))) RefTailAddrInst
   : public UnaryInstructionBase<SILInstructionKind::RefTailAddrInst,
                                 SingleValueInstruction>
 {
@@ -6633,7 +6660,8 @@ public:
 
 /// MethodInst - Abstract base for instructions that implement dynamic
 /// method lookup.
-class MethodInst : public SingleValueInstruction {
+class __attribute__((swift_attr("import_as_ref"))) MethodInst
+  : public SingleValueInstruction {
   SILDeclRef Member;
 public:
   MethodInst(SILInstructionKind Kind, SILDebugLocation DebugLoc, SILType Ty,
@@ -6649,7 +6677,7 @@ public:
 /// ClassMethodInst - Given the address of a value of class type and a method
 /// constant, extracts the implementation of that method for the dynamic
 /// instance type of the class.
-class ClassMethodInst
+class __attribute__((swift_attr("import_as_ref"))) ClassMethodInst
     : public UnaryInstructionBase<SILInstructionKind::ClassMethodInst,
                                   MethodInst>
 {
@@ -6663,7 +6691,7 @@ class ClassMethodInst
 /// SuperMethodInst - Given the address of a value of class type and a method
 /// constant, extracts the implementation of that method for the superclass of
 /// the static type of the class.
-class SuperMethodInst
+class __attribute__((swift_attr("import_as_ref"))) SuperMethodInst
   : public UnaryInstructionBase<SILInstructionKind::SuperMethodInst, MethodInst>
 {
   friend SILBuilder;
@@ -6676,7 +6704,7 @@ class SuperMethodInst
 /// ObjCMethodInst - Given the address of a value of class type and a method
 /// constant, extracts the implementation of that method for the dynamic
 /// instance type of the class.
-class ObjCMethodInst final
+class __attribute__((swift_attr("import_as_ref"))) ObjCMethodInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::ObjCMethodInst,
           ObjCMethodInst,
@@ -6698,7 +6726,7 @@ class ObjCMethodInst final
 /// ObjCSuperMethodInst - Given the address of a value of class type and a method
 /// constant, extracts the implementation of that method for the superclass of
 /// the static type of the class.
-class ObjCSuperMethodInst
+class __attribute__((swift_attr("import_as_ref"))) ObjCSuperMethodInst
   : public UnaryInstructionBase<SILInstructionKind::ObjCSuperMethodInst, MethodInst>
 {
   friend SILBuilder;
@@ -6711,7 +6739,7 @@ class ObjCSuperMethodInst
 /// WitnessMethodInst - Given a type, a protocol conformance,
 /// and a protocol method constant, extracts the implementation of that method
 /// for the type.
-class WitnessMethodInst final
+class __attribute__((swift_attr("import_as_ref"))) WitnessMethodInst final
     : public InstructionBaseWithTrailingOperands<
                                           SILInstructionKind::WitnessMethodInst,
                                           WitnessMethodInst, MethodInst> {
@@ -6771,7 +6799,7 @@ OpenedExistentialAccess getOpenedExistentialAccessFor(AccessKind access);
 /// Given the address of an existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
-class OpenExistentialAddrInst
+class __attribute__((swift_attr("import_as_ref"))) OpenExistentialAddrInst
   : public UnaryInstructionBase<SILInstructionKind::OpenExistentialAddrInst,
                                 SingleValueInstruction>
 {
@@ -6788,7 +6816,7 @@ public:
 /// Given an opaque value referring to an existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
-class OpenExistentialValueInst
+class __attribute__((swift_attr("import_as_ref"))) OpenExistentialValueInst
     : public UnaryInstructionBase<SILInstructionKind::OpenExistentialValueInst,
                                   GuaranteedFirstArgForwardingSingleValueInst> {
   friend SILBuilder;
@@ -6801,7 +6829,7 @@ class OpenExistentialValueInst
 /// Given a class existential, "opens" the
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
-class OpenExistentialRefInst
+class __attribute__((swift_attr("import_as_ref"))) OpenExistentialRefInst
     : public UnaryInstructionBase<SILInstructionKind::OpenExistentialRefInst,
                                   FirstArgOwnershipForwardingSingleValueInst> {
   friend SILBuilder;
@@ -6815,7 +6843,7 @@ class OpenExistentialRefInst
 /// "opens" the existential by returning a pointer to a fresh
 /// archetype metatype T.Type, which also captures the (dynamic)
 /// conformances.
-class OpenExistentialMetatypeInst
+class __attribute__((swift_attr("import_as_ref"))) OpenExistentialMetatypeInst
   : public UnaryInstructionBase<SILInstructionKind::OpenExistentialMetatypeInst,
                                 SingleValueInstruction>
 {
@@ -6828,7 +6856,7 @@ class OpenExistentialMetatypeInst
 /// Given a boxed existential container,
 /// "opens" the existential by returning a pointer to a fresh
 /// archetype T, which also captures the (dynamic) conformances.
-class OpenExistentialBoxInst
+class __attribute__((swift_attr("import_as_ref"))) OpenExistentialBoxInst
   : public UnaryInstructionBase<SILInstructionKind::OpenExistentialBoxInst,
                                 SingleValueInstruction>
 {
@@ -6840,7 +6868,7 @@ class OpenExistentialBoxInst
 
 /// Given a boxed existential container, "opens" the existential by returning a
 /// fresh archetype T, which also captures the (dynamic) conformances.
-class OpenExistentialBoxValueInst
+class __attribute__((swift_attr("import_as_ref"))) OpenExistentialBoxValueInst
     : public UnaryInstructionBase<
           SILInstructionKind::OpenExistentialBoxValueInst,
           GuaranteedFirstArgForwardingSingleValueInst> {
@@ -6855,7 +6883,7 @@ class OpenExistentialBoxValueInst
 /// a protocol type, initializes its existential container to contain a concrete
 /// value of the given type, and returns the address of the uninitialized
 /// concrete value inside the existential container.
-class InitExistentialAddrInst final
+class __attribute__((swift_attr("import_as_ref"))) InitExistentialAddrInst final
   : public UnaryInstructionWithTypeDependentOperandsBase<
                                 SILInstructionKind::InitExistentialAddrInst,
                                 InitExistentialAddrInst,
@@ -6898,7 +6926,7 @@ public:
 /// initializes its existential container to contain a concrete
 /// value of the given type, and returns the uninitialized
 /// concrete value inside the existential container.
-class InitExistentialValueInst final
+class __attribute__((swift_attr("import_as_ref"))) InitExistentialValueInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::InitExistentialValueInst, InitExistentialValueInst,
           SingleValueInstruction> {
@@ -6931,7 +6959,7 @@ public:
 /// InitExistentialRefInst - Given a class instance reference and a set of
 /// conformances, creates a class existential value referencing the
 /// class instance.
-class InitExistentialRefInst final
+class __attribute__((swift_attr("import_as_ref"))) InitExistentialRefInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::InitExistentialRefInst, InitExistentialRefInst,
           FirstArgOwnershipForwardingSingleValueInst> {
@@ -6969,7 +6997,7 @@ public:
 /// InitExistentialMetatypeInst - Given a metatype reference and a set
 /// of conformances, creates an existential metatype value referencing
 /// the metatype.
-class InitExistentialMetatypeInst final
+class __attribute__((swift_attr("import_as_ref"))) InitExistentialMetatypeInst final
   : public UnaryInstructionWithTypeDependentOperandsBase<
                                   SILInstructionKind::InitExistentialMetatypeInst,
                                   InitExistentialMetatypeInst,
@@ -7015,7 +7043,7 @@ public:
 /// the value buffer. This should only be used for partially-initialized
 /// existentials; a fully-initialized existential can be destroyed with
 /// DestroyAddrInst and deallocated with DeallocStackInst.
-class DeinitExistentialAddrInst
+class __attribute__((swift_attr("import_as_ref"))) DeinitExistentialAddrInst
   : public UnaryInstructionBase<SILInstructionKind::DeinitExistentialAddrInst,
                                 NonValueInstruction>
 {
@@ -7025,7 +7053,7 @@ class DeinitExistentialAddrInst
       : UnaryInstructionBase(DebugLoc, Existential) {}
 };
 
-class DeinitExistentialValueInst
+class __attribute__((swift_attr("import_as_ref"))) DeinitExistentialValueInst
     : public UnaryInstructionBase<SILInstructionKind::DeinitExistentialValueInst,
                                   NonValueInstruction> {
   friend SILBuilder;
@@ -7035,7 +7063,7 @@ class DeinitExistentialValueInst
 };
 
 /// Projects the capture storage address from a @block_storage address.
-class ProjectBlockStorageInst
+class __attribute__((swift_attr("import_as_ref"))) ProjectBlockStorageInst
   : public UnaryInstructionBase<SILInstructionKind::ProjectBlockStorageInst,
                                 SingleValueInstruction>
 {
@@ -7049,7 +7077,7 @@ class ProjectBlockStorageInst
 
 /// Initializes a block header, creating a block that
 /// invokes a given thin cdecl function.
-class InitBlockStorageHeaderInst
+class __attribute__((swift_attr("import_as_ref"))) InitBlockStorageHeaderInst
     : public InstructionBase<SILInstructionKind::InitBlockStorageHeaderInst,
                              SingleValueInstruction> {
   friend SILBuilder;
@@ -7083,7 +7111,7 @@ public:
 };
 
 /// StrongRetainInst - Increase the strong reference count of an object.
-class StrongRetainInst
+class __attribute__((swift_attr("import_as_ref"))) StrongRetainInst
   : public UnaryInstructionBase<SILInstructionKind::StrongRetainInst,
                                 RefCountingInst>
 {
@@ -7101,7 +7129,7 @@ class StrongRetainInst
 /// An object can be destroyed when its strong reference count is
 /// zero.  It can be deallocated when both its strong reference and
 /// weak reference counts reach zero.
-class StrongReleaseInst
+class __attribute__((swift_attr("import_as_ref"))) StrongReleaseInst
   : public UnaryInstructionBase<SILInstructionKind::StrongReleaseInst,
                                 RefCountingInst>
 {
@@ -7124,7 +7152,7 @@ class StrongReleaseInst
 ///
 /// Name##ReleaseInst - Decrease the 'name' reference count of an object.
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-class StrongRetain##Name##Inst \
+class __attribute__((swift_attr("import_as_ref"))) StrongRetain##Name##Inst \
     : public UnaryInstructionBase<SILInstructionKind::StrongRetain##Name##Inst,\
                                   RefCountingInst> { \
   friend SILBuilder; \
@@ -7134,7 +7162,7 @@ class StrongRetain##Name##Inst \
     setAtomicity(atomicity); \
   } \
 }; \
-class Name##RetainInst \
+class __attribute__((swift_attr("import_as_ref"))) Name##RetainInst \
     : public UnaryInstructionBase<SILInstructionKind::Name##RetainInst, \
                                 RefCountingInst> { \
   friend SILBuilder; \
@@ -7144,7 +7172,7 @@ class Name##RetainInst \
     setAtomicity(atomicity); \
   } \
 }; \
-class Name##ReleaseInst \
+class __attribute__((swift_attr("import_as_ref"))) Name##ReleaseInst \
     : public UnaryInstructionBase<SILInstructionKind::Name##ReleaseInst, \
                                   RefCountingInst> { \
   friend SILBuilder; \
@@ -7158,7 +7186,7 @@ class Name##ReleaseInst \
 
 /// FixLifetimeInst - An artificial use of a value for the purposes of ARC or
 /// RVO optimizations.
-class FixLifetimeInst :
+class __attribute__((swift_attr("import_as_ref"))) FixLifetimeInst :
   public UnaryInstructionBase<SILInstructionKind::FixLifetimeInst,
                               NonValueInstruction>
 {
@@ -7181,7 +7209,7 @@ class FixLifetimeInst :
 /// lifetime ending use allowing for static verification of deallocating
 /// destroyers, without an actual release being emitted (avoiding the runtime
 /// assert).
-class EndLifetimeInst
+class __attribute__((swift_attr("import_as_ref"))) EndLifetimeInst
     : public UnaryInstructionBase<SILInstructionKind::EndLifetimeInst,
                                   NonValueInstruction> {
   friend SILBuilder;
@@ -7195,7 +7223,7 @@ class EndLifetimeInst
 /// This is used today in destructors where due to Objective-C legacy
 /// constraints, we need to be able to convert a guaranteed parameter to an owned
 /// parameter.
-class UncheckedOwnershipConversionInst
+class __attribute__((swift_attr("import_as_ref"))) UncheckedOwnershipConversionInst
     : public UnaryInstructionBase<SILInstructionKind::UncheckedOwnershipConversionInst,
                                   SingleValueInstruction> {
   friend SILBuilder;
@@ -7237,7 +7265,7 @@ public:
 /// result) have a dependence on "base" being alive. Do not allow for things
 /// that /may/ destroy base to be moved earlier than any of these uses of
 /// "value"'.
-class MarkDependenceInst
+class __attribute__((swift_attr("import_as_ref"))) MarkDependenceInst
     : public InstructionBase<SILInstructionKind::MarkDependenceInst,
                              FirstArgOwnershipForwardingSingleValueInst> {
   friend SILBuilder;
@@ -7269,7 +7297,7 @@ public:
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply
 /// retain a block that is already on the heap.
-class CopyBlockInst
+class __attribute__((swift_attr("import_as_ref"))) CopyBlockInst
     : public UnaryInstructionBase<SILInstructionKind::CopyBlockInst,
                                   SingleValueInstruction>
 {
@@ -7279,7 +7307,7 @@ class CopyBlockInst
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
-class CopyBlockWithoutEscapingInst
+class __attribute__((swift_attr("import_as_ref"))) CopyBlockWithoutEscapingInst
     : public InstructionBase<SILInstructionKind::CopyBlockWithoutEscapingInst,
                              SingleValueInstruction> {
   friend SILBuilder;
@@ -7308,7 +7336,7 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
-class CopyValueInst
+class __attribute__((swift_attr("import_as_ref"))) CopyValueInst
     : public UnaryInstructionBase<SILInstructionKind::CopyValueInst,
                                   SingleValueInstruction> {
   friend class SILBuilder;
@@ -7327,7 +7355,7 @@ class ExplicitCopyValueInst
 };
 
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  class StrongCopy##Name##ValueInst                                            \
+  class __attribute__((swift_attr("import_as_ref"))) StrongCopy##Name##ValueInst \
       : public UnaryInstructionBase<                                           \
             SILInstructionKind::StrongCopy##Name##ValueInst,                   \
             SingleValueInstruction> {                                          \
@@ -7338,7 +7366,7 @@ class ExplicitCopyValueInst
   };
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  class StrongCopy##Name##ValueInst                                            \
+  class __attribute__((swift_attr("import_as_ref"))) StrongCopy##Name##ValueInst \
       : public UnaryInstructionBase<                                           \
             SILInstructionKind::StrongCopy##Name##ValueInst,                   \
             SingleValueInstruction> {                                          \
@@ -7349,7 +7377,7 @@ class ExplicitCopyValueInst
   };
 #include "swift/AST/ReferenceStorage.def"
 
-class DestroyValueInst
+class __attribute__((swift_attr("import_as_ref"))) DestroyValueInst
     : public UnaryInstructionBase<SILInstructionKind::DestroyValueInst,
                                   NonValueInstruction> {
   friend class SILBuilder;
@@ -7375,7 +7403,7 @@ public:
   }
 };
 
-class MoveValueInst
+class __attribute__((swift_attr("import_as_ref"))) MoveValueInst
     : public UnaryInstructionBase<SILInstructionKind::MoveValueInst,
                                   SingleValueInstruction> {
   friend class SILBuilder;
@@ -7395,7 +7423,7 @@ public:
 
 /// Given an object reference, return true iff it is non-nil and refers
 /// to a native swift object with strong reference count of 1.
-class IsUniqueInst
+class __attribute__((swift_attr("import_as_ref"))) IsUniqueInst
     : public UnaryInstructionBase<SILInstructionKind::IsUniqueInst,
                                   SingleValueInstruction>
 {
@@ -7411,7 +7439,7 @@ class IsUniqueInst
 /// Returns two results: the first result is an Int1 which is the result of the
 /// uniqueness check. The second result is the class reference operand, which
 /// can be used for mutation.
-class BeginCOWMutationInst final
+class __attribute__((swift_attr("import_as_ref"))) BeginCOWMutationInst final
     : public UnaryInstructionBase<SILInstructionKind::BeginCOWMutationInst,
                                   MultipleValueInstruction>,
       public MultipleValueInstructionTrailingObjects<BeginCOWMutationInst>
@@ -7451,7 +7479,7 @@ public:
 };
 
 /// Marks the end of the mutation of a reference counted object.
-class EndCOWMutationInst
+class __attribute__((swift_attr("import_as_ref"))) EndCOWMutationInst
     : public UnaryInstructionBase<SILInstructionKind::EndCOWMutationInst,
                                   SingleValueInstruction>
 {
@@ -7475,7 +7503,7 @@ public:
 
 /// Given an escaping closure return true iff it has a non-nil context and the
 /// context has a strong reference count greater than 1.
-class IsEscapingClosureInst
+class __attribute__((swift_attr("import_as_ref"))) IsEscapingClosureInst
     : public UnaryInstructionBase<SILInstructionKind::IsEscapingClosureInst,
                                   SingleValueInstruction> {
   friend SILBuilder;
@@ -7498,7 +7526,8 @@ public:
 //===----------------------------------------------------------------------===//
 
 /// DeallocationInst - An abstract parent class for Dealloc{Stack, Box, Ref}.
-class DeallocationInst : public NonValueInstruction {
+class __attribute__((swift_attr("import_as_ref"))) DeallocationInst
+  : public NonValueInstruction {
 protected:
   DeallocationInst(SILInstructionKind Kind, SILDebugLocation DebugLoc)
       : NonValueInstruction(Kind, DebugLoc) {}
@@ -7508,7 +7537,7 @@ public:
 };
 
 /// DeallocStackInst - Deallocate stack memory allocated by alloc_stack.
-class DeallocStackInst :
+class __attribute__((swift_attr("import_as_ref"))) DeallocStackInst :
     public UnaryInstructionBase<SILInstructionKind::DeallocStackInst,
                                 DeallocationInst> {
   friend SILBuilder;
@@ -7525,7 +7554,7 @@ class DeallocStackInst :
 ///
 /// It is undefined behavior if the type of the operand does not match the
 /// most derived type of the allocated instance.
-class DeallocRefInst :
+class __attribute__((swift_attr("import_as_ref"))) DeallocRefInst :
   public UnaryInstructionBase<SILInstructionKind::DeallocRefInst,
                               DeallocationInst> {
   friend SILBuilder;
@@ -7556,7 +7585,7 @@ public:
 ///
 /// The metatype value can either be the static self type (in a designated
 /// initializer) or a dynamic self type (in a convenience initializer).
-class DeallocPartialRefInst
+class __attribute__((swift_attr("import_as_ref"))) DeallocPartialRefInst
     : public InstructionBase<SILInstructionKind::DeallocPartialRefInst,
                              DeallocationInst> {
   friend SILBuilder;
@@ -7583,7 +7612,7 @@ public:
 ///
 /// This does not destroy the boxed value instance; it must either be
 /// uninitialized or have been manually destroyed.
-class DeallocBoxInst
+class __attribute__((swift_attr("import_as_ref"))) DeallocBoxInst
     : public UnaryInstructionBase<SILInstructionKind::DeallocBoxInst,
                                   DeallocationInst>
 {
@@ -7599,7 +7628,7 @@ class DeallocBoxInst
 ///
 /// This does not destroy the boxed value instance; it must either be
 /// uninitialized or have been manually destroyed.
-class DeallocExistentialBoxInst
+class __attribute__((swift_attr("import_as_ref"))) DeallocExistentialBoxInst
     : public UnaryInstructionBase<SILInstructionKind::DeallocExistentialBoxInst,
                                   DeallocationInst>
 {
@@ -7621,7 +7650,7 @@ public:
 ///   release_value %1
 /// but a destroy instruction can be used for types that cannot be loaded,
 /// such as resilient value types.
-class DestroyAddrInst
+class __attribute__((swift_attr("import_as_ref"))) DestroyAddrInst
     : public UnaryInstructionBase<SILInstructionKind::DestroyAddrInst,
                                   NonValueInstruction>
 {
@@ -7632,7 +7661,7 @@ class DestroyAddrInst
 };
 
 /// Project out the address of the value in a box.
-class ProjectBoxInst
+class __attribute__((swift_attr("import_as_ref"))) ProjectBoxInst
     : public UnaryInstructionBase<SILInstructionKind::ProjectBoxInst,
                                   SingleValueInstruction> {
   friend SILBuilder;
@@ -7652,7 +7681,7 @@ public:
 };
 
 /// Project out the address of the value in an existential box.
-class ProjectExistentialBoxInst
+class __attribute__((swift_attr("import_as_ref"))) ProjectExistentialBoxInst
     : public UnaryInstructionBase<SILInstructionKind::ProjectExistentialBoxInst,
                                   SingleValueInstruction> {
   friend SILBuilder;
@@ -7670,7 +7699,7 @@ class ProjectExistentialBoxInst
 ///
 /// Optionally cond_fail has a static failure message, which is displayed in the debugger in case the failure
 /// is triggered.
-class CondFailInst final
+class __attribute__((swift_attr("import_as_ref"))) CondFailInst final
     : public UnaryInstructionBase<SILInstructionKind::CondFailInst,
                                   NonValueInstruction>,
       private llvm::TrailingObjects<CondFailInst, char>
@@ -7696,7 +7725,8 @@ public:
 //===----------------------------------------------------------------------===//
 
 /// Abstract base class for indexing instructions.
-class IndexingInst : public SingleValueInstruction {
+class __attribute__((swift_attr("import_as_ref"))) IndexingInst
+  : public SingleValueInstruction {
   enum { Base, Index };
   FixedOperandList<2> Operands;
 public:
@@ -7717,7 +7747,7 @@ public:
 /// IndexAddrInst - "%2 : $*T = index_addr %0 : $*T, %1 : $Builtin.Word"
 /// This takes an address and indexes it, striding by the pointed-
 /// to type.  This is used to index into arrays of uniform elements.
-class IndexAddrInst
+class __attribute__((swift_attr("import_as_ref"))) IndexAddrInst
     : public InstructionBase<SILInstructionKind::IndexAddrInst,
                              IndexingInst> {
   friend SILBuilder;
@@ -7730,7 +7760,7 @@ class IndexAddrInst
 
 /// TailAddrInst - like IndexingInst, but aligns-up the resulting address to a
 /// tail-allocated element type.
-class TailAddrInst
+class __attribute__((swift_attr("import_as_ref"))) TailAddrInst
     : public InstructionBase<SILInstructionKind::TailAddrInst,
                              IndexingInst> {
   friend SILBuilder;
@@ -7748,7 +7778,7 @@ public:
 ///   = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
 /// This takes an address and indexes it, striding by the pointed-
 /// to type.  This is used to index into arrays of uniform elements.
-class IndexRawPointerInst
+class __attribute__((swift_attr("import_as_ref"))) IndexRawPointerInst
     : public InstructionBase<SILInstructionKind::IndexRawPointerInst,
                              IndexingInst> {
   friend SILBuilder;
@@ -7772,7 +7802,8 @@ enum class TermKind {
 };
 
 /// This class defines a "terminating instruction" for a SILBasicBlock.
-class TermInst : public NonValueInstruction {
+class __attribute__((swift_attr("import_as_ref"))) TermInst
+  : public NonValueInstruction {
 protected:
   TermInst(SILInstructionKind K, SILDebugLocation DebugLoc)
       : NonValueInstruction(K, DebugLoc) {}
@@ -7922,8 +7953,8 @@ public:
 };
 
 // Forwards the first operand to a result in each successor block.
-class OwnershipForwardingTermInst : public TermInst,
-                                    public OwnershipForwardingMixin {
+class __attribute__((swift_attr("import_as_ref"))) OwnershipForwardingTermInst
+  : public TermInst, public OwnershipForwardingMixin {
 protected:
   OwnershipForwardingTermInst(SILInstructionKind kind,
                               SILDebugLocation debugLoc,
@@ -7958,7 +7989,7 @@ public:
 /// UnreachableInst - Position in the code which would be undefined to reach.
 /// These are always implicitly generated, e.g. when falling off the end of a
 /// function or after a no-return function call.
-class UnreachableInst
+class __attribute__((swift_attr("import_as_ref"))) UnreachableInst
     : public InstructionBase<SILInstructionKind::UnreachableInst,
                              TermInst> {
   friend SILBuilder;
@@ -7977,7 +8008,7 @@ public:
 };
 
 /// ReturnInst - Representation of a ReturnStmt.
-class ReturnInst
+class __attribute__((swift_attr("import_as_ref"))) ReturnInst
   : public UnaryInstructionBase<SILInstructionKind::ReturnInst, TermInst>
 {
   friend SILBuilder;
@@ -8009,7 +8040,7 @@ public:
 
 /// ThrowInst - Throw a typed error (which, in our system, is
 /// essentially just a funny kind of return).
-class ThrowInst
+class __attribute__((swift_attr("import_as_ref"))) ThrowInst
   : public UnaryInstructionBase<SILInstructionKind::ThrowInst, TermInst>
 {
   friend SILBuilder;
@@ -8032,7 +8063,7 @@ public:
 /// UnwindInst - Continue unwinding out of this function.  Currently this is
 /// only used in coroutines as the eventual terminator of the unwind edge
 /// out of a 'yield'.
-class UnwindInst
+class __attribute__((swift_attr("import_as_ref"))) UnwindInst
   : public InstructionBase<SILInstructionKind::UnwindInst,
                            TermInst> {
   friend SILBuilder;
@@ -8052,7 +8083,7 @@ public:
 
 /// Suspend execution of an async task until
 /// essentially just a funny kind of return).
-class AwaitAsyncContinuationInst final
+class __attribute__((swift_attr("import_as_ref"))) AwaitAsyncContinuationInst final
   : public UnaryInstructionBase<SILInstructionKind::AwaitAsyncContinuationInst,
                                 TermInst>
 {
@@ -8100,7 +8131,7 @@ public:
 ///
 /// This is a terminator because the caller can abort the coroutine,
 /// e.g. if an error is thrown and an unwind is provoked.
-class YieldInst final
+class __attribute__((swift_attr("import_as_ref"))) YieldInst final
   : public InstructionBaseWithTrailingOperands<SILInstructionKind::YieldInst,
                                                YieldInst, TermInst> {
   friend SILBuilder;
@@ -8156,7 +8187,7 @@ public:
 };
 
 /// BranchInst - An unconditional branch.
-class BranchInst final
+class __attribute__((swift_attr("import_as_ref"))) BranchInst final
     : public InstructionBaseWithTrailingOperands<SILInstructionKind::BranchInst,
                                                  BranchInst, TermInst> {
   friend SILBuilder;
@@ -8207,7 +8238,7 @@ public:
 };
 
 /// A conditional branch.
-class CondBranchInst final
+class __attribute__((swift_attr("import_as_ref"))) CondBranchInst final
     : public InstructionBaseWithTrailingOperands<
                                              SILInstructionKind::CondBranchInst,
                                              CondBranchInst,
@@ -8387,7 +8418,7 @@ public:
 };
 
 /// A switch on a value of a builtin type.
-class SwitchValueInst final
+class __attribute__((swift_attr("import_as_ref"))) SwitchValueInst final
     : public InstructionBaseWithTrailingOperands<
                                       SILInstructionKind::SwitchValueInst,
                                       SwitchValueInst, TermInst, SILSuccessor> {
@@ -8671,7 +8702,7 @@ public:
 
 /// A switch on a loadable enum's discriminator. The data for each case is
 /// passed into the corresponding destination block as an argument.
-class SwitchEnumInst
+class __attribute__((swift_attr("import_as_ref"))) SwitchEnumInst
     : public InstructionBase<SILInstructionKind::SwitchEnumInst,
                              SwitchEnumInstBase<OwnershipForwardingTermInst>> {
   friend SILBuilder;
@@ -8702,7 +8733,7 @@ public:
   SILPhiArgument *createOptionalSomeResult();
 };
 /// A switch on an enum's discriminator in memory.
-class SwitchEnumAddrInst
+class __attribute__((swift_attr("import_as_ref"))) SwitchEnumAddrInst
     : public InstructionBase<SILInstructionKind::SwitchEnumAddrInst,
                              SwitchEnumInstBase<TermInst>> {
   friend SILBuilder;
@@ -8729,7 +8760,7 @@ private:
 ///
 /// If the method exists, branches to the first BB, providing it with the
 /// method reference; otherwise, branches to the second BB.
-class DynamicMethodBranchInst
+class __attribute__((swift_attr("import_as_ref"))) DynamicMethodBranchInst
     : public InstructionBase<SILInstructionKind::DynamicMethodBranchInst,
                              TermInst> {
   friend SILBuilder;
@@ -8802,7 +8833,8 @@ public:
 
 /// The base class for cast instructions which are terminators and have a
 /// CastConsumptionKind.
-class CastBranchWithConsumptionKindBase : public CastBranchInstBase<TermInst> {
+class __attribute__((swift_attr("import_as_ref")))
+CastBranchWithConsumptionKindBase : public CastBranchInstBase<TermInst> {
   CastConsumptionKind ConsumptionKind;
 
 public:
@@ -8889,7 +8921,7 @@ public:
 /// Perform a checked cast operation and branch on whether the cast succeeds.
 /// The success branch destination block receives the cast result as a BB
 /// argument.
-class CheckedCastBranchInst final
+class __attribute__((swift_attr("import_as_ref"))) CheckedCastBranchInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::CheckedCastBranchInst, CheckedCastBranchInst,
           CastBranchInstBase<OwnershipForwardingTermInst>> {
@@ -8933,7 +8965,7 @@ public:
 /// Perform a checked cast operation and branch on whether the cast succeeds.
 /// The success branch destination block receives the cast result as a BB
 /// argument.
-class CheckedCastValueBranchInst final
+class __attribute__((swift_attr("import_as_ref"))) CheckedCastValueBranchInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::CheckedCastValueBranchInst,
           CheckedCastValueBranchInst, CastBranchInstBase<TermInst>> {
@@ -8971,7 +9003,7 @@ public:
 
 /// Perform a checked cast operation and branch on whether the cast succeeds.
 /// The result of the checked cast is left in the destination address.
-class CheckedCastAddrBranchInst final
+class __attribute__((swift_attr("import_as_ref"))) CheckedCastAddrBranchInst final
     : public AddrCastInstBase<
               SILInstructionKind::CheckedCastAddrBranchInst,
               CheckedCastAddrBranchInst, CastBranchWithConsumptionKindBase> {
@@ -8997,7 +9029,7 @@ class CheckedCastAddrBranchInst final
 /// checks. This is a variant of UncheckedRefCast that works on address types,
 /// thus encapsulates an implicit load and take of the reference followed by a
 /// store and initialization of a new reference.
-class UncheckedRefCastAddrInst final
+class __attribute__((swift_attr("import_as_ref"))) UncheckedRefCastAddrInst final
     : public AddrCastInstBase<
                SILInstructionKind::UncheckedRefCastAddrInst,
                UncheckedRefCastAddrInst, NonValueInstruction> {
@@ -9011,7 +9043,7 @@ public:
          SILValue dest, CanType targetType, SILFunction &F);
 };
 
-class UncheckedAddrCastInst final
+class __attribute__((swift_attr("import_as_ref"))) UncheckedAddrCastInst final
   : public UnaryInstructionWithTypeDependentOperandsBase<
                                 SILInstructionKind::UncheckedAddrCastInst,
                                 UncheckedAddrCastInst,
@@ -9030,7 +9062,8 @@ class UncheckedAddrCastInst final
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 /// The result of the checked cast is left in the destination address.
-class UnconditionalCheckedCastAddrInst final
+class __attribute__((swift_attr("import_as_ref")))
+UnconditionalCheckedCastAddrInst final
     : public AddrCastInstBase<
                SILInstructionKind::UnconditionalCheckedCastAddrInst,
                UnconditionalCheckedCastAddrInst, NonValueInstruction> {
@@ -9048,7 +9081,8 @@ class UnconditionalCheckedCastAddrInst final
 };
 
 /// A private abstract class to store the destinations of a TryApplyInst.
-class TryApplyInstBase : public TermInst {
+class __attribute__((swift_attr("import_as_ref"))) TryApplyInstBase
+  : public TermInst {
 public:
   enum {
     // Map branch targets to block successor indices.
@@ -9084,7 +9118,7 @@ public:
 
 /// TryApplyInst - Represents the full application of a function that
 /// can produce an error.
-class TryApplyInst final
+class __attribute__((swift_attr("import_as_ref"))) TryApplyInst final
     : public InstructionBase<SILInstructionKind::TryApplyInst,
                              ApplyInstBase<TryApplyInst, TryApplyInstBase>>,
       public llvm::TrailingObjects<TryApplyInst, Operand> {
@@ -9113,7 +9147,7 @@ class TryApplyInst final
 /// (optional). The differentiation transform canonicalizes
 /// `differentiable_function` instructions, filling in derivative function
 /// operands if missing.
-class DifferentiableFunctionInst final
+class __attribute__((swift_attr("import_as_ref"))) DifferentiableFunctionInst final
     : public InstructionBaseWithTrailingOperands<
           SILInstructionKind::DifferentiableFunctionInst,
           DifferentiableFunctionInst,
@@ -9200,7 +9234,7 @@ public:
 
 /// LinearFunctionInst - given a function, its derivative and traspose functions,
 /// create an `@differentiable(_linear)` function that represents a bundle of these.
-class LinearFunctionInst final
+class __attribute__((swift_attr("import_as_ref"))) LinearFunctionInst final
     : public InstructionBaseWithTrailingOperands<
           SILInstructionKind::LinearFunctionInst, LinearFunctionInst,
           AllArgOwnershipForwardingSingleValueInst> {
@@ -9240,7 +9274,7 @@ public:
 
 /// DifferentiableFunctionExtractInst - extracts either the original or
 /// derivative function value from a `@differentiable` function.
-class DifferentiableFunctionExtractInst
+class __attribute__((swift_attr("import_as_ref"))) DifferentiableFunctionExtractInst
     : public UnaryInstructionBase<
           SILInstructionKind::DifferentiableFunctionExtractInst,
           GuaranteedFirstArgForwardingSingleValueInst> {
@@ -9284,7 +9318,7 @@ public:
 /// LinearFunctionExtractInst - given an `@differentiable(_linear)` function
 /// representing a bundle of the original function and the transpose function,
 /// extract the specified function.
-class LinearFunctionExtractInst
+class __attribute__((swift_attr("import_as_ref"))) LinearFunctionExtractInst
     : public UnaryInstructionBase<SILInstructionKind::LinearFunctionExtractInst,
                                   GuaranteedFirstArgForwardingSingleValueInst> {
 private:
@@ -9309,7 +9343,7 @@ public:
 
 /// DifferentiabilityWitnessFunctionInst - Looks up a differentiability witness
 /// function for a given original function.
-class DifferentiabilityWitnessFunctionInst
+class __attribute__((swift_attr("import_as_ref"))) DifferentiabilityWitnessFunctionInst
     : public InstructionBase<
           SILInstructionKind::DifferentiabilityWitnessFunctionInst,
           SingleValueInstruction> {
@@ -9416,7 +9450,8 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
 }
 
 /// The first operand is the ownership equivalent source.
-class OwnershipForwardingMultipleValueInstruction
+class __attribute__((swift_attr("import_as_ref")))
+OwnershipForwardingMultipleValueInstruction
     : public MultipleValueInstruction,
       public OwnershipForwardingMixin {
 public:
@@ -9449,7 +9484,7 @@ public:
 
 /// Instruction that takes in a struct value and splits the struct into the
 /// struct's fields.
-class DestructureStructInst final
+class __attribute__((swift_attr("import_as_ref"))) DestructureStructInst final
     : public UnaryInstructionBase<SILInstructionKind::DestructureStructInst,
                                   OwnershipForwardingMultipleValueInstruction>,
       public MultipleValueInstructionTrailingObjects<DestructureStructInst> {
@@ -9473,7 +9508,7 @@ public:
 
 /// Instruction that takes in a tuple value and splits the tuple into the
 /// tuples's elements.
-class DestructureTupleInst final
+class __attribute__((swift_attr("import_as_ref"))) DestructureTupleInst final
     : public UnaryInstructionBase<SILInstructionKind::DestructureTupleInst,
                                   OwnershipForwardingMultipleValueInstruction>,
       public MultipleValueInstructionTrailingObjects<DestructureTupleInst> {
