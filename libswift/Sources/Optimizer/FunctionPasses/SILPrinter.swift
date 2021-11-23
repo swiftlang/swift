@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SIL
+import SILBridging
 
 let silPrinterPass = FunctionPass(name: "sil-printer", runSILPrinter)
 
@@ -18,6 +19,8 @@ func runSILPrinter(function: Function, context: PassContext) {
   print("run SILPrinter on function: \(function.name)")
 
   for (bbIdx, block) in function.blocks.enumerated() {
+    print("MARK - ")
+
     print("bb\(bbIdx):")
 
     print("  predecessors: " +
@@ -28,7 +31,7 @@ func runSILPrinter(function: Function, context: PassContext) {
     print("  arguments:")
     for arg in block.arguments {
       print("    arg: \(arg)")
-      for use in arg.uses {
+      for use in getAsValue(arg)!.uses {
         print("      user: \(use.instruction)")
       }
     }

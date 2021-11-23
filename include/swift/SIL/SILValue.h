@@ -339,7 +339,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ValueOwnershipKind Kind);
 /// This is the base class of the SIL value hierarchy, which represents a
 /// runtime computed value. Some examples of ValueBase are SILArgument and
 /// SingleValueInstruction.
-class ValueBase : public SILNode, public SILAllocated<ValueBase> {
+class __attribute__((swift_attr("import_as_ref"))) ValueBase
+    : public SILNode, public SILAllocated<ValueBase> {
   friend class Operand;
 
   SILType Type;
@@ -1434,7 +1435,8 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
 /// Used internally in e.g. the SIL parser and deserializer to handle forward-
 /// referenced values.
 /// A PlaceholderValue must not appear in valid SIL.
-class PlaceholderValue : public ValueBase {
+class __attribute__((swift_attr("import_as_ref"))) PlaceholderValue
+    : public ValueBase {
   static int numPlaceholderValuesAlive;
 
 public:

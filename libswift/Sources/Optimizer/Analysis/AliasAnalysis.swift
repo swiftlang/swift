@@ -13,11 +13,14 @@
 import OptimizerBridging
 import SIL
 
+public typealias Instruction = SILInstruction
+public typealias Value = swift.ValueBase
+
 struct AliasAnalysis {
   let bridged: BridgedAliasAnalysis
   
   func mayRead(_ inst: Instruction, fromAddress: Value) -> Bool {
-    switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, fromAddress.bridged) {
+    switch AliasAnalysis_getMemBehavior(bridged, inst, fromAddress) {
       case MayReadBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
         return true
       default:
@@ -26,7 +29,7 @@ struct AliasAnalysis {
   }
 
   func mayWrite(_ inst: Instruction, toAddress: Value) -> Bool {
-    switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, toAddress.bridged) {
+    switch AliasAnalysis_getMemBehavior(bridged, inst, toAddress) {
       case MayWriteBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
         return true
       default:
@@ -35,7 +38,7 @@ struct AliasAnalysis {
   }
 
   func mayReadOrWrite(_ inst: Instruction, address: Value) -> Bool {
-    switch AliasAnalysis_getMemBehavior(bridged, inst.bridged, address.bridged) {
+    switch AliasAnalysis_getMemBehavior(bridged, inst, address) {
       case MayReadBehavior, MayWriteBehavior, MayReadWriteBehavior,
            MayHaveSideEffectsBehavior:
         return true

@@ -62,7 +62,8 @@ struct SILArgumentKind {
   }
 };
 
-class SILArgument : public ValueBase {
+class __attribute__((swift_attr("import_as_ref"))) SILArgument
+    : public ValueBase {
   friend class SILBasicBlock;
 
   SILBasicBlock *parentBlock;
@@ -202,7 +203,8 @@ inline SILArgument *castToArgument(SwiftObject argument) {
   return static_cast<SILArgument *>(argument);
 }
 
-class SILPhiArgument : public SILArgument {
+class __attribute__((swift_attr("import_as_ref")))  SILPhiArgument
+    : public SILArgument {
   friend class SILBasicBlock;
 
   SILPhiArgument(SILBasicBlock *parentBlock, SILType type,
@@ -310,7 +312,8 @@ public:
   }
 };
 
-class SILFunctionArgument : public SILArgument {
+class __attribute__((swift_attr("import_as_ref"))) SILFunctionArgument
+    : public SILArgument {
   friend class SILBasicBlock;
 
   bool noImplicitCopy = false;

@@ -18,7 +18,7 @@ public struct Builder {
   let location: Location
   private let passContext: BridgedPassContext
 
-  private var bridgedInsPoint: BridgedInstruction { insertionPoint.bridged }
+  private var bridgedInsPoint: SILInstruction { insertionPoint }
 
   private func notifyInstructionsChanged() {
     PassContext_notifyChanges(passContext, instructionsChanged)
@@ -40,24 +40,24 @@ public struct Builder {
   }
 
   public func createBuiltinBinaryFunction(name: String,
-      operandType: Type, resultType: Type, arguments: [Value]) -> BuiltinInst {
+                                          operandType: Type, resultType: Type, arguments: [Value]) -> swift.BuiltinInst {
     notifyInstructionsChanged()
     return arguments.withBridgedValues { valuesRef in
       return name.withBridgedStringRef { nameStr in
         let bi = SILBuilder_createBuiltinBinaryFunction(
           bridgedInsPoint, location.bridgedLocation, nameStr,
-          operandType.bridged, resultType.bridged, valuesRef)
-        return bi.getAs(BuiltinInst.self)
+          operandType, resultType, valuesRef)
+        return getAsBuiltinInst(bi)!
       }
     }
   }
 
-  public func createCondFail(condition: Value, message: String) -> CondFailInst {
+  public func createCondFail(condition: Value, message: String) -> swift.CondFailInst {
     notifyInstructionsChanged()
     return message.withBridgedStringRef { messageStr in
       let cf = SILBuilder_createCondFail(
-        bridgedInsPoint, location.bridgedLocation, condition.bridged, messageStr)
-      return cf.getAs(CondFailInst.self)
+        bridgedInsPoint, location.bridgedLocation, condition, messageStr)
+      return getAsCondFailInst(cf)!
     }
   }
 }

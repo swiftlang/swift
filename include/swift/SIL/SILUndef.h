@@ -22,7 +22,7 @@ class SILArgument;
 class SILInstruction;
 class SILModule;
 
-class SILUndef : public ValueBase {
+class __attribute__((swift_attr("import_as_ref"))) SILUndef : public ValueBase {
   SILUndef(SILType type);
 
 public:

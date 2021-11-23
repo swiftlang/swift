@@ -2135,7 +2135,9 @@ static void emitDynamicSelfMetadata(IRGenSILFunction &IGF) {
     selfTy = metaTy.getInstanceType();
     switch (metaTy->getRepresentation()) {
     case MetatypeRepresentation::Thin:
-      llvm_unreachable("class metatypes are never thin");
+      assert(selfTy.isForeignReferenceType());
+      selfKind = IRGenFunction::ObjectReference;
+      break;
     case MetatypeRepresentation::Thick:
       selfKind = IRGenFunction::SwiftMetatype;
       break;

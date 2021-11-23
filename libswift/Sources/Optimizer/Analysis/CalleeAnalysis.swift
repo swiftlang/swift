@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-import OptimizerBridging
+import SILBridging
 import SIL
+import OptimizerBridging
 
 public struct CalleeAnalysis {
   let bridged: BridgedCalleeAnalysis
 
   public func getCallees(callee: Value) -> FunctionArray {
-    return FunctionArray(bridged: CalleeAnalysis_getCallees(bridged, callee.bridged))
+    return FunctionArray(bridged: CalleeAnalysis_getCallees(bridged, callee))
   }
 }
 
@@ -28,7 +29,7 @@ public struct FunctionArray : RandomAccessCollection, CustomReflectable {
   public var endIndex: Int { BridgedFunctionArray_size(bridged) }
 
   public subscript(_ index: Int) -> Function {
-    return BridgedFunctionArray_get(bridged, index).function
+    return BridgedFunctionArray_get(bridged, index)
   }
 
   public var allCalleesKnown: Bool { bridged.incomplete == 0 }
