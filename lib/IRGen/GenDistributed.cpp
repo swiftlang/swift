@@ -17,6 +17,7 @@
 #include "GenDistributed.h"
 
 #include "BitPatternBuilder.h"
+#include "Callee.h"
 #include "ClassTypeInfo.h"
 #include "ExtraInhabitants.h"
 #include "GenDecl.h"
@@ -74,6 +75,10 @@ public:
 
 private:
   Explosion computeArguments(llvm::Value *argumentBuffer);
+
+  FunctionPointer getPointerToMethod() const;
+
+  Callee getCalleeForDistributedMethod(llvm::Value *self) const;
 };
 
 } // end namespace
@@ -227,4 +232,25 @@ void DistributedAccessor::emit() {
   auto arguments = computeArguments(argBuffer);
 
   IGF.Builder.CreateRetVoid();
+}
+
+FunctionPointer DistributedAccessor::getPointerToMethod() const {
+  auto fnType = Method->getLoweredFunctionType();
+  auto fpKind = classifyFunctionPointerKind(Method);
+  auto signature = IGM.getSignature(fnType, fpKind.useSpecialConvention());
+
+  auto *fnPtr =
+      IGM.getAddrOfSILFunction(Method, NotForDefinition,
+                               /*isDynamicallyReplaceable=*/false,
+                               /*shouldCallPreviousImplementation=*/false);
+
+  return FunctionPointer::forDirect(fpKind, fnPtr, /*secondary=*/nullptr,
+                                    signature);
+}
+
+Callee
+DistributedAccessor::getCalleeForDistributedMethod(llvm::Value *self) const {
+  auto fnType = Method->getLoweredFunctionType();
+  CalleeInfo info{fnType, fnType, SubstitutionMap()};
+  return {std::move(info), getPointerToMethod(), self};
 }
