@@ -62,6 +62,7 @@ jobs:
           esac
 
         env:
+          TARGETS_TO_DIST: "ubuntu18.04_x86_64 ubuntu20.04_x86_64 macos_x86_64 macos_arm64"
           GITHUB_TOKEN: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
           DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
