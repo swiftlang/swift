@@ -17,11 +17,13 @@
 #include "GenDistributed.h"
 
 #include "BitPatternBuilder.h"
-#include "Callee.h"
 #include "CallEmission.h"
+#include "Callee.h"
 #include "ClassTypeInfo.h"
 #include "ExtraInhabitants.h"
+#include "GenCall.h"
 #include "GenDecl.h"
+#include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -69,8 +71,14 @@ class DistributedAccessor {
   /// Underlying distributed method for this accessor.
   SILFunction *Method;
 
+  /// The interface type of this accessor function.
+  CanSILFunctionType AccessorType;
+  /// The asynchronous context associated with this accessor.
+  AsyncContextLayout AsyncLayout;
+
 public:
-  DistributedAccessor(IRGenFunction &IGF, SILFunction *method);
+  DistributedAccessor(IRGenFunction &IGF, SILFunction *method,
+                      CanSILFunctionType accessorTy);
 
   void emit();
 
@@ -84,6 +92,39 @@ private:
 
 } // end namespace
 
+/// Compute a type of a distributed method accessor function based
+/// on the provided distributed method.
+static CanSILFunctionType getAccessorType(IRGenModule &IGM,
+                                          SILFunction *DistMethod) {
+  auto &Context = IGM.Context;
+
+  auto getParamForArguments = [&]() {
+    auto ptrType = Context.getUnsafeRawPointerType();
+    return SILParameterInfo(ptrType->getCanonicalType(),
+                            ParameterConvention::Direct_Guaranteed);
+  };
+
+  // `self` of the distributed actor is going to be passed as an argument
+  // to this accessor function.
+  auto extInfo = SILExtInfoBuilder()
+                     .withRepresentation(SILFunctionTypeRepresentation::Thick)
+                     .withAsync()
+                     .build();
+
+  auto methodTy = DistMethod->getLoweredFunctionType();
+  // Accessor gets argument value buffer and a reference to `self` of
+  // the actor and produces a call to the distributed thunk forwarding
+  // its result(s) out.
+  return SILFunctionType::get(
+      /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
+      ParameterConvention::Direct_Guaranteed, {getParamForArguments()},
+      /*Yields=*/{},
+      /*Results=*/methodTy->getResults(),
+      /*ErrorResult=*/None,
+      /*patternSubs=*/SubstitutionMap(),
+      /*invocationSubs=*/SubstitutionMap(), Context);
+}
+
 llvm::Function *
 IRGenModule::getAddrOfDistributedMethodAccessor(SILFunction *F,
                                                 ForDefinition_t forDefinition) {
@@ -96,34 +137,7 @@ IRGenModule::getAddrOfDistributedMethodAccessor(SILFunction *F,
     return entry;
   }
 
-  auto getParamForArguments = [&]() {
-    auto ptrType = Context.getUnsafeRawPointerType();
-    return SILParameterInfo(ptrType->getCanonicalType(),
-                            ParameterConvention::Direct_Guaranteed);
-  };
-
-
-  // `self` of the distributed actor is going to be passed as an argument
-  // to this accessor function.
-  auto extInfo = SILExtInfoBuilder()
-    .withRepresentation(SILFunctionTypeRepresentation::Thick)
-    .build();
-
-  auto methodTy = F->getLoweredFunctionType();
-  // Accessor gets argument value buffer and a reference to `self` of
-  // the actor and produces a call to the distributed thunk forwarding
-  // its result(s) out.
-  auto accessorType = SILFunctionType::get(
-      /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
-      ParameterConvention::Direct_Guaranteed,
-      {getParamForArguments()},
-      /*Yields=*/{},
-      /*Results=*/methodTy->getResults(),
-      /*ErrorResult=*/None,
-      /*patternSubs=*/SubstitutionMap(),
-      /*invocationSubs=*/SubstitutionMap(), Context);
-
-  Signature signature = getSignature(accessorType);
+  Signature signature = getSignature(getAccessorType(*this, F));
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   return createFunction(*this, link, signature);
@@ -137,12 +151,18 @@ void IRGenModule::emitDistributedMethodAccessor(SILFunction *method) {
     return;
 
   IRGenFunction IGF(*this, f);
-  DistributedAccessor(IGF, method).emit();
+  DistributedAccessor(IGF, method, getAccessorType(*this, method)).emit();
 }
 
 DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
-                                         SILFunction *method)
-    : IGM(IGF.IGM), IGF(IGF), Method(method) {}
+                                         SILFunction *method,
+                                         CanSILFunctionType accessorTy)
+    : IGM(IGF.IGM), IGF(IGF), Method(method), AccessorType(accessorTy),
+      AsyncLayout(getAsyncContextLayout(
+          IGM, AccessorType, AccessorType, SubstitutionMap(),
+          /*suppress generics*/ true,
+          FunctionPointer::Kind(
+              FunctionPointer::BasicKind::AsyncFunctionPointer))) {}
 
 Explosion DistributedAccessor::computeArguments(llvm::Value *argumentBuffer) {
   auto fnType = Method->getLoweredFunctionType();
@@ -229,10 +249,29 @@ void DistributedAccessor::emit() {
 
   auto params = IGF.collectParameters();
 
+  // FIXME: Once we remove async task and executor this should be one not three.
+  unsigned numAsyncContextParams =
+      (unsigned)AsyncFunctionArgumentIndex::Context + 1;
+  (void)params.claim(numAsyncContextParams);
+
   // UnsafeRawPointer that holds all of the argument values
   auto *argBuffer = params.claimNext();
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
+
+  GenericContextScope scope(IGM, methodTy->getInvocationGenericSignature());
+
+  // Preliminary: Setup async context for this accessor.
+  {
+    auto asyncContextIdx =
+        Signature::forAsyncEntry(IGM, AccessorType,
+                                 /*useSpecialConvention*/ false)
+            .getAsyncContextIndex();
+
+    auto entity = LinkEntity::forDistributedMethodAccessor(Method);
+    emitAsyncFunctionEntry(IGF, AsyncLayout, entity, asyncContextIdx);
+    emitAsyncFunctionPointer(IGM, IGF.CurFn, entity, AsyncLayout.getSize());
+  }
 
   // Step one is to load all of the data from argument buffer,
   // so it could be forwarded to the distributed method.
@@ -241,8 +280,6 @@ void DistributedAccessor::emit() {
   // Step two, let's form and emit a call to the distributed method
   // using computed argument explosion.
   {
-    GenericContextScope scope(IGM, methodTy->getInvocationGenericSignature());
-
     Explosion result;
 
     auto callee = getCalleeForDistributedMethod(actorSelf);
@@ -255,15 +292,9 @@ void DistributedAccessor::emit() {
     emission->emitToExplosion(result, /*isOutlined=*/false);
     emission->end();
 
-    if (result.empty()) {
-      IGF.Builder.CreateRetVoid();
-      return;
-    }
-
+    Explosion error;
     auto resultTy = conv.getSILResultType(expansionContext);
-    IGF.emitScalarReturn(resultTy, resultTy, result,
-                         /*swiftCCReturn=*/false,
-                         /*isOutlined=*/false);
+    emitAsyncReturn(IGF, AsyncLayout, resultTy, AccessorType, result, error);
   }
 }
 
