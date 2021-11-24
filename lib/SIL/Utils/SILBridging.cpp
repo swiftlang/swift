@@ -490,6 +490,9 @@ SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store) {
   return (SwiftInt)castToInst<StoreInst>(store)->getOwnershipQualifier();
 }
 
+void RefCountingInst_setNonAtomic(BridgedInstruction inst) {
+  castToInst<RefCountingInst>(inst)->setNonAtomic();
+}
 
 //===----------------------------------------------------------------------===//
 //                                SILBuilder

@@ -25,7 +25,7 @@ struct PassContext {
   var isSwift51RuntimeAvailable: Bool {
     PassContext_isSwift51RuntimeAvailable(passContext) != 0
   }
-  
+
   var aliasAnalysis: AliasAnalysis {
     let bridgedAA = PassContext_getAliasAnalysis(passContext)
     return AliasAnalysis(bridged: bridgedAA)
@@ -34,6 +34,10 @@ struct PassContext {
   var calleeAnalysis: CalleeAnalysis {
     let bridgeCA = PassContext_getCalleeAnalysis(passContext)
     return CalleeAnalysis(bridged: bridgeCA)
+  }
+
+  var isAssumeSingleThreadedEnabled: Bool {
+    return !(PassContext_isAssumeSingleThreadedEnabled(passContext) == 0)
   }
 
   func erase(instruction: Instruction) {
@@ -55,6 +59,10 @@ struct PassContext {
     PassContext_notifyChanges(passContext, instructionsChanged)
 
     SILInstruction_setOperand(instruction.bridged, index, value.bridged)
+  }
+
+  func invalidateAnalysis(_ kind: ChangeNotificationKind, at function: Function) {
+    PassContext_invalidateAnalysis(passContext, function.bridged, kind)
   }
 }
 

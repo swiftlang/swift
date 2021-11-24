@@ -1194,3 +1194,25 @@ BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context) 
   SILPassManager *pm = castToPassInvocation(context)->getPassManager();
   return {pm->getAnalysis<BasicCalleeAnalysis>()};
 }
+
+void PassContext_invalidateAnalysis(BridgedPassContext context,
+                         BridgedFunction function,
+                         enum ChangeNotificationKind changeKind) {
+  SILPassManager *pm = castToPassInvocation(context)->getPassManager();
+  switch (changeKind) {
+  case instructionsChanged:
+    pm->invalidateAnalysis(castToFunction(function), SILAnalysis::InvalidationKind::Instructions);
+    break;
+  case callsChanged:
+    pm->invalidateAnalysis(castToFunction(function), SILAnalysis::InvalidationKind::CallsAndInstructions);
+    break;
+  case branchesChanged:
+    pm->invalidateAnalysis(castToFunction(function), SILAnalysis::InvalidationKind::BranchesAndInstructions);
+    break;
+  }
+}
+
+SwiftInt PassContext_isAssumeSingleThreadedEnabled(BridgedPassContext context) {
+  SILPassManager *pm = castToPassInvocation(context)->getPassManager();
+  return pm->getOptions().AssumeSingleThreaded;
+}

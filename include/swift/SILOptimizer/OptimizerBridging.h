@@ -64,6 +64,9 @@ BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
 
 BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context);
 
+void PassContext_invalidateAnalysis(BridgedPassContext context, BridgedFunction function, enum ChangeNotificationKind changeKind);
+SwiftInt PassContext_isAssumeSingleThreadedEnabled(BridgedPassContext context);
+
 BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
                                             BridgedValue callee);
 SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees);

@@ -230,6 +230,7 @@ BridgedBasicBlock BranchInst_getTargetBlock(BridgedInstruction bi);
 SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se);
 SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx);
 SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store);
+void RefCountingInst_setNonAtomic(BridgedInstruction inst);
 
 BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedInstruction insertionPoint,

@@ -1,8 +1,8 @@
-//===--- AssumeSingleThreaded.cpp - Assume single-threaded execution  -----===//
+//===--- AssumeSingleThreaded.swift - Assume single-threaded execution --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -25,35 +25,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/Support/CommandLine.h"
 
-using namespace swift;
+import SIL
+import SILBridging
 
-namespace {
-class AssumeSingleThreaded : public swift::SILFunctionTransform {
-  /// The entry point to the transformation.
-  void run() override {
-    if (!getOptions().AssumeSingleThreaded)
-      return;
-    for (auto &BB : *getFunction()) {
-      for (auto &I : BB) {
-        if (auto RCInst = dyn_cast<RefCountingInst>(&I))
-          RCInst->setNonAtomic();
-      }
-    }
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+let assumeSingleThreaded = FunctionPass(name: "sil-assume-single-threaded") { function, context in
+
+  if !context.isAssumeSingleThreadedEnabled {
+    return
   }
 
-};
-} // end anonymous namespace
-
-
-SILTransform *swift::createLegacyAssumeSingleThreaded() {
-  return new AssumeSingleThreaded();
+  for block in function.blocks {
+    for instruction in block.instructions {
+      if let rcInst = instruction as? RefCountingInst {
+        rcInst.setNonAtomic()
+      }
+    }
+  }
+  context.invalidateAnalysis(instructionsChanged, at: function)
 }

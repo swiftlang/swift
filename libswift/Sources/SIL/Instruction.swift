@@ -228,7 +228,11 @@ final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
 
 final public class DeallocRefInst : Instruction, UnaryInstruction {}
 
-public class RefCountingInst : Instruction, UnaryInstruction {}
+public class RefCountingInst : Instruction, UnaryInstruction {
+  public func setNonAtomic() {
+    RefCountingInst_setNonAtomic(bridged)
+  }
+}
 
 final public class StrongRetainInst : RefCountingInst {
 }
