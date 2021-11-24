@@ -159,6 +159,7 @@ create_installer() {
     xcrun stapler staple "${darwin_toolchain_installer_package}"
   else
     echo "Failed to notarize the toolchain $darwin_toolchain_installer_package: $request_status"
+    exit 1
   fi
 }
 
