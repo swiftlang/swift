@@ -3,16 +3,25 @@
 public func takeIntConst(_ a: _const Int) {}
 public func takeStringConst(_ a: _const String) {}
 public func takeDoubleConst(_ a: _const Double) {}
+public func takeArrayConst(_ a: _const [String]) {}
+public func takeDictConst(_ a: _const [Int: String]) {}
 
-func main(_ i: Int, _ d: Double, _ s: String) {
+func main(_ i: Int, _ d: Double, _ s: String, arr: [String], dict: [Int: String]) {
 	takeIntConst(2)
 	takeDoubleConst(3.3)
 	takeStringConst("")
+	takeArrayConst([""])
+	takeDictConst([1: "", 2: "text"])
 	
 	takeIntConst(i) // expected-error {{expect a compile-time constant literal}}
 	takeDoubleConst(d) // expected-error {{expect a compile-time constant literal}}
 	takeStringConst("\(d)") // expected-error {{expect a compile-time constant literal}}
 	takeStringConst(s) // expected-error {{expect a compile-time constant literal}}
+	takeArrayConst(arr) // expected-error {{expect a compile-time constant literal}}
+	takeArrayConst([s]) // expected-error {{expect a compile-time constant literal}}
+	takeArrayConst(["", s]) // expected-error {{expect a compile-time constant literal}}
+	takeDictConst([1: "", 2: s]) // expected-error {{expect a compile-time constant literal}}
+	takeDictConst([1: "", i: "text"]) // expected-error {{expect a compile-time constant literal}}
 }
 
 public struct Utils {
