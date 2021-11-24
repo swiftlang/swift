@@ -36,7 +36,23 @@ struct PassContext {
     return CalleeAnalysis(bridged: bridgeCA)
   }
 
-  func erase(instruction: Instruction) {
+  enum EraseMode {
+    case onlyInstruction, includingDebugUses
+  }
+
+  func erase(instruction: Instruction, _ mode: EraseMode = .onlyInstruction) {
+    switch mode {
+      case .onlyInstruction:
+        break
+      case .includingDebugUses:
+        for result in instruction.results {
+          for use in result.uses {
+            assert(use.instruction is DebugValueInst)
+            PassContext_eraseInstruction(passContext, use.instruction.bridged)
+          }
+        }
+    }
+  
     if instruction is FullApplySite {
       PassContext_notifyChanges(passContext, callsChanged)
     }
@@ -47,7 +63,13 @@ struct PassContext {
 
     PassContext_eraseInstruction(passContext, instruction.bridged)
   }
-  
+
+  func replaceAllUses(of value: Value, with replacement: Value) {
+    for use in value.uses {
+      setOperand(of: use.instruction, at: use.index, to: replacement)
+    }
+  }
+
   func setOperand(of instruction: Instruction, at index : Int, to value: Value) {
     if instruction is FullApplySite && index == ApplyOperands.calleeOperandIndex {
       PassContext_notifyChanges(passContext, callsChanged)

@@ -326,6 +326,8 @@ final public class GlobalAddrInst : GlobalAccessInst {}
 
 final public class GlobalValueInst : GlobalAccessInst {}
 
+final public class IntegerLiteralInst : SingleValueInstruction {}
+
 final public class TupleInst : SingleValueInstruction {
 }
 

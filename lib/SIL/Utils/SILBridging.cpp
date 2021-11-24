@@ -513,3 +513,11 @@ BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
   return {builder.createCondFail(getRegularLocation(loc),
     castToSILValue(condition), getStringRef(messge))};
 }
+
+BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,
+          BridgedLocation loc, BridgedType type, SwiftInt value) {
+  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+  return {builder.createIntegerLiteral(getRegularLocation(loc),
+                                       getSILType(type), value)};
+}
+
