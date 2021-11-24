@@ -258,34 +258,35 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   }
   for (auto *sv: vars) {
     bool hasConst = sv->getAttrs().getAttribute<CompileTimeConstAttr>();
-    bool hasStatic = StaticSpelling != StaticSpellingKind::None;
     if (!hasConst)
-      break;
-    while(1) {
-      // only static _const let/var is supported
-      if (!hasStatic) {
-        binding->diagnose(diag::require_static_for_const);
-        break;
-      }
-      if (isReq) {
-        break;
-      }
-      // var is only allowed in a protocol.
-      if (!sv->isLet()) {
-        binding->diagnose(diag::require_let_for_const);
-        break;
-      }
-      // Diagnose when an init isn't given and it's not a compile-time constant
-      auto *init = binding->getInit(entryNumber);
-      if (!init) {
-        binding->diagnose(diag::require_const_initializer_for_const);
-        break;
-      }
+      continue;
+    bool hasStatic = StaticSpelling != StaticSpellingKind::None;
+    // only static _const let/var is supported
+    if (!hasStatic) {
+      binding->diagnose(diag::require_static_for_const);
+      continue;
+    }
+    if (isReq) {
+      continue;
+    }
+    auto varSourceFile = binding->getDeclContext()->getParentSourceFile();
+    auto isVarInInterfaceFile =
+        varSourceFile && varSourceFile->Kind == SourceFileKind::Interface;
+    // Don't diagnose too strictly for textual interfaces.
+    if (isVarInInterfaceFile) {
+      continue;
+    }
+    // var is only allowed in a protocol.
+    if (!sv->isLet()) {
+      binding->diagnose(diag::require_let_for_const);
+    }
+    // Diagnose when an init isn't given and it's not a compile-time constant
+    if (auto *init = binding->getInit(entryNumber)) {
       if (!init->isSemanticallyConstExpr()) {
         binding->diagnose(diag::require_const_initializer_for_const);
-        break;
       }
-      break;
+    } else {
+      binding->diagnose(diag::require_const_initializer_for_const);
     }
   }
 

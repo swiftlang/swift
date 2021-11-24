@@ -9,11 +9,11 @@
 // RUN: %FileCheck %s < %t/printed-module.txt
 
 public struct A {
-	public _const let A = "value"
+	public static _const let A = "value"
 	public func takeConst1(a: _const Int) {}
 	public func takeConst2(a b: _const Int) {}
 }
 
-// CHECK: _const public let A: Swift.String
+// CHECK: _const public static let A: Swift.String
 // CHECK: public func takeConst1(a: _const Swift.Int)
 // CHECK: public func takeConst2(a b: _const Swift.Int)
