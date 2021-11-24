@@ -386,7 +386,6 @@ llvm::Constant *IRGenModule::defineAsyncFunctionPointer(LinkEntity entity,
   auto asyncEntity = LinkEntity::forAsyncFunctionPointer(entity);
   auto *var = cast<llvm::GlobalVariable>(
       getAddrOfLLVMVariable(asyncEntity, init, DebugTypeInfo()));
-  setTrueConstGlobal(var);
   return var;
 }
 
