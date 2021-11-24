@@ -1182,14 +1182,17 @@ void DSEContext::runIterativeDSE() {
 }
 
 bool DSEContext::run() {
-  std::pair<int, int> LSCount = std::make_pair(0, 0);
+  int numLoads = 0, numStores = 0;
+  bool immutableLoadsFound = false;
   // Walk over the function and find all the locations accessed by
   // this function.
   LSLocation::enumerateLSLocations(*F, LocationVault, LocToBitIndex,
-                                   BaseToLocIndex, TE, LSCount);
+                                   BaseToLocIndex, TE,
+                                   /*stopAtImmutable*/ false,
+                                   numLoads, numStores, immutableLoadsFound);
 
   // Check how to optimize this function.
-  ProcessKind Kind = getProcessFunctionKind(LSCount.second);
+  ProcessKind Kind = getProcessFunctionKind(numStores);
   
   // We do not optimize this function at all.
   if (Kind == ProcessKind::ProcessNone)
