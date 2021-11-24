@@ -9735,7 +9735,7 @@ static void loadAllMembersOfRecordDecl(StructDecl *recordDecl) {
       continue;
 
     for (auto found : recordDecl->lookupDirect(name)) {
-      if (addedMembers.insert(found).second)
+      if (addedMembers.insert(found).second && found->getDeclContext() == recordDecl)
         recordDecl->addMember(found);
     }
   }
