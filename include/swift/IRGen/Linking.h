@@ -484,6 +484,9 @@ class LinkEntity {
 
     /// The pointer is SILFunction*
     DistributedMethodAccessor,
+    /// An async function pointer for a distributed method accessor.
+    /// The pointer is a SILFunction*.
+    DistributedMethodAccessorAsyncPointer,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -1239,6 +1242,13 @@ public:
           Kind, unsigned(LinkEntity::Kind::PartialApplyForwarderAsyncFunctionPointer));
       break;
 
+    case LinkEntity::Kind::DistributedMethodAccessor: {
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(LinkEntity::Kind::DistributedMethodAccessorAsyncPointer));
+      break;
+    }
+
     default:
       llvm_unreachable("Link entity kind cannot have an async function pointer");
     }
@@ -1304,6 +1314,11 @@ public:
     case LinkEntity::Kind::PartialApplyForwarderAsyncFunctionPointer:
       entity.Data = LINKENTITY_SET_FIELD(
           Kind, unsigned(LinkEntity::Kind::PartialApplyForwarder));
+      break;
+
+    case LinkEntity::Kind::DistributedMethodAccessorAsyncPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DistributedMethodAccessor));
       break;
 
     default:
