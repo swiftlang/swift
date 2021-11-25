@@ -12,35 +12,35 @@
 
 import SILBridging
 
-final public class BasicBlock : ListNode, CustomStringConvertible {
-  public var next: BasicBlock? { SILBasicBlock_next(bridged).block }
-  public var previous: BasicBlock? { SILBasicBlock_previous(bridged).block }
+extension SILBasicBlock : ListNode, CustomStringConvertible {
+  public var next: BasicBlock? { SILBasicBlock_next(self) }
+  public var previous: BasicBlock? { SILBasicBlock_previous(self) }
 
-  public var function: Function { SILBasicBlock_getFunction(bridged).function }
+  public var function: Function { SILBasicBlock_getFunction(self) }
 
   public var description: String {
-    var s = SILBasicBlock_debugDescription(bridged)
+    var s = SILBasicBlock_debugDescription(self)
     return String(cString: s.c_str())
   }
 
   public var arguments: ArgumentArray { ArgumentArray(block: self) }
 
   public var instructions: List<Instruction> {
-    List(startAt: SILBasicBlock_firstInst(bridged).instruction)
+    List(startAt: SILBasicBlock_firstInst(self))
   }
 
   public var reverseInstructions: ReverseList<Instruction> {
-    ReverseList(startAt: SILBasicBlock_lastInst(bridged).instruction)
+    ReverseList(startAt: SILBasicBlock_lastInst(self))
   }
-  
-  public var terminator: TermInst {
-    SILBasicBlock_lastInst(bridged).instruction as! TermInst
+
+  public var terminator: swift.TermInst {
+    getAsTermInst(SILBasicBlock_lastInst(self)!)!
   }
 
   public var successors: SuccessorArray { terminator.successors }
   
   public var predecessors: PredecessorList {
-    PredecessorList(startAt: SILBasicBlock_getFirstPred(bridged))
+    PredecessorList(startAt: SILBasicBlock_getFirstPred(self))
   }
 
   public var singlePredecessor: BasicBlock? {
@@ -63,21 +63,21 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
   }
   
   public var label: String { "bb\(index)" }
-
-  var bridged: BridgedBasicBlock { BridgedBasicBlock(obj: SwiftObject(self)) }
 }
 
-public func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }
-public func != (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs !== rhs }
+public func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { isPtrEq(lhs, rhs) }
+public func != (lhs: BasicBlock, rhs: BasicBlock) -> Bool { !(lhs == rhs) }
+
+public typealias BasicBlock = SILBasicBlock
 
 public struct ArgumentArray : RandomAccessCollection {
   fileprivate let block: BasicBlock
 
   public var startIndex: Int { return 0 }
-  public var endIndex: Int { SILBasicBlock_getNumArguments(block.bridged) }
+  public var endIndex: Int { SILBasicBlock_getNumArguments(block) }
 
   public subscript(_ index: Int) -> Argument {
-    SILBasicBlock_getArgument(block.bridged, index).argument
+    SILBasicBlock_getArgument(block, index)
   }
 }
 
@@ -94,7 +94,7 @@ public struct SuccessorArray : RandomAccessCollection, CustomReflectable {
   public subscript(_ index: Int) -> BasicBlock {
     precondition(index >= 0 && index < endIndex)
     let s = BridgedSuccessor(succ: succArray.data + index &* BridgedSuccessorSize);
-    return SILSuccessor_getTargetBlock(s).block
+    return SILSuccessor_getTargetBlock(s)
   }
   
   public var customMirror: Mirror {
@@ -112,7 +112,7 @@ public struct PredecessorList : Sequence, IteratorProtocol, CustomReflectable {
     if let succPtr = currentSucc.succ {
       let succ = BridgedSuccessor(succ: succPtr)
       currentSucc = SILSuccessor_getNext(succ)
-      return SILSuccessor_getContainingInst(succ).instruction.block
+      return SILSuccessor_getContainingInst(succ).block
     }
     return nil
   }
@@ -121,15 +121,4 @@ public struct PredecessorList : Sequence, IteratorProtocol, CustomReflectable {
     let c: [Mirror.Child] = map { (label: nil, value: $0) }
     return Mirror(self, children: c)
   }
-}
-
-
-// Bridging utilities
-
-extension BridgedBasicBlock {
-  var block: BasicBlock { obj.getAs(BasicBlock.self) }
-}
-
-extension OptionalBridgedBasicBlock {
-  var block: BasicBlock? { obj.getAs(BasicBlock.self) }
 }

@@ -31,7 +31,7 @@ class SILFunction;
 class SILArgument;
 class SILPrintContext;
 
-class SILBasicBlock :
+class __attribute__((swift_attr("import_as_ref"))) SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock>,
 public SwiftObjectHeader {
   friend class SILSuccessor;

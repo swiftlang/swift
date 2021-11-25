@@ -2746,11 +2746,7 @@ for host in "${ALL_HOSTS[@]}"; do
         CLANG_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
     fi
 
-    if [[ "${NATIVE_SWIFT_TOOLS_PATH}" ]] ; then
-        SWIFTC_BIN="${NATIVE_SWIFT_TOOLS_PATH}/swiftc"
-    else
-        SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
-    fi
+    SWIFTC_BIN="/Users/zoecarver/Developer/swift-source/build/Ninja-ReleaseAssert/swift-macosx-x86_64/bin/swiftc"
 
     # Run the tests for each product
     for product in "${PRODUCTS[@]}"; do

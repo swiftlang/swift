@@ -821,8 +821,8 @@ inline AliasAnalysis *castToAliasAnalysis(BridgedAliasAnalysis aa) {
 }
 
 BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
-                                                   BridgedInstruction inst,
-                                                   BridgedValue addr) {
+                                                   SILInstruction *inst,
+                                                   ValueBase *addr) {
   return (BridgedMemoryBehavior)castToAliasAnalysis(aa)->
-    computeMemoryBehavior(castToInst(inst), castToSILValue(addr));
+    computeMemoryBehavior(inst, addr);
 }

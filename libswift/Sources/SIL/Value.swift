@@ -12,50 +12,17 @@
 
 import SILBridging
 
-public protocol Value : AnyObject, CustomStringConvertible {
-  var uses: UseList { get }
-  var type: Type { get }
-  var definingInstruction: Instruction? { get }
-}
+public typealias Value = swift.ValueBase
 
 extension Value {
   public var description: String {
-    var s = SILNode_debugDescription(bridgedNode)
+    var s = SILNode_debugDescription(self)
     return String(cString: s.c_str())
   }
 
-  public var uses: UseList {
-    return UseList(SILValue_firstUse(bridged))
-  }
+  public var uses: UseList { UseList(SILValue_firstUse(self)) }
 
-  public var type: Type {
-    return Type(bridged: SILValue_getType(bridged))
-  }
-
-  public var hashable: HashableValue { ObjectIdentifier(self) }
-
-  public var bridged: BridgedValue {
-    BridgedValue(obj: SwiftObject(self as AnyObject))
-  }
-  var bridgedNode: BridgedNode {
-    BridgedNode(obj: SwiftObject(self as AnyObject))
-  }
+  public var type: Type { SILValue_getType(self) }
 }
 
-public typealias HashableValue = ObjectIdentifier
-
-public func ==(_ lhs: Value, _ rhs: Value) -> Bool {
-  return lhs === rhs
-}
-
-extension BridgedValue {
-  func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
-}
-
-final class Undef : Value {
-  public var definingInstruction: Instruction? { nil }
-}
-
-final class PlaceholderValue : Value {
-  public var definingInstruction: Instruction? { nil }
-}
+public func==(_ a: Value, _ b: Value) -> Bool { isPtrEq(a, b) }

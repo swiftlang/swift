@@ -12,35 +12,36 @@
 
 import SILBridging
 
+public typealias Argument = swift.SILArgument
+
 /// A basic block argument.
 ///
 /// Maps to both, SILPhiArgument and SILFunctionArgument.
-public class Argument : Value, Equatable {
-  public var definingInstruction: Instruction? { nil }
-
+extension swift.SILArgument {
   public var block: BasicBlock {
-    return SILArgument_getParent(bridged).block
-  }
-
-  var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
-  
-  public var index: Int {
-    return block.arguments.firstIndex(of: self)!
+    return SILArgument_getParent(self)
   }
   
-  public static func ==(lhs: Argument, rhs: Argument) -> Bool {
-    lhs === rhs
+  public var index: Int { Int(getIndex()) }
+}
+
+public func ==(lhs: Argument, rhs: Argument) -> Bool {
+  isPtrEq(getAsValue(lhs)!, getAsValue(rhs)!)
+}
+
+public typealias FunctionArgument = swift.SILFunctionArgument;
+public typealias BlockArgument = swift.SILPhiArgument;
+extension BlockArgument {
+  public var block: BasicBlock {
+    return SILArgument_getParent(getAsSILArgument(self)!)
   }
-}
+  
+  public var index: Int { getAsSILArgument(self)!.index }
 
-final public class FunctionArgument : Argument {
-}
-
-final public class BlockArgument : Argument {
   /// Note: critical edges are not supported, i.e. this is false if there is
   /// a cond_br in the predecessors.
   public var isPhiArgument: Bool {
-    block.predecessors.allSatisfy { $0.terminator is BranchInst }
+    block.predecessors.allSatisfy { isaBranchInst(getAsSILInstruction($0.terminator)) }
   }
 
   public var incomingPhiOperands: LazyMapSequence<PredecessorList, Operand> {
@@ -54,11 +55,4 @@ final public class BlockArgument : Argument {
     let idx = index
     return block.predecessors.lazy.map { $0.terminator.operands[idx].value }
   }
-}
-
-// Bridging utilities
-
-extension BridgedArgument {
-  var argument: Argument { obj.getAs(Argument.self) }
-  var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
 }

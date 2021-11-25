@@ -22,12 +22,12 @@ extern "C" {
 #endif
 
 typedef struct {
-  BridgedFunction function;
+  SILFunction *function;
   BridgedPassContext passContext;
 } BridgedFunctionPassCtxt;
 
 typedef struct {
-  BridgedInstruction instruction;
+  SILInstruction *instruction;
   BridgedPassContext passContext;
 } BridgedInstructionPassCtxt;
 
@@ -59,16 +59,15 @@ SwiftInt PassContext_isSwift51RuntimeAvailable(BridgedPassContext context);
 BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context);
 
 BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
-                                                   BridgedInstruction inst,
-                                                   BridgedValue addr);
+                                                   SILInstruction *inst,
+                                                   ValueBase *addr);
 
 BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context);
 
 BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
-                                            BridgedValue callee);
+                                            ValueBase *callee);
 SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees);
-BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
-                                         SwiftInt index);
+SILFunction *BridgedFunctionArray_get(BridgedCalleeList callees, SwiftInt index);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -12,6 +12,7 @@
 
 import SILBridging
 
+// TODO: replace this with an extension on swift.SILGlobalVariable.
 final public class GlobalVariable : CustomStringConvertible {
   public var name: String {
     return SILGlobalVariable_getName(bridged).string

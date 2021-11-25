@@ -115,7 +115,7 @@ public:
 ///   subobject.  If the SILNode is actually the base subobject of a
 ///   ValueBase subobject, the cast will yield a corrupted value.
 ///   Always use the LLVM casts (cast<>, dyn_cast<>, etc.) instead.
-class alignas(8) SILNode :
+class __attribute__((swift_attr("import_as_ref"))) alignas(8) SILNode :
   // SILNode contains a swift object header for bridging with libswift.
   // For details see libswift/README.md.
   public SwiftObjectHeader {
@@ -469,7 +469,6 @@ public:
   // of the cast machinery.  At a high level, all you need to know is to
   // never use static_cast to downcast a SILNode.
   SILInstruction *castToInstruction();
-  const SILInstruction *castToInstruction() const;
   
   static SILNode *instAsNode(SILInstruction *inst);
   static const SILNode *instAsNode(const SILInstruction *inst);

@@ -12,13 +12,13 @@
 
 import SILBridging
 
-public struct Type {
-  var bridged: BridgedType
-  
-  public var isAddress: Bool { SILType_isAddress(bridged) != 0 }
+public typealias Type = swift.SILType
+
+extension swift.SILType {
+  public var isAddress: Bool { SILType_isAddress(self) != 0 }
   public var isObject: Bool { !isAddress }
   
   public func isTrivial(in function: Function) -> Bool {
-    return SILType_isTrivial(bridged, function.bridged) != 0
+    return SILType_isTrivial(self, function) != 0
   }
 }
