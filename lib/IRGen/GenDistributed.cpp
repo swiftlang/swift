@@ -112,6 +112,10 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
                      .build();
 
   auto methodTy = DistMethod->getLoweredFunctionType();
+
+  assert(methodTy->isAsync());
+  assert(methodTy->hasErrorResult());
+
   // Accessor gets argument value buffer and a reference to `self` of
   // the actor and produces a call to the distributed thunk forwarding
   // its result(s) out.
@@ -120,7 +124,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
       ParameterConvention::Direct_Guaranteed, {getParamForArguments()},
       /*Yields=*/{},
       /*Results=*/methodTy->getResults(),
-      /*ErrorResult=*/None,
+      /*ErrorResult=*/methodTy->getErrorResult(),
       /*patternSubs=*/SubstitutionMap(),
       /*invocationSubs=*/SubstitutionMap(), Context);
 }
@@ -281,6 +285,7 @@ void DistributedAccessor::emit() {
   // using computed argument explosion.
   {
     Explosion result;
+    Explosion error;
 
     auto callee = getCalleeForDistributedMethod(actorSelf);
     auto emission =
@@ -290,9 +295,20 @@ void DistributedAccessor::emit() {
     emission->setArgs(arguments, /*isOutlined=*/false,
                       /*witnessMetadata=*/nullptr);
     emission->emitToExplosion(result, /*isOutlined=*/false);
+
+    // Both accessor and distributed method are always `async throws`
+    // so we need to load error value (if any) from the slot.
+    {
+      assert(methodTy->hasErrorResult());
+
+      SILType errorType = conv.getSILErrorType(expansionContext);
+      Address calleeErrorSlot =
+          emission->getCalleeErrorSlot(errorType, /*isCalleeAsync=*/true);
+      error.add(IGF.Builder.CreateLoad(calleeErrorSlot));
+    }
+
     emission->end();
 
-    Explosion error;
     auto resultTy = conv.getSILResultType(expansionContext);
     emitAsyncReturn(IGF, AsyncLayout, resultTy, AccessorType, result, error);
   }
