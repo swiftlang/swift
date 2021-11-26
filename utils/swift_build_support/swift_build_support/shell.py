@@ -212,7 +212,7 @@ def run(*args, **kwargs):
     repo_path = os.getcwd()
     echo_output = kwargs.pop('echo', False)
     dry_run = kwargs.pop('dry_run', False)
-    env = kwargs.pop('env', None)
+    env = kwargs.get('env', None)
     if dry_run:
         _echo_command(dry_run, *args, env=env)
         return(None, 0, args)
