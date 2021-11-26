@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SILBridging
 import SIL
 
 // Removes all reference counting instructions of a `global_value` instruction
@@ -18,12 +19,14 @@ import SIL
 // Note that `simplifyStrongRetainPass` and `simplifyStrongReleasePass` can
 // even remove "unbalanced" retains/releases of a `global_value`, but this
 // requires a minimum deployment target.
-let simplifyGlobalValuePass = InstructionPass<GlobalValueInst>(
+let simplifyGlobalValuePass = InstructionPass(
   name: "simplify-global_value", {
-  (globalValue: GlobalValueInst, context: PassContext) in
+    (inst: Instruction, context: PassContext) in
+    
+  let globalValue = getAsGlobalValueInst(inst)!
 
   var users = StackList<Instruction>(context)
-  if checkUsers(of: globalValue, users: &users) {
+  if checkUsers(of: getAsValue(globalValue)!, users: &users) {
     while let inst = users.pop() {
       context.erase(instruction: inst)
     }
@@ -37,19 +40,19 @@ let simplifyGlobalValuePass = InstructionPass<GlobalValueInst>(
 private func checkUsers(of val: Value, users: inout StackList<Instruction>) -> Bool {
   for use in val.uses {
     let user = use.instruction
-    if user is RefCountingInst || user is DebugValueInst {
+    if user is RefCountingInst || isaDebugValueInst(user) {
       users.push(user)
       continue
     }
-    if let upCast = user as? UpcastInst {
-      if !checkUsers(of: upCast, users: &users) {
+    if let upCast = getAsUpcastInst(user) {
+      if !checkUsers(of: getAsValue(upCast)!, users: &users) {
         return false
       }
       continue
     }
     // Projection instructions don't access the object header, so they don't
     // prevent deleting reference counting instructions.
-    if user is RefElementAddrInst || user is RefTailAddrInst {
+    if isaRefElementAddrInst(user) || isaRefTailAddrInst(user) {
       continue
     }
     return false

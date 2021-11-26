@@ -10,15 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SILBridging
 import SIL
 
 let mergeCondFailsPass = FunctionPass(name: "merge-cond_fails", runMergeCondFails)
 
 /// Return true if the operand of the cond_fail instruction looks like
 /// the overflow bit of an arithmetic instruction.
-private func hasOverflowConditionOperand(_ cfi: CondFailInst) -> Bool {
-  if let tei = cfi.operand as? TupleExtractInst {
-    return tei.operand is BuiltinInst
+private func hasOverflowConditionOperand(_ cfi: swift.CondFailInst) -> Bool {
+  if let tei = getAsTupleExtractInst(cfi.operand) {
+    return isaBuiltinInst(tei.operand)
   }
   return false
 }
@@ -30,15 +31,14 @@ private func hasOverflowConditionOperand(_ cfi: CondFailInst) -> Bool {
 /// This pass merges cond_fail instructions by building the disjunction of
 /// their operands.
 private func runMergeCondFails(function: Function, context: PassContext) {
-
   // Merge cond_fail instructions if there is no side-effect or read in
   // between them.
   for block in function.blocks {
     // Per basic block list of cond_fails to merge.
-    var condFailToMerge = StackList<CondFailInst>(context)
+    var condFailToMerge = StackList<swift.CondFailInst>(context)
 
     for inst in block.instructions {
-      if let cfi = inst as? CondFailInst {
+      if let cfi = getAsCondFailInst(inst) {
         // Do not process arithmetic overflow checks. We typically generate more
         // efficient code with separate jump-on-overflow.
         if !hasOverflowConditionOperand(cfi) &&
@@ -58,7 +58,7 @@ private func runMergeCondFails(function: Function, context: PassContext) {
 
 /// Try to merge the cond_fail instructions. Returns true if any could
 /// be merge.
-private func mergeCondFails(_ condFailToMerge: inout StackList<CondFailInst>,
+private func mergeCondFails(_ condFailToMerge: inout StackList<swift.CondFailInst>,
                             context: PassContext) {
   guard let lastCFI = condFailToMerge.last else {
     return
@@ -70,10 +70,11 @@ private func mergeCondFails(_ condFailToMerge: inout StackList<CondFailInst>,
   // Merge conditions and remove the merged cond_fail instructions.
   for cfi in condFailToMerge {
     if let prevCond = mergedCond {
-      mergedCond = builder.createBuiltinBinaryFunction(name: "or",
+      let builtinCall = builder.createBuiltinBinaryFunction(name: "or",
                                         operandType: prevCond.type,
                                         resultType: prevCond.type,
                                         arguments: [prevCond, cfi.operand])
+      mergedCond = getAsValue(builtinCall)
       didMerge = true
     } else {
       mergedCond = cfi.operand
@@ -89,6 +90,6 @@ private func mergeCondFails(_ condFailToMerge: inout StackList<CondFailInst>,
                              message: lastCFI.message)
 
   while let cfi = condFailToMerge.pop() {
-    context.erase(instruction: cfi)
+    context.erase(instruction: getAsSILInstruction(cfi))
   }
 }

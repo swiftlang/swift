@@ -142,7 +142,7 @@ private:
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
-class SILFunction
+class __attribute__((swift_attr("import_as_ref"))) SILFunction
   : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction>,
     public SwiftObjectHeader {
     

@@ -14,10 +14,86 @@
 #define SWIFT_SIL_SILBRIDGING_H
 
 #include "BridgedSwiftObject.h"
+
+#include "swift/SIL/SILNode.h"
+#include "swift/SIL/SILType.h"
+#include "swift/SIL/SILUndef.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILFunction.h"
+
+#include "swift/AST/AnyFunctionRef.h"
+
 #include <stddef.h>
 #include <string>
 
+using namespace swift;
+
+#define INST(ID, NAME) \
+inline SILInstruction * _Nonnull getAsSILInstruction(ID * _Nonnull I) { \
+  return static_cast<SILInstruction *>(I); \
+} \
+inline ID * _Nullable getAs##ID(SILInstruction * _Nonnull p) { \
+  return dyn_cast<ID>(p); \
+} \
+inline bool isa##ID(SILInstruction * _Nonnull p) { return isa<ID>(p); }
+
+#define ABSTRACT_INST(ID, NAME) \
+inline SILInstruction * _Nonnull getAsSILInstruction(ID * _Nonnull I) { \
+  return static_cast<SILInstruction *>(I); \
+} \
+inline ID * _Nullable getAs##ID(SILInstruction * _Nonnull p) { \
+  return dyn_cast<ID>(p); \
+} \
+inline bool isa##ID(SILInstruction * _Nonnull p) { return isa<ID>(p); }
+
+#include "swift/SIL/SILNodes.def"
+#undef INST
+
+#define VALUE(ID, NAME)    \
+inline ID * _Nullable getAs##ID(ValueBase *v) { \
+  return dyn_cast<ID>(v); \
+} \
+inline bool isa##ID(ValueBase *v) { return isa<ID>(v); } \
+inline ValueBase * _Nullable getAsValue(ID * _Nonnull v) { \
+  return dyn_cast<ValueBase>(v); \
+}
+
+#include "swift/SIL/SILNodes.def"
+#undef SINGLE_VALUE_INST
+
+// There are a couple of holes in the above set of functions.
+inline SILArgument * _Nullable getAsSILArgument(ValueBase *a) {
+  return dyn_cast<SILArgument>(a);
+}
+
+inline SILArgument * _Nullable getAsSILArgument(SILPhiArgument *a) {
+  return dyn_cast<SILArgument>(a);
+}
+
+inline SILArgument * _Nullable getAsSILArgument(SILFunctionArgument *a) {
+  return dyn_cast<SILArgument>(a);
+}
+
+inline SingleValueInstruction * _Nullable
+getAsSingleValueInstruction(ValueBase *v) {
+  return dyn_cast<SingleValueInstruction>(v);
+}
+
+inline ValueBase * _Nullable getAsValue(SILArgument * _Nonnull v) {
+  return dyn_cast<ValueBase>(v);
+}
+
+inline ValueBase * _Nullable getAsValue(SingleValueInstruction * _Nonnull v) {
+  return dyn_cast<ValueBase>(v);
+}
+
+inline ValueBase * _Nullable getAsValue(SILValue v) { return v; }
+
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+
+template<class T> using OptionalRef = T * _Nullable;
 
 typedef struct {
   const unsigned char * _Nullable data;
@@ -63,10 +139,6 @@ typedef struct {
 } BridgedLocation;
 
 typedef struct {
-  void * _Nullable typePtr;
-} BridgedType;
-
-typedef struct {
   const void * _Nullable data;
   size_t count;
 } BridgedValueArray;
@@ -89,43 +161,7 @@ typedef struct {
 
 typedef struct {
   SwiftObject obj;
-} BridgedFunction;
-
-typedef struct {
-  SwiftObject obj;
 } BridgedGlobalVar;
-
-typedef struct {
-  SwiftObject obj;
-} BridgedBasicBlock;
-
-typedef struct {
-  OptionalSwiftObject obj;
-} OptionalBridgedBasicBlock;
-
-typedef struct {
-  SwiftObject obj;
-} BridgedArgument;
-
-typedef struct {
-  OptionalSwiftObject obj;
-} OptionalBridgedArgument;
-
-typedef struct {
-  SwiftObject obj;
-} BridgedNode;
-
-typedef struct {
-  SwiftObject obj;
-} BridgedValue;
-
-typedef struct {
-  SwiftObject obj;
-} BridgedInstruction;
-
-typedef struct {
-  OptionalSwiftObject obj;
-} OptionalBridgedInstruction;
 
 typedef struct {
   SwiftObject obj;
@@ -144,6 +180,12 @@ typedef enum {
 
 typedef intptr_t SwiftInt;
 
+// TODO: we can remove these once we auto generate equality operators for
+// foreign reference types.
+inline bool isPtrEq(ValueBase *a, ValueBase *b) { return a == b; }
+inline bool isPtrEq(SILInstruction *a, SILInstruction *b) { return a == b; }
+inline bool isPtrEq(SILBasicBlock *a, SILBasicBlock *b) { return a == b; }
+
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
 
 void OStream_write(BridgedOStream os, BridgedStringRef str);
@@ -153,90 +195,94 @@ void freeBridgedStringRef(BridgedStringRef str);
 void PassContext_notifyChanges(BridgedPassContext passContext,
                                enum ChangeNotificationKind changeKind);
 void PassContext_eraseInstruction(BridgedPassContext passContext,
-                                  BridgedInstruction inst);
+                                  SILInstruction *inst);
 BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
 BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
                                   BridgedSlab afterSlab);
 BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
                                  BridgedSlab slab);
 
-BridgedStringRef SILFunction_getName(BridgedFunction function);
-std::string SILFunction_debugDescription(BridgedFunction function);
-OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function);
-OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function);
-SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function);
-SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function);
+BridgedStringRef SILFunction_getName(SILFunction *function);
+std::string SILFunction_debugDescription(SILFunction *function);
+SILBasicBlock * _Nullable SILFunction_firstBlock(SILFunction *function);
+OptionalRef<SILBasicBlock> SILFunction_lastBlock(SILFunction *function);
+SwiftInt SILFunction_numIndirectResultArguments(SILFunction *function);
+SwiftInt SILFunction_getSelfArgumentIndex(SILFunction *function);
 
 BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global);
 std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
 
-OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
-OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);
-BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block);
-std::string SILBasicBlock_debugDescription(BridgedBasicBlock block);
-OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block);
-OptionalBridgedInstruction SILBasicBlock_lastInst(BridgedBasicBlock block);
-SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block);
-BridgedArgument SILBasicBlock_getArgument(BridgedBasicBlock block, SwiftInt index);
-OptionalBridgedSuccessor SILBasicBlock_getFirstPred(BridgedBasicBlock block);
-OptionalBridgedSuccessor SILSuccessor_getNext(BridgedSuccessor succ);
-BridgedBasicBlock SILSuccessor_getTargetBlock(BridgedSuccessor succ);
-BridgedInstruction SILSuccessor_getContainingInst(BridgedSuccessor succ);
+int SILBasicBlock_mytest(SILBasicBlock *b);
 
-BridgedValue Operand_getValue(BridgedOperand);
+OptionalRef<SILBasicBlock> SILBasicBlock_next(SILBasicBlock *block);
+OptionalRef<SILBasicBlock> SILBasicBlock_previous(SILBasicBlock *block);
+SILFunction *SILBasicBlock_getFunction(SILBasicBlock *block);
+std::string SILBasicBlock_debugDescription(SILBasicBlock *block);
+SILInstruction *SILBasicBlock_firstInst(SILBasicBlock *block);
+// TODO: we could make this a terminator inst.
+OptionalRef<SILInstruction> SILBasicBlock_lastInst(SILBasicBlock *block);
+SwiftInt SILBasicBlock_getNumArguments(SILBasicBlock *block);
+SILArgument *SILBasicBlock_getArgument(SILBasicBlock *block, SwiftInt index);
+OptionalBridgedSuccessor SILBasicBlock_getFirstPred(SILBasicBlock *block);
+OptionalBridgedSuccessor SILSuccessor_getNext(BridgedSuccessor succ);
+SILBasicBlock *SILSuccessor_getTargetBlock(BridgedSuccessor succ);
+SILInstruction *SILSuccessor_getContainingInst(BridgedSuccessor succ);
+
+ValueBase *Operand_getValue(BridgedOperand);
 OptionalBridgedOperand Operand_nextUse(BridgedOperand);
-BridgedInstruction Operand_getUser(BridgedOperand);
+SILInstruction *Operand_getUser(BridgedOperand);
 SwiftInt Operand_isTypeDependent(BridgedOperand);
 
-std::string SILNode_debugDescription(BridgedNode node);
-OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
-BridgedType SILValue_getType(BridgedValue value);
+std::string SILNode_debugDescription(ValueBase *node);
+std::string SILInstruction_debugDescription(SILInstruction *i);
+OptionalBridgedOperand SILValue_firstUse(ValueBase *value);
+SILType SILValue_getType(ValueBase *value);
 
-SwiftInt SILType_isAddress(BridgedType);
-SwiftInt SILType_isTrivial(BridgedType, BridgedFunction);
+SwiftInt SILType_isAddress(SILType);
+SwiftInt SILType_isTrivial(SILType, SILFunction *);
 
-BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);
+SILBasicBlock *SILArgument_getParent(SILArgument *argument);
 
-OptionalBridgedInstruction SILInstruction_next(BridgedInstruction inst);
-OptionalBridgedInstruction SILInstruction_previous(BridgedInstruction inst);
-BridgedBasicBlock SILInstruction_getParent(BridgedInstruction inst);
-BridgedArrayRef SILInstruction_getOperands(BridgedInstruction inst);
-void SILInstruction_setOperand(BridgedInstruction inst, SwiftInt index,
-                               BridgedValue value);
-BridgedLocation SILInstruction_getLocation(BridgedInstruction inst);
-BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst);
+OptionalRef<SILInstruction> SILInstruction_next(SILInstruction *inst);
+OptionalRef<SILInstruction> SILInstruction_previous(SILInstruction *inst);
+SILBasicBlock *SILInstruction_getParent(SILInstruction *inst);
+BridgedArrayRef SILInstruction_getOperands(SILInstruction *inst);
+void SILInstruction_setOperand(SILInstruction *inst, SwiftInt index,
+                               ValueBase *value);
+BridgedLocation SILInstruction_getLocation(SILInstruction *inst);
+BridgedMemoryBehavior SILInstruction_getMemBehavior(SILInstruction *inst);
 
-BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result);
-SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst);
+SILInstruction *MultiValueInstResult_getParent(BridgedMultiValueResult result);
+SwiftInt MultipleValueInstruction_getNumResults(MultipleValueInstruction *inst);
 BridgedMultiValueResult
-  MultipleValueInstruction_getResult(BridgedInstruction inst, SwiftInt index);
+  MultipleValueInstruction_getResult(MultipleValueInstruction *inst, SwiftInt index);
 
-BridgedArrayRef TermInst_getSuccessors(BridgedInstruction term);
+BridgedArrayRef TermInst_getSuccessors(TermInst *term);
 
-BridgedStringRef CondFailInst_getMessage(BridgedInstruction cfi);
-BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
-SwiftInt TupleExtractInst_fieldIndex(BridgedInstruction tei);
-SwiftInt TupleElementAddrInst_fieldIndex(BridgedInstruction teai);
-SwiftInt StructExtractInst_fieldIndex(BridgedInstruction sei);
-SwiftInt StructElementAddrInst_fieldIndex(BridgedInstruction seai);
-SwiftInt EnumInst_caseIndex(BridgedInstruction ei);
-SwiftInt UncheckedEnumDataInst_caseIndex(BridgedInstruction uedi);
-SwiftInt RefElementAddrInst_fieldIndex(BridgedInstruction reai);
-SwiftInt PartialApplyInst_numArguments(BridgedInstruction ai);
-SwiftInt ApplyInst_numArguments(BridgedInstruction ai);
-SwiftInt BeginApplyInst_numArguments(BridgedInstruction ai);
-SwiftInt TryApplyInst_numArguments(BridgedInstruction ai);
-BridgedBasicBlock BranchInst_getTargetBlock(BridgedInstruction bi);
-SwiftInt SwitchEnumInst_getNumCases(BridgedInstruction se);
-SwiftInt SwitchEnumInst_getCaseIndex(BridgedInstruction se, SwiftInt idx);
-SwiftInt StoreInst_getStoreOwnership(BridgedInstruction store);
+BridgedStringRef CondFailInst_getMessage(CondFailInst *cfi);
+BridgedGlobalVar GlobalAccessInst_getGlobal(GlobalAccessInst *globalInst);
+SwiftInt TupleExtractInst_fieldIndex(TupleExtractInst *tei);
+SwiftInt TupleElementAddrInst_fieldIndex(TupleElementAddrInst *teai);
+SwiftInt StructExtractInst_fieldIndex(StructExtractInst *sei);
+SwiftInt StructElementAddrInst_fieldIndex(StructElementAddrInst *seai);
+SwiftInt EnumInst_caseIndex(EnumInst *ei);
+SwiftInt UncheckedEnumDataInst_caseIndex(UncheckedEnumDataInst *uedi);
+SwiftInt RefElementAddrInst_fieldIndex(RefElementAddrInst *reai);
+SwiftInt PartialApplyInst_numArguments(PartialApplyInst *ai);
+SwiftInt ApplyInst_numArguments(ApplyInst *ai);
+SwiftInt BeginApplyInst_numArguments(BeginApplyInst *ai);
+SwiftInt TryApplyInst_numArguments(TryApplyInst *ai);
+SILBasicBlock *BranchInst_getTargetBlock(BranchInst *bi);
+SwiftInt SwitchEnumInst_getNumCases(SwitchEnumInst *se);
+SwiftInt SwitchEnumInst_getCaseIndex(SwitchEnumInst *se, SwiftInt idx);
+SwiftInt StoreInst_getStoreOwnership(StoreInst *store);
 
-BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
-          BridgedInstruction insertionPoint,
+SILInstruction *SILBuilder_createBuiltinBinaryFunction(
+          SILInstruction *insertionPoint,
           BridgedLocation loc, BridgedStringRef name,
-          BridgedType operandType, BridgedType resultType, BridgedValueArray arguments);
-BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge);
+          SILType operandType, SILType resultType, BridgedValueArray arguments);
+SILInstruction *SILBuilder_createCondFail(SILInstruction *insertionPoint,
+          BridgedLocation loc, ValueBase *condition, BridgedStringRef messge);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

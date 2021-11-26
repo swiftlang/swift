@@ -236,7 +236,13 @@ public:
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
     return getASTType().getNominalOrBoundGenericNominal();
   }
-  
+
+  /// If this type maps to a Swift class, check if that class is a foreign
+  /// reference type.
+  bool isForeignReferenceType() const {
+    return getASTType().isForeignReferenceType();
+  }
+
   /// True if the type is an address type.
   bool isAddress() const { return getCategory() == SILValueCategory::Address; }
 

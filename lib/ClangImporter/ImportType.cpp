@@ -452,6 +452,10 @@ namespace {
           pointeeQualType, ImportTypeKind::Value, AllowNSUIntegerAsInt,
           Bridgeability::None);
 
+      // If this is imported as a reference type, ignore the pointer.
+      if (pointeeType && pointeeType->isForeignReferenceType())
+        return {pointeeType, ImportHint::OtherPointer};
+
       // If the pointed-to type is unrepresentable in Swift, or its C
       // alignment is greater than the maximum Swift alignment, import as
       // OpaquePointer.
@@ -523,6 +527,9 @@ namespace {
                                    AllowNSUIntegerAsInt, Bridgeability::None);
       if (!pointeeType)
         return Type();
+
+      if (pointeeType->isForeignReferenceType())
+        return {pointeeType, ImportHint::None};
 
       if (pointeeQualType->isFunctionType()) {
         return importFunctionPointerLikeType(*type, pointeeType);
@@ -1516,7 +1523,8 @@ static ImportedType adjustTypeForConcreteImport(
   assert(importedType);
 
   if (importKind == ImportTypeKind::RecordField &&
-      importedType->isAnyClassReferenceType()) {
+      importedType->isAnyClassReferenceType() &&
+      !importedType->isForeignReferenceType()) {
     // Wrap retainable struct fields in Unmanaged.
     // FIXME: Eventually we might get C++-like support for strong pointers in
     // structs, at which point we should really be checking the lifetime
@@ -1959,8 +1967,11 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         param, AccessLevel::Private, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
         ImportedHeaderUnit);
-    paramInfo->setSpecifier(isInOut ? ParamSpecifier::InOut
-                                    : ParamSpecifier::Default);
+    // Foreign references are already references so they don't need to be passed
+    // as inout.
+    paramInfo->setSpecifier(isInOut && !swiftParamTy->isForeignReferenceType()
+                                ? ParamSpecifier::InOut
+                                : ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
     parameters.push_back(paramInfo);

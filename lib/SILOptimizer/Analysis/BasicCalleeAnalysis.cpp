@@ -326,9 +326,9 @@ void BasicCalleeAnalysis::print(llvm::raw_ostream &os) const {
 //===----------------------------------------------------------------------===//
 
 BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
-                                            BridgedValue callee) {
+                                            ValueBase *callee) {
   BasicCalleeAnalysis *bca = static_cast<BasicCalleeAnalysis *>(calleeAnalysis.bca);
-  CalleeList cl = bca->getCalleeListOfValue(castToSILValue(callee));
+  CalleeList cl = bca->getCalleeListOfValue(callee);
   return {cl.getOpaquePtr(), cl.getOpaqueKind(), cl.isIncomplete()};
 }
 
@@ -338,11 +338,11 @@ SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees) {
   return cl.end() - cl.begin();
 }
 
-BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
-                                         SwiftInt index) {
+SILFunction *BridgedFunctionArray_get(BridgedCalleeList callees,
+                                      SwiftInt index) {
   CalleeList cl = CalleeList::fromOpaque(callees.opaquePtr, callees.kind,
                                          callees.incomplete);
   auto iter = cl.begin() + index;
   assert(index >= 0 && iter < cl.end());
-  return {*iter};
+  return *iter;
 }

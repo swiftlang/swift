@@ -1518,6 +1518,11 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
   }
 
   bool isCanonicalStaticallySpecializedGenericMetadata() const {
+    // Struct metadata is used for foreign reference types, in which case the
+    // descriptor is not a struct descriptor.
+    if (!llvm::isa<TargetStructDescriptor<Runtime>>(this->Description))
+      return false;
+
     auto *description = getDescription();
     if (!description->isGeneric())
       return false;

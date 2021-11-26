@@ -3249,6 +3249,9 @@ namespace {
       case ReferenceCounting::Bridge:
       case ReferenceCounting::Error:
         llvm_unreachable("classes shouldn't have this kind of refcounting");
+      case ReferenceCounting::None:
+        llvm_unreachable(
+            "Foreign reference types don't conform to 'AnyClass'.");
       }
 
       llvm_unreachable("Not a valid ReferenceCounting.");

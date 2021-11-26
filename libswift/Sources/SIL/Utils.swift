@@ -16,7 +16,7 @@ import SILBridging
 //                              Lists
 //===----------------------------------------------------------------------===//
 
-public protocol ListNode : AnyObject {
+public protocol ListNode {
   associatedtype Element
   var next: Element? { get }
   var previous: Element? { get }
@@ -27,7 +27,10 @@ public struct List<NodeType: ListNode> :
       where NodeType.Element == NodeType {
   private var currentNode: NodeType?
   
-  public init(startAt: NodeType?) { currentNode = startAt }
+  public init(startAt: NodeType?) {
+    print("Init...")
+    currentNode = startAt
+  }
 
   public mutating func next() -> NodeType? {
     if let node = currentNode {

@@ -4121,7 +4121,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
 
 TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
-  StructDecl *recordDecl = desc.recordDecl;
+  NominalTypeDecl *recordDecl = desc.recordDecl;
   DeclName name = desc.name;
 
   auto &ctx = recordDecl->getASTContext();

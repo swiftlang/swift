@@ -472,7 +472,7 @@ void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
 void SILCombiner::runSwiftInstructionPass(SILInstruction *inst,
                               void (*runFunction)(BridgedInstructionPassCtxt)) {
   Worklist.setLibswiftPassInvocation(&libswiftPassInvocation);
-  runFunction({ {inst->asSILNode()}, {&libswiftPassInvocation} });
+  runFunction({inst, {&libswiftPassInvocation}});
   Worklist.setLibswiftPassInvocation(nullptr);
   libswiftPassInvocation.finishedPassRun();
 }
@@ -528,7 +528,7 @@ namespace {
 class SILCombine : public SILFunctionTransform {
 
   llvm::SmallVector<SILInstruction *, 64> TrackingList;
-  
+
   /// The entry point to the transformation.
   void run() override {
     auto *AA = PM->getAnalysis<AliasAnalysis>(getFunction());
