@@ -11,6 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 import SILBridging
+#if os(Windows)
+@_implementationOnly import func ucrt.free
+#elseif os(Linux)
+@_implementationOnly import func Glibc.free
+#else
+@_implementationOnly import func Darwin.free
+#endif
 
 final public class GlobalVariable : CustomStringConvertible {
   public var name: String {
@@ -18,8 +25,9 @@ final public class GlobalVariable : CustomStringConvertible {
   }
 
   public var description: String {
-    var s = SILGlobalVariable_debugDescription(bridged)
-    return String(cString: s.c_str())
+    let buffer = SILGlobalVariable_debugDescription(bridged)
+    defer { free(buffer) }
+    return String(cString: buffer)
   }
 
   // TODO: initializer instructions

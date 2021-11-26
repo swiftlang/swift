@@ -11,6 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 import SILBridging
+#if os(Windows)
+@_implementationOnly import func ucrt.free
+#elseif os(Linux)
+@_implementationOnly import func Glibc.free
+#else
+@_implementationOnly import func Darwin.free
+#endif
 
 final public class BasicBlock : ListNode, CustomStringConvertible {
   public var next: BasicBlock? { SILBasicBlock_next(bridged).block }
@@ -19,8 +26,9 @@ final public class BasicBlock : ListNode, CustomStringConvertible {
   public var function: Function { SILBasicBlock_getFunction(bridged).function }
 
   public var description: String {
-    var s = SILBasicBlock_debugDescription(bridged)
-    return String(cString: s.c_str())
+    let buffer = SILBasicBlock_debugDescription(bridged)
+    defer { free(buffer) }
+    return String(cString: buffer)
   }
 
   public var arguments: ArgumentArray { ArgumentArray(block: self) }

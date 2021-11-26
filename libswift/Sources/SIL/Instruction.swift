@@ -11,6 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 import SILBridging
+#if os(Windows)
+@_implementationOnly import func ucrt.free
+#elseif os(Linux)
+@_implementationOnly import func Glibc.free
+#else
+@_implementationOnly import func Darwin.free
+#endif
 
 //===----------------------------------------------------------------------===//
 //                       Instruction base classes
@@ -30,10 +37,11 @@ public class Instruction : ListNode, CustomStringConvertible, Hashable {
   }
 
   final public var description: String {
-    var s = SILNode_debugDescription(bridgedNode)
-    return String(cString: s.c_str())
+    let buffer = SILNode_debugDescription(bridgedNode)
+    defer { free(buffer) }
+    return String(cString: buffer)
   }
-  
+
   final public var operands: OperandArray {
     return OperandArray(opArray: SILInstruction_getOperands(bridged))
   }
@@ -124,8 +132,9 @@ public class SingleValueInstruction : Instruction, Value {
 
 public final class MultipleValueInstructionResult : Value {
   final public var description: String {
-    var s = SILNode_debugDescription(bridgedNode)
-    return String(cString: s.c_str())
+    let buffer = SILNode_debugDescription(bridgedNode)
+    defer { free(buffer) }
+    return String(cString: buffer)
   }
 
   public var instruction: Instruction {

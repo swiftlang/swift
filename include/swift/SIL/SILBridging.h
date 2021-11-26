@@ -15,7 +15,6 @@
 
 #include "BridgedSwiftObject.h"
 #include <stddef.h>
-#include <string>
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -161,19 +160,19 @@ BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
                                  BridgedSlab slab);
 
 BridgedStringRef SILFunction_getName(BridgedFunction function);
-std::string SILFunction_debugDescription(BridgedFunction function);
+char * _Nonnull SILFunction_debugDescription(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function);
 OptionalBridgedBasicBlock SILFunction_lastBlock(BridgedFunction function);
 SwiftInt SILFunction_numIndirectResultArguments(BridgedFunction function);
 SwiftInt SILFunction_getSelfArgumentIndex(BridgedFunction function);
 
 BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global);
-std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global);
+char * _Nonnull SILGlobalVariable_debugDescription(BridgedGlobalVar global);
 
 OptionalBridgedBasicBlock SILBasicBlock_next(BridgedBasicBlock block);
 OptionalBridgedBasicBlock SILBasicBlock_previous(BridgedBasicBlock block);
 BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block);
-std::string SILBasicBlock_debugDescription(BridgedBasicBlock block);
+char * _Nonnull SILBasicBlock_debugDescription(BridgedBasicBlock block);
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block);
 OptionalBridgedInstruction SILBasicBlock_lastInst(BridgedBasicBlock block);
 SwiftInt SILBasicBlock_getNumArguments(BridgedBasicBlock block);
@@ -188,7 +187,7 @@ OptionalBridgedOperand Operand_nextUse(BridgedOperand);
 BridgedInstruction Operand_getUser(BridgedOperand);
 SwiftInt Operand_isTypeDependent(BridgedOperand);
 
-std::string SILNode_debugDescription(BridgedNode node);
+char * _Nonnull SILNode_debugDescription(BridgedNode node);
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
 BridgedType SILValue_getType(BridgedValue value);
 

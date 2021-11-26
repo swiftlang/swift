@@ -11,6 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 import SILBridging
+#if os(Windows)
+@_implementationOnly import func ucrt.free
+#elseif os(Linux)
+@_implementationOnly import func Glibc.free
+#else
+@_implementationOnly import func Darwin.free
+#endif
 
 public protocol Value : AnyObject, CustomStringConvertible {
   var uses: UseList { get }
@@ -20,8 +27,9 @@ public protocol Value : AnyObject, CustomStringConvertible {
 
 extension Value {
   public var description: String {
-    var s = SILNode_debugDescription(bridgedNode)
-    return String(cString: s.c_str())
+    let buffer = SILNode_debugDescription(bridgedNode)
+    defer { free(buffer) }
+    return String(cString: buffer)
   }
 
   public var uses: UseList {

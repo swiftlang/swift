@@ -165,12 +165,12 @@ BridgedStringRef SILFunction_getName(BridgedFunction function) {
   return getBridgedStringRef(castToFunction(function)->getName());
 }
 
-std::string SILFunction_debugDescription(BridgedFunction function) {
+char *SILFunction_debugDescription(BridgedFunction function) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToFunction(function)->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return strdup(str.c_str());
 }
 
 OptionalBridgedBasicBlock SILFunction_firstBlock(BridgedFunction function) {
@@ -226,12 +226,12 @@ BridgedFunction SILBasicBlock_getFunction(BridgedBasicBlock block) {
   return {castToBasicBlock(block)->getParent()};
 }
 
-std::string SILBasicBlock_debugDescription(BridgedBasicBlock block) {
+char *SILBasicBlock_debugDescription(BridgedBasicBlock block) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToBasicBlock(block)->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return strdup(str.c_str());
 }
 
 OptionalBridgedInstruction SILBasicBlock_firstInst(BridgedBasicBlock block) {
@@ -291,12 +291,12 @@ BridgedBasicBlock SILArgument_getParent(BridgedArgument argument) {
 static_assert(BridgedOperandSize == sizeof(Operand),
               "wrong bridged Operand size");
 
-std::string SILNode_debugDescription(BridgedNode node) {
+char *SILNode_debugDescription(BridgedNode node) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToSILNode(node)->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return strdup(str.c_str());
 }
 
 static Operand *castToOperand(BridgedOperand operand) {
@@ -347,12 +347,12 @@ BridgedStringRef SILGlobalVariable_getName(BridgedGlobalVar global) {
   return getBridgedStringRef(castToGlobal(global)->getName());
 }
 
-std::string SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
+char *SILGlobalVariable_debugDescription(BridgedGlobalVar global) {
   std::string str;
   llvm::raw_string_ostream os(str);
   castToGlobal(global)->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return strdup(str.c_str());
 }
 
 //===----------------------------------------------------------------------===//
