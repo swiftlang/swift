@@ -973,6 +973,7 @@ function(add_swift_host_tool executable)
       INSTALL_RPATH "${RPATH_LIST}")
 
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX" AND ASHT_HAS_LIBSWIFT AND LIBSWIFT_BUILD_MODE)
+    set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(LIBSWIFT_BUILD_MODE STREQUAL "HOSTTOOLS")
       # At build time and and run time, link against the swift libraries in the
       # installed host toolchain.
@@ -980,6 +981,7 @@ function(add_swift_host_tool executable)
       get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
       set(host_lib_dir "${swift_dir}/lib/swift/linux")
 
+      target_link_libraries(${executable} PRIVATE ${swiftrt})
       target_link_libraries(${executable} PRIVATE "swiftCore")
 
       target_link_directories(${executable} PRIVATE ${host_lib_dir})
@@ -993,6 +995,7 @@ function(add_swift_host_tool executable)
       if (NOT "${ASHT_BOOTSTRAPPING}" STREQUAL "0")
         get_bootstrapping_swift_lib_dir(bs_lib_dir "${ASHT_BOOTSTRAPPING}")
         target_link_directories(${executable} PRIVATE ${bs_lib_dir})
+        target_link_libraries(${executable} PRIVATE ${swiftrt})
         target_link_libraries(${executable} PRIVATE "swiftCore")
       endif()
 
