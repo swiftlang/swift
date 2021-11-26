@@ -213,8 +213,10 @@ def run(*args, **kwargs):
     echo_output = kwargs.pop('echo', False)
     dry_run = kwargs.pop('dry_run', False)
     env = kwargs.get('env', None)
-    if dry_run:
+    if dry_run or echo_output:
+        print(repo_path)
         _echo_command(dry_run, *args, env=env)
+    if dry_run:
         return(None, 0, args)
 
     my_pipe = subprocess.Popen(
@@ -225,8 +227,6 @@ def run(*args, **kwargs):
     if lock:
         lock.acquire()
     if echo_output:
-        print(repo_path)
-        _echo_command(dry_run, *args, env=env)
         if stdout:
             print(stdout, end="")
         if stderr:
