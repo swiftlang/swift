@@ -83,7 +83,7 @@ public:
   void emit();
 
 private:
-  Explosion computeArguments(llvm::Value *argumentBuffer);
+  void computeArguments(llvm::Value *argumentBuffer, Explosion &arguments);
 
   FunctionPointer getPointerToMethod() const;
 
@@ -168,10 +168,9 @@ DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
           FunctionPointer::Kind(
               FunctionPointer::BasicKind::AsyncFunctionPointer))) {}
 
-Explosion DistributedAccessor::computeArguments(llvm::Value *argumentBuffer) {
+void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
+                                           Explosion &arguments) {
   auto fnType = Method->getLoweredFunctionType();
-
-  Explosion arguments;
 
   auto offset =
       IGF.createAlloca(IGM.Int8PtrTy, IGM.getPointerAlignment(), "offset");
@@ -242,8 +241,6 @@ Explosion DistributedAccessor::computeArguments(llvm::Value *argumentBuffer) {
   }
 
   IGF.Builder.CreateLifetimeEnd(offset, IGM.getPointerSize());
-
-  return arguments;
 }
 
 void DistributedAccessor::emit() {
@@ -253,12 +250,25 @@ void DistributedAccessor::emit() {
 
   auto params = IGF.collectParameters();
 
+  auto directResultTy = conv.getSILResultType(expansionContext);
+  const auto &directResultTI = IGM.getTypeInfo(directResultTy);
+  auto &resultSchema = directResultTI.nativeReturnValueSchema(IGM);
+  llvm::Value *indirectResultSlot = nullptr;
+
+  if (resultSchema.requiresIndirect())
+    indirectResultSlot = params.claimNext();
+
+  Explosion arguments;
+  // Claim indirect results first, they are going to be passed
+  // through to the distributed method.
+  params.transferInto(arguments, conv.getNumIndirectSILResults());
+
   // FIXME: Once we remove async task and executor this should be one not three.
   unsigned numAsyncContextParams =
       (unsigned)AsyncFunctionArgumentIndex::Context + 1;
   (void)params.claim(numAsyncContextParams);
 
-  // UnsafeRawPointer that holds all of the argument values
+  // UnsafeRawPointer that holds all of the argument values.
   auto *argBuffer = params.claimNext();
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
@@ -279,7 +289,7 @@ void DistributedAccessor::emit() {
 
   // Step one is to load all of the data from argument buffer,
   // so it could be forwarded to the distributed method.
-  auto arguments = computeArguments(argBuffer);
+  computeArguments(argBuffer, arguments);
 
   // Step two, let's form and emit a call to the distributed method
   // using computed argument explosion.
@@ -294,7 +304,15 @@ void DistributedAccessor::emit() {
     emission->begin();
     emission->setArgs(arguments, /*isOutlined=*/false,
                       /*witnessMetadata=*/nullptr);
-    emission->emitToExplosion(result, /*isOutlined=*/false);
+
+    if (resultSchema.requiresIndirect()) {
+      Address resultAddr(indirectResultSlot,
+                         directResultTI.getBestKnownAlignment());
+      emission->emitToMemory(resultAddr, cast<LoadableTypeInfo>(directResultTI),
+                             /*isOutlined=*/false);
+    } else {
+      emission->emitToExplosion(result, /*isOutlined=*/false);
+    }
 
     // Both accessor and distributed method are always `async throws`
     // so we need to load error value (if any) from the slot.
@@ -309,8 +327,8 @@ void DistributedAccessor::emit() {
 
     emission->end();
 
-    auto resultTy = conv.getSILResultType(expansionContext);
-    emitAsyncReturn(IGF, AsyncLayout, resultTy, AccessorType, result, error);
+    emitAsyncReturn(IGF, AsyncLayout, directResultTy, AccessorType, result,
+                    error);
   }
 }
 
