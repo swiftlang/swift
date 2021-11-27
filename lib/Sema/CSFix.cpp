@@ -169,7 +169,7 @@ bool TreatArrayLiteralAsDictionary::diagnose(const Solution &solution,
                                                     getToType(), getFromType(),
                                                     getLocator());
   return failure.diagnose(asNote);
-};
+}
 
 TreatArrayLiteralAsDictionary *
 TreatArrayLiteralAsDictionary::create(ConstraintSystem &cs,
@@ -178,7 +178,7 @@ TreatArrayLiteralAsDictionary::create(ConstraintSystem &cs,
   assert(getAsExpr<ArrayExpr>(locator->getAnchor())->getNumElements() <= 1);
   return new (cs.getAllocator())
       TreatArrayLiteralAsDictionary(cs, dictionaryTy, arrayTy, locator);
-};
+}
 
 bool MarkExplicitlyEscaping::diagnose(const Solution &solution,
                                       bool asNote) const {

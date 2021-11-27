@@ -1468,7 +1468,7 @@ SerializedASTFile::getSourceOrderForDecl(const Decl *D) const {
 void SerializedASTFile::collectAllGroups(
     SmallVectorImpl<StringRef> &Names) const {
   File.collectAllGroups(Names);
-};
+}
 
 Optional<StringRef>
 SerializedASTFile::getGroupNameByUSR(StringRef USR) const {

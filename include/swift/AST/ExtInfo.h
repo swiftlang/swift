@@ -221,7 +221,7 @@ convertRepresentation(FunctionTypeRepresentation rep) {
     return SILFunctionTypeRepresentation::CFunctionPointer;
   }
   llvm_unreachable("Unhandled FunctionTypeRepresentation!");
-};
+}
 
 inline Optional<FunctionTypeRepresentation>
 convertRepresentation(SILFunctionTypeRepresentation rep) {
@@ -241,7 +241,7 @@ convertRepresentation(SILFunctionTypeRepresentation rep) {
     return None;
   }
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation!");
-};
+}
 
 /// Can this calling convention result in a function being called indirectly
 /// through the runtime.

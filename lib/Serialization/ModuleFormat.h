@@ -2064,7 +2064,7 @@ namespace identifier_block {
   };
 
   using IdentifierDataLayout = BCRecordLayout<IDENTIFIER_DATA, BCBlob>;
-};
+}
 
 /// The record types within the index block.
 ///

@@ -343,7 +343,7 @@ bool RewriteStep::isInverseOf(const RewriteStep &other) const {
 
   assert(EndOffset == other.EndOffset && "Bad whiskering?");
   return true;
-};
+}
 
 bool RewriteStep::maybeSwapRewriteSteps(RewriteStep &other,
                                         const RewriteSystem &system) {

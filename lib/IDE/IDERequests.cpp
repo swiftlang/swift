@@ -1033,7 +1033,7 @@ bool RangeResolver::walkToStmtPre(Stmt *S) {
   Impl->analyze(S);
   Impl->enter(S);
   return true;
-};
+}
 
 bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
   if (D->isImplicit())
@@ -1053,7 +1053,7 @@ bool RangeResolver::walkToExprPost(Expr *E) {
 bool RangeResolver::walkToStmtPost(Stmt *S) {
   Impl->leave(S);
   return !Impl->hasResult();
-};
+}
 
 bool RangeResolver::walkToDeclPost(Decl *D) {
   Impl->leave(D);

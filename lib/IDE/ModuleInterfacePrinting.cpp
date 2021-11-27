@@ -378,7 +378,7 @@ static bool printModuleInterfaceDecl(Decl *D,
 /// Sorts import declarations for display.
 static bool compareImports(ImportDecl *LHS, ImportDecl *RHS) {
   return LHS->getImportPath() < RHS->getImportPath();
-};
+}
 
 /// Sorts Swift declarations for display.
 static bool compareSwiftDecls(Decl *LHS, Decl *RHS) {
@@ -393,7 +393,7 @@ static bool compareSwiftDecls(Decl *LHS, Decl *RHS) {
     // FIXME: not sufficient to establish a total order for overloaded decls.
   }
   return LHS->getKind() < RHS->getKind();
-};
+}
 
 static std::pair<ArrayRef<Decl*>, ArrayRef<Decl*>>
 getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,

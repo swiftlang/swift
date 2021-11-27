@@ -1405,7 +1405,7 @@ hasOnlyRecursiveOwnershipUsers(ApplyInst *ai, SILInstruction *ignoreUser,
     foundUsers.push_back(user);
   }
   return true;
-};
+}
 
 /// We only know how to simulate reference call effects for unary
 /// function calls that take their argument @owned or @guaranteed and return an

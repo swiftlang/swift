@@ -1158,7 +1158,7 @@ bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
 /// type repr. \param inferredType The type inferred by the type checker.
 void notePlaceholderReplacementTypes(Type writtenType, Type inferredType);
 
-}; // namespace TypeChecker
+} // namespace TypeChecker
 
 /// Returns the protocol requirement kind of the given declaration.
 /// Used in diagnostics.

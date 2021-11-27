@@ -2329,7 +2329,7 @@ static bool fixItOverrideDeclarationTypesImpl(
 
   llvm_unreachable("unknown overridable member");
 }
-};
+}
 
 bool swift::computeFixitsForOverridenDeclaration(
     ValueDecl *decl, const ValueDecl *base,

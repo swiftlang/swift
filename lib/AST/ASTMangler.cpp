@@ -1727,7 +1727,7 @@ static char getParamConvention(ParameterConvention conv) {
     case ParameterConvention::Direct_Guaranteed: return 'g';
   }
   llvm_unreachable("bad parameter convention");
-};
+}
 
 static Optional<char>
 getParamDifferentiability(SILParameterDifferentiability diffKind) {
@@ -1738,7 +1738,7 @@ getParamDifferentiability(SILParameterDifferentiability diffKind) {
     return 'w';
   }
   llvm_unreachable("bad parameter differentiability");
-};
+}
 
 static char getResultConvention(ResultConvention conv) {
   switch (conv) {
@@ -1749,7 +1749,7 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::Autoreleased: return 'a';
   }
   llvm_unreachable("bad result convention");
-};
+}
 
 static Optional<char>
 getResultDifferentiability(SILResultDifferentiability diffKind) {
@@ -1760,7 +1760,7 @@ getResultDifferentiability(SILResultDifferentiability diffKind) {
     return 'w';
   }
   llvm_unreachable("bad result differentiability");
-};
+}
 
 void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
                                         GenericSignature outerGenericSig) {

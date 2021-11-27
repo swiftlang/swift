@@ -1092,7 +1092,7 @@ static Type getTypeForCompletion(const constraints::Solution &S, Expr *E) {
   }
 
   return S.getResolvedType(E);
-};
+}
 
 /// Whether the given completion expression is the only expression in its
 /// containing closure or function body and its value is implicitly returned.
