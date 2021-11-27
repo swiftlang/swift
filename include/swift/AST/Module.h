@@ -517,6 +517,15 @@ public:
     Bits.ModuleDecl.HasIncrementalInfo = enabled;
   }
 
+  /// Returns true if this module was built with
+  /// -experimental-hermetic-seal-at-link.
+  bool hasHermeticSealAtLink() const {
+    return Bits.ModuleDecl.HasHermeticSealAtLink;
+  }
+  void setHasHermeticSealAtLink(bool enabled = true) {
+    Bits.ModuleDecl.HasHermeticSealAtLink = enabled;
+  }
+
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
   bool isSystemModule() const {

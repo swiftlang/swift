@@ -741,6 +741,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     // We've loaded the file. Now try to bring it into the AST.
     fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
     M.setStaticLibrary(loadedModuleFile->isStaticLibrary());
+    M.setHasHermeticSealAtLink(loadedModuleFile->hasHermeticSealAtLink());
     if (loadedModuleFile->isTestable())
       M.setTestingEnabled();
     if (loadedModuleFile->arePrivateImportsEnabled())
@@ -799,6 +800,15 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     if (loadedModuleFile &&
         loadedModuleFile->mayHaveDiagnosticsPointingAtBuffer())
       OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
+  }
+
+  // The -experimental-hermetic-seal-at-link flag turns on dead-stripping
+  // optimizations assuming library code can be optimized against client code.
+  // If the imported module was built with -experimental-hermetic-seal-at-link
+  // but the current module isn't, error out.
+  if (M.hasHermeticSealAtLink() && !Ctx.LangOpts.HermeticSealAtLink) {
+    Ctx.Diags.diagnose(diagLoc.getValueOr(SourceLoc()),
+                       diag::need_hermetic_seal_to_import_module, M.getName());
   }
 
   return fileUnit;

@@ -330,10 +330,13 @@ private:
     unsigned ArePrivateImportsEnabled : 1;
 
     /// Whether this module file is actually a .sib file.
-    unsigned IsSIB: 1;
+    unsigned IsSIB : 1;
 
     /// Whether this module is compiled as static library.
-    unsigned IsStaticLibrary: 1;
+    unsigned IsStaticLibrary : 1;
+
+    /// Whether this module was built with -experimental-hermetic-seal-at-link.
+    unsigned HasHermeticSealAtLink : 1;
 
     /// Whether this module file is compiled with '-enable-testing'.
     unsigned IsTestable : 1;
