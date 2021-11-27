@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 
 // CHECK: [[INDEXED_GETTER_ENCODING:@.+]] = private unnamed_addr constant [11 x i8] c"@24@0:8q16\00"
 // CHECK: [[INDEXED_SETTER_ENCODING:@.+]] = private unnamed_addr constant [14 x i8] c"v32@0:8@16q24\00"
