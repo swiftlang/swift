@@ -20,6 +20,10 @@
 
 #include <stdint.h>
 
+#if !defined(__has_feature)
+#define __has_feature(feature) 0
+#endif
+
 // TODO: These macro definitions are duplicated in Visibility.h. Move
 // them to a single file if we find a location that both Visibility.h and
 // BridgedSwiftObject.h can import.
