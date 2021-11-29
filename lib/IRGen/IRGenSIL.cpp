@@ -2200,7 +2200,7 @@ void IRGenSILFunction::emitSILFunction() {
   }
 
   // Generate accessor thunk for the `distributed` method.
-  if (CurSILFn->isDistributed() && !CurSILFn->isThunk()) {
+  if (CurSILFn->isDistributed() && CurSILFn->isThunk()) {
     IGM.emitDistributedMethodAccessor(CurSILFn);
   }
 
