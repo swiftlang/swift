@@ -181,7 +181,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
       if (fn->isAsync() || fn->isSendable() || fn->hasGlobalActor())
         return true;
 
-      for (const auto param: fn->getParams()) {
+      for (const auto &param : fn->getParams()) {
         if (param.isIsolated())
           return true;
       }
