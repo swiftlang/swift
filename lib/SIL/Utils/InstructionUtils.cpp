@@ -62,18 +62,6 @@ SILValue swift::getUnderlyingObject(SILValue v) {
   }
 }
 
-SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue v) {
-  while (true) {
-    SILValue v2 = stripCastsWithoutMarkDependence(v);
-    v2 = stripAddressProjections(v2);
-    v2 = stripIndexingInsts(v2);
-    v2 = lookThroughOwnershipInsts(v2);
-    if (v2 == v)
-      return v2;
-    v = v2;
-  }
-}
-
 /// Return the underlying SILValue after stripping off identity SILArguments if
 /// we belong to a BB with one predecessor.
 SILValue swift::stripSinglePredecessorArgs(SILValue V) {

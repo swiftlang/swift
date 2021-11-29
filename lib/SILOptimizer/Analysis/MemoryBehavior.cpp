@@ -566,6 +566,17 @@ static SILValue getBeginScopeInst(SILValue V) {
   if (BorrowedValue borrowedObj = getSingleBorrowIntroducingValue(object)) {
     return borrowedObj.value;
   }
+  if (!object->getFunction()->hasOwnership()) {
+    // In non-OSSA, do a quick check if the object is a guaranteed function
+    // argument.
+    // Note that in OSSA, getSingleBorrowIntroducingValue will detect a
+    // guaranteed argument.
+    SILValue root = findOwnershipReferenceAggregate(object);
+    if (auto *funcArg = dyn_cast<SILFunctionArgument>(root)) {
+      if (funcArg->getArgumentConvention().isGuaranteedConvention())
+        return funcArg;
+    }
+  }
   return SILValue();
 }
 

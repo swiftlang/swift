@@ -469,7 +469,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       LiteralInst, None, DoesNotRelease)
     BRIDGED_SINGLE_VALUE_INST(GlobalValueInst, global_value,
                       LiteralInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(IntegerLiteralInst, integer_literal,
+    BRIDGED_SINGLE_VALUE_INST(IntegerLiteralInst, integer_literal,
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(FloatLiteralInst, float_literal,
                       LiteralInst, None, DoesNotRelease)

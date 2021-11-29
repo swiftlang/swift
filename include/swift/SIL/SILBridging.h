@@ -237,6 +237,8 @@ BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedType operandType, BridgedType resultType, BridgedValueArray arguments);
 BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
           BridgedLocation loc, BridgedValue condition, BridgedStringRef messge);
+BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,
+          BridgedLocation loc, BridgedType type, SwiftInt value);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

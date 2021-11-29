@@ -431,6 +431,7 @@ PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
+SWIFT_INSTRUCTION_PASS(BeginCOWMutationInst, "simplify-begin_cow_mutation")
 SWIFT_INSTRUCTION_PASS_WITH_LEGACY(GlobalValueInst, "simplify-global_value")
 SWIFT_INSTRUCTION_PASS_WITH_LEGACY(StrongRetainInst, "simplify-strong_retain")
 SWIFT_INSTRUCTION_PASS_WITH_LEGACY(StrongReleaseInst, "simplify-strong_release")
