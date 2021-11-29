@@ -27,9 +27,9 @@ bb0:
 // CHECK: [[context_addr:%.*]] = getelementptr inbounds %swift.context, %swift.context* [[base_context]], i32 0, i32 0
 // CHECK: [[ctxt:%.*]] = load %swift.context*, %swift.context** [[ctxt_addr]]
 // CHECK-arm64e: [[ctxt_addr_int:%[0-9]+]] = ptrtoint %swift.context** [[context_addr]] to i64
-// CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend.i64(i64 [[ctxt_addr_int]], i64 48546)
+// CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend(i64 [[ctxt_addr_int]], i64 48546)
 // CHECK-arm64e: [[ctxt_int:%[0-9]+]]      = ptrtoint %swift.context* [[ctxt]] to i64
-// CHECK-arm64e: [[signed_int:%[0-9]+]]      = call i64 @llvm.ptrauth.sign.i64(i64 [[ctxt_int]], i32 2, i64 [[ptrauth_blend]])
+// CHECK-arm64e: [[signed_int:%[0-9]+]]      = call i64 @llvm.ptrauth.sign(i64 [[ctxt_int]], i32 2, i64 [[ptrauth_blend]])
 // CHECK-arm64e: [[signed_ctxt:%[0-9]+]]   = inttoptr i64 [[signed_int]] to %swift.context*
 // CHECK-arm64e: store %swift.context* [[signed_ctxt]], %swift.context** [[context_addr]]
 // CHECK-x86_64: store %swift.context* [[ctxt]], %swift.context** [[context_addr]]
@@ -44,9 +44,9 @@ bb0:
 // CHECK: [[continuation_fn_addr:%.*]] = getelementptr inbounds %swift.context, %swift.context* [[base_context]], i32 0, i32 1
 // CHECK: [[continuation_fn:%.*]] = bitcast i8* [[resume_intrinsic]] to void (%swift.context*)*
 // CHECK-arm64e: [[continuation_fn_addr_int:%[0-9]+]] = ptrtoint void (%swift.context*)** [[continuation_fn_addr]] to i64
-// CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend.i64(i64 [[continuation_fn_addr_int]], i64 55047)
+// CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend(i64 [[continuation_fn_addr_int]], i64 55047)
 // CHECK-arm64e: [[continuation_fn_int:%[0-9]+]]      = ptrtoint void (%swift.context*)* [[continuation_fn]] to i64
-// CHECK-arm64e: [[signed_int:%[0-9]+]]      = call i64 @llvm.ptrauth.sign.i64(i64 [[continuation_fn_int]], i32 0, i64 [[ptrauth_blend]])
+// CHECK-arm64e: [[signed_int:%[0-9]+]]      = call i64 @llvm.ptrauth.sign(i64 [[continuation_fn_int]], i32 0, i64 [[ptrauth_blend]])
 // CHECK-arm64e: [[signed_continuation_fn:%[0-9]+]]   = inttoptr i64 [[signed_int]] to void (%swift.context*)*
 // CHECK-arm64e: store void (%swift.context*)* [[signed_continuation_fn]], void (%swift.context*)** [[continuation_fn_addr]]
 // CHECK-x86_64: store void (%swift.context*)* [[continuation_fn]], void (%swift.context*)** [[continuation_fn_addr]]

@@ -27,7 +27,7 @@ bb0(%0 : $*T):
 // CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
 // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 1272)
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 1272)
 // CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %0, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
 
@@ -43,7 +43,7 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
 // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 58298)
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 58298)
 // CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
 
@@ -59,7 +59,7 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
 // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 18648)
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 18648)
 // CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
 
@@ -75,7 +75,7 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
 // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 34641)
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 34641)
 // CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* %0, %swift.opaque* %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
 
@@ -91,7 +91,7 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
 // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 61402)
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 61402)
 // CHECK-NEXT: call %swift.opaque* [[WITNESS]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
 
@@ -109,7 +109,7 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[SLOT]], align
 // CHECK-NEXT: [[WITNESS:%.*]] = bitcast i8* [[T0]] to
 // CHECK-NEXT: [[T0:%.*]] = ptrtoint i8** [[SLOT]] to i64
-// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend.i64(i64 [[T0]], i64 1272)
+// CHECK-NEXT: [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T0]], i64 1272)
 // CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %0, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: call void [[WITNESS]](%swift.opaque* noalias %1, %swift.type* %T) {{#[0-9]+}} [ "ptrauth"(i32 0, i64 [[DISC]]) ]
 // CHECK-NEXT: ret void
