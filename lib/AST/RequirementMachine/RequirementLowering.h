@@ -34,8 +34,23 @@ class Requirement;
 
 namespace rewriting {
 
-void
-desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
+// Entry points used by AbstractGenericSignatureRequest and
+// InferredGenericSignatureRequest; see RequiremetnLowering.cpp for
+// documentation
+// comments.
+
+void desugarRequirement(Requirement req, SmallVectorImpl<Requirement> &result);
+
+void inferRequirements(Type type, SourceLoc loc, ModuleDecl *module,
+                       SmallVectorImpl<StructuralRequirement> &result);
+
+void realizeRequirement(Requirement req, RequirementRepr *reqRepr,
+                        ModuleDecl *moduleForInference,
+                        SmallVectorImpl<StructuralRequirement> &result);
+
+void realizeInheritedRequirements(TypeDecl *decl, Type type,
+                                  ModuleDecl *moduleForInference,
+                                  SmallVectorImpl<StructuralRequirement> &result);
 
 /// A utility class for bulding rewrite rules from the top-level requirements
 /// of a generic signature.
@@ -80,12 +95,15 @@ struct RuleBuilder {
 
   RuleBuilder(RewriteContext &ctx, bool dump) : Context(ctx), Dump(dump) {}
   void addRequirements(ArrayRef<Requirement> requirements);
+  void addRequirements(ArrayRef<StructuralRequirement> requirements);
   void addProtocols(ArrayRef<const ProtocolDecl *> proto);
   void addProtocol(const ProtocolDecl *proto,
                    bool initialComponent);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
+                      const ProtocolDecl *proto);
+  void addRequirement(const StructuralRequirement &req,
                       const ProtocolDecl *proto);
   void collectRulesFromReferencedProtocols();
 };
