@@ -5,7 +5,7 @@
 // RUN: %target-sil-opt %t/tmp.sib -enable-sil-opaque-values -verify -o %t/tmp.2.sib -module-name opaqueval
 // RUN: %target-sil-opt %t/tmp.2.sib -enable-sil-opaque-values -emit-sorted-sil -verify -module-name opaqueval | %FileCheck %s
 
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 import Swift
