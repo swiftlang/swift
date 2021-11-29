@@ -245,3 +245,15 @@ struct UnsolvableInheritance2<T : U.A, U : T.A> {}
 
 enum X7<T> where X7.X : G { case X } // expected-error{{enum case 'X' is not a member type of 'X7<T>'}}
 // expected-error@-1{{cannot find type 'G' in scope}}
+
+// Test that contextual type resolution for generic metatypes is consistent
+// under a same-type constraint.
+protocol MetatypeTypeResolutionProto {}
+struct X8<T> {
+  static var property1: T.Type { T.self }
+  static func method1() -> T.Type { T.self }
+}
+extension X8 where T == MetatypeTypeResolutionProto {
+  static var property2: T.Type { property1 } // ok, still .Protocol
+  static func method2() -> T.Type { method1() } // ok, still .Protocol
+}

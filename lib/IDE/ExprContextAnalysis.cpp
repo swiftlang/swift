@@ -308,7 +308,7 @@ void swift::ide::collectPossibleReturnTypesFromContext(
               const_cast<DeclContext *>(DC), /*diagnostics=*/false);
 
           if (!type->hasError()) {
-            candidates.push_back(type);
+            candidates.push_back(DC->mapTypeIntoContext(type));
             return;
           }
         }

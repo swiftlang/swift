@@ -1098,16 +1098,14 @@ void ConstraintSystem::shrink(Expr *expr) {
           auto *const typeRepr = coerceExpr->getCastTypeRepr();
 
           if (typeRepr && isSuitableCollection(typeRepr)) {
-            const auto coercionType =
-                TypeResolution::forContextual(
-                    CS.DC, None,
-                    // FIXME: Should we really be unconditionally complaining
-                    // about unbound generics and placeholders here? For
-                    // example:
-                    // let foo: [Array<Float>] = [[0], [1], [2]] as [Array]
-                    // let foo: [Array<Float>] = [[0], [1], [2]] as [Array<_>]
-                    /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr)
-                    .resolveType(typeRepr);
+            const auto coercionType = TypeResolution::resolveContextualType(
+                typeRepr, CS.DC, None,
+                // FIXME: Should we really be unconditionally complaining
+                // about unbound generics and placeholders here? For
+                // example:
+                // let foo: [Array<Float>] = [[0], [1], [2]] as [Array]
+                // let foo: [Array<Float>] = [[0], [1], [2]] as [Array<_>]
+                /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
             if (coercionType->hasError())

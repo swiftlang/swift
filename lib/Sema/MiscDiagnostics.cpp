@@ -3509,6 +3509,13 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 
     bool shouldWalkIntoTapExpression() override { return false; }
 
+    std::pair<bool, ArgumentList *>
+    walkToArgumentListPre(ArgumentList *args) override {
+      // Don't walk into an explicit argument list, as trailing closures that
+      // appear in child arguments are fine.
+      return {args->isImplicit(), args};
+    }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       switch (E->getKind()) {
       case ExprKind::Paren:

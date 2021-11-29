@@ -445,7 +445,7 @@ std::string gatherGenericParamBindingsText(
 /// Check the given set of generic arguments against the requirements in a
 /// generic signature.
 ///
-/// \param dc The context in which the generic arguments should be checked.
+/// \param module The module to use for conformace lookup.
 /// \param loc The location at which any diagnostics should be emitted.
 /// \param noteLoc The location at which any notes will be printed.
 /// \param owner The type that owns the generic signature.
@@ -454,7 +454,7 @@ std::string gatherGenericParamBindingsText(
 /// should be checked.
 /// \param substitutions Substitutions from interface types of the signature.
 RequirementCheckResult checkGenericArguments(
-    DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
+    ModuleDecl *module, SourceLoc loc, SourceLoc noteLoc, Type owner,
     TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
     SubstOptions options = None);
@@ -465,10 +465,49 @@ RequirementCheckResult checkGenericArguments(
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions);
 
-bool checkContextualRequirements(GenericTypeDecl *decl,
-                                 Type parentTy,
-                                 SourceLoc loc,
-                                 DeclContext *dc);
+/// Checks whether the generic requirements imposed on the nested type
+/// declaration \p decl (if present) are in agreement with the substitutions
+/// that are needed to spell it as a member of the given parent type
+/// \p parentTy.
+///
+/// For example, given
+/// \code
+/// struct S<X> {}
+/// extension S where X == Bool {
+///   struct Inner {}
+/// }
+/// \endcode
+/// \c Inner cannot be referenced on \c S<Int>, because its contextual
+/// requirement \c X \c == \c Bool is not satisfied by the substitution
+/// \c [X \c = \c Int].
+///
+/// Similarly, \c typealias \c Y below is a viable type witness in the
+/// conformance of \c S to \c P, because its contextual requirement
+/// \c Self.X \c == \c Bool is satisfied by the substitution
+/// \c [Self \c = \c S].
+/// \code
+/// protocol P {
+///   associatedtype X
+///   associatedtype Y
+/// }
+/// extension P where X == Bool {
+///   typealias Y = Bool
+/// }
+///
+/// struct S: P {
+///   typealias X = Bool
+/// }
+/// \endcode
+///
+/// \param module The module to use for conformace lookup.
+/// \param contextSig The generic signature that should be used to map
+/// \p parentTy into context. We pass a generic signature to secure on-demand
+/// computation of the associated generic enviroment.
+///
+/// \returns \c true on success.
+bool checkContextualRequirements(GenericTypeDecl *decl, Type parentTy,
+                                 SourceLoc loc, ModuleDecl *module,
+                                 GenericSignature contextSig);
 
 /// Add any implicitly-defined constructors required for the given
 /// struct, class or actor.

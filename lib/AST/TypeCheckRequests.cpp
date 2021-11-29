@@ -58,10 +58,6 @@ void swift::simple_display(llvm::raw_ostream &out,
   case TypeResolutionStage::Interface:
     out << "interface";
     break;
-
-  case TypeResolutionStage::Contextual:
-    out << "contextual";
-    break;
   }
 }
 
