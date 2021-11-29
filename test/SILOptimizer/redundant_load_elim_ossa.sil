@@ -163,6 +163,22 @@ bb0(%0 : @owned $AB):
   return %5 : $Int
 }
 
+// CHECK-LABEL: sil [ossa] @forward_load_of_immutable_class_property
+// CHECK:     [[L:%[0-9]+]] = load
+// CHECK:     apply %{{[0-9]+}}([[L]])
+// CHECK-NOT: load
+// CHECK:     return [[L]]
+// CHECK-LABEL: } // end sil function 'forward_load_of_immutable_class_property'
+sil [ossa] @forward_load_of_immutable_class_property : $@convention(thin) (@guaranteed AB) -> Int {
+bb0(%0 : @guaranteed $AB):
+  %1 = ref_element_addr [immutable] %0 : $AB, #AB.value
+  %2 = load [trivial] %1 : $*Int
+  %3 = function_ref @use_Int : $@convention(thin) (Int) -> ()
+  apply %3(%2) : $@convention(thin) (Int) -> ()
+  %5 = load [trivial] %1 : $*Int
+  return %5 : $Int
+}
+
 // CHECK-LABEL: sil hidden [ossa] @load_forward_across_end_cow_mutation :
 // CHECK-NOT: = load
 // CHECK-LABEL: } // end sil function 'load_forward_across_end_cow_mutation'

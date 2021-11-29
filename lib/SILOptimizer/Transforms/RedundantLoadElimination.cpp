@@ -486,14 +486,21 @@ private:
   /// If set, RLE ignores loads from that array type.
   NominalTypeDecl *ArrayType;
 
+  /// Se to true if loads with a `ref_element_addr [immutable]` or
+  /// `ref_tail_addr [immutable]` base address are found.
+  bool immutableLoadsFound = false;
+
+  /// Only optimize loads with a base address of  `ref_element_addr [immutable]`
+  /// `ref_tail_addr [immutable]`.
+  bool onlyImmutableLoads;
+
 #ifndef NDEBUG
   SILPrintContext printCtx;
 #endif
 
 public:
-  RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
-             TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-             EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads);
+  RLEContext(SILFunction *F, SILPassManager *PM,
+             bool disableArrayLoads, bool onlyImmutableLoads);
 
   RLEContext(const RLEContext &) = delete;
   RLEContext(RLEContext &&) = delete;
@@ -503,6 +510,8 @@ public:
 
   /// Entry point to redundant load elimination.
   bool run();
+
+  bool shouldOptimizeImmutableLoads() const { return immutableLoadsFound; }
 
   SILFunction *getFunction() const { return Fn; }
 
@@ -569,6 +578,11 @@ public:
       if (!ArrayType ||
           LI->getType().getNominalOrBoundGenericNominal() != ArrayType) {
         return LI;
+      }
+      if (onlyImmutableLoads &&
+          !LSLocation::getBaseAddressOrObject(LI->getOperand(),
+                                             /*stopAtImmutable*/ true).second) {
+        return nullptr;
       }
     }
     return nullptr;
@@ -1200,14 +1214,17 @@ void BlockState::dump(RLEContext &Ctx) {
 //                          RLEContext Implementation
 //===----------------------------------------------------------------------===//
 
-RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
-                       TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-                       EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads)
-    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI), BBToLocState(F),
-      BBWithLoads(F),
+RLEContext::RLEContext(SILFunction *F, SILPassManager *PM,
+                       bool disableArrayLoads, bool onlyImmutableLoads)
+    : Fn(F), PM(PM), AA(PM->getAnalysis<AliasAnalysis>(F)),
+      TE(PM->getAnalysis<TypeExpansionAnalysis>()),
+      PO(PM->getAnalysis<PostOrderAnalysis>()->get(F)),
+      EAFI(PM->getAnalysis<EpilogueARCAnalysis>()->get(F)),
+      BBToLocState(F), BBWithLoads(F),
       ArrayType(disableArrayLoads
                     ? F->getModule().getASTContext().getArrayDecl()
-                    : nullptr)
+                    : nullptr),
+      onlyImmutableLoads(onlyImmutableLoads)
 #ifndef NDEBUG
       ,
       printCtx(llvm::dbgs(), /*Verbose=*/false, /*Sorted=*/true)
@@ -1567,14 +1584,15 @@ bool RLEContext::run() {
   // Phase 4. we perform the redundant load elimination.
   // Walk over the function and find all the locations accessed by
   // this function.
-  std::pair<int, int> LSCount = std::make_pair(0, 0); 
+  int numLoads = 0, numStores = 0;
   LSLocation::enumerateLSLocations(*Fn, LocationVault,
                                    LocToBitIndex,
                                    BaseToLocIndex, TE,
-                                   LSCount);
+                                   /*stopAtImmutable*/ onlyImmutableLoads,
+                                   numLoads, numStores, immutableLoadsFound);
 
   // Check how to optimize this function.
-  ProcessKind Kind = getProcessFunctionKind(LSCount.first, LSCount.second);
+  ProcessKind Kind = getProcessFunctionKind(numLoads, numStores);
   
   // We do not optimize this function at all.
   if (Kind == ProcessKind::ProcessNone)
@@ -1681,14 +1699,20 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "*** RLE on function: " << F->getName()
                             << " ***\n");
 
-    auto *AA = PM->getAnalysis<AliasAnalysis>(F);
-    auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
-    auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
-    auto *EAFI = PM->getAnalysis<EpilogueARCAnalysis>()->get(F);
-
-    RLEContext RLE(F, PM, AA, TE, PO, EAFI, disableArrayLoads);
+    RLEContext RLE(F, PM, disableArrayLoads,
+                   /*onlyImmutableLoads*/ false);
     if (RLE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
+    if (RLE.shouldOptimizeImmutableLoads()) {
+      /// Re-running RLE with cutting base addresses off at
+      /// `ref_element_addr [immutable]` or `ref_tail_addr [immutable]` can
+      /// expose additional opportunities.
+      RLEContext RLE2(F, PM, disableArrayLoads,
+                      /*onlyImmutableLoads*/ true);
+      if (RLE2.run()) {
+        invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+      }
     }
   }
 };
