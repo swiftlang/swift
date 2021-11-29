@@ -17,7 +17,11 @@
 #include "swift/AST/RawComment.h"
 #include "swift/Basic/BasicSourceInfo.h"
 
+#include "llvm/ADT/PointerIntPair.h"
+
 namespace swift {
+class SynthesizedFileUnit;
+
 /// A container for module-scope declarations that itself provides a scope; the
 /// smallest unit of code organization.
 ///
@@ -33,18 +37,24 @@ class FileUnit : public DeclContext, public ASTAllocated<FileUnit> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
-  // FIXME: Stick this in a PointerIntPair.
-  const FileUnitKind Kind;
+  // The pointer is FileUnit insted of SynthesizedFileUnit to break circularity.
+  llvm::PointerIntPair<FileUnit *, 3, FileUnitKind> SynthesizedFileAndKind;
 
 protected:
   FileUnit(FileUnitKind kind, ModuleDecl &M)
-    : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind) {
+    : DeclContext(DeclContextKind::FileUnit, &M),
+      SynthesizedFileAndKind(nullptr, kind) {
   }
 
 public:
   FileUnitKind getKind() const {
-    return Kind;
+    return SynthesizedFileAndKind.getInt();
   }
+
+  /// Returns the synthesized file for this source file, if it exists.
+  SynthesizedFileUnit *getSynthesizedFile() const;
+
+  SynthesizedFileUnit &getOrCreateSynthesizedFile();
 
   /// Look up a (possibly overloaded) value set at top-level scope
   /// (but with the specified access path, which may come from an import decl)
