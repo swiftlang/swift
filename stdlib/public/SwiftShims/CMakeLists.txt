@@ -177,7 +177,6 @@ if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
         COMMENT "Symlinking headers for bootstrapping0")
 
     add_dependencies(${target_name} copy_shim_headers)
-    add_dependencies(bootstrapping${bootstrapping}-all ${target_name})
   endforeach()
 endif()
 

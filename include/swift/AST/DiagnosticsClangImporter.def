@@ -85,6 +85,10 @@ NOTE(unresolvable_clang_decl_is_a_framework_bug,none,
 WARNING(clang_swift_attr_unhandled,none,
         "Ignoring unknown Swift attribute or modifier '%0'", (StringRef))
 
+WARNING(clang_error_code_must_be_sendable,none,
+        "cannot make error code type '%0' non-sendable because Swift errors "
+        "are always sendable", (StringRef))
+
 WARNING(implicit_bridging_header_imported_from_module,none,
         "implicit import of bridging header '%0' via module %1 "
         "is deprecated and will be removed in a later version of Swift",

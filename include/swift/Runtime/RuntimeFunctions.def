@@ -1691,6 +1691,16 @@ FUNCTION(TSanInoutAccess, __tsan_external_write, C_CC, AlwaysAvailable,
          ATTRS(NoUnwind),
          EFFECT(NoEffect))
 
+// int32 __isPlatformVersionAtLeast(uint32_t platform, uint32_t major,
+//                                  uint32_t minor, uint32_t patch);
+// This a C builtin provided by compiler-rt.
+FUNCTION(PlatformVersionAtLeast, __isPlatformVersionAtLeast,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int32Ty),
+         ARGS(Int32Ty, Int32Ty, Int32Ty, Int32Ty),
+         ATTRS(NoUnwind),
+         EFFECT(NoEffect))
+
 FUNCTION(GetKeyPath, swift_getKeyPath, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
          ARGS(Int8PtrTy, Int8PtrTy),
