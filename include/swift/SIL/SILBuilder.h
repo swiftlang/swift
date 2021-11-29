@@ -266,11 +266,10 @@ public:
   void clearInsertionPoint() { BB = nullptr; }
 
   /// setInsertionPoint - Set the insertion point.
-  void setInsertionPoint(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt) {
+  void setInsertionPoint(SILBasicBlock *BB, SILBasicBlock::iterator insertPt) {
     this->BB = BB;
-    this->InsertPt = InsertPt;
-    if (InsertPt == BB->end())
-      return;
+    this->InsertPt = insertPt;
+    assert(insertPt == BB->end() || insertPt->getParent() == BB);
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
