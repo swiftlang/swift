@@ -150,7 +150,7 @@ namespace {
 
     Type performTypeResolution(TypeRepr *TyR, bool IsSILType,
                                GenericEnvironment *GenericEnv,
-                               GenericParamList *GenericParams);
+                               GenericParamList *GenericParams) const;
 
     void convertRequirements(ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To);
@@ -915,9 +915,8 @@ void SILParser::convertRequirements(ArrayRef<RequirementRepr> From,
   // Use parser lexical scopes to resolve references
   // to the generic parameters.
   auto ResolveToInterfaceType = [&](TypeRepr *TyR) -> Type {
-    return performTypeResolution(TyR, /*IsSILType=*/false,
-                                 ContextGenericEnv, ContextGenericParams)
-        ->mapTypeOutOfContext();
+    return performTypeResolution(TyR, /*IsSILType=*/false, ContextGenericEnv,
+                                 ContextGenericParams);
   };
 
   for (auto &Req : From) {
@@ -1187,7 +1186,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
 
 Type SILParser::performTypeResolution(TypeRepr *TyR, bool IsSILType,
                                       GenericEnvironment *GenericEnv,
-                                      GenericParamList *GenericParams) {
+                                      GenericParamList *GenericParams) const {
   if (GenericEnv == nullptr)
     GenericEnv = ContextGenericEnv;
 
@@ -1251,26 +1250,26 @@ bool SILParser::parseASTType(CanType &result,
   ParserResult<TypeRepr> parsedType = P.parseType();
   if (parsedType.isNull()) return true;
 
-  bool wantInterfaceType = true;
+  bool wantContextualType = false;
   if (genericEnv == nullptr) {
     genericEnv = ContextGenericEnv;
-    wantInterfaceType = false;
+    wantContextualType = true;
   }
   if (genericParams == nullptr)
     genericParams = ContextGenericParams;
 
   bindSILGenericParams(parsedType.get());
 
-  const auto resolvedType =
-      performTypeResolution(parsedType.get(), /*isSILType=*/false,
-                            genericEnv, genericParams);
+  auto resolvedType = performTypeResolution(
+      parsedType.get(), /*isSILType=*/false, genericEnv, genericParams);
+  if (wantContextualType && genericEnv) {
+    resolvedType = genericEnv->mapTypeIntoContext(resolvedType);
+  }
+
   if (resolvedType->hasError())
     return true;
 
-  if (wantInterfaceType)
-    result = resolvedType->mapTypeOutOfContext()->getCanonicalType();
-  else
-    result = resolvedType->getCanonicalType();
+  result = resolvedType->getCanonicalType();
 
   return false;
 }
@@ -1363,9 +1362,12 @@ bool SILParser::parseSILType(SILType &Result,
   auto *attrRepr =
       P.applyAttributeToType(
         TyR.get(), attrs, specifier, specifierLoc, isolatedLoc);
-  const auto Ty =
-      performTypeResolution(attrRepr, /*IsSILType=*/true,
-                            OuterGenericEnv, OuterGenericParams);
+  auto Ty = performTypeResolution(attrRepr, /*IsSILType=*/true, OuterGenericEnv,
+                                  OuterGenericParams);
+  if (OuterGenericEnv) {
+    Ty = OuterGenericEnv->mapTypeIntoContext(Ty);
+  }
+
   if (Ty->hasError())
     return true;
 
@@ -1930,9 +1932,12 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     if (TyR.isNull())
       return true;
 
-    const auto Ty =
-        performTypeResolution(TyR.get(), /*IsSILType=*/false,
-                              GenericEnv, GenericParams);
+    auto Ty = performTypeResolution(TyR.get(), /*IsSILType=*/false, GenericEnv,
+                                    GenericParams);
+    if (GenericEnv) {
+      Ty = GenericEnv->mapTypeIntoContext(Ty);
+    }
+
     if (Ty->hasError())
       return true;
     parsed.push_back({Loc, Ty});
@@ -2321,9 +2326,8 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
       genericParams = fnType->getGenericParams();
     }
 
-    const auto Ty =
-        performTypeResolution(TyR.get(), /*IsSILType=*/false,
-                              genericEnv, genericParams);
+    const auto Ty = performTypeResolution(TyR.get(), /*IsSILType=*/false,
+                                          genericEnv, genericParams);
     if (Ty->hasError())
       return true;
 
@@ -6841,9 +6845,12 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
   if (witnessParams == nullptr)
     witnessParams = ContextGenericParams;
 
-  const auto ConformingTy =
-      performTypeResolution(TyR.get(), /*IsSILType=*/false,
-                            witnessEnv, witnessParams);
+  auto ConformingTy = performTypeResolution(TyR.get(), /*IsSILType=*/false,
+                                            witnessEnv, witnessParams);
+  if (witnessEnv) {
+    ConformingTy = witnessEnv->mapTypeIntoContext(ConformingTy);
+  }
+
   if (ConformingTy->hasError())
     return ProtocolConformanceRef();
 
@@ -6957,13 +6964,17 @@ static bool parseSILWitnessTableEntry(
       if (TyR.isNull())
         return true;
 
-      const auto Ty =
+      auto Ty =
           swift::performTypeResolution(TyR.get(), P.Context,
                                        /*isSILMode=*/false,
                                        /*isSILType=*/false,
                                        witnessEnv,
                                        witnessParams,
                                        &P.SF);
+      if (witnessEnv) {
+        Ty = witnessEnv->mapTypeIntoContext(Ty);
+      }
+
       if (Ty->hasError())
         return true;
 
@@ -7018,12 +7029,16 @@ static bool parseSILWitnessTableEntry(
     if (TyR.isNull())
       return true;
 
-    const auto Ty =
+    auto Ty =
         swift::performTypeResolution(TyR.get(), P.Context,
                                      /*isSILMode=*/false,
                                      /*isSILType=*/false,
                                      witnessEnv, witnessParams,
                                      &P.SF);
+    if (witnessEnv) {
+      Ty = witnessEnv->mapTypeIntoContext(Ty);
+    }
+
     if (Ty->hasError())
       return true;
 

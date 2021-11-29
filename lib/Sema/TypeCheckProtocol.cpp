@@ -4705,8 +4705,9 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     // If the type comes from a constrained extension or has a 'where'
     // clause, check those requirements now.
     if (!skipRequirementCheck &&
-        !TypeChecker::checkContextualRequirements(genericDecl, Adoptee,
-                                                  SourceLoc(), DC)) {
+        !TypeChecker::checkContextualRequirements(
+            genericDecl, Adoptee, SourceLoc(), DC->getParentModule(),
+            DC->getGenericSignatureOfContext())) {
       continue;
     }
 
@@ -4798,7 +4799,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       proto, substitutingType, ProtocolConformanceRef(Conformance));
 
   auto result = TypeChecker::checkGenericArguments(
-      DC, Loc, Loc,
+      DC->getParentModule(), Loc, Loc,
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(),
       { proto->getSelfInterfaceType() },

@@ -1818,9 +1818,10 @@ bool TypeVarBindingProducer::computeNext() {
       // always preserved.
       auto *BGT = type->castTo<BoundGenericType>();
       auto dstLocator = TypeVar->getImpl().getLocator();
-      auto newType = CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
-                                               dstLocator)
-                         ->reconstituteSugar(/*recursive=*/false);
+      auto newType =
+          CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
+                                    dstLocator, /*isTypeResolution=*/false)
+              ->reconstituteSugar(/*recursive=*/false);
       addNewBinding(binding.withType(newType));
     }
 

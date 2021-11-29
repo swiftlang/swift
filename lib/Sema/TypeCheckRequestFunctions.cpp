@@ -56,17 +56,6 @@ Type InheritedTypeRequest::evaluate(
                                      /*unboundTyOpener*/ nullptr,
                                      /*placeholderHandler*/ nullptr);
     break;
-
-  case TypeResolutionStage::Contextual: {
-    // Compute the contextual type by mapping the interface type into context.
-    auto result =
-      evaluator(InheritedTypeRequest{decl, index,
-                                     TypeResolutionStage::Interface});
-    if (!result)
-      return Type();
-
-    return dc->mapTypeIntoContext(*result);
-  }
   }
 
   const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);

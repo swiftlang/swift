@@ -930,3 +930,14 @@ func rdar79757320() {
   // expected-error@-1 {{cannot infer contextual base in reference to member 'a'}}
   // expected-error@-2 {{cannot infer contextual base in reference to member 'b'}}
 }
+
+protocol P_eaf0300ff7a {}
+do {
+  struct Outer<T: P_eaf0300ff7a> {
+    struct Inner<U> {}
+
+    func container<T>() -> Inner<T> {
+      return Inner()
+    }
+  }
+}

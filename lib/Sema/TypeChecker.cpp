@@ -369,22 +369,21 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
 
-  const auto resolution = TypeResolution::forContextual(
-      DC, GenericEnv, options,
-      [](auto unboundTy) {
-        // FIXME: Don't let unbound generic types escape type resolution.
-        // For now, just return the unbound generic type.
-        return unboundTy;
-      },
-      // FIXME: Don't let placeholder types escape type resolution.
-      // For now, just return the placeholder type.
-      PlaceholderType::get);
-
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
 
-  return resolution.resolveType(TyR, GenericParams);
+  return TypeResolution::forInterface(
+             DC, GenericEnv, options,
+             [](auto unboundTy) {
+               // FIXME: Don't let unbound generic types escape type resolution.
+               // For now, just return the unbound generic type.
+               return unboundTy;
+             },
+             // FIXME: Don't let placeholder types escape type resolution.
+             // For now, just return the placeholder type.
+             PlaceholderType::get)
+      .resolveType(TyR, GenericParams);
 }
 
 namespace {
@@ -501,7 +500,7 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
 bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
                                    DeclContext *dc,
                                    Optional<TypeResolutionStage> stage) {
-  if (stage && stage != TypeResolutionStage::Contextual)
+  if (stage)
     type = dc->mapTypeIntoContext(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
       LookUpConformanceInModule(dc->getParentModule()));
