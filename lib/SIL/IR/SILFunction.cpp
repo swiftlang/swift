@@ -683,6 +683,9 @@ SILFunction::isPossiblyUsedExternally() const {
   if (ReplacedFunction)
     return true;
 
+  if (isDistributed() && isThunk())
+    return true;
+
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
