@@ -132,6 +132,11 @@ class GenericClass<T> {
   typealias TA<U> = MyType<T, U>
   typealias TAI<U> = MyType<Int, U>
 
+  func testNestedUnbound(t: T) {
+    typealias Nested<X, Y> = MyType<X, Y>
+    _ = Nested(a: t, b: t)
+  }
+
   func testCapture<S>(s: S, t: T) -> TA<S> {
     return TA<S>(a: t, b: s)
   }
