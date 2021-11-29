@@ -601,7 +601,7 @@ static bool printResponse(sourcekitd_response_t Resp) {
 
   sourcekitd_response_dispose(Resp);
   return IsError;
-};
+}
 
 static bool handleRequest(StringRef ReqStr, std::string &ErrorMessage) {
   bool UseAsync = false;
