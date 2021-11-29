@@ -758,7 +758,9 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   ///
   /// This can differ from \c getTopLevelDecls, e.g. it returns decls from a
-  /// shadowed clang module.
+  /// shadowed clang module. It does not force synthesized top-level decls that
+  /// should be printed to be added; use \c swift::getTopLevelDeclsForDisplay()
+  /// for that.
   void getDisplayDecls(SmallVectorImpl<Decl*> &results) const;
 
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;

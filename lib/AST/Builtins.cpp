@@ -1578,6 +1578,12 @@ static ValueDecl *getBuildDefaultActorExecutorRef(ASTContext &ctx,
                             _executor);
 }
 
+static ValueDecl *getTargetOSVersionAtLeast(ASTContext &Context,
+                                            Identifier Id) {
+  auto int32Type = BuiltinIntegerType::get(32, Context);
+  return getBuiltinFunction(Id, {int32Type, int32Type, int32Type}, int32Type);
+}
+
 static ValueDecl *getBuildOrdinarySerialExecutorRef(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
@@ -2824,6 +2830,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateAsyncTaskInGroup:
     return getCreateAsyncTaskInGroup(Context, Id);
+
+  case BuiltinValueKind::TargetOSVersionAtLeast:
+    return getTargetOSVersionAtLeast(Context, Id);
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);

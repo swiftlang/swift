@@ -86,7 +86,8 @@ Optional<Type> GenericEnvironment::getMappingIfPresent(
 
 Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
                                             Type type) {
-  assert(!type->hasArchetype() && "already have a contextual type");
+  assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
+         "already have a contextual type");
   assert((env || !type->hasTypeParameter()) &&
          "no generic environment provided for type with type parameters");
 
@@ -230,8 +231,8 @@ Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
 Type GenericEnvironment::mapTypeIntoContext(
                                 Type type,
                                 LookupConformanceFn lookupConformance) const {
-  assert(!type->hasOpenedExistential() &&
-         "Opened existentials are special and so are you");
+  assert((!type->hasArchetype() || type->hasOpenedExistential()) &&
+         "already have a contextual type");
 
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,

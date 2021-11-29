@@ -111,35 +111,6 @@ function(get_bootstrapping_swift_lib_dir bs_lib_dir bootstrapping)
   set(bs_lib_dir ${bs_lib_dir} PARENT_SCOPE)
 endfunction()
 
-function(add_bootstrapping_target bootstrapping)
-  if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
-
-    set(target "bootstrapping${bootstrapping}-all")
-    add_custom_target(${target})
-
-    if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
-      set(lib_target "bootstrapping${bootstrapping}-corelib")
-      add_custom_target(${lib_target})
-      add_dependencies(${target} ${lib_target})
-    endif()
-
-    if(SWIFT_PATH_TO_LIBICU_BUILD)
-      # Need to symlink the libicu libraries to be able to run
-      # the bootstrapping compiler with a custom library path.
-      get_bootstrapping_path(output_dir
-          "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" "${bootstrapping}")
-      if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-        message("TODO: support for copying ICU libraries on Windows")
-      endif()
-      add_custom_command(TARGET "${target}" POST_BUILD
-        COMMAND
-          "ln" "-s" "-f" "${SWIFT_PATH_TO_LIBICU_BUILD}/lib/libicu*" "."
-        WORKING_DIRECTORY "${output_dir}"
-        COMMENT "symlink ICU libraries for bootstrapping stage ${bootstrapping}")
-    endif()
-  endif()
-endfunction()
-
 function(is_build_type_optimized build_type result_var_name)
   if("${build_type}" STREQUAL "Debug")
     set("${result_var_name}" FALSE PARENT_SCOPE)

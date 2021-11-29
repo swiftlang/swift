@@ -466,3 +466,12 @@ class TrailingDerived : TrailingBase {
     super.init(x: x) {}
   }
 }
+
+// rdar://85343171 - Spurious warning on trailing closure in argument list.
+func rdar85343171() {
+  func foo(_ i: Int) -> Bool { true }
+  func bar(_ fn: () -> Void) -> Int { 0 }
+
+  // Okay, as trailing closure is nested in argument list.
+  if foo(bar {}) {}
+}

@@ -10,7 +10,7 @@
 // RUN: %target-swift-frontend -emit-module -DPROTOCOL_LIB -DAFTER %s -module-name protocol_lib -emit-module-path %t/protocol_lib.swiftmodule
 
 // The conforming library's types should still deserialize.
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print conforms_lib -I %t | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print conforms_lib -I %t -allow-compiler-errors | %FileCheck %s
 
 // Protocols that use a missing protocol have to disappear (see the FileCheck
 // lines).
