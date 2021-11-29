@@ -223,6 +223,21 @@ func emitScalarSets(
   emitCollection(scalarSets, name: "_swift_stdlib_names_scalar_sets", into: &result)
 }
 
+func emitLargestNameCount(_ names: [(UInt32, String)], into result: inout String) {
+  var largestCount = 0
+  
+  for (_, name) in names {
+    largestCount = Swift.max(largestCount, name.count)
+  }
+  
+  print("""
+  Please copy and paste the following into 'stdlib/public/SwiftShims/UnicodeData.h':
+  
+  #define SWIFT_STDLIB_LARGEST_NAME_COUNT \(largestCount)
+  
+  """)
+}
+
 func generateNameProp(into result: inout String) {
   let derivedName = readFile("Data/DerivedName.txt")
   
@@ -232,6 +247,8 @@ func generateNameProp(into result: inout String) {
   getName(from: derivedName, into: &names, words: &words)
   
   sortWords(&words, from: names)
+  
+  emitLargestNameCount(names, into: &result)
   
   let wordOffsets = emitWords(words, into: &result)
   let wordIndices = emitWordOffsets(wordOffsets, into: &result)

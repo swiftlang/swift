@@ -743,50 +743,32 @@ extension Unicode.Scalar.Properties {
 
 /// Case mapping properties.
 extension Unicode.Scalar.Properties {
-  fileprivate enum _CaseMapping: UInt8 {
-    case uppercase
-    case lowercase
-    case titlecase
+  fileprivate struct _CaseMapping {
+    let rawValue: UInt8
+
+    static let uppercase = _CaseMapping(rawValue: 0)
+    static let lowercase = _CaseMapping(rawValue: 1)
+    static let titlecase = _CaseMapping(rawValue: 2)
   }
 
   fileprivate func _getMapping(_ mapping: _CaseMapping) -> String {
     // First, check if our scalar has a special mapping where it's mapped to
     // more than 1 scalar.
-    let specialMappingPtr = _swift_stdlib_getSpecialMapping(_scalar.value)
+    var specialMappingLength = 0
 
-    if let specialMapping = specialMappingPtr {
-      func readSpecialMapping(_ ptr: UnsafePointer<UInt32>) -> String {
-        let count = Int(ptr.pointee)
+    let specialMappingPtr = _swift_stdlib_getSpecialMapping(
+      _scalar.value,
+      mapping.rawValue,
+      &specialMappingLength
+    )
 
-        if count == 0 {
-          return "\(_scalar)"
-        }
+    if let specialMapping = specialMappingPtr, specialMappingLength != 0 {
+      let buffer = UnsafeBufferPointer<UInt8>(
+        start: specialMapping,
+        count: specialMappingLength
+      )
 
-        var result = ""
-
-        for i in 0 ..< count {
-          result += "\(Unicode.Scalar(_unchecked: ptr[1 + i]))"
-        }
-
-        return result
-      }
-
-      switch mapping {
-      case .uppercase:
-        return readSpecialMapping(specialMapping)
-
-      case .lowercase:
-        let upperCount = Int(specialMapping.pointee)
-
-        return readSpecialMapping(specialMapping + upperCount + 1)
-
-      case .titlecase:
-        let upperCount = Int(specialMapping.pointee)
-        let lowerPtr = specialMapping + upperCount + 1
-        let lowerCount = Int(lowerPtr.pointee)
-
-        return readSpecialMapping(lowerPtr + lowerCount + 1)
-      }
+      return String._uncheckedFromUTF8(buffer, isASCII: false)
     }
 
     // If we did not have a special mapping, check if we have a direct scalar
@@ -800,11 +782,11 @@ extension Unicode.Scalar.Properties {
       let scalar = Unicode.Scalar(
         _unchecked: UInt32(Int(_scalar.value) &+ Int(mappingDistance))
       )
-      return "\(scalar)"
+      return String(scalar)
     }
 
     // We did not have any mapping. Return the scalar as is.
-    return "\(_scalar)"
+    return String(_scalar)
   }
 
   /// The lowercase mapping of the scalar.
@@ -867,7 +849,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Age" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var age: Unicode.Version? {
-    let age = _swift_stdlib_getAge(_scalar.value)
+    let age: UInt16 = _swift_stdlib_getAge(_scalar.value)
 
     if age == .max {
       return nil
@@ -1207,55 +1189,46 @@ extension Unicode.Scalar.Properties {
   internal func _fastScalarName() -> String? {
     // Define a couple algorithmetic names below.
 
-    // Hangul Syllable *
-    if (0xAC00 ... 0xD7A3).contains(_scalar.value) {
-      return _hangulName()
-    }
-
-    // Variation Selector-17 through Variation Selector-256
-    if (0xE0100 ... 0xE01EF).contains(_scalar.value) {
-      return "VARIATION SELECTOR-\(_scalar.value - 0xE0100 + 17)"
-    }
-
     let scalarName = String(_scalar.value, radix: 16, uppercase: true)
 
-    // CJK Unified Ideograph-*
-    if (0x3400 ... 0x4DBF).contains(_scalar.value) ||
-       (0x4E00 ... 0x9FFF).contains(_scalar.value) ||
-       (0x20000 ... 0x2A6DF).contains(_scalar.value) ||
-       (0x2A700 ... 0x2B738).contains(_scalar.value) ||
-       (0x2B740 ... 0x2B81D).contains(_scalar.value) ||
-       (0x2B820 ... 0x2CEA1).contains(_scalar.value) ||
-       (0x2CEB0 ... 0x2EBE0).contains(_scalar.value) ||
-       (0x2F800 ... 0x2FA1D).contains(_scalar.value) ||
-       (0x30000 ... 0x3134A).contains(_scalar.value) {
+    switch _scalar.value {
+    // Hangul Syllable *
+    case (0xAC00 ... 0xD7A3):
+      return _hangulName()
+
+    // Variation Selector-17 through Variation Selector-256
+    case (0xE0100 ... 0xE01EF):
+      return "VARIATION SELECTOR-\(_scalar.value - 0xE0100 + 17)"
+
+    case (0x3400 ... 0x4DBF),
+         (0x4E00 ... 0x9FFF),
+         (0x20000 ... 0x2A6DF),
+         (0x2A700 ... 0x2B738),
+         (0x2B740 ... 0x2B81D),
+         (0x2B820 ... 0x2CEA1),
+         (0x2CEB0 ... 0x2EBE0),
+         (0x2F800 ... 0x2FA1D),
+         (0x30000 ... 0x3134A):
       return "CJK UNIFIED IDEOGRAPH-\(scalarName)"
-    }
 
-    // CJK Compatibility Ideograph-*
-    if (0xF900 ... 0xFA6D).contains(_scalar.value) ||
-       (0xFA70 ... 0xFAD9).contains(_scalar.value) {
+    case (0xF900 ... 0xFA6D),
+         (0xFA70 ... 0xFAD9):
       return "CJK COMPATIBILITY IDEOGRAPH-\(scalarName)"
-    }
 
-    // Tangut Ideograph-*
-    if (0x17000 ... 0x187F7).contains(_scalar.value) ||
-       (0x18D00 ... 0x18D08).contains(_scalar.value) {
+    case (0x17000 ... 0x187F7),
+         (0x18D00 ... 0x18D08):
       return "TANGUT IDEOGRAPH-\(scalarName)"
-    }
 
-    // Khitan Small Script Character-*
-    if (0x18B00 ... 0x18CD5).contains(_scalar.value) {
+    case (0x18B00 ... 0x18CD5):
       return "KHITAN SMALL SCRIPT CHARACTER-\(scalarName)"
-    }
 
-    // Nushu Character-*
-    if (0x1B170 ... 0x1B2FB).contains(_scalar.value) {
+    case (0x1B170 ... 0x1B2FB):
       return "NUSHU CHARACTER-\(scalarName)"
-    }
 
     // Otherwise, go look it up.
-    return nil
+    default:
+      return nil
+    }
   }
 
   /// The published name of the scalar.
@@ -1272,8 +1245,14 @@ extension Unicode.Scalar.Properties {
     }
 
     // The longest name that Unicode defines is 88 characters long.
-    let name = String(_uninitializedCapacity: 90) { buffer in
-      _swift_stdlib_getScalarName(_scalar.value, buffer.baseAddress)
+    let largestCount = Int(SWIFT_STDLIB_LARGEST_NAME_COUNT)
+
+    let name = String(_uninitializedCapacity: largestCount) { buffer in
+      _swift_stdlib_getScalarName(
+        _scalar.value,
+        buffer.baseAddress,
+        buffer.count
+      )
     }
 
     return name.isEmpty ? nil : name
@@ -1293,13 +1272,11 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Name_Alias" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var nameAlias: String? {
-    let nameAliasPtr = _swift_stdlib_getNameAlias(_scalar.value)
-
-    guard nameAliasPtr != nil else {
+    guard let nameAliasPtr = _swift_stdlib_getNameAlias(_scalar.value) else {
       return nil
     }
 
-    return String(cString: nameAliasPtr!)
+    return String(cString: nameAliasPtr)
   }
 }
 
@@ -1449,9 +1426,8 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Canonical_Combining_Class" property in
   /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var canonicalCombiningClass: Unicode.CanonicalCombiningClass {
-    let normData = _swift_stdlib_getNormData(_scalar.value)
-    let rawValue = UInt8(normData >> 3)
-    return Unicode.CanonicalCombiningClass(rawValue: rawValue)
+    let normData = Unicode._NormData(_scalar)
+    return Unicode.CanonicalCombiningClass(rawValue: normData.ccc)
   }
 }
 
@@ -1498,6 +1474,19 @@ extension Unicode {
     /// meet the requirements of `decimal` will have numeric type `numeric`,
     /// and programs can treat `digit` and `numeric` equivalently.
     case numeric
+
+    internal init(rawValue: UInt8) {
+      switch rawValue {
+      case 0:
+        self = .numeric
+      case 1:
+        self = .digit
+      case 2:
+        self = .decimal
+      default:
+        fatalError("Unknown numeric type \(rawValue)")
+      }
+    }
   }
 }
 
@@ -1523,16 +1512,11 @@ extension Unicode.Scalar.Properties {
   public var numericType: Unicode.NumericType? {
     let rawValue = _swift_stdlib_getNumericType(_scalar.value)
 
-    switch rawValue {
-    case 0:
-      return .numeric
-    case 1:
-      return .digit
-    case 2:
-      return .decimal
-    default:
+    guard rawValue != .max else {
       return nil
     }
+
+    return Unicode.NumericType(rawValue: rawValue)
   }
 
   /// The numeric value of the scalar.

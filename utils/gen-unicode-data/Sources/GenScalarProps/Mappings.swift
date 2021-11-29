@@ -261,7 +261,7 @@ func emitSpecialMappings(
   _ data: [UInt32: ([UInt32], [UInt32], [UInt32])],
   into result: inout String
 ) {
-  var specialMappings: [UInt32] = []
+  var specialMappings: [UInt8] = []
   var index: UInt32 = 0
   var scalarIndices: [UInt32: UInt32] = [:]
   
@@ -272,11 +272,21 @@ func emitSpecialMappings(
     if uppercase.count == 1 {
       specialMappings.append(0)
     } else {
-      specialMappings.append(UInt32(uppercase.count))
+      let uppercase = uppercase.map { Unicode.Scalar($0)! }
+      
+      var utf8Length: UInt8 = 0
       
       for scalar in uppercase {
-        specialMappings.append(scalar)
-        index += 1
+        utf8Length += UInt8(scalar.utf8.count)
+      }
+      
+      specialMappings.append(utf8Length)
+      
+      for scalar in uppercase {
+        for byte in String(scalar).utf8 {
+          specialMappings.append(byte)
+          index += 1
+        }
       }
     }
     
@@ -284,11 +294,21 @@ func emitSpecialMappings(
     if lowercase.count == 1 {
       specialMappings.append(0)
     } else {
-      specialMappings.append(UInt32(lowercase.count))
+      let lowercase = lowercase.map { Unicode.Scalar($0)! }
+      
+      var utf8Length: UInt8 = 0
       
       for scalar in lowercase {
-        specialMappings.append(scalar)
-        index += 1
+        utf8Length += UInt8(scalar.utf8.count)
+      }
+      
+      specialMappings.append(utf8Length)
+      
+      for scalar in lowercase {
+        for byte in String(scalar).utf8 {
+          specialMappings.append(byte)
+          index += 1
+        }
       }
     }
     
@@ -296,11 +316,21 @@ func emitSpecialMappings(
     if titlecase.count == 1 {
       specialMappings.append(0)
     } else {
-      specialMappings.append(UInt32(titlecase.count))
+      let titlecase = titlecase.map { Unicode.Scalar($0)! }
+      
+      var utf8Length: UInt8 = 0
       
       for scalar in titlecase {
-        specialMappings.append(scalar)
-        index += 1
+        utf8Length += UInt8(scalar.utf8.count)
+      }
+      
+      specialMappings.append(utf8Length)
+      
+      for scalar in titlecase {
+        for byte in String(scalar).utf8 {
+          specialMappings.append(byte)
+          index += 1
+        }
       }
     }
   }

@@ -175,7 +175,9 @@ __swift_int32_t _swift_stdlib_getMapping(__swift_uint32_t scalar,
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-const __swift_uint32_t *_swift_stdlib_getSpecialMapping(__swift_uint32_t scalar) {
+const __swift_uint8_t *_swift_stdlib_getSpecialMapping(__swift_uint32_t scalar,
+                                                       __swift_uint8_t mapping,
+                                                     __swift_intptr_t *length) {
   auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
                                                  _swift_stdlib_special_mappings,
                                           _swift_stdlib_special_mappings_ranks);
@@ -186,12 +188,36 @@ const __swift_uint32_t *_swift_stdlib_getSpecialMapping(__swift_uint32_t scalar)
 
   auto index = _swift_stdlib_special_mappings_data_indices[dataIdx];
 
-  return _swift_stdlib_special_mappings_data + index;
+  auto uppercase = _swift_stdlib_special_mappings_data + index;
+  auto lowercase = uppercase + 1 + *uppercase;
+  auto titlecase = lowercase + 1 + *lowercase;
+
+  switch (mapping) {
+    // Uppercase
+    case 0:
+      *length = *uppercase;
+      return uppercase + 1;
+
+    // Lowercase
+    case 1:
+      *length = *lowercase;
+      return lowercase + 1;
+
+    // Titlecase
+    case 2:
+      *length = *titlecase;
+      return titlecase + 1;
+
+    // Unknown mapping.
+    default:
+      return nullptr;
+  }
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
-                                             __swift_uint8_t *buffer) {
+                                             __swift_uint8_t *buffer,
+                                             __swift_intptr_t capacity) {
   auto setOffset = _swift_stdlib_names_scalar_sets[scalar >> 7];
 
   if (setOffset == std::numeric_limits<__swift_uint16_t>::max()) {
@@ -217,6 +243,7 @@ __swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
 
   auto nameSize = nextScalarOffset - scalarOffset;
 
+  // The total number of initialized bytes in the name string.
   int c = 0;
 
   for (__swift_uint32_t i = 0; i < nameSize; i += 1) {
@@ -242,10 +269,22 @@ __swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
 
     // The last character in a word has the 7th bit set.
     while (*word < 0x80) {
+      if (c >= capacity) {
+        return c;
+      }
+
       buffer[c++] = *word++;
     }
 
+    if (c >= capacity) {
+      return c;
+    }
+
     buffer[c++] = *word & 0x7F;
+
+    if (c >= capacity) {
+      return c;
+    }
 
     buffer[c++] = ' ';
   }

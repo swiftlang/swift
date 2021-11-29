@@ -850,6 +850,7 @@ extension String {
     }
 
     var result = ""
+    result.reserveCapacity(utf8.count)
 
     for scalar in unicodeScalars {
       result += scalar.properties.lowercaseMapping
@@ -883,6 +884,7 @@ extension String {
     }
 
     var result = ""
+    result.reserveCapacity(utf8.count)
 
     for scalar in unicodeScalars {
       result += scalar.properties.uppercaseMapping
