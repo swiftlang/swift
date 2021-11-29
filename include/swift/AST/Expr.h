@@ -486,7 +486,9 @@ public:
   bool isSemanticallyInOutExpr() const {
     return getSemanticsProvidingExpr()->getKind() == ExprKind::InOut;
   }
-  
+
+  bool isSemanticallyConstExpr() const;
+
   /// Returns false if this expression needs to be wrapped in parens when
   /// used inside of a any postfix expression, true otherwise.
   ///

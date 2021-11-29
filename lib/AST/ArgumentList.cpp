@@ -39,6 +39,10 @@ bool Argument::isInOut() const {
   return ArgExpr->isSemanticallyInOutExpr();
 }
 
+bool Argument::isConst() const {
+  return ArgExpr->isSemanticallyConstExpr();
+}
+
 ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
                                    ArrayRef<Argument> args, SourceLoc rParenLoc,
                                    Optional<unsigned> firstTrailingClosureIndex,
