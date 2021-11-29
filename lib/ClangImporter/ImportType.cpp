@@ -1908,11 +1908,9 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     Type swiftParamTy;
     bool isParamTypeImplicitlyUnwrapped = false;
     bool isInOut = false;
-
-    auto referenceType = dyn_cast<clang::ReferenceType>(paramTy);
-    if (referenceType &&
-        isa<clang::TemplateTypeParmType>(referenceType->getPointeeType())) {
-      auto pointeeType = referenceType->getPointeeType();
+    if ((isa<clang::ReferenceType>(paramTy) || isa<clang::PointerType>(paramTy)) &&
+        isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
+      auto pointeeType = paramTy->getPointeeType();
       auto templateParamType = cast<clang::TemplateTypeParmType>(pointeeType);
       PointerTypeKind pointerKind = pointeeType.getQualifiers().hasConst()
                                         ? PTK_UnsafePointer

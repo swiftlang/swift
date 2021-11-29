@@ -17,6 +17,7 @@
 // CHECK: func lvalueReference<T>(_ ref: UnsafeMutablePointer<T>)
 // CHECK: func constLvalueReference<T>(_: UnsafePointer<T>)
 // CHECK: func forwardingReference<T>(_: UnsafeMutablePointer<T>)
+// CHECK: func PointerTemplateParameter<T>(_: UnsafeMutablePointer<T>)
 
 // CHECK: enum Orbiters {
 // CHECK:   static func galileo<T>(_: T)
