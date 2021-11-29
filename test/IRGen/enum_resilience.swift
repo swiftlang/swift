@@ -101,7 +101,7 @@ public func functionWithResilientEnum(_ m: Medium) -> Medium {
 // CHECK-NEXT: [[WITNESS:%.*]]  = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%initializeWithCopy]] = bitcast i8* [[WITNESS]]
 // CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
-// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: call %swift.opaque* [[WITNESS_FN]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* [[METADATA]])
 // CHECK-NEXT: ret void
 
@@ -121,7 +121,7 @@ public func functionWithIndirectResilientEnum(_ ia: IndirectApproach) -> Indirec
 // CHECK-NEXT: [[WITNESS:%.*]]  = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%initializeWithCopy]] = bitcast i8* [[WITNESS]]
 // CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
-// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: call %swift.opaque* [[WITNESS_FN]](%swift.opaque* noalias %0, %swift.opaque* noalias %1, %swift.type* [[METADATA]])
 // CHECK-NEXT: ret void
 
@@ -143,7 +143,7 @@ public func constructResilientEnumNoPayload() -> Medium {
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%.*]] = bitcast i8* [[WITNESS]]
 // CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
-// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* noalias %0, i32 [[TAG]], %swift.type* [[METADATA]])
 
 // CHECK-NEXT: ret void
@@ -169,14 +169,14 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%initializeWithCopy]] = bitcast i8* [[WITNESS]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
 // CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
-// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: call %swift.opaque* [[WITNESS_FN]](%swift.opaque* noalias [[ENUM_STORAGE]], %swift.opaque* noalias %1, %swift.type* [[METADATA]])
 
 // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 4
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%initializeWithTake]] = bitcast i8* [[WITNESS]] to %swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)*
 // CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
-// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: call %swift.opaque* [[WITNESS_FN]](%swift.opaque* noalias %0, %swift.opaque* noalias [[ENUM_STORAGE]], %swift.type* [[METADATA]])
 
 // CHECK-NEXT: [[TAG:%.*]] = load i32, i32* @"$s14resilient_enum6MediumO8PostcardyAC0A7_struct4SizeVcACmFWC"
@@ -192,7 +192,7 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[WITNESS_FN:%destructiveInjectEnumTag]] = bitcast i8* [[WITNESS]]
 // CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
-// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: call void [[WITNESS_FN]](%swift.opaque* noalias %0, i32 [[TAG]], %swift.type* [[METADATA2]])
 // CHECK-NEXT: [[STORAGE_ALLOCA:%.*]] = bitcast %swift.opaque* [[ENUM_STORAGE]] to i8*
 // CHECK-NEXT: call void @llvm.lifetime.end.p0i8({{(i32|i64)}} -1, i8* [[STORAGE_ALLOCA]])
@@ -348,7 +348,7 @@ extension ResilientMultiPayloadGenericEnum {
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[STORE_TAG:%.*]] = bitcast i8* {{%.+}} to void (%swift.opaque*, i32, i32, %swift.type*)* 
 // CHECK-arm64e-NEXT: ptrtoint i8** {{.*}} to i64
-// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: call void [[STORE_TAG]](%swift.opaque* noalias [[BUFFER]], i32 1, i32 1, %swift.type* [[METADATA]])
 // CHECK-NEXT: ret void
 // CHECK-NEXT: {{^}$}}

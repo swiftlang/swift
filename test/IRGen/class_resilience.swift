@@ -563,7 +563,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[VTABLE_OFFSET_ADDR:%.*]] = bitcast i8* [[VTABLE_OFFSET_TMP]] to i32 (%T16class_resilience14ResilientChildC*)**
 // CHECK-NEXT: [[METHOD:%.*]] = load i32 (%T16class_resilience14ResilientChildC*)*, i32 (%T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]]
 // CHECK-arm64e-NEXT: ptrtoint i32 (%T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]] to i64
-// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: [[RESULT:%.*]] = call swiftcc i32 [[METHOD]](%T16class_resilience14ResilientChildC* swiftself %0)
 // CHECK-NEXT: ret i32 [[RESULT]]
 
@@ -579,7 +579,7 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[VTABLE_OFFSET_ADDR:%.*]] = bitcast i8* [[VTABLE_OFFSET_TMP]] to void (i32, %T16class_resilience14ResilientChildC*)**
 // CHECK-NEXT: [[METHOD:%.*]] = load void (i32, %T16class_resilience14ResilientChildC*)*, void (i32, %T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]]
 // CHECK-arm64e-NEXT: ptrtoint void (i32, %T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]] to i64
-// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
+// CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: call swiftcc void [[METHOD]](i32 %0, %T16class_resilience14ResilientChildC* swiftself %1)
 // CHECK-NEXT: ret void
 
