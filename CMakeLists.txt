@@ -1089,9 +1089,6 @@ if(SWIFT_ENABLE_DISPATCH)
   include(Libdispatch)
 endif()
 
-add_bootstrapping_target(0)
-add_bootstrapping_target(1)
-
 # Add all of the subdirectories, where we actually do work.
 
 ###############

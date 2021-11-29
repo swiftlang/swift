@@ -1223,6 +1223,15 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::TargetOSVersionAtLeast) {
+    auto major = args.claimNext();
+    auto minor = args.claimNext();
+    auto patch = args.claimNext();
+    auto result = IGF.emitTargetOSVersionAtLeastCall(major, minor, patch);
+    out.add(result);
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::Swift3ImplicitObjCEntrypoint) {
     llvm::Value *entrypointArgs[7];
     auto argIter = IGF.CurFn->arg_begin();

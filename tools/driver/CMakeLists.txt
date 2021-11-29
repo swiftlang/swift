@@ -38,9 +38,6 @@ if(${LIBSWIFT_BUILD_MODE} MATCHES "BOOTSTRAPPING.*")
     SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "swiftc${CMAKE_EXECUTABLE_SUFFIX}"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/bootstrapping1/bin")
-
-  add_dependencies(bootstrapping0-all swift-frontend-bootstrapping0)
-  add_dependencies(bootstrapping1-all swift-frontend-bootstrapping1)
 endif()
 
 add_swift_host_tool(swift-frontend
