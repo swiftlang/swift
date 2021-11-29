@@ -42,7 +42,7 @@ void UnitTestSourceFileDepGraphFactory::addAllUsedDecls() {
     if (!isADefinedDecl(s))
       addAUsedDecl(s, kind);
   });
-};
+}
 
 //==============================================================================
 // MARK: UnitTestSourceFileDepGraphFactory - adding individual Decls
