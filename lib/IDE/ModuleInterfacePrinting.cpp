@@ -399,12 +399,12 @@ static std::pair<ArrayRef<Decl*>, ArrayRef<Decl*>>
 getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
                                SmallVectorImpl<Decl *> &Decls,
                                AccessLevel AccessFilter) {
-  Overlay->getDisplayDecls(Decls);
+  swift::getTopLevelDeclsForDisplay(Overlay, Decls);
 
   // Collect the imports of the underlying module so we can filter them out.
   SmallPtrSet<ModuleDecl *, 8> PrevImported;
   SmallVector<Decl*, 1> DeclaringDecls;
-  Declaring->getDisplayDecls(DeclaringDecls);
+  swift::getTopLevelDeclsForDisplay(Declaring, DeclaringDecls);
   for (auto *D: DeclaringDecls) {
     if (auto *ID = dyn_cast<ImportDecl>(D))
       PrevImported.insert(ID->getModule());
@@ -548,7 +548,7 @@ void swift::ide::printModuleInterface(
   adjustPrintOptions(AdjustedOptions);
 
   SmallVector<Decl *, 1> Decls;
-  TopLevelMod->getDisplayDecls(Decls);
+  swift::getTopLevelDeclsForDisplay(TopLevelMod, Decls);
 
   SmallVector<ImportDecl *, 1> ImportDecls;
   llvm::DenseSet<const clang::Module *> ClangModulesForImports;

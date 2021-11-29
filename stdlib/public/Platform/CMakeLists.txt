@@ -53,18 +53,22 @@ if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING" AND
       ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
       INSTALL_IN_COMPONENT "never_install")
 
+  set(b0_deps swiftCore-bootstrapping0)
+  set(b1_deps swiftCore-bootstrapping1)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(b0_deps ${b0_deps} swiftOnoneSupport-bootstrapping0)
+    set(b1_deps ${b1_deps} swiftOnoneSupport-bootstrapping1)
+  endif()
+
   add_swift_target_library_single(swiftDarwin-bootstrapping0 swiftDarwin
       ${swiftDarwin_common_bootstrapping_options}
-      FILE_DEPENDS bootstrapping0-corelib
+      FILE_DEPENDS ${b0_deps}
       BOOTSTRAPPING 0)
 
   add_swift_target_library_single(swiftDarwin-bootstrapping1 swiftDarwin
       ${swiftDarwin_common_bootstrapping_options}
-      FILE_DEPENDS bootstrapping1-corelib
+      FILE_DEPENDS ${b1_deps}
       BOOTSTRAPPING 1)
-
-  add_dependencies(bootstrapping1-all swiftDarwin-bootstrapping1)
-  add_dependencies(bootstrapping0-all swiftDarwin-bootstrapping0)
 endif()
 
 add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}

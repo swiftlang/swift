@@ -467,6 +467,14 @@ getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
   return None;
 }
 
+static bool clangSupportsPragmaAttributeWithSwiftAttr() {
+  clang::AttributeCommonInfo swiftAttrInfo(clang::SourceRange(),
+     clang::AttributeCommonInfo::AT_SwiftAttr,
+     clang::AttributeCommonInfo::AS_GNU);
+  auto swiftAttrParsedInfo = clang::ParsedAttrInfo::get(swiftAttrInfo);
+  return swiftAttrParsedInfo.IsSupportedByPragmaAttribute;
+}
+
 static Optional<StringRef>
 getWasiLibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
                          SmallVectorImpl<char> &buffer) {
@@ -644,6 +652,12 @@ importer::getNormalInvocationArguments(
       // '__swift__'.
       "-DSWIFT_CLASS_EXTRA=",
     });
+
+    // Indicate that using '__attribute__((swift_attr))' with '@Sendable' and
+    // '@_nonSendable' on Clang declarations is fully supported, including the
+    // 'attribute push' pragma.
+    if (clangSupportsPragmaAttributeWithSwiftAttr())
+      invocationArgStrs.push_back( "-D__SWIFT_ATTR_SUPPORTS_SENDABLE_DECLS=1");
 
     // Get the version of this compiler and pass it to C/Objective-C
     // declarations.
