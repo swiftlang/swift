@@ -10,9 +10,6 @@
 // Crash expectations can't be implemented on WASI/WebAssembly.
 // UNSUPPORTED: OS=wasi
 
-// Disabled until test hang can be looked at.
-// UNSUPPORTED: OS=windows-msvc
-
 // UNSUPPORTED: use_os_stdlib
 
 // This test makes sure that we properly save/restore access when we

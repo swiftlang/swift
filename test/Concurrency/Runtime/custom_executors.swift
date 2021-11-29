@@ -6,8 +6,6 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: concurrency_runtime
 
-// Disabled until test hang can be looked at.
-// UNSUPPORTED: OS=windows-msvc
 
 actor Simple {
   var count = 0
