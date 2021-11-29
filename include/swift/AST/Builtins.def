@@ -770,6 +770,9 @@ BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
 BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,
                        "resumeNonThrowingContinuationReturning", "", Special)
 
+/// targetOSVersionAtLeast has type (Builtin.Int32, Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+BUILTIN_MISC_OPERATION(TargetOSVersionAtLeast, "targetOSVersionAtLeast", "n", Special)
+
 /// Resume a throwing continuation normally with the given result.
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
                        "resumeThrowingContinuationReturning", "", Special)
