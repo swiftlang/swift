@@ -6,11 +6,5 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
-add_libswift_module(Optimizer
-    DEPENDS SIL ExperimentalRegex)
-
-add_subdirectory(Analysis)
-add_subdirectory(InstructionPasses)
-add_subdirectory(PassManager)
-add_subdirectory(FunctionPasses)
-add_subdirectory(Utilities)
+libswift_sources(Optimizer
+  OptUtils.swift)
