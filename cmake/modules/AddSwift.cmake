@@ -779,6 +779,7 @@ function(add_libswift name)
               "-parse-as-library" ${sources}
               "-wmo" ${libswift_compile_options}
               "-I" "${SWIFT_SOURCE_DIR}/include/swift"
+              "-I" "${SWIFT_SOURCE_DIR}/include"
               "-I" "${build_dir}"
       COMMENT "Building libswift module ${module}")
 
