@@ -1018,6 +1018,21 @@ public:
   static bool classof(const IsolatedTypeRepr *T) { return true; }
 };
 
+/// An '_const' type.
+/// \code
+///   x : _const Int
+/// \endcode
+class CompileTimeConstTypeRepr : public SpecifierTypeRepr {
+public:
+  CompileTimeConstTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::CompileTimeConst, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::CompileTimeConst;
+  }
+  static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
+};
+
 /// A TypeRepr for a known, fixed type.
 ///
 /// Fixed type representations should be used sparingly, in places
@@ -1287,6 +1302,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Owned:
   case TypeReprKind::Isolated:
   case TypeReprKind::Placeholder:
+  case TypeReprKind::CompileTimeConst:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

@@ -722,6 +722,9 @@ ERROR(cannot_return_value_from_void_func,none,
 NOTE(add_return_type_note,none,
      "did you mean to add a return type?", ())
 
+ERROR(expect_compile_time_const,none,
+      "expect a compile-time constant literal", ())
+
 //------------------------------------------------------------------------------
 // MARK: Import Resolution
 //------------------------------------------------------------------------------
@@ -2320,6 +2323,9 @@ WARNING(warn_protocol_witness_optionality,none,
 NOTE(protocol_witness_static_conflict,none,
      "candidate operates on %select{a type|an instance}0, not "
      "%select{an instance|a type}0 as required", (bool))
+NOTE(protocol_witness_const_conflict,none,
+     "candidate operates as %select{const|non-const}0, not "
+     "%select{non-const|const}0 as required", (bool))
 NOTE(protocol_witness_prefix_postfix_conflict,none,
      "candidate is %select{|prefix, |postfix, }1not "
      "%select{prefix|postfix}0 as required", (bool, unsigned))

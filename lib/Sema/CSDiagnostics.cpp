@@ -5436,6 +5436,11 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
   return true;
 }
 
+bool NotCompileTimeConstFailure::diagnoseAsError() {
+  emitDiagnostic(diag::expect_compile_time_const);
+  return true;
+}
+
 bool CollectionElementContextualFailure::diagnoseAsError() {
   auto anchor = getRawAnchor();
   auto *locator = getLocator();

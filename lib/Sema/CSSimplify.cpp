@@ -1504,6 +1504,12 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           }
         }
       }
+      if (!argument.isCompileTimeConst() && param.isCompileTimeConst()) {
+        if (cs.shouldAttemptFixes()) {
+          cs.recordFix(NotCompileTimeConst::create(cs, paramTy,
+                                                   cs.getConstraintLocator(loc)));
+        }
+      }
 
       cs.addConstraint(
           subKind, argTy, paramTy,
@@ -11837,7 +11843,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveExtraneousArguments:
   case FixKind::SpecifyTypeForPlaceholder:
   case FixKind::AllowAutoClosurePointerConversion:
-  case FixKind::IgnoreKeyPathContextualMismatch: {
+  case FixKind::IgnoreKeyPathContextualMismatch:
+  case FixKind::NotCompileTimeConst: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
