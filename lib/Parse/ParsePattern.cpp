@@ -259,7 +259,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     while (Tok.is(tok::kw_inout) ||
            Tok.isContextualKeyword("__shared") ||
            Tok.isContextualKeyword("__owned") ||
-           Tok.isContextualKeyword("isolated")) {
+           Tok.isContextualKeyword("isolated") ||
+           Tok.isContextualKeyword("_const")) {
 
       if (Tok.isContextualKeyword("isolated")) {
         // did we already find an 'isolated' type modifier?
@@ -284,6 +285,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
         // consume 'isolated' as type modifier
         param.IsolatedLoc = consumeToken();
+        continue;
+      }
+
+      if (Tok.isContextualKeyword("_const")) {
+        param.CompileConstLoc = consumeToken();
         continue;
       }
 
@@ -589,6 +595,12 @@ mapParsedParameters(Parser &parser,
         param->setIsolated();
       }
 
+      if (paramInfo.CompileConstLoc.isValid()) {
+        type = new (parser.Context) CompileTimeConstTypeRepr(
+            type, paramInfo.CompileConstLoc);
+        param->setCompileTimeConst();
+      }
+
       param->setTypeRepr(type);
 
       // Dig through the type to find any attributes or modifiers that are
@@ -614,6 +626,12 @@ mapParsedParameters(Parser &parser,
               param->setIsolated(true);
             unwrappedType = STR->getBase();
             continue;;
+          }
+
+          if (auto *CTR = dyn_cast<CompileTimeConstTypeRepr>(unwrappedType)) {
+            param->setCompileTimeConst(true);
+            unwrappedType = CTR->getBase();
+            continue;
           }
 
           break;

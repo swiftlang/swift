@@ -250,6 +250,46 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     return &pbe;
   }
 
+  llvm::SmallVector<VarDecl *, 2> vars;
+  binding->getPattern(entryNumber)->collectVariables(vars);
+  bool isReq = false;
+  if (auto *d = binding->getDeclContext()->getAsDecl()) {
+    isReq = isa<ProtocolDecl>(d);
+  }
+  for (auto *sv: vars) {
+    bool hasConst = sv->getAttrs().getAttribute<CompileTimeConstAttr>();
+    if (!hasConst)
+      continue;
+    bool hasStatic = StaticSpelling != StaticSpellingKind::None;
+    // only static _const let/var is supported
+    if (!hasStatic) {
+      binding->diagnose(diag::require_static_for_const);
+      continue;
+    }
+    if (isReq) {
+      continue;
+    }
+    auto varSourceFile = binding->getDeclContext()->getParentSourceFile();
+    auto isVarInInterfaceFile =
+        varSourceFile && varSourceFile->Kind == SourceFileKind::Interface;
+    // Don't diagnose too strictly for textual interfaces.
+    if (isVarInInterfaceFile) {
+      continue;
+    }
+    // var is only allowed in a protocol.
+    if (!sv->isLet()) {
+      binding->diagnose(diag::require_let_for_const);
+    }
+    // Diagnose when an init isn't given and it's not a compile-time constant
+    if (auto *init = binding->getInit(entryNumber)) {
+      if (!init->isSemanticallyConstExpr()) {
+        binding->diagnose(diag::require_const_initializer_for_const);
+      }
+    } else {
+      binding->diagnose(diag::require_const_initializer_for_const);
+    }
+  }
+
   // If we have a type but no initializer, check whether the type is
   // default-initializable. If so, do it.
   if (!pbe.isInitialized() &&
@@ -297,8 +337,6 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   // If the pattern binding appears in a type or library file context, then
   // it must bind at least one variable.
   if (!contextAllowsPatternBindingWithoutVariables(binding->getDeclContext())) {
-    llvm::SmallVector<VarDecl *, 2> vars;
-    binding->getPattern(entryNumber)->collectVariables(vars);
     if (vars.empty()) {
       // Selector for error message.
       enum : unsigned {

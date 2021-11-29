@@ -83,6 +83,9 @@ public:
   /// Whether the argument is \c inout, denoted with the '&' prefix.
   bool isInOut() const;
 
+  /// Whether the argument is a compile-time constant value.
+  bool isConst() const;
+
   bool operator==(const Argument &other) {
     return LabelLoc == other.LabelLoc && Label == other.Label &&
            ArgExpr == other.ArgExpr;

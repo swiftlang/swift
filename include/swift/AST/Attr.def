@@ -694,6 +694,11 @@ SIMPLE_DECL_ATTR(_predatesConcurrency, PredatesConcurrency,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   125)
 
+CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeConst,
+  DeclModifier | OnParam | OnVar |
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  126)
+
 // If you're adding a new underscored attribute here, please document it in
 // docs/ReferenceGuides/UnderscoredAttributes.md.
 
