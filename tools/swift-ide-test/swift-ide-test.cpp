@@ -2793,7 +2793,7 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
     {
       GroupNamesPrinter Printer(llvm::outs());
       llvm::SmallVector<Decl*, 256> Results;
-      M->getDisplayDecls(Results);
+      swift::getTopLevelDeclsForDisplay(M, Results);
       for (auto R : Results) {
         Printer.addDecl(R);
       }

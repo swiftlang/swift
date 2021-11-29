@@ -18,6 +18,7 @@
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -877,7 +878,7 @@ public:
 
 std::shared_ptr<sma::Module> createSMAModel(ModuleDecl *M) {
   SmallVector<Decl *, 1> Decls;
-  M->getDisplayDecls(Decls);
+  swift::getTopLevelDeclsForDisplay(M, Decls);
 
   SMAModelGenerator Generator;
   for (auto *D : Decls) {

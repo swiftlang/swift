@@ -5,21 +5,21 @@
 
 // REQUIRES: objc_interop
 
-// CHECK: enum Normal : Int {
+// CHECK-LABEL: enum Normal : Int, @unchecked Sendable {
 // CHECK-NOT: {{^}}}
 // CHECK: case one
 // CHECK-NEXT: case two
 // CHECK-NEXT: case three
 // CHECK-NEXT: }
 
-// CHECK: enum SwiftEnum : Int {
+// CHECK-LABEL: enum SwiftEnum : Int, @unchecked Sendable {
 // CHECK-NOT: {{^}}}
 // CHECK: case one
 // CHECK-NEXT: case two
 // CHECK-NEXT: case three
 // CHECK-NEXT: }
 
-// CHECK: enum SwiftEnumTwo : Int {
+// CHECK-LABEL: enum SwiftEnumTwo : Int, @unchecked Sendable {
 // CHECK-NOT: {{^}}}
 // CHECK: case SwiftEnumTwoA
 // CHECK-NEXT: case SwiftEnumTwoB
