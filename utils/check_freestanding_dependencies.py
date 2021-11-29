@@ -43,15 +43,15 @@ cxx_dependencies = [
 ]
 math_dependencies = [
     "_ceill", "_cos", "_cosf", "_cosl", "_exp", "_exp2", "_exp2f", "_exp2l",
-    "_expf", "_expl", "_fma", "_fmaf", "_fmal", "_fmod", "_fmodf", "_fmodl",
-    "_log", "_log10", "_log10f", "_log10l", "_log2", "_log2f", "_log2l",
-    "_logf", "_logl", "_nearbyintl", "_remainder", "_remainderf", "_remainderl",
-    "_rintl", "_roundl", "_sin", "_sinf", "_sinl", "_truncl",
+    "_expf", "_expl", "_floorl", "_fma", "_fmaf", "_fmal", "_fmod", "_fmodf",
+    "_fmodl", "_log", "_log10", "_log10f", "_log10l", "_log2", "_log2f",
+    "_log2l", "_logf", "_logl", "_nearbyintl", "_remainder", "_remainderf",
+    "_remainderl", "_rintl", "_roundl", "_sin", "_sinf", "_sinl", "_truncl",
 ]
 common_expected_dependencies = [
     "___bzero", "___divti3", "___error", "___stderrp", "___stdoutp",
     "___truncsfhf2", "___udivti3", "_abort", "_arc4random_buf",
-    "_calloc", "_close", "_flockfile", "_floorl", "_fprintf",
+    "_calloc", "_close", "_fflush", "_flockfile", "_fprintf",
     "_fputc", "_fputs", "_free", "_funlockfile", "_fwrite", "_malloc",
     "_malloc_size", "_memchr", "_memcmp", "_memcpy", "_memmove", "_memset",
     "_posix_memalign", "_putc", "_read", "_realloc", "_snprintf", "_strchr",
