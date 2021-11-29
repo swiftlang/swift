@@ -25,6 +25,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Statistic.h"
 #include "RequirementLowering.h"
 #include <memory>
@@ -357,5 +358,112 @@ AbstractGenericSignatureRequestRQM::evaluate(
   bool hadError = false;
 
   auto result = GenericSignature::get(genericParams, minimalRequirements);
+  return GenericSignatureWithError(result, hadError);
+}
+
+GenericSignatureWithError
+InferredGenericSignatureRequestRQM::evaluate(
+        Evaluator &evaluator,
+        ModuleDecl *parentModule,
+        const GenericSignatureImpl *parentSigImpl,
+        GenericParamList *genericParamList,
+        WhereClauseOwner whereClause,
+        SmallVector<Requirement, 2> addedRequirements,
+        SmallVector<TypeLoc, 2> inferenceSources,
+        bool allowConcreteGenericParams) const {
+  GenericSignature parentSig(parentSigImpl);
+
+  auto &ctx = parentModule->getASTContext();
+
+  SmallVector<GenericTypeParamType *, 4> genericParams(
+      parentSig.getGenericParams().begin(),
+      parentSig.getGenericParams().end());
+
+  SmallVector<StructuralRequirement, 4> requirements;
+  for (const auto &req : parentSig.getRequirements())
+    requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
+
+  const auto visitRequirement = [&](const Requirement &req,
+                                    RequirementRepr *reqRepr) {
+    realizeRequirement(req, reqRepr, parentModule, requirements);
+    return false;
+  };
+
+  if (genericParamList) {
+    // Extensions never have a parent signature.
+    assert(genericParamList->getOuterParameters() == nullptr || !parentSig);
+
+    // Collect all outer generic parameter lists.
+    SmallVector<GenericParamList *, 2> gpLists;
+    for (auto *outerParamList = genericParamList;
+         outerParamList != nullptr;
+         outerParamList = outerParamList->getOuterParameters()) {
+      gpLists.push_back(outerParamList);
+    }
+
+    // The generic parameter lists must appear from innermost to outermost.
+    // We walk them backwards to order outer parameters before inner
+    // parameters.
+    for (auto *gpList : llvm::reverse(gpLists)) {
+      assert(gpList->size() > 0 &&
+             "Parsed an empty generic parameter list?");
+
+      for (auto *gpDecl : *gpList) {
+        auto *gpType = gpDecl->getDeclaredInterfaceType()
+                             ->castTo<GenericTypeParamType>();
+        genericParams.push_back(gpType);
+
+        realizeInheritedRequirements(gpDecl, gpType, parentModule,
+                                     requirements);
+      }
+
+      // Add the generic parameter list's 'where' clause to the builder.
+      //
+      // The only time generic parameter lists have a 'where' clause is
+      // in SIL mode; all other generic declarations have a free-standing
+      // 'where' clause, which will be visited below.
+      WhereClauseOwner(parentModule, gpList)
+        .visitRequirements(TypeResolutionStage::Structural,
+                           visitRequirement);
+    }
+  }
+
+  if (whereClause) {
+    std::move(whereClause).visitRequirements(
+        TypeResolutionStage::Structural,
+        visitRequirement);
+  }
+
+  // Perform requirement inference from function parameter and result
+  // types and such.
+  for (auto sourcePair : inferenceSources) {
+    auto *typeRepr = sourcePair.getTypeRepr();
+    auto loc = typeRepr ? typeRepr->getStartLoc() : SourceLoc();
+
+    inferRequirements(sourcePair.getType(), loc, parentModule, requirements);
+  }
+
+  // Finish by adding any remaining requirements. This is used to introduce
+  // inferred same-type requirements when building the generic signature of
+  // an extension whose extended type is a generic typealias.
+  for (const auto &req : addedRequirements)
+    requirements.push_back({req, SourceLoc(), /*wasInferred=*/true});
+
+  // Heap-allocate the requirement machine to save stack space.
+  std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
+      ctx.getRewriteContext()));
+
+  machine->initWithWrittenRequirements(genericParams, requirements);
+
+  auto minimalRequirements =
+    machine->computeMinimalGenericSignatureRequirements();
+
+  // FIXME: Implement this
+  bool hadError = false;
+
+  auto result = GenericSignature::get(genericParams, minimalRequirements);
+
+  // FIXME: Handle allowConcreteGenericParams
+
   return GenericSignatureWithError(result, hadError);
 }

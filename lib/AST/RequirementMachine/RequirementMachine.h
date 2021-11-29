@@ -32,6 +32,7 @@ class ASTContext;
 class AssociatedTypeDecl;
 class CanType;
 class GenericTypeParamType;
+class InferredGenericSignatureRequestRQM;
 class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
@@ -47,6 +48,7 @@ class RequirementMachine final {
   friend class swift::ASTContext;
   friend class swift::rewriting::RewriteContext;
   friend class swift::AbstractGenericSignatureRequestRQM;
+  friend class swift::InferredGenericSignatureRequestRQM;
 
   CanGenericSignature Sig;
   SmallVector<Type, 2> Params;
@@ -86,6 +88,9 @@ class RequirementMachine final {
   void initWithAbstractRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements);
+  void initWithWrittenRequirements(
+      ArrayRef<GenericTypeParamType *> genericParams,
+      ArrayRef<StructuralRequirement> requirements);
 
   bool isComplete() const;
 
