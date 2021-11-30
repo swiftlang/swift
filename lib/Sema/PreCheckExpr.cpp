@@ -893,8 +893,6 @@ namespace {
     /// implicit `ErrorExpr` in place of invalid references.
     bool UseErrorExprs;
 
-    bool LeaveClosureBodiesUnchecked;
-
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -1082,11 +1080,9 @@ namespace {
 
   public:
     PreCheckExpression(DeclContext *dc, Expr *parent,
-                       bool replaceInvalidRefsWithErrors,
-                       bool leaveClosureBodiesUnchecked)
-        : Ctx(dc->getASTContext()), DC(dc),
-          ParentExpr(parent), UseErrorExprs(replaceInvalidRefsWithErrors),
-          LeaveClosureBodiesUnchecked(leaveClosureBodiesUnchecked) {}
+                       bool replaceInvalidRefsWithErrors)
+        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent),
+          UseErrorExprs(replaceInvalidRefsWithErrors) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
@@ -1419,12 +1415,11 @@ namespace {
 
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
       // With multi-statement closure inference enabled, constraint generation
-      // is responsible for pattern verification and type-checking in the body
-      // of the closure, so there is no need to walk into patterns.
-      bool walkIntoPatterns =
-          !(isa<ClosureExpr>(DC) &&
-            Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference);
-      return {walkIntoPatterns, pattern};
+      // is responsible for pattern verification and type-checking, so there
+      // is no need to walk into patterns in that mode.
+      bool shouldWalkIntoPatterns =
+          !Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
+      return {shouldWalkIntoPatterns, pattern};
     }
   };
 } // end anonymous namespace
@@ -1433,13 +1428,8 @@ namespace {
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // If we won't be checking the body of the closure, don't walk into it here.
-  if (!closure->hasSingleExpressionBody()) {
-    if (LeaveClosureBodiesUnchecked)
-      return false;
-
-    if (!Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference)
-      return false;
-  }
+  if (!shouldTypeCheckInEnclosingExpression(closure))
+    return false;
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
@@ -2092,15 +2082,11 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
-                                          bool replaceInvalidRefsWithErrors,
-                                          bool leaveClosureBodiesUnchecked) {
+                                          bool replaceInvalidRefsWithErrors) {
   auto &ctx = dc->getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
 
-  PreCheckExpression preCheck(dc, expr,
-                              replaceInvalidRefsWithErrors,
-                              leaveClosureBodiesUnchecked);
-
+  PreCheckExpression preCheck(dc, expr, replaceInvalidRefsWithErrors);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;

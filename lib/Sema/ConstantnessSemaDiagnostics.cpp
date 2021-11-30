@@ -359,13 +359,10 @@ void swift::diagnoseConstantArgumentRequirement(
     }
     
     std::pair<bool, Expr *> walkToClosureExprPre(ClosureExpr *closure) {
-      auto &ctx = DC->getASTContext();
-
-      if (closure->hasSingleExpressionBody() ||
-          ctx.TypeCheckerOpts.EnableMultiStatementClosureInference) {
-        // Closure bodies are not visited directly by the ASTVisitor,
-        // so we must descend into the body manuall and set the
-        // DeclContext to that of the closure.
+      if (closure->hasSingleExpressionBody()) {
+        // Single expression closure bodies are not visited directly
+        // by the ASTVisitor, so we must descend into the body manually
+        // and set the DeclContext to that of the closure.
         DC = closure;
         return {true, closure};
       }

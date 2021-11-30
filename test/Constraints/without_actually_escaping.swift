@@ -10,7 +10,7 @@ func escapeX(_ xx: (Int) -> Int, _ value: Int) { // expected-note* {{non-escapin
   withoutActuallyEscaping(xx) { escapableXX in
     x = xx // expected-error{{non-escaping parameter}}
     x = escapableXX
-    x = xx
+    x = xx // expected-error{{non-escaping parameter}}
 
     _ = x(value)
     _ = xx(value)
