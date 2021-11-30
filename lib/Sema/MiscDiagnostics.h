@@ -13,7 +13,6 @@
 #ifndef SWIFT_SEMA_MISC_DIAGNOSTICS_H
 #define SWIFT_SEMA_MISC_DIAGNOSTICS_H
 
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Expr.h"
@@ -27,15 +26,12 @@ namespace swift {
   class AbstractFunctionDecl;
   class ApplyExpr;
   class CallExpr;
-  class ClosureExpr;
   class DeclContext;
-  class Decl;
   class Expr;
   class InFlightDiagnostic;
   class Stmt;
   class TopLevelCodeDecl;
   class ValueDecl;
-  class ForEachStmt;
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
 void performSyntacticExprDiagnostics(
@@ -119,23 +115,6 @@ void fixItEncloseTrailingClosure(ASTContext &ctx,
 /// we emit a diagnostic suggesting the async call.
 void checkFunctionAsyncUsage(AbstractFunctionDecl *decl);
 void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
-
-/// Detect and diagnose a missing `try` in `for-in` loop sequence
-/// expression in async context (denoted with `await` keyword).
-bool diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
-                                           ForEachStmt *forEach);
-
-class BaseDiagnosticWalker : public ASTWalker {
-  bool walkToDeclPre(Decl *D) override;
-
-  bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-    return false;
-  }
-
-private:
-  static bool shouldWalkIntoDeclInClosureContext(Decl *D);
-};
-
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H
