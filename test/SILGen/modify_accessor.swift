@@ -61,7 +61,9 @@ class SetterSynthesisFromModify {
   var modifiable: String {
     get { return stored }
 // CHECK: sil hidden [transparent] [ossa] @$s15modify_accessor25SetterSynthesisFromModifyC10modifiableSSvs
-// CHECK:         [[VALUE_BORROW:%.*]] = begin_borrow %0 : $String
+// CHECK:         [[VALUE_BORROW:%.*]] = begin_borrow [lexical] %0 : $String
+// CHECK-NEXT:    debug_value
+// CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[VALUE:%.*]] = copy_value [[VALUE_BORROW]] : $String
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[MODIFYFN:%.*]] = function_ref @$s15modify_accessor25SetterSynthesisFromModifyC10modifiableSSvM

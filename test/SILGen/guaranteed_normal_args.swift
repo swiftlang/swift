@@ -148,7 +148,7 @@ struct StructContainingBridgeObject {
 
   // CHECK-LABEL: sil hidden [ossa] @$ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
   // CHECK: bb0([[ARG:%.*]] : @owned $AnyObject,
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [lexical] [[ARG]]
   // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   [[CASTED_ARG:%.*]] = unchecked_ref_cast [[COPIED_ARG]] : $AnyObject to $Builtin.BridgeObject
   // CHECK:   assign [[CASTED_ARG]] to

@@ -84,7 +84,7 @@ func modifyAndPerform<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
 // CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping0A24ActuallyEscapingConflictyyF : $@convention(thin) () -> () {
 // CHECK: [[CLOSURE_1_FUN:%.*]] = function_ref @$s25without_actually_escaping0A24ActuallyEscapingConflictyyFyycfU_ :
 // CHECK: [[CLOSURE_1:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_1_FUN]](
-// CHECK: [[BORROWED_CLOSURE_1:%.*]] = begin_borrow [[CLOSURE_1]]
+// CHECK: [[BORROWED_CLOSURE_1:%.*]] = begin_borrow [lexical] [[CLOSURE_1]]
 // CHECK: [[COPY_BORROWED_CLOSURE_1:%.*]] = copy_value [[BORROWED_CLOSURE_1]]
 // CHECK: [[COPY_2_BORROWED_CLOSURE_1:%.*]] = copy_value [[COPY_BORROWED_CLOSURE_1]]
 // CHECK: [[THUNK_FUNC:%.*]] = function_ref @$sIeg_Ieg_TR :

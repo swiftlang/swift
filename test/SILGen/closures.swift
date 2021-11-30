@@ -492,7 +492,7 @@ class SuperSub : SuperBase {
   // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_1:\$s8closures8SuperSubC1c[_0-9a-zA-Z]*]] : $@convention(thin) (@guaranteed SuperSub) -> ()
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[SELF_COPY]])
-  // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [[PA]]
+  // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [lexical] [[PA]]
   // CHECK:   [[PA_COPY:%.*]] = copy_value [[BORROWED_PA]]
   // CHECK:   [[B:%.*]] = begin_borrow [[PA_COPY]]
   // CHECK:   apply [[B]]()
@@ -524,7 +524,7 @@ class SuperSub : SuperBase {
   // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_1:\$s8closures8SuperSubC1d[_0-9a-zA-Z]*]] : $@convention(thin) (@guaranteed SuperSub) -> ()
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[SELF_COPY]])
-  // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [[PA]]
+  // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [lexical] [[PA]]
   // CHECK:   [[PA_COPY:%.*]] = copy_value [[BORROWED_PA]]
   // CHECK:   [[B:%.*]] = begin_borrow [[PA_COPY]]
   // CHECK:   apply [[B]]()
@@ -567,7 +567,7 @@ class SuperSub : SuperBase {
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_NAME2:\$s8closures8SuperSubC1e.*]] : $@convention(thin)
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [[PA]]
+    // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [lexical] [[PA]]
     // CHECK:   [[PA_COPY:%.*]] = copy_value [[BORROWED_PA]]
     // CHECK:   [[B:%.*]] = begin_borrow [[PA_COPY]]
     // CHECK:   apply [[B]]() : $@callee_guaranteed () -> ()

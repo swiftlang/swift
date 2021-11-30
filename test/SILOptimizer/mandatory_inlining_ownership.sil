@@ -28,7 +28,7 @@ bb(%0 : @guaranteed $C):
 
 // CHECK-LABEL: sil [ossa] @callerWithOwned : $@convention(thin) (@owned C) -> Builtin.Int64 {
 // CHECK: bb0(%0 : @owned $C):
-// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
+// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
 // CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Builtin.Int64
 // CHECK:   end_borrow [[BORROW]] : $C
@@ -63,7 +63,7 @@ bb2:
 
 // CHECK-LABEL: sil [ossa] @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
 // CHECK: bb0(%0 : @owned $C):
-// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
+// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
 // CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Builtin.Int64
 // CHECK: bb{{.*}}:

@@ -21,7 +21,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }
 // CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
 // CHECK-RAW: [[PB_BOX:%[0-9]+]] = project_box [[MARKED_SELF_BOX]]
-// CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
+// CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [lexical] [[STR]]
 // CHECK-RAW: [[COPIED_STR:%.*]] = copy_value [[BORROWED_STR]]
 // CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK-RAW: [[BORROWED_COPIED_STR:%.*]] = begin_borrow [[COPIED_STR]]

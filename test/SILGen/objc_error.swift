@@ -113,7 +113,7 @@ class MyNSError : NSError {
 // CHECK:   [[NSERROR_SUBCLASS:%.*]] = apply {{.*}}({{.*}}) : $@convention(method) (@thick MyNSError.Type) -> @owned MyNSError
 // CHECK:   [[UPCAST:%.*]] = upcast [[NSERROR_SUBCLASS]] : $MyNSError to $NSError
 // CHECK:   [[EXISTENTIAL_REF:%.*]] = init_existential_ref [[UPCAST]]
-// CHECK:   [[BORROWED_EXISTENTIAL_REF:%.*]] = begin_borrow [[EXISTENTIAL_REF]]
+// CHECK:   [[BORROWED_EXISTENTIAL_REF:%.*]] = begin_borrow [lexical] [[EXISTENTIAL_REF]]
 // CHECK:   [[COPY_BORROWED_EXISTENTIAL_REF:%.*]] = copy_value [[BORROWED_EXISTENTIAL_REF]]
 // CHECK:   end_borrow [[BORROWED_EXISTENTIAL_REF]]
 // CHECK:   destroy_value [[EXISTENTIAL_REF]]

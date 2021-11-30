@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -Onone -enable-copy-propagation | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -Onone -enable-copy-propagation -disable-lexical-lifetimes | %FileCheck %s -DINT=i%target-ptrsize
 
 // Test debug_value [poison] emission
 
