@@ -1760,9 +1760,12 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
     return;
   }
 
-  if (!getASTContext().SILOpts.supportsLexicalLifetimes(getModule()) ||
-      Val->getOwnershipKind() == OwnershipKind::None) {
+  if (!getASTContext().SILOpts.supportsLexicalLifetimes(getModule())) {
     B.emitDestroyValueOperation(silLoc, Val);
+    return;
+  }
+
+  if (Val->getOwnershipKind() == OwnershipKind::None) {
     return;
   }
 

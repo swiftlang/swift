@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -disable-lexical-lifetimes)
+
 // REQUIRES: executable_test
 
 // Test differentiation of `Optional` values and operations.

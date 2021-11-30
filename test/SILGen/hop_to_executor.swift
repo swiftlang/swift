@@ -158,7 +158,7 @@ actor BlueActorImpl {
 // CHECK:     bb0([[BLUE:%[0-9]+]] : @guaranteed $BlueActorImpl):
 // CHECK:       hop_to_executor [[BLUE]] : $BlueActorImpl
 // CHECK:       [[RED:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@thick RedActorImpl.Type) -> @owned RedActorImpl
-// CHECK:       [[REDBORROW:%[0-9]+]] = begin_borrow [[RED]] : $RedActorImpl
+// CHECK:       [[REDBORROW:%[0-9]+]] = begin_borrow [lexical] [[RED]] : $RedActorImpl
 // CHECK:       [[INTARG:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:       [[METH:%[0-9]+]] = class_method [[REDBORROW]] : $RedActorImpl, #RedActorImpl.hello : (isolated RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
 // CHECK:       hop_to_executor [[REDBORROW]] : $RedActorImpl

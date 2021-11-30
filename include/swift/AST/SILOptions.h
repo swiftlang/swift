@@ -34,6 +34,9 @@ enum class LexicalLifetimesOption : uint8_t {
   // Do not insert any lexical lifetimes.
   Off = 0,
 
+  // Insert lexical lifetimes in SILGen, but remove them before leaving Raw SIL.
+  Early,
+
   // Insert lexical lifetimes and do not remove them until OSSA is lowered. This
   // is experimental.
   ExperimentalLate,
@@ -56,7 +59,7 @@ public:
   bool RemoveRuntimeAsserts = false;
 
   /// Enable experimental support for emitting defined borrow scopes.
-  LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::Off;
+  LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::Early;
 
   /// Force-run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
