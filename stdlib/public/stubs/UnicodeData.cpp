@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "../SwiftShims/UnicodeData.h"
+#include <limits>
 
 // Every 4 byte chunks of data that we need to hash (in this case only ever
 // scalars and levels who are all uint32), we need to calculate K. At the end
@@ -47,7 +48,6 @@ static __swift_uint32_t hash(__swift_uint32_t scalar, __swift_uint32_t level,
 
 // This implementation is based on the minimal perfect hashing strategy found
 // here: https://arxiv.org/pdf/1702.03154.pdf
-SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
                                          __swift_intptr_t levels,
                                          const __swift_uint64_t * const *keys,
@@ -101,4 +101,58 @@ __swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
   }
 
   return resultIdx;
+}
+
+__swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
+                                              const __swift_uint64_t *bitArrays,
+                                              const __swift_uint16_t *ranks) {
+  auto chunkSize = 0x110000 / 64 / 64;
+  auto base = scalar / chunkSize;
+  auto idx = base / 64;
+  auto chunkBit = base % 64;
+  
+  auto quickLookSize = bitArrays[0];
+  
+  // If our chunk index is larger than the quick look indices, then it means
+  // our scalar appears in chunks who are all 0 and trailing.
+  if ((__swift_uint64_t) idx > quickLookSize) {
+    return std::numeric_limits<__swift_intptr_t>::max();
+  }
+  
+  auto quickLook = bitArrays[idx + 1];
+  
+  if ((quickLook & ((__swift_uint64_t) 1 << chunkBit)) == 0) {
+    return std::numeric_limits<__swift_intptr_t>::max();
+  }
+  
+  // Ok, our scalar failed the quick look check. Go lookup our scalar in the
+  // chunk specific bit array.
+  auto chunkRank = ranks[idx];
+  
+  if (chunkBit != 0) {
+    chunkRank += __builtin_popcountll(quickLook << (64 - chunkBit));
+  }
+  
+  auto chunkBA = bitArrays + 1 + quickLookSize + (chunkRank * 5);
+  
+  auto scalarOverallBit = scalar - (base * chunkSize);
+  auto scalarSpecificBit = scalarOverallBit % 64;
+  auto scalarWord = scalarOverallBit / 64;
+  
+  auto chunkWord = chunkBA[scalarWord];
+  
+  // If our scalar specifically is not turned on, then we're done.
+  if ((chunkWord & ((__swift_uint64_t) 1 << scalarSpecificBit)) == 0) {
+    return std::numeric_limits<__swift_intptr_t>::max();
+  }
+  
+  auto scalarRank = ranks[quickLookSize + (chunkRank * 5) + scalarWord];
+  
+  if (scalarSpecificBit != 0) {
+    scalarRank += __builtin_popcountll(chunkWord << (64 - scalarSpecificBit));
+  }
+  
+  auto chunkDataIdx = chunkBA[4] >> 16;
+
+  return chunkDataIdx + scalarRank;
 }

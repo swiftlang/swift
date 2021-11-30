@@ -29,16 +29,6 @@
 extern "C" {
 #endif
 
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t _swift_stdlib_unicode_strToUpper(
-  __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
-  const __swift_uint16_t *Source, __swift_int32_t SourceLength);
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t _swift_stdlib_unicode_strToLower(
-  __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
-  const __swift_uint16_t *Source, __swift_int32_t SourceLength);
-
 typedef enum __swift_stdlib_UProperty {
   __swift_stdlib_UCHAR_GENERAL_CATEGORY = 0x1005,
   __swift_stdlib_UCHAR_NUMERIC_TYPE = 0x1009,
@@ -264,16 +254,6 @@ typedef enum __swift_stdlib_UCharNameChoice {
 #endif
 } __swift_stdlib_UCharNameChoice;
 
-typedef enum __swift_stdlib_UNumericType {
-  __swift_stdlib_U_NT_NONE,
-  __swift_stdlib_U_NT_DECIMAL,
-  __swift_stdlib_U_NT_DIGIT,
-  __swift_stdlib_U_NT_NUMERIC,
-#ifndef U_HIDE_DEPRECATED_API
-  __swift_stdlib_U_NT_COUNT
-#endif
-} __swift_stdlib_UNumericType;
-
 typedef struct __swift_stdlib_UBreakIterator __swift_stdlib_UBreakIterator;
 typedef struct __swift_stdlib_UText __swift_stdlib_UText;
 typedef __swift_int8_t __swift_stdlib_UBool;
@@ -290,44 +270,6 @@ typedef __swift_uint16_t __swift_stdlib_UChar;
 #define __SWIFT_STDLIB_U_MAX_VERSION_LENGTH 4
 typedef __swift_uint8_t
     __swift_stdlib_UVersionInfo[__SWIFT_STDLIB_U_MAX_VERSION_LENGTH];
-
-SWIFT_RUNTIME_STDLIB_API
-void __swift_stdlib_u_charAge(
-    __swift_stdlib_UChar32, __swift_stdlib_UVersionInfo _Nonnull);
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t
-    __swift_stdlib_u_getIntPropertyValue(__swift_stdlib_UChar32,
-                                         __swift_stdlib_UProperty);
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t __swift_stdlib_u_charName(
-    __swift_stdlib_UChar32 code, __swift_stdlib_UCharNameChoice nameChoice,
-    char *_Nullable buffer, __swift_int32_t bufferLength,
-    __swift_stdlib_UErrorCode *pErrorCode);
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t __swift_stdlib_u_strToLower(
-    __swift_stdlib_UChar *dest, __swift_int32_t destCapacity,
-    const __swift_stdlib_UChar *src, __swift_int32_t srcLength,
-    const char *_Nullable locale, __swift_stdlib_UErrorCode *pErrorCode);
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t __swift_stdlib_u_strToTitle(
-    __swift_stdlib_UChar *dest, __swift_int32_t destCapacity,
-    const __swift_stdlib_UChar *src, __swift_int32_t srcLength,
-    __swift_stdlib_UBreakIterator *_Nullable titleIter,
-    const char *_Nullable locale, __swift_stdlib_UErrorCode *pErrorCode);
-
-SWIFT_RUNTIME_STDLIB_API
-__swift_int32_t __swift_stdlib_u_strToUpper(
-    __swift_stdlib_UChar *dest, __swift_int32_t destCapacity,
-    const __swift_stdlib_UChar *src, __swift_int32_t srcLength,
-    const char *_Nullable locale, __swift_stdlib_UErrorCode *pErrorCode);
-
-SWIFT_RUNTIME_STDLIB_API
-double __swift_stdlib_u_getNumericValue(__swift_stdlib_UChar32 c);
-
 
 #ifdef __cplusplus
 } // extern "C"
