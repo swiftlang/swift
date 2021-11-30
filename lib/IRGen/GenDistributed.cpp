@@ -263,7 +263,6 @@ void DistributedAccessor::emit() {
   // through to the distributed method.
   params.transferInto(arguments, conv.getNumIndirectSILResults());
 
-  // FIXME: Once we remove async task and executor this should be one not three.
   unsigned numAsyncContextParams =
       (unsigned)AsyncFunctionArgumentIndex::Context + 1;
   (void)params.claim(numAsyncContextParams);
