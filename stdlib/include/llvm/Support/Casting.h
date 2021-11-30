@@ -20,7 +20,6 @@
 #include <memory>
 #include <type_traits>
 
-inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 //===----------------------------------------------------------------------===//
@@ -133,24 +132,30 @@ struct isa_impl_wrap<To, FromTy, FromTy> {
   }
 };
 
-// isa<X> - Return true if the parameter to the template is an instance of the
-// template type argument.  Used like this:
+// isa<X> - Return true if the parameter to the template is an instance of one
+// of the template type arguments.  Used like this:
 //
 //  if (isa<Type>(myVal)) { ... }
+//  if (isa<Type0, Type1, Type2>(myVal)) { ... }
 //
 template <class X, class Y> LLVM_NODISCARD inline bool isa(const Y &Val) {
   return isa_impl_wrap<X, const Y,
                        typename simplify_type<const Y>::SimpleType>::doit(Val);
 }
 
+template <typename First, typename Second, typename... Rest, typename Y>
+LLVM_NODISCARD inline bool isa(const Y &Val) {
+  return isa<First>(Val) || isa<Second, Rest...>(Val);
+}
+
 // isa_and_nonnull<X> - Functionally identical to isa, except that a null value
 // is accepted.
 //
-template <class X, class Y>
+template <typename... X, class Y>
 LLVM_NODISCARD inline bool isa_and_nonnull(const Y &Val) {
   if (!Val)
     return false;
-  return isa<X>(Val);
+  return isa<X...>(Val);
 }
 
 //===----------------------------------------------------------------------===//
@@ -397,6 +402,5 @@ LLVM_NODISCARD inline auto unique_dyn_cast_or_null(std::unique_ptr<Y> &&Val) {
 }
 
 } // end namespace llvm
-}} // namespace swift::runtime
 
 #endif // LLVM_SUPPORT_CASTING_H

@@ -21,7 +21,6 @@
 #include <cstddef>
 #include <cstdint>
 
-inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 template <typename T> struct PointerUnionTypeSelectorReturn {
@@ -92,13 +91,6 @@ namespace pointer_union_detail {
     static inline void *getAsVoidPointer(void *P) { return P; }
     static inline void *getFromVoidPointer(void *P) { return P; }
     static constexpr int NumLowBitsAvailable = lowBitsAvailable<PTs...>();
-  };
-
-  /// Implement assignment in terms of construction.
-  template <typename Derived, typename T> struct AssignableFrom {
-    Derived &operator=(T t) {
-      return static_cast<Derived &>(*this) = Derived(t);
-    }
   };
 
   template <typename Derived, typename ValTy, int I, typename ...Types>
@@ -198,7 +190,7 @@ public:
   }
 
   /// Returns the current pointer if it is of the specified pointer type,
-  /// otherwises returns null.
+  /// otherwise returns null.
   template <typename T> T dyn_cast() const {
     if (is<T>())
       return get<T>();
@@ -296,6 +288,5 @@ template <typename ...PTs> struct DenseMapInfo<PointerUnion<PTs...>> {
 };
 
 } // end namespace llvm
-}} // swift::runtime
 
 #endif // LLVM_ADT_POINTERUNION_H

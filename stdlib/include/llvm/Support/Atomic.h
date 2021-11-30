@@ -17,14 +17,13 @@
 #ifndef LLVM_SUPPORT_ATOMIC_H
 #define LLVM_SUPPORT_ATOMIC_H
 
-#include <stdint.h>
+#include "llvm/Support/DataTypes.h"
 
 // Windows will at times define MemoryFence.
 #ifdef MemoryFence
 #undef MemoryFence
 #endif
 
-inline namespace __swift { inline namespace __runtime {
 namespace llvm {
   namespace sys {
     void MemoryFence();
@@ -39,6 +38,5 @@ namespace llvm {
                             cas_flag old_value);
   }
 }
-}} // namespace swift::runtime
 
 #endif

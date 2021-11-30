@@ -23,7 +23,6 @@
 #include <iterator>
 #include <utility>
 
-inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 namespace detail {
@@ -131,8 +130,12 @@ public:
 
     Iterator& operator++() { ++I; return *this; }
     Iterator operator++(int) { auto T = *this; ++I; return T; }
-    bool operator==(const ConstIterator& X) const { return I == X.I; }
-    bool operator!=(const ConstIterator& X) const { return I != X.I; }
+    friend bool operator==(const Iterator &X, const Iterator &Y) {
+      return X.I == Y.I;
+    }
+    friend bool operator!=(const Iterator &X, const Iterator &Y) {
+      return X.I != Y.I;
+    }
   };
 
   class ConstIterator {
@@ -156,8 +159,12 @@ public:
 
     ConstIterator& operator++() { ++I; return *this; }
     ConstIterator operator++(int) { auto T = *this; ++I; return T; }
-    bool operator==(const ConstIterator& X) const { return I == X.I; }
-    bool operator!=(const ConstIterator& X) const { return I != X.I; }
+    friend bool operator==(const ConstIterator &X, const ConstIterator &Y) {
+      return X.I == Y.I;
+    }
+    friend bool operator!=(const ConstIterator &X, const ConstIterator &Y) {
+      return X.I != Y.I;
+    }
   };
 
   using iterator = Iterator;
@@ -172,6 +179,11 @@ public:
   iterator find(const_arg_type_t<ValueT> V) { return Iterator(TheMap.find(V)); }
   const_iterator find(const_arg_type_t<ValueT> V) const {
     return ConstIterator(TheMap.find(V));
+  }
+
+  /// Check if the set contains the given element.
+  bool contains(const_arg_type_t<ValueT> V) const {
+    return TheMap.find(V) != TheMap.end();
   }
 
   /// Alternative version of find() which allows a different, and possibly less
@@ -286,6 +298,5 @@ public:
 };
 
 } // end namespace llvm
-}} // namespace swift::runtime
 
 #endif // LLVM_ADT_DENSESET_H

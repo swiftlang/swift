@@ -20,7 +20,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include <cstdlib>
 
-inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 LLVM_ATTRIBUTE_RETURNS_NONNULL inline void *safe_malloc(size_t Sz) {
@@ -85,6 +84,4 @@ allocate_buffer(size_t Size, size_t Alignment);
 void deallocate_buffer(void *Ptr, size_t Size, size_t Alignment);
 
 } // namespace llvm
-}} // namespace swift::runtime
-
 #endif

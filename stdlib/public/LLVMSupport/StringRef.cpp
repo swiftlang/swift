@@ -7,7 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/edit_distance.h"
 #include "llvm/Support/Error.h"
 #include <bitset>
 
@@ -30,8 +34,7 @@ static int ascii_strncasecmp(const char *LHS, const char *RHS, size_t Length) {
   return 0;
 }
 
-/// compare_lower - Compare strings, ignoring case.
-int StringRef::compare_lower(StringRef RHS) const {
+int StringRef::compare_insensitive(StringRef RHS) const {
   if (int Res = ascii_strncasecmp(Data, RHS.Data, std::min(Length, RHS.Length)))
     return Res;
   if (Length == RHS.Length)
@@ -39,19 +42,17 @@ int StringRef::compare_lower(StringRef RHS) const {
   return Length < RHS.Length ? -1 : 1;
 }
 
-/// Check if this string starts with the given \p Prefix, ignoring case.
-bool StringRef::startswith_lower(StringRef Prefix) const {
+bool StringRef::startswith_insensitive(StringRef Prefix) const {
   return Length >= Prefix.Length &&
       ascii_strncasecmp(Data, Prefix.Data, Prefix.Length) == 0;
 }
 
-/// Check if this string ends with the given \p Suffix, ignoring case.
-bool StringRef::endswith_lower(StringRef Suffix) const {
+bool StringRef::endswith_insensitive(StringRef Suffix) const {
   return Length >= Suffix.Length &&
       ascii_strncasecmp(end() - Suffix.Length, Suffix.Data, Suffix.Length) == 0;
 }
 
-size_t StringRef::find_lower(char C, size_t From) const {
+size_t StringRef::find_insensitive(char C, size_t From) const {
   char L = toLower(C);
   return find_if([L](char D) { return toLower(D) == L; }, From);
 }
@@ -87,24 +88,28 @@ int StringRef::compare_numeric(StringRef RHS) const {
   return Length < RHS.Length ? -1 : 1;
 }
 
+// Compute the edit distance between the two given strings.
+unsigned StringRef::edit_distance(llvm::StringRef Other,
+                                  bool AllowReplacements,
+                                  unsigned MaxEditDistance) const {
+  return llvm::ComputeEditDistance(
+      makeArrayRef(data(), size()),
+      makeArrayRef(Other.data(), Other.size()),
+      AllowReplacements, MaxEditDistance);
+}
+
 //===----------------------------------------------------------------------===//
 // String Operations
 //===----------------------------------------------------------------------===//
 
 std::string StringRef::lower() const {
-  std::string Result(size(), char());
-  for (size_type i = 0, e = size(); i != e; ++i) {
-    Result[i] = toLower(Data[i]);
-  }
-  return Result;
+  return std::string(map_iterator(begin(), toLower),
+                     map_iterator(end(), toLower));
 }
 
 std::string StringRef::upper() const {
-  std::string Result(size(), char());
-  for (size_type i = 0, e = size(); i != e; ++i) {
-    Result[i] = toUpper(Data[i]);
-  }
-  return Result;
+  return std::string(map_iterator(begin(), toUpper),
+                     map_iterator(end(), toUpper));
 }
 
 //===----------------------------------------------------------------------===//
@@ -165,10 +170,10 @@ size_t StringRef::find(StringRef Str, size_t From) const {
   return npos;
 }
 
-size_t StringRef::find_lower(StringRef Str, size_t From) const {
+size_t StringRef::find_insensitive(StringRef Str, size_t From) const {
   StringRef This = substr(From);
   while (This.size() >= Str.size()) {
-    if (This.startswith_lower(Str))
+    if (This.startswith_insensitive(Str))
       return From;
     This = This.drop_front();
     ++From;
@@ -176,7 +181,7 @@ size_t StringRef::find_lower(StringRef Str, size_t From) const {
   return npos;
 }
 
-size_t StringRef::rfind_lower(char C, size_t From) const {
+size_t StringRef::rfind_insensitive(char C, size_t From) const {
   From = std::min(From, Length);
   size_t i = From;
   while (i != 0) {
@@ -203,13 +208,13 @@ size_t StringRef::rfind(StringRef Str) const {
   return npos;
 }
 
-size_t StringRef::rfind_lower(StringRef Str) const {
+size_t StringRef::rfind_insensitive(StringRef Str) const {
   size_t N = Str.size();
   if (N > Length)
     return npos;
   for (size_t i = Length - N + 1, e = 0; i != e;) {
     --i;
-    if (substr(i, N).equals_lower(Str))
+    if (substr(i, N).equals_insensitive(Str))
       return i;
   }
   return npos;
@@ -399,8 +404,8 @@ static unsigned GetAutoSenseRadix(StringRef &Str) {
   return 10;
 }
 
-bool __swift::__runtime::llvm::consumeUnsignedInteger(
-    StringRef &Str, unsigned Radix, unsigned long long &Result) {
+bool llvm::consumeUnsignedInteger(StringRef &Str, unsigned Radix,
+                                  unsigned long long &Result) {
   // Autosense radix if not specified.
   if (Radix == 0)
     Radix = GetAutoSenseRadix(Str);
@@ -447,8 +452,8 @@ bool __swift::__runtime::llvm::consumeUnsignedInteger(
   return false;
 }
 
-bool __swift::__runtime::llvm::consumeSignedInteger(
-    StringRef &Str, unsigned Radix, long long &Result) {
+bool llvm::consumeSignedInteger(StringRef &Str, unsigned Radix,
+                                long long &Result) {
   unsigned long long ULLVal;
 
   // Handle positive strings first.
@@ -477,8 +482,8 @@ bool __swift::__runtime::llvm::consumeSignedInteger(
 
 /// GetAsUnsignedInteger - Workhorse method that converts a integer character
 /// sequence of radix up to 36 to an unsigned long long value.
-bool __swift::__runtime::llvm::getAsUnsignedInteger(
-    StringRef Str, unsigned Radix, unsigned long long &Result) {
+bool llvm::getAsUnsignedInteger(StringRef Str, unsigned Radix,
+                                unsigned long long &Result) {
   if (consumeUnsignedInteger(Str, Radix, Result))
     return true;
 
@@ -487,8 +492,8 @@ bool __swift::__runtime::llvm::getAsUnsignedInteger(
   return !Str.empty();
 }
 
-bool __swift::__runtime::llvm::getAsSignedInteger(
-    StringRef Str, unsigned Radix, long long &Result) {
+bool llvm::getAsSignedInteger(StringRef Str, unsigned Radix,
+                              long long &Result) {
   if (consumeSignedInteger(Str, Radix, Result))
     return true;
 
@@ -497,7 +502,98 @@ bool __swift::__runtime::llvm::getAsSignedInteger(
   return !Str.empty();
 }
 
+bool StringRef::getAsInteger(unsigned Radix, APInt &Result) const {
+  StringRef Str = *this;
+
+  // Autosense radix if not specified.
+  if (Radix == 0)
+    Radix = GetAutoSenseRadix(Str);
+
+  assert(Radix > 1 && Radix <= 36);
+
+  // Empty strings (after the radix autosense) are invalid.
+  if (Str.empty()) return true;
+
+  // Skip leading zeroes.  This can be a significant improvement if
+  // it means we don't need > 64 bits.
+  while (!Str.empty() && Str.front() == '0')
+    Str = Str.substr(1);
+
+  // If it was nothing but zeroes....
+  if (Str.empty()) {
+    Result = APInt(64, 0);
+    return false;
+  }
+
+  // (Over-)estimate the required number of bits.
+  unsigned Log2Radix = 0;
+  while ((1U << Log2Radix) < Radix) Log2Radix++;
+  bool IsPowerOf2Radix = ((1U << Log2Radix) == Radix);
+
+  unsigned BitWidth = Log2Radix * Str.size();
+  if (BitWidth < Result.getBitWidth())
+    BitWidth = Result.getBitWidth(); // don't shrink the result
+  else if (BitWidth > Result.getBitWidth())
+    Result = Result.zext(BitWidth);
+
+  APInt RadixAP, CharAP; // unused unless !IsPowerOf2Radix
+  if (!IsPowerOf2Radix) {
+    // These must have the same bit-width as Result.
+    RadixAP = APInt(BitWidth, Radix);
+    CharAP = APInt(BitWidth, 0);
+  }
+
+  // Parse all the bytes of the string given this radix.
+  Result = 0;
+  while (!Str.empty()) {
+    unsigned CharVal;
+    if (Str[0] >= '0' && Str[0] <= '9')
+      CharVal = Str[0]-'0';
+    else if (Str[0] >= 'a' && Str[0] <= 'z')
+      CharVal = Str[0]-'a'+10;
+    else if (Str[0] >= 'A' && Str[0] <= 'Z')
+      CharVal = Str[0]-'A'+10;
+    else
+      return true;
+
+    // If the parsed value is larger than the integer radix, the string is
+    // invalid.
+    if (CharVal >= Radix)
+      return true;
+
+    // Add in this character.
+    if (IsPowerOf2Radix) {
+      Result <<= Log2Radix;
+      Result |= CharVal;
+    } else {
+      Result *= RadixAP;
+      CharAP = CharVal;
+      Result += CharAP;
+    }
+
+    Str = Str.substr(1);
+  }
+
+  return false;
+}
+
+bool StringRef::getAsDouble(double &Result, bool AllowInexact) const {
+  APFloat F(0.0);
+  auto StatusOrErr = F.convertFromString(*this, APFloat::rmNearestTiesToEven);
+  if (errorToBool(StatusOrErr.takeError()))
+    return true;
+
+  APFloat::opStatus Status = *StatusOrErr;
+  if (Status != APFloat::opOK) {
+    if (!AllowInexact || !(Status & APFloat::opInexact))
+      return true;
+  }
+
+  Result = F.convertToDouble();
+  return false;
+}
+
 // Implementation of StringRef hashing.
-hash_code __swift::__runtime::llvm::hash_value(StringRef S) {
+hash_code llvm::hash_value(StringRef S) {
   return hash_combine_range(S.begin(), S.end());
 }
