@@ -18,28 +18,6 @@
 
 using namespace swift;
 
-/// Return true iff the \p applySite calls a constant-evaluable function and
-/// it is non-generic and read/destroy only, which means that the call can do
-/// only the following and nothing else:
-///   (1) The call may read any memory location.
-///   (2) The call may destroy owned parameters i.e., consume them.
-///   (3) The call may write into memory locations newly created by the call.
-///   (4) The call may use assertions, which traps at runtime on failure.
-///   (5) The call may return a non-generic value.
-/// Essentially, these are calls whose "effect" is visible only in their return
-/// value or through the parameters that are destroyed. The return value
-/// is also guaranteed to have value semantics as it is non-generic and
-/// reference semantics is not constant evaluable.
-static bool isNonGenericReadOnlyConstantEvaluableCall(FullApplySite applySite) {
-  assert(applySite);
-  SILFunction *callee = applySite.getCalleeFunction();
-  if (!callee || !isConstantEvaluable(callee)) {
-    return false;
-  }
-  return !applySite.hasSubstitutions() && !getNumInOutArguments(applySite) &&
-         !applySite.getNumIndirectSILResults();
-}
-
 static bool hasOnlyIncidentalUses(SILInstruction *inst,
                                   bool disallowDebugUses = false) {
   for (SILValue result : inst->getResults()) {
@@ -160,7 +138,7 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
     // provided the parameter lifetimes are handled correctly, which is taken
     // care of by the function: \c deleteInstruction.
     FullApplySite applySite(cast<ApplyInst>(inst));
-    return isNonGenericReadOnlyConstantEvaluableCall(applySite);
+    return isReadOnlyConstantEvaluableCall(applySite);
   }
   default: {
     return false;

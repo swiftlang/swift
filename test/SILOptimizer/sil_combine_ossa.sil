@@ -5219,3 +5219,22 @@ bb0(%0 : @owned $Klass, %1 : $Builtin.Word):
   destroy_value %0 : $Klass
   return %11 : $AnyObject
 }
+
+// Test that DCE during SILCombine does not remove traps.
+// Tests isReadOnlyConstantEvaluable().
+sil hidden [noinline] [_semantics "programtermination_point"] @trapWrapper : $@convention(thin) () -> () {
+bb0:
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @testTrap : $@convention(thin) () -> () {
+// CHECK: apply
+// CHECK-LABEL: } // end sil function 'testTrap'
+sil [ossa] @testTrap : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @trapWrapper : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
