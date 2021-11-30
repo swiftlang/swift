@@ -456,17 +456,6 @@ function(_add_target_variant_link_flags)
       endif()
   endif()
 
-  if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" STREQUAL "")
-    get_filename_component(SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC_LIBDIR
-      "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" DIRECTORY)
-    list(APPEND library_search_directories "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC_LIBDIR}")
-  endif()
-  if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" STREQUAL "")
-    get_filename_component(SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N_LIBDIR
-      "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" DIRECTORY)
-    list(APPEND library_search_directories "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N_LIBDIR}")
-  endif()
-
   if(SWIFT_USE_LINKER AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     # The linker is normally chosen based on the host, but the Android NDK only
     # uses lld now.
@@ -1308,9 +1297,6 @@ function(add_swift_target_library_single target name)
         "SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>")
     endif()
   endif()
-  target_include_directories(${target} SYSTEM PRIVATE
-    ${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_UC_INCLUDE}
-    ${SWIFT_${SWIFTLIB_SINGLE_SDK}_${SWIFTLIB_SINGLE_ARCHITECTURE}_ICU_I18N_INCLUDE})
   target_compile_options(${target} PRIVATE
     ${c_compile_flags})
   target_link_options(${target} PRIVATE
