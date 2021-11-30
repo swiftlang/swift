@@ -854,3 +854,24 @@ bb1(%4 : $XX):
 bb2(%5 : $Error):
   throw %5 : $Error
 }
+
+final class UnownedLink {
+  @_hasStorage unowned var link: @sil_unowned UnownedLink
+}
+
+// CHECK-LABEL: sil @dont_promote_escaping_through_unowned
+// CHECK:         alloc_ref $UnownedLink
+// CHECK-NOT:     dealloc_ref
+// CHECK-LABEL: } // end sil function 'dont_promote_escaping_through_unowned'
+sil @dont_promote_escaping_through_unowned : $@convention(method) (@guaranteed UnownedLink) -> () {
+bb0(%0 : $UnownedLink):
+  %298 = alloc_ref $UnownedLink
+  %20 = ref_to_unowned %298 : $UnownedLink to $@sil_unowned UnownedLink
+  %44 = ref_element_addr %0 : $UnownedLink, #UnownedLink.link
+  %45 = begin_access [modify] [dynamic] %44 : $*@sil_unowned UnownedLink
+  store %20 to %45 : $*@sil_unowned UnownedLink
+  end_access %45 : $*@sil_unowned UnownedLink
+  strong_release %298 : $UnownedLink
+  %r = tuple ()
+  return %r : $()
+}
