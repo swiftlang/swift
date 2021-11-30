@@ -1506,8 +1506,17 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       }
       if (!argument.isCompileTimeConst() && param.isCompileTimeConst()) {
         if (cs.shouldAttemptFixes()) {
-          cs.recordFix(NotCompileTimeConst::create(cs, paramTy,
-                                                   cs.getConstraintLocator(loc)));
+          auto *locator = cs.getConstraintLocator(loc);
+          SourceRange range;
+          // simplify locator so the anchor is the exact argument.
+          locator = simplifyLocator(cs, locator, range);
+          if (locator->getPath().empty() &&
+              locator->getAnchor().isExpr(ExprKind::UnresolvedMemberChainResult)) {
+            locator =
+              cs.getConstraintLocator(cast<UnresolvedMemberChainResultExpr>(
+                locator->getAnchor().get<Expr*>())->getChainBase());
+          }
+          cs.recordFix(NotCompileTimeConst::create(cs, paramTy, locator));
         }
       }
 
