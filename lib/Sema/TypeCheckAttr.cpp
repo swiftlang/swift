@@ -2094,6 +2094,9 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TupleType::getEmpty(context), declContext);
   func->setSynthesized(true);
+  // It's never useful to provide a dynamic replacement of this function--it is
+  // just a pass-through to MainType.main.
+  func->setIsDynamic(false);
 
   auto *params = context.Allocate<MainTypeAttrParams>();
   params->mainFunction = mainFunction;
