@@ -555,23 +555,20 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     if (isa<DefaultArgumentExpr>(Elem))
       return;
 
-    CharSourceRange NR;
     auto NL = Arg.getLabelLoc();
     auto Name = Arg.getLabel();
-    if (NL.isValid() && !Name.empty())
-      NR = CharSourceRange(NL, Name.getLength());
 
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::Argument;
-    SN.NameRange = NR;
     SN.BodyRange = charSourceRangeFromSourceRange(SM, Elem->getSourceRange());
-    if (NR.isValid()) {
-      SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
-                                                          Elem->getEndLoc()));
-      passTokenNodesUntil(NR.getStart(), ExcludeNodeAtLocation);
-    }
-    else
+    if (NL.isValid() && !Name.empty()) {
+      SN.NameRange = CharSourceRange(NL, Name.getLength());
+      SN.Range = charSourceRangeFromSourceRange(
+          SM, SourceRange(NL, Elem->getEndLoc()));
+      passTokenNodesUntil(NL, ExcludeNodeAtLocation);
+    } else {
       SN.Range = SN.BodyRange;
+    }
 
     pushStructureNode(SN, Elem);
   };
@@ -604,6 +601,17 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       SN.BodyRange = innerCharSourceRangeFromSourceRange(
           SM, CE->getArgs()->getSourceRange());
     pushStructureNode(SN, CE);
+
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::CallExpression;
+    SN.Range = charSourceRangeFromSourceRange(SM, E->getSourceRange());
+    SN.NameRange =
+        charSourceRangeFromSourceRange(SM, SE->getBase()->getSourceRange());
+    if (SE->getArgs()->getSourceRange().isValid())
+      SN.BodyRange = innerCharSourceRangeFromSourceRange(
+          SM, SE->getArgs()->getSourceRange());
+    pushStructureNode(SN, SE);
 
   } else if (auto *ObjectE = dyn_cast<ObjectLiteralExpr>(E)) {
     SyntaxStructureNode SN;
