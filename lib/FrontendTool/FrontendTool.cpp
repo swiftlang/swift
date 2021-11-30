@@ -1813,18 +1813,21 @@ createJSONFixItDiagnosticConsumerIfNeeded(
 
 /// A PrettyStackTraceEntry to print frontend information useful for debugging.
 class PrettyStackTraceFrontend : public llvm::PrettyStackTraceEntry {
-  const LangOptions &LangOpts;
+  const CompilerInvocation &Invocation;
 
 public:
-  PrettyStackTraceFrontend(const LangOptions &langOpts)
-      : LangOpts(langOpts) {}
+  PrettyStackTraceFrontend(const CompilerInvocation &invocation)
+      : Invocation(invocation) {}
 
   void print(llvm::raw_ostream &os) const override {
-    auto effective = LangOpts.EffectiveLanguageVersion;
+    auto effective = Invocation.getLangOptions().EffectiveLanguageVersion;
     if (effective != version::Version::getCurrentLanguageVersion()) {
       os << "Compiling with effective version " << effective;
     } else {
       os << "Compiling with the current language version";
+    }
+    if (Invocation.getFrontendOptions().AllowModuleWithCompilerErrors) {
+      os << " while allowing modules with compiler errors";
     }
     os << "\n";
   };
@@ -1936,7 +1939,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   /// (leaks checking is not thread safe).
   Invocation.getSILOptions().checkSILModuleLeaks = true;
 
-  PrettyStackTraceFrontend frontendTrace(Invocation.getLangOptions());
+  PrettyStackTraceFrontend frontendTrace(Invocation);
 
   // Make an array of PrettyStackTrace objects to dump the configuration files
   // we used to parse the arguments. These are RAII objects, so they and the
