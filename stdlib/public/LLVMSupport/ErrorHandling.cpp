@@ -15,28 +15,55 @@
 #include "llvm/ADT/StringRef.h"
 #include <cassert>
 #include <cstdlib>
+#include <cstdio>
 
 #if defined(_MSC_VER)
 # include <io.h>
 # include <fcntl.h>
-#else
-# include <stdio.h>
 #endif
+
+#include <stdarg.h>
+
+#if SWIFT_STDLIB_HAS_ASL
+#include <asl.h>
+#elif defined(__ANDROID__)
+#include <android/log.h>
+#endif
+
+namespace {
+void error(const char *fmt, ...) {
+  char buffer[1024];
+  va_list argp;
+
+  va_start(argp, fmt);
+  vsnprintf(buffer, sizeof(buffer), fmt, argp);
+  va_end(argp);
+
+#if SWIFT_STDLIB_HAS_ASL
+  asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", buffer);
+#elif defined(__ANDROID__)
+  __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", buffer);
+#elif defined(_WIN32)
+#define STDERR_FILENO 2
+  _write(STDERR_FILENO, buffer, strlen(buffer));
+#else
+  fputs(buffer, stderr);
+  fflush(stderr);
+#endif
+}
+}
 
 using namespace llvm;
 
 void __swift::__runtime::llvm::report_fatal_error(const char *Reason,
                                                   bool GenCrashDiag) {
-  report_fatal_error(std::string(Reason), GenCrashDiag);
+  error("LLVM ERROR: %s\n", Reason);
+  abort();
 }
 
 void __swift::__runtime::llvm::report_fatal_error(const std::string &Reason,
                                                   bool GenCrashDiag) {
-  // Blast the result out to stderr.  We don't try hard to make sure this
-  // succeeds (e.g. handling EINTR) and we can't use errs() here because
-  // raw ostreams can call report_fatal_error.
-  fprintf(stderr, "LLVM ERROR: %s\n", Reason.c_str());
-  abort();
+  report_fatal_error(Reason.c_str(), GenCrashDiag);
 }
 
 void __swift::__runtime::llvm::report_fatal_error(StringRef Reason,
@@ -48,7 +75,7 @@ void __swift::__runtime::llvm::report_bad_alloc_error(const char *Reason,
                                                       bool GenCrashDiag) {
   // Don't call the normal error handler. It may allocate memory. Directly write
   // an OOM to stderr and abort.
-  fprintf(stderr, "LLVM ERROR: out of memory\n");
+  error("LLVM ERROR: out of memory\n");
   abort();
 }
 
@@ -58,11 +85,11 @@ void __swift::__runtime::llvm::llvm_unreachable_internal(
   // llvm_unreachable is intended to be used to indicate "impossible"
   // situations, and not legitimate runtime errors.
   if (msg)
-    fprintf(stderr, "%s\n", msg);
-  fprintf(stderr, "UNREACHABLE executed");
+    error("%s\n", msg);
+  error("UNREACHABLE executed");
   if (file)
-    fprintf(stderr, " at %s:%u", file, line);
-  fprintf(stderr, "!\n");
+    error(" at %s:%u", file, line);
+  error("!\n");
   abort();
 #ifdef LLVM_BUILTIN_UNREACHABLE
   // Windows systems and possibly others don't declare abort() to be noreturn,
