@@ -3012,7 +3012,7 @@ bool ConformanceChecker::checkActorIsolation(
 
   case ActorIsolationRestriction::CrossActorSelf: {
     if (diagnoseNonSendableTypesInReference(
-        witness, DC->getParentModule(), witness->getLoc(),
+        witness, DC, witness->getLoc(),
         ConcurrentReferenceKind::CrossActor)) {
       return true;
     }
@@ -3145,7 +3145,7 @@ bool ConformanceChecker::checkActorIsolation(
       return false;
 
     return diagnoseNonSendableTypesInReference(
-      witness, DC->getParentModule(), witness->getLoc(),
+      witness, DC, witness->getLoc(),
       ConcurrentReferenceKind::CrossActor);
   }
 
@@ -3180,7 +3180,7 @@ bool ConformanceChecker::checkActorIsolation(
 
     if (isCrossActor) {
       return diagnoseNonSendableTypesInReference(
-        witness, DC->getParentModule(), witness->getLoc(),
+        witness, DC, witness->getLoc(),
         ConcurrentReferenceKind::CrossActor);
     }
 

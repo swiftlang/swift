@@ -3526,9 +3526,9 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 }
 
 static void diagnoseMissingConformance(
-    SourceLoc loc, Type type, ProtocolDecl *proto, ModuleDecl *module) {
+    SourceLoc loc, Type type, ProtocolDecl *proto, const DeclContext *fromDC) {
   assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
-  diagnoseMissingSendableConformance(loc, type, module);
+  diagnoseMissingSendableConformance(loc, type, fromDC);
 }
 
 bool
@@ -3546,15 +3546,13 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
   // Diagnose "missing" conformances where we needed a conformance but
   // didn't have one.
+  auto *DC = where.getDeclContext();
   if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
     if (builtinConformance->isMissing()) {
       diagnoseMissingConformance(loc, builtinConformance->getType(),
-                                 builtinConformance->getProtocol(),
-                                 where.getDeclContext()->getParentModule());
+                                 builtinConformance->getProtocol(), DC);
     }
   }
-
-  auto *DC = where.getDeclContext();
 
   auto maybeEmitAssociatedTypeNote = [&]() {
     if (!depTy && !replacementTy)
