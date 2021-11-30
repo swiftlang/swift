@@ -213,7 +213,7 @@ namespace {
       }
 
       if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
-        LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
+        LTI.binaryExprs.push_back(binaryExpr);
       }  
       
       if (auto favoredType = CS.getFavoredType(expr)) {
