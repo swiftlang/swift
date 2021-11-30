@@ -248,9 +248,7 @@ public:
   processASTAsync(SwiftInvocationRef Invok, SwiftASTConsumerRef ASTConsumer,
                   const void *OncePerASTToken,
                   SourceKitCancellationToken CancellationToken,
-                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
-                  ArrayRef<ImmutableTextSnapshotRef> Snapshots =
-                      ArrayRef<ImmutableTextSnapshotRef>());
+                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem);
 
   std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
                                                       std::string &Error);

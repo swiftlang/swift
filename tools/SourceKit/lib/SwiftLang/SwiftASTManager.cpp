@@ -372,22 +372,17 @@ class ASTBuildOperation
 
   /// Create a vector of text snapshots containing all files explicitly
   /// referenced by the compiler invocation and a vector of buffer stamps of
-  /// those files. For all files that have a snapshot specified in \p
-  /// FixedSnapshots, that snapshot is used. For all other files \p FileSystem
-  /// will be consulted for the current contents of the file.
+  /// those files.
   std::pair<std::vector<ImmutableTextSnapshotRef>, std::vector<BufferStamp>>
-  snapshotAndStampsForFilesInCompilerInvocation(
-      ArrayRef<ImmutableTextSnapshotRef> FixedSnapshots);
+  snapshotAndStampsForFilesInCompilerInvocation();
 
 public:
   ASTBuildOperation(IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-                    ArrayRef<ImmutableTextSnapshotRef> Snapshots,
                     SwiftInvocationRef InvokRef, SwiftASTManagerRef ASTManager,
                     std::function<void(void)> DidFinishCallback)
       : InvokRef(InvokRef), FileSystem(FileSystem), ASTManager(ASTManager),
         DidFinishCallback(DidFinishCallback) {
-    auto SnapshotsAndStamps =
-        snapshotAndStampsForFilesInCompilerInvocation(Snapshots);
+    auto SnapshotsAndStamps = snapshotAndStampsForFilesInCompilerInvocation();
     // const_cast is fine here. We just want to guard against modifying these
     // fields later on. It's fine to set them in the constructor.
     const_cast<std::vector<ImmutableTextSnapshotRef> &>(this->Snapshots) =
@@ -441,8 +436,7 @@ public:
   /// listed in the input files. As such, this might be \c true before the AST
   /// build and \c false after the AST has been built. See documentation on \c
   /// DependencyStamps for more info.
-  bool matchesSourceState(IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
-                          ArrayRef<ImmutableTextSnapshotRef> Snapshots);
+  bool matchesSourceState(IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem);
 
   /// Called when a consumer is cancelled. This calls \c cancelled on the
   /// consumer, removes it from the \c Consumers severed by this build operation
@@ -495,14 +489,12 @@ class ASTProducer : public std::enable_shared_from_this<ASTProducer> {
 
   /// Returns the latest build operation which can serve the \p Consumer or
   /// \c nullptr if no such build operation exists.
-  /// \p FileSystem and \p Snapshots describe the source state that the \p
-  /// Consumer expects.
   ///
   /// Assumes that \c BuildOperationsMtx has been claimed.
   ASTBuildOperationRef getBuildOperationForConsumer(
       SwiftASTConsumerRef Consumer,
       IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      ArrayRef<ImmutableTextSnapshotRef> Snapshots, SwiftASTManagerRef Mgr);
+      SwiftASTManagerRef Mgr);
 
 public:
   explicit ASTProducer(SwiftInvocationRef InvokRef)
@@ -513,7 +505,6 @@ public:
   /// cancelled, \c failed or \c handlePrimaryAST callback.
   void enqueueConsumer(SwiftASTConsumerRef Consumer,
                        IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-                       ArrayRef<ImmutableTextSnapshotRef> Snapshots,
                        SwiftASTManagerRef Mgr);
 
   size_t getMemoryCost() const {
@@ -754,8 +745,7 @@ SwiftInvocationRef SwiftASTManager::getInvocation(
 void SwiftASTManager::processASTAsync(
     SwiftInvocationRef InvokRef, SwiftASTConsumerRef ASTConsumer,
     const void *OncePerASTToken, SourceKitCancellationToken CancellationToken,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
-    ArrayRef<ImmutableTextSnapshotRef> Snapshots) {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem) {
   assert(fileSystem);
   ASTProducerRef Producer = Impl.getASTProducer(InvokRef);
 
@@ -775,8 +765,7 @@ void SwiftASTManager::processASTAsync(
     Impl.ScheduledConsumers.push_back({ASTConsumer, OncePerASTToken});
   }
 
-  Producer->enqueueConsumer(ASTConsumer, fileSystem, Snapshots,
-                            shared_from_this());
+  Producer->enqueueConsumer(ASTConsumer, fileSystem, shared_from_this());
 
   auto WeakConsumer = SwiftASTConsumerWeakRef(ASTConsumer);
   Impl.ReqTracker->setCancellationHandler(CancellationToken, [WeakConsumer] {
@@ -860,26 +849,12 @@ SwiftASTManager::Implementation::getMemoryBuffer(
   return nullptr;
 }
 
-/// If \p Snapshots contains a snapshot for the given \p Filename return it.
-/// Otherwise, return \c None.
-Optional<ImmutableTextSnapshotRef>
-findSnapshot(ArrayRef<ImmutableTextSnapshotRef> Snapshots,
-             const std::string &Filename) {
-  for (auto &Snap : Snapshots) {
-    if (Snap->getFilename() == Filename) {
-      return Snap;
-    }
-  }
-  return None;
-}
-
 std::pair<std::vector<ImmutableTextSnapshotRef>, std::vector<BufferStamp>>
-ASTBuildOperation::snapshotAndStampsForFilesInCompilerInvocation(
-    ArrayRef<ImmutableTextSnapshotRef> FixedSnapshots) {
+ASTBuildOperation::snapshotAndStampsForFilesInCompilerInvocation() {
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
   std::string Error; // is ignored
 
-  std::vector<ImmutableTextSnapshotRef> Snapshots = FixedSnapshots.vec();
+  std::vector<ImmutableTextSnapshotRef> Snapshots;
   std::vector<BufferStamp> Stamps;
   Stamps.reserve(Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
 
@@ -889,15 +864,11 @@ ASTBuildOperation::snapshotAndStampsForFilesInCompilerInvocation(
        Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
     const std::string &Filename = input.getFileName();
     bool IsPrimary = input.isPrimary();
-    if (auto FoundSnapshot = findSnapshot(Snapshots, Filename)) {
-      Stamps.push_back(FoundSnapshot.getValue()->getStamp());
-    } else {
-      auto Content = ASTManager->Impl.getFileContent(Filename, IsPrimary,
-                                                     FileSystem, Error);
-      Stamps.push_back(Content.Stamp);
-      if (Content.Snapshot) {
-        Snapshots.push_back(Content.Snapshot);
-      }
+    auto Content =
+        ASTManager->Impl.getFileContent(Filename, IsPrimary, FileSystem, Error);
+    Stamps.push_back(Content.Stamp);
+    if (Content.Snapshot) {
+      Snapshots.push_back(Content.Snapshot);
     }
   }
   assert(Stamps.size() ==
@@ -906,8 +877,7 @@ ASTBuildOperation::snapshotAndStampsForFilesInCompilerInvocation(
 }
 
 bool ASTBuildOperation::matchesSourceState(
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> OtherFileSystem,
-    ArrayRef<ImmutableTextSnapshotRef> OtherSnapshots) {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> OtherFileSystem) {
   const SwiftInvocation::Implementation &Invok = InvokRef->Impl;
 
   // Check if the inputs changed.
@@ -918,13 +888,8 @@ bool ASTBuildOperation::matchesSourceState(
   // snapshotAndStampsForFilesInCompilerInvocation.
   for (const auto &input :
        Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    const std::string &File = input.getFileName();
-    if (auto FoundSnapshot = findSnapshot(OtherSnapshots, File)) {
-      InputStamps.push_back(FoundSnapshot.getValue()->getStamp());
-    } else {
-      InputStamps.push_back(
-          ASTManager->Impl.getBufferStamp(File, OtherFileSystem));
-    }
+    InputStamps.push_back(
+        ASTManager->Impl.getBufferStamp(input.getFileName(), OtherFileSystem));
   }
   assert(InputStamps.size() ==
          Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
@@ -1249,12 +1214,12 @@ bool ASTBuildOperation::addConsumer(SwiftASTConsumerRef Consumer) {
 ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
     SwiftASTConsumerRef Consumer,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    ArrayRef<ImmutableTextSnapshotRef> Snapshots, SwiftASTManagerRef Mgr) {
+    SwiftASTManagerRef Mgr) {
   for (auto &BuildOp : llvm::reverse(BuildOperations)) {
     if (BuildOp->isCancelled()) {
       continue;
     }
-    if (BuildOp->matchesSourceState(FileSystem, Snapshots)) {
+    if (BuildOp->matchesSourceState(FileSystem)) {
       ++Mgr->Impl.Stats->numASTCacheHits;
       return BuildOp;
     } else if (Consumer->canUseASTWithSnapshots(BuildOp->getSnapshots())) {
@@ -1268,19 +1233,18 @@ ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
 void ASTProducer::enqueueConsumer(
     SwiftASTConsumerRef Consumer,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    ArrayRef<ImmutableTextSnapshotRef> Snapshots, SwiftASTManagerRef Mgr) {
+    SwiftASTManagerRef Mgr) {
   // We can't use a llvm::sys::ScopedLock here because we need to unlock it
   // before calling enqueueConsumer again in the !WasAdded case below.
   std::unique_lock<llvm::sys::Mutex> BuildOperationsLock(BuildOperationsMtx);
-  if (auto BuildOp =
-          getBuildOperationForConsumer(Consumer, FileSystem, Snapshots, Mgr)) {
+  if (auto BuildOp = getBuildOperationForConsumer(Consumer, FileSystem, Mgr)) {
     bool WasAdded = BuildOp->addConsumer(Consumer);
     if (!WasAdded) {
       // The build operation was cancelled after the call to
       // getBuildOperationForConsumer but before the consumer could be added.
       // This should be an absolute edge case. Let's just try again.
       BuildOperationsLock.unlock();
-      enqueueConsumer(Consumer, FileSystem, Snapshots, Mgr);
+      enqueueConsumer(Consumer, FileSystem, Mgr);
       return;
     }
   } else {
@@ -1296,7 +1260,7 @@ void ASTProducer::enqueueConsumer(
       }
     };
     ASTBuildOperationRef NewBuildOp = std::make_shared<ASTBuildOperation>(
-        FileSystem, Snapshots, InvokRef, Mgr, DidFinishCallback);
+        FileSystem, InvokRef, Mgr, DidFinishCallback);
     BuildOperations.push_back(NewBuildOp);
     NewBuildOp->addConsumer(Consumer);
     NewBuildOp->schedule(Mgr->Impl.ASTBuildQueue);
