@@ -2969,6 +2969,13 @@ CanType ASTMangler::getDeclTypeForMangling(
 
   Type ty = decl->getInterfaceType()->getReferenceStorageReferent();
 
+  // If this declaration predates concurrency, adjust its type to not
+  // contain type features that were not available pre-concurrency. This
+  // cannot alter the ABI in any way.
+  if (decl->predatesConcurrency()) {
+    ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true);
+  }
+
   auto canTy = ty->getCanonicalType();
 
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {

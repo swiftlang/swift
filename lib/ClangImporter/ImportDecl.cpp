@@ -8392,17 +8392,13 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   return *sourceFile;
 }
 
-Optional<bool> swift::importer::isMainActorAttr(
-    ASTContext &ctx, const clang::SwiftAttrAttr *swiftAttr) {
+bool swift::importer::isMainActorAttr(const clang::SwiftAttrAttr *swiftAttr) {
   if (swiftAttr->getAttribute() == "@MainActor" ||
-      swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
       swiftAttr->getAttribute() == "@UIActor") {
-    bool isUnsafe = swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
-        !ctx.LangOpts.isSwiftVersionAtLeast(6);
-    return isUnsafe;
+    return true;
   }
 
-  return None;
+  return false;
 }
 
 void
@@ -8430,9 +8426,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
   for (auto swiftAttr : ClangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
     // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
     // point at which to do name lookup for imported entities.
-    if (auto isMainActor = isMainActorAttr(SwiftContext, swiftAttr)) {
-      bool isUnsafe = *isMainActor;
-
+    if (isMainActorAttr(swiftAttr)) {
       if (SeenMainActorAttr) {
         // Cannot add main actor annotation twice. We'll keep the first
         // one and raise a warning about the duplicate.
@@ -8446,7 +8440,6 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       if (Type mainActorType = SwiftContext.getMainActorType()) {
         auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
         auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
-        attr->setArgIsUnsafe(isUnsafe);
         MappedDecl->getAttrs().add(attr);
         SeenMainActorAttr = swiftAttr;
       }
