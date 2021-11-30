@@ -345,19 +345,6 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto *disjunction = CS.selectDisjunction();
   auto bestBindings = CS.determineBestBindings();
 
-  if (CS.shouldAttemptFixes()) {
-    if ((bestBindings &&
-         (bestBindings->forClosureResult() ||
-          bestBindings->forGenericParameter()) &&
-         bestBindings->isHole()) &&
-        !disjunction) {
-      if (auto *conjunction = CS.selectConjunction()) {
-        return suspend(
-            std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
-      }
-    }
-  }
-
   if (bestBindings &&
       (!disjunction || bestBindings->favoredOverDisjunction(disjunction))) {
     // Produce a type variable step.

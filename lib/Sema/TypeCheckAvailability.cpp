@@ -3302,7 +3302,7 @@ void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
 
 namespace {
 
-class StmtAvailabilityWalker : public BaseDiagnosticWalker {
+class StmtAvailabilityWalker : public ASTWalker {
   DeclContext *DC;
   bool WalkRecursively;
 
@@ -3338,6 +3338,7 @@ public:
     return std::make_pair(true, P);
   }
 };
+
 }
 
 void swift::diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
