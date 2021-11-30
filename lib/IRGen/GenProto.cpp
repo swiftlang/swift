@@ -2883,7 +2883,7 @@ static void save(const NecessaryBindings &bindings, IRGenFunction &IGF,
           return transform(requirement, metadata);
         }
       });
-};
+}
 
 void NecessaryBindings::save(IRGenFunction &IGF, Address buffer,
                              Explosion &source) const {

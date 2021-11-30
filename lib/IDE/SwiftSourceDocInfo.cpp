@@ -655,7 +655,7 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
     }
   }
   return WasResolved;
-};
+}
 
 void ResolvedRangeInfo::print(llvm::raw_ostream &OS) const {
   OS << "<Kind>";

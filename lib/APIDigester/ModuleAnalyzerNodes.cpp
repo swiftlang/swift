@@ -179,7 +179,7 @@ SDKNodeDeclImport::SDKNodeDeclImport(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclImport) {}
 
 SDKNodeDeclAssociatedType::SDKNodeDeclAssociatedType(SDKNodeInitInfo Info):
-  SDKNodeDecl(Info, SDKNodeKind::DeclAssociatedType) {};
+  SDKNodeDecl(Info, SDKNodeKind::DeclAssociatedType) {}
 
 SDKNodeDeclSubscript::SDKNodeDeclSubscript(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclSubscript),

@@ -2114,7 +2114,7 @@ bool SILParser::parseForwardingOwnershipKind(
            || parseSILOwnership(forwardingKind);
   }
   return false;
-};
+}
 
 ///  (',' sil-loc)? (',' sil-scope-ref)?
 bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B) {
@@ -2197,7 +2197,7 @@ static bool parseIndexList(Parser &P, StringRef label,
                    "index list"))
     return true;
   return false;
-};
+}
 
 /// Parse a differentiability kind, an autodiff config, and a function name for
 /// a differentiability witness. Returns true on error.
