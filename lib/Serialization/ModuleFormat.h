@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 645; // add isCompileTimeConst
+const uint16_t SWIFTMODULE_VERSION_MINOR = 646; // hasHermeticSealAtLink option
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -809,6 +809,7 @@ namespace options_block {
     XCC,
     IS_SIB,
     IS_STATIC_LIBRARY,
+    HAS_HERMETIC_SEAL_AT_LINK,
     IS_TESTABLE,
     RESILIENCE_STRATEGY,
     ARE_PRIVATE_IMPORTS_ENABLED,
@@ -835,6 +836,10 @@ namespace options_block {
 
   using IsStaticLibraryLayout = BCRecordLayout<
     IS_STATIC_LIBRARY
+  >;
+
+  using HasHermeticSealAtLinkLayout = BCRecordLayout<
+    HAS_HERMETIC_SEAL_AT_LINK
   >;
 
   using IsTestableLayout = BCRecordLayout<

@@ -183,6 +183,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.StaticLibrary = opts.Static;
 
+  serializationOpts.HermeticSealAtLink = opts.HermeticSealAtLink;
+
   serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
 
   return serializationOpts;

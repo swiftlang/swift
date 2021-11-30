@@ -109,7 +109,8 @@ class ExtendedValidationInfo {
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
-    unsigned IsStaticLibrary: 1;
+    unsigned IsStaticLibrary : 1;
+    unsigned HasHermeticSealAtLink : 1;
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
     unsigned IsImplicitDynamicEnabled : 1;
@@ -147,6 +148,10 @@ public:
   bool isStaticLibrary() const { return Bits.IsStaticLibrary; }
   void setIsStaticLibrary(bool val) {
     Bits.IsStaticLibrary = val;
+  }
+  bool hasHermeticSealAtLink() const { return Bits.HasHermeticSealAtLink; }
+  void setHasHermeticSealAtLink(bool val) {
+    Bits.HasHermeticSealAtLink = val;
   }
   bool isTestable() const { return Bits.IsTestable; }
   void setIsTestable(bool val) {

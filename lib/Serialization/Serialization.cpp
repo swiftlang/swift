@@ -1031,6 +1031,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         IsStaticLibrary.emit(ScratchRecord);
       }
 
+      if (options.HermeticSealAtLink) {
+        options_block::HasHermeticSealAtLinkLayout HasHermeticSealAtLink(Out);
+        HasHermeticSealAtLink.emit(ScratchRecord);
+      }
+
       if (M->isTestingEnabled()) {
         options_block::IsTestableLayout IsTestable(Out);
         IsTestable.emit(ScratchRecord);

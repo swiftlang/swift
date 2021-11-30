@@ -132,6 +132,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::IS_STATIC_LIBRARY:
       extendedInfo.setIsStaticLibrary(true);
       break;
+    case options_block::HAS_HERMETIC_SEAL_AT_LINK:
+      extendedInfo.setHasHermeticSealAtLink(true);
+      break;
     case options_block::IS_TESTABLE:
       extendedInfo.setIsTestable(true);
       break;
@@ -1257,6 +1260,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.ArePrivateImportsEnabled = extInfo.arePrivateImportsEnabled();
       Bits.IsSIB = extInfo.isSIB();
       Bits.IsStaticLibrary = extInfo.isStaticLibrary();
+      Bits.HasHermeticSealAtLink = extInfo.hasHermeticSealAtLink();
       Bits.IsTestable = extInfo.isTestable();
       Bits.ResilienceStrategy = unsigned(extInfo.getResilienceStrategy());
       Bits.IsImplicitDynamicEnabled = extInfo.isImplicitDynamicEnabled();
