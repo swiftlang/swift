@@ -17,7 +17,6 @@
 #define LLVM_ADT_STLEXTRAS_H
 
 #include "llvm/ADT/Optional.h"
-#include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/iterator.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -41,6 +40,32 @@
 
 inline namespace __swift { inline namespace __runtime {
 namespace llvm {
+
+template <typename...>
+struct conjunction // NOLINT(readability-identifier-naming)
+    : std::true_type {};
+template <typename B1> struct conjunction<B1> : B1 {};
+template <typename B1, typename... Bn>
+struct conjunction<B1, Bn...>
+    : std::conditional<bool(B1::value), conjunction<Bn...>, B1>::type {};
+
+template <typename...>
+struct disjunction // NOLINT(readability-identifier-naming)
+    : std::false_type {};
+template <typename B1> struct disjunction<B1> : B1 {};
+template <typename B1, typename... Bn>
+struct disjunction<B1, Bn...>
+    : std::conditional<bool(B1::value), B1, disjunction<Bn...>>::type {};
+
+template <typename T>
+struct remove_cvref // NOLINT(readability-identifier-naming)
+{
+  using type = std::remove_cv_t<std::remove_reference_t<T>>;
+};
+
+template <typename T>
+using remove_cvref_t // NOLINT(readability-identifier-naming)
+    = typename llvm::remove_cvref<T>::type;
 
 // Only used by compiler if both template types are the same.  Useful when
 // using SFINAE to test for the existence of member functions.

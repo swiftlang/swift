@@ -17,7 +17,6 @@
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/None.h"
-#include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/type_traits.h"
 #include <cassert>
@@ -27,6 +26,19 @@
 
 inline namespace __swift { inline namespace __runtime {
 namespace llvm {
+
+struct in_place_t // NOLINT(readability-identifier-naming)
+{
+  explicit in_place_t() = default;
+};
+/// \warning This must not be odr-used, as it cannot be made \c inline in C++14.
+constexpr in_place_t in_place; // NOLINT(readability-identifier-naming)
+
+template <typename T>
+struct in_place_type_t // NOLINT(readability-identifier-naming)
+{
+  explicit in_place_type_t() = default;
+};
 
 class raw_ostream;
 
