@@ -68,10 +68,10 @@ func test3() {
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
   let o = getAString()
 
+  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [lexical] [[STR]]
   // CHECK-NEXT: debug_value
   // CHECK-NOT: destroy_value
 
-  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [[STR]]
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_BORROW]])
   useAString(o)

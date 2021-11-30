@@ -912,7 +912,8 @@ inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {
   case SILStage::Raw:
     // In Raw SIL, we support lexical lifetimes as long as lexical lifetimes is
-    // not turned off all the way.
+    // not turned off all the way. This means lexical lifetimes is set to either
+    // early or experimental late.
     return LexicalLifetimes != LexicalLifetimesOption::Off;
   case SILStage::Canonical:
     // In Canonical SIL, we only support lexical lifetimes when in experimental
