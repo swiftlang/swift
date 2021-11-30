@@ -96,7 +96,7 @@ function(_add_host_variant_swift_sanitizer_flags target)
       # Not supported
     elseif(LLVM_USE_SANITIZER STREQUAL "Address;Undefined" OR
            LLVM_USE_SANITIZER STREQUAL "Undefined;Address")
-      set(_Swift_SANITIZER_FLAGS "-sanitize=address -sanitize=undefined")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address" "-sanitize=undefined")
     elseif(LLVM_USE_SANITIZER STREQUAL "Leaks")
       # Not supported
     else()
