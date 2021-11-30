@@ -222,6 +222,8 @@ set(SWIFTLIB_SOURCES
   SliceBuffer.swift
   SIMDVector.swift
   UnfoldSequence.swift
+  UnsafeBufferPointerSlice.swift
+  UnsafeBufferPointerProtocols.swift
   VarArgs.swift
   Zip.swift
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
