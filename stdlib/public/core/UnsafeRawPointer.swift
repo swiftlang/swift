@@ -319,6 +319,70 @@ public struct UnsafeRawPointer: _Pointer, Sendable {
     return UnsafePointer<T>(_rawValue)
   }
 
+  /// Executes the given closure while temporarily binding memory to
+  /// the specified number of instances of type `T`.
+  ///
+  /// Use this method when you have a pointer to raw memory and you need
+  /// to access that memory as instances of a given type `T`. Accessing
+  /// memory as a type `T` requires that the memory be bound to that type. A
+  /// memory location may only be bound to one type at a time, so accessing
+  /// the same memory as an unrelated type without first rebinding the memory
+  /// is undefined.
+  ///
+  /// Any instance of `T` within the re-bound region may be initialized or
+  /// uninitialized. The memory underlying any individual instance of `T`
+  /// must have the same initialization state (i.e.  initialized or
+  /// uninitialized.) Accessing a `T` whose underlying memory
+  /// is in a mixed initialization state shall be undefined behaviour.
+  ///
+  /// The following example temporarily rebinds a raw memory pointer
+  /// to `Int64`, then accesses a property on the signed integer.
+  ///
+  ///     let pointer: UnsafeRawPointer = fetchValue()
+  ///     let isNegative = pointer.withMemoryRebound(to: Int64.self,
+  ///                                                capacity: 1) {
+  ///         return $0.pointee < 0
+  ///     }
+  ///
+  /// After executing `body`, this method rebinds memory back to its original
+  /// binding state. This can be unbound memory, or bound to a different type.
+  ///
+  /// - Note: The region of memory starting at this pointer must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
+  ///   That is, `Int(bitPattern: self) % MemoryLayout<T>.alignment`
+  ///   must equal zero.
+  ///
+  /// - Note: The region of memory starting at this pointer may have been
+  ///   bound to a type. If that is the case, then `T` must be
+  ///   layout compatible with the type to which the memory has been bound.
+  ///   This requirement does not apply if the region of memory
+  ///   has not been bound to any type.
+  ///
+  /// - Parameters:
+  ///   - type: The type to temporarily bind the memory referenced by this
+  ///     pointer. This pointer must be a multiple of this type's alignment.
+  ///   - count: The number of instances of `T` in the re-bound region.
+  ///   - body: A closure that takes a typed pointer to the
+  ///     same memory as this pointer, only bound to type `T`. The closure's
+  ///     pointer argument is valid only for the duration of the closure's
+  ///     execution. If `body` has a return value, that value is also used as
+  ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - pointer: The pointer temporarily bound to `T`.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
+  @inlinable
+  public func withMemoryRebound<T, Result>(
+    to type: T.Type,
+    capacity count: Int,
+    _ body: (_ pointer: UnsafePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    _debugPrecondition(
+      Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0
+    )
+    let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(_rawValue, binding) }
+    return try body(.init(_rawValue))
+  }
+
   /// Returns a typed pointer to the memory referenced by this pointer,
   /// assuming that the memory is already bound to the specified type.
   ///
@@ -682,6 +746,69 @@ public struct UnsafeMutableRawPointer: _Pointer, Sendable {
   ) -> UnsafeMutablePointer<T> {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
     return UnsafeMutablePointer<T>(_rawValue)
+  }
+
+  /// Executes the given closure while temporarily binding memory to
+  /// the specified number of instances of type `T`.
+  ///
+  /// Use this method when you have a pointer to raw memory and you need
+  /// to access that memory as instances of a given type `T`. Accessing
+  /// memory as a type `T` requires that the memory be bound to that type. A
+  /// memory location may only be bound to one type at a time, so accessing
+  /// the same memory as an unrelated type without first rebinding the memory
+  /// is undefined.
+  ///
+  /// Any instance of `T` within the re-bound region may be initialized or
+  /// uninitialized. The memory underlying any individual instance of `T`
+  /// must have the same initialization state (i.e.  initialized or
+  /// uninitialized.) Accessing a `T` whose underlying memory
+  /// is in a mixed initialization state shall be undefined behaviour.
+  ///
+  /// The following example temporarily rebinds a raw memory pointer
+  /// to `Int64`, then modifies the signed integer.
+  ///
+  ///     let pointer: UnsafeMutableRawPointer = fetchValue()
+  ///     pointer.withMemoryRebound(to: Int64.self, capacity: 1) {
+  ///         ptr.pointee.negate()
+  ///     }
+  ///
+  /// After executing `body`, this method rebinds memory back to its original
+  /// binding state. This can be unbound memory, or bound to a different type.
+  ///
+  /// - Note: The region of memory starting at this pointer must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
+  ///   That is, `Int(bitPattern: self) % MemoryLayout<T>.alignment`
+  ///   must equal zero.
+  ///
+  /// - Note: The region of memory starting at this pointer may have been
+  ///   bound to a type. If that is the case, then `T` must be
+  ///   layout compatible with the type to which the memory has been bound.
+  ///   This requirement does not apply if the region of memory
+  ///   has not been bound to any type.
+  ///
+  /// - Parameters:
+  ///   - type: The type to temporarily bind the memory referenced by this
+  ///     pointer. This pointer must be a multiple of this type's alignment.
+  ///   - count: The number of instances of `T` in the re-bound region.
+  ///   - body: A closure that takes a typed pointer to the
+  ///     same memory as this pointer, only bound to type `T`. The closure's
+  ///     pointer argument is valid only for the duration of the closure's
+  ///     execution. If `body` has a return value, that value is also used as
+  ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - pointer: The pointer temporarily bound to `T`.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
+  @inlinable
+  public func withMemoryRebound<T, Result>(
+    to type: T.Type,
+    capacity count: Int,
+    _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    _debugPrecondition(
+      Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0
+    )
+    let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(_rawValue, binding) }
+    return try body(.init(_rawValue))
   }
 
   /// Returns a typed pointer to the memory referenced by this pointer,

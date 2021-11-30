@@ -850,6 +850,95 @@ extension Unsafe${Mutable}RawBufferPointer {
     return Unsafe${Mutable}BufferPointer<T>(
       start: Unsafe${Mutable}Pointer<T>(base._rawValue), count: capacity)
   }
+
+  /// Executes the given closure while temporarily binding the buffer to
+  /// instances of type `T`.
+  ///
+  /// Use this method when you have a buffer to raw memory and you need
+  /// to access that memory as instances of a given type `T`. Accessing
+  /// memory as a type `T` requires that the memory be bound to that type.
+  /// A memory location may only be bound to one type at a time, so accessing
+  /// the same memory as an unrelated type without first rebinding the memory
+  /// is undefined.
+  ///
+  /// Any instance of `T` within the re-bound region may be initialized or
+  /// uninitialized. The memory underlying any individual instance of `T`
+  /// must have the same initialization state (i.e.  initialized or
+  /// uninitialized.) Accessing a `T` whose underlying memory
+  /// is in a mixed initialization state shall be undefined behaviour.
+  ///
+  /// If the byte count of the original buffer is not a multiple of
+  /// the stride of `T`, then the re-bound buffer is shorter
+  /// than the original buffer.
+  ///
+  /// After executing `body`, this method rebinds memory back to its original
+  /// binding state. This can be unbound memory, or bound to a different type.
+  ///
+  /// - Note: The buffer's base address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
+  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  ///   must equal zero.
+  ///
+  /// - Note: A raw buffer may represent memory that has been bound to a type.
+  ///   If that is the case, then `T` must be layout compatible with the
+  ///   type to which the memory has been bound. This requirement does not
+  ///   apply if the raw buffer represents memory that has not been bound
+  ///   to any type.
+  ///
+  /// - Parameters:
+  ///   - type: The type to temporarily bind the memory referenced by this
+  ///     pointer. This pointer must be a multiple of this type's alignment.
+  ///   - body: A closure that takes a typed pointer to the
+  ///     same memory as this pointer, only bound to type `T`. The closure's
+  ///     pointer argument is valid only for the duration of the closure's
+  ///     execution. If `body` has a return value, that value is also used as
+  ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - buffer: The buffer temporarily bound to instances of `T`.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
+  @inlinable
+  public func withMemoryRebound<T, Result>(
+    to type: T.Type,
+    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws -> Result
+  ) rethrows -> Result {
+    guard let s = _position, let e = _end else {
+      return try body(.init(start: nil, count: 0))
+    }
+    _debugPrecondition(
+      Int(bitPattern: s) & (MemoryLayout<T>.alignment-1) == 0
+    )
+    let c = s.distance(to: e) / MemoryLayout<T>.stride
+    let binding = Builtin.bindMemory(s._rawValue, c._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(s._rawValue, binding) }
+    return try body(.init(start: .init(s._rawValue), count: c))
+  }
+
+  /// Returns a typed buffer to the memory referenced by this buffer,
+  /// assuming that the memory is already bound to the specified type.
+  ///
+  /// Use this method when you have a raw buffer to memory that has already
+  /// been bound to the specified type. The memory starting at this pointer
+  /// must be bound to the type `T`. Accessing memory through the returned
+  /// pointer is undefined if the memory has not been bound to `T`. To bind
+  /// memory to `T`, use `bindMemory(to:capacity:)` instead of this method.
+  ///
+  /// - Note: The buffer's base address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
+  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  ///   must equal zero.
+  ///
+  /// - Parameter to: The type `T` that the memory has already been bound to.
+  /// - Returns: A typed pointer to the same memory as this raw pointer.
+  @_transparent
+  public func assumingMemoryBound<T>(
+    to: T.Type
+  ) -> Unsafe${Mutable}BufferPointer<T> {
+    guard let base = _position else {
+      return .init(start: nil, count: 0)
+    }
+
+    let c = count / MemoryLayout<T>.stride
+    return .init(start: .init(base._rawValue), count: c)
+  }
 }
 
 extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {

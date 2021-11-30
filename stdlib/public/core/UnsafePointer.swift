@@ -243,8 +243,8 @@ public struct UnsafePointer<Pointee>: _Pointer, Sendable {
     }
   }
 
-  /// Executes the given closure while temporarily binding the specified number
-  /// of instances to the given type.
+  /// Executes the given closure while temporarily binding memory to
+  /// the specified number of instances of type `T`.
   ///
   /// Use this method when you have a pointer to memory bound to one type and
   /// you need to access that memory as instances of another type. Accessing
@@ -253,15 +253,22 @@ public struct UnsafePointer<Pointee>: _Pointer, Sendable {
   /// the same memory as an unrelated type without first rebinding the memory
   /// is undefined.
   ///
-  /// The region of memory starting at this pointer and covering `count`
-  /// instances of the pointer's `Pointee` type must be initialized.
+  /// The region of memory that starts at this pointer and covers `count`
+  /// strides of `T` instances must be bound to `Pointee`.
+  /// Any instance of `T` within the re-bound region may be initialized or
+  /// uninitialized. Every instance of `Pointee` overlapping with a given
+  /// instance of `T` should have the same initialization state (i.e.
+  /// initialized or uninitialized.) Accessing a `T` whose underlying
+  /// `Pointee` storage is in a mixed initialization state shall be
+  /// undefined behaviour.
   ///
   /// The following example temporarily rebinds the memory of a `UInt64`
   /// pointer to `Int64`, then accesses a property on the signed integer.
   ///
   ///     let uint64Pointer: UnsafePointer<UInt64> = fetchValue()
-  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) { ptr in
-  ///         return ptr.pointee < 0
+  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self,
+  ///                                                      capacity: 1) {
+  ///         return $0.pointee < 0
   ///     }
   ///
   /// Because this pointer's memory is no longer bound to its `Pointee` type
@@ -274,31 +281,43 @@ public struct UnsafePointer<Pointee>: _Pointer, Sendable {
   /// `Pointee` type.
   ///
   /// - Note: Only use this method to rebind the pointer's memory to a type
-  ///   with the same size and stride as the currently bound `Pointee` type.
-  ///   To bind a region of memory to a type that is a different size, convert
-  ///   the pointer to a raw pointer and use the `bindMemory(to:capacity:)`
-  ///   method.
+  ///   that is layout compatible with the `Pointee` type. The stride of the
+  ///   temporary type (`T`) may be an integer multiple or a whole fraction
+  ///   of `Pointee`'s stride, for example to point to one element of
+  ///   an aggregate.
+  ///   To bind a region of memory to a type that does not match these
+  ///   requirements, convert the pointer to a raw pointer and use the
+  ///   `bindMemory(to:)` method.
+  ///   If `T` and `Pointee` have different alignments, this pointer
+  ///   must be aligned with the larger of the two alignments.
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
-  ///     pointer. The type `T` must be the same size and be layout compatible
+  ///     pointer. The type `T` must be layout compatible
   ///     with the pointer's `Pointee` type.
-  ///   - count: The number of instances of `Pointee` to bind to `type`.
-  ///   - body: A closure that takes a  typed pointer to the
+  ///   - count: The number of instances of `T` in the re-bound region.
+  ///   - body: A closure that takes a typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
-  public func withMemoryRebound<T, Result>(to type: T.Type, capacity count: Int,
-    _ body: (UnsafePointer<T>) throws -> Result
+  @_alwaysEmitIntoClient
+  public func withMemoryRebound<T, Result>(
+    to type: T.Type, capacity count: Int,
+    _ body: (_ pointer: UnsafePointer<T>) throws -> Result
   ) rethrows -> Result {
-    Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
-    defer {
-      Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
-    }
-    return try body(UnsafePointer<T>(_rawValue))
+    _debugPrecondition(
+      Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
+      MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
+      ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
+      : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
+    )
+    let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(_rawValue, binding) }
+    return try body(.init(_rawValue))
   }
 
   /// Accesses the pointee at the specified offset from this pointer.
@@ -939,8 +958,8 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
     return UnsafeMutableRawPointer(self)
   }
 
-  /// Executes the given closure while temporarily binding the specified number
-  /// of instances to the given type.
+  /// Executes the given closure while temporarily binding memory to
+  /// the specified number of instances of the given type.
   ///
   /// Use this method when you have a pointer to memory bound to one type and
   /// you need to access that memory as instances of another type. Accessing
@@ -949,15 +968,21 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
   /// the same memory as an unrelated type without first rebinding the memory
   /// is undefined.
   ///
-  /// The region of memory starting at this pointer and covering `count`
-  /// instances of the pointer's `Pointee` type must be initialized.
+  /// The region of memory that starts at this pointer and covers `count`
+  /// strides of `T` instances must be bound to `Pointee`.
+  /// Any instance of `T` within the re-bound region may be initialized or
+  /// uninitialized. Every instance of `Pointee` overlapping with a given
+  /// instance of `T` should have the same initialization state (i.e.
+  /// initialized or uninitialized.) Accessing a `T` whose underlying
+  /// `Pointee` storage is in a mixed initialization state shall be
+  /// undefined behaviour.
   ///
   /// The following example temporarily rebinds the memory of a `UInt64`
-  /// pointer to `Int64`, then accesses a property on the signed integer.
+  /// pointer to `Int64`, then modifies the signed integer.
   ///
   ///     let uint64Pointer: UnsafeMutablePointer<UInt64> = fetchValue()
-  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) { ptr in
-  ///         return ptr.pointee < 0
+  ///     uint64Pointer.withMemoryRebound(to: Int64.self, capacity: 1) { ptr in
+  ///         ptr.pointee.negate()
   ///     }
   ///
   /// Because this pointer's memory is no longer bound to its `Pointee` type
@@ -970,31 +995,43 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
   /// `Pointee` type.
   ///
   /// - Note: Only use this method to rebind the pointer's memory to a type
-  ///   with the same size and stride as the currently bound `Pointee` type.
-  ///   To bind a region of memory to a type that is a different size, convert
-  ///   the pointer to a raw pointer and use the `bindMemory(to:capacity:)`
-  ///   method.
+  ///   that is layout compatible with the `Pointee` type. The stride of the
+  ///   temporary type (`T`) may be an integer multiple or a whole fraction
+  ///   of `Pointee`'s stride, for example to point to one element of
+  ///   an aggregate.
+  ///   To bind a region of memory to a type that does not match these
+  ///   requirements, convert the pointer to a raw pointer and use the
+  ///   `bindMemory(to:)` method.
+  ///   If `T` and `Pointee` have different alignments, this pointer
+  ///   must be aligned with the larger of the two alignments.
   ///
   /// - Parameters:
   ///   - type: The type to temporarily bind the memory referenced by this
-  ///     pointer. The type `T` must be the same size and be layout compatible
+  ///     pointer. The type `T` must be layout compatible
   ///     with the pointer's `Pointee` type.
-  ///   - count: The number of instances of `Pointee` to bind to `type`.
+  ///   - count: The number of instances of `T` in the re-bound region.
   ///   - body: A closure that takes a mutable typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
-  public func withMemoryRebound<T, Result>(to type: T.Type, capacity count: Int,
-    _ body: (UnsafeMutablePointer<T>) throws -> Result
+  @_alwaysEmitIntoClient
+  public func withMemoryRebound<T, Result>(
+    to type: T.Type, capacity count: Int,
+    _ body: (_ pointer: UnsafeMutablePointer<T>) throws -> Result
   ) rethrows -> Result {
-    Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
-    defer {
-      Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
-    }
-    return try body(UnsafeMutablePointer<T>(_rawValue))
+    _debugPrecondition(
+      Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
+      MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
+      ? MemoryLayout<Pointee>.stride % MemoryLayout<T>.stride == 0
+      : MemoryLayout<T>.stride % MemoryLayout<Pointee>.stride == 0
+    )
+    let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(_rawValue, binding) }
+    return try body(.init(_rawValue))
   }
 
   /// Reads or updates the pointee at the specified offset from this pointer.
