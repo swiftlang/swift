@@ -207,6 +207,9 @@ enum class AssociatedValueCheck {
 /// Diagnostic printing of \c StaticSpellingKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, StaticSpellingKind SSK);
 
+/// Diagnostic printing of \c ReferenceOwnership.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, ReferenceOwnership RO);
+
 /// Encapsulation of the overload signature of a given declaration,
 /// which is used to determine uniqueness of a declaration within a
 /// given context.
