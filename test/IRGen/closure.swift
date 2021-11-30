@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CAPTURE
 // RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 
 // CHECK-DAG: [[FILENAME:@[0-9]+]] = {{.*}} c"{{.*}}closure.swift\00"
 // OPT: [[FILENAME:@[0-9]+]] = {{.*}} [1 x i8] zeroinitializer
