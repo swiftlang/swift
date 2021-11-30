@@ -39,7 +39,7 @@ modules, eliminating the need for headers and the code duplication they entail.
 
 To learn more about the programming language, visit [swift.org](https://swift.org/documentation/).
 
-### Table Of Contents
+### Table of Contents
 1. [Contributing to Swift](https://github.com/apple/swift#contributing-to-swift)
 2. [Getting Started](https://github.com/apple/swift#getting-started)
 3. [Build Failures](https://github.com/apple/swift#build-failures)
