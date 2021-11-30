@@ -350,60 +350,18 @@ __swift_uint16_t _swift_stdlib_getNormData(__swift_uint32_t scalar) {
   if (scalar < 0xC0) {
     return 0;
   }
-  
-  auto chunkSize = 0x110000 / 64 / 64;
-  auto base = scalar / chunkSize;
-  auto idx = base / 64;
-  auto chunkBit = base % 64;
-  
-  auto quickLookSize = _swift_stdlib_normData[0];
-  
-  // If our chunk index is larger than the quick look indices, then it means
-  // our scalar appears in chunks who are all 0 and trailing.
-  if ((__swift_uint64_t) idx > quickLookSize) {
+
+  auto dataIdx = _swift_stdlib_getScalarBitArrayIdx(scalar,
+                                                    _swift_stdlib_normData,
+                                                  _swift_stdlib_normData_ranks);
+
+  // If we don't have an index into the data indices, then this scalar has no
+  // normalization information.
+  if (dataIdx == std::numeric_limits<__swift_intptr_t>::max()) {
     return 0;
   }
-  
-  auto quickLook = _swift_stdlib_normData[idx + 1];
-  
-  if ((quickLook & ((__swift_uint64_t) 1 << chunkBit)) == 0) {
-    return 0;
-  }
-  
-  // Ok, our scalar failed the quick look check. Go lookup our scalar in the
-  // chunk specific bit array.
-  auto chunkRank = _swift_stdlib_normData_ranks[idx];
-  
-  if (chunkBit != 0) {
-    chunkRank += __builtin_popcountll(quickLook << (64 - chunkBit));
-  }
-  
-  auto chunkBA = _swift_stdlib_normData + 1 + quickLookSize + (chunkRank * 5);
-  
-  auto scalarOverallBit = scalar - (base * chunkSize);
-  auto scalarSpecificBit = scalarOverallBit % 64;
-  auto scalarWord = scalarOverallBit / 64;
-  
-  auto chunkWord = chunkBA[scalarWord];
-  
-  // If our scalar specifically is not turned on, then we're done.
-  if ((chunkWord & ((__swift_uint64_t) 1 << scalarSpecificBit)) == 0) {
-    return 0;
-  }
-  
-  auto scalarRank = _swift_stdlib_normData_ranks[
-    quickLookSize + (chunkRank * 5) + scalarWord
-  ];
-  
-  if (scalarSpecificBit != 0) {
-    scalarRank += __builtin_popcountll(chunkWord << (64 - scalarSpecificBit));
-  }
-  
-  auto chunkDataIdx = chunkBA[4] >> 16;
-  auto scalarDataIdx = _swift_stdlib_normData_data_indices[
-    chunkDataIdx + scalarRank
-  ];
-  
+
+  auto scalarDataIdx = _swift_stdlib_normData_data_indices[dataIdx];
   return _swift_stdlib_normData_data[scalarDataIdx];
 }
 
