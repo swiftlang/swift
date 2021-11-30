@@ -1129,7 +1129,8 @@ RemoveReturn *RemoveReturn::create(ConstraintSystem &cs, Type resultTy,
 NotCompileTimeConst::NotCompileTimeConst(ConstraintSystem &cs, Type paramTy,
                                          ConstraintLocator *locator):
   ContextualMismatch(cs, FixKind::NotCompileTimeConst, paramTy,
-                     cs.getASTContext().TheEmptyTupleType, locator) {}
+                     cs.getASTContext().TheEmptyTupleType, locator,
+                     /*warning*/true) {}
 
 NotCompileTimeConst *
 NotCompileTimeConst::create(ConstraintSystem &cs, Type paramTy,
@@ -1138,7 +1139,14 @@ NotCompileTimeConst::create(ConstraintSystem &cs, Type paramTy,
 }
 
 bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const {
-  NotCompileTimeConstFailure failure(solution, getLocator());
+  auto *locator = getLocator();
+  // Referencing an enum element directly is considered a compile-time literal.
+  if (auto *d = solution.resolveLocatorToDecl(locator).getDecl()) {
+    if (isa<EnumElementDecl>(d)) {
+      return true;
+    }
+  }
+  NotCompileTimeConstFailure failure(solution, locator);
   return failure.diagnose(asNote);
 }
 
