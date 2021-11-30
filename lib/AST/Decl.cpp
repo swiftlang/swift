@@ -652,9 +652,14 @@ const ExternalSourceLocs *Decl::getSerializedLocs() const {
   auto *Result = getASTContext().Allocate<ExternalSourceLocs>();
   Result->BufferID = BufferID;
   Result->Loc = ResolveLoc(RawLocs->Loc);
-  for (auto &Range : RawLocs->DocRanges) {
-    Result->DocRanges.emplace_back(ResolveLoc(Range.first), Range.second);
+
+  auto DocRanges = getASTContext().AllocateUninitialized<CharSourceRange>(RawLocs->DocRanges.size());
+  for (auto I : indices(RawLocs->DocRanges)) {
+    auto &Range = RawLocs->DocRanges[I];
+    DocRanges[I] = CharSourceRange(ResolveLoc(Range.first), Range.second);
   }
+  Result->DocRanges = DocRanges;
+
   Context.setExternalSourceLocs(this, Result);
   return Result;
 }
