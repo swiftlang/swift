@@ -111,6 +111,27 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
   return None;
 }
 
+static bool isReadOnlyFunction(WellKnownFunction function) {
+  switch (function) {
+  case WellKnownFunction::ArrayInitEmpty:
+  case WellKnownFunction::AllocateUninitializedArray:
+  case WellKnownFunction::StringInitEmpty:
+  case WellKnownFunction::StringMakeUTF8:
+  case WellKnownFunction::StringEquals:
+  case WellKnownFunction::StringEscapePercent:
+  case WellKnownFunction::BinaryIntegerDescription:
+    return true;
+
+  case WellKnownFunction::EndArrayMutation:
+  case WellKnownFunction::FinalizeUninitializedArray:
+  case WellKnownFunction::ArrayAppendElement:
+  case WellKnownFunction::StringAppend:
+  case WellKnownFunction::AssertionFailure:
+  case WellKnownFunction::DebugPrint:
+    return false;
+  }
+}
+
 /// Helper function for creating UnknownReason without a payload.
 static SymbolicValue getUnknown(ConstExprEvaluator &evaluator, SILNode *node,
                                 UnknownReason::UnknownKind kind) {
@@ -2290,4 +2311,40 @@ bool swift::hasConstantEvaluableAnnotation(SILFunction *fun) {
 bool swift::isConstantEvaluable(SILFunction *fun) {
   return hasConstantEvaluableAnnotation(fun) ||
          isKnownConstantEvaluableFunction(fun);
+}
+
+/// Return true iff the \p applySite is constant-evaluable and read-only.
+///
+/// Functions annotated as "constant_evaluable" are assumed to be "side-effect
+/// free", unless their signature and substitution map indicates otherwise. A
+/// constant_evaluable function call is read only unless it:
+///   (1) has generic parameters
+///   (2) has inout parameters
+///   (3) has indirect results
+///
+/// Read-only constant evaluable functions can do only the following and
+/// nothing else:
+///   (1) The call may read any memory location.
+///   (2) The call may destroy owned parameters i.e., consume them.
+///   (3) The call may write into memory locations newly created by the call.
+///   (4) The call may use assertions, which traps at runtime on failure.
+///   (5) The call may return a non-generic value.
+///
+/// Essentially, these are calls whose "effect" is visible only in their return
+/// value or through the parameters that are destroyed. The return value
+/// is also guaranteed to have value semantics as it is non-generic and
+/// reference semantics is not constant evaluable.
+bool swift::isReadOnlyConstantEvaluableCall(FullApplySite applySite) {
+  SILFunction *callee = applySite.getCalleeFunction();
+  if (!callee)
+    return false;
+
+  if (auto knownFunction = classifyFunction(callee)) {
+    return isReadOnlyFunction(knownFunction.getValue());
+  }
+  if (!hasConstantEvaluableAnnotation(callee))
+    return false;
+
+  return !applySite.hasSubstitutions() && !getNumInOutArguments(applySite)
+         && !applySite.getNumIndirectSILResults();
 }
