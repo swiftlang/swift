@@ -30,11 +30,12 @@
 extern "C" size_t __builtin_strlen(const char *);
 #endif
 
-inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
+  class APInt;
   class hash_code;
   template <typename T> class SmallVectorImpl;
+  template <typename T> struct DenseMapInfo;
   class StringRef;
 
   /// Helper functions for StringRef::getAsInteger.
@@ -120,10 +121,6 @@ namespace llvm {
         : Data(Str.data()), Length(Str.size()) {}
 #endif
 
-    static StringRef withNullAsEmpty(const char *data) {
-      return StringRef(data ? data : "");
-    }
-
     /// @}
     /// @name Iterators
     /// @{
@@ -192,10 +189,10 @@ namespace llvm {
               compareMemory(Data, RHS.Data, RHS.Length) == 0);
     }
 
-    /// equals_lower - Check for string equality, ignoring case.
+    /// Check for string equality, ignoring case.
     LLVM_NODISCARD
-    bool equals_lower(StringRef RHS) const {
-      return Length == RHS.Length && compare_lower(RHS) == 0;
+    bool equals_insensitive(StringRef RHS) const {
+      return Length == RHS.Length && compare_insensitive(RHS) == 0;
     }
 
     /// compare - Compare two strings; the result is -1, 0, or 1 if this string
@@ -212,14 +209,36 @@ namespace llvm {
       return Length < RHS.Length ? -1 : 1;
     }
 
-    /// compare_lower - Compare two strings, ignoring case.
+    /// Compare two strings, ignoring case.
     LLVM_NODISCARD
-    int compare_lower(StringRef RHS) const;
+    int compare_insensitive(StringRef RHS) const;
 
     /// compare_numeric - Compare two strings, treating sequences of digits as
     /// numbers.
     LLVM_NODISCARD
     int compare_numeric(StringRef RHS) const;
+
+    /// Determine the edit distance between this string and another
+    /// string.
+    ///
+    /// \param Other the string to compare this string against.
+    ///
+    /// \param AllowReplacements whether to allow character
+    /// replacements (change one character into another) as a single
+    /// operation, rather than as two operations (an insertion and a
+    /// removal).
+    ///
+    /// \param MaxEditDistance If non-zero, the maximum edit distance that
+    /// this routine is allowed to compute. If the edit distance will exceed
+    /// that maximum, returns \c MaxEditDistance+1.
+    ///
+    /// \returns the minimum number of character insertions, removals,
+    /// or (if \p AllowReplacements is \c true) replacements needed to
+    /// transform one of the given strings into the other. If zero,
+    /// the strings are identical.
+    LLVM_NODISCARD
+    unsigned edit_distance(StringRef Other, bool AllowReplacements = true,
+                           unsigned MaxEditDistance = 0) const;
 
     /// str - Get the contents as an std::string.
     LLVM_NODISCARD
@@ -271,7 +290,7 @@ namespace llvm {
 
     /// Check if this string starts with the given \p Prefix, ignoring case.
     LLVM_NODISCARD
-    bool startswith_lower(StringRef Prefix) const;
+    bool startswith_insensitive(StringRef Prefix) const;
 
     /// Check if this string ends with the given \p Suffix.
     LLVM_NODISCARD
@@ -282,7 +301,7 @@ namespace llvm {
 
     /// Check if this string ends with the given \p Suffix, ignoring case.
     LLVM_NODISCARD
-    bool endswith_lower(StringRef Suffix) const;
+    bool endswith_insensitive(StringRef Suffix) const;
 
     /// @}
     /// @name String Searching
@@ -308,7 +327,7 @@ namespace llvm {
     /// \returns The index of the first occurrence of \p C, or npos if not
     /// found.
     LLVM_NODISCARD
-    size_t find_lower(char C, size_t From = 0) const;
+    size_t find_insensitive(char C, size_t From = 0) const;
 
     /// Search for the first character satisfying the predicate \p F
     ///
@@ -346,7 +365,7 @@ namespace llvm {
     /// \returns The index of the first occurrence of \p Str, or npos if not
     /// found.
     LLVM_NODISCARD
-    size_t find_lower(StringRef Str, size_t From = 0) const;
+    size_t find_insensitive(StringRef Str, size_t From = 0) const;
 
     /// Search for the last character \p C in the string.
     ///
@@ -369,7 +388,7 @@ namespace llvm {
     /// \returns The index of the last occurrence of \p C, or npos if not
     /// found.
     LLVM_NODISCARD
-    size_t rfind_lower(char C, size_t From = npos) const;
+    size_t rfind_insensitive(char C, size_t From = npos) const;
 
     /// Search for the last string \p Str in the string.
     ///
@@ -383,7 +402,7 @@ namespace llvm {
     /// \returns The index of the last occurrence of \p Str, or npos if not
     /// found.
     LLVM_NODISCARD
-    size_t rfind_lower(StringRef Str) const;
+    size_t rfind_insensitive(StringRef Str) const;
 
     /// Find the first character in the string that is \p C, or npos if not
     /// found. Same as find.
@@ -450,14 +469,16 @@ namespace llvm {
     /// Return true if the given string is a substring of *this, and false
     /// otherwise.
     LLVM_NODISCARD
-    bool contains_lower(StringRef Other) const {
-      return find_lower(Other) != npos;
+    bool contains_insensitive(StringRef Other) const {
+      return find_insensitive(Other) != npos;
     }
 
     /// Return true if the given character is contained in *this, and false
     /// otherwise.
     LLVM_NODISCARD
-    bool contains_lower(char C) const { return find_lower(C) != npos; }
+    bool contains_insensitive(char C) const {
+      return find_insensitive(C) != npos;
+    }
 
     /// @}
     /// @name Helpful Algorithms
@@ -539,6 +560,27 @@ namespace llvm {
       Result = ULLVal;
       return false;
     }
+
+    /// Parse the current string as an integer of the specified \p Radix, or of
+    /// an autosensed radix if the \p Radix given is 0.  The current value in
+    /// \p Result is discarded, and the storage is changed to be wide enough to
+    /// store the parsed integer.
+    ///
+    /// \returns true if the string does not solely consist of a valid
+    /// non-empty number in the appropriate base.
+    ///
+    /// APInt::fromString is superficially similar but assumes the
+    /// string is well-formed in the given radix.
+    bool getAsInteger(unsigned Radix, APInt &Result) const;
+
+    /// Parse the current string as an IEEE double-precision floating
+    /// point value.  The string must be a well-formed double.
+    ///
+    /// If \p AllowInexact is false, the function will fail if the string
+    /// cannot be represented exactly.  Otherwise, the function only fails
+    /// in case of an overflow or underflow, or an invalid floating point
+    /// representation.
+    bool getAsDouble(double &Result, bool AllowInexact = true) const;
 
     /// @}
     /// @name String Operations
@@ -645,10 +687,30 @@ namespace llvm {
       return true;
     }
 
+    /// Returns true if this StringRef has the given prefix, ignoring case,
+    /// and removes that prefix.
+    bool consume_front_insensitive(StringRef Prefix) {
+      if (!startswith_insensitive(Prefix))
+        return false;
+
+      *this = drop_front(Prefix.size());
+      return true;
+    }
+
     /// Returns true if this StringRef has the given suffix and removes that
     /// suffix.
     bool consume_back(StringRef Suffix) {
       if (!endswith(Suffix))
+        return false;
+
+      *this = drop_back(Suffix.size());
+      return true;
+    }
+
+    /// Returns true if this StringRef has the given suffix, ignoring case,
+    /// and removes that suffix.
+    bool consume_back_insensitive(StringRef Suffix) {
+      if (!endswith_insensitive(Suffix))
         return false;
 
       *this = drop_back(Suffix.size());
@@ -886,7 +948,35 @@ namespace llvm {
   LLVM_NODISCARD
   hash_code hash_value(StringRef S);
 
+  // Provide DenseMapInfo for StringRefs.
+  template <> struct DenseMapInfo<StringRef> {
+    static inline StringRef getEmptyKey() {
+      return StringRef(
+          reinterpret_cast<const char *>(~static_cast<uintptr_t>(0)), 0);
+    }
+
+    static inline StringRef getTombstoneKey() {
+      return StringRef(
+          reinterpret_cast<const char *>(~static_cast<uintptr_t>(1)), 0);
+    }
+
+    static unsigned getHashValue(StringRef Val) {
+      assert(Val.data() != getEmptyKey().data() &&
+             "Cannot hash the empty key!");
+      assert(Val.data() != getTombstoneKey().data() &&
+             "Cannot hash the tombstone key!");
+      return (unsigned)(hash_value(Val));
+    }
+
+    static bool isEqual(StringRef LHS, StringRef RHS) {
+      if (RHS.data() == getEmptyKey().data())
+        return LHS.data() == getEmptyKey().data();
+      if (RHS.data() == getTombstoneKey().data())
+        return LHS.data() == getTombstoneKey().data();
+      return LHS == RHS;
+    }
+  };
+
 } // end namespace llvm
-}} // namespace swift::runtime
 
 #endif // LLVM_ADT_STRINGREF_H

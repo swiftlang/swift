@@ -20,7 +20,6 @@
 #include <cstdint>
 #include <limits>
 
-inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 template <typename T> struct DenseMapInfo;
@@ -241,6 +240,5 @@ struct PointerLikeTypeTraits<
 };
 
 } // end namespace llvm
-}} // namespace swift::runtime
 
 #endif // LLVM_ADT_POINTERINTPAIR_H

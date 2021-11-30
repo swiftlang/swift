@@ -22,7 +22,6 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemAlloc.h"
 
-inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// CRTP base class providing obvious overloads for the core \c
@@ -100,6 +99,5 @@ public:
 };
 
 } // namespace llvm
-}} // inline namespace swift::runtime
 
 #endif // LLVM_SUPPORT_ALLOCATORBASE_H

@@ -18,10 +18,8 @@
 #ifndef LLVM_ADT_ITERATOR_RANGE_H
 #define LLVM_ADT_ITERATOR_RANGE_H
 
-#include <iterator>
 #include <utility>
 
-inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
 /// A range adaptor for a pair of iterators.
@@ -61,6 +59,5 @@ template <typename T> iterator_range<T> make_range(std::pair<T, T> p) {
 }
 
 }
-}} // namespace swift::runtime
 
 #endif

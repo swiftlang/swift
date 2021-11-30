@@ -13,8 +13,9 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MathExtras.h"
+#include "llvm/Support/MemAlloc.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
@@ -58,6 +59,7 @@ SmallPtrSetImplBase::insert_imp_big(const void *Ptr) {
   else
     ++NumNonEmpty; // Track density.
   *Bucket = Ptr;
+  incrementEpoch();
   return std::make_pair(Bucket, true);
 }
 
