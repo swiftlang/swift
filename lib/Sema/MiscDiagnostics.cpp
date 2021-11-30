@@ -24,7 +24,6 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -51,37 +50,6 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
   return nullptr;
 }
 
-bool BaseDiagnosticWalker::walkToDeclPre(Decl *D) {
-  return isa<ClosureExpr>(D->getDeclContext())
-             ? shouldWalkIntoDeclInClosureContext(D)
-             : false;
-}
-
-bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
-  auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext());
-  assert(closure);
-
-  if (closure->isSeparatelyTypeChecked())
-    return false;
-
-  auto &opts = D->getASTContext().TypeCheckerOpts;
-
-  // If multi-statement inference is enabled, let's not walk
-  // into declarations contained in a multi-statement closure
-  // because they'd be handled via `typeCheckDecl` that runs
-  // syntactic diagnostics.
-  if (opts.EnableMultiStatementClosureInference &&
-      !closure->hasSingleExpressionBody()) {
-    // Since pattern bindings get their types through solution application,
-    // `typeCheckDecl` doesn't touch initializers (because they are already
-    // fully type-checked), so pattern bindings have to be allowed to be
-    // walked to diagnose syntactic issues.
-    return isa<PatternBindingDecl>(D);
-  }
-
-  return true;
-}
-
 /// Diagnose syntactic restrictions of expressions.
 ///
 ///   - Module values may only occur as part of qualification.
@@ -104,7 +72,7 @@ bool BaseDiagnosticWalker::shouldWalkIntoDeclInClosureContext(Decl *D) {
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                          bool isExprStmt) {
-  class DiagnoseWalker : public BaseDiagnosticWalker {
+  class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
 
@@ -121,7 +89,17 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       return { false, P };
     }
 
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
+        return !closure->isSeparatelyTypeChecked();
+      return false;
+    }
+
     bool walkToTypeReprPre(TypeRepr *T) override { return true; }
+
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
+    }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
@@ -1471,7 +1449,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
 /// confusion, so we force an explicit self.
 static void diagnoseImplicitSelfUseInClosure(const Expr *E,
                                              const DeclContext *DC) {
-  class DiagnoseWalker : public BaseDiagnosticWalker {
+  class DiagnoseWalker : public ASTWalker {
     ASTContext &Ctx;
     SmallVector<AbstractClosureExpr *, 4> Closures;
   public:
@@ -1550,6 +1528,18 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       }
 
       return true;
+    }
+
+
+    // Don't walk into nested decls.
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *closure = dyn_cast<ClosureExpr>(D->getDeclContext()))
+        return !closure->isSeparatelyTypeChecked();
+      return false;
+    }
+
+    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
+      return false;
     }
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
@@ -5149,34 +5139,4 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   }
 
   return None;
-}
-
-bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
-                                                  ForEachStmt *forEach) {
-  if (!forEach->getAwaitLoc().isValid())
-    return false;
-
-  auto &ctx = dc->getASTContext();
-
-  auto sequenceProto = TypeChecker::getProtocol(
-      ctx, forEach->getForLoc(), KnownProtocolKind::AsyncSequence);
-
-  if (!sequenceProto)
-    return false;
-
-  // fetch the sequence out of the statement
-  // else wise the value is potentially unresolved
-  auto Ty = forEach->getSequence()->getType();
-  auto module = dc->getParentModule();
-  auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
-
-  if (conformanceRef.hasEffect(EffectKind::Throws) &&
-      forEach->getTryLoc().isInvalid()) {
-    ctx.Diags
-        .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
-        .fixItInsert(forEach->getAwaitLoc(), "try");
-    return true;
-  }
-
-  return false;
 }

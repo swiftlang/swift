@@ -31,13 +31,13 @@ test_builder {
 test_builder {
   test(doesntExist()) // expected-error {{cannot find 'doesntExist' in scope}}
 
-  if let result = doesntExist() { // expected-error {{cannot find 'doesntExist' in scope}}
+  if let result = doesntExist() {
   }
 
-  if bar = test(42) {} // expected-error {{cannot find 'bar' in scope}}
+  if bar = test(42) {}
 
-  let foo = bar() // expected-error {{cannot find 'bar' in scope}}
+  let foo = bar()
 
-  switch (doesntExist()) { // expected-error {{cannot find 'doesntExist' in scope}}
+  switch (doesntExist()) {
   }
 }

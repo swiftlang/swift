@@ -120,8 +120,9 @@ var selfRef = { selfRef() }
 // expected-note@-1 2{{through reference here}}
 // expected-error@-2 {{circular reference}}
 
-var nestedSelfRef = { // expected-error {{circular reference}} expected-note 2 {{through reference here}}
+var nestedSelfRef = {
   var recursive = { nestedSelfRef() }
+  // expected-warning@-1 {{variable 'recursive' was never mutated; consider changing to 'let' constant}}
   recursive()
 }
 
@@ -139,11 +140,12 @@ func anonymousClosureArgsInClosureWithArgs() {
   var a3 = { (z: Int) in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'z'?}} {{26-28=z}}
   var a4 = { (z: [Int], w: [Int]) in
     f($0.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'z'?}} {{7-9=z}} expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
-    f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}}
+    f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}} expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
   }
   var a5 = { (_: [Int], w: [Int]) in
     f($0.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
     f($1.count) // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{7-9=w}}
+    // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
   }
 }
 
@@ -401,7 +403,7 @@ Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
-let samples = {
+let samples = {   // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
           if (i > 10) { return true }
           else { return false }
         }()
@@ -483,8 +485,8 @@ func lvalueCapture<T>(c: GenericClass<T>) {
 }
 
 // Don't expose @lvalue-ness in diagnostics.
-let closure = {
-  var helper = true // expected-warning {{variable 'helper' was never mutated; consider changing to 'let' constant}}
+let closure = { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
+  var helper = true
   return helper
 }
 

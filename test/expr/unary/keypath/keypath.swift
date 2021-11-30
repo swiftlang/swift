@@ -1093,6 +1093,8 @@ func rdar74711236() {
         // `isSupported` should be an invalid declaration to trigger a crash in `map(\.option)`
         let isSupported = context!.supported().contains(type)
         return (isSupported ? [type] : []).map(\.option)
+        // expected-error@-1 {{value of type 'Any' has no member 'option'}}
+        // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
       }
       return []
     }()

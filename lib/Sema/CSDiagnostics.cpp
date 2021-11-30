@@ -463,8 +463,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
       }
 
       bool hasFix = false;
-      auto &cs = getConstraintSystem();
-      cs.forEachExpr(caseExpr, [&](Expr *expr) -> Expr * {
+      forEachExprInConstraintSystem(caseExpr, [&](Expr *expr) -> Expr * {
         hasFix |= anchors.count(expr);
         return hasFix ? nullptr : expr;
       });
@@ -3592,8 +3591,7 @@ bool MissingMemberFailure::diagnoseAsError() {
 
     bool hasUnresolvedPattern = false;
     if (auto *E = getAsExpr(anchor)) {
-      auto &cs = getConstraintSystem();
-      cs.forEachExpr(const_cast<Expr *>(E), [&](Expr *expr) {
+      forEachExprInConstraintSystem(const_cast<Expr *>(E), [&](Expr *expr) {
         hasUnresolvedPattern |= isa<UnresolvedPatternExpr>(expr);
         return hasUnresolvedPattern ? nullptr : expr;
       });

@@ -4056,7 +4056,8 @@ namespace {
       if (expr->isLiteralInit()) {
         auto *literalInit = expr->getSubExpr();
         if (auto *call = dyn_cast<CallExpr>(literalInit)) {
-          cs.forEachExpr(call->getFn(), [&](Expr *subExpr) -> Expr * {
+          forEachExprInConstraintSystem(call->getFn(),
+                                        [&](Expr *subExpr) -> Expr * {
             auto *TE = dyn_cast<TypeExpr>(subExpr);
             if (!TE)
               return subExpr;

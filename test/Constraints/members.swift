@@ -595,10 +595,10 @@ func rdar50679161() {
 
   func foo() {
     _ = { () -> Void in
-      // Missing `.self` or `init` is not diagnosed here because there are errors in
-      // `if let` statement and `MiscDiagnostics` only run if the body is completely valid.
       var foo = S
-
+      // expected-error@-1 {{expected member name or constructor call after type name}}
+      // expected-note@-2 {{add arguments after the type to construct a value of the type}}
+      // expected-note@-3 {{use '.self' to reference the type object}}
       if let v = Int?(1) {
         var _ = Q(
           a: v + foo.w,
@@ -609,14 +609,6 @@ func rdar50679161() {
           // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
         )
       }
-    }
-
-    _ = { () -> Void in
-      var foo = S
-      // expected-error@-1 {{expected member name or constructor call after type name}}
-      // expected-note@-2 {{add arguments after the type to construct a value of the type}}
-      // expected-note@-3 {{use '.self' to reference the type object}}
-      print(foo)
     }
   }
 }
