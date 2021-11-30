@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t %S/Inputs/objc_protocols_Bas.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: PTRSIZE=64
 // REQUIRES: objc_interop
 
 import gizmo
