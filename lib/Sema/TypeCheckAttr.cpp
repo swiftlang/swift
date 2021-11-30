@@ -2083,8 +2083,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   }
 
   auto where = ExportContext::forDeclSignature(D);
-  diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where, None,
-                           /*containingClosure*/ nullptr);
+  diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where, None);
 
   auto *const func = FuncDecl::createImplicit(
       context, StaticSpellingKind::KeywordStatic,

@@ -233,8 +233,7 @@ diagnoseSubstitutionMapAvailability(SourceLoc loc,
 /// was emitted.
 bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
                               const Expr *call, const ExportContext &where,
-                              DeclAvailabilityFlags flags = None,
-                              const ClosureExpr *singleExprClosure = nullptr);
+                              DeclAvailabilityFlags flags = None);
 
 void diagnoseUnavailableOverride(ValueDecl *override,
                                  const ValueDecl *base,
