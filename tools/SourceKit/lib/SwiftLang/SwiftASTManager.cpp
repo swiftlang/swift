@@ -605,7 +605,8 @@ struct SwiftASTManager::Implementation {
 
   BufferStamp
   getBufferStamp(StringRef FilePath,
-                 IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) const;
+                 IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+                 bool CheckEditorDocs = true) const;
 
   std::unique_ptr<llvm::MemoryBuffer>
   getMemoryBuffer(StringRef Filename,
@@ -793,12 +794,13 @@ FileContentRef SwiftASTManager::Implementation::getFileContent(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) const {
   std::string FilePath = SwiftLangSupport::resolvePathSymlinks(UnresolvedPath);
-  if (auto EditorDoc = EditorDocs->findByPath(FilePath))
+  if (auto EditorDoc = EditorDocs->findByPath(FilePath, /*IsRealpath=*/true))
     return getFileContentFromSnap(EditorDoc->getLatestSnapshot(), IsPrimary,
                                   FilePath);
 
   // FIXME: Is there a way to get timestamp and buffer for a file atomically ?
-  auto Stamp = getBufferStamp(FilePath, FileSystem);
+  // No need to check EditorDocs again. We did so above.
+  auto Stamp = getBufferStamp(FilePath, FileSystem, /*CheckEditorDocs=*/false);
   auto Buffer = getMemoryBuffer(FilePath, FileSystem, Error);
   return new FileContent(nullptr, UnresolvedPath.str(), std::move(Buffer),
                          IsPrimary, Stamp);
@@ -806,11 +808,15 @@ FileContentRef SwiftASTManager::Implementation::getFileContent(
 
 BufferStamp SwiftASTManager::Implementation::getBufferStamp(
     StringRef FilePath,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) const {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    bool CheckEditorDocs) const {
   assert(FileSystem);
 
-  if (auto EditorDoc = EditorDocs->findByPath(FilePath))
-    return EditorDoc->getLatestSnapshot()->getStamp();
+  if (CheckEditorDocs) {
+    if (auto EditorDoc = EditorDocs->findByPath(FilePath)) {
+      return EditorDoc->getLatestSnapshot()->getStamp();
+    }
+  }
 
   auto StatusOrErr = FileSystem->status(FilePath);
   if (std::error_code Err = StatusOrErr.getError()) {

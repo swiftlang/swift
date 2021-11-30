@@ -156,7 +156,10 @@ public:
   /// Looks up the document only by the path name that was given initially.
   SwiftEditorDocumentRef getByUnresolvedName(StringRef FilePath);
   /// Looks up the document by resolving symlinks in the paths.
-  SwiftEditorDocumentRef findByPath(StringRef FilePath);
+  /// If \p IsRealpath is \c true, then \p FilePath must already be
+  /// canonicalized to a realpath.
+  SwiftEditorDocumentRef findByPath(StringRef FilePath,
+                                    bool IsRealpath = false);
   SwiftEditorDocumentRef remove(StringRef FilePath);
 };
 
