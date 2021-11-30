@@ -637,7 +637,7 @@ static int compareResultName(Item &a, Item &b) {
 
   // Next, sort by full description text.
   return a.description.compare(b.description);
-};
+}
 
 namespace {
 enum class ResultBucket {

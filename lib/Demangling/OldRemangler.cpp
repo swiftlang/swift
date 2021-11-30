@@ -259,7 +259,7 @@ static bool isInSwiftModule(Node *node) {
           context->getText() == STDLIB_NAME &&
           // Check for private declarations in Swift
           node->getChild(1)->getKind() == Node::Kind::Identifier);
-};
+}
 
 bool Remangler::mangleStandardSubstitution(Node *node) {
   // Look for known substitutions.

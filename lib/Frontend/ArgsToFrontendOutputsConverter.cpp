@@ -550,7 +550,7 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
   llvm::SmallString<128> path(defaultSupplementaryOutputPathExcludingExtension);
   llvm::sys::path::replace_extension(path, file_types::getExtension(type));
   return path.str().str();
-};
+}
 
 void SupplementaryOutputPathsComputer::deriveModulePathParameters(
     StringRef mainOutputFile, options::ID &emitOption, std::string &extension,

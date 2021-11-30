@@ -3420,7 +3420,7 @@ lowerKeyPathSubscriptIndexTypes(
                                     ->getCanonicalType(),
                              indexLoweredTy});
   }
-};
+}
 
 static void
 lowerKeyPathSubscriptIndexPatterns(
@@ -3438,7 +3438,7 @@ lowerKeyPathSubscriptIndexPatterns(
 
     indexPatterns.push_back({baseOperand++, formalTy, loweredTy, hashable});
   }
-};
+}
 
 KeyPathPatternComponent
 SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,

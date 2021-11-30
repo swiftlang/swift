@@ -4199,7 +4199,7 @@ static AssociatedTypeDecl *getAssociatedTypeAnchor(
 
   return bestAnchor;
 }
-};
+}
 
 AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
   llvm::SmallSet<const AssociatedTypeDecl *, 8> searched;

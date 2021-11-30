@@ -1396,7 +1396,7 @@ inline void simple_display(llvm::raw_ostream &out, Stmt *S) {
     out << Stmt::getKindName(S->getKind());
   else
     out << "(null)";
-};
+}
 
 } // end namespace swift
 

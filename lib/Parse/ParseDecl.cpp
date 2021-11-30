@@ -1061,7 +1061,7 @@ static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
     }
   }
   return true;
-};
+}
 
 /// Parse a differentiability parameters 'wrt:' clause, returning true on error.
 /// If `allowNamedParameters` is false, allow only index parameters and 'self'.

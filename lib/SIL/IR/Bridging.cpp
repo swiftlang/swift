@@ -119,7 +119,7 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
   }
 
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
-};
+}
 
 Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
                                            Type t, Bridgeability bridging,

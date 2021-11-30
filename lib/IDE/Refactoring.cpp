@@ -2917,7 +2917,7 @@ getUnsatisfiedRequirements(const IterableDeclContext *IDC) {
 bool RefactoringActionFillProtocolStub::
 isApplicable(const ResolvedCursorInfo &Tok, DiagnosticEngine &Diag) {
   return FillProtocolStubContext::getContextFromCursorInfo(Tok).canProceed();
-};
+}
 
 bool RefactoringActionFillProtocolStub::performChange() {
   // Get the filling protocol context from the input token.

@@ -407,7 +407,7 @@ namespace {
       return true;
     }
   };
-};
+}
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericEnvironment *

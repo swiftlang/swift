@@ -3657,7 +3657,7 @@ static bool conformsToDifferentiable(Type type, ModuleDecl *module,
     return true;
   auto tanType = conf.getTypeWitnessByName(type, ctx.Id_TangentVector);
   return type->isEqual(tanType);
-};
+}
 
 IndexSubset *TypeChecker::inferDifferentiabilityParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
@@ -4109,7 +4109,7 @@ static bool checkFunctionSignature(
 
   // Required result type is a function. Recurse.
   return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
-};
+}
 
 /// Returns an `AnyFunctionType` from the given parameters, result type, and
 /// generic signature.

@@ -35,7 +35,7 @@ static inline void sip_round(uint64_t &v0, uint64_t &v1, uint64_t &v2,
   v1 ^= v2;
   v2 = ROTATE_LEFT(v2, 32);
 }
-}; // end anonymous namespace
+} // end anonymous namespace
 
 void StableHasher::compress(uint64_t value) {
   state.v3 ^= value;

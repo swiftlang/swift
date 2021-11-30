@@ -4215,9 +4215,9 @@ struct ResolvedMemberResult::Implementation {
   Optional<unsigned> BestIdx;
 };
 
-ResolvedMemberResult::ResolvedMemberResult(): Impl(new Implementation()) {};
+ResolvedMemberResult::ResolvedMemberResult(): Impl(new Implementation()) {}
 
-ResolvedMemberResult::~ResolvedMemberResult() { delete Impl; };
+ResolvedMemberResult::~ResolvedMemberResult() { delete Impl; }
 
 ResolvedMemberResult::operator bool() const {
   return !Impl->AllDecls.empty();

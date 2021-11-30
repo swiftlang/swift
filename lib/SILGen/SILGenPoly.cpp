@@ -171,7 +171,7 @@ namespace {
                                    const TypeLowering &expectedTL);
   };
 } // end anonymous namespace
-;
+
 
 static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) {
@@ -339,7 +339,7 @@ static bool isProtocolClass(Type t) {
   ASTContext &ctx = classDecl->getASTContext();
   return (classDecl->getName() == ctx.Id_Protocol &&
           classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC);
-};
+}
 
 static ManagedValue emitManagedLoad(SILGenFunction &SGF, SILLocation loc,
                                     ManagedValue addr,
