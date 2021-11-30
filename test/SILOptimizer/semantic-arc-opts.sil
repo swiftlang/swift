@@ -1497,3 +1497,31 @@ bb3:
   return %9999 : $()
 }
 
+// Make sure we do not convert checked_cast_br from owned to guaranteed if we
+// are casting from AnyObject. This is because we may need to unwrap boxed
+// AnyObject + bridging.
+//
+// CHECK-LABEL: sil [ossa] @cast_anyobject_donot_opt : $@convention(thin) (@guaranteed AnyObject) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
+// CHECK: [[COPIED_ARG:%.*]] = copy_value [[ARG]]
+// CHECK: checked_cast_br [[COPIED_ARG]] :
+// CHECK: } // end sil function 'cast_anyobject_donot_opt'
+sil [ossa] @cast_anyobject_donot_opt : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %2 = copy_value %0 : $AnyObject
+  checked_cast_br %2 : $AnyObject to Builtin.NativeObject, bb1, bb2
+
+bb1(%3 : @owned $Builtin.NativeObject):
+  %4 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %3 : $Builtin.NativeObject
+  br bb3(%4 : $FakeOptional<Builtin.NativeObject>)
+
+bb2(%5 : @owned $AnyObject):
+  destroy_value %5 : $AnyObject
+  %6 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.none!enumelt
+  br bb3(%6 : $FakeOptional<Builtin.NativeObject>)
+
+bb3(%7 : @owned $FakeOptional<Builtin.NativeObject>):
+  destroy_value %7 : $FakeOptional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
