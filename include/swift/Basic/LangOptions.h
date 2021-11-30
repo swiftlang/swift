@@ -310,10 +310,6 @@ namespace swift {
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;
 
-    /// Enable experimental support for structural opaque result types, e.g.
-    /// `func f() -> (some P)?`.
-    bool EnableExperimentalStructuralOpaqueTypes = false;
-
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 

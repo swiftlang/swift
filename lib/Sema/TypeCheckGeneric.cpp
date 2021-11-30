@@ -115,14 +115,6 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   auto *dc = originatingDecl->getInnermostDeclContext();
   auto &ctx = dc->getASTContext();
 
-  // Support for structural opaque result types is hidden behind a compiler flag
-  // until the proposal gets approved.
-  if (!ctx.LangOpts.EnableExperimentalStructuralOpaqueTypes &&
-      !isa<OpaqueReturnTypeRepr>(repr)) {
-    ctx.Diags.diagnose(repr->getLoc(), diag::structural_opaque_types_are_experimental);
-    return nullptr;
-  }
-
   // Protocol requirements can't have opaque return types.
   //
   // TODO: Maybe one day we could treat this as sugar for an associated type.
