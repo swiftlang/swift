@@ -50,7 +50,7 @@ struct ExternalSourceLocs {
 
   unsigned BufferID = 0;
   SourceLoc Loc;
-  SmallVector<CharSourceRange, 4> DocRanges;
+  ArrayRef<CharSourceRange> DocRanges;
 };
 
 class BasicSourceFileInfo {
