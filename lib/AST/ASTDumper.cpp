@@ -3803,6 +3803,10 @@ namespace {
       printFlag(T->isAsync(), "async");
       printFlag(T->isThrowing(), "throws");
 
+      if (Type globalActor = T->getGlobalActor()) {
+        printField("global_actor", globalActor.getString());
+      }
+
       OS << "\n";
       Indent += 2;
       // [TODO: Improve-Clang-type-printing]
@@ -3813,10 +3817,6 @@ namespace {
           ->getClangASTContext();
         T->getClangTypeInfo().dump(os, ctx);
         printField("clang_type", os.str());
-      }
-
-      if (Type globalActor = T->getGlobalActor()) {
-        printField("global_actor", globalActor.getString());
       }
 
       printAnyFunctionParams(T->getParams(), "input");

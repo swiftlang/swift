@@ -90,16 +90,14 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
   _ = slowServer.allOperations
 }
 
-func testSendable(fn: () -> Void) { // expected-note{{parameter 'fn' is implicitly non-sendable}}
-  doSomethingConcurrently(fn)
-  // expected-error@-1{{passing non-sendable parameter 'fn' to function expecting a @Sendable closure}}
+func testSendable(fn: () -> Void) {
+  doSomethingConcurrently(fn) // okay, due to implicit @_predatesConcurrency
   doSomethingConcurrentlyButUnsafe(fn) // okay, @Sendable not part of the type
 
   var x = 17
   doSomethingConcurrently {
-    print(x) // expected-error{{reference to captured var 'x' in concurrently-executing code}}
-    x = x + 1 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
-    // expected-error@-1{{reference to captured var 'x' in concurrently-executing code}}
+    print(x)
+    x = x + 1
   }
 }
 

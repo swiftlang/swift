@@ -1189,6 +1189,15 @@ public:
   /// types.
   Type lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals);
 
+  /// Remove concurrency-related types and constraints from the given
+  /// type
+  ///
+  /// \param recurse Whether to recurse into function types.
+  ///
+  /// \param dropGlobalActor Whether to drop a global actor from a function
+  /// type.
+  Type stripConcurrency(bool recurse, bool dropGlobalActor);
+
   /// Whether this is the AnyObject type.
   bool isAnyObject();
 

@@ -46,6 +46,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/Defer.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -719,7 +720,14 @@ Optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
 }
 
 bool Decl::predatesConcurrency() const {
-  return getAttrs().hasAttribute<PredatesConcurrencyAttr>();
+  if (getAttrs().hasAttribute<PredatesConcurrencyAttr>())
+    return true;
+
+  // Imported C declarations always predate concurrency.
+  if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
+    return true;
+
+  return false;
 }
 
 
