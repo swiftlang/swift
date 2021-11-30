@@ -20,4 +20,6 @@ auto getFuncRvalueRef() -> int (&&)();
 // crashing when we have an "_Atomic" type or a reference to one.
 void dontImportAtomicRef(_Atomic(int)&) { }
 
+void takeConstRef(const int &);
+
 #endif // TEST_INTEROP_CXX_REFERENCE_INPUTS_REFERENCE_H

@@ -53,6 +53,11 @@ DependentTypesTestSuite.test("Takes inout argument and returns dependent type.")
   expectEqual(m.getValue(), 42)
 }
 
+DependentTypesTestSuite.test("Takes const ref and returns dependent type.") {
+  let m = constRefToDependent(42) as! M<Int>
+  expectEqual(m.getValue(), 42)
+}
+
 
 // We still have some problems calling methods on Windows: SR-13129 and rdar://88391102
 #if !os(Windows)
