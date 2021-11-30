@@ -6,10 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/Support/Error.h"
 #include <bitset>
+#include <climits>
 
 using namespace llvm;
 
