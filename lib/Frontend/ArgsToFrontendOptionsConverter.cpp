@@ -290,6 +290,8 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.Static = Args.hasArg(OPT_static);
 
+  Opts.HermeticSealAtLink = Args.hasArg(OPT_experimental_hermetic_seal_at_link);
+
   return false;
 }
 

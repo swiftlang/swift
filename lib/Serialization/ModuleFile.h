@@ -474,6 +474,11 @@ public:
     return Core->Bits.IsStaticLibrary;
   }
 
+  /// Whether this module was built with -experimental-hermetic-seal-at-link.
+  bool hasHermeticSealAtLink() const {
+    return Core->Bits.HasHermeticSealAtLink;
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);

@@ -142,6 +142,7 @@ namespace swift {
     bool IsSIB = false;
     bool DisableCrossModuleIncrementalInfo = false;
     bool StaticLibrary = false;
+    bool HermeticSealAtLink = false;
     bool IsOSSA = false;
   };
 
