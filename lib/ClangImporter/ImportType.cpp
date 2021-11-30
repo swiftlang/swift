@@ -1906,7 +1906,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // Import the parameter type into Swift.
     Type swiftParamTy;
     bool isParamTypeImplicitlyUnwrapped = false;
-    bool isInOut = false;
+    ParamSpecifier paramSpecifier = ParamSpecifier::Default;
     if ((isa<clang::ReferenceType>(paramTy) || isa<clang::PointerType>(paramTy)) &&
         isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
       auto pointeeType = paramTy->getPointeeType();
@@ -1926,7 +1926,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     } else {
       if (auto refType = dyn_cast<clang::ReferenceType>(paramTy)) {
         paramTy = refType->getPointeeType();
-        isInOut = true;
+        paramSpecifier = paramTy.isConstQualified() ? ParamSpecifier::Shared
+                                                    : ParamSpecifier::InOut;
       }
       auto importedType = importType(paramTy, importKind, allowNSUIntegerAsInt,
                                      Bridgeability::Full, OptionalityOfParam);
@@ -1957,8 +1958,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         param, AccessLevel::Private, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
         ImportedHeaderUnit);
-    paramInfo->setSpecifier(isInOut ? ParamSpecifier::InOut
-                                    : ParamSpecifier::Default);
+    paramInfo->setSpecifier(paramSpecifier);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
     parameters.push_back(paramInfo);

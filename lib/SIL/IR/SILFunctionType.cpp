@@ -1289,6 +1289,17 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 
     return true;
   }
+
+  // Pass C++ const reference types indirectly.
+  if (clangTy->isReferenceType() &&
+      clangTy->getPointeeType().isConstQualified()) {
+    // FIXME: Template substitution references are still mapped as
+    // UnsafePointer.
+    if (isa<clang::SubstTemplateTypeParmType>(
+            clangTy->getPointeeType().getTypePtr()))
+      return false;
+    return true;
+  }
   return false;
 }
 

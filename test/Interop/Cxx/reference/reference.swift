@@ -46,8 +46,8 @@ ReferenceTestSuite.test("pass-lvalue-reference") {
 
 ReferenceTestSuite.test("pass-const-lvalue-reference") {
   expectNotEqual(22, getStaticInt())
-  var val: CInt = 22
-  setConstStaticIntRef(&val)
+  let val: CInt = 22
+  setConstStaticIntRef(val)
   expectEqual(22, getStaticInt())
 }
 
@@ -60,8 +60,8 @@ ReferenceTestSuite.test("pass-rvalue-reference") {
 
 ReferenceTestSuite.test("pass-const-rvalue-reference") {
   expectNotEqual(53, getStaticInt())
-  var val: CInt = 53
-  setConstStaticIntRvalueRef(&val)
+  let val: CInt = 53
+  setConstStaticIntRvalueRef(val)
   expectEqual(53, getStaticInt())
 }
 
@@ -79,6 +79,42 @@ ReferenceTestSuite.test("func-rvalue-reference") {
   expectNotEqual(61, getStaticInt())
   setStaticInt(61)
   expectEqual(61, cxxF())
+}
+
+ReferenceTestSuite.test("pod-struct-const-lvalue-reference") {
+  let pod = PODStruct(x: 78)
+
+  expectNotEqual(78, getStaticInt())
+  takeConstPODStructRef(pod)
+  expectEqual(78, getStaticInt())
+}
+
+ReferenceTestSuite.test("pod-struct-const-rvalue-reference") {
+  let pod = PODStruct(x: 79)
+
+  expectNotEqual(79, getStaticInt())
+  takeConstPODStructRvalueRef(pod)
+  expectEqual(79, getStaticInt())
+}
+
+ReferenceTestSuite.test("pod-struct-pointer-const-lvalue-reference") {
+  var pod = PODStruct(x: 84)
+
+  expectNotEqual(84, getStaticInt())
+  withUnsafeMutablePointer(to: &pod) { ump in
+    takeConstPODStructPointerConstRef(ump)
+  }
+  expectEqual(84, getStaticInt())
+}
+
+ReferenceTestSuite.test("pod-struct-pointer-const-rvalue-reference") {
+  var pod = PODStruct(x: 85)
+
+  expectNotEqual(85, getStaticInt())
+  withUnsafeMutablePointer(to: &pod) { ump in
+    takeConstPODStructPointerConstRvalueRef(ump)
+  }
+  expectEqual(85, getStaticInt())
 }
 
 runAllTests()

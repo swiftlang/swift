@@ -8,8 +8,8 @@
 // CHECK: func setStaticInt(_: Int32)
 // CHECK: func setStaticIntRef(_: inout Int32)
 // CHECK: func setStaticIntRvalueRef(_: inout Int32)
-// CHECK: func setConstStaticIntRef(_: inout Int32)
-// CHECK: func setConstStaticIntRvalueRef(_: inout Int32)
+// CHECK: func setConstStaticIntRef(_: __shared Int32)
+// CHECK: func setConstStaticIntRvalueRef(_: __shared Int32)
 // CHECK: func getFuncRef() -> @convention(c) () -> Int32
 // CHECK: func getFuncRvalueRef() -> @convention(c) () -> Int32
 

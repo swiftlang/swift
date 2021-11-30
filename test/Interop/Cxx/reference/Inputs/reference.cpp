@@ -16,3 +16,19 @@ void setConstStaticIntRvalueRef(const int &&i) { staticInt = i; }
 
 auto getFuncRef() -> int (&)() { return getStaticInt; }
 auto getFuncRvalueRef() -> int (&&)() { return getStaticInt; }
+
+void takeConstPODStructRef(const PODStruct &value) {
+  staticInt = value.x;
+}
+
+void takeConstPODStructRvalueRef(const PODStruct &&value) {
+  staticInt = value.x;
+}
+
+void takeConstPODStructPointerConstRef(PODStruct * _Nonnull const &value) {
+  staticInt = value->x;
+}
+
+void takeConstPODStructPointerConstRvalueRef(PODStruct * _Nonnull const &&value) {
+  staticInt = value->x;
+}

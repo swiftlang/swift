@@ -20,4 +20,14 @@ auto getFuncRvalueRef() -> int (&&)();
 // crashing when we have an "_Atomic" type or a reference to one.
 void dontImportAtomicRef(_Atomic(int)&) { }
 
+struct PODStruct {
+  int x;
+};
+
+void takeConstPODStructRef(const PODStruct &);
+void takeConstPODStructRvalueRef(const PODStruct &&);
+
+void takeConstPODStructPointerConstRef(PODStruct * _Nonnull const &);
+void takeConstPODStructPointerConstRvalueRef(PODStruct * _Nonnull const &&);
+
 #endif // TEST_INTEROP_CXX_REFERENCE_INPUTS_REFERENCE_H
