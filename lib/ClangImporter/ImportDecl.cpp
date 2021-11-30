@@ -9773,18 +9773,19 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   }
 
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
-    // TODO: this is a hack to set member loading as lazy again. It got set to
-    // non-lazy when getMembers was called.
-    cast<StructDecl>(D)->setMemberLoader(this, 0);
+    // We haven't loaded any members yet, so tell our context that it still has
+    // lazy members. Otherwise, we won't be able to look up any individual
+    // members (lazily) in "loadAllMembersOfRecordDecl".
+    cast<StructDecl>(D)->setHasLazyMembers(true);
     loadAllMembersOfRecordDecl(cast<StructDecl>(D));
+    // Now that all members are loaded, mark the context as lazily complete.
+    cast<StructDecl>(D)->setHasLazyMembers(false);
     return;
   }
 
-  // Namespace members will only be loaded lazily.
   if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
-    // TODO: this is a hack to set member loading as lazy again. It got set to
-    // non-lazy when getMembers was called.
-    cast<EnumDecl>(D)->setMemberLoader(this, 0);
+    // Namespace members will only be loaded lazily.
+    cast<EnumDecl>(D)->setHasLazyMembers(true);
     return;
   }
 
