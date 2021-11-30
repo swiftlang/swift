@@ -441,11 +441,6 @@ function(_add_target_variant_link_flags)
     # link against the custom C++ library
     swift_android_cxx_libraries_for_arch(${LFLAGS_ARCH} cxx_link_libraries)
     list(APPEND link_libraries ${cxx_link_libraries})
-
-    # link against the ICU libraries
-    list(APPEND link_libraries
-      ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_I18N}
-      ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_UC})
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
     # generator leaves the intermediate object file in a place where it will not
