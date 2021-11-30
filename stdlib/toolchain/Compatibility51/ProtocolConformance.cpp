@@ -472,7 +472,7 @@ static void addImageCallback(const mach_header *mh) {
   Conformances.unsafeGetAlreadyInitialized()
     .SectionsToScan
     .push_back(ConformanceSection{recordsBegin, recordsEnd});
-};
+}
 
 static void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
   addImageCallback(mh);

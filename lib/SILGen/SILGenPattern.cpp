@@ -1378,7 +1378,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     return emitBoolDispatch(rowsToSpecialize, arg, handler, failure);
   }
   llvm_unreachable("bad pattern kind");
-};
+}
 
 /// Given that we've broken down a source value into this subobject,
 /// and that we were supposed to use the given consumption rules on

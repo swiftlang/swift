@@ -2117,7 +2117,7 @@ void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
 
   // Finalize the lookup table, which may fail.
   finalizeLookupTable(table, nameImporter, buffersForDiagnostics);
-};
+}
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {

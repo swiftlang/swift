@@ -5342,7 +5342,7 @@ static void recordDerivativeFunctionConfig(
         {ctx.getIdentifier(attr->getParameterIndices()->getString()),
          AFD->getGenericSignature()});
   }
-};
+}
 
 /// Recursively walks the members and derived global decls of any nominal types
 /// to build up global tables.

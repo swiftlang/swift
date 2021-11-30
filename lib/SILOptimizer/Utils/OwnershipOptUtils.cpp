@@ -1706,7 +1706,7 @@ void GuaranteedPhiBorrowFixup::insertEndBorrowsAndFindPhis(
     // Otherwise, just plop down an end_borrow after the last use.
     createEndBorrow(phi, std::next(lastUser->getIterator()));
   }
-};
+}
 
 // For each phi that transitively uses an inner guaranteed value, create nested
 // borrow scopes so that it is a well-formed reborrow.

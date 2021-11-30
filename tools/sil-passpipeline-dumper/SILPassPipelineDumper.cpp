@@ -66,4 +66,4 @@ int main(int argc, char **argv) {
   llvm::outs() << '\n';
 
   return 0;
-};
+}

@@ -1742,7 +1742,7 @@ namespace {
   static StringRef
   pathStringFromFrameworkSearchPath(const SearchPathOptions::FrameworkSearchPath &next) {
     return next.Path;
-  };
+  }
 }
 
 std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
