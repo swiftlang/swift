@@ -29,91 +29,27 @@ bool swift::isValueAddressOrTrivial(SILValue v) {
          v.getOwnershipKind() == OwnershipKind::None;
 }
 
-// These operations forward both owned and guaranteed ownership.
-static bool isOwnershipForwardingInstructionKind(SILInstructionKind kind) {
-  switch (kind) {
-  case SILInstructionKind::TupleInst:
-  case SILInstructionKind::StructInst:
-  case SILInstructionKind::EnumInst:
-  case SILInstructionKind::DifferentiableFunctionInst:
-  case SILInstructionKind::LinearFunctionInst:
-  case SILInstructionKind::OpenExistentialRefInst:
-  case SILInstructionKind::UpcastInst:
-  case SILInstructionKind::UncheckedValueCastInst:
-  case SILInstructionKind::UncheckedRefCastInst:
-  case SILInstructionKind::ConvertFunctionInst:
-  case SILInstructionKind::RefToBridgeObjectInst:
-  case SILInstructionKind::BridgeObjectToRefInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst:
-  case SILInstructionKind::UncheckedEnumDataInst:
-  case SILInstructionKind::SelectEnumInst:
-  case SILInstructionKind::SwitchEnumInst:
-  case SILInstructionKind::CheckedCastBranchInst:
-  case SILInstructionKind::DestructureStructInst:
-  case SILInstructionKind::DestructureTupleInst:
-  case SILInstructionKind::MarkDependenceInst:
-  case SILInstructionKind::InitExistentialRefInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
-// These operations forward guaranteed ownership, but don't necessarily forward
-// owned values.
-static bool isGuaranteedForwardingInstructionKind(SILInstructionKind kind) {
-  switch (kind) {
-  case SILInstructionKind::TupleExtractInst:
-  case SILInstructionKind::StructExtractInst:
-  case SILInstructionKind::DifferentiableFunctionExtractInst:
-  case SILInstructionKind::LinearFunctionExtractInst:
-  case SILInstructionKind::OpenExistentialValueInst:
-  case SILInstructionKind::OpenExistentialBoxValueInst:
-    return true;
-  default:
-    return isOwnershipForwardingInstructionKind(kind);
-  }
-}
-
 bool swift::canOpcodeForwardGuaranteedValues(SILValue value) {
   // If we have an argument from a transforming terminator, we can forward
   // guaranteed.
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *ti = arg->getSingleTerminator())
-      if (ti->isTransformationTerminator()) {
-        assert(OwnershipForwardingMixin::isa(ti));
-        return true;
-      }
+      if (ti->isTransformationTerminator())
+        return OwnershipForwardingMixin::get(ti)->isDirectlyForwarding();
 
-  auto *inst = value->getDefiningInstruction();
-  if (!inst)
-    return false;
+  if (auto *inst = value->getDefiningInstruction())
+    if (auto *mixin = OwnershipForwardingMixin::get(inst))
+      return mixin->isDirectlyForwarding() &&
+             !isa<OwnedFirstArgForwardingSingleValueInst>(inst);
 
-  bool result = isGuaranteedForwardingInstructionKind(inst->getKind());
-  if (result) {
-    assert(!isa<OwnedFirstArgForwardingSingleValueInst>(inst));
-    assert(OwnershipForwardingMixin::isa(inst));
-  }
-  return result;
+  return false;
 }
 
 bool swift::canOpcodeForwardGuaranteedValues(Operand *use) {
-  auto *user = use->getUser();
-  bool result = isOwnershipForwardingInstructionKind(user->getKind());
-  if (result) {
-    assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(user));
-    assert(OwnershipForwardingMixin::isa(user));
-  }
-  return result;
-}
-
-static bool isOwnedForwardingValueKind(SILInstructionKind kind) {
-  switch (kind) {
-  case SILInstructionKind::MarkUninitializedInst:
-    return true;
-  default:
-    return isOwnershipForwardingInstructionKind(kind);
-  }
+  if (auto *mixin = OwnershipForwardingMixin::get(use->getUser()))
+    return mixin->isDirectlyForwarding() &&
+           !isa<OwnedFirstArgForwardingSingleValueInst>(use->getUser());
+  return false;
 }
 
 bool swift::canOpcodeForwardOwnedValues(SILValue value) {
@@ -121,29 +57,23 @@ bool swift::canOpcodeForwardOwnedValues(SILValue value) {
   // terminator, we are fine.
   if (auto *arg = dyn_cast<SILPhiArgument>(value))
     if (auto *predTerm = arg->getSingleTerminator())
-      if (predTerm->isTransformationTerminator()) {
-        assert(OwnershipForwardingMixin::isa(predTerm));
-        return true;
-      }
-  auto *inst = value->getDefiningInstruction();
-  if (!inst)
-    return false;
+      if (predTerm->isTransformationTerminator())
+        return OwnershipForwardingMixin::get(predTerm)->isDirectlyForwarding();
 
-  bool result = isOwnedForwardingValueKind(inst->getKind());
-  if (result) {
-    assert(!isa<GuaranteedFirstArgForwardingSingleValueInst>(inst));
-    assert(OwnershipForwardingMixin::isa(inst));
-  }
-  return result;
+  if (auto *inst = value->getDefiningInstruction())
+    if (auto *mixin = OwnershipForwardingMixin::get(inst))
+      return mixin->isDirectlyForwarding() &&
+             !isa<GuaranteedFirstArgForwardingSingleValueInst>(inst);
+
+  return false;
 }
 
 bool swift::canOpcodeForwardOwnedValues(Operand *use) {
   auto *user = use->getUser();
-  bool result = isOwnershipForwardingInstructionKind(user->getKind());
-  if (result) {
-    assert(OwnershipForwardingMixin::isa(user));
-  }
-  return result;
+  if (auto *mixin = OwnershipForwardingMixin::get(user))
+    return mixin->isDirectlyForwarding() &&
+           !isa<GuaranteedFirstArgForwardingSingleValueInst>(user);
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -980,7 +910,8 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
       // predecessor terminator.
       auto *arg = cast<SILPhiArgument>(value);
       auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst && termInst->isTransformationTerminator() &&
+             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
       assert(termInst->getNumOperands() == 1 &&
              "Transforming terminators should always have a single operand");
       worklist.push_back(termInst->getAllOperands()[0].get());
@@ -1031,7 +962,8 @@ BorrowedValue swift::getSingleBorrowIntroducingValue(SILValue inputValue) {
       // predecessor terminator.
       auto *arg = cast<SILPhiArgument>(currentValue);
       auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst && termInst->isTransformationTerminator() &&
+             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
       assert(termInst->getNumOperands() == 1 &&
              "Transformation terminators should only have single operands");
       currentValue = termInst->getAllOperands()[0].get();
@@ -1083,7 +1015,8 @@ bool swift::getAllOwnedValueIntroducers(
       // predecessor terminator.
       auto *arg = cast<SILPhiArgument>(value);
       auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst && termInst->isTransformationTerminator() &&
+             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
       assert(termInst->getNumOperands() == 1 &&
              "Transforming terminators should always have a single operand");
       worklist.push_back(termInst->getAllOperands()[0].get());
@@ -1127,10 +1060,11 @@ OwnedValueIntroducer swift::getSingleOwnedValueIntroducer(SILValue inputValue) {
       }
 
       // Otherwise, we should have a block argument that is defined by a single
-      // predecessor terminator.
+      // predecessor terminator and is directly forwarding.
       auto *arg = cast<SILPhiArgument>(currentValue);
       auto *termInst = arg->getSingleTerminator();
-      assert(termInst && termInst->isTransformationTerminator());
+      assert(termInst && termInst->isTransformationTerminator() &&
+             OwnershipForwardingMixin::get(termInst)->isDirectlyForwarding());
       assert(termInst->getNumOperands()
              - termInst->getNumTypeDependentOperands() == 1 &&
              "Transformation terminators should only have single operands");
