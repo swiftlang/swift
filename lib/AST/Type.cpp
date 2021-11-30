@@ -755,6 +755,94 @@ Type TypeBase::lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals){
   return type;
 }
 
+Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
+  // Look through optionals.
+  if (Type optionalObject = getOptionalObjectType()) {
+    Type newOptionalObject =
+        optionalObject->stripConcurrency(recurse, dropGlobalActor);
+    if (optionalObject->isEqual(newOptionalObject))
+      return Type(this);
+
+    return OptionalType::get(newOptionalObject);
+  }
+
+  // Function types.
+  if (auto fnType = getAs<AnyFunctionType>()) {
+    // Strip off Sendable and (possibly) the global actor.
+    ASTExtInfo extInfo =
+        fnType->hasExtInfo() ? fnType->getExtInfo() : ASTExtInfo();
+    extInfo = extInfo.withConcurrent(false);
+    if (dropGlobalActor)
+      extInfo = extInfo.withGlobalActor(Type());
+
+    ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
+    Type resultType = fnType->getResult();
+
+    SmallVector<AnyFunctionType::Param, 4> newParams;
+    if (recurse) {
+      for (unsigned paramIdx : indices(params)) {
+        const auto &param = params[paramIdx];
+        Type newParamType = param.getPlainType()->stripConcurrency(
+            recurse, dropGlobalActor);
+
+        if (!newParams.empty()) {
+          newParams.push_back(param.withType(newParamType));
+          continue;
+        }
+
+        if (newParamType->isEqual(param.getPlainType()))
+          continue;
+
+        newParams.append(params.begin(), params.begin() + paramIdx);
+        newParams.push_back(param.withType(newParamType));
+      }
+
+      if (!newParams.empty())
+        params = newParams;
+
+      resultType = resultType->stripConcurrency(recurse, dropGlobalActor);
+    }
+
+    // Drop Sendable requirements.
+    GenericSignature genericSig;
+    if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
+      auto requirements = genericFnType->getRequirements();
+      SmallVector<Requirement, 4> newRequirements;
+      for (unsigned reqIdx : indices(requirements)) {
+        // If it's a Sendable requirement, skip it.
+        const auto &req = requirements[reqIdx];
+        if (req.getKind() == RequirementKind::Conformance &&
+            req.getSecondType()->castTo<ProtocolType>()->getDecl()
+              ->isSpecificProtocol(KnownProtocolKind::Sendable))
+          continue;
+
+        newRequirements.push_back(req);
+      }
+
+      if (newRequirements.size() == requirements.size()) {
+        genericSig = genericFnType->getGenericSignature();
+      } else {
+        genericSig = GenericSignature::get(
+            genericFnType->getGenericParams(), newRequirements);
+      }
+    }
+
+    Type newFnType;
+    if (genericSig) {
+      newFnType = GenericFunctionType::get(
+          genericSig, params, resultType, extInfo);
+    } else {
+      newFnType = FunctionType::get(params, resultType, extInfo);
+    }
+    if (newFnType->isEqual(this))
+      return Type(this);
+
+    return newFnType;
+  }
+
+  return Type(this);
+}
+
 bool TypeBase::isAnyObject() {
   auto canTy = getCanonicalType();
 

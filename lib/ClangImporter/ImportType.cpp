@@ -1727,7 +1727,7 @@ Type ClangImporter::Implementation::applyParamAttributes(
       continue;
 
     // Map the main-actor attribute.
-    if (isMainActorAttr(SwiftContext, swiftAttr)) {
+    if (isMainActorAttr(swiftAttr)) {
       if (Type mainActor = SwiftContext.getMainActorType()) {
         type = applyToFunctionType(type, [&](ASTExtInfo extInfo) {
           return extInfo.withGlobalActor(mainActor);
