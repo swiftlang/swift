@@ -19,6 +19,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
@@ -145,6 +146,277 @@ struct IndexedWitness {
   ValueDecl *Requirement;
 };
 
+/// Identifies containers along with the types and expressions to which they
+/// correspond.
+///
+/// The simplest form of a container is an function, it becomes the active
+/// container immediately when it's visited. Pattern bindings however are more
+/// complex, as their lexical structure does not translate directly into
+/// container semantics.
+///
+/// Given the tuple binding 'let (a, b): (Int, String) = (intValue,
+/// stringValue)' we can see that 'a' corresponds to 'Int' and 'intValue',
+/// while 'b' corresponds to 'String' and 'stringValue'. By identifying these
+/// relationships, we can pinpoint locations within the PatternBindingDecl
+/// that the corresponding VarDecl should be marked as the current active
+/// container. For example, when we walk to the TypeRepr for 'Int', we can
+/// make 'a' the current active container, and likewise for 'String', 'b'. And
+/// thus, when the walk reaches the point of creating the reference for 'Int'
+/// it will be contained by 'a'.
+///
+/// These locations are also identified for single named pattern bindings; in
+/// which case, the VarDecl is activated for all types and expressions with
+/// the pattern.
+///
+/// Pattern bindings containing an AnyPattern (i.e let _) are a special case,
+/// as they have no VarDecl. Their types and expressions are associated with
+/// the current active container, if any. Therefore, given such a pattern
+/// declared within a function, the type and expression references will be
+/// contained by the function. If there is no active container, the references
+/// are not contained.
+class ContainerTracker {
+  typedef llvm::PointerUnion<const VarDecl *, const TuplePattern *>
+      PatternElement;
+  typedef llvm::PointerUnion<const Decl *, const Pattern *> Container;
+  typedef const void *ActivationKey;
+
+  struct StackEntry {
+    const Decl *TrackedDecl = nullptr;
+    ActivationKey ActiveKey = nullptr;
+    llvm::DenseMap<ActivationKey, Container> Containers{};
+  };
+
+  SmallVector<StackEntry, 4> Stack;
+
+public:
+  void beginTracking(Decl *D) {
+    if (auto PBD = dyn_cast<PatternBindingDecl>(D)) {
+      StackEntry Entry = identifyContainers(PBD);
+      Stack.push_back(std::move(Entry));
+    } else if (isa<AbstractFunctionDecl>(D)) {
+      StackEntry Entry;
+      Entry.TrackedDecl = D;
+      Entry.ActiveKey = D;
+      Entry.Containers[D] = D;
+      Stack.push_back(std::move(Entry));
+    }
+  }
+
+  void endTracking(Decl *D) {
+    if (Stack.empty())
+      return;
+    if (Stack.back().TrackedDecl == D)
+      Stack.pop_back();
+  }
+
+  bool empty() const { return Stack.empty(); }
+
+  void forEachActiveContainer(llvm::function_ref<void(const Decl *)> f) const {
+    if (Stack.empty())
+      return;
+
+    const StackEntry &Entry = Stack.back();
+
+    if (!Entry.ActiveKey)
+      return;
+
+    auto MapEntry = Entry.Containers.find(Entry.ActiveKey);
+
+    if (MapEntry == Entry.Containers.end())
+      return;
+
+    Container C = MapEntry->second;
+
+    if (auto *D = C.dyn_cast<const Decl *>()) {
+      f(D);
+    } else if (auto *P = C.dyn_cast<const Pattern *>()) {
+      P->forEachVariable([&](VarDecl *VD) { f(VD); });
+    }
+  }
+
+  void activateContainersFor(ActivationKey K) {
+    if (Stack.empty())
+      return;
+
+    StackEntry &Entry = Stack.back();
+
+    // Only activate the ActivationKey if there's an entry in the Containers.
+    if (Entry.Containers.count(K))
+      Entry.ActiveKey = K;
+  }
+
+private:
+  StackEntry identifyContainers(const PatternBindingDecl *PBD) const {
+    StackEntry Entry;
+    Entry.TrackedDecl = PBD;
+
+    if (auto *VD = PBD->getSingleVar()) {
+      // This is a single var binding; therefore, it may also have custom
+      // attributes. Immediately activate the VarDecl so that it can be the
+      // container for the attribute references.
+      Entry.ActiveKey = PBD;
+      Entry.Containers[PBD] = VD;
+    }
+
+    for (auto Index : range(PBD->getNumPatternEntries())) {
+      Pattern *P = PBD->getPattern(Index);
+      if (!P)
+        continue;
+
+      TypeRepr *PatternTypeRepr = nullptr;
+      Expr *PatternInitExpr = nullptr;
+
+      if (auto *TP = dyn_cast<TypedPattern>(P)) {
+        if (auto *TR = TP->getTypeRepr()) {
+          if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
+            PatternTypeRepr = TTR;
+          } else {
+            // Non-tuple type, associate all elements in this pattern with the
+            // type.
+            associateAllPatternElements(P, TR, Entry);
+          }
+        }
+      }
+
+      if (auto *InitExpr = PBD->getInit(Index)) {
+        if (auto *TE = dyn_cast<TupleExpr>(InitExpr)) {
+          PatternInitExpr = TE;
+        } else {
+          // Non-tuple initializer, associate all elements in this pattern with
+          // the initializer.
+          associateAllPatternElements(P, InitExpr, Entry);
+        }
+      }
+
+      if (PatternTypeRepr || PatternInitExpr) {
+        forEachPatternElementPreservingIndex(
+            P, [&](PatternElement Element, size_t Index) {
+              associatePatternElement(Element, Index, PatternTypeRepr,
+                                      PatternInitExpr, Entry);
+            });
+      }
+    }
+
+    return Entry;
+  }
+
+  void associatePatternElement(PatternElement Element, size_t Index,
+                               TypeRepr *TR, Expr *E, StackEntry &Entry) const {
+    if (auto *TTR = dyn_cast_or_null<TupleTypeRepr>(TR)) {
+      if (Index < TTR->getNumElements())
+        TR = TTR->getElementType(Index);
+    }
+
+    if (auto *TE = dyn_cast_or_null<TupleExpr>(E)) {
+      if (Index < TE->getNumElements())
+        E = TE->getElement(Index);
+    }
+
+    if (!Element) {
+      // This element is represents an AnyPattern (i.e let _).
+      if (TR)
+        associateAnyPattern(TR, Entry);
+
+      if (E)
+        associateAnyPattern(E, Entry);
+
+      return;
+    }
+
+    if (auto *VD = Element.dyn_cast<const VarDecl *>()) {
+      if (TR)
+        Entry.Containers[TR] = VD;
+
+      if (E)
+        Entry.Containers[E] = VD;
+    } else if (auto *TP = Element.dyn_cast<const TuplePattern *>()) {
+      forEachPatternElementPreservingIndex(
+          TP, [&](PatternElement Element, size_t Index) {
+            associatePatternElement(Element, Index, TR, E, Entry);
+          });
+    }
+  }
+
+  // AnyPatterns behave differently to other patterns as they've no associated
+  // VarDecl. The given ActivationKey is therefore associated with the current
+  // active container, if any.
+  void associateAnyPattern(ActivationKey K, StackEntry &Entry) const {
+    Entry.Containers[K] = activeContainer();
+  }
+
+  Container activeContainer() const {
+    if (Stack.empty())
+      return nullptr;
+
+    const StackEntry &Entry = Stack.back();
+
+    if (Entry.ActiveKey) {
+      auto ActiveContainer = Entry.Containers.find(Entry.ActiveKey);
+
+      if (ActiveContainer != Entry.Containers.end())
+        return ActiveContainer->second;
+    }
+
+    return nullptr;
+  }
+
+  void associateAllPatternElements(const Pattern *P, ActivationKey K,
+                                   StackEntry &Entry) const {
+    if (isAnyPattern(P)) {
+      // This pattern consists of a single AnyPattern (i.e let _).
+      associateAnyPattern(K, Entry);
+    } else {
+      Entry.Containers[K] = P;
+    }
+  }
+
+  /// Enumerates elements within a Pattern while preserving their source
+  /// location. Given the pattern binding 'let (a, _, (b, c)) = ...' the given
+  /// function is called with the following values:
+  ///
+  /// VarDecl(a), 0
+  /// nullptr, 1
+  /// TuplePattern(b, c), 2
+  ///
+  /// Here nullptr represents the location of an AnyPattern, for which there
+  /// is no associated VarDecl.
+  void forEachPatternElementPreservingIndex(
+      const Pattern *P,
+      llvm::function_ref<void(PatternElement, size_t)> f) const {
+    auto *SP = P->getSemanticsProvidingPattern();
+
+    if (auto *TP = dyn_cast<TuplePattern>(SP)) {
+      for (size_t Index = 0; Index < TP->getNumElements(); ++Index) {
+        f(getPatternElement(TP->getElement(Index).getPattern()), Index);
+      }
+    } else {
+      f(getPatternElement(SP), 0);
+    }
+  }
+
+  PatternElement getPatternElement(const Pattern *P) const {
+    auto *SP = P->getSemanticsProvidingPattern();
+
+    if (auto *NP = dyn_cast<NamedPattern>(SP)) {
+      return NP->getDecl();
+    } else if (auto *TP = dyn_cast<TuplePattern>(SP)) {
+      return TP;
+    }
+
+    return nullptr;
+  }
+
+  bool isAnyPattern(const Pattern *P) const {
+    auto *SP = P->getSemanticsProvidingPattern();
+
+    if (isa<NamedPattern>(SP) || isa<TuplePattern>(SP)) {
+      return false;
+    }
+
+    return true;
+  }
+};
+
 class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexDataConsumer &IdxConsumer;
   SourceManager &SrcMgr;
@@ -153,6 +425,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 
   bool IsModuleFile = false;
   bool isSystemModule = false;
+
   struct Entity {
     Decl *D;
     SymbolInfo SymInfo;
@@ -173,6 +446,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   llvm::DenseMap<void *, NameAndUSR> nameAndUSRCache;
   llvm::DenseMap<DeclAccessorPair, NameAndUSR> accessorNameAndUSRCache;
   StringScratchSpace stringStorage;
+  ContainerTracker Containers;
 
   bool getNameAndUSR(ValueDecl *D, ExtensionDecl *ExtD,
                      StringRef &name, StringRef &USR) {
@@ -291,6 +565,7 @@ public:
   ~IndexSwiftASTWalker() override {
     assert(Cancelled || EntitiesStack.empty());
     assert(Cancelled || ManuallyVisitedAccessorStack.empty());
+    assert(Cancelled || Containers.empty());
   }
 
   void visitModule(ModuleDecl &Mod);
@@ -334,10 +609,11 @@ private:
     return true;
   }
 
-  /// Report calls to the initializers of property wrapper types on wrapped properties.
+  /// Report calls to the initializers of property wrapper types on wrapped
+  /// properties.
   ///
   /// These may be either explicit:
-  ///     `\@Wrapper(initialialValue: 42) var x: Int`
+  ///     `\@Wrapper(initialValue: 42) var x: Int`
   /// or implicit:
   ///     `\@Wrapper var x = 10`
   bool handleCustomAttrInitRefs(Decl * D) {
@@ -426,7 +702,7 @@ private:
     if (Cancelled)
       return false;
     ExprStack.push_back(E);
-
+    Containers.activateContainersFor(E);
     handleMemberwiseInitRefs(E);
     return true;
   }
@@ -437,6 +713,28 @@ private:
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
     return true;
+  }
+
+  bool walkToTypeReprPre(TypeRepr *T) override {
+    if (Cancelled)
+      return false;
+    Containers.activateContainersFor(T);
+    return true;
+  }
+
+  bool walkToPatternPre(Pattern *P) override {
+    if (Cancelled)
+      return false;
+    Containers.activateContainersFor(P);
+    return true;
+  }
+
+  void beginBalancedASTOrderDeclVisit(Decl *D) override {
+    Containers.beginTracking(D);
+  }
+
+  void endBalancedASTOrderDeclVisit(Decl *D) override {
+    Containers.endTracking(D);
   }
 
   /// Extensions redeclare all generic parameters of their extended type to add
@@ -540,9 +838,7 @@ private:
     Info.roles |= (unsigned)SymbolRole::Reference;
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
-
-    if (auto Container = getContainingDecl())
-      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Container);
+    addContainedByRelationIfContained(Info);
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;
@@ -565,14 +861,11 @@ private:
     return nullptr;
   }
 
-  Decl *getContainingDecl() const {
-    for (const auto &Entity: EntitiesStack) {
-      if (isa<AbstractFunctionDecl>(Entity.D) &&
-          (Entity.Roles & (SymbolRoleSet)SymbolRole::Definition)) {
-        return Entity.D;
-      }
-    }
-    return nullptr;
+  void addContainedByRelationIfContained(IndexSymbol &Info) {
+    Containers.forEachActiveContainer([&](const Decl *D) {
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy,
+                  const_cast<Decl *>(D));
+    });
   }
 
   void repressRefAtLoc(SourceLoc Loc) {
@@ -586,7 +879,6 @@ private:
       return false;
     auto &Suppressed = EntitiesStack.back().RefsToSuppress;
     return std::find(Suppressed.begin(), Suppressed.end(), Loc) != Suppressed.end();
-
   }
 
   Expr *getContainingExpr(size_t index) const {
@@ -1321,8 +1613,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   if (IsRef) {
     Info.roles |= (unsigned)SymbolRole::Reference;
-    if (auto Container = getContainingDecl())
-      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Container);
+    addContainedByRelationIfContained(Info);
   } else {
     Info.roles |= (unsigned)SymbolRole::Definition;
     if (D->isImplicit())
@@ -1428,7 +1719,6 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
 bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D,
                                                  SourceLoc Loc, IndexSymbol &Info,
                                                  Optional<AccessKind> AccKind) {
-
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 
