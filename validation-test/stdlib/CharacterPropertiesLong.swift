@@ -1,3 +1,6 @@
+// rdar://85481585
+// REQUIRES: rdar85481585
+
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test,optimized_stdlib
 // REQUIRES: long_test
