@@ -3991,6 +3991,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   auto protocolSubMap = SubstitutionMap::getProtocolSubstitutions(
       proto, selfType.getDependentType(*this), ProtocolConformanceRef(proto));
 
+  auto result = ConstraintResult::Resolved;
+
   // Use the requirement signature to avoid rewalking the entire protocol.  This
   // cannot compute the requirement signature directly, because that may be
   // infinitely recursive: this code is also used to construct it.
@@ -4007,10 +4009,11 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       auto reqResult = substReq
                            ? addRequirement(*substReq, innerSource, nullptr)
                            : ConstraintResult::Conflicting;
-      if (isErrorResult(reqResult)) return reqResult;
+      if (isErrorResult(reqResult) && !isErrorResult(result))
+        result = reqResult;
     }
 
-    return ConstraintResult::Resolved;
+    return result;
   }
 
   if (!onlySameTypeConstraints) {
@@ -4018,8 +4021,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     auto inheritedReqResult =
       addInheritedRequirements(proto, selfType.getUnresolvedType(), source,
                                nullptr);
-    if (isErrorResult(inheritedReqResult))
-      return inheritedReqResult;
+    if (isErrorResult(inheritedReqResult) && !isErrorResult(inheritedReqResult))
+      result = inheritedReqResult;
   }
 
   // Add any requirements in the where clause on the protocol.
@@ -4048,7 +4051,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
                              getASTContext()),
                          innerSource);
 
-    return ConstraintResult::Resolved;
+    return result;
   }
 
   // Remaining logic is not relevant in ObjC protocol cases.
@@ -4159,8 +4162,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       auto assocResult =
         addInheritedRequirements(assocTypeDecl, assocType, source,
                                  /*inferForModule=*/nullptr);
-      if (isErrorResult(assocResult))
-        return assocResult;
+      if (isErrorResult(assocResult) && !isErrorResult(result))
+        result = assocResult;
     }
 
     // Add requirements from this associated type's where clause.
@@ -4314,7 +4317,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     }
   }
 
-  return ConstraintResult::Resolved;
+  return result;
 }
 
 ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
