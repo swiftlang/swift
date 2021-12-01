@@ -1100,13 +1100,13 @@ static void swift_task_asyncMainDrainQueueImpl() {
 
   HMODULE hModule = LoadLibraryW(L"dispatch.dll");
   if (hModule == NULL)
-    abort();
+    swift_reportError(0, "unable to load dispatch.dll");
 
   pfndispatch_main =
       reinterpret_cast<void (FAR *)(void)>(GetProcAddress(hModule,
                                                           "dispatch_main"));
   if (pfndispatch_main == NULL)
-    abort();
+    swift_reportError(0, "unable to locate dispatch_main in dispatch.dll");
 
   pfndispatch_main();
   exit(0);
