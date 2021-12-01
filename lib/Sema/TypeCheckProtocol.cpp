@@ -4562,19 +4562,28 @@ CheckTypeWitnessResult
 swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
                         const NormalProtocolConformance *Conf,
                         SubstOptions options) {
+  auto &ctx = assocType->getASTContext();
+
   if (type->hasError())
-    return ErrorType::get(assocType->getASTContext());
+    return ErrorType::get(ctx);
 
   const auto proto = Conf->getProtocol();
   const auto dc = Conf->getDeclContext();
-  const auto genericSig = proto->getGenericSignature();
+  const auto sig = proto->getGenericSignature();
+
+  // FIXME: The RequirementMachine will assert on re-entrant construction.
+  // We should find a more principled way of breaking this cycle.
+  if (ctx.isRecursivelyConstructingRequirementMachine(sig.getCanonicalSignature()) ||
+      ctx.isRecursivelyConstructingRequirementMachine(proto))
+    return ErrorType::get(ctx);
+
   const auto depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
                                               assocType);
 
   Type contextType = type->hasTypeParameter() ? dc->mapTypeIntoContext(type)
                                               : type;
 
-  if (auto superclass = genericSig->getSuperclassBound(depTy)) {
+  if (auto superclass = sig->getSuperclassBound(depTy)) {
     if (superclass->hasTypeParameter()) {
       // Replace type parameters with other known or tentative type witnesses.
       superclass = superclass.subst(
@@ -4596,7 +4605,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
   auto *module = dc->getParentModule();
 
   // Check protocol conformances.
-  for (const auto reqProto : genericSig->getRequiredProtocols(depTy)) {
+  for (const auto reqProto : sig->getRequiredProtocols(depTy)) {
     if (module->lookupConformance(contextType, reqProto)
             .isInvalid())
       return CheckTypeWitnessResult(reqProto->getDeclaredInterfaceType());
@@ -4617,7 +4626,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
     }
   }
 
-  if (genericSig->requiresClass(depTy) &&
+  if (sig->requiresClass(depTy) &&
       !contextType->satisfiesClassConstraint())
     return CheckTypeWitnessResult(module->getASTContext().getAnyObjectType());
 

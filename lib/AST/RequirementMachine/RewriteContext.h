@@ -178,6 +178,7 @@ public:
   bool isRecursivelyConstructingRequirementMachine(CanGenericSignature sig);
 
   RequirementMachine *getRequirementMachine(const ProtocolDecl *proto);
+  bool isRecursivelyConstructingRequirementMachine(const ProtocolDecl *proto);
 
   ~RewriteContext();
 };
