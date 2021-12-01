@@ -361,11 +361,12 @@ class ModelASTWalker : public ASTWalker {
   friend class InactiveClauseRAII;
   bool inInactiveClause = false;
 
+  struct ParentArgsTy {
+    Expr *Parent = nullptr;
+    llvm::DenseMap<Expr *, Argument> Args;
+  };
   /// A mapping of argument expressions to their full argument info.
-  llvm::DenseMap<Expr *, Argument> ArgumentInfo;
-
-  /// The number of ArgumentList parents in the walk.
-  unsigned ArgumentListDepth = 0;
+  SmallVector<ParentArgsTy, 4> ParentArgs;
 
 public:
   SyntaxModelWalker &Walker;
@@ -528,21 +529,27 @@ static bool shouldTreatAsSingleToken(const SyntaxStructureNode &Node,
 
 std::pair<bool, ArgumentList *>
 ModelASTWalker::walkToArgumentListPre(ArgumentList *ArgList) {
+  Expr *ParentExpr = Parent.getAsExpr();
+  if (!ParentExpr)
+    return {true, ArgList};
+
+  ParentArgsTy Mapping;
+  Mapping.Parent = ParentExpr;
   for (auto Arg : *ArgList) {
-    auto res = ArgumentInfo.insert({Arg.getExpr(), Arg});
+    auto res = Mapping.Args.try_emplace(Arg.getExpr(), Arg);
     assert(res.second && "Duplicate arguments?");
     (void)res;
   }
-  ArgumentListDepth += 1;
+  ParentArgs.push_back(std::move(Mapping));
   return {true, ArgList};
 }
 
 ArgumentList *ModelASTWalker::walkToArgumentListPost(ArgumentList *ArgList) {
-  // If there are no more argument lists above us, we can clear out the argument
-  // mapping to save memory.
-  ArgumentListDepth -= 1;
-  if (ArgumentListDepth == 0)
-    ArgumentInfo.clear();
+  if (Expr *ParentExpr = Parent.getAsExpr()) {
+    assert(ParentExpr == ParentArgs.back().Parent &&
+           "Unmatched walkToArgumentList(Pre|Post)");
+    ParentArgs.pop_back();
+  }
   return ArgList;
 }
 
@@ -573,9 +580,14 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     pushStructureNode(SN, Elem);
   };
 
-  auto Arg = ArgumentInfo.find(E);
-  if (Arg != ArgumentInfo.end())
-    addCallArgExpr(Arg->second);
+  if (auto *ParentExpr = Parent.getAsExpr()) {
+    if (!ParentArgs.empty() && ParentArgs.back().Parent == ParentExpr) {
+      auto &ArgumentInfo = ParentArgs.back().Args;
+      auto Arg = ArgumentInfo.find(E);
+      if (Arg != ArgumentInfo.end())
+        addCallArgExpr(Arg->second);
+    }
+  }
 
   if (E->isImplicit())
     return { true, E };
