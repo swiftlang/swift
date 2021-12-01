@@ -4601,9 +4601,9 @@ WARNING(non_sendable_keypath_access,none,
         "cannot form key path that accesses non-sendable type %0",
         (Type))
 ERROR(non_concurrent_type_member,none,
-      "%select{stored property %1|associated value %1}0 of "
-      "'Sendable'-conforming %2 %3 has non-sendable type %4",
-      (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
+      "%select{stored property %2|associated value %2}1 of "
+      "'Sendable'-conforming %3 %4 has non-sendable type %0",
+      (Type, bool, DeclName, DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %1 %2 is mutable",
       (DeclName, DescriptiveDeclKind, DeclName))

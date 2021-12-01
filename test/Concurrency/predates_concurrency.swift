@@ -111,7 +111,7 @@ struct S2: Q {
 }
 
 struct S3: Q, Sendable {
-  var ns: NS // expected-error{{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-sendable type 'NS'}}
+  var ns: NS // expected-warning{{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-sendable type 'NS'}}
 }
 
 // ---------------------------------------------------------------------------
