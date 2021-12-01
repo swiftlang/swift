@@ -4069,9 +4069,15 @@ static bool checkFunctionSignature(
   // Check that generic signatures match.
   auto requiredGenSig = required.getOptGenericSignature();
   auto candidateGenSig = candidateFnTy.getOptGenericSignature();
-  if (!candidateGenSig.requirementsNotSatisfiedBy(requiredGenSig).empty()) {
+  // Check that the candidate signature's generic parameters are a subset of
+  // those of the required signature.
+  if (requiredGenSig && candidateGenSig &&
+      candidateGenSig.getGenericParams().size()
+          > requiredGenSig.getGenericParams().size())
     return false;
-  }
+  // Check that the requirements are satisfied.
+  if (!candidateGenSig.requirementsNotSatisfiedBy(requiredGenSig).empty())
+    return false;
 
   // Check that parameter types match, disregarding labels.
   if (required->getNumParams() != candidateFnTy->getNumParams())
