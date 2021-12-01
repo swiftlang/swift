@@ -4159,6 +4159,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     Type assocType =
       DependentMemberType::get(selfType.getDependentType(*this), assocTypeDecl);
     if (!onlySameTypeConstraints) {
+      (void) resolve(assocType, source);
+
       auto assocResult =
         addInheritedRequirements(assocTypeDecl, assocType, source,
                                  /*inferForModule=*/nullptr);
