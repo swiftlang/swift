@@ -195,10 +195,7 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
     // 3. Adjust typed pointer to the alignement of the type.
     auto alignedOffset = typeInfo.roundUpToTypeAlignment(IGF, eltPtr, paramTy);
 
-    // 4. Load argument value from the element pointer.
-    auto *argValue = IGF.Builder.CreateLoad(alignedOffset, "argval");
-
-    // 5. Create an exploded version of the type to pass as an
+    // 4. Create an exploded version of the type to pass as an
     //    argument to distributed method.
 
     if (paramTy.isObject()) {
@@ -208,6 +205,13 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
       if (nativeSchema.requiresIndirect()) {
         llvm_unreachable("indirect parameters are not supported");
       }
+
+      // If schema is empty, skip to the next argument.
+      if (nativeSchema.empty())
+        continue;
+
+      // 5. Load argument value from the element pointer.
+      auto *argValue = IGF.Builder.CreateLoad(alignedOffset, "argval");
 
       Explosion nonNativeParam;
       nonNativeParam.add(argValue);
@@ -224,7 +228,8 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
         arguments.add(nativeParam.claimNext());
       }
     } else {
-      arguments.add(argValue);
+      // 5. Load argument value from the element pointer.
+      arguments.add(IGF.Builder.CreateLoad(alignedOffset, "argval"));
     }
 
     // 6. Move the offset to the beginning of the next element.
