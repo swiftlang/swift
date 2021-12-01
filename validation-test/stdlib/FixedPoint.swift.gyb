@@ -1,3 +1,6 @@
+// rdar://85481960
+// REQUIRES: rdar85481960
+
 // RUN: %target-run-stdlib-swiftgyb
 // REQUIRES: executable_test
 
