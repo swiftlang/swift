@@ -26,6 +26,11 @@ extension Unicode.Scalar {
     internal init(_ scalar: Unicode.Scalar) {
       self._scalar = scalar
     }
+
+    // Provide the value as UChar32 to make calling the ICU APIs cleaner
+    internal var icuValue: __swift_stdlib_UChar32 {
+      return __swift_stdlib_UChar32(bitPattern: self._scalar._value)
+    }
   }
 
   /// Properties of this scalar defined by the Unicode standard.
@@ -743,50 +748,69 @@ extension Unicode.Scalar.Properties {
 
 /// Case mapping properties.
 extension Unicode.Scalar.Properties {
-  fileprivate struct _CaseMapping {
-    let rawValue: UInt8
+  // The type of ICU case conversion functions.
+  internal typealias _U_StrToX = (
+    /* dest */ UnsafeMutablePointer<__swift_stdlib_UChar>,
+    /* destCapacity */ Int32,
+    /* src */ UnsafePointer<__swift_stdlib_UChar>,
+    /* srcLength */ Int32,
+    /* locale */ UnsafePointer<Int8>,
+    /* pErrorCode */ UnsafeMutablePointer<__swift_stdlib_UErrorCode>
+  ) -> Int32
 
-    static let uppercase = _CaseMapping(rawValue: 0)
-    static let lowercase = _CaseMapping(rawValue: 1)
-    static let titlecase = _CaseMapping(rawValue: 2)
-  }
-
-  fileprivate func _getMapping(_ mapping: _CaseMapping) -> String {
-    // First, check if our scalar has a special mapping where it's mapped to
-    // more than 1 scalar.
-    var specialMappingLength = 0
-
-    let specialMappingPtr = _swift_stdlib_getSpecialMapping(
-      _scalar.value,
-      mapping.rawValue,
-      &specialMappingLength
-    )
-
-    if let specialMapping = specialMappingPtr, specialMappingLength != 0 {
-      let buffer = UnsafeBufferPointer<UInt8>(
-        start: specialMapping,
-        count: specialMappingLength
-      )
-
-      return String._uncheckedFromUTF8(buffer, isASCII: false)
+  /// Applies the given ICU string mapping to the scalar.
+  ///
+  /// This function attempts first to write the mapping into a stack-based
+  /// UTF-16 buffer capable of holding 16 code units, which should be enough for
+  /// all current case mappings. In the event more space is needed, it will be
+  /// allocated on the heap.
+  internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
+    // Allocate 16 code units on the stack.
+    var fixedArray = _FixedArray16<UInt16>(allZeros: ())
+    let count: Int = fixedArray.withUnsafeMutableBufferPointer { buf in
+      return _scalar.withUTF16CodeUnits { utf16 in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          buf.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(buf.count),
+          utf16.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(utf16.count),
+          "",
+          &err)
+        guard err.isSuccess else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
+        }
+        return Int(correctSize)
+      }
     }
-
-    // If we did not have a special mapping, check if we have a direct scalar
-    // to scalar mapping.
-    let mappingDistance = _swift_stdlib_getMapping(
-      _scalar.value,
-      mapping.rawValue
-    )
-
-    if mappingDistance != 0 {
-      let scalar = Unicode.Scalar(
-        _unchecked: UInt32(Int(_scalar.value) &+ Int(mappingDistance))
-      )
-      return String(scalar)
+    if _fastPath(count <= 16) {
+      fixedArray.count = count
+      return fixedArray.withUnsafeBufferPointer {
+        String._uncheckedFromUTF16($0)
+      }
     }
-
-    // We did not have any mapping. Return the scalar as is.
-    return String(_scalar)
+    // Allocate `count` code units on the heap.
+    let array = Array<UInt16>(unsafeUninitializedCapacity: count) {
+      buf, initializedCount in
+      _scalar.withUTF16CodeUnits { utf16 in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          buf.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(buf.count),
+          utf16.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(utf16.count),
+          "",
+          &err)
+        guard err.isSuccess else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
+        }
+        _internalInvariant(count == correctSize, "inconsistent ICU behavior")
+        initializedCount = count
+      }
+    }
+    return array.withUnsafeBufferPointer {
+      String._uncheckedFromUTF16($0)
+    }
   }
 
   /// The lowercase mapping of the scalar.
@@ -800,7 +824,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Lowercase_Mapping" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var lowercaseMapping: String {
-    _getMapping(.lowercase)
+    return _applyMapping(__swift_stdlib_u_strToLower)
   }
 
   /// The titlecase mapping of the scalar.
@@ -814,7 +838,9 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Titlecase_Mapping" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var titlecaseMapping: String {
-    _getMapping(.titlecase)
+    return _applyMapping { ptr, cap, src, len, locale, err in
+      return __swift_stdlib_u_strToTitle(ptr, cap, src, len, nil, locale, err)
+    }
   }
 
   /// The uppercase mapping of the scalar.
@@ -828,7 +854,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Uppercase_Mapping" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var uppercaseMapping: String {
-    _getMapping(.uppercase)
+    return _applyMapping(__swift_stdlib_u_strToUpper)
   }
 }
 
@@ -849,16 +875,15 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Age" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var age: Unicode.Version? {
-    let age: UInt16 = _swift_stdlib_getAge(_scalar.value)
-
-    if age == .max {
-      return nil
+    var versionInfo: __swift_stdlib_UVersionInfo = (0, 0, 0, 0)
+    withUnsafeMutablePointer(to: &versionInfo) { tuplePtr in
+      tuplePtr.withMemoryRebound(to: UInt8.self, capacity: 4) {
+        versionInfoPtr in
+        __swift_stdlib_u_charAge(icuValue, versionInfoPtr)
+      }
     }
-
-    let major = age & 0xFF
-    let minor = (age & 0xFF00) >> 8
-
-    return (major: Int(major), minor: Int(minor))
+    guard versionInfo.0 != 0 else { return nil }
+    return (major: Int(versionInfo.0), minor: Int(versionInfo.1))
   }
 }
 
@@ -1083,38 +1108,38 @@ extension Unicode {
     /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
     case unassigned
 
-    internal init(rawValue: UInt8) {
+    internal init(rawValue: __swift_stdlib_UCharCategory) {
       switch rawValue {
-      case 0: self = .uppercaseLetter
-      case 1: self = .lowercaseLetter
-      case 2: self = .titlecaseLetter
-      case 3: self = .modifierLetter
-      case 4: self = .otherLetter
-      case 5: self = .nonspacingMark
-      case 6: self = .spacingMark
-      case 7: self = .enclosingMark
-      case 8: self = .decimalNumber
-      case 9: self = .letterNumber
-      case 10: self = .otherNumber
-      case 11: self = .connectorPunctuation
-      case 12: self = .dashPunctuation
-      case 13: self = .openPunctuation
-      case 14: self = .closePunctuation
-      case 15: self = .initialPunctuation
-      case 16: self = .finalPunctuation
-      case 17: self = .otherPunctuation
-      case 18: self = .mathSymbol
-      case 19: self = .currencySymbol
-      case 20: self = .modifierSymbol
-      case 21: self = .otherSymbol
-      case 22: self = .spaceSeparator
-      case 23: self = .lineSeparator
-      case 24: self = .paragraphSeparator
-      case 25: self = .control
-      case 26: self = .format
-      case 27: self = .surrogate
-      case 28: self = .privateUse
-      case 29: self = .unassigned
+      case __swift_stdlib_U_UNASSIGNED: self = .unassigned
+      case __swift_stdlib_U_UPPERCASE_LETTER: self = .uppercaseLetter
+      case __swift_stdlib_U_LOWERCASE_LETTER: self = .lowercaseLetter
+      case __swift_stdlib_U_TITLECASE_LETTER: self = .titlecaseLetter
+      case __swift_stdlib_U_MODIFIER_LETTER: self = .modifierLetter
+      case __swift_stdlib_U_OTHER_LETTER: self = .otherLetter
+      case __swift_stdlib_U_NON_SPACING_MARK: self = .nonspacingMark
+      case __swift_stdlib_U_ENCLOSING_MARK: self = .enclosingMark
+      case __swift_stdlib_U_COMBINING_SPACING_MARK: self = .spacingMark
+      case __swift_stdlib_U_DECIMAL_DIGIT_NUMBER: self = .decimalNumber
+      case __swift_stdlib_U_LETTER_NUMBER: self = .letterNumber
+      case __swift_stdlib_U_OTHER_NUMBER: self = .otherNumber
+      case __swift_stdlib_U_SPACE_SEPARATOR: self = .spaceSeparator
+      case __swift_stdlib_U_LINE_SEPARATOR: self = .lineSeparator
+      case __swift_stdlib_U_PARAGRAPH_SEPARATOR: self = .paragraphSeparator
+      case __swift_stdlib_U_CONTROL_CHAR: self = .control
+      case __swift_stdlib_U_FORMAT_CHAR: self = .format
+      case __swift_stdlib_U_PRIVATE_USE_CHAR: self = .privateUse
+      case __swift_stdlib_U_SURROGATE: self = .surrogate
+      case __swift_stdlib_U_DASH_PUNCTUATION: self = .dashPunctuation
+      case __swift_stdlib_U_START_PUNCTUATION: self = .openPunctuation
+      case __swift_stdlib_U_END_PUNCTUATION: self = .closePunctuation
+      case __swift_stdlib_U_CONNECTOR_PUNCTUATION: self = .connectorPunctuation
+      case __swift_stdlib_U_OTHER_PUNCTUATION: self = .otherPunctuation
+      case __swift_stdlib_U_MATH_SYMBOL: self = .mathSymbol
+      case __swift_stdlib_U_CURRENCY_SYMBOL: self = .currencySymbol
+      case __swift_stdlib_U_MODIFIER_SYMBOL: self = .modifierSymbol
+      case __swift_stdlib_U_OTHER_SYMBOL: self = .otherSymbol
+      case __swift_stdlib_U_INITIAL_PUNCTUATION: self = .initialPunctuation
+      case __swift_stdlib_U_FINAL_PUNCTUATION: self = .finalPunctuation
       default: fatalError("Unknown general category \(rawValue)")
       }
     }
@@ -1148,86 +1173,42 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "General_Category" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var generalCategory: Unicode.GeneralCategory {
-    let rawValue = _swift_stdlib_getGeneralCategory(_scalar.value)
+    let rawValue = __swift_stdlib_UCharCategory(
+      __swift_stdlib_UCharCategory.RawValue(
+      __swift_stdlib_u_getIntPropertyValue(
+        icuValue, __swift_stdlib_UCHAR_GENERAL_CATEGORY)))
     return Unicode.GeneralCategory(rawValue: rawValue)
   }
 }
 
 extension Unicode.Scalar.Properties {
-  internal func _hangulName() -> String {
-    // T = Hangul tail consonants
-    let T: (base: UInt32, count: UInt32) = (base: 0x11A7, count: 28)
-    // N = Number of precomposed Hangul syllables that start with the same
-    //     leading consonant. (There is no base for N).
-    let N: (base: UInt32, count: UInt32) = (base: 0x0, count: 588)
-    // S = Hangul precomposed syllables
-    let S: (base: UInt32, count: UInt32) = (base: 0xAC00, count: 11172)
 
-    let hangulLTable = ["G", "GG", "N", "D", "DD", "R", "M", "B", "BB", "S",
-                        "SS", "", "J", "JJ", "C", "K", "T", "P", "H"]
+  internal func _scalarName(
+    _ choice: __swift_stdlib_UCharNameChoice
+  ) -> String? {
+    var error = __swift_stdlib_U_ZERO_ERROR
+    let count = Int(__swift_stdlib_u_charName(icuValue, choice, nil, 0, &error))
+    guard count > 0 else { return nil }
 
-    let hangulVTable = ["A", "AE", "YA", "YAE", "EO", "E", "YEO", "YE", "O",
-                        "WA", "WAE", "OE", "YO", "U", "WEO", "WE", "WI", "YU",
-                        "EU", "YI", "I"]
-
-    let hangulTTable = ["", "G", "GG", "GS", "N", "NJ", "NH", "D", "L", "LG",
-                        "LM", "LB", "LS", "LT", "LP", "LH", "M", "B", "BS", "S",
-                        "SS", "NG", "J", "C", "K", "T", "P", "H"]
-
-    let sIdx = _scalar.value &- S.base
-    let lIdx = Int(sIdx / N.count)
-    let vIdx = Int((sIdx % N.count) / T.count)
-    let tIdx = Int(sIdx % T.count)
-
-    let scalarName = hangulLTable[lIdx] + hangulVTable[vIdx] + hangulTTable[tIdx]
-    return "HANGUL SYLLABLE \(scalarName)"
-  }
-
-  // Used to potentially return a name who can either be represented in a large
-  // range or algorithmetically. A good example are the Hangul names. Instead of
-  // storing those names, we can define an algorithm to generate the name.
-  internal func _fastScalarName() -> String? {
-    // Define a couple algorithmetic names below.
-
-    let scalarName = String(_scalar.value, radix: 16, uppercase: true)
-
-    switch _scalar.value {
-    // Hangul Syllable *
-    case (0xAC00 ... 0xD7A3):
-      return _hangulName()
-
-    // Variation Selector-17 through Variation Selector-256
-    case (0xE0100 ... 0xE01EF):
-      return "VARIATION SELECTOR-\(_scalar.value - 0xE0100 + 17)"
-
-    case (0x3400 ... 0x4DBF),
-         (0x4E00 ... 0x9FFF),
-         (0x20000 ... 0x2A6DF),
-         (0x2A700 ... 0x2B738),
-         (0x2B740 ... 0x2B81D),
-         (0x2B820 ... 0x2CEA1),
-         (0x2CEB0 ... 0x2EBE0),
-         (0x2F800 ... 0x2FA1D),
-         (0x30000 ... 0x3134A):
-      return "CJK UNIFIED IDEOGRAPH-\(scalarName)"
-
-    case (0xF900 ... 0xFA6D),
-         (0xFA70 ... 0xFAD9):
-      return "CJK COMPATIBILITY IDEOGRAPH-\(scalarName)"
-
-    case (0x17000 ... 0x187F7),
-         (0x18D00 ... 0x18D08):
-      return "TANGUT IDEOGRAPH-\(scalarName)"
-
-    case (0x18B00 ... 0x18CD5):
-      return "KHITAN SMALL SCRIPT CHARACTER-\(scalarName)"
-
-    case (0x1B170 ... 0x1B2FB):
-      return "NUSHU CHARACTER-\(scalarName)"
-
-    // Otherwise, go look it up.
-    default:
-      return nil
+    // ICU writes a trailing null, so we have to save room for it as well.
+    let array = Array<UInt8>(unsafeUninitializedCapacity: count + 1) {
+      buffer, initializedCount in
+      var error = __swift_stdlib_U_ZERO_ERROR
+      let correctSize = __swift_stdlib_u_charName(
+        icuValue,
+        choice,
+        UnsafeMutableRawPointer(buffer.baseAddress._unsafelyUnwrappedUnchecked)
+          .assumingMemoryBound(to: Int8.self),
+        Int32(buffer.count),
+        &error)
+      guard error.isSuccess else {
+        fatalError("Unexpected error case-converting Unicode scalar.")
+      }
+      _internalInvariant(count == correctSize, "inconsistent ICU behavior")
+      initializedCount = count + 1
+    }
+    return array.withUnsafeBufferPointer { buffer in
+      String._fromASCII(UnsafeBufferPointer(rebasing: buffer[..<count]))
     }
   }
 
@@ -1240,22 +1221,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Name" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var name: String? {
-    if let fastName = _fastScalarName() {
-      return fastName
-    }
-
-    // The longest name that Unicode defines is 88 characters long.
-    let largestCount = Int(SWIFT_STDLIB_LARGEST_NAME_COUNT)
-
-    let name = String(_uninitializedCapacity: largestCount) { buffer in
-      _swift_stdlib_getScalarName(
-        _scalar.value,
-        buffer.baseAddress,
-        buffer.count
-      )
-    }
-
-    return name.isEmpty ? nil : name
+    return _scalarName(__swift_stdlib_U_UNICODE_CHAR_NAME)
   }
 
   /// The normative formal alias of the scalar.
@@ -1272,11 +1238,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Name_Alias" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var nameAlias: String? {
-    guard let nameAliasPtr = _swift_stdlib_getNameAlias(_scalar.value) else {
-      return nil
-    }
-
-    return String(cString: nameAliasPtr)
+    return _scalarName(__swift_stdlib_U_CHAR_NAME_ALIAS)
   }
 }
 
@@ -1426,8 +1388,9 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Canonical_Combining_Class" property in
   /// the [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var canonicalCombiningClass: Unicode.CanonicalCombiningClass {
-    let normData = Unicode._NormData(_scalar)
-    return Unicode.CanonicalCombiningClass(rawValue: normData.ccc)
+    let normData = _swift_stdlib_getNormData(_scalar.value)
+    let rawValue = UInt8(normData >> 3)
+    return Unicode.CanonicalCombiningClass(rawValue: rawValue)
   }
 }
 
@@ -1475,16 +1438,13 @@ extension Unicode {
     /// and programs can treat `digit` and `numeric` equivalently.
     case numeric
 
-    internal init(rawValue: UInt8) {
+    internal init?(rawValue: __swift_stdlib_UNumericType) {
       switch rawValue {
-      case 0:
-        self = .numeric
-      case 1:
-        self = .digit
-      case 2:
-        self = .decimal
-      default:
-        fatalError("Unknown numeric type \(rawValue)")
+      case __swift_stdlib_U_NT_NONE: return nil
+      case __swift_stdlib_U_NT_DECIMAL: self = .decimal
+      case __swift_stdlib_U_NT_DIGIT: self = .digit
+      case __swift_stdlib_U_NT_NUMERIC: self = .numeric
+      default: fatalError("Unknown numeric type \(rawValue)")
       }
     }
   }
@@ -1510,12 +1470,10 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Numeric_Type" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var numericType: Unicode.NumericType? {
-    let rawValue = _swift_stdlib_getNumericType(_scalar.value)
-
-    guard rawValue != .max else {
-      return nil
-    }
-
+    let rawValue = __swift_stdlib_UNumericType(
+      __swift_stdlib_UNumericType.RawValue(
+      __swift_stdlib_u_getIntPropertyValue(
+        icuValue, __swift_stdlib_UCHAR_NUMERIC_TYPE)))
     return Unicode.NumericType(rawValue: rawValue)
   }
 
@@ -1536,10 +1494,8 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Numeric_Value" property in the [Unicode
   /// Standard](http://www.unicode.org/versions/latest/).
   public var numericValue: Double? {
-    guard numericType != nil else {
-      return nil
-    }
-
-    return _swift_stdlib_getNumericValue(_scalar.value)
+    let icuNoNumericValue: Double = -123456789
+    let result = __swift_stdlib_u_getNumericValue(icuValue)
+    return result != icuNoNumericValue ? result : nil
   }
 }

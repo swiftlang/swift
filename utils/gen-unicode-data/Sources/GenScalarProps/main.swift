@@ -16,12 +16,6 @@ func generateScalarProps() {
   var result = readFile("Input/UnicodeScalarProps.cpp")
   
   generateBinaryProps(into: &result)
-  genericNumericProps(into: &result)
-  generateNameAliasProp(into: &result)
-  generateMappingProps(into: &result)
-  generateNameProp(into: &result)
-  generateAgeProp(into: &result)
-  generateGeneralCategory(into: &result)
   
   write(result, to: "../../stdlib/public/stubs/UnicodeScalarProps.cpp")
 }
