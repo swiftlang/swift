@@ -269,13 +269,24 @@ SILCombiner::optimizeAlignment(PointerToAddressInst *ptrAdrInst) {
     if (newAlign && newAlign.valueOrOne() <= oldAlign)
       return nullptr;
 
-    // Case #1: the pointer is assumed naturally aligned, or Case #2: the
-    // pointer is assumed to have non-zero alignment greater than it current
-    // alignment. In either case, rewrite the address alignment with the assumed
-    // alignment, and bypass the Builtin.assumeAlign.
+    // Case #1: the pointer is assumed naturally aligned
+    //
+    // Or Case #2: the pointer is assumed to have non-zero alignment greater
+    // than it current alignment.
+    //
+    // In either case, rewrite the address alignment with the assumed alignment,
+    // and bypass the Builtin.assumeAlign.
     return Builder.createPointerToAddress(
         ptrAdrInst->getLoc(), ptrSrc, ptrAdrInst->getType(),
         ptrAdrInst->isStrict(), ptrAdrInst->isInvariant(), newAlign);
+  }
+  // Handle possible 32-bit sign-extension.
+  SILValue extendedAlignment;
+  if (match(alignOper,
+            m_ApplyInst(BuiltinValueKind::SExtOrBitCast,
+                        m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
+                                    m_SILValue(extendedAlignment))))) {
+    alignOper = extendedAlignment;
   }
   MetatypeInst *metatype;
   if (match(alignOper,
