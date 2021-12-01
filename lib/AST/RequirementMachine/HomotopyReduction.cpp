@@ -778,6 +778,23 @@ void RewriteSystem::minimizeRewriteSystem() {
   verifyMinimizedRules();
 }
 
+/// In a conformance-valid rewrite system, any rule with unresolved symbols on
+/// the left or right hand side should have been simplified by another rule.
+bool RewriteSystem::hasNonRedundantUnresolvedRules() const {
+  assert(Complete);
+  assert(Minimized);
+
+  for (const auto &rule : Rules) {
+    if (!rule.isRedundant() &&
+        !rule.isPermanent() &&
+        rule.containsUnresolvedSymbols()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Collect all non-permanent, non-redundant rules whose domain is equal to
 /// one of the protocols in \p proto. In other words, the first symbol of the
 /// left hand side term is either a protocol symbol or associated type symbol
@@ -793,11 +810,11 @@ RewriteSystem::getMinimizedProtocolRules(
   for (unsigned ruleID : indices(Rules)) {
     const auto &rule = getRule(ruleID);
 
-    if (rule.isPermanent())
+    if (rule.isPermanent() ||
+        rule.isRedundant() ||
+        rule.containsUnresolvedSymbols()) {
       continue;
-
-    if (rule.isRedundant())
-      continue;
+    }
 
     auto domain = rule.getLHS()[0].getProtocols();
     assert(domain.size() == 1);
@@ -822,11 +839,11 @@ RewriteSystem::getMinimizedGenericSignatureRules() const {
   for (unsigned ruleID : indices(Rules)) {
     const auto &rule = getRule(ruleID);
 
-    if (rule.isPermanent())
+    if (rule.isPermanent() ||
+        rule.isRedundant() ||
+        rule.containsUnresolvedSymbols()) {
       continue;
-
-    if (rule.isRedundant())
-      continue;
+    }
 
     if (rule.getLHS()[0].getKind() != Symbol::Kind::GenericParam)
       continue;
@@ -905,26 +922,14 @@ void RewriteSystem::verifyMinimizedRules() const {
       continue;
     }
 
-    if (rule.isRedundant())
-      continue;
-
     // Simplified rules should be redundant, unless they're protocol conformance
     // rules, which unfortunately might no be redundant, because we try to keep
     // them in the original protocol definition for compatibility with the
     // GenericSignatureBuilder's minimization algorithm.
-    if (rule.isSimplified() && !rule.isProtocolConformanceRule()) {
+    if (rule.isSimplified() &&
+        !rule.isRedundant() &&
+        !rule.isProtocolConformanceRule()) {
       llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
-      dump(llvm::errs());
-      abort();
-    }
-
-    // Rules with unresolved name symbols (other than permanent rules for
-    // associated type introduction) should be redundant.
-    //
-    // FIXME: What about invalid code?
-    if (rule.getLHS().containsUnresolvedSymbols() ||
-        rule.getRHS().containsUnresolvedSymbols()) {
-      llvm::errs() << "Unresolved rule is not redundant: " << rule << "\n\n";
       dump(llvm::errs());
       abort();
     }

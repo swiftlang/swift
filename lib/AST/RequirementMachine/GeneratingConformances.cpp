@@ -642,6 +642,9 @@ void RewriteSystem::computeGeneratingConformances(
     if (rule.isRedundant())
       continue;
 
+    if (rule.containsUnresolvedSymbols())
+      continue;
+
     if (!rule.isProtocolConformanceRule())
       continue;
 

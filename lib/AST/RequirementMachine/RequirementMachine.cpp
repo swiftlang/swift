@@ -366,3 +366,9 @@ void RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy)
 bool RequirementMachine::isComplete() const {
   return Complete;
 }
+
+bool RequirementMachine::hadError() const {
+  // FIXME: Implement other checks here
+  // FIXME: Assert if hadError() is true but we didn't emit any diagnostics?
+  return System.hasNonRedundantUnresolvedRules();
+}
