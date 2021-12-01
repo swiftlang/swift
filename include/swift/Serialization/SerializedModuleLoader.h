@@ -465,6 +465,9 @@ public:
   virtual void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)>) const override;
 
+  virtual void collectSerializedSearchPath(
+      llvm::function_ref<void(StringRef)> callback) const override;
+
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST;
   }

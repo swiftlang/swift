@@ -103,6 +103,10 @@ public:
   /// specified in LLDB from the target.source-map entries.
   PathRemapper SearchPathRemapper;
 
+  /// Recover the search paths deserialized from .swiftmodule files to their
+  /// original form.
+  PathObfuscator DeserializedPathRecoverer;
+
 private:
   static StringRef
   pathStringFromFrameworkSearchPath(const FrameworkSearchPath &next) {

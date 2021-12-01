@@ -292,6 +292,10 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.HermeticSealAtLink = Args.hasArg(OPT_experimental_hermetic_seal_at_link);
 
+  for (auto A : Args.getAllArgValues(options::OPT_serialized_path_obfuscate)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.serializedPathObfuscator.addMapping(SplitMap.first, SplitMap.second);
+  }
   return false;
 }
 
