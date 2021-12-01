@@ -279,6 +279,9 @@ struct SendableCheckContext {
   /// Determine the diagnostic behavior when referencing the given nominal
   /// type in this context.
   DiagnosticBehavior diagnosticBehavior(NominalTypeDecl *nominal) const;
+
+  /// Whether we are in an explicit conformance to Sendable.
+  bool isExplicitSendableConformance() const;
 };
 
 /// Diagnose any non-Sendable types that occur within the given type, using
@@ -291,8 +294,7 @@ struct SendableCheckContext {
 /// \returns \c true if any diagnostics were produced, \c false otherwise.
 bool diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext, SourceLoc loc,
-    llvm::function_ref<
-      std::pair<DiagnosticBehavior, bool>(Type, DiagnosticBehavior)> diagnose);
+    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose);
 
 namespace detail {
   template<typename T>
@@ -314,10 +316,12 @@ bool diagnoseNonSendableTypes(
   return diagnoseNonSendableTypes(
       type, fromContext, loc, [&](Type specificType,
       DiagnosticBehavior behavior) {
-    ctx.Diags.diagnose(loc, diag, type, diagArgs...)
-      .limitBehavior(behavior);
-    return std::pair<DiagnosticBehavior, bool>(
-        behavior, behavior == DiagnosticBehavior::Unspecified);
+    if (behavior != DiagnosticBehavior::Ignore) {
+      ctx.Diags.diagnose(loc, diag, type, diagArgs...)
+        .limitBehavior(behavior);
+    }
+
+    return false;
   });
 }
 
