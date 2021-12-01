@@ -192,6 +192,9 @@ static llvm::cl::opt<OptGroup> OptimizationGroup(
         clEnumValN(OptGroup::Lowering, "lowering", "Run lowering passes")),
     llvm::cl::init(OptGroup::Unknown));
 
+static llvm::cl::opt<bool>
+Onone("Onone", llvm::cl::desc("set SILOptions.OptMode to Onone"));
+
 static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
        llvm::cl::values(
@@ -487,6 +490,8 @@ int main(int argc, char **argv) {
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.OptMode = OptimizationMode::ForSpeed;
+  if (Onone)
+    SILOpts.OptMode = OptimizationMode::NoOptimization;
   SILOpts.VerifySILOwnership = !DisableSILOwnershipVerifier;
   SILOpts.OptRecordFile = RemarksFilename;
   SILOpts.OptRecordPasses = RemarksPasses;
