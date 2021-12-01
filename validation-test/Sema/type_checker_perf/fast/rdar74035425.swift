@@ -7,5 +7,5 @@ struct Value {
 }
 
 func test(values: [[Value]]) -> String {
-  "[" + "" + values.map({ "[" + $0.map({ $0.debugDescription }).joined(separator: ", ") + "]" }).joined(separator: ", ") + "]"
+  values.map({ "[" + $0.map({ $0.debugDescription }).joined(separator: ", ") + "]" }).joined(separator: ", ")
 }
