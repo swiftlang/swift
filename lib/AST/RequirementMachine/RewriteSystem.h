@@ -103,6 +103,11 @@ public:
     return Redundant;
   }
 
+  bool containsUnresolvedSymbols() const {
+    return (LHS.containsUnresolvedSymbols() ||
+            RHS.containsUnresolvedSymbols());
+  }
+
   void markSimplified() {
     assert(!Simplified);
     Simplified = true;
@@ -314,8 +319,6 @@ private:
 
   void checkMergedAssociatedType(Term lhs, Term rhs);
 
-public:
-
   //////////////////////////////////////////////////////////////////////////////
   ///
   /// Homotopy reduction
@@ -337,13 +340,17 @@ public:
   void performHomotopyReduction(
       const llvm::DenseSet<unsigned> *redundantConformances);
 
+public:
   void minimizeRewriteSystem();
+
+  bool hasNonRedundantUnresolvedRules() const;
 
   llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
   getMinimizedProtocolRules(ArrayRef<const ProtocolDecl *> protos) const;
 
   std::vector<unsigned> getMinimizedGenericSignatureRules() const;
 
+private:
   void verifyRewriteLoops() const;
 
   void verifyRedundantConformances(
@@ -398,6 +405,7 @@ public:
   void computeGeneratingConformances(
       llvm::DenseSet<unsigned> &redundantConformances);
 
+public:
   void dump(llvm::raw_ostream &out) const;
 };
 

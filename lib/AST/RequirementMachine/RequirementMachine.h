@@ -137,6 +137,8 @@ public:
 
   std::vector<Requirement> computeMinimalGenericSignatureRequirements();
 
+  bool hadError() const;
+
   void verify(const MutableTerm &term) const;
   void dump(llvm::raw_ostream &out) const;
 

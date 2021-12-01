@@ -359,10 +359,9 @@ AbstractGenericSignatureRequestRQM::evaluate(
   auto minimalRequirements =
     machine->computeMinimalGenericSignatureRequirements();
 
-  // FIXME: Implement this
-  bool hadError = false;
-
   auto result = GenericSignature::get(genericParams, minimalRequirements);
+  bool hadError = machine->hadError();
+
   return GenericSignatureWithError(result, hadError);
 }
 
@@ -463,10 +462,8 @@ InferredGenericSignatureRequestRQM::evaluate(
   auto minimalRequirements =
     machine->computeMinimalGenericSignatureRequirements();
 
-  // FIXME: Implement this
-  bool hadError = false;
-
   auto result = GenericSignature::get(genericParams, minimalRequirements);
+  bool hadError = machine->hadError();
 
   // FIXME: Handle allowConcreteGenericParams
 
