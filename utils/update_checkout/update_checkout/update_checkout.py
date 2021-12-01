@@ -70,7 +70,7 @@ def check_parallel_results(results, op):
             print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
             fail_count += 1
             if r.stderr:
-                print(r.stderr)
+                print(r.stderr.decode('utf-8'))
     return fail_count
 
 
