@@ -104,6 +104,17 @@ private func _stringCompareFastUTF8(
   bothNFC: Bool
 ) -> Bool {
   if _fastPath(bothNFC) {
+    /*
+     If we know both Strings are NFC *and* we're just checking
+     equality, then we can early-out without looking at the contents
+     if the UTF8 counts are different (without the NFC req, equal 
+     characters can have different counts). It might be nicer to do 
+     this in _binaryCompare, but we have the information about what 
+     operation we're trying to do at this level.
+     */
+    if expecting == .equal && utf8Left.count != utf8Right.count {
+        return false
+    }
     let cmp = _binaryCompare(utf8Left, utf8Right)
     return _lexicographicalCompare(cmp, 0, expecting: expecting)
   }
