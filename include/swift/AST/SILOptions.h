@@ -64,7 +64,7 @@ public:
   /// Force-run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
   /// When this is 'false' the pipeline has default behavior.
-  bool EnableCopyPropagation = false;
+  bool EnableCopyPropagation = true;
 
   /// Disable SIL copy propagation to preserve object lifetime in whatever
   /// optimization pipeline is currently used.
