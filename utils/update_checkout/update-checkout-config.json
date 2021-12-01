@@ -77,6 +77,8 @@
             "remote": { "id": "apple/swift-nio" } },
         "swift-nio-ssl": {
             "remote": { "id": "apple/swift-nio-ssl" } },
+        "swift-experimental-string-processing": {
+            "remote": { "id": "apple/swift-experimental-string-processing" } },
         "llvm-project": {
             "remote": { "id": "apple/llvm-project" } }
     },
@@ -120,7 +122,8 @@
                 "swift-markdown": "main",
                 "swift-cmark-gfm": "gfm",
                 "swift-nio": "2.31.2",
-                "swift-nio-ssl": "2.15.0"
+                "swift-nio-ssl": "2.15.0",
+                "swift-experimental-string-processing": "main"
             }
         },
         "rebranch": {
