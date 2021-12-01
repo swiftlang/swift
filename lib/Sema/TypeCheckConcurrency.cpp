@@ -601,53 +601,102 @@ static bool hasUnavailableConformance(ProtocolConformanceRef conformance) {
   return false;
 }
 
+static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
+  if (dc->getParentModule()->isConcurrencyChecked())
+    return true;
+
+  return contextUsesConcurrencyFeatures(dc);
+}
+
+/// Determine the default diagnostic behavior for this language mode.
+static DiagnosticBehavior defaultSendableDiagnosticBehavior(
+    const LangOptions &langOpts) {
+  // Prior to Swift 6, all Sendable-related diagnostics are warnings.
+  if (!langOpts.isSwiftVersionAtLeast(6))
+    return DiagnosticBehavior::Warning;
+
+  return DiagnosticBehavior::Unspecified;
+}
+
+bool SendableCheckContext::isExplicitSendableConformance() const {
+  if (!conformanceCheck)
+    return false;
+
+  switch (*conformanceCheck) {
+  case SendableCheck::Explicit:
+    return true;
+
+  case SendableCheck::ImpliedByStandardProtocol:
+  case SendableCheck::Implicit:
+    return false;
+  }
+}
+
+DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
+  // If we're not supposed to diagnose existing data races from this context,
+  // ignore the diagnostic entirely.
+  if (!isExplicitSendableConformance() &&
+      !shouldDiagnoseExistingDataRaces(fromDC))
+    return DiagnosticBehavior::Ignore;
+
+  return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
+}
+
+/// Determine the diagnostic behavior for a Sendable reference to the given
+/// nominal type.
+DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
+    NominalTypeDecl *nominal) const {
+  // Determine whether the type was explicitly non-Sendable.
+  auto nominalModule = nominal->getParentModule();
+  bool isExplicitlyNonSendable = nominalModule->isConcurrencyChecked() ||
+      isExplicitSendableConformance();
+
+  // Determine whether this nominal type is visible via a @_predatesConcurrency
+  // import.
+  ImportDecl *predatesConcurrencyImport = nullptr;
+
+  // When the type is explicitly non-Sendable...
+  if (isExplicitlyNonSendable) {
+    // @_predatesConcurrency imports downgrade the diagnostic to a warning.
+    if (predatesConcurrencyImport) {
+      // FIXME: Note that this @_predatesConcurrency import was "used".
+      return DiagnosticBehavior::Warning;
+    }
+
+    return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
+  }
+
+  // When the type is implicitly non-Sendable...
+
+  // @_predatesConcurrency always suppresses the diagnostic.
+  if (predatesConcurrencyImport) {
+    // FIXME: Note that this @_predatesConcurrency import was "used".
+    return DiagnosticBehavior::Ignore;
+  }
+
+  return defaultDiagnosticBehavior();
+}
+
 /// Produce a diagnostic for a single instance of a non-Sendable type where
 /// a Sendable type is required.
 static bool diagnoseSingleNonSendableType(
-    Type type, ModuleDecl *module, SourceLoc loc,
-    llvm::function_ref<
-      std::pair<DiagnosticBehavior, bool>(Type, DiagnosticBehavior)> diagnose) {
+    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
 
   auto behavior = DiagnosticBehavior::Unspecified;
 
+  auto module = fromContext.fromDC->getParentModule();
   ASTContext &ctx = module->getASTContext();
   auto nominal = type->getAnyNominal();
-  const LangOptions &langOpts = ctx.LangOpts;
   if (nominal) {
-    // A nominal type that has not provided conformance to Sendable will be
-    // diagnosed based on whether its defining module was consistently
-    // checked for concurrency.
-    auto nominalModule = nominal->getParentModule();
-
-    if (langOpts.isSwiftVersionAtLeast(6)) {
-      // In Swift 6, error when the nominal type comes from a module that
-      // had the concurrency checks consistently applied or from this module.
-      // Otherwise, warn.
-      if (nominalModule->isConcurrencyChecked() || nominalModule == module)
-        behavior = DiagnosticBehavior::Unspecified;
-      else
-        behavior = DiagnosticBehavior::Warning;
-    } else {
-      // In Swift 5, warn if either the imported or importing model is
-      // checking for concurrency, or if the nominal type comes from this
-      // module. Otherwise, leave a safety hole.
-      if (nominalModule->isConcurrencyChecked() ||
-          nominalModule == module ||
-          langOpts.WarnConcurrency)
-        behavior = DiagnosticBehavior::Warning;
-      else
-        behavior = DiagnosticBehavior::Ignore;
-    }
-  } else if (!langOpts.isSwiftVersionAtLeast(6)) {
-    // Always warn in Swift 5.
-    behavior = DiagnosticBehavior::Warning;
+    behavior = fromContext.diagnosticBehavior(nominal);
+  } else {
+    behavior = fromContext.defaultDiagnosticBehavior();
   }
 
-  DiagnosticBehavior actualBehavior;
-  bool wasError;
-  std::tie(actualBehavior, wasError) = diagnose(type, behavior);
+  bool wasSuppressed = diagnose(type, behavior);
 
-  if (actualBehavior == DiagnosticBehavior::Ignore) {
+  if (behavior == DiagnosticBehavior::Ignore || wasSuppressed) {
     // Don't emit any other diagnostics.
   } else if (type->is<FunctionType>()) {
     ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
@@ -663,13 +712,14 @@ static bool diagnoseSingleNonSendableType(
         nominal->getName());
   }
 
-  return wasError;
+  return behavior == DiagnosticBehavior::Unspecified && !wasSuppressed;
 }
 
 bool swift::diagnoseNonSendableTypes(
-    Type type, ModuleDecl *module, SourceLoc loc,
-    llvm::function_ref<
-      std::pair<DiagnosticBehavior, bool>(Type, DiagnosticBehavior)> diagnose) {
+    Type type, SendableCheckContext fromContext, SourceLoc loc,
+    llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+  auto module = fromContext.fromDC->getParentModule();
+
   // If the Sendable protocol is missing, do nothing.
   auto proto = module->getASTContext().getProtocol(KnownProtocolKind::Sendable);
   if (!proto)
@@ -678,7 +728,7 @@ bool swift::diagnoseNonSendableTypes(
   // FIXME: More detail for unavailable conformances.
   auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
   if (conformance.isInvalid() || hasUnavailableConformance(conformance)) {
-    return diagnoseSingleNonSendableType(type, module, loc, diagnose);
+    return diagnoseSingleNonSendableType(type, fromContext, loc, diagnose);
   }
 
   // Walk the conformance, diagnosing any missing Sendable conformances.
@@ -686,7 +736,7 @@ bool swift::diagnoseNonSendableTypes(
   conformance.forEachMissingConformance(module,
       [&](BuiltinProtocolConformance *missing) {
         if (diagnoseSingleNonSendableType(
-                missing->getType(), module, loc, diagnose)) {
+                missing->getType(), fromContext, loc, diagnose)) {
           anyMissing = true;
         }
 
@@ -697,7 +747,7 @@ bool swift::diagnoseNonSendableTypes(
 }
 
 bool swift::diagnoseNonSendableTypesInReference(
-    ConcreteDeclRef declRef, ModuleDecl *module, SourceLoc loc,
+    ConcreteDeclRef declRef, const DeclContext *fromDC, SourceLoc loc,
     ConcurrentReferenceKind refKind) {
   // For functions, check the parameter and result types.
   SubstitutionMap subs = declRef.getSubstitutions();
@@ -705,7 +755,7 @@ bool swift::diagnoseNonSendableTypesInReference(
     for (auto param : *function->getParameters()) {
       Type paramType = param->getInterfaceType().subst(subs);
       if (diagnoseNonSendableTypes(
-              paramType, module, loc, diag::non_sendable_param_type))
+              paramType, fromDC, loc, diag::non_sendable_param_type))
         return true;
     }
 
@@ -713,7 +763,7 @@ bool swift::diagnoseNonSendableTypesInReference(
     if (auto func = dyn_cast<FuncDecl>(function)) {
       Type resultType = func->getResultInterfaceType().subst(subs);
       if (diagnoseNonSendableTypes(
-              resultType, module, loc, diag::non_sendable_result_type))
+              resultType, fromDC, loc, diag::non_sendable_result_type))
         return true;
     }
 
@@ -725,7 +775,7 @@ bool swift::diagnoseNonSendableTypesInReference(
         ? var->getType()
         : var->getValueInterfaceType().subst(subs);
     if (diagnoseNonSendableTypes(
-            propertyType, module, loc,
+            propertyType, fromDC, loc,
             diag::non_sendable_property_type,
             var->getDescriptiveKind(), var->getName(),
             var->isLocalCapture()))
@@ -736,14 +786,14 @@ bool swift::diagnoseNonSendableTypesInReference(
     for (auto param : *subscript->getIndices()) {
       Type paramType = param->getInterfaceType().subst(subs);
       if (diagnoseNonSendableTypes(
-              paramType, module, loc, diag::non_sendable_param_type))
+              paramType, fromDC, loc, diag::non_sendable_param_type))
         return true;
     }
 
     // Check the element type of a subscript.
     Type resultType = subscript->getElementInterfaceType().subst(subs);
     if (diagnoseNonSendableTypes(
-            resultType, module, loc, diag::non_sendable_result_type))
+            resultType, fromDC, loc, diag::non_sendable_result_type))
       return true;
 
     return false;
@@ -753,9 +803,9 @@ bool swift::diagnoseNonSendableTypesInReference(
 }
 
 void swift::diagnoseMissingSendableConformance(
-    SourceLoc loc, Type type, ModuleDecl *module) {
+    SourceLoc loc, Type type, const DeclContext *fromDC) {
   diagnoseNonSendableTypes(
-      type, module, loc, diag::non_sendable_type);
+      type, fromDC, loc, diag::non_sendable_type);
 }
 
 namespace {
@@ -1893,7 +1943,7 @@ namespace {
         // Check for non-sendable types.
         bool problemFound =
             diagnoseNonSendableTypesInReference(
-              concDeclRef, getDeclContext()->getParentModule(), declLoc,
+              concDeclRef, getDeclContext(), declLoc,
               ConcurrentReferenceKind::SynchronousAsAsyncCall);
         if (problemFound)
           result = AsyncMarkingResult::NotSendable;
@@ -2023,14 +2073,14 @@ namespace {
       for (const auto &param : fnType->getParams()) {
         // FIXME: Dig out the locations of the corresponding arguments.
         if (diagnoseNonSendableTypes(
-                param.getParameterType(), getParentModule(), apply->getLoc(),
+                param.getParameterType(), getDeclContext(), apply->getLoc(),
                 diag::non_sendable_param_type))
           return true;
       }
 
       // Check for sendability of the result type.
       if (diagnoseNonSendableTypes(
-             fnType->getResult(), getParentModule(), apply->getLoc(),
+             fnType->getResult(), getDeclContext(), apply->getLoc(),
              diag::non_sendable_result_type))
         return true;
 
@@ -2056,7 +2106,7 @@ namespace {
       // A cross-actor access requires types to be concurrent-safe.
       if (isCrossActor) {
         return diagnoseNonSendableTypesInReference(
-            valueRef, getParentModule(), loc,
+            valueRef, getDeclContext(), loc,
             ConcurrentReferenceKind::CrossActor);
       }
 
@@ -2174,7 +2224,7 @@ namespace {
             (ctx.LangOpts.EnableExperimentalFlowSensitiveConcurrentCaptures &&
              parent.dyn_cast<LoadExpr *>())) {
           return diagnoseNonSendableTypesInReference(
-              valueRef, getParentModule(), loc,
+              valueRef, getDeclContext(), loc,
               ConcurrentReferenceKind::LocalCapture);
         }
 
@@ -2226,7 +2276,7 @@ namespace {
             auto type = component.getComponentType();
             if (shouldDiagnoseExistingDataRaces(getDeclContext()) &&
                 diagnoseNonSendableTypes(
-                    type, getParentModule(), component.getLoc(),
+                    type, getDeclContext(), component.getLoc(),
                     diag::non_sendable_keypath_access))
               return true;
 
@@ -2293,7 +2343,7 @@ namespace {
             if (type &&
                 shouldDiagnoseExistingDataRaces(getDeclContext()) &&
                 diagnoseNonSendableTypes(
-                    type, getParentModule(), component.getLoc(),
+                    type, getDeclContext(), component.getLoc(),
                     diag::non_sendable_keypath_capture))
               diagnosed = true;
           }
@@ -2399,7 +2449,7 @@ namespace {
         }
 
         return diagnoseNonSendableTypesInReference(
-            memberRef, getDeclContext()->getParentModule(), memberLoc,
+            memberRef, getDeclContext(), memberLoc,
             ConcurrentReferenceKind::CrossActor);
       }
 
@@ -3172,9 +3222,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
         subs = genericEnv->getForwardingSubstitutionMap();
       }
       diagnoseNonSendableTypesInReference(
-          ConcreteDeclRef(value, subs),
-          value->getDeclContext()->getParentModule(), value->getLoc(),
-          ConcurrentReferenceKind::Nonisolated);
+          ConcreteDeclRef(value, subs), value->getDeclContext(),
+          value->getLoc(), ConcurrentReferenceKind::Nonisolated);
     }
 
     // Classes with global actors have additional rules regarding inheritance.
@@ -3589,51 +3638,6 @@ bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
   return false;
 }
 
-static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
-  if (dc->getParentModule()->isConcurrencyChecked())
-    return true;
-
-  return contextUsesConcurrencyFeatures(dc);
-}
-
-/// Limit the diagnostic behavior used when performing checks for the Sendable
-/// instance storage of Sendable types.
-///
-/// \returns a pair containing the diagnostic behavior that should be used
-/// for this diagnostic, as well as a Boolean value indicating whether to
-/// treat this as an error.
-static std::pair<DiagnosticBehavior, bool> limitSendableInstanceBehavior(
-    const LangOptions &langOpts, SendableCheck check,
-    DiagnosticBehavior suggestedBehavior) {
-  // Is an error suggested?
-  bool suggestedError = suggestedBehavior == DiagnosticBehavior::Unspecified ||
-      suggestedBehavior == DiagnosticBehavior::Error;
-  switch (check) {
-  case SendableCheck::Implicit:
-    // For implicit checks, we always ignore the diagnostic and fail.
-    return std::make_pair(DiagnosticBehavior::Ignore, true);
-
-  case SendableCheck::Explicit:
-    // Bump warnings up to errors due to explicit Sendable conformance.
-    if (suggestedBehavior == DiagnosticBehavior::Warning)
-      return std::make_pair(DiagnosticBehavior::Unspecified, true);
-
-    return std::make_pair(suggestedBehavior, suggestedError);
-
-  case SendableCheck::ImpliedByStandardProtocol:
-    // If we aren't in Swift 6, downgrade diagnostics.
-    if (!langOpts.isSwiftVersionAtLeast(6)) {
-      if (langOpts.WarnConcurrency &&
-          suggestedBehavior != DiagnosticBehavior::Ignore)
-        return std::make_pair(DiagnosticBehavior::Warning, false);
-
-      return std::make_pair(DiagnosticBehavior::Ignore, false);
-    }
-
-    return std::make_pair(suggestedBehavior, suggestedError);
-  }
-}
-
 namespace {
   /// Visit the instance storage of the given nominal type as seen through
   /// the given declaration context.
@@ -3705,38 +3709,36 @@ static bool checkSendableInstanceStorage(
         if (check == SendableCheck::Implicit)
           return true;
 
-        auto action = limitSendableInstanceBehavior(
-            langOpts, check, DiagnosticBehavior::Unspecified);
-
-        property->diagnose(diag::concurrent_value_class_mutable_property,
-                           property->getName(), nominal->getDescriptiveKind(),
-                           nominal->getName())
-            .limitBehavior(action.first);
-        invalid = invalid || action.second;
+        auto behavior = SendableCheckContext(
+            dc, check).defaultDiagnosticBehavior();
+        if (behavior != DiagnosticBehavior::Ignore) {
+          property->diagnose(diag::concurrent_value_class_mutable_property,
+                             property->getName(), nominal->getDescriptiveKind(),
+                             nominal->getName())
+              .limitBehavior(behavior);
+        }
+        invalid = invalid || (behavior == DiagnosticBehavior::Unspecified);
         return true;
       }
 
       // Check that the property type is Sendable.
-      bool diagnosedProperty = diagnoseNonSendableTypes(
-          propertyType, dc->getParentModule(), property->getLoc(),
-          [&](Type type, DiagnosticBehavior suggestedBehavior) {
-            auto action = limitSendableInstanceBehavior(
-                langOpts, check, suggestedBehavior);
-            if (check == SendableCheck::Implicit)
-              return action;
+      diagnoseNonSendableTypes(
+          propertyType, SendableCheckContext(dc, check), property->getLoc(),
+          [&](Type type, DiagnosticBehavior behavior) {
+            if (check == SendableCheck::Implicit) {
+              invalid = true;
+              return true;
+            }
 
             property->diagnose(diag::non_concurrent_type_member,
-                               false, property->getName(),
+                               propertyType, false, property->getName(),
                                nominal->getDescriptiveKind(),
-                               nominal->getName(),
-                               propertyType)
-                .limitBehavior(action.first);
-            return action;
+                               nominal->getName())
+                .limitBehavior(behavior);
+            return false;
           });
 
-      if (diagnosedProperty) {
-        invalid = true;
-
+      if (invalid) {
         // For implicit checks, bail out early if anything failed.
         if (check == SendableCheck::Implicit)
           return true;
@@ -3747,26 +3749,23 @@ static bool checkSendableInstanceStorage(
 
     /// Handle an enum associated value.
     bool operator()(EnumElementDecl *element, Type elementType) {
-      bool diagnosedElement = diagnoseNonSendableTypes(
-          elementType, dc->getParentModule(), element->getLoc(),
-          [&](Type type, DiagnosticBehavior suggestedBehavior) {
-            auto action = limitSendableInstanceBehavior(
-                langOpts, check, suggestedBehavior);
-            if (check == SendableCheck::Implicit)
-              return action;
+      diagnoseNonSendableTypes(
+          elementType, SendableCheckContext(dc, check), element->getLoc(),
+          [&](Type type, DiagnosticBehavior behavior) {
+            if (check == SendableCheck::Implicit) {
+              invalid = true;
+              return true;
+            }
 
-            element->diagnose(diag::non_concurrent_type_member,
+            element->diagnose(diag::non_concurrent_type_member, type,
                               true, element->getName(),
                               nominal->getDescriptiveKind(),
-                              nominal->getName(),
-                              type)
-                .limitBehavior(action.first);
-            return action;
+                              nominal->getName())
+                .limitBehavior(behavior);
+            return false;
           });
 
-      if (diagnosedElement) {
-        invalid = true;
-
+      if (invalid) {
         // For implicit checks, bail out early if anything failed.
         if (check == SendableCheck::Implicit)
           return true;
@@ -3815,46 +3814,43 @@ bool swift::checkSendableConformance(
 
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  const LangOptions &langOpts = conformanceDC->getASTContext().LangOpts;
-  DiagnosticBehavior behavior;
-  bool diagnosticCausesFailure;
-  std::tie(behavior, diagnosticCausesFailure) = limitSendableInstanceBehavior(
-      langOpts, check, DiagnosticBehavior::Unspecified);
-  if (!conformanceDC->getParentSourceFile() ||
+  auto behavior = SendableCheckContext(conformanceDC)
+      .defaultDiagnosticBehavior();
+  if (conformanceDC->getParentSourceFile() &&
+      nominal->getParentSourceFile() &&
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
     conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
                               nominal->getDescriptiveKind(),
                               nominal->getName())
-        .limitBehavior(behavior);
+      .limitBehavior(behavior);
 
-    if (diagnosticCausesFailure)
+    if (behavior == DiagnosticBehavior::Unspecified)
       return true;
   }
 
-  if (classDecl) {
+  if (classDecl && classDecl->getParentSourceFile()) {
+    bool isInherited = isa<InheritedProtocolConformance>(conformance);
+
     // An non-final class cannot conform to `Sendable`.
     if (!classDecl->isSemanticallyFinal()) {
       classDecl->diagnose(diag::concurrent_value_nonfinal_class,
                           classDecl->getName())
-          .limitBehavior(behavior);
+        .limitBehavior(behavior);
 
-      if (diagnosticCausesFailure)
+      if (behavior == DiagnosticBehavior::Unspecified)
         return true;
     }
 
-    // A 'Sendable' class cannot inherit from another class, although
-    // we allow `NSObject` for Objective-C interoperability.
-    if (!isa<InheritedProtocolConformance>(conformance)) {
+    if (!isInherited) {
+      // A 'Sendable' class cannot inherit from another class, although
+      // we allow `NSObject` for Objective-C interoperability.
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         if (!superclassDecl->isNSObject()) {
           classDecl->diagnose(
               diag::concurrent_value_inherit,
               nominal->getASTContext().LangOpts.EnableObjCInterop,
-              classDecl->getName())
-              .limitBehavior(behavior);
-
-          if (diagnosticCausesFailure)
-            return true;
+              classDecl->getName());
+          return true;
         }
       }
     }
