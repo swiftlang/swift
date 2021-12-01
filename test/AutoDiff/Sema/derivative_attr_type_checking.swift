@@ -573,6 +573,27 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   }
 }
 
+struct SR15530_Struct<T> {}
+extension SR15530_Struct: Differentiable where T: Differentiable {}
+
+extension SR15530_Struct {
+  // expected-note @+1 {{candidate instance method does not have type equal to or less constrained than '<T where T : Differentiable> (inout SR15530_Struct<T>) -> (Int, @differentiable(reverse) (inout T) -> Void) -> Void'}}
+  mutating func sr15530_update<D>(at index: Int, byCalling closure: (inout T, D) -> Void, withArgument: D) {
+    fatalError("Stop")
+  }
+}
+
+extension SR15530_Struct where T: Differentiable {
+  // expected-error @+1 {{referenced declaration 'sr15530_update' could not be resolved}}
+  @derivative(of: sr15530_update)
+  mutating func vjp_sr15530_update(
+    at index: Int,
+    byCalling closure: @differentiable(reverse) (inout T) -> Void
+  ) -> (value: Void, pullback: (inout Self.TangentVector) -> Void) {
+    fatalError("Stop")
+  }
+}
+
 extension Class {
   subscript() -> Float {
     get { 1 }
