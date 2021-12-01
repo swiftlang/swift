@@ -174,6 +174,9 @@ public:
     /// Argument type tag for annotated results.
     CallArgumentTypeBegin,
 
+    /// Added if the argument has a default value.
+    CallArgumentDefaultBegin,
+
     /// System type name.
     TypeIdSystem,
 
@@ -252,6 +255,7 @@ public:
            Kind == ChunkKind::GenericParameterBegin ||
            Kind == ChunkKind::OptionalBegin ||
            Kind == ChunkKind::CallArgumentTypeBegin ||
+           Kind == ChunkKind::CallArgumentDefaultBegin ||
            Kind == ChunkKind::TypeAnnotationBegin ||
            Kind == ChunkKind::ParameterDeclBegin ||
            Kind == ChunkKind::ParameterDeclTypeBegin ||

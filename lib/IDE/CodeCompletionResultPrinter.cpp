@@ -172,9 +172,6 @@ class AnnotatingResultPrinter {
   /// Print the current chunk group \p i currently points. Advances \p i to
   /// just past the group.
   void printNestedGroup(StringRef tag, ChunkIter &i, const ChunkIter e) {
-    if (!tag.empty())
-      OS << "<" << tag << ">";
-
     assert(i != e && !i->hasText() &&
            CodeCompletionString::Chunk::chunkStartsNestedGroup(i->getKind()));
     auto nestingLevel = i->getNestingLevel();
@@ -182,9 +179,22 @@ class AnnotatingResultPrinter {
     // Skip the "Begin" chunk.
     ++i;
 
-    while (i != e && !i->endsPreviousNestedGroup(nestingLevel)) {
+    // Self-closing tag for an empty element.
+    if (i == e || i->endsPreviousNestedGroup(nestingLevel)) {
+      if (!tag.empty())
+        OS << "<" << tag << "/>";
+      return;
+    }
+
+    if (!tag.empty())
+      OS << "<" << tag << ">";
+    do {
       if (i->is(ChunkKind::CallArgumentTypeBegin)) {
         printNestedGroup("callarg.type", i, e);
+        continue;
+      }
+      if (i->is(ChunkKind::CallArgumentDefaultBegin)) {
+        printNestedGroup("callarg.default", i, e);
         continue;
       }
       if (i->is(ChunkKind::ParameterDeclTypeBegin)) {
@@ -193,8 +203,7 @@ class AnnotatingResultPrinter {
       }
       printTextChunk(*i);
       ++i;
-    }
-
+    } while (i != e && !i->endsPreviousNestedGroup(nestingLevel));
     if (!tag.empty())
       OS << "</" << tag << ">";
   }

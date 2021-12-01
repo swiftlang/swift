@@ -74,6 +74,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentClosureType:
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallArgumentTypeBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallArgumentDefaultBegin:
     case CodeCompletionString::Chunk::ChunkKind::ParameterDeclBegin:
     case CodeCompletionString::Chunk::ChunkKind::ParameterDeclExternalName:
     case CodeCompletionString::Chunk::ChunkKind::ParameterDeclLocalName:
