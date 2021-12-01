@@ -825,6 +825,9 @@ public:
   /// Setup the loader for lazily-loaded members.
   void setMemberLoader(LazyMemberLoader *loader, uint64_t contextData);
 
+  /// Externally tell this context that it has no more lazy members, i.e. all lazy member loading is complete.
+  void setHasLazyMembers(bool hasLazyMembers) const;
+
   /// Load all of the members of this context.
   void loadAllMembers() const;
 
