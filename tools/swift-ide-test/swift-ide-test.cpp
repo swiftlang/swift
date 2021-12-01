@@ -803,6 +803,10 @@ static llvm::cl::opt<std::string>
                      llvm::cl::desc("Define a macro for @available"),
                      llvm::cl::cat(Category));
 
+static llvm::cl::list<std::string>
+SerializedPathObfuscate("serialized-path-obfuscate", llvm::cl::desc("Path to access notes file"),
+                    llvm::cl::cat(Category));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -2819,6 +2823,9 @@ static void printModuleMetadata(ModuleDecl *MD) {
     OS << "size=" << info.getFileSize();
     OS << "\n";
   });
+  MD->collectSerializedSearchPath([&](StringRef path) {
+    OS << "searchpath=" << path << ";\n";
+  });
 }
 
 static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,
@@ -4117,6 +4124,13 @@ int main(int argc, char *argv[]) {
 
   if (!options::DefineAvailability.empty()) {
     InitInvok.getLangOptions().AvailabilityMacros.push_back(options::DefineAvailability);
+  }
+  for (auto map: options::SerializedPathObfuscate) {
+    auto SplitMap = StringRef(map).split('=');
+    InitInvok.getFrontendOptions().serializedPathObfuscator
+      .addMapping(SplitMap.first, SplitMap.second);
+    InitInvok.getSearchPathOptions().DeserializedPathRecoverer
+      .addMapping(SplitMap.first, SplitMap.second);
   }
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
