@@ -6,7 +6,7 @@ func test() {
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=open %s -- %s == \
-// RUN:   -req=edit -offset=0 -length=53 -replace="" -req-opts=enablesyntaxmap=0,enablesubstructure=0,enablediagnostics=0 %s -- %s == \
+// RUN:   -req=edit -offset=0 -length=53 -replace="" -req-opts=enablesyntaxmap=0,enablesubstructure=0,enablediagnostics=0 -dont-print-response %s -- %s == \
 // RUN:   -req=expand-placeholder -offset=23 -length=18 %s \
 // RUN: | %FileCheck %s
 

@@ -2663,7 +2663,18 @@ public:
   sourcekitd_response_t createResponse();
 
   bool needsSemanticInfo() override {
-    return !Opts.SyntacticOnly && !isSemanticEditorDisabled();
+    if (Opts.SyntacticOnly) {
+      return false;
+    } else if (isSemanticEditorDisabled()) {
+      return false;
+    } else if (!documentStructureEnabled() &&
+               !syntaxMapEnabled() &&
+               !diagnosticsEnabled() &&
+               !syntaxTreeEnabled()) {
+      return false;
+    } else {
+      return true;
+    }
   }
 
   void handleRequestError(const char *Description) override;
