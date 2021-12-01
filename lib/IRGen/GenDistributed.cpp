@@ -180,7 +180,8 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
   IGF.Builder.CreateStore(argumentBuffer, offset);
 
   // Cover all of the arguments except to `self` of the actor.
-  for (auto &param : fnType->getParameters().drop_back()) {
+  auto parameters = fnType->getParameters().drop_back();
+  for (const auto &param : parameters) {
     auto paramTy = param.getSILStorageInterfaceType();
     const TypeInfo &typeInfo = IGF.getTypeInfo(paramTy);
 
@@ -232,8 +233,9 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
       arguments.add(IGF.Builder.CreateLoad(alignedOffset, "argval"));
     }
 
-    // 6. Move the offset to the beginning of the next element.
-    {
+    // 6. Move the offset to the beginning of the next element, unless
+    //    this is the last element.
+    if (param != parameters.back()) {
       llvm::Value *typeSize = typeInfo.getSize(IGF, paramTy);
 
       llvm::Value *addr = alignedOffset.getAddress();
