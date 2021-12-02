@@ -273,6 +273,15 @@ public:
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
 
+  /// If the shared pointer is not a \c nullptr and the pointee is \c true,
+  /// all operations working on this ASTContext should be aborted at the next
+  /// possible opportunity.
+  /// This is used by SourceKit to cancel requests for which the result is no
+  /// longer of interest.
+  /// The returned result will be discarded, so the operation that acknowledges
+  /// the cancellation might return with any result.
+  std::shared_ptr<std::atomic<bool>> CancellationFlag = nullptr;
+
   TypeCheckCompletionCallback *CompletionCallback = nullptr;
 
   /// The request-evaluator that is used to process various requests.
