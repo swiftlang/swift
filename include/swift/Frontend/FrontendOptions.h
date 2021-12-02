@@ -15,7 +15,6 @@
 
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Version.h"
-#include "swift/Basic/PathRemapper.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -437,10 +436,6 @@ public:
 
   /// Whether to include symbols with SPI information in the symbol graph.
   bool IncludeSPISymbolsInSymbolGraph = false;
-
-  /// This is used to obfuscate the serialized search paths so we don't have
-  /// to encode the actual paths into the .swiftmodule file.
-  PathObfuscator serializedPathObfuscator;
 
 private:
   static bool canActionEmitDependencies(ActionType);
