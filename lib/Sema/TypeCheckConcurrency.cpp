@@ -605,7 +605,7 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   if (dc->getParentModule()->isConcurrencyChecked())
     return true;
 
-  return contextUsesConcurrencyFeatures(dc);
+  return contextRequiresStrictConcurrencyChecking(dc);
 }
 
 /// Determine the default diagnostic behavior for this language mode.
@@ -3586,7 +3586,11 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   overridden->diagnose(diag::overridden_here);
 }
 
-bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
+bool swift::contextRequiresStrictConcurrencyChecking(const DeclContext *dc) {
+  // If Swift >= 6, everything uses strict concurrency checking.
+  if (dc->getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+    return true;
+
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
       // A closure with an explicit global actor or nonindependent
@@ -4071,7 +4075,7 @@ Type swift::adjustVarTypeForConcurrency(
   if (!var->predatesConcurrency())
     return type;
 
-  if (contextUsesConcurrencyFeatures(dc))
+  if (contextRequiresStrictConcurrencyChecking(dc))
     return type;
 
   bool isLValue = false;
@@ -4193,7 +4197,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     unsigned numApplies, bool isMainDispatchQueue) {
   // Apply unsafe concurrency features to the given function type.
   fnType = applyUnsafeConcurrencyToFunctionType(
-      fnType, decl, contextUsesConcurrencyFeatures(dc), numApplies,
+      fnType, decl, contextRequiresStrictConcurrencyChecking(dc), numApplies,
       isMainDispatchQueue);
 
   Type globalActorType;
@@ -4208,7 +4212,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     case ActorIsolation::GlobalActorUnsafe:
       // Only treat as global-actor-qualified within code that has adopted
       // Swift Concurrency features.
-      if (!contextUsesConcurrencyFeatures(dc))
+      if (!contextRequiresStrictConcurrencyChecking(dc))
         return fnType;
 
       LLVM_FALLTHROUGH;
@@ -4250,7 +4254,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 }
 
 bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {
-  return contextUsesConcurrencyFeatures(dc);
+  return contextRequiresStrictConcurrencyChecking(dc);
 }
 
 AbstractFunctionDecl const *swift::isActorInitOrDeInitContext(

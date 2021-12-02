@@ -211,9 +211,10 @@ public:
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
 
-/// Determine whether the given context uses concurrency features, such
-/// as async functions or actors.
-bool contextUsesConcurrencyFeatures(const DeclContext *dc);
+/// Determine whether the given context requires strict concurrency checking,
+/// e.g., because it uses concurrency features directly or because it's in
+/// code where strict checking has been enabled.
+bool contextRequiresStrictConcurrencyChecking(const DeclContext *dc);
 
 /// Diagnose the presence of any non-sendable types when referencing a
 /// given declaration from a particular declaration context.

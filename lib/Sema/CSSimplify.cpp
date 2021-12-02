@@ -2173,8 +2173,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   /// Whether to downgrade to a concurrency warning.
   auto isConcurrencyWarning = [&] {
-    if (contextUsesConcurrencyFeatures(DC) ||
-        Context.LangOpts.isSwiftVersionAtLeast(6))
+    if (contextRequiresStrictConcurrencyChecking(DC))
       return false;
 
     switch (kind) {
