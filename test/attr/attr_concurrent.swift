@@ -29,7 +29,7 @@ func passingConcurrentOrNot(
   f(ncfn)
 
   acceptsConcurrent(cfn) // okay
-  acceptsConcurrent(ncfn) // expected-error{{passing non-sendable parameter 'ncfn' to function expecting a @Sendable closure}}
+  acceptsConcurrent(ncfn) // expected-warning{{passing non-sendable parameter 'ncfn' to function expecting a @Sendable closure}}
   acceptsNonConcurrent(cfn) // okay
   acceptsNonConcurrent(ncfn) // okay
 
@@ -50,7 +50,7 @@ func closures() {
     })
 
   let closure1 = { $0 + 1 } // inferred to be non-sendable
-  acceptsConcurrent(closure1) // expected-error{{converting non-sendable function value to '@Sendable (Int) -> Int' may introduce data races}}
+  acceptsConcurrent(closure1) // expected-warning{{converting non-sendable function value to '@Sendable (Int) -> Int' may introduce data races}}
 }
 
 // Mutation of captured locals from within @Sendable functions.

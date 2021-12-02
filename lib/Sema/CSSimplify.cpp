@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
+#include "TypeCheckConcurrency.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -2170,6 +2171,22 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync);
   }
 
+  /// Whether to downgrade to a concurrency warning.
+  auto isConcurrencyWarning = [&] {
+    if (contextUsesConcurrencyFeatures(DC) ||
+        Context.LangOpts.isSwiftVersionAtLeast(6))
+      return false;
+
+    switch (kind) {
+    case ConstraintKind::Conversion:
+    case ConstraintKind::ArgumentConversion:
+      return true;
+
+    default:
+      return false;
+    }
+  };
+
   // A @Sendable function can be a subtype of a non-@Sendable function.
   if (func1->isSendable() != func2->isSendable()) {
     // Cannot add '@Sendable'.
@@ -2178,7 +2195,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return getTypeMatchFailure(locator);
 
       auto *fix = AddSendableAttribute::create(
-          *this, func1, func2, getConstraintLocator(locator));
+          *this, func1, func2, getConstraintLocator(locator),
+          isConcurrencyWarning());
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
     }
@@ -2212,7 +2230,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return getTypeMatchFailure(locator);
 
       auto *fix = MarkGlobalActorFunction::create(
-          *this, func1, func2, getConstraintLocator(locator));
+          *this, func1, func2, getConstraintLocator(locator),
+          isConcurrencyWarning());
 
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
