@@ -106,13 +106,13 @@ public func precondition(
 /// one of the other cases must be satisfied. To protect code from invalid
 /// usage in Release builds, see `preconditionFailure(_:file:line:)`.
 ///
-/// * In playgrounds and -Onone builds (the default for Xcode's Debug
+/// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
 ///   configuration), stop program execution in a debuggable state after
 ///   printing `message`.
 ///
-/// * In -O builds, has no effect.
+/// * In `-O` builds, has no effect.
 ///
-/// * In -Ounchecked builds, the optimizer may assume that this function is
+/// * In `-Ounchecked` builds, the optimizer may assume that this function is
 ///   never called. Failure to satisfy that assumption is a serious
 ///   programming error.
 ///
