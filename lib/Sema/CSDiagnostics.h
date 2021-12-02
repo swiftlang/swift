@@ -42,13 +42,17 @@ class FunctionArgApplyInfo;
 class FailureDiagnostic {
   const Solution &S;
   ConstraintLocator *Locator;
+  bool isWarning;
 
 public:
-  FailureDiagnostic(const Solution &solution, ConstraintLocator *locator)
-      : S(solution), Locator(locator) {}
+  FailureDiagnostic(const Solution &solution, ConstraintLocator *locator,
+                    bool isWarning = false)
+      : S(solution), Locator(locator), isWarning(isWarning) {}
 
-  FailureDiagnostic(const Solution &solution, ASTNode anchor)
-      : FailureDiagnostic(solution, solution.getConstraintLocator(anchor)) {}
+  FailureDiagnostic(const Solution &solution, ASTNode anchor,
+                    bool isWarning = false)
+      : FailureDiagnostic(solution, solution.getConstraintLocator(anchor),
+                          isWarning) { }
 
   virtual ~FailureDiagnostic();
 
@@ -601,7 +605,7 @@ class ContextualFailure : public FailureDiagnostic {
 
 public:
   ContextualFailure(const Solution &solution, Type lhs, Type rhs,
-                    ConstraintLocator *locator)
+                    ConstraintLocator *locator, bool isWarning = false)
       : ContextualFailure(
             solution,
             locator->isForContextualType()
@@ -609,12 +613,13 @@ public:
                       .getPurpose()
                 : solution.getConstraintSystem().getContextualTypePurpose(
                       locator->getAnchor()),
-            lhs, rhs, locator) {}
+            lhs, rhs, locator, isWarning) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
-                    Type lhs, Type rhs, ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), CTP(purpose), RawFromType(lhs),
-        RawToType(rhs) {
+                    Type lhs, Type rhs, ConstraintLocator *locator,
+                    bool isWarning = false)
+      : FailureDiagnostic(solution, locator, isWarning), CTP(purpose),
+        RawFromType(lhs), RawToType(rhs) {
     assert(lhs && "Expected a valid 'from' type");
     assert(rhs && "Expected a valid 'to' type");
   }
@@ -753,8 +758,9 @@ public:
 
   AttributedFuncToTypeConversionFailure(const Solution &solution, Type fromType,
                                         Type toType, ConstraintLocator *locator,
-                                        AttributeKind attributeKind)
-      : ContextualFailure(solution, fromType, toType, locator),
+                                        AttributeKind attributeKind,
+                                        bool isWarning = false)
+      : ContextualFailure(solution, fromType, toType, locator, isWarning),
         attributeKind(attributeKind) {}
 
   bool diagnoseAsError() override;
@@ -777,8 +783,9 @@ private:
 class DroppedGlobalActorFunctionAttr final : public ContextualFailure {
 public:
   DroppedGlobalActorFunctionAttr(const Solution &solution, Type fromType,
-                                 Type toType, ConstraintLocator *locator)
-      : ContextualFailure(solution, fromType, toType, locator) {}
+                                 Type toType, ConstraintLocator *locator,
+                                 bool isWarning)
+    : ContextualFailure(solution, fromType, toType, locator, isWarning) { }
 
   bool diagnoseAsError() override;
 };
@@ -1942,8 +1949,9 @@ class ArgumentMismatchFailure : public ContextualFailure {
 
 public:
   ArgumentMismatchFailure(const Solution &solution, Type argType,
-                          Type paramType, ConstraintLocator *locator)
-      : ContextualFailure(solution, argType, paramType, locator),
+                          Type paramType, ConstraintLocator *locator,
+                          bool warning = false)
+      : ContextualFailure(solution, argType, paramType, locator, warning),
         Info(*getFunctionArgApplyInfo(getLocator())) {}
 
   bool diagnoseAsError() override;
@@ -2112,16 +2120,15 @@ public:
 /// ```
 class NonEphemeralConversionFailure final : public ArgumentMismatchFailure {
   ConversionRestrictionKind ConversionKind;
-  bool DowngradeToWarning;
 
 public:
   NonEphemeralConversionFailure(const Solution &solution,
                                 ConstraintLocator *locator, Type fromType,
                                 Type toType,
                                 ConversionRestrictionKind conversionKind,
-                                bool downgradeToWarning)
-      : ArgumentMismatchFailure(solution, fromType, toType, locator),
-        ConversionKind(conversionKind), DowngradeToWarning(downgradeToWarning) {
+                                bool warning)
+      : ArgumentMismatchFailure(solution, fromType, toType, locator, warning),
+        ConversionKind(conversionKind) {
   }
 
   bool diagnoseAsError() override;
