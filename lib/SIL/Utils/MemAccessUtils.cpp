@@ -1893,6 +1893,7 @@ static bool isScratchBuffer(SILValue value) {
 
 bool swift::memInstMustInitialize(Operand *memOper) {
   SILValue address = memOper->get();
+
   SILInstruction *memInst = memOper->getUser();
 
   switch (memInst->getKind()) {
@@ -1908,6 +1909,12 @@ bool swift::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::InjectEnumAddrInst:
     return true;
 
+  case SILInstructionKind::BeginApplyInst:
+  case SILInstructionKind::TryApplyInst:
+  case SILInstructionKind::ApplyInst: {
+    FullApplySite applySite(memInst);
+    return applySite.isIndirectResultOperand(*memOper);
+  }
   case SILInstructionKind::StoreInst:
     return cast<StoreInst>(memInst)->getOwnershipQualifier()
            == StoreOwnershipQualifier::Init;
