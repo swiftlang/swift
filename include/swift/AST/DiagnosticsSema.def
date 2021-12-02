@@ -4719,7 +4719,8 @@ ERROR(async_named_decl_must_be_available_from_async,none,
         "asynchronous %0 %1 must be available from asynchronous contexts",
         (DescriptiveDeclKind, DeclName))
 ERROR(async_unavailable_decl,none,
-      "%0 %1 is unavailable from asynchronous contexts", (DescriptiveDeclKind, DeclBaseName))
+      "%0 %1 is unavailable from asynchronous contexts%select{|; %3}2",
+      (DescriptiveDeclKind, DeclBaseName, bool, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
