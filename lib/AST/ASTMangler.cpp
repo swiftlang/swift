@@ -266,8 +266,8 @@ std::string ASTMangler::mangleGlobalVariableFull(const VarDecl *decl) {
       if (clangDecl->getDeclContext()->isTranslationUnit()) {
         Buffer << clangDecl->getName();
       } else {
-        clang::MangleContext *mangler =
-          decl->getClangDecl()->getASTContext().createMangleContext();
+        std::unique_ptr<clang::MangleContext> mangler(
+            decl->getClangDecl()->getASTContext().createMangleContext());
         mangler->mangleName(clangDecl, Buffer);
       }
     }
