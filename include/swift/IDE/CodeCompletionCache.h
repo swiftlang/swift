@@ -13,8 +13,9 @@
 #ifndef SWIFT_IDE_CODE_COMPLETIONCACHE_H
 #define SWIFT_IDE_CODE_COMPLETIONCACHE_H
 
-#include "swift/IDE/CodeCompletion.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/IDE/CodeCompletion.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/Chrono.h"
 #include <system_error>
@@ -43,17 +44,19 @@ public:
     bool ForTestableLookup;
     bool ForPrivateImportLookup;
     bool AddInitsInToplevel;
+    bool AddCallWithNoDefaultArgs;
     bool Annotated;
 
     friend bool operator==(const Key &LHS, const Key &RHS) {
       return LHS.ModuleFilename == RHS.ModuleFilename &&
-        LHS.ModuleName == RHS.ModuleName &&
-        LHS.AccessPath == RHS.AccessPath &&
-        LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot &&
-        LHS.ForTestableLookup == RHS.ForTestableLookup &&
-        LHS.ForPrivateImportLookup == RHS.ForPrivateImportLookup &&
-        LHS.AddInitsInToplevel == RHS.AddInitsInToplevel &&
-        LHS.Annotated == RHS.Annotated;
+             LHS.ModuleName == RHS.ModuleName &&
+             LHS.AccessPath == RHS.AccessPath &&
+             LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot &&
+             LHS.ForTestableLookup == RHS.ForTestableLookup &&
+             LHS.ForPrivateImportLookup == RHS.ForPrivateImportLookup &&
+             LHS.AddInitsInToplevel == RHS.AddInitsInToplevel &&
+             LHS.AddCallWithNoDefaultArgs == RHS.AddCallWithNoDefaultArgs &&
+             LHS.Annotated == RHS.Annotated;
     }
   };
 
@@ -110,23 +113,18 @@ template<>
 struct DenseMapInfo<swift::ide::CodeCompletionCache::Key> {
   using KeyTy = swift::ide::CodeCompletionCache::Key;
   static inline KeyTy getEmptyKey() {
-    return KeyTy{"", "", {}, false, false, false, false, false};
+    return KeyTy{"", "", {}, false, false, false, false, false, false};
   }
   static inline KeyTy getTombstoneKey() {
-    return KeyTy{"", "", {}, true, false, false, false, false};
+    return KeyTy{"", "", {}, true, false, false, false, false, false};
   }
   static unsigned getHashValue(const KeyTy &Val) {
-    size_t H = 0;
-    H ^= std::hash<std::string>()(Val.ModuleFilename);
-    H ^= std::hash<std::string>()(Val.ModuleName);
-    for (auto Piece : Val.AccessPath)
-      H ^= std::hash<std::string>()(Piece);
-    H ^= std::hash<bool>()(Val.ResultsHaveLeadingDot);
-    H ^= std::hash<bool>()(Val.ForTestableLookup);
-    H ^= std::hash<bool>()(Val.ForPrivateImportLookup);
-    H ^= std::hash<bool>()(Val.AddInitsInToplevel);
-    H ^= std::hash<bool>()(Val.Annotated);
-    return static_cast<unsigned>(H);
+    return llvm::hash_combine(
+        Val.ModuleFilename, Val.ModuleName,
+        llvm::hash_combine_range(Val.AccessPath.begin(), Val.AccessPath.end()),
+        Val.ResultsHaveLeadingDot, Val.ForTestableLookup,
+        Val.ForPrivateImportLookup, Val.AddInitsInToplevel,
+        Val.AddCallWithNoDefaultArgs, Val.Annotated);
   }
   static bool isEqual(const KeyTy &LHS, const KeyTy &RHS) {
     return LHS == RHS;

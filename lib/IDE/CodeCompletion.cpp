@@ -2777,8 +2777,9 @@ public:
     }
   }
 
-  static bool hasInterestingDefaultValues(const AbstractFunctionDecl *func) {
-    if (!func) return false;
+  bool addItemWithoutDefaultArgs(const AbstractFunctionDecl *func) {
+    if (!func || !Sink.addCallWithNoDefaultArgs)
+      return false;
     for (auto param : *func->getParameters()) {
       if (hasInterestingDefaultValue(param))
         return true;
@@ -3078,7 +3079,7 @@ public:
       if (isImplicitlyCurriedInstanceMethod) {
         addPattern({AFD->getImplicitSelfDecl()}, /*includeDefaultArgs=*/true);
       } else {
-        if (hasInterestingDefaultValues(AFD))
+        if (addItemWithoutDefaultArgs(AFD))
           addPattern(AFD->getParameters()->getArray(),
                      /*includeDefaultArgs=*/false);
         addPattern(AFD->getParameters()->getArray(),
@@ -3282,7 +3283,7 @@ public:
       if (trivialTrailingClosure)
         addMethodImpl(/*includeDefaultArgs=*/false,
                       /*trivialTrailingClosure=*/true);
-      if (hasInterestingDefaultValues(FD))
+      if (addItemWithoutDefaultArgs(FD))
         addMethodImpl(/*includeDefaultArgs=*/false);
       addMethodImpl(/*includeDefaultArgs=*/true);
     }
@@ -3372,8 +3373,8 @@ public:
       }
     };
 
-    if (ConstructorType && hasInterestingDefaultValues(CD))
-      addConstructorImpl(/*includeDefaultArgs*/ false);
+    if (ConstructorType && addItemWithoutDefaultArgs(CD))
+      addConstructorImpl(/*includeDefaultArgs=*/false);
     addConstructorImpl();
   }
 
@@ -6653,8 +6654,8 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                 AccessLevel::Internal, TheModule,
                 SourceFile::ImportQueryKind::PrivateOnly),
             CompletionContext.getAddInitsToTopLevel(),
-            CompletionContext.getAnnotateResult(),
-        };
+            CompletionContext.addCallWithNoDefaultArgs(),
+            CompletionContext.getAnnotateResult()};
 
         using PairType = llvm::DenseSet<swift::ide::CodeCompletionCache::Key,
             llvm::DenseMapInfo<CodeCompletionCache::Key>>::iterator;
@@ -7548,6 +7549,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       Sink.addInitsToTopLevel = context.getAddInitsToTopLevel();
       Sink.enableCallPatternHeuristics = context.getCallPatternHeuristics();
       Sink.includeObjectLiterals = context.includeObjectLiterals();
+      Sink.addCallWithNoDefaultArgs = context.addCallWithNoDefaultArgs();
       lookupCodeCompletionResultsFromModule(
           (*V)->Sink, R.TheModule, R.Key.AccessPath,
           R.Key.ResultsHaveLeadingDot, SF);

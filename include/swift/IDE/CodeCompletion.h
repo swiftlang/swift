@@ -962,6 +962,9 @@ struct CodeCompletionResultSink {
   /// Whether to perform "call pettern heuristics".
   bool enableCallPatternHeuristics = false;
 
+  /// Whether to include an item without any default arguments.
+  bool addCallWithNoDefaultArgs = true;
+
   std::vector<CodeCompletionResult *> Results;
 
   /// A single-element cache for module names stored in Allocator, keyed by a
@@ -1052,6 +1055,13 @@ public:
   }
   bool getCallPatternHeuristics() const {
     return CurrentResults.enableCallPatternHeuristics;
+  }
+
+  void setAddCallWithNoDefaultArgs(bool flag) {
+    CurrentResults.addCallWithNoDefaultArgs = flag;
+  }
+  bool addCallWithNoDefaultArgs() const {
+    return CurrentResults.addCallWithNoDefaultArgs;
   }
 
   /// Allocate a string owned by the code completion context.
