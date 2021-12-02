@@ -20,8 +20,6 @@ from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
 from build_swift.build_swift.constants import SWIFT_REPO_NAME
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
-import six
-
 from swift_build_support.swift_build_support import products
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support import targets
@@ -494,7 +492,7 @@ class BuildScriptInvocation(object):
             try:
                 config = HostSpecificConfiguration(host_target, args)
             except argparse.ArgumentError as e:
-                exit_rejecting_arguments(six.text_type(e))
+                exit_rejecting_arguments(str(e))
 
             # Convert into `build-script-impl` style variables.
             options[host_target] = {
@@ -607,7 +605,7 @@ class BuildScriptInvocation(object):
         builder.add_product(products.SwiftDocC,
                             is_enabled=self.args.build_swiftdocc)
         builder.add_product(products.SwiftDocCRender,
-                            is_enabled=self.args.install_swiftdocc)                  
+                            is_enabled=self.args.install_swiftdocc)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully
@@ -693,7 +691,7 @@ class BuildScriptInvocation(object):
             try:
                 config = HostSpecificConfiguration(host_target.name, self.args)
             except argparse.ArgumentError as e:
-                exit_rejecting_arguments(six.text_type(e))
+                exit_rejecting_arguments(str(e))
             print("Building the standard library for: {}".format(
                 " ".join(config.swift_stdlib_build_targets)))
             if config.swift_test_run_targets and (

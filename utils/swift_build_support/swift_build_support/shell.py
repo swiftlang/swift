@@ -13,8 +13,6 @@ Centralized command line and file system interface for the build script.
 """
 # ----------------------------------------------------------------------------
 
-from __future__ import print_function
-
 import os
 import pipes
 import platform
@@ -132,12 +130,11 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         _env = dict(os.environ)
         _env.update(env)
     try:
-        out = subprocess.check_output(command, env=_env, stderr=stderr)
-        # Coerce to `str` hack. not py3 `byte`, not py2 `unicode`.
-        return str(out.decode())
+        out = subprocess.check_output(command, env=_env, stderr=stderr, text=True)
+        return out
     except subprocess.CalledProcessError as e:
         if allow_non_zero_exit:
-            return str(e.output.decode())
+            return e.output
         if optional:
             return None
         _fatal_error(

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This source file is part of the Swift.org open source project
 #
@@ -8,13 +8,9 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-
 """
 Small script used to easily run the swift_build_support module unit tests.
 """
-
-
-from __future__ import absolute_import, unicode_literals
 
 import os
 import sys

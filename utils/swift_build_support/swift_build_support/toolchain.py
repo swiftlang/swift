@@ -14,8 +14,6 @@ Represent toolchain - the versioned executables.
 """
 # ----------------------------------------------------------------------------
 
-from __future__ import absolute_import
-
 import os
 import platform
 
@@ -24,7 +22,6 @@ from build_swift.build_swift.shell import which
 from build_swift.build_swift.wrappers import xcrun
 
 from . import shell
-
 
 __all__ = [
     'host_toolchain',
