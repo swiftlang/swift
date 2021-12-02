@@ -406,6 +406,8 @@ public:
       SingleValueInstruction *user, SingleValueInstruction *value,
       function_ref<SILValue()> newValueGenerator);
 
+  SILInstruction *optimizeAlignment(PointerToAddressInst *ptrAdrInst);
+
   InstModCallbacks &getInstModCallbacks() { return deleter.getCallbacks(); }
 
 private:

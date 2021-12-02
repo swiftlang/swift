@@ -820,6 +820,24 @@ BUILTIN_MISC_OPERATION(Move, "move", "", Special)
 /// the SILVerifier.
 BUILTIN_MISC_OPERATION(Copy, "copy", "", Special)
 
+/// Unchecked pointer alignment assertion. Allows the compiler to assume
+/// alignment of the pointer to emit more efficient code.
+///
+///   %alignedPtr = builtin "assumeAlignment" (%ptr : $Builtin.RawPointer,
+///                                            %alignment : $Builtin.Int)
+///                                           : $Builtin.RawPointer
+///   %address = pointer_to_address %alignedPtr
+///              : $Builtin.RawPointer to [align=1] $*Int
+///   %val = load %address : $*Int
+///
+/// With compile-time knowledge of the value of `%alignment` the compiler can
+/// optimize any downstream 'pointer_to_address' instruction by refining its
+/// '[align=]' flag . That `[align=]` flag can be used by IRGen to refine the
+/// alignment on LLVM load instructions that use the resulting address.
+///
+/// (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION(AssumeAlignment, "assumeAlignment", "n", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //
