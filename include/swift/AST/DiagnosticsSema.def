@@ -1881,9 +1881,6 @@ WARNING(spi_attribute_on_import_of_public_module,none,
         (DeclName, StringRef))
 
 // Opaque return types
-ERROR(structural_opaque_types_are_experimental,none,
-      "'opaque' types cannot be nested inside other types; "
-      "structural 'opaque' types are an experimental feature", ())
 ERROR(opaque_type_invalid_constraint,none,
       "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
       "and/or a base class", ())
@@ -4878,6 +4875,10 @@ ERROR(opaque_type_unsupported_pattern,none,
 ERROR(opaque_type_in_protocol_requirement,none,
       "'some' type cannot be the return type of a protocol requirement; did you mean to add an associated type?",
       ())
+ERROR(opaque_type_in_parameter,none,
+      "'some' cannot appear in parameter position in result "
+      "type %0",
+      (Type))
 
 // Function differentiability
 ERROR(attr_only_on_parameters_of_differentiable,none,
