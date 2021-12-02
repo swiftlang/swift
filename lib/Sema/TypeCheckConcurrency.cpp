@@ -3554,31 +3554,6 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
     }
   }
 
-  // If the overriding declaration uses an unsafe global actor, we can do
-  // anything that doesn't actively conflict with the overridden isolation.
-  if (isolation == ActorIsolation::GlobalActorUnsafe) {
-    switch (overriddenIsolation) {
-    case ActorIsolation::Unspecified:
-      return;
-
-    case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
-    case ActorIsolation::Independent:
-      // Diagnose below.
-      break;
-
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      // The global actors don't match; diagnose it.
-      if (overriddenIsolation.getGlobalActor()->isEqual(
-              isolation.getGlobalActor()))
-        return;
-
-      // Diagnose below.
-      break;
-    }
-  }
-
   // Isolation mismatch. Diagnose it.
   value->diagnose(
       diag::actor_isolation_override_mismatch, isolation,
