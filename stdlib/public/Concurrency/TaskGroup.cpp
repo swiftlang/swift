@@ -281,7 +281,13 @@ private:
 
 #if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
   // TODO: move to lockless via the status atomic (make readyQueue an mpsc_queue_t<ReadyQueueItem>)
-  mutable std::mutex mutex;
+  mutable std::mutex mutex_;
+
+  void lock() const { mutex_.lock(); }
+  void unlock() const { mutex_.unlock(); }
+#else
+  void lock() const {}
+  void unlock() const {}
 #endif
 
   /// Used for queue management, counting number of waiting and ready tasks
@@ -561,9 +567,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   assert(completedTask->groupChildFragment()->getGroup() == asAbstract(this));
   SWIFT_TASK_DEBUG_LOG("offer task %p to group %p", completedTask, this);
 
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-  mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
-#endif
+  lock(); // TODO: remove fragment lock, and use status for synchronization
 
   // Immediately increment ready count and acquire the status
   // Examples:
@@ -601,9 +605,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
         // Run the task.
         auto result = PollResult::get(completedTask, hadErrorResult);
 
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-        mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-#endif
+        unlock(); // TODO: remove fragment lock, and use status for synchronization
 
         auto waitingContext =
             static_cast<TaskFutureWaitAsyncContext *>(
@@ -643,9 +645,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   assert(completedTask == readyItem.getTask());
   assert(readyItem.getTask()->isFuture());
   readyQueue.enqueue(readyItem);
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-  mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-#endif
+  unlock(); // TODO: remove fragment lock, and use status for synchronization
   return;
 }
 
@@ -730,9 +730,7 @@ static void swift_taskGroup_wait_next_throwingImpl(
 }
 
 PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-  mutex.lock(); // TODO: remove group lock, and use status for synchronization
-#endif
+  lock(); // TODO: remove group lock, and use status for synchronization
   SWIFT_TASK_DEBUG_LOG("poll group = %p", this);
   auto assumed = statusMarkWaitingAssumeAcquire();
 
@@ -750,9 +748,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
     statusRemoveWaiting();
     result.status = PollStatus::Empty;
     result.successType = this->successType;
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-    mutex.unlock(); // TODO: remove group lock, and use status for synchronization
-#endif
+    unlock(); // TODO: remove group lock, and use status for synchronization
     return result;
   }
 
@@ -799,9 +795,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.successType = futureFragment->getResultType();
           assert(result.retainedTask && "polled a task, it must be not null");
           _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-          mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-#endif
+          unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
 
         case ReadyStatus::Error:
@@ -812,9 +806,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.successType = nullptr;
           assert(result.retainedTask && "polled a task, it must be not null");
           _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-          mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-#endif
+          unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
 
         case ReadyStatus::Empty:
@@ -822,9 +814,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.storage = nullptr;
           result.retainedTask = nullptr;
           result.successType = this->successType;
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-          mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-#endif
+          unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
       }
       assert(false && "must return result when status compare-and-swap was successful");
@@ -844,9 +834,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
         waitHead, waitingTask,
         /*success*/ std::memory_order_release,
         /*failure*/ std::memory_order_acquire)) {
-#if !SWIFT_STDLIB_SINGLE_THREADED_RUNTIME
-      mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-#endif
+      unlock(); // TODO: remove fragment lock, and use status for synchronization
       // no ready tasks, so we must wait.
       result.status = PollStatus::MustWait;
       _swift_task_clearCurrent();
