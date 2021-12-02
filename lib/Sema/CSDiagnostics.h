@@ -1949,8 +1949,9 @@ class ArgumentMismatchFailure : public ContextualFailure {
 
 public:
   ArgumentMismatchFailure(const Solution &solution, Type argType,
-                          Type paramType, ConstraintLocator *locator)
-      : ContextualFailure(solution, argType, paramType, locator),
+                          Type paramType, ConstraintLocator *locator,
+                          bool warning = false)
+      : ContextualFailure(solution, argType, paramType, locator, warning),
         Info(*getFunctionArgApplyInfo(getLocator())) {}
 
   bool diagnoseAsError() override;
@@ -2119,16 +2120,15 @@ public:
 /// ```
 class NonEphemeralConversionFailure final : public ArgumentMismatchFailure {
   ConversionRestrictionKind ConversionKind;
-  bool DowngradeToWarning;
 
 public:
   NonEphemeralConversionFailure(const Solution &solution,
                                 ConstraintLocator *locator, Type fromType,
                                 Type toType,
                                 ConversionRestrictionKind conversionKind,
-                                bool downgradeToWarning)
-      : ArgumentMismatchFailure(solution, fromType, toType, locator),
-        ConversionKind(conversionKind), DowngradeToWarning(downgradeToWarning) {
+                                bool warning)
+      : ArgumentMismatchFailure(solution, fromType, toType, locator, warning),
+        ConversionKind(conversionKind) {
   }
 
   bool diagnoseAsError() override;

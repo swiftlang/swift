@@ -6782,12 +6782,9 @@ bool NonEphemeralConversionFailure::diagnosePointerInit() const {
     return false;
   }
 
-  auto diagID = DowngradeToWarning
-                    ? diag::cannot_construct_dangling_pointer_warning
-                    : diag::cannot_construct_dangling_pointer;
-
   auto anchor = getRawAnchor();
-  emitDiagnosticAt(::getLoc(anchor), diagID, constructedTy, constructorKind)
+  emitDiagnosticAt(::getLoc(anchor), diag::cannot_construct_dangling_pointer,
+                   constructedTy, constructorKind)
       .highlight(::getSourceRange(anchor));
 
   emitSuggestionNotes();
@@ -6817,20 +6814,12 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
 
   auto *argExpr = getArgExpr();
   if (isa<InOutExpr>(argExpr)) {
-    auto diagID = DowngradeToWarning
-                      ? diag::cannot_use_inout_non_ephemeral_warning
-                      : diag::cannot_use_inout_non_ephemeral;
-
-    emitDiagnosticAt(argExpr->getLoc(), diagID, argDesc, getCallee(),
-                     getCalleeFullName())
+    emitDiagnosticAt(argExpr->getLoc(), diag::cannot_use_inout_non_ephemeral,
+                     argDesc, getCallee(), getCalleeFullName())
         .highlight(argExpr->getSourceRange());
   } else {
-    auto diagID = DowngradeToWarning
-                      ? diag::cannot_pass_type_to_non_ephemeral_warning
-                      : diag::cannot_pass_type_to_non_ephemeral;
-
-    emitDiagnosticAt(argExpr->getLoc(), diagID, getArgType(), argDesc,
-                     getCallee(), getCalleeFullName())
+    emitDiagnosticAt(argExpr->getLoc(), diag::cannot_pass_type_to_non_ephemeral,
+                     getArgType(), argDesc, getCallee(), getCalleeFullName())
         .highlight(argExpr->getSourceRange());
   }
   emitSuggestionNotes();
