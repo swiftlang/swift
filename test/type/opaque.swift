@@ -76,10 +76,8 @@ struct Test {
 let zingle = {() -> some P in 1 } // expected-error{{'some' types are only implemented}}
 
 
-// Support for structural opaque result types is hidden behind a compiler flag
-// until the proposal gets approved.
-func twoOpaqueTypes() -> (some P, some P) { return (1, 2) } // expected-error{{'opaque' types cannot be nested inside other types}}
-func asArrayElem() -> (some P)! { return [1] } // expected-error{{'opaque' types cannot be nested inside other types}}
+func twoOpaqueTypes() -> (some P, some P) { return (1, 2) } // expected-error{{'(some P, some P)' contains multiple 'opaque' types, but only one 'opaque' type is supported}}
+func asArrayElem() -> [some P] { return [1] }
 
 // Invalid positions
 
