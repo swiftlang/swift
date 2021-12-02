@@ -1776,6 +1776,9 @@ public:
         }
 
         static bool treatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
+#ifndef NDEBUG
+        treatAsError = true;
+#endif
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
