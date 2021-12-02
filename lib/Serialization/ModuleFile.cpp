@@ -361,6 +361,7 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       modulePath.str(), std::move(newBuf), nullptr, nullptr,
       /*isFramework*/ isFramework, Ctx.SILOpts.EnableOSSAModules,
+      Ctx.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFile);
   Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());
@@ -997,6 +998,13 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
     return None;
 
   return getCommentForDeclByUSR(USRBuffer.str());
+}
+
+void ModuleFile::collectSerializedSearchPath(
+    llvm::function_ref<void(StringRef)> callback) const {
+  for (auto path: Core->SearchPaths) {
+    callback(path.Path);
+  }
 }
 
 void ModuleFile::collectBasicSourceFileInfo(

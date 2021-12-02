@@ -45,6 +45,10 @@ namespace swift {
     /// Path prefixes that should be rewritten in debug info.
     PathRemapper DebuggingOptionsPrefixMap;
 
+    /// Obfuscate the serialized paths so we don't have the actual paths encoded
+    /// in the .swiftmodule file.
+    PathObfuscator PathObfuscator;
+
     /// Describes a single-file dependency for this module, along with the
     /// appropriate strategy for how to verify if it's up-to-date.
     class FileDependency {

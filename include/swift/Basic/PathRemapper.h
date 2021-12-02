@@ -58,6 +58,21 @@ public:
   }
 };
 
+class PathObfuscator {
+  PathRemapper obfuscator, recoverer;
+public:
+  void addMapping(StringRef FromPrefix, StringRef ToPrefix) {
+    obfuscator.addMapping(FromPrefix, ToPrefix);
+    recoverer.addMapping(ToPrefix, FromPrefix);
+  }
+  std::string obfuscate(StringRef Path) const {
+    return obfuscator.remapPath(Path);
+  }
+  std::string recover(StringRef Path) const {
+    return recoverer.remapPath(Path);
+  }
+};
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_PATHREMAPPER_H
