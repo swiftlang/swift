@@ -187,8 +187,8 @@ static ValueDecl *generateSpecializedCXXFunctionTemplate(
   // Generate a name for the specialized function.
   std::string newNameStr;
   llvm::raw_string_ostream buffer(newNameStr);
-  clang::MangleContext *mangler =
-      specialized->getASTContext().createMangleContext();
+  std::unique_ptr<clang::MangleContext> mangler(
+      specialized->getASTContext().createMangleContext());
   mangler->mangleName(specialized, buffer);
   buffer.flush();
   // Add all parameters as empty parameters.
