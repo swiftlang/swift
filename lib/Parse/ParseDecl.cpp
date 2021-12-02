@@ -2749,6 +2749,45 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     Attributes.add(TypeSequenceAttr::create(Context, AtLoc, range));
     break;
   }
+
+  case DAK_UnavailableFromAsync: {
+
+    StringRef message;
+    if (consumeIf(tok::l_paren)) {
+      if (!Tok.is(tok::identifier)) {
+        llvm_unreachable("Flag must start with an indentifier");
+      }
+
+      StringRef flag = Tok.getText();
+
+      if (flag != "message") {
+        llvm_unreachable("Unknown unavailable argument");
+      }
+      consumeToken();
+      if (!consumeIf(tok::colon)) {
+        llvm_unreachable("Expected ':' following 'message'");
+      }
+      if (!Tok.is(tok::string_literal)) {
+        llvm_unreachable("Expected string literal");
+      }
+
+      Optional<StringRef> value = getStringLiteralIfNotInterpolated(
+          Loc, "' I don't know what goes here! '");
+      if (!value)
+        llvm_unreachable("Expected a message, homie");
+
+      consumeToken();
+
+      message = *value;
+
+      if (!consumeIf(tok::r_paren))
+        llvm_unreachable("Expected a closing r-paren");
+    }
+
+    Attributes.add(new (Context) UnavailableFromAsyncAttr(
+        message, AtLoc, SourceRange(Loc, Tok.getLoc()), false));
+    break;
+  }
   }
 
   if (DuplicateAttribute) {

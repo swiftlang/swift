@@ -2022,6 +2022,12 @@ namespace decls_block {
     TypeIDField, // type referenced by this custom attribute
     BCFixed<1>   // is the argument (unsafe)
   >;
+
+  using UnavailableFromAsyncDeclAttrLayout = BCRecordLayout<
+    UnavailableFromAsync_DECL_ATTR,
+    BCFixed<1>, // Implicit flag
+    BCBlob      // Message
+  >;
 }
 
 /// Returns the encoding kind for the given decl.

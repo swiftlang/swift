@@ -35,7 +35,7 @@ actor Baz { }
 
 @available(SwiftStdlib 5.1, *)
 struct Bop {
-  @_unavailableFromAsync
+  @_unavailableFromAsync(message: "Use Bop(a: Int) instead")
   init() {}                 // expected-note 4 {{'init()' declared here}}
 
   init(a: Int) { }
@@ -59,7 +59,7 @@ func foo() {}               // expected-note 4 {{'foo()' declared here}}
 func makeAsyncClosuresSynchronously(bop: inout Bop) -> (() async -> Void) {
   return { () async -> Void in
     // Unavailable methods
-    _ = Bop()     // expected-warning@:9{{'init' is unavailable from asynchronous contexts}}
+    _ = Bop()     // expected-warning@:9{{'init' is unavailable from asynchronous contexts; Use Bop(a: Int) instead}}
     _ = Bop(a: 32)
     bop.foo()     // expected-warning@:9{{'foo' is unavailable from asynchronous contexts}}
     bop.muppet()  // expected-warning@:9{{'muppet' is unavailable from asynchronous contexts}}
@@ -83,7 +83,7 @@ func makeAsyncClosuresSynchronously(bop: inout Bop) -> (() async -> Void) {
 func asyncFunc() async { // expected-error{{asynchronous global function 'asyncFunc()' must be available from asynchronous contexts}}
 
   var bop = Bop(a: 32)
-  _ = Bop()     // expected-warning@:7{{'init' is unavailable from asynchronous contexts}}
+  _ = Bop()     // expected-warning@:7{{'init' is unavailable from asynchronous contexts; Use Bop(a: Int) instead}}
   bop.foo()     // expected-warning@:7{{'foo' is unavailable from asynchronous contexts}}
   bop.muppet()  // expected-warning@:7{{'muppet' is unavailable from asynchronous contexts}}
   unavailableFunction() // expected-warning@:3{{'unavailableFunction' is unavailable from asynchronous contexts}}
@@ -107,13 +107,13 @@ func asyncFunc() async { // expected-error{{asynchronous global function 'asyncF
       foo()           // expected-warning@:7{{'foo' is unavailable from asynchronous contexts}}
       bop.foo()       // expected-warning@:11{{'foo' is unavailable from asynchronous contexts}}
       bop.muppet()    // expected-warning@:11{{'muppet' is unavailable from asynchronous contexts}}
-      _ = Bop()       // expected-warning@:11{{'init' is unavailable from asynchronous contexts}}
+      _ = Bop()       // expected-warning@:11{{'init' is unavailable from asynchronous contexts; Use Bop(a: Int) instead}}
       unavailableFunction() // expected-warning@:7{{'unavailableFunction' is unavailable from asynchronous contexts}}
     }
   }
 
   _ = { () async -> Void in
-    _ = Bop()     // expected-warning@:9{{'init' is unavailable from asynchronous contexts}}
+    _ = Bop()     // expected-warning@:9{{'init' is unavailable from asynchronous contexts; Use Bop(a: Int) instead}}
     foo()         // expected-warning@:5{{'foo' is unavailable from asynchronous contexts}}
     bop.foo()     // expected-warning@:9{{'foo' is unavailable from asynchronous contexts}}
     bop.muppet()  // expected-warning@:9{{'muppet' is unavailable from asynchronous contexts}}
