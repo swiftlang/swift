@@ -586,6 +586,7 @@ private:
     case Node::Kind::IndexSubset:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
+    case Node::Kind::AccessibleFunctionRecord:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2001,6 +2002,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::DistributedMethodAccessor:
     if (!Options.ShortenThunk) {
       Printer << "distributed method accessor for ";
+    }
+    return nullptr;
+  case Node::Kind::AccessibleFunctionRecord:
+    if (!Options.ShortenThunk) {
+      Printer << "accessible function runtime record for ";
     }
     return nullptr;
   case Node::Kind::DynamicallyReplaceableFunctionKey:

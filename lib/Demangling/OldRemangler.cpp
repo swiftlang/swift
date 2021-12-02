@@ -2784,3 +2784,9 @@ Demangle::mangleNodeAsObjcCString(NodePointer node,
 
   return remangler.getBufferStr().data();
 }
+
+ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
+                                                        unsigned depth) {
+  Buffer << "HF";
+  return ManglingError::Success;
+}

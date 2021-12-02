@@ -140,6 +140,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::AsyncFunctionPointer:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
+    case Node::Kind::AccessibleFunctionRecord:
       return true;
     default:
       return false;
@@ -800,7 +801,7 @@ recur:
         return createWithChild(
             Node::Kind::ProtocolConformanceRefInProtocolModule, popProtocol());
 
-      // Runtime records (type/protocol/conformance)
+      // Runtime records (type/protocol/conformance/function)
       case 'c':
         return createWithChild(Node::Kind::ProtocolConformanceDescriptorRecord,
                                popProtocolConformance());
@@ -810,6 +811,8 @@ recur:
         return createWithChild(Node::Kind::OpaqueTypeDescriptorRecord, popNode());
       case 'r':
         return createWithChild(Node::Kind::ProtocolDescriptorRecord, popProtocol());
+      case 'F':
+        return createNode(Node::Kind::AccessibleFunctionRecord);
 
       default:
         pushBack();

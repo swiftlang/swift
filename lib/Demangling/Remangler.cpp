@@ -1618,6 +1618,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::AsyncFunctionPointer:
       case Node::Kind::AsyncAwaitResumePartialFunction:
       case Node::Kind::AsyncSuspendResumePartialFunction:
+      case Node::Kind::AccessibleFunctionRecord:
         mangleInReverseOrder = true;
         break;
       default:
@@ -3378,6 +3379,12 @@ ManglingError Remangler::mangleGlobalVariableOnceDeclList(Node *node,
     RETURN_IF_ERROR(mangle(node->getChild(i), depth + 1));
     Buffer << '_';
   }
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleAccessibleFunctionRecord(Node *node,
+                                                        unsigned depth) {
+  Buffer << "HF";
   return ManglingError::Success;
 }
 

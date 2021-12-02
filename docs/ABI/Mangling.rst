@@ -143,6 +143,7 @@ Globals
     global ::= opaque-type 'Ho'          // opaque type descriptor runtime record
   #endif
   global ::= protocol-conformance 'Hc'   // protocol conformance runtime record
+  global ::= global 'HF'                 // accessible function runtime record
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
 
