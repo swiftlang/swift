@@ -849,14 +849,24 @@ extension String {
       }
     }
 
-    var result = ""
-    result.reserveCapacity(utf8.count)
+    var buffer: [UInt8] = []
+    buffer.reserveCapacity(utf8.count)
 
     for scalar in unicodeScalars {
-      result += scalar.properties.lowercaseMapping
+      switch scalar.properties._getMapping(.lowercase) {
+      case .scalar(let scalar):
+        scalar.withUTF8CodeUnits {
+          buffer.append(contentsOf: $0)
+        }
+
+      case .specialMapping(let specialMapping):
+        buffer.append(contentsOf: specialMapping)
+      }
     }
 
-    return result
+    return buffer.withUnsafeBufferPointer {
+      String._uncheckedFromUTF8($0, isASCII: false)
+    }
   }
 
   /// Returns an uppercase version of the string.
@@ -883,14 +893,24 @@ extension String {
       }
     }
 
-    var result = ""
-    result.reserveCapacity(utf8.count)
+    var buffer: [UInt8] = []
+    buffer.reserveCapacity(utf8.count)
 
     for scalar in unicodeScalars {
-      result += scalar.properties.uppercaseMapping
+      switch scalar.properties._getMapping(.uppercase) {
+      case .scalar(let scalar):
+        scalar.withUTF8CodeUnits {
+          buffer.append(contentsOf: $0)
+        }
+
+      case .specialMapping(let specialMapping):
+        buffer.append(contentsOf: specialMapping)
+      }
     }
 
-    return result
+    return buffer.withUnsafeBufferPointer {
+      String._uncheckedFromUTF8($0, isASCII: false)
+    }
   }
 
   /// Creates an instance from the description of a given

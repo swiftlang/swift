@@ -743,15 +743,30 @@ extension Unicode.Scalar.Properties {
 
 /// Case mapping properties.
 extension Unicode.Scalar.Properties {
-  fileprivate struct _CaseMapping {
+  internal struct _CaseMapping {
     let rawValue: UInt8
 
-    static let uppercase = _CaseMapping(rawValue: 0)
-    static let lowercase = _CaseMapping(rawValue: 1)
-    static let titlecase = _CaseMapping(rawValue: 2)
+    static var uppercase: _CaseMapping {
+      _CaseMapping(rawValue: 0)
+    }
+
+    static var lowercase: _CaseMapping {
+      _CaseMapping(rawValue: 1)
+    }
+
+    static var titlecase: _CaseMapping {
+      _CaseMapping(rawValue: 2)
+    }
   }
 
-  fileprivate func _getMapping(_ mapping: _CaseMapping) -> String {
+  internal enum _CaseMappingResult {
+    case scalar(Unicode.Scalar)
+    case specialMapping(UnsafeBufferPointer<UInt8>)
+  }
+
+  internal func _getMapping(
+    _ mapping: _CaseMapping
+  ) -> _CaseMappingResult {
     // First, check if our scalar has a special mapping where it's mapped to
     // more than 1 scalar.
     var specialMappingLength = 0
@@ -768,7 +783,7 @@ extension Unicode.Scalar.Properties {
         count: specialMappingLength
       )
 
-      return String._uncheckedFromUTF8(buffer, isASCII: false)
+      return .specialMapping(buffer)
     }
 
     // If we did not have a special mapping, check if we have a direct scalar
@@ -782,11 +797,26 @@ extension Unicode.Scalar.Properties {
       let scalar = Unicode.Scalar(
         _unchecked: UInt32(Int(_scalar.value) &+ Int(mappingDistance))
       )
-      return String(scalar)
+
+      return .scalar(scalar)
     }
 
     // We did not have any mapping. Return the scalar as is.
-    return String(_scalar)
+    return .scalar(_scalar)
+  }
+
+  fileprivate func _mappingToString(
+    _ mapping: _CaseMappingResult
+  ) -> String {
+    switch mapping {
+    // Single scalar mapping
+    case .scalar(let scalar):
+      return String(scalar)
+
+    // Special mapping buffer of scalars in UTF-8
+    case .specialMapping(let specialMapping):
+      return String._uncheckedFromUTF8(specialMapping, isASCII: false)
+    }
   }
 
   /// The lowercase mapping of the scalar.
@@ -800,7 +830,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Lowercase_Mapping" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var lowercaseMapping: String {
-    _getMapping(.lowercase)
+    _mappingToString(_getMapping(.lowercase))
   }
 
   /// The titlecase mapping of the scalar.
@@ -814,7 +844,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Titlecase_Mapping" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var titlecaseMapping: String {
-    _getMapping(.titlecase)
+    _mappingToString(_getMapping(.titlecase))
   }
 
   /// The uppercase mapping of the scalar.
@@ -828,7 +858,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Uppercase_Mapping" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var uppercaseMapping: String {
-    _getMapping(.uppercase)
+    _mappingToString(_getMapping(.uppercase))
   }
 }
 
