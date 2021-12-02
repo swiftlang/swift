@@ -1214,11 +1214,6 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     Opts.PlaceholderDependencyModuleMap = A->getValue();
   if (const Arg *A = Args.getLastArg(OPT_batch_scan_input_file))
     Opts.BatchScanInputFilePath = A->getValue();
-
-  for (auto A : Args.getAllArgValues(options::OPT_serialized_path_obfuscate)) {
-    auto SplitMap = StringRef(A).split('=');
-    Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
-  }
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
