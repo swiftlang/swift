@@ -1430,11 +1430,11 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitPointerToAddressInst(PointerToAddressInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createPointerToAddress(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType()),
-                                    Inst->isStrict(), Inst->isInvariant()));
+  recordClonedInstruction(
+      Inst, getBuilder().createPointerToAddress(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()), Inst->isStrict(),
+                Inst->isInvariant(), Inst->alignment()));
 }
 
 template<typename ImplClass>

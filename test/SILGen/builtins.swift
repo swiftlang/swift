@@ -33,7 +33,7 @@ func load_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins12load_raw_pod{{[_0-9a-zA-Z]*}}F
 func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.Int64
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [align=1] $*Builtin.Int64
   // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.loadRaw(x)
@@ -41,7 +41,7 @@ func load_raw_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins12load_raw_obj{{[_0-9a-zA-Z]*}}F
 func load_raw_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
-  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to $*Builtin.NativeObject
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [align=1] $*Builtin.NativeObject
   // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
   // CHECK: return [[VAL]]
   return Builtin.loadRaw(x)
@@ -885,4 +885,11 @@ func valueToBridgeObject(_ x: UInt) -> Builtin.BridgeObject {
 // CHECK: return
 func assumeTrue(_ x: Builtin.Int1) {
   Builtin.assume_Int1(x)
+}
+
+// CHECK: sil hidden [ossa] @$s8builtins15assumeAlignmentyyBp_BwtF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {  
+// CHECK: builtin "assumeAlignment"(%{{.*}} : $Builtin.RawPointer, %{{.*}} : $Builtin.Word) : $Builtin.RawPointer
+// CHECK: return
+func assumeAlignment(_ p: Builtin.RawPointer, _ x: Builtin.Word) {
+  Builtin.assumeAlignment(p, x)
 }

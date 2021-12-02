@@ -2113,7 +2113,7 @@ static void rewriteFunction(StructLoweringState &pass,
                                             currSILType);
     auto *newInstr = pointerBuilder.createPointerToAddress(
         instr->getLoc(), instr->getOperand(), newSILType.getAddressType(),
-        instr->isStrict());
+        instr->isStrict(), instr->isInvariant(), instr->alignment());
     instr->replaceAllUsesWith(newInstr);
     instr->getParent()->erase(instr);
   }
