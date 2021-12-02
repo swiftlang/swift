@@ -2751,7 +2751,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_UnavailableFromAsync: {
-
     StringRef message;
     if (consumeIf(tok::l_paren)) {
       if (!Tok.is(tok::identifier)) {
@@ -2761,27 +2760,36 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       StringRef flag = Tok.getText();
 
       if (flag != "message") {
-        llvm_unreachable("Unknown unavailable argument");
+        diagnose(Tok.getLoc(), diag::attr_unknown_option, flag, AttrName);
+        return true;
       }
       consumeToken();
       if (!consumeIf(tok::colon)) {
-        llvm_unreachable("Expected ':' following 'message'");
+        if (!Tok.is(tok::equal)) {
+          diagnose(Tok.getLoc(), diag::attr_expected_colon_after_label, flag);
+          return false;
+        }
+        diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
+          .fixItReplace(Tok.getLoc(), ": ");
+        consumeToken();
       }
       if (!Tok.is(tok::string_literal)) {
-        llvm_unreachable("Expected string literal");
+        diagnose(Tok.getLoc(), diag::attr_expected_string_literal, AttrName);
+        return false;
       }
 
       Optional<StringRef> value = getStringLiteralIfNotInterpolated(
-          Loc, "' I don't know what goes here! '");
+          Tok.getLoc(), flag);
       if (!value)
-        llvm_unreachable("Expected a message, homie");
-
+        return false;
+      Token stringTok = Tok;
       consumeToken();
-
       message = *value;
 
       if (!consumeIf(tok::r_paren))
-        llvm_unreachable("Expected a closing r-paren");
+        diagnose(stringTok.getRange().getEnd(), diag::attr_expected_rparen,
+            AttrName, /*isModifiler*/false)
+          .fixItInsertAfter(stringTok.getLoc(), ")");
     }
 
     Attributes.add(new (Context) UnavailableFromAsyncAttr(

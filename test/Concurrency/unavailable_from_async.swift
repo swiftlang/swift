@@ -128,3 +128,33 @@ func asyncFunc() async { // expected-error{{asynchronous global function 'asyncF
   }
 
 }
+
+// Parsing tests
+
+// expected-error@+2 {{expected declaration}}
+// expected-error@+1:24{{unknown option 'nope' for attribute '_unavailableFromAsync'}}
+@_unavailableFromAsync(nope: "almost right, but not quite")
+func blarp1() {}
+
+// expected-error@+2 {{expected declaration}}
+// expected-error@+1 {{expected ':' after label 'message'}}
+@_unavailableFromAsync(message; "almost right, but not quite")
+func blarp2() {}
+
+// expected-error@+1:31 {{'=' has been replaced with ':' in attribute arguments}}{{31-32=: }}
+@_unavailableFromAsync(message="almost right, but not quite")
+func blarp3() {}
+
+// expected-error@+2 {{expected declaration}}
+// expected-error@+1 {{expected string literal in '_unavailableFromAsync' attribute}}
+@_unavailableFromAsync(message: 32)
+func blarp4() {}
+
+// expected-error@+2 {{expected declaration}}
+// expected-error@+1 {{message cannot be an interpolated string}}
+@_unavailableFromAsync(message: "blarppy blarp \(31 + 10)")
+func blarp5() {}
+
+// expected-error@+1:48 {{expected ')' in '_unavailableFromAsync' attribute}}{{48-48=)}}
+@_unavailableFromAsync(message: "blarppy blarp"
+func blarp6() {}
