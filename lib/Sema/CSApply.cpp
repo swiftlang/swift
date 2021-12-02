@@ -187,8 +187,8 @@ static ValueDecl *generateSpecializedCXXFunctionTemplate(
   // Generate a name for the specialized function.
   std::string newNameStr;
   llvm::raw_string_ostream buffer(newNameStr);
-  clang::MangleContext *mangler =
-      specialized->getASTContext().createMangleContext();
+  std::unique_ptr<clang::MangleContext> mangler(
+      specialized->getASTContext().createMangleContext());
   mangler->mangleName(specialized, buffer);
   buffer.flush();
   // Add all parameters as empty parameters.
@@ -4056,7 +4056,8 @@ namespace {
       if (expr->isLiteralInit()) {
         auto *literalInit = expr->getSubExpr();
         if (auto *call = dyn_cast<CallExpr>(literalInit)) {
-          cs.forEachExpr(call->getFn(), [&](Expr *subExpr) -> Expr * {
+          forEachExprInConstraintSystem(call->getFn(),
+                                        [&](Expr *subExpr) -> Expr * {
             auto *TE = dyn_cast<TypeExpr>(subExpr);
             if (!TE)
               return subExpr;

@@ -1779,6 +1779,22 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
+static DiagnosticBehavior
+behaviorLimitForExplicitUnavailability(
+    const RootProtocolConformance *rootConf,
+    const DeclContext *fromDC) {
+  auto protoDecl = rootConf->getProtocol();
+
+  // Soften errors about unavailable `Sendable` conformances depending on the
+  // concurrency checking mode
+  if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      protoDecl->isSpecificProtocol(KnownProtocolKind::UnsafeSendable)) {
+    return SendableCheckContext(fromDC).defaultDiagnosticBehavior();
+  }
+
+  return DiagnosticBehavior::Unspecified;
+}
+
 void TypeChecker::diagnosePotentialUnavailability(
     const RootProtocolConformance *rootConf,
     const ExtensionDecl *ext,
@@ -1795,11 +1811,13 @@ void TypeChecker::diagnosePotentialUnavailability(
     auto diagID = (ctx.LangOpts.EnableConformanceAvailabilityErrors
                    ? diag::conformance_availability_only_version_newer
                    : diag::conformance_availability_only_version_newer_warn);
+    auto behavior = behaviorLimitForExplicitUnavailability(rootConf, dc);
     auto err =
       ctx.Diags.diagnose(
                loc, diagID,
                type, proto, prettyPlatformString(targetPlatform(ctx.LangOpts)),
                reason.getRequiredOSVersionRange().getLowerEndpoint());
+    err.limitBehavior(behavior);
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(loc, dc,
@@ -2422,31 +2440,6 @@ bool swift::diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
   });
 }
 
-static DiagnosticBehavior
-behaviorLimitForExplicitUnavailability(const RootProtocolConformance *rootConf) {
-  auto protoDecl = rootConf->getProtocol();
-
-  // Soften errors about unavailable `Sendable` conformances depending on the
-  // concurrency checking mode
-  if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable) ||
-      protoDecl->isSpecificProtocol(KnownProtocolKind::UnsafeSendable)) {
-    // TODO: Base this on concurrency checking mode from ExportContext so it
-    //       detects when you're in concurrency code without -warn-concurrency.
-    auto &langOpts = protoDecl->getASTContext().LangOpts;
-    if (langOpts.isSwiftVersionAtLeast(6))
-      /* fall through */;
-    else if (!langOpts.WarnConcurrency)
-      // TODO: Needs more conditions--should only do this if we aren't in a
-      //       concurrent context, and either the import or the declaration is
-      //       @predatesConcurrency.
-      return DiagnosticBehavior::Ignore;
-    else
-      return DiagnosticBehavior::Warning;
-  }
-
-  return DiagnosticBehavior::Unspecified;
-}
-
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
@@ -2482,11 +2475,12 @@ bool swift::diagnoseExplicitUnavailability(SourceLoc loc,
       // This was platform-specific; indicate the platform.
       platform = attr->prettyPlatformString();
       break;
-    } else {
-      // Downgrade unavailable Sendable conformances to warnings prior to
-      // Swift 6.
-      behavior = behaviorLimitForExplicitUnavailability(rootConf);
     }
+
+    // Downgrade unavailable Sendable conformance diagnostics where
+    // appropriate.
+    behavior = behaviorLimitForExplicitUnavailability(
+        rootConf, where.getDeclContext());
     LLVM_FALLTHROUGH;
 
   case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
@@ -3302,7 +3296,7 @@ void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
 
 namespace {
 
-class StmtAvailabilityWalker : public BaseDiagnosticWalker {
+class StmtAvailabilityWalker : public ASTWalker {
   DeclContext *DC;
   bool WalkRecursively;
 
@@ -3338,6 +3332,7 @@ public:
     return std::make_pair(true, P);
   }
 };
+
 }
 
 void swift::diagnoseStmtAvailability(const Stmt *S, DeclContext *DC,
@@ -3525,9 +3520,9 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 }
 
 static void diagnoseMissingConformance(
-    SourceLoc loc, Type type, ProtocolDecl *proto, ModuleDecl *module) {
+    SourceLoc loc, Type type, ProtocolDecl *proto, const DeclContext *fromDC) {
   assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
-  diagnoseMissingSendableConformance(loc, type, module);
+  diagnoseMissingSendableConformance(loc, type, fromDC);
 }
 
 bool
@@ -3545,15 +3540,13 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
   // Diagnose "missing" conformances where we needed a conformance but
   // didn't have one.
+  auto *DC = where.getDeclContext();
   if (auto builtinConformance = dyn_cast<BuiltinProtocolConformance>(rootConf)){
     if (builtinConformance->isMissing()) {
       diagnoseMissingConformance(loc, builtinConformance->getType(),
-                                 builtinConformance->getProtocol(),
-                                 where.getDeclContext()->getParentModule());
+                                 builtinConformance->getProtocol(), DC);
     }
   }
-
-  auto *DC = where.getDeclContext();
 
   auto maybeEmitAssociatedTypeNote = [&]() {
     if (!depTy && !replacementTy)

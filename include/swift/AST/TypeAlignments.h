@@ -75,6 +75,7 @@ namespace swift {
   constexpr size_t SILFunctionAlignInBits = 2;
   constexpr size_t ASTContextAlignInBits = 2;
   constexpr size_t TypeVariableAlignInBits = 4;
+  constexpr size_t StoredDefaultArgumentAlignInBits = 4;
 
   // Well, this is the *minimum* pointer alignment; it's going to be 3 on
   // 64-bit targets, but that doesn't matter.
@@ -123,7 +124,7 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::SILFunctionType,
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Stmt, swift::StmtAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::BraceStmt, swift::StmtAlignInBits)
 
-LLVM_DECLARE_TYPE_ALIGNMENT(swift::ASTContext, swift::ASTContextAlignInBits);
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::ASTContext, swift::ASTContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::DeclContext, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::FileUnit, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::DifferentiableAttr, swift::PointerAlignInBits)
@@ -152,7 +153,7 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::AttributeBase, swift::AttrAlignInBits)
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeRepr, swift::TypeReprAlignInBits)
 
-LLVM_DECLARE_TYPE_ALIGNMENT(swift::CaseLabelItem, swift::PatternAlignInBits);
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::CaseLabelItem, swift::PatternAlignInBits)
 
 static_assert(alignof(void*) >= 2, "pointer alignment is too small");
 

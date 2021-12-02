@@ -148,7 +148,7 @@ func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 @available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>( // expected-note {{'myMap' has been explicitly marked unavailable here}}
+public func myMap<C : Collection, T>(
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -161,7 +161,7 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 
 // <rdar://problem/20142523>
 func rdar20142523() {
-  _ = myMap(0..<10, { x in // expected-error {{'myMap' is unavailable: call the 'map()' method on the sequence}}
+  myMap(0..<10, { x in // expected-error{{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{21-21=-> <#Result#> }} {{educational-notes=complex-closure-inference}}
     ()
     return x
   })
@@ -573,7 +573,7 @@ func r22263468(_ a : String?) {
   // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
   // re-think the way errors in tuple elements are detected because it's currently impossible to detect
   // exactly what went wrong here and aggregate fixes for different elements at the same time.
-  _ = MyTuple(42, a) // expected-error {{tuple type '(Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
+  _ = MyTuple(42, a) // expected-error {{tuple type '(_const Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
 }
 
 // rdar://71829040 - "ambiguous without more context" error for tuple type mismatch.

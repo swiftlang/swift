@@ -379,6 +379,9 @@ enum class FixKind : uint8_t {
 
   /// Produce a warning for a tuple label mismatch.
   AllowTupleLabelMismatch,
+
+  /// Produce an error for not getting a compile-time constant
+  NotCompileTimeConst,
 };
 
 class ConstraintFix {
@@ -1861,6 +1864,23 @@ public:
   }
 };
 
+class NotCompileTimeConst final : public ContextualMismatch {
+  NotCompileTimeConst(ConstraintSystem &cs, Type paramTy, ConstraintLocator *locator);
+
+public:
+  std::string getName() const override { return "replace with an literal"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static NotCompileTimeConst *create(ConstraintSystem &cs,
+                                     Type paramTy,
+                                     ConstraintLocator *locator);
+
+  static bool classof(ConstraintFix *fix) {
+    return fix->getKind() == FixKind::NotCompileTimeConst;
+  }
+};
+
 class CollectionElementContextualMismatch final
     : public ContextualMismatch,
       private llvm::TrailingObjects<CollectionElementContextualMismatch,
@@ -2284,10 +2304,6 @@ public:
   std::string getName() const override;
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
 
   static SpecifyClosureParameterType *create(ConstraintSystem &cs,
                                              ConstraintLocator *locator);

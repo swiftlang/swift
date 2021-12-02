@@ -543,8 +543,6 @@
           key.kind: source.lang.swift.decl.enumcase,
           key.offset: 911,
           key.length: 9,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.enumelement,
@@ -561,8 +559,6 @@
           key.kind: source.lang.swift.decl.enumcase,
           key.offset: 923,
           key.length: 9,
-          key.nameoffset: 0,
-          key.namelength: 0,
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.enumelement,

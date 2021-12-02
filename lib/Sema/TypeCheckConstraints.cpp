@@ -344,8 +344,7 @@ TypeChecker::typeCheckExpression(
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (ConstraintSystem::preCheckExpression(
-        expr, dc, /*replaceInvalidRefsWithErrors=*/true,
-        options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
+          expr, dc, /*replaceInvalidRefsWithErrors=*/true)) {
     target.setExpr(expr);
     return None;
   }
@@ -431,11 +430,9 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                              : CTP_DefaultParameter});
 }
 
-bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
-                                   DeclContext *DC, Type patternType,
-                                   PatternBindingDecl *PBD,
-                                   unsigned patternNumber,
-                                   TypeCheckExprOptions options) {
+bool TypeChecker::typeCheckBinding(
+    Pattern *&pattern, Expr *&initializer, DeclContext *DC,
+    Type patternType, PatternBindingDecl *PBD, unsigned patternNumber) {
   SolutionApplicationTarget target =
     PBD ? SolutionApplicationTarget::forInitialization(
             initializer, DC, patternType, PBD, patternNumber,
@@ -444,6 +441,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
             initializer, DC, patternType, pattern,
             /*bindPatternVarsOneWay=*/false);
 
+  auto options = TypeCheckExprOptions();
   if (DC->getASTContext().LangOpts.CheckAPIAvailabilityOnly &&
       PBD && !DC->getAsDecl()) {
     // Skip checking the initializer for non-public decls when
@@ -492,8 +490,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                           unsigned patternNumber,
-                                          Type patternType,
-                                          TypeCheckExprOptions options) {
+                                          Type patternType) {
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
@@ -522,8 +519,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
     }
   }
 
-  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC, patternType,
-                                                PBD, patternNumber, options);
+  bool hadError = TypeChecker::typeCheckBinding(
+      pattern, init, DC, patternType, PBD, patternNumber);
   if (!init) {
     PBD->setInvalid();
     return true;
@@ -591,17 +588,14 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   // Precheck the sequence.
   Expr *sequence = stmt->getSequence();
   if (ConstraintSystem::preCheckExpression(
-          sequence, dc, /*replaceInvalidRefsWithErrors=*/true,
-          /*leaveClosureBodiesUnchecked=*/false))
+          sequence, dc, /*replaceInvalidRefsWithErrors=*/true))
     return failed();
   stmt->setSequence(sequence);
 
   // Precheck the filtering condition.
   if (Expr *whereExpr = stmt->getWhere()) {
     if (ConstraintSystem::preCheckExpression(
-            whereExpr, dc,
-            /*replaceInvalidRefsWithErrors=*/true,
-            /*leaveClosureBodiesUnchecked=*/false))
+            whereExpr, dc, /*replaceInvalidRefsWithErrors=*/true))
       return failed();
 
     stmt->setWhere(whereExpr);
@@ -612,10 +606,24 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   if (!typeCheckExpression(target))
     return failed();
 
-  // Check to see if the sequence expr is throwing (in async context),
-  // if so require the stmt to have a `try`.
-  if (diagnoseUnhandledThrowsInAsyncContext(dc, stmt))
-    return failed();
+  // check to see if the sequence expr is throwing (and async), if so require 
+  // the stmt to have a try loc
+  if (stmt->getAwaitLoc().isValid()) {
+    // fetch the sequence out of the statement
+    // else wise the value is potentially unresolved
+    auto Ty = stmt->getSequence()->getType();
+    auto module = dc->getParentModule();
+    auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
+    
+    if (conformanceRef.hasEffect(EffectKind::Throws) &&
+        stmt->getTryLoc().isInvalid()) {
+      auto &diags = dc->getASTContext().Diags;
+      diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled, "call")
+        .fixItInsert(stmt->getAwaitLoc(), "try");
+
+      return failed();
+    }
+  }
 
   return false;
 }
@@ -2044,19 +2052,26 @@ HasDynamicCallableAttributeRequest::evaluate(Evaluator &evaluator,
   });
 }
 
-void ConstraintSystem::forEachExpr(
+bool swift::shouldTypeCheckInEnclosingExpression(ClosureExpr *expr) {
+  if (expr->hasSingleExpressionBody())
+    return true;
+
+  auto &ctx = expr->getASTContext();
+  return !expr->hasEmptyBody() &&
+         ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
+}
+
+void swift::forEachExprInConstraintSystem(
     Expr *expr, llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
-    ConstraintSystem &CS;
     llvm::function_ref<Expr *(Expr *)> callback;
 
-    ChildWalker(ConstraintSystem &CS,
-                llvm::function_ref<Expr *(Expr *)> callback)
-        : CS(CS), callback(callback) {}
+    ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
+    : callback(callback) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto closure = dyn_cast<ClosureExpr>(E)) {
-        if (!CS.participatesInInference(closure))
+        if (!shouldTypeCheckInEnclosingExpression(closure))
           return { false, callback(E) };
       }
       return { true, callback(E) };
@@ -2069,5 +2084,5 @@ void ConstraintSystem::forEachExpr(
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   };
 
-  expr->walk(ChildWalker(*this, callback));
+  expr->walk(ChildWalker(callback));
 }

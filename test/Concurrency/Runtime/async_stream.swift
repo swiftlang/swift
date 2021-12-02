@@ -8,9 +8,6 @@
 // rdar://78109470
 // UNSUPPORTED: back_deployment_runtime
 
-// https://bugs.swift.org/browse/SR-14466
-// UNSUPPORTED: OS=windows-msvc
-
 // Race condition
 // REQUIRES: rdar78033828
 

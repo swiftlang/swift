@@ -442,8 +442,6 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       ASTNode Element;
       /// Contextual information associated with the element (if any).
       ContextualTypeInfo Context;
-      /// Identifies whether result of this node is unused.
-      bool IsDiscarded;
     } ClosureElement;
   };
 
@@ -497,7 +495,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a closure body element constraint.
-  Constraint(ASTNode node, ContextualTypeInfo context, bool isDiscarded,
+  Constraint(ASTNode node, ContextualTypeInfo context,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
@@ -587,14 +585,12 @@ public:
 
   static Constraint *createClosureBodyElement(ConstraintSystem &cs,
                                               ASTNode node,
-                                              ConstraintLocator *locator,
-                                              bool isDiscarded = false);
+                                              ConstraintLocator *locator);
 
   static Constraint *createClosureBodyElement(ConstraintSystem &cs,
                                               ASTNode node,
                                               ContextualTypeInfo context,
-                                              ConstraintLocator *locator,
-                                              bool isDiscarded = false);
+                                              ConstraintLocator *locator);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -859,11 +855,6 @@ public:
   ContextualTypeInfo getElementContext() const {
     assert(Kind == ConstraintKind::ClosureBodyElement);
     return ClosureElement.Context;
-  }
-
-  bool isDiscardedElement() const {
-    assert(Kind == ConstraintKind::ClosureBodyElement);
-    return ClosureElement.IsDiscarded;
   }
 
   /// For an applicable function constraint, retrieve the trailing closure

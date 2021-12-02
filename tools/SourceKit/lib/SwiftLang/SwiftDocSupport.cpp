@@ -1282,7 +1282,7 @@ RequestRefactoringEditConsumer(CategorizedEditsReceiver Receiver) :
   Impl(*new Implementation(Receiver)) {}
 
 RequestRefactoringEditConsumer::
-~RequestRefactoringEditConsumer() { delete &Impl; };
+~RequestRefactoringEditConsumer() { delete &Impl; }
 
 void RequestRefactoringEditConsumer::
 accept(SourceManager &SM, RegionType RegionType,

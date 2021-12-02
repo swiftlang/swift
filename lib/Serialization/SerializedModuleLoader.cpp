@@ -404,7 +404,9 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   bool isFramework = false;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       modulePath.str(), std::move(moduleBuf.get()), nullptr, nullptr,
-      isFramework, isRequiredOSSAModules(), loadedModuleFile);
+      isFramework, isRequiredOSSAModules(),
+      Ctx.SearchPathOpts.DeserializedPathRecoverer,
+      loadedModuleFile);
 
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
@@ -730,7 +732,9 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       moduleInterfacePath, std::move(moduleInputBuffer),
       std::move(moduleDocInputBuffer), std::move(moduleSourceInfoInputBuffer),
-      isFramework, isRequiredOSSAModules(), loadedModuleFileCore);
+      isFramework, isRequiredOSSAModules(),
+      Ctx.SearchPathOpts.DeserializedPathRecoverer,
+      loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
 
   if (loadInfo.status == serialization::Status::Valid) {
@@ -741,6 +745,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     // We've loaded the file. Now try to bring it into the AST.
     fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
     M.setStaticLibrary(loadedModuleFile->isStaticLibrary());
+    M.setHasHermeticSealAtLink(loadedModuleFile->hasHermeticSealAtLink());
     if (loadedModuleFile->isTestable())
       M.setTestingEnabled();
     if (loadedModuleFile->arePrivateImportsEnabled())
@@ -799,6 +804,15 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     if (loadedModuleFile &&
         loadedModuleFile->mayHaveDiagnosticsPointingAtBuffer())
       OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
+  }
+
+  // The -experimental-hermetic-seal-at-link flag turns on dead-stripping
+  // optimizations assuming library code can be optimized against client code.
+  // If the imported module was built with -experimental-hermetic-seal-at-link
+  // but the current module isn't, error out.
+  if (M.hasHermeticSealAtLink() && !Ctx.LangOpts.HermeticSealAtLink) {
+    Ctx.Diags.diagnose(diagLoc.getValueOr(SourceLoc()),
+                       diag::need_hermetic_seal_to_import_module, M.getName());
   }
 
   return fileUnit;
@@ -1468,7 +1482,7 @@ SerializedASTFile::getSourceOrderForDecl(const Decl *D) const {
 void SerializedASTFile::collectAllGroups(
     SmallVectorImpl<StringRef> &Names) const {
   File.collectAllGroups(Names);
-};
+}
 
 Optional<StringRef>
 SerializedASTFile::getGroupNameByUSR(StringRef USR) const {
@@ -1544,4 +1558,9 @@ SerializedASTFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 void SerializedASTFile::collectBasicSourceFileInfo(
     llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
   File.collectBasicSourceFileInfo(callback);
+}
+
+void SerializedASTFile::collectSerializedSearchPath(
+    llvm::function_ref<void(StringRef)> callback) const {
+  File.collectSerializedSearchPath(callback);
 }

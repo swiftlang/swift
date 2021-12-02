@@ -1514,7 +1514,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 
   // Type check the declaration.
   if (auto *D = node.dyn_cast<Decl *>()) {
-    TypeChecker::typeCheckDecl(D, LeaveBraceStmtBodyUnchecked);
+    TypeChecker::typeCheckDecl(D);
     return;
   }
 

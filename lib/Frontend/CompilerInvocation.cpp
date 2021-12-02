@@ -736,6 +736,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableVolatileModules |= Args.hasArg(OPT_enable_volatile_modules);
 
+  Opts.HermeticSealAtLink |= Args.hasArg(OPT_experimental_hermetic_seal_at_link);
+
   Opts.UseDarwinPreStableABIBit =
     (Target.isMacOSX() && Target.isMacOSXVersionLT(10, 14, 4)) ||
     (Target.isiOS() && Target.isOSVersionLT(12, 2)) ||
@@ -864,7 +866,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
-  if (auto A = Args.getLastArg(OPT_requirement_machine_generic_signatures_EQ)) {
+  if (auto A = Args.getLastArg(OPT_requirement_machine_abstract_signatures_EQ)) {
     auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
         .Case("off", RequirementMachineMode::Disabled)
         .Case("on", RequirementMachineMode::Enabled)
@@ -872,7 +874,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         .Default(None);
 
     if (value)
-      Opts.RequirementMachineGenericSignatures = *value;
+      Opts.RequirementMachineAbstractSignatures = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+
+  if (auto A = Args.getLastArg(OPT_requirement_machine_inferred_signatures_EQ)) {
+    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
+        .Case("off", RequirementMachineMode::Disabled)
+        .Case("on", RequirementMachineMode::Enabled)
+        .Case("verify", RequirementMachineMode::Verify)
+        .Default(None);
+
+    if (value)
+      Opts.RequirementMachineInferredSignatures = *value;
     else
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
@@ -1198,6 +1214,11 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     Opts.PlaceholderDependencyModuleMap = A->getValue();
   if (const Arg *A = Args.getLastArg(OPT_batch_scan_input_file))
     Opts.BatchScanInputFilePath = A->getValue();
+
+  for (auto A : Args.getAllArgValues(options::OPT_serialized_path_obfuscate)) {
+    auto SplitMap = StringRef(A).split('=');
+    Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
+  }
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to

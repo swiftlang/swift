@@ -4037,9 +4037,12 @@ public:
   /// parent type by introducing fresh type variables for generic parameters
   /// and constructing a bound generic type from these type variables.
   ///
+  /// \param isTypeResolution Whether we are in the process of resolving a type.
+  ///
   /// \returns The opened type.
   Type openUnboundGenericType(GenericTypeDecl *decl, Type parentTy,
-                              ConstraintLocatorBuilder locator);
+                              ConstraintLocatorBuilder locator,
+                              bool isTypeResolution);
 
   /// Replace placeholder types with fresh type variables, and unbound generic
   /// types with bound generic types whose generic args are fresh type
@@ -4851,8 +4854,8 @@ private:
   /// Simplify a closure body element constraint by generating required
   /// constraints to represent the given element in constraint system.
   SolutionKind simplifyClosureBodyElementConstraint(
-      ASTNode element, ContextualTypeInfo context, bool isDiscarded,
-      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
+      ASTNode element, ContextualTypeInfo context, TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
 
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
@@ -5011,8 +5014,7 @@ public:
   /// \param replaceInvalidRefsWithErrors Indicates whether it's allowed
   /// to replace any discovered invalid member references with `ErrorExpr`.
   static bool preCheckExpression(Expr *&expr, DeclContext *dc,
-                                 bool replaceInvalidRefsWithErrors,
-                                 bool leaveClosureBodiesUnchecked);
+                                 bool replaceInvalidRefsWithErrors);
 
   /// Solve the system of constraints generated from provided target.
   ///
@@ -5243,16 +5245,6 @@ public:
   /// imported from C/ObjectiveC.
   bool isArgumentOfImportedDecl(ConstraintLocatorBuilder locator);
 
-  /// Check whether given closure should participate in inference e.g.
-  /// if it's a single-expression closure - it always does, but
-  /// multi-statement closures require special flags.
-  bool participatesInInference(ClosureExpr *closure) const;
-
-  /// Visit each subexpression that will be part of the constraint system
-  /// of the given expression, including those in closure bodies that will be
-  /// part of the constraint system.
-  void forEachExpr(Expr *expr, llvm::function_ref<Expr *(Expr *)> callback);
-
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
 
@@ -5275,7 +5267,8 @@ public:
 
   Type operator()(UnboundGenericType *unboundTy) const {
     return cs.openUnboundGenericType(unboundTy->getDecl(),
-                                     unboundTy->getParent(), locator);
+                                     unboundTy->getParent(), locator,
+                                     /*isTypeResolution=*/true);
   }
 };
 
@@ -6075,6 +6068,18 @@ BraceStmt *applyResultBuilderTransform(
         Optional<constraints::SolutionApplicationTarget> (
           constraints::SolutionApplicationTarget)>
             rewriteTarget);
+
+/// Determine whether the given closure expression should be type-checked
+/// within the context of its enclosing expression. Otherwise, it will be
+/// separately type-checked once its enclosing expression has determined all
+/// of the parameter and result types without looking at the body.
+bool shouldTypeCheckInEnclosingExpression(ClosureExpr *expr);
+
+/// Visit each subexpression that will be part of the constraint system
+/// of the given expression, including those in closure bodies that will be
+/// part of the constraint system.
+void forEachExprInConstraintSystem(
+    Expr *expr, llvm::function_ref<Expr *(Expr *)> callback);
 
 /// Whether the given parameter requires an argument.
 bool parameterRequiresArgument(

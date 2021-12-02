@@ -77,6 +77,7 @@ public func registerSILClasses() {
   register(ExistentialMetatypeInst.self)
   register(GlobalAddrInst.self)
   register(GlobalValueInst.self)
+  register(IntegerLiteralInst.self)
   register(TupleInst.self)
   register(TupleExtractInst.self)
   register(TupleElementAddrInst.self)

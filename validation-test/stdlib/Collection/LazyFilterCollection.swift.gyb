@@ -1,4 +1,8 @@
 // -*- swift -*-
+
+// rdar://85481899
+// REQUIRES: rdar85481899
+
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 

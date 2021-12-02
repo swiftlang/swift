@@ -1548,7 +1548,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
   }
 
   return DisallowedOriginKind::None;
-};
+}
 
 namespace {
 

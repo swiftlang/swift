@@ -84,7 +84,8 @@ static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor,
 /// Returns true on success.
 static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
                              SmallVectorImpl<uint64_t> &scratch,
-                             ExtendedValidationInfo &extendedInfo) {
+                             ExtendedValidationInfo &extendedInfo,
+                             PathObfuscator &pathRecoverer) {
   while (!cursor.AtEndOfStream()) {
     Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance();
     if (!maybeEntry) {
@@ -119,7 +120,7 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     unsigned kind = maybeKind.get();
     switch (kind) {
     case options_block::SDK_PATH:
-      extendedInfo.setSDKPath(blobData);
+      extendedInfo.setSDKPath(pathRecoverer.recover(blobData));
       break;
     case options_block::XCC:
       extendedInfo.addExtraClangImporterOption(blobData);
@@ -131,6 +132,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       break;
     case options_block::IS_STATIC_LIBRARY:
       extendedInfo.setIsStaticLibrary(true);
+      break;
+    case options_block::HAS_HERMETIC_SEAL_AT_LINK:
+      extendedInfo.setHasHermeticSealAtLink(true);
       break;
     case options_block::IS_TESTABLE:
       extendedInfo.setIsTestable(true);
@@ -168,7 +172,8 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
 static ValidationInfo validateControlBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
     std::pair<uint16_t, uint16_t> expectedVersion, bool requiresOSSAModules,
-    ExtendedValidationInfo *extendedInfo) {
+    ExtendedValidationInfo *extendedInfo,
+    PathObfuscator &pathRecoverer) {
   // The control block is malformed until we've at least read a major version
   // number.
   ValidationInfo result;
@@ -199,7 +204,7 @@ static ValidationInfo validateControlBlock(
           result.status = Status::Malformed;
           return result;
         }
-        if (!readOptionsBlock(cursor, scratch, *extendedInfo)) {
+        if (!readOptionsBlock(cursor, scratch, *extendedInfo, pathRecoverer)) {
           result.status = Status::Malformed;
           return result;
         }
@@ -462,10 +467,11 @@ ValidationInfo serialization::validateSerializedAST(
         result.status = Status::Malformed;
         return result;
       }
+      PathObfuscator localObfuscator;
       result = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          requiresOSSAModules, extendedInfo);
+          requiresOSSAModules, extendedInfo, localObfuscator);
       if (result.status == Status::Malformed)
         return result;
     } else if (dependencies &&
@@ -935,7 +941,7 @@ getActualImportControl(unsigned rawValue) {
   }
 }
 
-bool ModuleFileSharedCore::readModuleDocIfPresent() {
+bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer) {
   if (!this->ModuleDocInputBuffer)
     return true;
 
@@ -974,7 +980,7 @@ bool ModuleFileSharedCore::readModuleDocIfPresent() {
       info = validateControlBlock(
           docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
           RequiresOSSAModules,
-          /*extendedInfo*/ nullptr);
+          /*extendedInfo*/ nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftdoc is actually for this module.
@@ -1080,7 +1086,7 @@ bool ModuleFileSharedCore::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
   return false;
 }
 
-bool ModuleFileSharedCore::readModuleSourceInfoIfPresent() {
+bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRecoverer) {
   if (!this->ModuleSourceInfoInputBuffer)
     return true;
 
@@ -1118,7 +1124,8 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent() {
           infoCursor, scratch,
           {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
           RequiresOSSAModules,
-          /*extendedInfo*/ nullptr);
+          /*extendedInfo*/ nullptr,
+          pathRecoverer);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftsourceinfo is actually for this module.
@@ -1193,7 +1200,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework, bool requiresOSSAModules,
-    serialization::ValidationInfo &info)
+    serialization::ValidationInfo &info, PathObfuscator &pathRecoverer)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)),
@@ -1244,7 +1251,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       info = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          RequiresOSSAModules, &extInfo);
+          RequiresOSSAModules, &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {
         error(info.status);
         return;
@@ -1257,6 +1264,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.ArePrivateImportsEnabled = extInfo.arePrivateImportsEnabled();
       Bits.IsSIB = extInfo.isSIB();
       Bits.IsStaticLibrary = extInfo.isStaticLibrary();
+      Bits.HasHermeticSealAtLink = extInfo.hasHermeticSealAtLink();
       Bits.IsTestable = extInfo.isTestable();
       Bits.ResilienceStrategy = unsigned(extInfo.getResilienceStrategy());
       Bits.IsImplicitDynamicEnabled = extInfo.isImplicitDynamicEnabled();
@@ -1368,7 +1376,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           bool isSystem;
           input_block::SearchPathLayout::readRecord(scratch, isFramework,
                                                     isSystem);
-          SearchPaths.push_back({blobData, isFramework, isSystem});
+          SearchPaths.push_back({pathRecoverer.recover(blobData), isFramework,
+            isSystem});
           break;
         }
         case input_block::MODULE_INTERFACE_PATH: {
@@ -1568,8 +1577,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     return;
   }
   // Read source info file.
-  readModuleSourceInfoIfPresent();
-  if (!readModuleDocIfPresent()) {
+  readModuleSourceInfoIfPresent(pathRecoverer);
+  if (!readModuleDocIfPresent(pathRecoverer)) {
     info.status = error(Status::MalformedDocumentation);
     return;
   }

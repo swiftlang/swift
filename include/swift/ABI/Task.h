@@ -250,7 +250,7 @@ public:
     : Job(flags, run, metadata, captureCurrentVoucher),
       ResumeContext(initialContext) {
     assert(flags.isAsyncTask());
-    Id = getNextTaskId();
+    setTaskId();
   }
 
   /// Create a task with "immortal" reference counts.
@@ -265,10 +265,13 @@ public:
     : Job(flags, run, metadata, immortal, captureCurrentVoucher),
       ResumeContext(initialContext) {
     assert(flags.isAsyncTask());
-    Id = getNextTaskId();
+    setTaskId();
   }
 
   ~AsyncTask();
+
+  /// Set the task's ID field to the next task ID.
+  void setTaskId();
 
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
@@ -565,14 +568,6 @@ private:
   AsyncTask *&getNextWaitingTask() {
     return reinterpret_cast<AsyncTask *&>(
         SchedulerPrivate[NextWaitingTaskIndex]);
-  }
-
-  /// Get the next non-zero Task ID.
-  uint32_t getNextTaskId() {
-    static std::atomic<uint32_t> Id(1);
-    uint32_t Next = Id.fetch_add(1, std::memory_order_relaxed);
-    if (Next == 0) Next = Id.fetch_add(1, std::memory_order_relaxed);
-    return Next;
   }
 };
 

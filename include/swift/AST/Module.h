@@ -517,6 +517,15 @@ public:
     Bits.ModuleDecl.HasIncrementalInfo = enabled;
   }
 
+  /// Returns true if this module was built with
+  /// -experimental-hermetic-seal-at-link.
+  bool hasHermeticSealAtLink() const {
+    return Bits.ModuleDecl.HasHermeticSealAtLink;
+  }
+  void setHasHermeticSealAtLink(bool enabled = true) {
+    Bits.ModuleDecl.HasHermeticSealAtLink = enabled;
+  }
+
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
   bool isSystemModule() const {
@@ -824,6 +833,8 @@ public:
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
 
+  void collectSerializedSearchPath(
+      llvm::function_ref<void(StringRef)> callback) const;
   /// Retrieve a fingerprint value that summarizes the contents of this module.
   ///
   /// This interface hash a of a module is guaranteed to change if the interface

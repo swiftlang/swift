@@ -67,6 +67,11 @@ protected:
   /// If enabled, marker protocols can be encoded in the mangled name.
   bool AllowMarkerProtocols = true;
 
+  /// Whether the mangling predates concurrency, and therefore shouldn't
+  /// include concurrency features such as global actors or @Sendable
+  /// function types.
+  bool PredatesConcurrency = false;
+
 public:
   using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
                                               const OpaqueTypeDecl *>;

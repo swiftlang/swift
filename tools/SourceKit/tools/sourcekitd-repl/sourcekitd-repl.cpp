@@ -14,14 +14,15 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/Signals.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Process.h"
 #include "llvm/Support/ConvertUTF.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Mutex.h"
-#include <unistd.h>
+#include "llvm/Support/Process.h"
+#include "llvm/Support/Signals.h"
+#include "llvm/Support/raw_ostream.h"
 #include <histedit.h>
+#include <unistd.h>
 using namespace llvm;
 
 
@@ -601,15 +602,25 @@ static bool printResponse(sourcekitd_response_t Resp) {
 
   sourcekitd_response_dispose(Resp);
   return IsError;
-};
+}
 
 static bool handleRequest(StringRef ReqStr, std::string &ErrorMessage) {
   bool UseAsync = false;
-  ReqStr = ReqStr.ltrim();
-  if (ReqStr.startswith("async")) {
-    UseAsync = true;
-    ReqStr = ReqStr.substr(strlen("async"));
-  }
+  bool UseTimer = false;
+  while (true) {
+    ReqStr = ReqStr.ltrim();
+    if (ReqStr.startswith("async")) {
+      UseAsync = true;
+      ReqStr = ReqStr.substr(strlen("async"));
+      continue;
+    }
+    if (ReqStr.startswith("time")) {
+      UseTimer = true;
+      ReqStr = ReqStr.substr(strlen("time"));
+      continue;
+    }
+    break;
+  };
 
   SmallString<64> Str(ReqStr);
   char *Err = nullptr;
@@ -626,22 +637,33 @@ static bool handleRequest(StringRef ReqStr, std::string &ErrorMessage) {
 
   bool IsError = false;
 
+  auto startTime = std::chrono::steady_clock::now();
+  auto printRequestTime = [UseTimer, startTime](llvm::raw_ostream &OS) {
+    if (!UseTimer)
+      return;
+    std::chrono::duration<float, std::milli> delta(
+        std::chrono::steady_clock::now() - startTime);
+    OS << "request time: " << llvm::formatv("{0:ms+f3}", delta) << "\n";
+  };
+
+  llvm::raw_fd_ostream OS(STDOUT_FILENO, /*shouldClose=*/false);
   if (UseAsync) {
     static unsigned AsyncReqCount = 0;
     static llvm::sys::Mutex AsynRespPrintMtx;
 
     unsigned CurrReqCount = ++AsyncReqCount;
-    llvm::raw_fd_ostream OS(STDOUT_FILENO, /*shouldClose=*/false);
     OS << "send async request #" << CurrReqCount << '\n';
     sourcekitd_send_request(Req, nullptr, ^(sourcekitd_response_t Resp) {
       llvm::sys::ScopedLock L(AsynRespPrintMtx);
       llvm::raw_fd_ostream OS(STDOUT_FILENO, /*shouldClose=*/false);
       OS << "received async response #" << CurrReqCount << '\n';
+      printRequestTime(OS);
       printResponse(Resp);
     });
 
   } else {
     sourcekitd_response_t Resp = sourcekitd_send_request_sync(Req);
+    printRequestTime(OS);
     IsError = printResponse(Resp);
   }
 

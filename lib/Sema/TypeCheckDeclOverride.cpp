@@ -1561,6 +1561,7 @@ namespace  {
     UNINTERESTING_ATTR(NoImplicitCopy)
 
     UNINTERESTING_ATTR(TypeSequence)
+    UNINTERESTING_ATTR(CompileTimeConst)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

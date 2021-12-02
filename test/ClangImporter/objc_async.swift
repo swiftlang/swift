@@ -1,9 +1,11 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -disable-availability-checking  %s -verify -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -warn-concurrency
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -warn-concurrency
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 import Foundation
 import ObjCConcurrency
+
+if #available(SwiftStdlib 5.5, *) {
 
 @MainActor func onlyOnMainActor() { }
 
@@ -90,16 +92,14 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
   _ = slowServer.allOperations
 }
 
-func testSendable(fn: () -> Void) { // expected-note{{parameter 'fn' is implicitly non-sendable}}
-  doSomethingConcurrently(fn)
-  // expected-error@-1{{passing non-sendable parameter 'fn' to function expecting a @Sendable closure}}
+func testSendable(fn: () -> Void) {
+  doSomethingConcurrently(fn) // okay, due to implicit @_predatesConcurrency
   doSomethingConcurrentlyButUnsafe(fn) // okay, @Sendable not part of the type
 
   var x = 17
   doSomethingConcurrently {
-    print(x) // expected-error{{reference to captured var 'x' in concurrently-executing code}}
-    x = x + 1 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
-    // expected-error@-1{{reference to captured var 'x' in concurrently-executing code}}
+    print(x)
+    x = x + 1
   }
 }
 
@@ -122,7 +122,7 @@ func testSendableAttrs(
   func takesSendable<T: Sendable>(_: T) {}
 
   takesSendable(sendableClass)        // no-error
-  takesSendable(nonSendableClass)     // expected-FIXME-warning{{something about missing conformance}}
+  takesSendable(nonSendableClass)     // expected-warning{{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
 
   doSomethingConcurrently {
     print(sendableClass)               // no-error
@@ -215,3 +215,5 @@ func testMirrored(instance: ClassWithAsync) async {
     }
   }
 }
+
+} // SwiftStdlib 5.5

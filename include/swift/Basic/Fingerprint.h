@@ -24,7 +24,7 @@ namespace llvm {
 namespace yaml {
 class IO;
 }
-}; // namespace llvm
+} // namespace llvm
 
 namespace swift {
 
@@ -118,7 +118,7 @@ private:
 };
 
 void simple_display(llvm::raw_ostream &out, const Fingerprint &fp);
-}; // namespace swift
+} // namespace swift
 
 namespace swift {
 
@@ -134,11 +134,11 @@ template <> struct StableHasher::Combiner<Fingerprint> {
   }
 };
 
-}; // namespace swift
+} // namespace swift
 
 namespace llvm {
 class raw_ostream;
 raw_ostream &operator<<(raw_ostream &OS, const swift::Fingerprint &fp);
-}; // namespace llvm
+} // namespace llvm
 
 #endif // SWIFT_BASIC_FINGERPRINT_H

@@ -46,6 +46,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/Defer.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -652,9 +653,14 @@ const ExternalSourceLocs *Decl::getSerializedLocs() const {
   auto *Result = getASTContext().Allocate<ExternalSourceLocs>();
   Result->BufferID = BufferID;
   Result->Loc = ResolveLoc(RawLocs->Loc);
-  for (auto &Range : RawLocs->DocRanges) {
-    Result->DocRanges.emplace_back(ResolveLoc(Range.first), Range.second);
+
+  auto DocRanges = getASTContext().AllocateUninitialized<CharSourceRange>(RawLocs->DocRanges.size());
+  for (auto I : indices(RawLocs->DocRanges)) {
+    auto &Range = RawLocs->DocRanges[I];
+    DocRanges[I] = CharSourceRange(ResolveLoc(Range.first), Range.second);
   }
+  Result->DocRanges = DocRanges;
+
   Context.setExternalSourceLocs(this, Result);
   return Result;
 }
@@ -719,7 +725,14 @@ Optional<CustomAttrNominalPair> Decl::getGlobalActorAttr() const {
 }
 
 bool Decl::predatesConcurrency() const {
-  return getAttrs().hasAttribute<PredatesConcurrencyAttr>();
+  if (getAttrs().hasAttribute<PredatesConcurrencyAttr>())
+    return true;
+
+  // Imported C declarations always predate concurrency.
+  if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
+    return true;
+
+  return false;
 }
 
 
@@ -761,6 +774,10 @@ void AbstractFunctionDecl::setSingleExpressionBody(Expr *NewBody) {
     }
   }
   getBody()->setLastElement(NewBody);
+}
+
+bool AbstractStorageDecl::isCompileTimeConst() const {
+  return getAttrs().hasAttribute<CompileTimeConstAttr>();
 }
 
 bool AbstractStorageDecl::isTransparent() const {
@@ -4182,7 +4199,7 @@ static AssociatedTypeDecl *getAssociatedTypeAnchor(
 
   return bestAnchor;
 }
-};
+}
 
 AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
   llvm::SmallSet<const AssociatedTypeDecl *, 8> searched;
@@ -5257,6 +5274,13 @@ ArrayRef<StructuralRequirement>
 ProtocolDecl::getStructuralRequirements() const {
   return evaluateOrDefault(getASTContext().evaluator,
                StructuralRequirementsRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
+
+ArrayRef<Requirement>
+ProtocolDecl::getTypeAliasRequirements() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               TypeAliasRequirementsRequest { const_cast<ProtocolDecl *>(this) },
                None);
 }
 
@@ -6665,7 +6689,8 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto internalLabel = getParameterName();
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(),
-      getValueOwnership(), isIsolated(), /*isNoDerivative*/ false);
+      getValueOwnership(), isIsolated(), /*isNoDerivative*/ false,
+      isCompileTimeConst());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 

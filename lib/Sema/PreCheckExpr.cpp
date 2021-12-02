@@ -599,7 +599,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
           if (typeContext->getSelfClassDecl())
             SelfType = DynamicSelfType::get(SelfType, Context);
-          SelfType = DC->mapTypeIntoContext(SelfType);
           return new (Context)
               TypeExpr(new (Context) FixedTypeRepr(SelfType, Loc));
         }
@@ -894,8 +893,6 @@ namespace {
     /// implicit `ErrorExpr` in place of invalid references.
     bool UseErrorExprs;
 
-    bool LeaveClosureBodiesUnchecked;
-
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -1083,11 +1080,9 @@ namespace {
 
   public:
     PreCheckExpression(DeclContext *dc, Expr *parent,
-                       bool replaceInvalidRefsWithErrors,
-                       bool leaveClosureBodiesUnchecked)
-        : Ctx(dc->getASTContext()), DC(dc),
-          ParentExpr(parent), UseErrorExprs(replaceInvalidRefsWithErrors),
-          LeaveClosureBodiesUnchecked(leaveClosureBodiesUnchecked) {}
+                       bool replaceInvalidRefsWithErrors)
+        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent),
+          UseErrorExprs(replaceInvalidRefsWithErrors) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
@@ -1420,12 +1415,11 @@ namespace {
 
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *pattern) override {
       // With multi-statement closure inference enabled, constraint generation
-      // is responsible for pattern verification and type-checking in the body
-      // of the closure, so there is no need to walk into patterns.
-      bool walkIntoPatterns =
-          !(isa<ClosureExpr>(DC) &&
-            Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference);
-      return {walkIntoPatterns, pattern};
+      // is responsible for pattern verification and type-checking, so there
+      // is no need to walk into patterns in that mode.
+      bool shouldWalkIntoPatterns =
+          !Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference;
+      return {shouldWalkIntoPatterns, pattern};
     }
   };
 } // end anonymous namespace
@@ -1434,13 +1428,8 @@ namespace {
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // If we won't be checking the body of the closure, don't walk into it here.
-  if (!closure->hasSingleExpressionBody()) {
-    if (LeaveClosureBodiesUnchecked)
-      return false;
-
-    if (!Ctx.TypeCheckerOpts.EnableMultiStatementClosureInference)
-      return false;
-  }
+  if (!shouldTypeCheckInEnclosingExpression(closure))
+    return false;
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
@@ -1505,10 +1494,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // Fold 'T.U' into a nested type.
   if (auto *ITR = dyn_cast<IdentTypeRepr>(InnerTypeRepr)) {
     // Resolve the TypeRepr to get the base type for the lookup.
-    const auto options =
-        TypeResolutionOptions(TypeResolverContext::InExpression);
-    const auto resolution = TypeResolution::forContextual(
-        DC, options,
+    const auto BaseTy = TypeResolution::resolveContextualType(
+        InnerTypeRepr, DC, TypeResolverContext::InExpression,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -1517,7 +1504,6 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get);
-    const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy->mayHaveMembers()) {
       // See if there is a member type with this name.
@@ -2060,8 +2046,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         TypeResolutionOptions(TypeResolverContext::InExpression) |
         TypeResolutionFlags::SilenceErrors;
 
-    const auto resolution = TypeResolution::forContextual(
-        DC, options,
+    const auto result = TypeResolution::resolveContextualType(
+        typeExpr->getTypeRepr(), DC, options,
         [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
@@ -2070,13 +2056,13 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         PlaceholderType::get);
-    const auto result = resolution.resolveType(typeExpr->getTypeRepr());
+
     if (result->hasError())
       return nullptr;
     castTy = result;
   }
 
-  if (!castTy || !castTy->getAnyNominal())
+  if (!castTy->getAnyNominal())
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
@@ -2096,15 +2082,11 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
-                                          bool replaceInvalidRefsWithErrors,
-                                          bool leaveClosureBodiesUnchecked) {
+                                          bool replaceInvalidRefsWithErrors) {
   auto &ctx = dc->getASTContext();
   FrontendStatsTracer StatsTracer(ctx.Stats, "precheck-expr", expr);
 
-  PreCheckExpression preCheck(dc, expr,
-                              replaceInvalidRefsWithErrors,
-                              leaveClosureBodiesUnchecked);
-
+  PreCheckExpression preCheck(dc, expr, replaceInvalidRefsWithErrors);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;

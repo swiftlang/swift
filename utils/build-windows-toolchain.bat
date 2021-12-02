@@ -329,7 +329,7 @@ cmake ^
 cmake --build %BuildRoot%\5 || (exit /b)
 cmake --build %BuildRoot%\5 --target install || (exit /b)
 
-:: Build swift-tools-support-core
+:: Build swift-system
 cmake ^
   -B %BuildRoot%\6 ^
 
@@ -345,19 +345,41 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
 
+  -G Ninja ^
+  -S %SourceRoot%\swift-system || (exit /b)
+cmake --build %BuildRoot%\6 || (exit /b)
+cmake --build %BuildRoot%\6 --target install || (exit /b)
+
+:: Build swift-tools-support-core
+cmake ^
+  -B %BuildRoot%\7 ^
+
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
+
   -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
   -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
+  -D SwiftSystem_DIR=%BuildRoot%\6\cmake\modules ^
   -D SQLite3_INCLUDE_DIR=%BuildRoot%\Library\sqlite-3.36.0\usr\include ^
   -D SQLite3_LIBRARY=%BuildRoot%\Library\sqlite-3.36.0\usr\lib\SQLite3.lib ^
 
   -G Ninja ^
   -S %SourceRoot%\swift-tools-support-core || (exit /b)
-cmake --build %BuildRoot%\6 || (exit /b)
-cmake --build %BuildRoot%\6 --target install || (exit /b)
+cmake --build %BuildRoot%\7 || (exit /b)
+cmake --build %BuildRoot%\7 --target install || (exit /b)
 
 :: Build llbuild
 cmake ^
-  -B %BuildRoot%\7 ^
+  -B %BuildRoot%\8 ^
 
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
@@ -380,12 +402,12 @@ cmake ^
 
   -G Ninja ^
   -S %SourceRoot%\llbuild || (exit /b)
-cmake --build %BuildRoot%\7 || (exit /b)
-cmake --build %BuildRoot%\7 --target install || (exit /b)
+cmake --build %BuildRoot%\8 || (exit /b)
+cmake --build %BuildRoot%\8 --target install || (exit /b)
 
 :: Build swift-argument-parser
 cmake ^
-  -B %BuildRoot%\8 ^
+  -B %BuildRoot%\9 ^
 
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
@@ -405,12 +427,12 @@ cmake ^
 
   -G Ninja ^
   -S %SourceRoot%\swift-argument-parser || (exit /b)
-cmake --build %BuildRoot%\8 || (exit /b)
-cmake --build %BuildRoot%\8 --target install || (exit /b)
+cmake --build %BuildRoot%\9 || (exit /b)
+cmake --build %BuildRoot%\9 --target install || (exit /b)
 
 :: Build Yams
 cmake ^
-  -B %BuildRoot%\9 ^
+  -B %BuildRoot%\10 ^
 
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
@@ -431,12 +453,12 @@ cmake ^
 
   -G Ninja ^
   -S %SourceRoot%\Yams || (exit /b)
-cmake --build %BuildRoot%\9 || (exit /b)
-cmake --build %BuildRoot%\9 --target install || (exit /b)
+cmake --build %BuildRoot%\10 || (exit /b)
+cmake --build %BuildRoot%\10 --target install || (exit /b)
 
 :: Build swift-driver
 cmake ^
-  -B %BuildRoot%\10 ^
+  -B %BuildRoot%\11 ^
 
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
@@ -453,19 +475,20 @@ cmake ^
   -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
   -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
   -D XCTest_DIR=%BuildRoot%\5\cmake\modules ^
-  -D TSC_DIR=%BuildRoot%\6\cmake\modules ^
-  -D LLBuild_DIR=%BuildRoot%\7\cmake\modules ^
-  -D ArgumentParser_DIR=%BuildRoot%\8\cmake\modules ^
-  -D Yams_DIR=%BuildRoot%\9\cmake\modules ^
+  -D SwiftSystem_DIR=%BuildRoot%\6\cmake\modules ^
+  -D TSC_DIR=%BuildRoot%\7\cmake\modules ^
+  -D LLBuild_DIR=%BuildRoot%\8\cmake\modules ^
+  -D ArgumentParser_DIR=%BuildRoot%\9\cmake\modules ^
+  -D Yams_DIR=%BuildRoot%\10\cmake\modules ^
 
   -G Ninja ^
   -S %SourceRoot%\swift-driver || (exit /b)
-cmake --build %BuildRoot%\10 || (exit /b)
-cmake --build %BuildRoot%\10 --target install || (exit /b)
+cmake --build %BuildRoot%\11 || (exit /b)
+cmake --build %BuildRoot%\11 --target install || (exit /b)
 
 :: Build swift-crypto
 cmake ^
-  -B %BuildRoot%\11 ^
+  -B %BuildRoot%\12 ^
 
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=cl ^
@@ -484,31 +507,10 @@ cmake ^
 
   -G Ninja ^
   -S %SourceRoot%\swift-crypto || (exit /b)
-cmake --build %BuildRoot%\11 || (exit /b)
-cmake --build %BuildRoot%\11 --target install || (exit /b)
-
-:: Build swift-collections
-cmake ^
-  -B %BuildRoot%\12 ^
-
-  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
-  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
-  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
-  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
-  -D CMAKE_MT=mt ^
-  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
-  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
-  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
-
-  -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
-
-  -G Ninja ^
-  -S %SourceRoot%\swift-collections || (exit /b)
 cmake --build %BuildRoot%\12 || (exit /b)
 cmake --build %BuildRoot%\12 --target install || (exit /b)
 
-:: Build swift-package-manager
+:: Build swift-collections
 cmake ^
   -B %BuildRoot%\13 ^
 
@@ -524,24 +526,46 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
 
-  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
-  -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
-  -D TSC_DIR=%BuildRoot%\6\cmake\modules ^
-  -D LLBuild_DIR=%BuildRoot%\7\cmake\modules ^
-  -D ArgumentParser_DIR=%BuildRoot%\8\cmake\modules ^
-  -D Yams_DIR=%BuildRoot%\9\cmake\modules ^
-  -D SwiftDriver_DIR=%BuildRoot%\10\cmake\modules ^
-  -D SwiftCrypto_DIR=%BuildRoot%\11\cmake\modules ^
-  -D SwiftCollections_DIR=%BuildRoot%\12\cmake\modules ^
-
   -G Ninja ^
-  -S %SourceRoot%\swiftpm || (exit /b)
+  -S %SourceRoot%\swift-collections || (exit /b)
 cmake --build %BuildRoot%\13 || (exit /b)
 cmake --build %BuildRoot%\13 --target install || (exit /b)
 
-:: Build IndexStoreDB
+:: Build swift-package-manager
 cmake ^
   -B %BuildRoot%\14 ^
+
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=%BuildRoot%/1/bin/clang-cl.exe ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=%BuildRoot%/1/bin/swiftc.exe ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX=%InstallRoot% ^
+
+  -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
+  -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
+  -D SwiftSystem_DIR=%BuildRoot%\6\cmake\modules ^
+  -D TSC_DIR=%BuildRoot%\7\cmake\modules ^
+  -D LLBuild_DIR=%BuildRoot%\8\cmake\modules ^
+  -D ArgumentParser_DIR=%BuildRoot%\9\cmake\modules ^
+  -D Yams_DIR=%BuildRoot%\10\cmake\modules ^
+  -D SwiftDriver_DIR=%BuildRoot%\11\cmake\modules ^
+  -D SwiftCrypto_DIR=%BuildRoot%\12\cmake\modules ^
+  -D SwiftCollections_DIR=%BuildRoot%\13\cmake\modules ^
+
+  -G Ninja ^
+  -S %SourceRoot%\swiftpm || (exit /b)
+cmake --build %BuildRoot%\14 || (exit /b)
+cmake --build %BuildRoot%\14 --target install || (exit /b)
+
+:: Build IndexStoreDB
+cmake ^
+  -B %BuildRoot%\15 ^
 
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
@@ -561,12 +585,12 @@ cmake ^
 
   -G Ninja ^
   -S %SourceRoot%\indexstore-db || (exit /b)
-cmake --build %BuildRoot%\14 || (exit /b)
-cmake --build %BuildRoot%\14 --target install || (exit /b)
+cmake --build %BuildRoot%\15 || (exit /b)
+cmake --build %BuildRoot%\15 --target install || (exit /b)
 
 :: Build SourceKit-LSP
 cmake ^
-  -B %BuildRoot%\15 ^
+  -B %BuildRoot%\16 ^
 
   -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
@@ -583,18 +607,19 @@ cmake ^
 
   -D dispatch_DIR=%BuildRoot%\3\cmake\modules ^
   -D Foundation_DIR=%BuildRoot%\4\cmake\modules ^
-  -D TSC_DIR=%BuildRoot%\6\cmake\modules ^
-  -D LLBuild_DIR=%BuildRoot%\7\cmake\modules ^
-  -D ArgumentParser_DIR=%BuildRoot%\8\cmake\modules ^
-  -D Yams_DIR=%BuildRoot%\9\cmake\modules ^
-  -D SwiftPM_DIR=%BuildRoot%\13\cmake\modules ^
-  -D IndexStoreDB_DIR=%BuildRoot%\14\cmake\modules ^
-  -D SwiftCollections_DIR=%BuildRoot%\12\cmake\modules ^
+  -D SwiftSystem_DIR=%BuildRoot%\6\cmake\modules ^
+  -D TSC_DIR=%BuildRoot%\7\cmake\modules ^
+  -D LLBuild_DIR=%BuildRoot%\8\cmake\modules ^
+  -D ArgumentParser_DIR=%BuildRoot%\9\cmake\modules ^
+  -D Yams_DIR=%BuildRoot%\10\cmake\modules ^
+  -D SwiftPM_DIR=%BuildRoot%\14\cmake\modules ^
+  -D IndexStoreDB_DIR=%BuildRoot%\15\cmake\modules ^
+  -D SwiftCollections_DIR=%BuildRoot%\13\cmake\modules ^
 
   -G Ninja ^
   -S %SourceRoot%\sourcekit-lsp || (exit /b)
-cmake --build %BuildRoot%\15 || (exit /b)
-cmake --build %BuildRoot%\15 --target install || (exit /b)
+cmake --build %BuildRoot%\16 || (exit /b)
+cmake --build %BuildRoot%\16 --target install || (exit /b)
 
 :: Create Configuration Files
 python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" > %SDKInstallRoot%\SDKSettings.plist

@@ -179,6 +179,7 @@ public:
   }
 
   void visitFinalAttr(FinalAttr *attr);
+  void visitCompileTimeConstAttr(CompileTimeConstAttr *attr) {}
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
@@ -2093,6 +2094,9 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
       /*GenericParams=*/nullptr, ParameterList::createEmpty(context),
       /*FnRetType=*/TupleType::getEmpty(context), declContext);
   func->setSynthesized(true);
+  // It's never useful to provide a dynamic replacement of this function--it is
+  // just a pass-through to MainType.main.
+  func->setIsDynamic(false);
 
   auto *params = context.Allocate<MainTypeAttrParams>();
   params->mainFunction = mainFunction;
@@ -2755,13 +2759,13 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    return TypeResolution::forContextual(PD, None,
-                                         // Unbound generics and placeholders
-                                         // are not allowed within this
-                                         // attribute.
-                                         /*unboundTyOpener*/ nullptr,
-                                         /*placeholderHandler*/ nullptr)
-        .resolveType(typeEraserRepr);
+    return TypeResolution::resolveContextualType(
+        typeEraserRepr, PD, None,
+        // Unbound generics and placeholders
+        // are not allowed within this
+        // attribute.
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
   } else {
     auto *LazyResolver = attr->Resolver;
     assert(LazyResolver && "type eraser was neither parsed nor deserialized?");
@@ -2938,9 +2942,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
   Type T = attr->getProtocolType();
   if (!T && attr->getProtocolTypeRepr()) {
-    T = TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
-            .resolveType(attr->getProtocolTypeRepr());
+    T = TypeResolution::resolveContextualType(attr->getProtocolTypeRepr(), DC,
+                                              None, /*unboundTyOpener*/ nullptr,
+                                              /*placeholderHandler*/ nullptr);
   }
 
   // Definite error-types were already diagnosed in resolveType.
@@ -3653,7 +3657,7 @@ static bool conformsToDifferentiable(Type type, ModuleDecl *module,
     return true;
   auto tanType = conf.getTypeWitnessByName(type, ctx.Id_TangentVector);
   return type->isEqual(tanType);
-};
+}
 
 IndexSubset *TypeChecker::inferDifferentiabilityParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
@@ -4065,9 +4069,15 @@ static bool checkFunctionSignature(
   // Check that generic signatures match.
   auto requiredGenSig = required.getOptGenericSignature();
   auto candidateGenSig = candidateFnTy.getOptGenericSignature();
-  if (!candidateGenSig.requirementsNotSatisfiedBy(requiredGenSig).empty()) {
+  // Check that the candidate signature's generic parameters are a subset of
+  // those of the required signature.
+  if (requiredGenSig && candidateGenSig &&
+      candidateGenSig.getGenericParams().size()
+          > requiredGenSig.getGenericParams().size())
     return false;
-  }
+  // Check that the requirements are satisfied.
+  if (!candidateGenSig.requirementsNotSatisfiedBy(requiredGenSig).empty())
+    return false;
 
   // Check that parameter types match, disregarding labels.
   if (required->getNumParams() != candidateFnTy->getNumParams())
@@ -4105,7 +4115,7 @@ static bool checkFunctionSignature(
 
   // Required result type is a function. Recurse.
   return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
-};
+}
 
 /// Returns an `AnyFunctionType` from the given parameters, result type, and
 /// generic signature.
@@ -4740,11 +4750,10 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
     const auto options =
         TypeResolutionOptions(None) | TypeResolutionFlags::AllowModule;
-    baseType =
-        TypeResolution::forContextual(derivative->getDeclContext(), options,
-                                      /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr)
-            .resolveType(baseTypeRepr);
+    baseType = TypeResolution::resolveContextualType(
+        baseTypeRepr, derivative->getDeclContext(), options,
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
   }
   if (baseType && baseType->hasError())
     return true;
@@ -5333,10 +5342,10 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 
   Type baseType;
   if (attr->getBaseTypeRepr()) {
-    baseType = TypeResolution::forContextual(transpose->getDeclContext(), None,
-                                             /*unboundTyOpener*/ nullptr,
-                                             /*placeholderHandler*/ nullptr)
-                   .resolveType(attr->getBaseTypeRepr());
+    baseType = TypeResolution::resolveContextualType(
+        attr->getBaseTypeRepr(), transpose->getDeclContext(), None,
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr);
   }
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions

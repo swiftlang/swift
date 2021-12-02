@@ -247,6 +247,19 @@ AsyncTask::~AsyncTask() {
   Private.destroy();
 }
 
+void AsyncTask::setTaskId() {
+  static std::atomic<uint64_t> NextId(1);
+
+  // We want the 32-bit Job::Id to be non-zero, so loop if we happen upon zero.
+  uint64_t Fetched;
+  do {
+    Fetched = NextId.fetch_add(1, std::memory_order_relaxed);
+    Id = Fetched & 0xffffffff;
+  } while (Id == 0);
+
+  _private().Id = (Fetched >> 32) & 0xffffffff;
+}
+
 SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
@@ -1100,13 +1113,13 @@ static void swift_task_asyncMainDrainQueueImpl() {
 
   HMODULE hModule = LoadLibraryW(L"dispatch.dll");
   if (hModule == NULL)
-    abort();
+    swift_reportError(0, "unable to load dispatch.dll");
 
   pfndispatch_main =
       reinterpret_cast<void (FAR *)(void)>(GetProcAddress(hModule,
                                                           "dispatch_main"));
   if (pfndispatch_main == NULL)
-    abort();
+    swift_reportError(0, "unable to locate dispatch_main in dispatch.dll");
 
   pfndispatch_main();
   exit(0);

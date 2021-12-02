@@ -488,6 +488,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.IsNonSwiftModule = 0;
   Bits.ModuleDecl.IsMainModule = 0;
   Bits.ModuleDecl.HasIncrementalInfo = 0;
+  Bits.ModuleDecl.HasHermeticSealAtLink = 0;
   Bits.ModuleDecl.IsConcurrencyChecked = 0;
 }
 
@@ -1803,6 +1804,15 @@ void ModuleDecl::collectBasicSourceFileInfo(
       callback(BasicSourceFileInfo(SF));
     } else if (auto *serialized = dyn_cast<LoadedFile>(fileUnit)) {
       serialized->collectBasicSourceFileInfo(callback);
+    }
+  }
+}
+
+void ModuleDecl::collectSerializedSearchPath(
+    llvm::function_ref<void(StringRef)> callback) const {
+  for (const FileUnit *fileUnit : getFiles()) {
+    if (auto *serialized = dyn_cast<LoadedFile>(fileUnit)) {
+      serialized->collectSerializedSearchPath(callback);
     }
   }
 }

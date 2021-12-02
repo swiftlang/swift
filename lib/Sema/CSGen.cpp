@@ -213,7 +213,7 @@ namespace {
       }
 
       if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
-        LTI.binaryExprs.push_back(dyn_cast<BinaryExpr>(expr));
+        LTI.binaryExprs.push_back(binaryExpr);
       }  
       
       if (auto favoredType = CS.getFavoredType(expr)) {
@@ -836,6 +836,9 @@ namespace {
           ty = ty->getInOutObjectType();
           flags = flags.withInOut(true);
         }
+        if (arg.isConst()) {
+          flags = flags.withCompileTimeConst(true);
+        }
         result.emplace_back(ty, arg.getLabel(), flags);
       }
     }
@@ -1321,10 +1324,8 @@ namespace {
       // Introduce type variables for unbound generics.
       const auto genericOpener = OpenUnboundGenericType(CS, locator);
       const auto placeholderHandler = HandlePlaceholderType(CS, locator);
-      const auto result = TypeResolution::forContextual(CS.DC, resCtx,
-                                                        genericOpener,
-                                                        placeholderHandler)
-              .resolveType(repr);
+      const auto result = TypeResolution::resolveContextualType(
+          repr, CS.DC, resCtx, genericOpener, placeholderHandler);
       if (result->hasError()) {
         return Type();
       }
@@ -1597,13 +1598,12 @@ namespace {
           auto *const locator = CS.getConstraintLocator(expr);
           const auto options =
               TypeResolutionOptions(TypeResolverContext::InExpression);
-          for (size_t i = 0, size = specializations.size(); i < size; ++i) {
-            const auto resolution = TypeResolution::forContextual(
-                CS.DC, options,
+          for (size_t i = 0, e = specializations.size(); i < e; ++i) {
+            const auto result = TypeResolution::resolveContextualType(
+                specializations[i], CS.DC, options,
                 // Introduce type variables for unbound generics.
                 OpenUnboundGenericType(CS, locator),
                 HandlePlaceholderType(CS, locator));
-            const auto result = resolution.resolveType(specializations[i]);
             if (result->hasError())
               return Type();
 
@@ -2105,7 +2105,7 @@ namespace {
         // If this is a multi-statement closure, let's mark result
         // as potential hole right away.
         return Type(CS.createTypeVariable(
-            resultLocator, CS.participatesInInference(closure)
+            resultLocator, shouldTypeCheckInEnclosingExpression(closure)
                                ? 0
                                : TVO_CanBindToHole));
       }();
@@ -2627,7 +2627,7 @@ namespace {
       // genreation only if closure is going to participate
       // in the type-check. This allows us to delay validation of
       // multi-statement closures until body is opened.
-      if (CS.participatesInInference(closure) &&
+      if (shouldTypeCheckInEnclosingExpression(closure) &&
           collectVarRefs.hasErrorExprs) {
         return Type();
       }
@@ -4215,9 +4215,9 @@ struct ResolvedMemberResult::Implementation {
   Optional<unsigned> BestIdx;
 };
 
-ResolvedMemberResult::ResolvedMemberResult(): Impl(new Implementation()) {};
+ResolvedMemberResult::ResolvedMemberResult(): Impl(new Implementation()) {}
 
-ResolvedMemberResult::~ResolvedMemberResult() { delete Impl; };
+ResolvedMemberResult::~ResolvedMemberResult() { delete Impl; }
 
 ResolvedMemberResult::operator bool() const {
   return !Impl->AllDecls.empty();

@@ -335,7 +335,7 @@ static bool isStructurallyIdentical(SILValue LHS, SILValue RHS) {
   return (lResult->ResultIndex == rResult->ResultIndex &&
           lResult->Instruction->isIdenticalTo(rResult->Instruction,
                                               isStructurallyIdentical));
-};
+}
 
 /// Compare two sequences of SIL instructions. They should be structurally
 /// equivalent.

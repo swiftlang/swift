@@ -594,7 +594,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -630,6 +630,9 @@ protected:
 
     /// Whether this module has incremental dependency information available.
     HasIncrementalInfo : 1,
+
+    /// Whether this module was built with -experimental-hermetic-seal-at-link.
+    HasHermeticSealAtLink : 1,
 
     /// Whether this module has been compiled with comprehensive checking for
     /// concurrency, e.g., Sendable checking.
@@ -4225,6 +4228,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class StructuralRequirementsRequest;
+  friend class TypeAliasRequirementsRequest;
   friend class ProtocolDependenciesRequest;
   friend class RequirementSignatureRequest;
   friend class RequirementSignatureRequestRQM;
@@ -4421,6 +4425,11 @@ public:
   /// instead.
   ArrayRef<StructuralRequirement> getStructuralRequirements() const;
 
+  /// Retrieve same-type requirements implied by protocol typealiases with the
+  /// same name as associated types, and diagnose cases that are better expressed
+  /// via a 'where' clause.
+  ArrayRef<Requirement> getTypeAliasRequirements() const;
+
   /// Get the list of protocols appearing on the right hand side of conformance
   /// requirements. Computed from the structural requirements, above.
   ArrayRef<ProtocolDecl *> getProtocolDependencies() const;
@@ -4583,6 +4592,7 @@ public:
   void setStatic(bool IsStatic) {
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
+  bool isCompileTimeConst() const;
 
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
@@ -5356,7 +5366,7 @@ class ParamDecl : public VarDecl {
 
   TypeRepr *TyRepr = nullptr;
 
-  struct alignas(1 << DeclAlignInBits) StoredDefaultArgument {
+  struct alignas(1 << StoredDefaultArgumentAlignInBits) StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
 
     /// Stores the context for the default argument as well as a bit to
@@ -5380,10 +5390,13 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
+
+    /// Whether or not this parameter is '_const'.
+    IsCompileTimeConst = 1 << 3,
   };
 
   /// The default value, if any, along with flags.
-  llvm::PointerIntPair<StoredDefaultArgument *, 3, OptionSet<Flags>>
+  llvm::PointerIntPair<StoredDefaultArgument *, 4, OptionSet<Flags>>
       DefaultValueAndFlags;
 
   friend class ParamSpecifierRequest;
@@ -5550,6 +5563,17 @@ public:
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsIsolated
                                       : flags - Flags::IsIsolated);
+  }
+
+  /// Whether or not this parameter is marked with '_const'.
+  bool isCompileTimeConst() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsCompileTimeConst);
+  }
+
+  void setCompileTimeConst(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsCompileTimeConst
+                                      : flags - Flags::IsCompileTimeConst);
   }
 
   /// Does this parameter reject temporary pointer conversions?

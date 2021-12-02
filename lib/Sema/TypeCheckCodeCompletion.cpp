@@ -206,9 +206,7 @@ public:
       // If this is a closure, only walk into its children if they
       // are type-checked in the context of the enclosing expression.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        // TODO: This has to be deleted once `EnableMultiStatementClosureInference`
-        //       is enabled by default.
-        if (!closure->hasSingleExpressionBody())
+        if (!shouldTypeCheckInEnclosingExpression(closure))
           return { false, expr };
         for (auto &Param : *closure->getParameters()) {
           Param->setSpecifier(swift::ParamSpecifier::Default);
@@ -307,12 +305,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
   referencedDecl = nullptr;
 
-  ConstraintSystemOptions options;
-  options |= ConstraintSystemFlags::SuppressDiagnostics;
-  options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
-
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(dc, options);
+  ConstraintSystem cs(dc, ConstraintSystemFlags::SuppressDiagnostics);
 
   // Attempt to solve the constraint system.
   const Type originalType = expr->getType();
@@ -404,7 +398,6 @@ getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
   ConstraintSystemOptions options;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
   options |= ConstraintSystemFlags::ReusePrecheckedType;
-  options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
   // Construct a constraint system from this expression.
   ConstraintSystem CS(DC, options);
@@ -795,8 +788,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
     // expression and folding sequence expressions.
     auto failedPreCheck = ConstraintSystem::preCheckExpression(
         expr, DC,
-        /*replaceInvalidRefsWithErrors=*/true,
-        /*leaveClosureBodiesUnchecked=*/true);
+        /*replaceInvalidRefsWithErrors=*/true);
 
     target.setExpr(expr);
 
@@ -812,8 +804,6 @@ bool TypeChecker::typeCheckForCodeCompletion(
     options |= ConstraintSystemFlags::AllowFixes;
     options |= ConstraintSystemFlags::SuppressDiagnostics;
     options |= ConstraintSystemFlags::ForCodeCompletion;
-    options |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
-
 
     ConstraintSystem cs(DC, options);
 
@@ -902,9 +892,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
   if (constraints::ConstraintSystem::preCheckExpression(
-          parsedExpr, DC,
-          /*replaceInvalidRefsWithErrors=*/true,
-          /*leaveClosureBodiesUnchecked=*/true))
+          parsedExpr, DC, /*replaceInvalidRefsWithErrors=*/true))
     return None;
 
   switch (kind) {
@@ -984,9 +972,7 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   parsedExpr = parsedExpr->walk(SanitizeExpr(ctx, /*shouldReusePrecheckedType=*/false));
 
   DiagnosticSuppression suppression(ctx.Diags);
-  auto resultTy = TypeChecker::typeCheckExpression(
-      parsedExpr, DC,
-      /*contextualInfo=*/{}, TypeCheckExprFlags::LeaveClosureBodyUnchecked);
+  auto resultTy = TypeChecker::typeCheckExpression(parsedExpr, DC);
   return !resultTy;
 }
 
@@ -1092,7 +1078,7 @@ static Type getTypeForCompletion(const constraints::Solution &S, Expr *E) {
   }
 
   return S.getResolvedType(E);
-};
+}
 
 /// Whether the given completion expression is the only expression in its
 /// containing closure or function body and its value is implicitly returned.

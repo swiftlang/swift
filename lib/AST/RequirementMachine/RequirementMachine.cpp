@@ -139,6 +139,9 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
   RequirementMachineStepLimit = langOpts.RequirementMachineStepLimit;
   RequirementMachineDepthLimit = langOpts.RequirementMachineDepthLimit;
   Stats = ctx.getASTContext().Stats;
+
+  if (Stats)
+    ++Stats->getFrontendCounters().NumRequirementMachines;
 }
 
 RequirementMachine::~RequirementMachine() {}
@@ -147,18 +150,14 @@ RequirementMachine::~RequirementMachine() {}
 ///
 /// This must only be called exactly once, before any other operations are
 /// performed on this requirement machine.
+///
+/// Used by ASTContext::getOrCreateRequirementMachine().
 void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   Sig = sig;
   Params.append(sig.getGenericParams().begin(),
                 sig.getGenericParams().end());
 
   PrettyStackTraceGenericSignature debugStack("building rewrite system for", sig);
-
-  auto &ctx = Context.getASTContext();
-  auto *Stats = ctx.Stats;
-
-  if (Stats)
-    ++Stats->getFrontendCounters().NumRequirementMachines;
 
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
@@ -189,14 +188,10 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 ///
 /// This must only be called exactly once, before any other operations are
 /// performed on this requirement machine.
+///
+/// Used by RequirementSignatureRequest.
 void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
   Protos = protos;
-
-  auto &ctx = Context.getASTContext();
-  auto *Stats = ctx.Stats;
-
-  if (Stats)
-    ++Stats->getFrontendCounters().NumRequirementMachines;
 
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
@@ -225,17 +220,54 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
 }
 
 /// Build a requirement machine from a set of generic parameters and
-/// (possibly non-canonical or non-minimal) structural requirements.
+/// (possibly non-canonical or non-minimal) abstract requirements.
+///
+/// This must only be called exactly once, before any other operations are
+/// performed on this requirement machine.
+///
+/// Used by AbstractGenericSignatureRequest.
 void RequirementMachine::initWithAbstractRequirements(
     ArrayRef<GenericTypeParamType *> genericParams,
     ArrayRef<Requirement> requirements) {
   Params.append(genericParams.begin(), genericParams.end());
 
-  auto &ctx = Context.getASTContext();
-  auto *Stats = ctx.Stats;
+  FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
-  if (Stats)
-    ++Stats->getFrontendCounters().NumRequirementMachines;
+  if (Dump) {
+    llvm::dbgs() << "Adding generic parameters:";
+    for (auto *paramTy : genericParams)
+      llvm::dbgs() << " " << Type(paramTy);
+    llvm::dbgs() << "\n";
+  }
+
+  // Collect the top-level requirements, and all transtively-referenced
+  // protocol requirement signatures.
+  RuleBuilder builder(Context, Dump);
+  builder.addRequirements(requirements);
+
+  // Add the initial set of rewrite rules to the rewrite system.
+  System.initialize(/*recordLoops=*/true,
+                    std::move(builder.PermanentRules),
+                    std::move(builder.RequirementRules));
+
+  computeCompletion(RewriteSystem::AllowInvalidRequirements);
+
+  if (Dump) {
+    llvm::dbgs() << "}\n";
+  }
+}
+
+/// Build a requirement machine from a set of generic parameters and
+/// structural requirements.
+///
+/// This must only be called exactly once, before any other operations are
+/// performed on this requirement machine.
+///
+/// Used by InferredGenericSignatureRequest.
+void RequirementMachine::initWithWrittenRequirements(
+    ArrayRef<GenericTypeParamType *> genericParams,
+    ArrayRef<StructuralRequirement> requirements) {
+  Params.append(genericParams.begin(), genericParams.end());
 
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 

@@ -98,8 +98,7 @@ void swift::ide::typeCheckContextAt(DeclContext *DC, SourceLoc Loc) {
             [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i))
-            typeCheckPatternBinding(PBD, i,
-                                    /*LeaveClosureBodyUnchecked=*/true);
+            typeCheckPatternBinding(PBD, i);
         }
       }
     } else if (auto *defaultArg = dyn_cast<DefaultArgumentInitializer>(DC)) {
@@ -308,7 +307,7 @@ void swift::ide::collectPossibleReturnTypesFromContext(
               const_cast<DeclContext *>(DC), /*diagnostics=*/false);
 
           if (!type->hasError()) {
-            candidates.push_back(type);
+            candidates.push_back(DC->mapTypeIntoContext(type));
             return;
           }
         }

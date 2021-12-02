@@ -387,6 +387,25 @@ public:
   bool isCached() const { return true; }
 };
 
+class TypeAliasRequirementsRequest :
+    public SimpleRequest<TypeAliasRequirementsRequest,
+                         ArrayRef<Requirement>(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Requirement>
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 class ProtocolDependenciesRequest :
     public SimpleRequest<ProtocolDependenciesRequest,
                          ArrayRef<ProtocolDecl *>(ProtocolDecl *),
@@ -1534,7 +1553,50 @@ public:
   SourceLoc getNearestLoc() const {
     return SourceLoc();
   }
-                           
+
+  // Cycle handling.
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Build a generic signature using the RequirementMachine. This is temporary;
+/// once the GenericSignatureBuilder goes away this will be folded into
+/// InferredGenericSignatureRequest.
+class InferredGenericSignatureRequestRQM :
+    public SimpleRequest<InferredGenericSignatureRequestRQM,
+                         GenericSignatureWithError (ModuleDecl *,
+                                                    const GenericSignatureImpl *,
+                                                    GenericParamList *,
+                                                    WhereClauseOwner,
+                                                    SmallVector<Requirement, 2>,
+                                                    SmallVector<TypeLoc, 2>,
+                                                    bool),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  GenericSignatureWithError
+  evaluate(Evaluator &evaluator,
+           ModuleDecl *parentModule,
+           const GenericSignatureImpl *baseSignature,
+           GenericParamList *genericParams,
+           WhereClauseOwner whereClause,
+           SmallVector<Requirement, 2> addedRequirements,
+           SmallVector<TypeLoc, 2> inferenceSources,
+           bool allowConcreteGenericParams) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+
+  /// Inferred generic signature requests don't have source-location info.
+  SourceLoc getNearestLoc() const {
+    return SourceLoc();
+  }
+
   // Cycle handling.
   void noteCycleStep(DiagnosticEngine &diags) const;
 };

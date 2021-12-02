@@ -1663,11 +1663,7 @@ public:
 
 /// Determines whether the given swift_attr attribute describes the main
 /// actor.
-///
-/// \returns None if this is not a main-actor attribute, and a Boolean
-/// indicating whether (unsafe) was provided in the attribute otherwise.
-Optional<bool> isMainActorAttr(
-    ASTContext &ctx, const clang::SwiftAttrAttr *swiftAttr);
+bool isMainActorAttr(const clang::SwiftAttrAttr *swiftAttr);
 
 }
 }

@@ -15,6 +15,7 @@
 
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/PathRemapper.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -341,6 +342,11 @@ public:
   /// True if the "-static" option is set.
   bool Static = false;
 
+  /// True if building with -experimental-hermetic-seal-at-link. Turns on
+  /// dead-stripping optimizations assuming that all users of library code
+  /// are present at LTO time.
+  bool HermeticSealAtLink = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.
@@ -431,6 +437,10 @@ public:
 
   /// Whether to include symbols with SPI information in the symbol graph.
   bool IncludeSPISymbolsInSymbolGraph = false;
+
+  /// This is used to obfuscate the serialized search paths so we don't have
+  /// to encode the actual paths into the .swiftmodule file.
+  PathObfuscator serializedPathObfuscator;
 
 private:
   static bool canActionEmitDependencies(ActionType);

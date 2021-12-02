@@ -118,7 +118,7 @@ void swift::printOpaquePrefixMap(raw_ostream &out, void *_root,
 
 void PrefixMapKeyPrinter<char>::print(raw_ostream &out, ArrayRef<char> key) {
   out << QuotedString(StringRef(key.data(), key.size()));
-};
+}
 
 void PrefixMapKeyPrinter<unsigned char>::print(raw_ostream &out,
                                                ArrayRef<unsigned char> key) {

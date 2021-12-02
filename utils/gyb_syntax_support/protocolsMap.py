@@ -11,6 +11,9 @@ SYNTAX_BUILDABLE_EXPRESSIBLE_AS_CONFORMANCES = {
     'IdentifierPattern': [
         'PatternBuildable'
     ],
+    'MemberDeclList': [
+        'MemberDeclBlock'
+    ],
     'SimpleTypeIdentifier': [
         'TypeAnnotation',
         'TypeBuildable',
@@ -19,5 +22,8 @@ SYNTAX_BUILDABLE_EXPRESSIBLE_AS_CONFORMANCES = {
     'StmtBuildable': [
         'CodeBlockItem',
         'SyntaxBuildable'
+    ],
+    'TokenSyntax': [
+        'BinaryOperatorExpr'
     ]
 }

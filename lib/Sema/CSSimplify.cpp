@@ -1504,6 +1504,21 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           }
         }
       }
+      if (!argument.isCompileTimeConst() && param.isCompileTimeConst()) {
+        if (cs.shouldAttemptFixes()) {
+          auto *locator = cs.getConstraintLocator(loc);
+          SourceRange range;
+          // simplify locator so the anchor is the exact argument.
+          locator = simplifyLocator(cs, locator, range);
+          if (locator->getPath().empty() &&
+              locator->getAnchor().isExpr(ExprKind::UnresolvedMemberChainResult)) {
+            locator =
+              cs.getConstraintLocator(cast<UnresolvedMemberChainResultExpr>(
+                locator->getAnchor().get<Expr*>())->getChainBase());
+          }
+          cs.recordFix(NotCompileTimeConst::create(cs, paramTy, locator));
+        }
+      }
 
       cs.addConstraint(
           subKind, argTy, paramTy,
@@ -2026,7 +2041,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
 
       // Something like `foo { x in }` or `foo { $0 }`
       if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
-        cs.forEachExpr(closure, [&](Expr *expr) -> Expr * {
+        forEachExprInConstraintSystem(closure, [&](Expr *expr) -> Expr * {
           if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
             if (!isParam(UDE->getBase()))
               return expr;
@@ -11631,7 +11646,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
   bool found = false;
   if (auto *expr = getAsExpr(anchor)) {
-    forEachExpr(expr, [&](Expr *subExpr) -> Expr * {
+    forEachExprInConstraintSystem(expr, [&](Expr *subExpr) -> Expr * {
       found |= anchors.count(subExpr);
       return subExpr;
     });
@@ -11837,7 +11852,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveExtraneousArguments:
   case FixKind::SpecifyTypeForPlaceholder:
   case FixKind::AllowAutoClosurePointerConversion:
-  case FixKind::IgnoreKeyPathContextualMismatch: {
+  case FixKind::IgnoreKeyPathContextualMismatch:
+  case FixKind::NotCompileTimeConst: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -12677,7 +12693,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::ClosureBodyElement:
     return simplifyClosureBodyElementConstraint(
         constraint.getClosureElement(), constraint.getElementContext(),
-        constraint.isDiscardedElement(),
         /*flags=*/None, constraint.getLocator());
 
   case ConstraintKind::BindTupleOfFunctionParams:

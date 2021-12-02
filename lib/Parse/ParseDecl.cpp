@@ -1061,7 +1061,7 @@ static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
     }
   }
   return true;
-};
+}
 
 /// Parse a differentiability parameters 'wrt:' clause, returning true on error.
 /// If `allowNamedParameters` is false, allow only index parameters and 'self'.
@@ -3776,13 +3776,15 @@ ParserStatus
 Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                       SourceLoc &SpecifierLoc,
                                       SourceLoc &IsolatedLoc,
+                                      SourceLoc &ConstLoc,
                                       TypeAttributes &Attributes) {
   PatternBindingInitializer *initContext = nullptr;
   Specifier = ParamDecl::Specifier::Default;
   while (Tok.is(tok::kw_inout) ||
          Tok.isContextualKeyword("__shared") ||
          Tok.isContextualKeyword("__owned") ||
-         Tok.isContextualKeyword("isolated")) {
+         Tok.isContextualKeyword("isolated") ||
+         Tok.isContextualKeyword("_const")) {
 
     if (Tok.isContextualKeyword("isolated")) {
       if (IsolatedLoc.isValid()) {
@@ -3790,6 +3792,11 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
           .fixItRemove(SpecifierLoc);
       }
       IsolatedLoc = consumeToken();
+      continue;
+    }
+
+    if (Tok.isContextualKeyword("_const")) {
+      ConstLoc = consumeToken();
       continue;
     }
 

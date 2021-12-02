@@ -258,14 +258,13 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
 }
 
 Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
-                       bool isDiscarded, ConstraintLocator *locator,
+                       ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(ConstraintKind::ClosureBodyElement), TheFix(nullptr),
       HasRestriction(false), IsActive(false), IsDisabled(false),
       IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       IsIsolated(false),
-      NumTypeVariables(typeVars.size()), ClosureElement{node, context,
-                                                        isDiscarded},
+      NumTypeVariables(typeVars.size()), ClosureElement{node, context},
       Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
@@ -344,8 +343,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
                   getLocator());
 
   case ConstraintKind::ClosureBodyElement:
-    return createClosureBodyElement(cs, getClosureElement(), getLocator(),
-                                    isDiscardedElement());
+    return createClosureBodyElement(cs, getClosureElement(), getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -1014,21 +1012,18 @@ Constraint *Constraint::createApplicableFunction(
 
 Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
                                                  ASTNode node,
-                                                 ConstraintLocator *locator,
-                                                 bool isDiscarded) {
-  return createClosureBodyElement(cs, node, ContextualTypeInfo(), locator,
-                                  isDiscarded);
+                                                 ConstraintLocator *locator) {
+  return createClosureBodyElement(cs, node, ContextualTypeInfo(), locator);
 }
 
 Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
                                                  ASTNode node,
                                                  ContextualTypeInfo context,
-                                                 ConstraintLocator *locator,
-                                                 bool isDiscarded) {
+                                                 ConstraintLocator *locator) {
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   unsigned size = totalSizeToAlloc<TypeVariableType *>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(node, context, isDiscarded, locator, typeVars);
+  return new (mem) Constraint(node, context, locator, typeVars);
 }
 
 Optional<TrailingClosureMatching>

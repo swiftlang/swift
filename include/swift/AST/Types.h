@@ -1189,6 +1189,15 @@ public:
   /// types.
   Type lookThroughAllOptionalTypes(SmallVectorImpl<Type> &optionals);
 
+  /// Remove concurrency-related types and constraints from the given
+  /// type
+  ///
+  /// \param recurse Whether to recurse into function types.
+  ///
+  /// \param dropGlobalActor Whether to drop a global actor from a function
+  /// type.
+  Type stripConcurrency(bool recurse, bool dropGlobalActor);
+
   /// Whether this is the AnyObject type.
   bool isAnyObject();
 
@@ -1407,7 +1416,7 @@ public:
     return T->getKind() == TypeKind::BuiltinRawPointer;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawPointerType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawPointerType, BuiltinType)
 
 /// BuiltinRawContinuationType - The builtin raw unsafe continuation type.
 /// In C, this is a non-null AsyncTask*.  This pointer is completely
@@ -1422,7 +1431,7 @@ public:
     return T->getKind() == TypeKind::BuiltinRawUnsafeContinuation;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawUnsafeContinuationType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawUnsafeContinuationType, BuiltinType)
 
 /// BuiltinExecutorType - The builtin executor-ref type.  In C, this
 /// is the ExecutorRef struct type.
@@ -1435,7 +1444,7 @@ public:
     return T->getKind() == TypeKind::BuiltinExecutor;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinExecutorType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinExecutorType, BuiltinType)
 
 /// BuiltinJobType - The builtin job type.  In C, this is a
 /// non-null Job*.  This pointer is completely unmanaged (the unscheduled
@@ -1449,7 +1458,7 @@ public:
     return T->getKind() == TypeKind::BuiltinJob;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinJobType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinJobType, BuiltinType)
 
 /// BuiltinDefaultActorStorageType - The type of the stored property
 /// that's added implicitly to default actors.  No C equivalent because
@@ -1465,7 +1474,7 @@ public:
     return T->getKind() == TypeKind::BuiltinDefaultActorStorage;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinDefaultActorStorageType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinDefaultActorStorageType, BuiltinType)
 
 /// BuiltinNativeObjectType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
@@ -1479,7 +1488,7 @@ public:
     return T->getKind() == TypeKind::BuiltinNativeObject;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinNativeObjectType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinNativeObjectType, BuiltinType)
 
 /// A type that contains an owning reference to a heap object packed with
 /// additional bits. The type uses a bit to discriminate native Swift objects
@@ -1493,7 +1502,7 @@ public:
     return T->getKind() == TypeKind::BuiltinBridgeObject;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBridgeObjectType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBridgeObjectType, BuiltinType)
 
 /// BuiltinUnsafeValueBufferType - The builtin opaque fixed-size value
 /// buffer type, into which storage for an arbitrary value can be
@@ -1512,7 +1521,7 @@ public:
     return T->getKind() == TypeKind::BuiltinUnsafeValueBuffer;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnsafeValueBufferType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnsafeValueBufferType, BuiltinType)
 
 /// A builtin vector type.
 class BuiltinVectorType : public BuiltinType, public llvm::FoldingSetNode {
@@ -1743,7 +1752,7 @@ public:
 
   BuiltinIntegerWidth getWidth() const = delete;
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerLiteralType, AnyBuiltinIntegerType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerLiteralType, AnyBuiltinIntegerType)
 
 inline BuiltinIntegerWidth AnyBuiltinIntegerType::getWidth() const {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(this)) {
@@ -1917,7 +1926,7 @@ public:
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {
-  enum ParameterFlags : uint8_t {
+  enum ParameterFlags : uint16_t {
     None         = 0,
     Variadic     = 1 << 0,
     AutoClosure  = 1 << 1,
@@ -1926,32 +1935,36 @@ class ParameterTypeFlags {
     Ownership    = 7 << OwnershipShift,
     NoDerivative = 1 << 6,
     Isolated     = 1 << 7,
-    NumBits = 8
+    CompileTimeConst = 1 << 8,
+    NumBits = 9
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
 
-  ParameterTypeFlags(OptionSet<ParameterFlags, uint8_t> val) : value(val) {}
+  ParameterTypeFlags(OptionSet<ParameterFlags, uint16_t> val) : value(val) {}
 
 public:
   ParameterTypeFlags() = default;
-  static ParameterTypeFlags fromRaw(uint8_t raw) {
+  static ParameterTypeFlags fromRaw(uint16_t raw) {
     return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
   }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
-                     ValueOwnership ownership, bool isolated, bool noDerivative)
+                     ValueOwnership ownership, bool isolated, bool noDerivative,
+                     bool compileTimeConst)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(ownership) << OwnershipShift |
               (isolated ? Isolated : 0) |
-              (noDerivative ? NoDerivative : 0)) {}
+              (noDerivative ? NoDerivative : 0) |
+              (compileTimeConst ? CompileTimeConst : 0)){}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ValueOwnership ownership,
-                    bool isolated, bool isNoDerivative);
+                    bool isolated, bool isNoDerivative,
+                    bool compileTimeConst);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -1961,6 +1974,7 @@ public:
   bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
   bool isIsolated() const { return value.contains(Isolated); }
+  bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
 
   ValueOwnership getValueOwnership() const {
@@ -1975,6 +1989,11 @@ public:
   ParameterTypeFlags withInOut(bool isInout) const {
     return withValueOwnership(isInout ? ValueOwnership::InOut
                                       : ValueOwnership::Default);
+  }
+
+  ParameterTypeFlags withCompileTimeConst(bool isConst) const {
+    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeConst
+                                      : value | ParameterTypeFlags::CompileTimeConst);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
@@ -2083,7 +2102,8 @@ public:
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
                               /*nonEphemeral*/ false, getValueOwnership(),
-                              /*isolated*/ false, /*noDerivative*/ false);
+                              /*isolated*/ false, /*noDerivative*/ false,
+                              /*compileTimeConst*/false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -2881,6 +2901,9 @@ public:
 
     /// Whether the parameter is 'isolated'.
     bool isIsolated() const { return Flags.isIsolated(); }
+
+    /// Whether the parameter is 'isCompileTimeConst'.
+    bool isCompileTimeConst() const { return Flags.isCompileTimeConst(); }
 
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
@@ -4096,7 +4119,7 @@ substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
                                     TypeExpansionContext context);
 namespace Lowering {
   class TypeConverter;
-};
+}
 
 /// SILFunctionType - The lowered type of a function value, suitable
 /// for use by SIL.
@@ -6325,7 +6348,8 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
-    ValueOwnership ownership, bool isolated, bool isNoDerivative) {
+    ValueOwnership ownership, bool isolated, bool isNoDerivative,
+    bool compileTimeConst) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -6336,7 +6360,7 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     ownership = ValueOwnership::InOut;
   }
   return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isolated,
-          isNoDerivative};
+          isNoDerivative, compileTimeConst};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

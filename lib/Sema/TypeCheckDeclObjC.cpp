@@ -438,7 +438,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
   case ActorIsolationRestriction::CrossActorSelf:
     // FIXME: Substitution map?
     diagnoseNonSendableTypesInReference(
-        const_cast<ValueDecl *>(VD), VD->getDeclContext()->getParentModule(),
+        const_cast<ValueDecl *>(VD), VD->getDeclContext(),
         VD->getLoc(), ConcurrentReferenceKind::CrossActor);
     return false;
   case ActorIsolationRestriction::ActorSelf:

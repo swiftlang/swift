@@ -536,6 +536,12 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                             SILBasicBlock *falseBlock,
                                             ProfileCounter Target1Count,
                                             ProfileCounter Target2Count) {
+  // Check if our source type is AnyObject. In such a case, we need to ensure
+  // plus one our operand since SIL does not support guaranteed casts from an
+  // AnyObject.
+  if (op.getType().isAnyObject()) {
+    op = op.ensurePlusOne(SGF, loc);
+  }
   createCheckedCastBranch(loc, isExact, op.forward(SGF),
                           destLoweredTy, destFormalTy,
                           trueBlock, falseBlock,

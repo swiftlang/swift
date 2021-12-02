@@ -1766,8 +1766,12 @@ namespace {
         return null();
       }
 
-      return buildGlobalVariable(array, "_PROTOCOL_METHOD_TYPES_",
-                                 /*const*/ true);
+      auto *gv_as_const =  buildGlobalVariable(array, "_PROTOCOL_METHOD_TYPES_",
+                               /*const*/ true,
+                               /*likage*/ llvm::GlobalVariable::WeakAnyLinkage);
+      llvm::GlobalValue *gv = (llvm::GlobalValue *)gv_as_const;
+      gv->setVisibility(llvm::GlobalValue::HiddenVisibility);
+      return gv;
     }
 
     void buildExtMethodTypes(ConstantArrayBuilder &array,
@@ -2167,8 +2171,9 @@ namespace {
     /// Build a private global variable as a structure containing the
     /// given fields.
     template <class B>
-    llvm::Constant *buildGlobalVariable(B &fields, StringRef nameBase,
-                                        bool isConst) {
+    llvm::Constant *buildGlobalVariable(B &fields, StringRef nameBase, bool isConst,
+                      llvm::GlobalValue::LinkageTypes linkage =
+                          llvm::GlobalVariable::InternalLinkage) {
       llvm::SmallString<64> nameBuffer;
       auto var =
         fields.finishAndCreateGlobal(Twine(nameBase) 
@@ -2178,7 +2183,7 @@ namespace {
                                            : Twine()),
                                      IGM.getPointerAlignment(),
                                      /*constant*/ true,
-                                     llvm::GlobalVariable::InternalLinkage);
+                                     linkage);
 
       switch (IGM.TargetInfo.OutputObjectFormat) {
       case llvm::Triple::MachO:

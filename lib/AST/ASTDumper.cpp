@@ -3059,6 +3059,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T) {
+    printCommon("_const") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitOptionalTypeRepr(OptionalTypeRepr *T) {
     printCommon("type_optional") << '\n';
     printRec(T->getBase());
@@ -3458,6 +3464,7 @@ namespace {
       printFlag(paramFlags.isVariadic(), "vararg");
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
+      printFlag(paramFlags.isCompileTimeConst(), "compileTimeConst");
       switch (paramFlags.getValueOwnership()) {
       case ValueOwnership::Default: break;
       case ValueOwnership::Owned: printFlag("owned"); break;
@@ -3796,6 +3803,10 @@ namespace {
       printFlag(T->isAsync(), "async");
       printFlag(T->isThrowing(), "throws");
 
+      if (Type globalActor = T->getGlobalActor()) {
+        printField("global_actor", globalActor.getString());
+      }
+
       OS << "\n";
       Indent += 2;
       // [TODO: Improve-Clang-type-printing]
@@ -3806,10 +3817,6 @@ namespace {
           ->getClangASTContext();
         T->getClangTypeInfo().dump(os, ctx);
         printField("clang_type", os.str());
-      }
-
-      if (Type globalActor = T->getGlobalActor()) {
-        printField("global_actor", globalActor.getString());
       }
 
       printAnyFunctionParams(T->getParams(), "input");

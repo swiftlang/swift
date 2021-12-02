@@ -266,8 +266,8 @@ std::string ASTMangler::mangleGlobalVariableFull(const VarDecl *decl) {
       if (clangDecl->getDeclContext()->isTranslationUnit()) {
         Buffer << clangDecl->getName();
       } else {
-        clang::MangleContext *mangler =
-          decl->getClangDecl()->getASTContext().createMangleContext();
+        std::unique_ptr<clang::MangleContext> mangler(
+            decl->getClangDecl()->getASTContext().createMangleContext());
         mangler->mangleName(clangDecl, Buffer);
       }
     }
@@ -1727,7 +1727,7 @@ static char getParamConvention(ParameterConvention conv) {
     case ParameterConvention::Direct_Guaranteed: return 'g';
   }
   llvm_unreachable("bad parameter convention");
-};
+}
 
 static Optional<char>
 getParamDifferentiability(SILParameterDifferentiability diffKind) {
@@ -1738,7 +1738,7 @@ getParamDifferentiability(SILParameterDifferentiability diffKind) {
     return 'w';
   }
   llvm_unreachable("bad parameter differentiability");
-};
+}
 
 static char getResultConvention(ResultConvention conv) {
   switch (conv) {
@@ -1749,7 +1749,7 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::Autoreleased: return 'a';
   }
   llvm_unreachable("bad result convention");
-};
+}
 
 static Optional<char>
 getResultDifferentiability(SILResultDifferentiability diffKind) {
@@ -1760,7 +1760,7 @@ getResultDifferentiability(SILResultDifferentiability diffKind) {
     return 'w';
   }
   llvm_unreachable("bad result differentiability");
-};
+}
 
 void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
                                         GenericSignature outerGenericSig) {
@@ -2968,6 +2968,13 @@ CanType ASTMangler::getDeclTypeForMangling(
   }
 
   Type ty = decl->getInterfaceType()->getReferenceStorageReferent();
+
+  // If this declaration predates concurrency, adjust its type to not
+  // contain type features that were not available pre-concurrency. This
+  // cannot alter the ABI in any way.
+  if (decl->predatesConcurrency()) {
+    ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true);
+  }
 
   auto canTy = ty->getCanonicalType();
 

@@ -164,6 +164,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       opts.SerializeOptionsForDebugging.getValueOr(
           !module->isExternallyConsumed());
 
+  serializationOpts.PathObfuscator = opts.serializedPathObfuscator;
   if (serializationOpts.SerializeOptionsForDebugging &&
       opts.DebugPrefixSerializedDebuggingOptions) {
     serializationOpts.DebuggingOptionsPrefixMap =
@@ -182,6 +183,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       opts.DisableCrossModuleIncrementalBuild;
 
   serializationOpts.StaticLibrary = opts.Static;
+
+  serializationOpts.HermeticSealAtLink = opts.HermeticSealAtLink;
 
   serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
 

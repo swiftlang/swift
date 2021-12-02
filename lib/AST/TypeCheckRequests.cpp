@@ -58,10 +58,6 @@ void swift::simple_display(llvm::raw_ostream &out,
   case TypeResolutionStage::Interface:
     out << "interface";
     break;
-
-  case TypeResolutionStage::Contextual:
-    out << "contextual";
-    break;
   }
 }
 
@@ -759,6 +755,14 @@ void GenericSignatureRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 
 void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
+  // For now, the GSB does a better job of describing the exact structure of
+  // the cycle.
+  //
+  // FIXME: We should consider merging the circularity handling the GSB does
+  // into this request.  See rdar://55263708
+}
+
+void InferredGenericSignatureRequestRQM::noteCycleStep(DiagnosticEngine &d) const {
   // For now, the GSB does a better job of describing the exact structure of
   // the cycle.
   //

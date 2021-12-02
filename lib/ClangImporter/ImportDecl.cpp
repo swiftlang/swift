@@ -8392,17 +8392,13 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   return *sourceFile;
 }
 
-Optional<bool> swift::importer::isMainActorAttr(
-    ASTContext &ctx, const clang::SwiftAttrAttr *swiftAttr) {
+bool swift::importer::isMainActorAttr(const clang::SwiftAttrAttr *swiftAttr) {
   if (swiftAttr->getAttribute() == "@MainActor" ||
-      swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
       swiftAttr->getAttribute() == "@UIActor") {
-    bool isUnsafe = swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
-        !ctx.LangOpts.isSwiftVersionAtLeast(6);
-    return isUnsafe;
+    return true;
   }
 
-  return None;
+  return false;
 }
 
 void
@@ -8430,9 +8426,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
   for (auto swiftAttr : ClangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
     // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
     // point at which to do name lookup for imported entities.
-    if (auto isMainActor = isMainActorAttr(SwiftContext, swiftAttr)) {
-      bool isUnsafe = *isMainActor;
-
+    if (isMainActorAttr(swiftAttr)) {
       if (SeenMainActorAttr) {
         // Cannot add main actor annotation twice. We'll keep the first
         // one and raise a warning about the duplicate.
@@ -8446,7 +8440,6 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       if (Type mainActorType = SwiftContext.getMainActorType()) {
         auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
         auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
-        attr->setArgIsUnsafe(isUnsafe);
         MappedDecl->getAttrs().add(attr);
         SeenMainActorAttr = swiftAttr;
       }
@@ -9787,7 +9780,8 @@ static void loadAllMembersOfRecordDecl(StructDecl *recordDecl) {
       continue;
 
     for (auto found : recordDecl->lookupDirect(name)) {
-      if (addedMembers.insert(found).second)
+      if (addedMembers.insert(found).second &&
+          found->getDeclContext() == recordDecl)
         recordDecl->addMember(found);
     }
   }
@@ -9825,18 +9819,19 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   }
 
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
-    // TODO: this is a hack to set member loading as lazy again. It got set to
-    // non-lazy when getMembers was called.
-    cast<StructDecl>(D)->setMemberLoader(this, 0);
+    // We haven't loaded any members yet, so tell our context that it still has
+    // lazy members. Otherwise, we won't be able to look up any individual
+    // members (lazily) in "loadAllMembersOfRecordDecl".
+    cast<StructDecl>(D)->setHasLazyMembers(true);
     loadAllMembersOfRecordDecl(cast<StructDecl>(D));
+    // Now that all members are loaded, mark the context as lazily complete.
+    cast<StructDecl>(D)->setHasLazyMembers(false);
     return;
   }
 
-  // Namespace members will only be loaded lazily.
   if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
-    // TODO: this is a hack to set member loading as lazy again. It got set to
-    // non-lazy when getMembers was called.
-    cast<EnumDecl>(D)->setMemberLoader(this, 0);
+    // Namespace members will only be loaded lazily.
+    cast<EnumDecl>(D)->setHasLazyMembers(true);
     return;
   }
 

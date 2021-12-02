@@ -439,6 +439,11 @@ namespace swift {
     /// Load swiftmodule files in memory as volatile and avoid mmap.
     bool EnableVolatileModules = false;
 
+    /// Enable experimental 'hermetic seal at link' feature. Turns on
+    /// dead-stripping optimizations assuming that all users of library code
+    /// are present at LTO time.
+    bool HermeticSealAtLink = false;
+
     /// Allow deserializing implementation only dependencies. This should only
     /// be set true by lldb and other tooling, so that deserilization
     /// recovery issues won't bring down the debugger.
@@ -489,8 +494,14 @@ namespace swift {
     RequirementMachineMode RequirementMachineProtocolSignatures =
         RequirementMachineMode::Disabled;
 
-    /// Enable the new experimental generic signature minimization algorithm.
-    RequirementMachineMode RequirementMachineGenericSignatures =
+    /// Enable the new experimental generic signature minimization algorithm
+    /// for abstract generic signatures.
+    RequirementMachineMode RequirementMachineAbstractSignatures =
+        RequirementMachineMode::Disabled;
+
+    /// Enable the new experimental generic signature minimization algorithm
+    /// for user-written generic signatures.
+    RequirementMachineMode RequirementMachineInferredSignatures =
         RequirementMachineMode::Disabled;
 
     /// Sets the target we are building for and updates platform conditions
@@ -682,7 +693,7 @@ namespace swift {
 
     /// Enable experimental support for type inference through multi-statement
     /// closures.
-    bool EnableMultiStatementClosureInference = true;
+    bool EnableMultiStatementClosureInference = false;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;

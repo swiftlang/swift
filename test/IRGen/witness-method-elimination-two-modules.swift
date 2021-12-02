@@ -28,7 +28,7 @@
 // RUN: %llvm-nm --defined-only %t/libLibrary.dylib | %FileCheck %s --check-prefix=NM
 
 // (6) Execution test
-// RUN: %target-run %t/main %t/libLibrary.dylib | %FileCheck %s
+// RUN: %target-run %t/main | %FileCheck %s
 
 // REQUIRES: executable_test
 
@@ -39,6 +39,9 @@
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is
 // loaded too late").
 // REQUIRES: no_asan
+
+// Remote test execution does not support dynamically loaded libraries.
+// UNSUPPORTED: remote_run
 
 #if LIBRARY
 

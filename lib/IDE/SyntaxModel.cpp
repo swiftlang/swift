@@ -361,11 +361,12 @@ class ModelASTWalker : public ASTWalker {
   friend class InactiveClauseRAII;
   bool inInactiveClause = false;
 
+  struct ParentArgsTy {
+    Expr *Parent = nullptr;
+    llvm::DenseMap<Expr *, Argument> Args;
+  };
   /// A mapping of argument expressions to their full argument info.
-  llvm::DenseMap<Expr *, Argument> ArgumentInfo;
-
-  /// The number of ArgumentList parents in the walk.
-  unsigned ArgumentListDepth = 0;
+  SmallVector<ParentArgsTy, 4> ParentArgs;
 
 public:
   SyntaxModelWalker &Walker;
@@ -528,21 +529,27 @@ static bool shouldTreatAsSingleToken(const SyntaxStructureNode &Node,
 
 std::pair<bool, ArgumentList *>
 ModelASTWalker::walkToArgumentListPre(ArgumentList *ArgList) {
+  Expr *ParentExpr = Parent.getAsExpr();
+  if (!ParentExpr)
+    return {true, ArgList};
+
+  ParentArgsTy Mapping;
+  Mapping.Parent = ParentExpr;
   for (auto Arg : *ArgList) {
-    auto res = ArgumentInfo.insert({Arg.getExpr(), Arg});
+    auto res = Mapping.Args.try_emplace(Arg.getExpr(), Arg);
     assert(res.second && "Duplicate arguments?");
     (void)res;
   }
-  ArgumentListDepth += 1;
+  ParentArgs.push_back(std::move(Mapping));
   return {true, ArgList};
 }
 
 ArgumentList *ModelASTWalker::walkToArgumentListPost(ArgumentList *ArgList) {
-  // If there are no more argument lists above us, we can clear out the argument
-  // mapping to save memory.
-  ArgumentListDepth -= 1;
-  if (ArgumentListDepth == 0)
-    ArgumentInfo.clear();
+  if (Expr *ParentExpr = Parent.getAsExpr()) {
+    assert(ParentExpr == ParentArgs.back().Parent &&
+           "Unmatched walkToArgumentList(Pre|Post)");
+    ParentArgs.pop_back();
+  }
   return ArgList;
 }
 
@@ -555,30 +562,32 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     if (isa<DefaultArgumentExpr>(Elem))
       return;
 
-    CharSourceRange NR;
     auto NL = Arg.getLabelLoc();
     auto Name = Arg.getLabel();
-    if (NL.isValid() && !Name.empty())
-      NR = CharSourceRange(NL, Name.getLength());
 
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::Argument;
-    SN.NameRange = NR;
     SN.BodyRange = charSourceRangeFromSourceRange(SM, Elem->getSourceRange());
-    if (NR.isValid()) {
-      SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
-                                                          Elem->getEndLoc()));
-      passTokenNodesUntil(NR.getStart(), ExcludeNodeAtLocation);
-    }
-    else
+    if (NL.isValid() && !Name.empty()) {
+      SN.NameRange = CharSourceRange(NL, Name.getLength());
+      SN.Range = charSourceRangeFromSourceRange(
+          SM, SourceRange(NL, Elem->getEndLoc()));
+      passTokenNodesUntil(NL, ExcludeNodeAtLocation);
+    } else {
       SN.Range = SN.BodyRange;
+    }
 
     pushStructureNode(SN, Elem);
   };
 
-  auto Arg = ArgumentInfo.find(E);
-  if (Arg != ArgumentInfo.end())
-    addCallArgExpr(Arg->second);
+  if (auto *ParentExpr = Parent.getAsExpr()) {
+    if (!ParentArgs.empty() && ParentArgs.back().Parent == ParentExpr) {
+      auto &ArgumentInfo = ParentArgs.back().Args;
+      auto Arg = ArgumentInfo.find(E);
+      if (Arg != ArgumentInfo.end())
+        addCallArgExpr(Arg->second);
+    }
+  }
 
   if (E->isImplicit())
     return { true, E };
@@ -604,6 +613,17 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       SN.BodyRange = innerCharSourceRangeFromSourceRange(
           SM, CE->getArgs()->getSourceRange());
     pushStructureNode(SN, CE);
+
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::CallExpression;
+    SN.Range = charSourceRangeFromSourceRange(SM, E->getSourceRange());
+    SN.NameRange =
+        charSourceRangeFromSourceRange(SM, SE->getBase()->getSourceRange());
+    if (SE->getArgs()->getSourceRange().isValid())
+      SN.BodyRange = innerCharSourceRangeFromSourceRange(
+          SM, SE->getArgs()->getSourceRange());
+    pushStructureNode(SN, SE);
 
   } else if (auto *ObjectE = dyn_cast<ObjectLiteralExpr>(E)) {
     SyntaxStructureNode SN;

@@ -198,6 +198,41 @@ Expr *Expr::getSemanticsProvidingExpr() {
   return this;
 }
 
+bool Expr::isSemanticallyConstExpr() const {
+  auto E = getSemanticsProvidingExpr();
+  if (!E) {
+    return false;
+  }
+  switch(E->getKind()) {
+  case ExprKind::IntegerLiteral:
+  case ExprKind::NilLiteral:
+  case ExprKind::BooleanLiteral:
+  case ExprKind::FloatLiteral:
+  case ExprKind::StringLiteral:
+    return true;
+  case ExprKind::Array:
+  case ExprKind::Dictionary: {
+    auto *CE = cast<CollectionExpr>(E);
+    for (auto *EL: CE->getElements()) {
+      if (!EL->isSemanticallyConstExpr())
+        return false;
+    }
+    return true;
+  }
+  case ExprKind::Tuple: {
+    auto *TE = cast<TupleExpr>(E);
+    for (auto *EL: TE->getElements()) {
+      if (!EL->isSemanticallyConstExpr()) {
+        return false;
+      }
+    }
+    return true;
+  }
+  default:
+    return false;
+  }
+}
+
 Expr *Expr::getValueProvidingExpr() {
   Expr *E = getSemanticsProvidingExpr();
 

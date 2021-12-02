@@ -1670,12 +1670,7 @@ public:
   ASTContext &Ctx;
   SourceFile *SF;
 
-  bool LeaveClosureBodiesUnchecked;
-
-  explicit DeclChecker(ASTContext &ctx, SourceFile *SF,
-                       bool LeaveClosureBodiesUnchecked = false)
-      : Ctx(ctx), SF(SF),
-        LeaveClosureBodiesUnchecked(LeaveClosureBodiesUnchecked) {}
+  explicit DeclChecker(ASTContext &ctx, SourceFile *SF) : Ctx(ctx), SF(SF) {}
 
   ASTContext &getASTContext() const { return Ctx; }
   void addDelayedFunction(AbstractFunctionDecl *AFD) {
@@ -2049,13 +2044,7 @@ public:
         continue;
 
       if (!PBD->isInitializerChecked(i)) {
-        TypeCheckExprOptions options;
-
-        if (LeaveClosureBodiesUnchecked)
-          options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-
-        TypeChecker::typeCheckPatternBinding(PBD, i, /*patternType=*/Type(),
-                                             options);
+        TypeChecker::typeCheckPatternBinding(PBD, i);
       }
 
       if (!PBD->isInvalid()) {
@@ -3175,9 +3164,9 @@ public:
 };
 } // end anonymous namespace
 
-void TypeChecker::typeCheckDecl(Decl *D, bool LeaveClosureBodiesUnchecked) {
+void TypeChecker::typeCheckDecl(Decl *D) {
   auto *SF = D->getDeclContext()->getParentSourceFile();
-  DeclChecker(D->getASTContext(), SF, LeaveClosureBodiesUnchecked).visit(D);
+  DeclChecker(D->getASTContext(), SF).visit(D);
 }
 
 void TypeChecker::checkParameterList(ParameterList *params,

@@ -107,7 +107,7 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)asyncImportSame:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(void)asyncImportSame:(NSString *)operation replyTo:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
 
--(void)overridableButRunsOnMainThreadWithCompletionHandler:(MAIN_ACTOR void (^ _Nullable)(NSString *))completion __attribute__((swift_attr("@_predatesConcurrency")));
+-(void)overridableButRunsOnMainThreadWithCompletionHandler:(MAIN_ACTOR void (^ _Nullable)(NSString *))completion;
 - (void)obtainClosureWithCompletionHandler:(void (^)(void (^_Nullable)(void),
                                                      NSError *_Nullable,
                                                      BOOL))completionHandler
@@ -178,7 +178,7 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
 #define MAGIC_NUMBER 42
 
 
-__attribute__((__swift_attr__("@MainActor(unsafe)")))
+__attribute__((__swift_attr__("@MainActor")))
 @interface NXView : NSObject
 -(void)onDisplay;
 @end
@@ -192,10 +192,10 @@ void doSomethingConcurrently(__attribute__((noescape)) SENDABLE void (^block)(vo
 
 
 
-void doSomethingConcurrentlyButUnsafe(__attribute__((noescape)) __attribute__((swift_attr("@Sendable"))) void (^block)(void)) __attribute__((swift_attr("@_predatesConcurrency")));
+void doSomethingConcurrentlyButUnsafe(__attribute__((noescape)) __attribute__((swift_attr("@Sendable"))) void (^block)(void));
 
 
-MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor(unsafe)"))) @protocol TripleMainActor
+MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor"))) @protocol TripleMainActor
 @end
 
 @protocol ProtocolWithAsync

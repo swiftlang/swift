@@ -21,8 +21,6 @@
 
 #if defined(__MACH__)
 
-#include <mach-o/dyld.h>
-
 /// The Mach-O section name for the section containing protocol descriptor
 /// references. This lives within SEG_TEXT.
 #define MachOProtocolsSection "__swift5_protos"

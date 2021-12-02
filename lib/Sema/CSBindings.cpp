@@ -25,14 +25,6 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
-bool BindingSet::forClosureResult() const {
-  return Info.TypeVar->getImpl().isClosureResultType();
-}
-
-bool BindingSet::forGenericParameter() const {
-  return bool(Info.TypeVar->getImpl().getGenericParameter());
-}
-
 bool BindingSet::canBeNil() const {
   auto &ctx = CS.getASTContext();
   return Literals.count(
@@ -1818,9 +1810,10 @@ bool TypeVarBindingProducer::computeNext() {
       // always preserved.
       auto *BGT = type->castTo<BoundGenericType>();
       auto dstLocator = TypeVar->getImpl().getLocator();
-      auto newType = CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
-                                               dstLocator)
-                         ->reconstituteSugar(/*recursive=*/false);
+      auto newType =
+          CS.openUnboundGenericType(BGT->getDecl(), BGT->getParent(),
+                                    dstLocator, /*isTypeResolution=*/false)
+              ->reconstituteSugar(/*recursive=*/false);
       addNewBinding(binding.withType(newType));
     }
 
