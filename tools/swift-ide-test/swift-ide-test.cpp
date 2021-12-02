@@ -961,6 +961,7 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
         CompletionInst.typeContextInfo(
             Params.Invocation, Params.Args, Params.FileSystem,
             Params.CompletionBuffer, Params.Offset, Params.DiagC,
+            /*CancellationFlag=*/nullptr,
             [&](CancellableResult<TypeContextInfoResult> Result) {
               ExitCode = printTypeContextInfo(Result);
             });
@@ -1032,6 +1033,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
         CompletionInst.conformingMethodList(
             Params.Invocation, Params.Args, Params.FileSystem,
             Params.CompletionBuffer, Params.Offset, Params.DiagC, typeNames,
+            /*CancellationFlag=*/nullptr,
             [&](CancellableResult<ConformingMethodListResults> Result) {
               ExitCode = printConformingMethodList(Result);
             });
@@ -1158,7 +1160,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
         Inst.codeComplete(
             Params.Invocation, Params.Args, Params.FileSystem,
             Params.CompletionBuffer, Params.Offset, Params.DiagC,
-            CompletionContext,
+            CompletionContext, /*CancellationFlag=*/nullptr,
             [&](CancellableResult<CodeCompleteResult> Result) {
               ExitCode = printCodeCompletionResults(
                   Result, CodeCompletionKeywords, CodeCompletionComments,
@@ -1487,6 +1489,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     CompletionInst.codeComplete(
         Invocation, /*Args=*/{}, FileSystem, completionBuffer.get(), Offset,
         CodeCompletionDiagnostics ? &PrintDiags : nullptr, CompletionContext,
+        /*CancellationFlag=*/nullptr,
         [&](CancellableResult<CodeCompleteResult> Result) {
           CallbackCalled = true;
           switch (Result.getKind()) {
