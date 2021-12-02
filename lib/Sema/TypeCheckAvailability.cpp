@@ -931,7 +931,8 @@ void TypeChecker::buildTypeRefinementContextHierarchyDelayed(SourceFile &SF, Abs
 
   // Build the refinement context for the function body.
   ASTContext &Context = SF.getASTContext();
-  TypeRefinementContextBuilder Builder(RootTRC, Context);
+  auto LocalTRC = RootTRC->findMostRefinedSubContext(AFD->getLoc(), Context.SourceMgr);
+  TypeRefinementContextBuilder Builder(LocalTRC, Context);
   Builder.build(AFD);
 }
 
