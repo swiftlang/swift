@@ -1077,11 +1077,9 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         options_block::XCCLayout XCC(Out);
 
         const auto &PathRemapper = options.DebuggingOptionsPrefixMap;
-        const auto &PathObfuscator = options.PathObfuscator;
-        auto sdkPath = M->getASTContext().SearchPathOpts.SDKPath;
         SDKPath.emit(
             ScratchRecord,
-            PathObfuscator.obfuscate(PathRemapper.remapPath(sdkPath)));
+            PathRemapper.remapPath(M->getASTContext().SearchPathOpts.SDKPath));
         auto &Opts = options.ExtraClangOptions;
         for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) {
           StringRef arg(*Arg);
@@ -1159,17 +1157,16 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::ModuleInterfaceLayout ModuleInterface(Out);
 
   if (options.SerializeOptionsForDebugging) {
-    const auto &PathObfuscator = options.PathObfuscator;
     const auto &PathMapper = options.DebuggingOptionsPrefixMap;
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     // Put the framework search paths first so that they'll be preferred upon
     // deserialization.
     for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
       SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
-                      PathObfuscator.obfuscate(PathMapper.remapPath(framepath.Path)));
+                      PathMapper.remapPath(framepath.Path));
     for (auto &path : searchPathOpts.ImportSearchPaths)
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
-                      PathObfuscator.obfuscate(PathMapper.remapPath(path)));
+                      PathMapper.remapPath(path));
   }
 
   // Note: We're not using StringMap here because we don't need to own the

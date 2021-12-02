@@ -833,8 +833,6 @@ public:
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
 
-  void collectSerializedSearchPath(
-      llvm::function_ref<void(StringRef)> callback) const;
   /// Retrieve a fingerprint value that summarizes the contents of this module.
   ///
   /// This interface hash a of a module is guaranteed to change if the interface

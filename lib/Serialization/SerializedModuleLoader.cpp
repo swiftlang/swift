@@ -404,9 +404,7 @@ llvm::ErrorOr<ModuleDependencies> SerializedModuleLoaderBase::scanModuleFile(
   bool isFramework = false;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       modulePath.str(), std::move(moduleBuf.get()), nullptr, nullptr,
-      isFramework, isRequiredOSSAModules(),
-      Ctx.SearchPathOpts.DeserializedPathRecoverer,
-      loadedModuleFile);
+      isFramework, isRequiredOSSAModules(), loadedModuleFile);
 
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
@@ -732,9 +730,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       moduleInterfacePath, std::move(moduleInputBuffer),
       std::move(moduleDocInputBuffer), std::move(moduleSourceInfoInputBuffer),
-      isFramework, isRequiredOSSAModules(),
-      Ctx.SearchPathOpts.DeserializedPathRecoverer,
-      loadedModuleFileCore);
+      isFramework, isRequiredOSSAModules(), loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
 
   if (loadInfo.status == serialization::Status::Valid) {
@@ -1558,9 +1554,4 @@ SerializedASTFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
 void SerializedASTFile::collectBasicSourceFileInfo(
     llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
   File.collectBasicSourceFileInfo(callback);
-}
-
-void SerializedASTFile::collectSerializedSearchPath(
-    llvm::function_ref<void(StringRef)> callback) const {
-  File.collectSerializedSearchPath(callback);
 }

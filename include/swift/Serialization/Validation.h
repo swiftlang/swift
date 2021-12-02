@@ -104,7 +104,7 @@ struct ValidationInfo {
 /// \sa validateSerializedAST()
 class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
-  std::string SDKPath;
+  StringRef SDKPath;
   StringRef ModuleABIName;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
@@ -121,7 +121,7 @@ public:
   ExtendedValidationInfo() : Bits() {}
 
   StringRef getSDKPath() const { return SDKPath; }
-  void setSDKPath(std::string path) {
+  void setSDKPath(StringRef path) {
     assert(SDKPath.empty());
     SDKPath = path;
   }
