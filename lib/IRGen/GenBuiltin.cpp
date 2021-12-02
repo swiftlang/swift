@@ -1336,6 +1336,18 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     addrTI.initializeWithCopy(IGF, resultAttr, inputAttr, addrTy, false);
     return;
   }
+  if (Builtin.ID == BuiltinValueKind::AssumeAlignment) {
+    // A no-op pointer cast that passes on its first value. Common occurences of
+    // this builtin should already be removed with the alignment guarantee moved
+    // to the subsequent load or store.
+    //
+    // TODO: Consider lowering to an LLVM intrinsic if there is any benefit:
+    // 'call void @llvm.assume(i1 true) ["align"(i32* %arg0, i32 %arg1)]'
+    auto pointerSrc = args.claimNext();
+    (void)args.claimAll();
+    out.add(pointerSrc);
+    return;
+  }
 
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

@@ -861,6 +861,12 @@ static ValueDecl *getCopyOperation(ASTContext &ctx, Identifier id) {
                             _parameters(_typeparam(0)), _typeparam(0));
 }
 
+static ValueDecl *getAssumeAlignment(ASTContext &ctx, Identifier id) {
+  // This is always "(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer"
+  return getBuiltinFunction(ctx, id, _thin, _parameters(_rawPointer, _word),
+                            _rawPointer);
+}
+
 static ValueDecl *getTransferArrayOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted),
@@ -2550,6 +2556,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty())
       return nullptr;
     return getCopyOperation(Context, Id);
+
+  case BuiltinValueKind::AssumeAlignment:
+    if (!Types.empty())
+      return nullptr;
+    return getAssumeAlignment(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs)
