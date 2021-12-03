@@ -1452,7 +1452,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // If experimental move only is enabled, always enable lexical lifetime as
   // well. Move only depends on lexical lifetimes.
   bool enableExperimentalLexicalLifetimes =
-      Args.hasArg(OPT_enable_experimental_lexical_lifetimes) ||
+      Args.hasArg(OPT_enable_lexical_lifetimes) ||
       Args.hasArg(OPT_enable_experimental_move_only);
   // Error if both experimental lexical lifetimes and disable lexical lifetimes
   // are both set.
