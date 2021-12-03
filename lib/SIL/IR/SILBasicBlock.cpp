@@ -34,13 +34,9 @@ using namespace swift;
 // SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
-SwiftMetatype SILBasicBlock::registeredMetatype;    
+SILBasicBlock::SILBasicBlock() : Parent(nullptr) {}
 
-SILBasicBlock::SILBasicBlock() :
-  SwiftObjectHeader(registeredMetatype), Parent(nullptr) {}
-
-SILBasicBlock::SILBasicBlock(SILFunction *parent) :
-  SwiftObjectHeader(registeredMetatype), Parent(parent) {}
+SILBasicBlock::SILBasicBlock(SILFunction *parent) : Parent(parent) {}
 
 SILBasicBlock::~SILBasicBlock() {
   if (!getParent()) {

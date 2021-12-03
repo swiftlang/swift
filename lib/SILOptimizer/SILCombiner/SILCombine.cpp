@@ -472,7 +472,7 @@ void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
 void SILCombiner::runSwiftInstructionPass(SILInstruction *inst,
                               void (*runFunction)(BridgedInstructionPassCtxt)) {
   Worklist.setLibswiftPassInvocation(&libswiftPassInvocation);
-  runFunction({ {inst->asSILNode()}, {&libswiftPassInvocation} });
+  runFunction({ {nullptr}, {&libswiftPassInvocation} });
   Worklist.setLibswiftPassInvocation(nullptr);
   libswiftPassInvocation.finishedPassRun();
 }

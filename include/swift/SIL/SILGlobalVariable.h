@@ -21,7 +21,6 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILType.h"
-#include "swift/SIL/SwiftObjectHeader.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 
@@ -36,10 +35,8 @@ class VarDecl;
 /// A global variable that has been referenced in SIL.
 class SILGlobalVariable
   : public llvm::ilist_node<SILGlobalVariable>,
-    public SILAllocated<SILGlobalVariable>,
-    public SwiftObjectHeader
+    public SILAllocated<SILGlobalVariable>
 {
-  static SwiftMetatype registeredMetatype;
     
 public:
   using const_iterator = SILBasicBlock::const_iterator;
@@ -101,10 +98,6 @@ private:
                     Optional<SILLocation> loc, VarDecl *decl);
   
 public:
-  static void registerBridgedMetatype(SwiftMetatype metatype) {
-    registeredMetatype = metatype;
-  }
-
   static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
                                    IsSerialized_t IsSerialized,
                                    StringRef MangledName, SILType LoweredType,

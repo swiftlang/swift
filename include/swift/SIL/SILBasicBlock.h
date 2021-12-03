@@ -22,7 +22,6 @@
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SwiftObjectHeader.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -32,15 +31,12 @@ class SILArgument;
 class SILPrintContext;
 
 class SILBasicBlock :
-public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock>,
-public SwiftObjectHeader {
+public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
   friend class SILFunction;
   friend class SILGlobalVariable;
   template <typename, unsigned> friend class BasicBlockData;
   friend class BasicBlockBitfield;
-
-  static SwiftMetatype registeredMetatype;
     
 public:
   using InstListType = llvm::iplist<SILInstruction>;
@@ -94,10 +90,6 @@ private:
   void operator delete(void *Ptr, size_t) = delete;
 
 public:
-  static void registerBridgedMetatype(SwiftMetatype metatype) {
-    registeredMetatype = metatype;
-  }
-
   ~SILBasicBlock();
 
   /// Gets the ID (= index in the function's block list) of the block.
