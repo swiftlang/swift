@@ -341,3 +341,17 @@ public distributed actor MyOtherActor {
 /// RESULT is returned indirectly so there is nothing to pass to `end`
 
 // CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
+
+/// ---> Thunk and distributed method for `MyOtherActor.empty`
+
+/// Let's check that there is no offset allocation here since parameter list is empty
+
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETF"
+// CHECK-NEXT: entry:
+// CHECK-NEXT: {{.*}} = alloca %swift.context*, align 8
+// CHECK-NEXT: %swifterror = alloca swifterror %swift.error*, align 8
+// CHECK-NEXT: {{.*}} = call token @llvm.coro.id.async(i32 20, i32 16, i32 0, i8* bitcast (%swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETFTu" to i8*))
+// CHECK-NEXT: {{.*}} = call i8* @llvm.coro.begin(token %4, i8* null)
+// CHECK-NEXT: store %swift.context* {{.*}}, %swift.context** {{.*}}, align 8
+// CHECK-NEXT: store %swift.error* null, %swift.error** %swifterror, align 8
+// CHECK-NEXT: {{.*}} = load i32, i32* getelementptr inbounds (%swift.async_func_pointer, %swift.async_func_pointer* bitcast (void (%swift.context*, %T27distributed_actor_accessors12MyOtherActorC*)* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTE" to %swift.async_func_pointer*), i32 0, i32 0), align 8

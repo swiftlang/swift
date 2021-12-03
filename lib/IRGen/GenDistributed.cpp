@@ -172,6 +172,13 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
                                            Explosion &arguments) {
   auto fnType = Method->getLoweredFunctionType();
 
+  // Cover all of the arguments except to `self` of the actor.
+  auto parameters = fnType->getParameters().drop_back();
+
+  // If there are no parameters to extract, we are done.
+  if (parameters.empty())
+    return;
+
   auto offset =
       IGF.createAlloca(IGM.Int8PtrTy, IGM.getPointerAlignment(), "offset");
   IGF.Builder.CreateLifetimeStart(offset, IGM.getPointerSize());
@@ -179,8 +186,6 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
   // Initialize "offset" with the address of the base of the argument buffer.
   IGF.Builder.CreateStore(argumentBuffer, offset);
 
-  // Cover all of the arguments except to `self` of the actor.
-  auto parameters = fnType->getParameters().drop_back();
   for (const auto &param : parameters) {
     auto paramTy = param.getSILStorageInterfaceType();
     const TypeInfo &typeInfo = IGF.getTypeInfo(paramTy);
