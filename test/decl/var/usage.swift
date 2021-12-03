@@ -502,7 +502,7 @@ func testVariablesBoundInPatterns() {
   }
 
   // Because Swift enables all kinds of creative binding forms, make sure that
-  // variable patterns occuring directly under a `let` or `var` have that
+  // variable patterns occurring directly under a `let` or `var` have that
   // introducer stripped by the fixit. All other cases are currently too
   // complicated for the VarDeclUsageChecker.
   switch StringB.simple(b: true) {
