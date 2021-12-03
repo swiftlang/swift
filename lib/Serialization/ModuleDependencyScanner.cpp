@@ -78,7 +78,7 @@ std::error_code PlaceholderSwiftModuleScanner::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
     bool skipBuildingInterface, bool IsFramework) {
-  StringRef moduleName = ModuleID.Item.str();
+  StringRef moduleName = Ctx.getRealModuleName(ModuleID.Item).str();
   auto it = PlaceholderDependencyModuleMap.find(moduleName);
   // If no placeholder module stub path is given matches the name, return with an
   // error code.
@@ -106,11 +106,12 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   // FIXME: Query the module interface loader to determine an appropriate
   // name for the module, which includes an appropriate hash.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
-  llvm::SmallString<32> modulePath = moduleName.str();
+  auto realModuleName = Ctx.getRealModuleName(moduleName);
+  llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
   Optional<ModuleDependencies> Result;
   std::error_code code =
-    astDelegate.runInSubContext(moduleName.str(),
+    astDelegate.runInSubContext(realModuleName.str(),
                                               moduleInterfacePath.str(),
                                               StringRef(),
                                               SourceLoc(),
@@ -119,7 +120,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
                     ArrayRef<StringRef> PCMArgs, StringRef Hash) {
     assert(mainMod);
     std::string InPath = moduleInterfacePath.str();
-    auto compiledCandidates = getCompiledCandidates(Ctx, moduleName.str(),
+    auto compiledCandidates = getCompiledCandidates(Ctx, realModuleName.str(),
                                                     InPath);
     Result = ModuleDependencies::forSwiftInterfaceModule(InPath,
                                                    compiledCandidates,
@@ -136,7 +137,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
 
     // Create a source file.
     unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(interfaceBuf.get()));
-    auto moduleDecl = ModuleDecl::create(moduleName, Ctx);
+    auto moduleDecl = ModuleDecl::create(realModuleName, Ctx);
     auto sourceFile = new (Ctx) SourceFile(
         *moduleDecl, SourceFileKind::Interface, bufferID);
 
