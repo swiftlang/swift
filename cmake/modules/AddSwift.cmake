@@ -802,16 +802,6 @@ macro(add_swift_lib_subdirectory name)
   add_llvm_subdirectory(SWIFT LIB ${name})
 endmacro()
 
-function(_link_built_compatibility_libs executable)
-  set(platform ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
-  target_link_directories(${executable} PRIVATE
-    ${SWIFTLIB_DIR}/${platform})
-  add_dependencies(${executable}
-    "swiftCompatibility50-${platform}"
-    "swiftCompatibility51-${platform}"
-    "swiftCompatibilityDynamicReplacements-${platform}")
-endfunction()
-
 function(add_swift_host_tool executable)
   set(options HAS_LIBSWIFT)
   set(single_parameter_options SWIFT_COMPONENT BOOTSTRAPPING)
@@ -910,23 +900,25 @@ function(add_swift_host_tool executable)
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
       elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-        # Pick up the built libswiftCompatibility<n>.a libraries
-        _link_built_compatibility_libs(${executable})
-
         # Add the SDK directory for the host platform.
         target_link_directories(${executable} PRIVATE "${sdk_dir}")
+
+        # A backup in case the toolchain doesn't have one of the compatibility libraries.
+        target_link_directories(${executable} PRIVATE
+          "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
       elseif(LIBSWIFT_BUILD_MODE STREQUAL "BOOTSTRAPPING")
-        # Pick up the built libswiftCompatibility<n>.a libraries
-        _link_built_compatibility_libs(${executable})
-
         # At build time link against the built swift libraries from the
         # previous bootstrapping stage.
         get_bootstrapping_swift_lib_dir(bs_lib_dir "${ASHT_BOOTSTRAPPING}")
         target_link_directories(${executable} PRIVATE ${bs_lib_dir})
+
+        # Required to pick up the built libswiftCompatibility<n>.a libraries
+        target_link_directories(${executable} PRIVATE
+          "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 
         # At runtime link against the built swift libraries from the current
         # bootstrapping stage.

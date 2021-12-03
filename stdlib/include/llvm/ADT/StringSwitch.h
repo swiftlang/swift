@@ -1,4 +1,4 @@
-﻿//===--- StringSwitch.h - Switch-on-literal-string Construct --------------===/
+//===--- StringSwitch.h - Switch-on-literal-string Construct --------------===/
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -139,21 +139,21 @@ public:
 
   // Case-insensitive case matchers.
   StringSwitch &CaseLower(StringLiteral S, T Value) {
-    if (!Result && Str.equals_lower(S))
+    if (!Result && Str.equals_insensitive(S))
       Result = std::move(Value);
 
     return *this;
   }
 
   StringSwitch &EndsWithLower(StringLiteral S, T Value) {
-    if (!Result && Str.endswith_lower(S))
+    if (!Result && Str.endswith_insensitive(S))
       Result = Value;
 
     return *this;
   }
 
   StringSwitch &StartsWithLower(StringLiteral S, T Value) {
-    if (!Result && Str.startswith_lower(S))
+    if (!Result && Str.startswith_insensitive(S))
       Result = std::move(Value);
 
     return *this;
@@ -193,6 +193,6 @@ public:
 };
 
 } // end namespace llvm
-}}
+}} // namespace swift::runtime
 
 #endif // LLVM_ADT_STRINGSWITCH_H

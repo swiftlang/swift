@@ -18,7 +18,7 @@ class Token(object):
         else:
             self.unprefixed_kind = unprefixed_kind
         self.serialization_code = serialization_code
-        self.text = text or ""
+        self.text = text
         self.classification = classification_by_name(classification)
         self.is_keyword = is_keyword
         self.requires_leading_space = requires_leading_space
