@@ -33,8 +33,6 @@ namespace llvm {
 
 #define ALIGN_CHECK_ISPOSITIVE(decl)                                           \
   assert(decl > 0 && (#decl " should be defined"))
-#define ALIGN_CHECK_ISSET(decl)                                                \
-  assert(decl.hasValue() && (#decl " should be defined"))
 
 /// This struct is a compact representation of a valid (non-zero power of two)
 /// alignment.
@@ -86,16 +84,6 @@ public:
   /// This is a hole in the type system and should not be abused.
   /// Needed to interact with C for instance.
   uint64_t value() const { return uint64_t(1) << ShiftValue; }
-
-  /// Returns a default constructed Align which corresponds to no alignment.
-  /// It was decided to deprecate Align::None because it's too close to
-  /// llvm::None which can be used to initialize `MaybeAlign`.
-  /// MaybeAlign = llvm::None means unspecified alignment,
-  /// Align = Align::None() means alignment of one byte.
-  LLVM_ATTRIBUTE_DEPRECATED(constexpr static const Align None(),
-                            "Use Align() or Align(1) instead") {
-    return Align();
-  }
 
   /// Allow constructions of constexpr Align.
   template <size_t kValue> constexpr static LogValue Constant() {
@@ -150,13 +138,6 @@ public:
 /// Checks that SizeInBytes is a multiple of the alignment.
 inline bool isAligned(Align Lhs, uint64_t SizeInBytes) {
   return SizeInBytes % Lhs.value() == 0;
-}
-
-/// Checks that SizeInBytes is a multiple of the alignment.
-/// Returns false if the alignment is undefined.
-inline bool isAligned(MaybeAlign Lhs, uint64_t SizeInBytes) {
-  ALIGN_CHECK_ISSET(Lhs);
-  return SizeInBytes % (*Lhs).value() == 0;
 }
 
 /// Checks that Addr is a multiple of the alignment.
@@ -225,13 +206,6 @@ inline uint64_t offsetToAlignedAddr(const void *Addr, Align Alignment) {
 
 /// Returns the log2 of the alignment.
 inline unsigned Log2(Align A) { return A.ShiftValue; }
-
-/// Returns the log2 of the alignment.
-/// \pre A must be defined.
-inline unsigned Log2(MaybeAlign A) {
-  ALIGN_CHECK_ISSET(A);
-  return Log2(A.getValue());
-}
 
 /// Returns the alignment that satisfies both alignments.
 /// Same semantic as MinAlign.
@@ -304,26 +278,6 @@ inline bool operator==(MaybeAlign Lhs, uint64_t Rhs) {
 inline bool operator!=(MaybeAlign Lhs, uint64_t Rhs) {
   return Lhs ? (*Lhs).value() != Rhs : Rhs != 0;
 }
-inline bool operator<=(MaybeAlign Lhs, uint64_t Rhs) {
-  ALIGN_CHECK_ISSET(Lhs);
-  ALIGN_CHECK_ISPOSITIVE(Rhs);
-  return (*Lhs).value() <= Rhs;
-}
-inline bool operator>=(MaybeAlign Lhs, uint64_t Rhs) {
-  ALIGN_CHECK_ISSET(Lhs);
-  ALIGN_CHECK_ISPOSITIVE(Rhs);
-  return (*Lhs).value() >= Rhs;
-}
-inline bool operator<(MaybeAlign Lhs, uint64_t Rhs) {
-  ALIGN_CHECK_ISSET(Lhs);
-  ALIGN_CHECK_ISPOSITIVE(Rhs);
-  return (*Lhs).value() < Rhs;
-}
-inline bool operator>(MaybeAlign Lhs, uint64_t Rhs) {
-  ALIGN_CHECK_ISSET(Lhs);
-  ALIGN_CHECK_ISPOSITIVE(Rhs);
-  return (*Lhs).value() > Rhs;
-}
 
 /// Comparisons operators between Align.
 inline bool operator==(Align Lhs, Align Rhs) {
@@ -345,57 +299,21 @@ inline bool operator>(Align Lhs, Align Rhs) {
   return Lhs.ShiftValue > Rhs.ShiftValue;
 }
 
-/// Comparisons operators between Align and MaybeAlign.
-inline bool operator==(Align Lhs, MaybeAlign Rhs) {
-  ALIGN_CHECK_ISSET(Rhs);
-  return Lhs.value() == (*Rhs).value();
-}
-inline bool operator!=(Align Lhs, MaybeAlign Rhs) {
-  ALIGN_CHECK_ISSET(Rhs);
-  return Lhs.value() != (*Rhs).value();
-}
-inline bool operator<=(Align Lhs, MaybeAlign Rhs) {
-  ALIGN_CHECK_ISSET(Rhs);
-  return Lhs.value() <= (*Rhs).value();
-}
-inline bool operator>=(Align Lhs, MaybeAlign Rhs) {
-  ALIGN_CHECK_ISSET(Rhs);
-  return Lhs.value() >= (*Rhs).value();
-}
-inline bool operator<(Align Lhs, MaybeAlign Rhs) {
-  ALIGN_CHECK_ISSET(Rhs);
-  return Lhs.value() < (*Rhs).value();
-}
-inline bool operator>(Align Lhs, MaybeAlign Rhs) {
-  ALIGN_CHECK_ISSET(Rhs);
-  return Lhs.value() > (*Rhs).value();
-}
+// Don't allow relational comparisons with MaybeAlign.
+bool operator<=(Align Lhs, MaybeAlign Rhs) = delete;
+bool operator>=(Align Lhs, MaybeAlign Rhs) = delete;
+bool operator<(Align Lhs, MaybeAlign Rhs) = delete;
+bool operator>(Align Lhs, MaybeAlign Rhs) = delete;
 
-/// Comparisons operators between MaybeAlign and Align.
-inline bool operator==(MaybeAlign Lhs, Align Rhs) {
-  ALIGN_CHECK_ISSET(Lhs);
-  return Lhs && (*Lhs).value() == Rhs.value();
-}
-inline bool operator!=(MaybeAlign Lhs, Align Rhs) {
-  ALIGN_CHECK_ISSET(Lhs);
-  return Lhs && (*Lhs).value() != Rhs.value();
-}
-inline bool operator<=(MaybeAlign Lhs, Align Rhs) {
-  ALIGN_CHECK_ISSET(Lhs);
-  return Lhs && (*Lhs).value() <= Rhs.value();
-}
-inline bool operator>=(MaybeAlign Lhs, Align Rhs) {
-  ALIGN_CHECK_ISSET(Lhs);
-  return Lhs && (*Lhs).value() >= Rhs.value();
-}
-inline bool operator<(MaybeAlign Lhs, Align Rhs) {
-  ALIGN_CHECK_ISSET(Lhs);
-  return Lhs && (*Lhs).value() < Rhs.value();
-}
-inline bool operator>(MaybeAlign Lhs, Align Rhs) {
-  ALIGN_CHECK_ISSET(Lhs);
-  return Lhs && (*Lhs).value() > Rhs.value();
-}
+bool operator<=(MaybeAlign Lhs, Align Rhs) = delete;
+bool operator>=(MaybeAlign Lhs, Align Rhs) = delete;
+bool operator<(MaybeAlign Lhs, Align Rhs) = delete;
+bool operator>(MaybeAlign Lhs, Align Rhs) = delete;
+
+bool operator<=(MaybeAlign Lhs, MaybeAlign Rhs) = delete;
+bool operator>=(MaybeAlign Lhs, MaybeAlign Rhs) = delete;
+bool operator<(MaybeAlign Lhs, MaybeAlign Rhs) = delete;
+bool operator>(MaybeAlign Lhs, MaybeAlign Rhs) = delete;
 
 inline Align operator*(Align Lhs, uint64_t Rhs) {
   assert(Rhs > 0 && "Rhs must be positive");
@@ -442,7 +360,6 @@ inline std::string DebugStr(const MaybeAlign &MA) {
 #endif // NDEBUG
 
 #undef ALIGN_CHECK_ISPOSITIVE
-#undef ALIGN_CHECK_ISSET
 
 } // namespace llvm
 }} // namespace swift::runtime
