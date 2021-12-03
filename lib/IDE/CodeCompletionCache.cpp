@@ -41,7 +41,7 @@ namespace swift {
     struct CacheValueCostInfo<swift::ide::CodeCompletionCacheImpl::Value> {
       static size_t
       getCost(const swift::ide::CodeCompletionCacheImpl::Value &V) {
-        return V.Sink.Allocator->getTotalMemory();
+        return V.Allocator->getTotalMemory();
       }
     };
   } // namespace sys
@@ -102,7 +102,8 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 3; // Removed "source file path".
+static constexpr uint32_t onDiskCompletionCacheVersion =
+    4; // Store ContextFreeCodeCompletionResults in cache
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -166,7 +167,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 
     const char *p = strings + index;
     auto size = read32le(p);
-    auto str = copyString(*V.Sink.Allocator, StringRef(p, size));
+    auto str = copyString(*V.Allocator, StringRef(p, size));
     knownStrings[index] = str;
     return str;
   };
@@ -192,21 +193,19 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
       }
     }
 
-    return CodeCompletionString::create(*V.Sink.Allocator, chunkList);
+    return CodeCompletionString::create(*V.Allocator, chunkList);
   };
 
   // RESULTS
   while (cursor != resultEnd) {
-    auto kind = static_cast<CodeCompletionResult::ResultKind>(*cursor++);
+    auto kind = static_cast<CodeCompletionResultKind>(*cursor++);
     auto declKind = static_cast<CodeCompletionDeclKind>(*cursor++);
     auto opKind = static_cast<CodeCompletionOperatorKind>(*cursor++);
-    auto context = static_cast<SemanticContextKind>(*cursor++);
     auto notRecommended =
-        static_cast<CodeCompletionResult::NotRecommendedReason>(*cursor++);
+        static_cast<ContextFreeNotRecommendedReason>(*cursor++);
     auto diagSeverity =
         static_cast<CodeCompletionDiagnosticSeverity>(*cursor++);
     auto isSystem = static_cast<bool>(*cursor++);
-    auto numBytesToErase = static_cast<unsigned>(*cursor++);
     auto chunkIndex = read32le(cursor);
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
@@ -223,21 +222,20 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto briefDocComment = getString(briefDocIndex);
     auto diagMessage = getString(diagMessageIndex);
 
-    CodeCompletionResult *result = nullptr;
-    if (kind == CodeCompletionResult::ResultKind::Declaration) {
-      result = new (*V.Sink.Allocator) CodeCompletionResult(
-          context, CodeCompletionFlair(), numBytesToErase, string, declKind,
-          isSystem, moduleName, notRecommended, diagSeverity, diagMessage,
-          briefDocComment,
-          copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
-          CodeCompletionResult::ExpectedTypeRelation::Unknown, opKind);
+    ContextFreeCodeCompletionResult *result = nullptr;
+    if (kind == CodeCompletionResultKind::Declaration) {
+      result = new (*V.Allocator) ContextFreeCodeCompletionResult(
+          CodeCompletionResultKind::Declaration, static_cast<uint8_t>(declKind),
+          opKind, isSystem, string, moduleName, briefDocComment,
+          copyArray(*V.Allocator, ArrayRef<StringRef>(assocUSRs)),
+          notRecommended, diagSeverity, diagMessage);
     } else {
-      result = new (*V.Sink.Allocator) CodeCompletionResult(
-          kind, context, CodeCompletionFlair(), numBytesToErase, string,
-          CodeCompletionResult::ExpectedTypeRelation::NotApplicable, opKind);
+      result = new (*V.Allocator) ContextFreeCodeCompletionResult(
+          kind, string, opKind, /*BriefDocComment=*/"", notRecommended,
+          diagSeverity, diagMessage);
     }
 
-    V.Sink.Results.push_back(result);
+    V.Results.push_back(result);
   }
 
   return true;
@@ -342,27 +340,22 @@ static void writeCachedModule(llvm::raw_ostream &out,
   // RESULTS
   {
     endian::Writer LE(results, little);
-    for (CodeCompletionResult *R : V.Sink.Results) {
-      assert(!R->getFlair().toRaw() && "Any flairs should not be cached");
-      assert(R->getNotRecommendedReason() !=
-             CodeCompletionResult::NotRecommendedReason::InvalidAsyncContext &&
-             "InvalidAsyncContext is decl context specific, cannot be cached");
-
+    for (ContextFreeCodeCompletionResult *R : V.Results) {
       // FIXME: compress bitfield
       LE.write(static_cast<uint8_t>(R->getKind()));
-      if (R->getKind() == CodeCompletionResult::ResultKind::Declaration)
+      if (R->getKind() == CodeCompletionResultKind::Declaration) {
         LE.write(static_cast<uint8_t>(R->getAssociatedDeclKind()));
-      else
+      } else {
         LE.write(static_cast<uint8_t>(~0u));
-      if (R->isOperator())
-        LE.write(static_cast<uint8_t>(R->getOperatorKind()));
-      else
+      }
+      if (R->isOperator()) {
+        LE.write(static_cast<uint8_t>(R->getKnownOperatorKind()));
+      } else {
         LE.write(static_cast<uint8_t>(CodeCompletionOperatorKind::None));
-      LE.write(static_cast<uint8_t>(R->getSemanticContext()));
+      }
       LE.write(static_cast<uint8_t>(R->getNotRecommendedReason()));
       LE.write(static_cast<uint8_t>(R->getDiagnosticSeverity()));
       LE.write(static_cast<uint8_t>(R->isSystem()));
-      LE.write(static_cast<uint8_t>(R->getNumBytesToErase()));
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
       LE.write(addString(R->getModuleName()));      // index into strings

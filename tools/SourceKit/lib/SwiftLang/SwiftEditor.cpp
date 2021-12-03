@@ -973,7 +973,7 @@ public:
 
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
-    auto Kind = CodeCompletionResult::getCodeCompletionDeclKind(D);
+    auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
     bool IsSystem = D->getModuleContext()->isSystemModule();
     SemaToks.emplace_back(Kind, ByteOffset, Length, IsRef, IsSystem);
   }

@@ -146,7 +146,7 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
     // FIXME: this adhoc filtering should be configurable like it is in the
     // codeCompleteOpen path.
     for (auto *Result : Result->Results) {
-      if (Result->getKind() == CodeCompletionResult::ResultKind::Literal) {
+      if (Result->getKind() == CodeCompletionResultKind::Literal) {
         switch (Result->getLiteralKind()) {
         case CodeCompletionLiteralKind::NilLiteral:
         case CodeCompletionLiteralKind::BooleanLiteral:
@@ -390,18 +390,16 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   CodeCompletionInfo Info;
   if (Result->hasCustomKind()) {
     Info.CustomKind = Result->getCustomKind();
-  } else if (Result->getKind() == CodeCompletionResult::ResultKind::Keyword) {
+  } else if (Result->getKind() == CodeCompletionResultKind::Keyword) {
     Info.Kind = KeywordUID;
-  } else if (Result->getKind() == CodeCompletionResult::ResultKind::Pattern) {
+  } else if (Result->getKind() == CodeCompletionResultKind::Pattern) {
     Info.Kind = PatternUID;
-  } else if (Result->getKind() ==
-             CodeCompletionResult::ResultKind::BuiltinOperator) {
+  } else if (Result->getKind() == CodeCompletionResultKind::BuiltinOperator) {
     Info.Kind = PatternUID; // FIXME: add a UID for operators
-  } else if (Result->getKind() ==
-             CodeCompletionResult::ResultKind::Declaration) {
+  } else if (Result->getKind() == CodeCompletionResultKind::Declaration) {
     Info.Kind = SwiftLangSupport::getUIDForCodeCompletionDeclKind(
         Result->getAssociatedDeclKind());
-  } else if (Result->getKind() == CodeCompletionResult::ResultKind::Literal) {
+  } else if (Result->getKind() == CodeCompletionResultKind::Literal) {
     auto literalKind = Result->getLiteralKind();
     if (legacyLiteralToKeyword &&
         (literalKind == CodeCompletionLiteralKind::BooleanLiteral ||
@@ -852,8 +850,7 @@ static bool checkInnerResult(CodeCompletionResult *result, bool &hasDot,
              chunks[1].is(CodeCompletionString::Chunk::ChunkKind::Dot)) {
     hasQDot = true;
     return true;
-  } else if (result->getKind() ==
-                 CodeCompletion::SwiftResult::ResultKind::Declaration &&
+  } else if (result->getKind() == CodeCompletionResultKind::Declaration &&
              result->getAssociatedDeclKind() ==
                  CodeCompletionDeclKind::Constructor) {
     hasInit = true;
@@ -910,12 +907,19 @@ static void transformAndForwardResults(
   auto buildInnerResult = [&](ArrayRef<CodeCompletionString::Chunk> chunks) {
     auto *completionString =
         CodeCompletionString::create(innerSink.allocator, chunks);
+    ContextFreeCodeCompletionResult contextFreeResult(
+        CodeCompletionResultKind::BuiltinOperator, completionString,
+        CodeCompletionOperatorKind::None,
+        /*BriefDocComment=*/"", ContextFreeNotRecommendedReason::None,
+        CodeCompletionDiagnosticSeverity::None,
+        /*DiagnosticMessage=*/"");
     CodeCompletion::SwiftResult paren(
-        CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
-        SemanticContextKind::CurrentNominal,
+        contextFreeResult, SemanticContextKind::CurrentNominal,
         CodeCompletionFlairBit::ExpressionSpecific,
-        exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString,
-        CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
+        exactMatch ? exactMatch->getNumBytesToErase() : 0,
+        CodeCompletionResult::ExpectedTypeRelation::NotApplicable,
+        ContextualNotRecommendedReason::None,
+        CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
 
     SwiftCompletionInfo info;
     std::vector<Completion *> extended =
@@ -987,7 +991,7 @@ static void transformAndForwardResults(
   organizer.groupAndSort(options);
 
   if ((options.addInnerResults || options.addInnerOperators) && exactMatch &&
-      exactMatch->getKind() == Completion::ResultKind::Declaration) {
+      exactMatch->getKind() == CodeCompletionResultKind::Declaration) {
     std::vector<Completion *> innerResults;
     bool hasDot = false;
     bool hasQDot = false;

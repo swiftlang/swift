@@ -626,21 +626,270 @@ enum class CodeCompletionDiagnosticSeverity : uint8_t {
   MAX_VALUE = Note
 };
 
-/// A single code completion result.
-class CodeCompletionResult {
-  friend class CodeCompletionResultBuilder;
+/// Reasons why a code completion item might not be recommended in a certain
+/// context.
+/// This enum is split into two subsets: \c ContextFreeNotRecommendedReason and
+/// \c ContextualNotRecommendedReason. When adding a case to this enum also add
+/// it to either of those.
+/// Context-free diagnostics are independent of the context they are used in.
+/// The not-recommended reason can thus be cached as part of a context free
+/// code completion result.
+/// Contextual not recommended reasons depend on the context they are used in.
+/// E.g. \c InvalidAsyncContext depends on whether the usage context is async or
+/// not.
+enum class NotRecommendedReason : uint8_t {
+  None = 0,                    // both contextual and context-free
+  RedundantImport,             // contextual
+  RedundantImportIndirect,     // contextual
+  Deprecated,                  // context-free
+  SoftDeprecated,              // context-free
+  InvalidAsyncContext,         // contextual
+  CrossActorReference,         // contextual
+  VariableUsedInOwnDefinition, // contextual
+
+  MAX_VALUE = VariableUsedInOwnDefinition
+};
+
+/// TODO: We consider deprecation warnings as context free although they don't
+/// produce deprecation warnings insdide context that have the same or a
+/// stronger deprecation attribute.
+/// E.g.
+/// In SDK:
+/// \code
+/// @available(iOS, deprecated: 12.0)
+/// func deprecatedFunc()
+/// \endcode
+///
+/// User code:
+/// \code
+/// @available(iOS, deprecated: 12.0)
+/// func insiderUserDeprecatedContext() {
+///   #^COMPLETE^#
+/// }
+/// \endcode
+/// suggests \c deprecatedFunc as deprecated although it doesn't produce a
+/// diagnostic during compilation. But this allows us to show deprecation
+/// warnings for cached results.
+enum class ContextFreeNotRecommendedReason : uint8_t {
+  None = 0,
+  Deprecated,
+  SoftDeprecated,
+  MAX_VALUE = SoftDeprecated
+};
+
+enum class ContextualNotRecommendedReason : uint8_t {
+  None = 0,
+  RedundantImport,
+  RedundantImportIndirect,
+  InvalidAsyncContext,
+  CrossActorReference,
+  VariableUsedInOwnDefinition,
+  MAX_VALUE = VariableUsedInOwnDefinition
+};
+
+enum class CodeCompletionResultKind : uint8_t {
+  Declaration,
+  Keyword,
+  Pattern,
+  Literal,
+  BuiltinOperator,
+
+  MAX_VALUE = BuiltinOperator
+};
+
+class CodeCompletionResult;
+
+/// The parts of a \c CodeCompletionResult that are not dependent on the context
+/// it appears in and can thus be cached.
+class ContextFreeCodeCompletionResult {
+  CodeCompletionResultKind Kind : 3;
+  uint8_t AssociatedKind;
+  CodeCompletionOperatorKind KnownOperatorKind : 6;
+  bool IsSystem : 1;
+  CodeCompletionString *CompletionString;
+  StringRef ModuleName;
+  StringRef BriefDocComment;
+  ArrayRef<StringRef> AssociatedUSRs;
+
+  ContextFreeNotRecommendedReason NotRecommended;
+  CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
+  StringRef DiagnosticMessage;
+
+  static_assert(int(CodeCompletionResultKind::MAX_VALUE) < 1 << 3, "");
+  static_assert(int(CodeCompletionOperatorKind::MAX_VALUE) < 1 << 6, "");
+  static_assert(int(CodeCompletionDiagnosticSeverity::MAX_VALUE) < 1 << 3, "");
 
 public:
-  enum class ResultKind : uint8_t {
-    Declaration,
-    Keyword,
-    Pattern,
-    Literal,
-    BuiltinOperator,
+  /// Memberwise initializer. \p AssociatedKInd is opaque and will be
+  /// interpreted based on \p Kind. If \p KnownOperatorKind is \c None and the
+  /// completion item is an operator, it will be determined based on the
+  /// compleiton string.
+  ///
+  /// \note The caller must ensure that the \p CompleitonString and all the
+  /// \c Ref types outlive this result, typically by storing them in the same
+  /// \c CodeCompletionResultSink as the result itself.
+  ContextFreeCodeCompletionResult(
+      CodeCompletionResultKind Kind, uint8_t AssociatedKind,
+      CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem,
+      CodeCompletionString *CompletionString, StringRef ModuleName,
+      StringRef BriefDocComment, ArrayRef<StringRef> AssociatedUSRs,
+      ContextFreeNotRecommendedReason NotRecommended,
+      CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+      StringRef DiagnosticMessage)
+      : Kind(Kind), AssociatedKind(AssociatedKind),
+        KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
+        CompletionString(CompletionString), ModuleName(ModuleName),
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
+        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
+        DiagnosticMessage(DiagnosticMessage) {
+    assert((NotRecommended == ContextFreeNotRecommendedReason::None) ==
+               (DiagnosticSeverity == CodeCompletionDiagnosticSeverity::None) &&
+           "Result should be not recommended iff it has a diagnostic");
+    assert((DiagnosticSeverity == CodeCompletionDiagnosticSeverity::None) ==
+               DiagnosticMessage.empty() &&
+           "Completion item should have diagnostic message iff the diagnostics "
+           "severity is not none");
+    assert(CompletionString && "Result should have a completion string");
+    if (isOperator() && KnownOperatorKind == CodeCompletionOperatorKind::None) {
+      this->KnownOperatorKind = getCodeCompletionOperatorKind(CompletionString);
+    }
+    assert(!isOperator() ||
+           getKnownOperatorKind() != CodeCompletionOperatorKind::None &&
+               "isOperator implies operator kind != None");
+  }
 
-    MAX_VALUE = BuiltinOperator
-  };
+  /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
+  ///
+  /// \note The caller must ensure that the \p CompletionString and all the
+  /// \c Ref types outlive this result, typically by storing them in the same
+  /// \c CodeCompletionResultSink as the result itself.
+  ContextFreeCodeCompletionResult(
+      CodeCompletionResultKind Kind, CodeCompletionString *CompletionString,
+      CodeCompletionOperatorKind KnownOperatorKind, StringRef BriefDocComment,
+      ContextFreeNotRecommendedReason NotRecommended,
+      CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+      StringRef DiagnosticMessage)
+      : ContextFreeCodeCompletionResult(
+            Kind, /*AssociatedKind=*/0, KnownOperatorKind,
+            /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
+            BriefDocComment, /*AssociatedUSRs=*/{}, NotRecommended,
+            DiagnosticSeverity, DiagnosticMessage) {}
 
+  /// Constructs a \c Keyword result.
+  ///
+  /// \note The caller must ensure that the \p CompletionString and
+  /// \p BriefDocComment outlive this result, typically by storing them in the
+  /// same \c CodeCompletionResultSink as the result itself.
+  ContextFreeCodeCompletionResult(CodeCompletionKeywordKind Kind,
+                                  CodeCompletionString *CompletionString,
+                                  StringRef BriefDocComment)
+      : ContextFreeCodeCompletionResult(
+            CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
+            CodeCompletionOperatorKind::None, /*IsSystem=*/false,
+            CompletionString, /*ModuleName=*/"", BriefDocComment,
+            /*AssociatedUSRs=*/{}, ContextFreeNotRecommendedReason::None,
+            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
+
+  /// Constructs a \c Literal result.
+  ///
+  /// \note The caller must ensure that the \p CompletionString outlives this
+  /// result, typically by storing them in the same \c CodeCompletionResultSink
+  /// as the result itself.
+  ContextFreeCodeCompletionResult(CodeCompletionLiteralKind LiteralKind,
+                                  CodeCompletionString *CompletionString)
+      : ContextFreeCodeCompletionResult(
+            CodeCompletionResultKind::Literal,
+            static_cast<uint8_t>(LiteralKind), CodeCompletionOperatorKind::None,
+            /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
+            /*BriefDocComment=*/"",
+            /*AssociatedUSRs=*/{}, ContextFreeNotRecommendedReason::None,
+            CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
+
+  /// Constructs a \c Declaration result.
+  ///
+  /// \note The caller must ensure that the \p CompletionString and all the
+  /// \c Ref types outlive this result, typically by storing them in the same
+  /// \c CodeCompletionResultSink as the result itself.
+  ContextFreeCodeCompletionResult(
+      CodeCompletionString *CompletionString, const Decl *AssociatedDecl,
+      StringRef ModuleName, StringRef BriefDocComment,
+      ArrayRef<StringRef> AssociatedUSRs,
+      ContextFreeNotRecommendedReason NotRecommended,
+      CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+      StringRef DiagnosticMessage)
+      : ContextFreeCodeCompletionResult(
+            CodeCompletionResultKind::Declaration,
+            static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
+            CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
+            CompletionString, ModuleName, BriefDocComment, AssociatedUSRs,
+            NotRecommended, DiagnosticSeverity, DiagnosticMessage) {
+    assert(AssociatedDecl && "should have a decl");
+  }
+
+  CodeCompletionResultKind getKind() const { return Kind; }
+
+  CodeCompletionDeclKind getAssociatedDeclKind() const {
+    assert(getKind() == CodeCompletionResultKind::Declaration);
+    return static_cast<CodeCompletionDeclKind>(AssociatedKind);
+  }
+  CodeCompletionLiteralKind getLiteralKind() const {
+    assert(getKind() == CodeCompletionResultKind::Literal);
+    return static_cast<CodeCompletionLiteralKind>(AssociatedKind);
+  }
+  CodeCompletionKeywordKind getKeywordKind() const {
+    assert(getKind() == CodeCompletionResultKind::Keyword);
+    return static_cast<CodeCompletionKeywordKind>(AssociatedKind);
+  }
+
+  CodeCompletionOperatorKind getKnownOperatorKind() const {
+    assert(isOperator());
+    return KnownOperatorKind;
+  }
+
+  bool isSystem() const { return IsSystem; };
+
+  CodeCompletionString *getCompletionString() const { return CompletionString; }
+
+  StringRef getModuleName() const { return ModuleName; }
+
+  StringRef getBriefDocComment() const { return BriefDocComment; }
+
+  ArrayRef<StringRef> getAssociatedUSRs() const { return AssociatedUSRs; }
+
+  ContextFreeNotRecommendedReason getNotRecommendedReason() const {
+    return NotRecommended;
+  }
+
+  CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
+    return DiagnosticSeverity;
+  }
+  StringRef getDiagnosticMessage() const { return DiagnosticMessage; };
+
+  bool isOperator() const {
+    if (getKind() != CodeCompletionResultKind::Declaration)
+      return getKind() == CodeCompletionResultKind::BuiltinOperator;
+    switch (getAssociatedDeclKind()) {
+    case CodeCompletionDeclKind::PrefixOperatorFunction:
+    case CodeCompletionDeclKind::PostfixOperatorFunction:
+    case CodeCompletionDeclKind::InfixOperatorFunction:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static CodeCompletionOperatorKind
+  getCodeCompletionOperatorKind(StringRef name);
+  static CodeCompletionOperatorKind
+  getCodeCompletionOperatorKind(CodeCompletionString *str);
+  static CodeCompletionDeclKind getCodeCompletionDeclKind(const Decl *D);
+  static bool getDeclIsSystem(const Decl *D);
+};
+
+/// A single code completion result enriched with information that depend on
+/// the completion's usage context.
+class CodeCompletionResult {
+public:
   /// Describes the relationship between the type of the completion results and
   /// the expected type at the code completion position.
   enum class ExpectedTypeRelation : uint8_t {
@@ -666,27 +915,18 @@ public:
     MAX_VALUE = Identical
   };
 
-  enum class NotRecommendedReason : uint8_t {
-    None = 0,
-    RedundantImport,
-    RedundantImportIndirect,
-    Deprecated,
-    SoftDeprecated,
-    InvalidAsyncContext,
-    CrossActorReference,
-    VariableUsedInOwnDefinition,
-
-    MAX_VALUE = VariableUsedInOwnDefinition
-  };
 
 private:
-  ResultKind Kind : 3;
-  unsigned AssociatedKind : 8;
-  CodeCompletionOperatorKind KnownOperatorKind : 6;
+  ContextFreeCodeCompletionResult ContextFree;
   SemanticContextKind SemanticContext : 3;
   unsigned char Flair : 8;
-  NotRecommendedReason NotRecommended : 4;
-  bool IsSystem : 1;
+
+  /// Contextual diagnostics. If the contextual not recommended reason is
+  /// \c None, then the context free diagnostic will be shown to the user,
+  /// otherwise the contextual diagnostic stored in this result is shown.
+  ContextualNotRecommendedReason NotRecommended : 4;
+  CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
+  StringRef DiagnosticMessage;
 
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
@@ -697,144 +937,38 @@ public:
   static const unsigned MaxNumBytesToErase = 127;
 
 private:
-  CodeCompletionString *CompletionString;
-  StringRef ModuleName;
-  StringRef BriefDocComment;
-  ArrayRef<StringRef> AssociatedUSRs;
   ExpectedTypeRelation TypeDistance : 3;
-  CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
-  StringRef DiagnosticMessage;
 
   // Assertions for limiting max values of enums.
-  static_assert(int(ResultKind::MAX_VALUE) < 1 << 3, "");
-  static_assert(int(CodeCompletionOperatorKind::MAX_VALUE) < 1 << 6, "");
   static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
-  static_assert(int(NotRecommendedReason::MAX_VALUE) < 1 << 4, "");
+  static_assert(int(ContextualNotRecommendedReason::MAX_VALUE) < 1 << 4, "");
   static_assert(int(ExpectedTypeRelation::MAX_VALUE) < 1 << 3, "");
-  static_assert(int(CodeCompletionDiagnosticSeverity::MAX_VALUE) < 1 << 3, "");
 
 public:
-  /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
-  ///
-  /// \note The caller must ensure \c CodeCompletionString outlives this result.
-  CodeCompletionResult(ResultKind Kind, SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
-                       CodeCompletionString *CompletionString,
-                       ExpectedTypeRelation TypeDistance,
-                       CodeCompletionOperatorKind KnownOperatorKind =
-                           CodeCompletionOperatorKind::None,
-                       StringRef BriefDocComment = StringRef())
-      : Kind(Kind), KnownOperatorKind(KnownOperatorKind),
-        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
-        NotRecommended(NotRecommendedReason::None),
-        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
-    assert(Kind != ResultKind::Declaration && "use the other constructor");
-    assert(CompletionString);
-    if (isOperator() && KnownOperatorKind == CodeCompletionOperatorKind::None)
-      this->KnownOperatorKind = getCodeCompletionOperatorKind(CompletionString);
-    assert(!isOperator() ||
-           getOperatorKind() != CodeCompletionOperatorKind::None);
-    AssociatedKind = 0;
-    IsSystem = false;
-    DiagnosticSeverity = CodeCompletionDiagnosticSeverity::None;
-  }
-
-  /// Constructs a \c Keyword result.
-  ///
-  /// \note The caller must ensure \c CodeCompletionString outlives this result.
-  CodeCompletionResult(CodeCompletionKeywordKind Kind,
+  /// Enrich a \c ContextFreeCodeCompletionResult with the following contextual
+  /// information.
+  CodeCompletionResult(ContextFreeCodeCompletionResult ContextFree,
                        SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
-                       CodeCompletionString *CompletionString,
+                       CodeCompletionFlair Flair, uint8_t NumBytesToErase,
                        ExpectedTypeRelation TypeDistance,
-                       StringRef BriefDocComment = StringRef())
-      : Kind(ResultKind::Keyword),
-        KnownOperatorKind(CodeCompletionOperatorKind::None),
-        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
-        NotRecommended(NotRecommendedReason::None),
-        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
-    assert(CompletionString);
-    AssociatedKind = static_cast<unsigned>(Kind);
-    IsSystem = false;
-    DiagnosticSeverity = CodeCompletionDiagnosticSeverity::None;
+                       ContextualNotRecommendedReason NotRecommended,
+                       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+                       StringRef DiagnosticMessage)
+      : ContextFree(ContextFree), SemanticContext(SemanticContext),
+        Flair(Flair.toRaw()), NotRecommended(NotRecommended),
+        DiagnosticSeverity(DiagnosticSeverity),
+        DiagnosticMessage(DiagnosticMessage), NumBytesToErase(NumBytesToErase),
+        TypeDistance(TypeDistance) {}
+
+  const ContextFreeCodeCompletionResult &getContextFreeResult() const {
+    return ContextFree;
   }
 
-  /// Constructs a \c Literal result.
-  ///
-  /// \note The caller must ensure \c CodeCompletionString outlives this result.
-  CodeCompletionResult(CodeCompletionLiteralKind LiteralKind,
-                       SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
-                       CodeCompletionString *CompletionString,
-                       ExpectedTypeRelation TypeDistance)
-      : Kind(ResultKind::Literal),
-        KnownOperatorKind(CodeCompletionOperatorKind::None),
-        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
-        NotRecommended(NotRecommendedReason::None),
-        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        TypeDistance(TypeDistance) {
-    AssociatedKind = static_cast<unsigned>(LiteralKind);
-    IsSystem = false;
-    DiagnosticSeverity = CodeCompletionDiagnosticSeverity::None;
-    assert(CompletionString);
-  }
-
-  /// Constructs a \c Declaration result.
-  ///
-  /// \note The caller must ensure \c CodeCompletionString and any StringRef
-  /// arguments outlive this result, typically by storing them in the same
-  /// \c CodeCompletionResultSink as the result itself.
-  CodeCompletionResult(SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
-                       CodeCompletionString *CompletionString,
-                       const Decl *AssociatedDecl, StringRef ModuleName,
-                       CodeCompletionResult::NotRecommendedReason NotRecReason,
-                       StringRef BriefDocComment,
-                       ArrayRef<StringRef> AssociatedUSRs,
-                       ExpectedTypeRelation TypeDistance)
-      : Kind(ResultKind::Declaration),
-        KnownOperatorKind(CodeCompletionOperatorKind::None),
-        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
-        NotRecommended(NotRecReason), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), ModuleName(ModuleName),
-        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        TypeDistance(TypeDistance) {
-    assert(AssociatedDecl && "should have a decl");
-    AssociatedKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
-    IsSystem = getDeclIsSystem(AssociatedDecl);
-    DiagnosticSeverity = CodeCompletionDiagnosticSeverity::None;
-    assert(CompletionString);
-    if (isOperator())
-      KnownOperatorKind = getCodeCompletionOperatorKind(CompletionString);
-    assert(!isOperator() ||
-           getOperatorKind() != CodeCompletionOperatorKind::None);
-  }
-
-  // Used by deserialization.
-  CodeCompletionResult(SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
-                       CodeCompletionString *CompletionString,
-                       CodeCompletionDeclKind DeclKind, bool IsSystem,
-                       StringRef ModuleName,
-                       CodeCompletionResult::NotRecommendedReason NotRecReason,
-                       CodeCompletionDiagnosticSeverity diagSeverity,
-                       StringRef DiagnosticMessage, StringRef BriefDocComment,
-                       ArrayRef<StringRef> AssociatedUSRs,
-                       ExpectedTypeRelation TypeDistance,
-                       CodeCompletionOperatorKind KnownOperatorKind)
-      : Kind(ResultKind::Declaration), KnownOperatorKind(KnownOperatorKind),
-        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
-        NotRecommended(NotRecReason), IsSystem(IsSystem),
-        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), TypeDistance(TypeDistance),
-        DiagnosticSeverity(diagSeverity), DiagnosticMessage(DiagnosticMessage) {
-    AssociatedKind = static_cast<unsigned>(DeclKind);
-    assert(CompletionString);
-    assert(!isOperator() ||
-           getOperatorKind() != CodeCompletionOperatorKind::None);
+  /// Return a pointer to the data structure storing the context free
+  /// properties.
+  /// The pointer is valid as long as this result is alive.
+  ContextFreeCodeCompletionResult *getContextFreeResultPtr() {
+    return &ContextFree;
   }
 
   /// Copy this result to \p Sink with \p newFlair . Note that this does NOT
@@ -843,47 +977,63 @@ public:
   CodeCompletionResult *withFlair(CodeCompletionFlair newFlair,
                                   CodeCompletionResultSink &Sink);
 
-  ResultKind getKind() const { return Kind; }
+  CodeCompletionResultKind getKind() const {
+    return getContextFreeResult().getKind();
+  }
 
   CodeCompletionDeclKind getAssociatedDeclKind() const {
-    assert(getKind() == ResultKind::Declaration);
-    return static_cast<CodeCompletionDeclKind>(AssociatedKind);
+    return getContextFreeResult().getAssociatedDeclKind();
   }
 
   CodeCompletionLiteralKind getLiteralKind() const {
-    assert(getKind() == ResultKind::Literal);
-    return static_cast<CodeCompletionLiteralKind>(AssociatedKind);
+    return getContextFreeResult().getLiteralKind();
   }
 
   CodeCompletionKeywordKind getKeywordKind() const {
-    assert(getKind() == ResultKind::Keyword);
-    return static_cast<CodeCompletionKeywordKind>(AssociatedKind);
+    return getContextFreeResult().getKeywordKind();
   }
 
-  bool isOperator() const {
-    if (getKind() != ResultKind::Declaration)
-      return getKind() == ResultKind::BuiltinOperator;
-    switch (getAssociatedDeclKind()) {
-    case CodeCompletionDeclKind::PrefixOperatorFunction:
-    case CodeCompletionDeclKind::PostfixOperatorFunction:
-    case CodeCompletionDeclKind::InfixOperatorFunction:
-      return true;
-    default:
-      return false;
-    }
-  }
+  bool isOperator() const { return getContextFreeResult().isOperator(); }
 
   CodeCompletionOperatorKind getOperatorKind() const {
-    assert(isOperator());
-    return KnownOperatorKind;
+    return getContextFreeResult().getKnownOperatorKind();
   }
 
-  bool isSystem() const { return IsSystem; }
+  bool isSystem() const { return getContextFreeResult().isSystem(); }
 
   ExpectedTypeRelation getExpectedTypeRelation() const { return TypeDistance; }
 
-  NotRecommendedReason getNotRecommendedReason() const {
+  /// Get the contextual not-recommended reason. This disregards context-free
+  /// not recommended reasons.
+  ContextualNotRecommendedReason getContextualNotRecommendedReason() const {
     return NotRecommended;
+  }
+
+  /// Return the contextual not recommended reason if there is one. If there is
+  /// no contextual not recommended reason, return the context-free not
+  /// recommended reason.
+  NotRecommendedReason getNotRecommendedReason() const {
+    switch (NotRecommended) {
+    case ContextualNotRecommendedReason::None:
+      switch (getContextFreeResult().getNotRecommendedReason()) {
+      case ContextFreeNotRecommendedReason::None:
+        return NotRecommendedReason::None;
+      case ContextFreeNotRecommendedReason::Deprecated:
+        return NotRecommendedReason::Deprecated;
+      case ContextFreeNotRecommendedReason::SoftDeprecated:
+        return NotRecommendedReason::SoftDeprecated;
+      }
+    case ContextualNotRecommendedReason::RedundantImport:
+      return NotRecommendedReason::RedundantImport;
+    case ContextualNotRecommendedReason::RedundantImportIndirect:
+      return NotRecommendedReason::RedundantImportIndirect;
+    case ContextualNotRecommendedReason::InvalidAsyncContext:
+      return NotRecommendedReason::InvalidAsyncContext;
+    case ContextualNotRecommendedReason::CrossActorReference:
+      return NotRecommendedReason::CrossActorReference;
+    case ContextualNotRecommendedReason::VariableUsedInOwnDefinition:
+      return NotRecommendedReason::VariableUsedInOwnDefinition;
+    }
   }
 
   SemanticContextKind getSemanticContext() const { return SemanticContext; }
@@ -902,42 +1052,56 @@ public:
   }
 
   CodeCompletionString *getCompletionString() const {
-    return CompletionString;
+    return getContextFreeResult().getCompletionString();
   }
 
-  StringRef getModuleName() const { return ModuleName; }
+  StringRef getModuleName() const {
+    return getContextFreeResult().getModuleName();
+  }
 
   StringRef getBriefDocComment() const {
-    return BriefDocComment;
+    return getContextFreeResult().getBriefDocComment();
   }
 
   ArrayRef<StringRef> getAssociatedUSRs() const {
-    return AssociatedUSRs;
+    return getContextFreeResult().getAssociatedUSRs();
   }
 
-  void setDiagnostics(CodeCompletionDiagnosticSeverity severity, StringRef message) {
-    DiagnosticSeverity = severity;
-    DiagnosticMessage = message;
-  }
-
-  CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
+  /// Get the contextual diagnostic severity. This disregards context-free
+  /// diagnostics.
+  CodeCompletionDiagnosticSeverity getContextualDiagnosticSeverity() const {
     return DiagnosticSeverity;
   }
 
+  /// Get the contextual diagnostic message. This disregards context-free
+  /// diagnostics.
+  StringRef getContextualDiagnosticMessage() const { return DiagnosticMessage; }
+
+  /// Return the contextual diagnostic severity if there was a contextual
+  /// diagnostic. If there is no contextual diagnostic, return the context-free
+  /// diagnostic severity.
+  CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
+    if (NotRecommended != ContextualNotRecommendedReason::None) {
+      return DiagnosticSeverity;
+    } else {
+      return getContextFreeResult().getDiagnosticSeverity();
+    }
+  }
+
+  /// Return the contextual diagnostic message if there was a contextual
+  /// diagnostic. If there is no contextual diagnostic, return the context-free
+  /// diagnostic message.
   StringRef getDiagnosticMessage() const {
-    return DiagnosticMessage;
+    if (NotRecommended != ContextualNotRecommendedReason::None) {
+      return DiagnosticMessage;
+    } else {
+      return getContextFreeResult().getDiagnosticMessage();
+    }
   }
 
   /// Print a debug representation of the code completion result to \p OS.
   void printPrefix(raw_ostream &OS) const;
   SWIFT_DEBUG_DUMP;
-
-  static CodeCompletionDeclKind getCodeCompletionDeclKind(const Decl *D);
-  static CodeCompletionOperatorKind
-  getCodeCompletionOperatorKind(StringRef name);
-  static CodeCompletionOperatorKind
-  getCodeCompletionOperatorKind(CodeCompletionString *str);
-  static bool getDeclIsSystem(const Decl *D);
 };
 
 struct CodeCompletionResultSink {
@@ -1116,14 +1280,6 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
                                            ArrayRef<std::string> accessPath,
                                            bool needLeadingDot,
                                            const SourceFile *SF);
-
-/// Copy code completion results from \p sourceSink to \p targetSink, possibly
-/// restricting by \p onlyTypes. Returns copied results in \p targetSink.
-MutableArrayRef<CodeCompletionResult *>
-copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
-                          CodeCompletionResultSink &sourceSink,
-                          bool onlyTypes,
-                          bool onlyPrecedenceGroups);
 
 } // end namespace ide
 } // end namespace swift

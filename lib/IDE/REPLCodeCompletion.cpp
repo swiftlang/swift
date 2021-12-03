@@ -121,7 +121,7 @@ static void toDisplayString(CodeCompletionResult *Result,
     }
     if (C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) ||
         C.is(CodeCompletionString::Chunk::ChunkKind::TypeAnnotationBegin)) {
-      if (Result->getKind() == CodeCompletionResult::ResultKind::Declaration) {
+      if (Result->getKind() == CodeCompletionResultKind::Declaration) {
         switch (Result->getAssociatedDeclKind()) {
         case CodeCompletionDeclKind::Module:
         case CodeCompletionDeclKind::PrecedenceGroup:
