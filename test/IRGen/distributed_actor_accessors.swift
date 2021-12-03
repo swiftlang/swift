@@ -70,6 +70,69 @@ public distributed actor MyActor {
   }
 }
 
+@available(SwiftStdlib 5.6, *)
+public distributed actor MyOtherActor {
+  public typealias Transport = AnyActorTransport
+
+  distributed func empty() {
+  }
+}
+
+
+/// ---> Let's check that distributed accessors and thunks are emitted as accessible functions
+
+/// -> `MyActor.simple1`
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTEHF" = private constant
+// CHECK-SAME: @"symbolic Si___________pIetMHygzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTETF"
+// CHECK-SAME: , section "__TEXT, __swift5_acfunc, regular"
+
+/// -> `MyActor.simple2`
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTEHF" = private constant
+// CHECK-SAME: @"symbolic Si_____SS______pIetMHygozo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETF"
+// CHECK-SAME: , section "__TEXT, __swift5_acfunc, regular"
+
+/// -> `MyActor.simple3`
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTEHF" = private constant
+// CHECK-SAME: @"symbolic SS_____Si______pIetMHggdzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTETF"
+// CHECK-SAME: , section "__TEXT, __swift5_acfunc, regular"
+
+/// -> `MyActor.single_case_enum`
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTEHF" = private constant
+// CHECK-SAME: @"symbolic __________AA______pIetMHygdzo_ 27distributed_actor_accessors7SimpleEO AA7MyActorC s5ErrorP"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTETF"
+// CHECK-SAME: , section "__TEXT, __swift5_acfunc, regular"
+
+/// -> `MyActor.with_indirect_enums`
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitFTEHF" = private constant
+// CHECK-SAME: @"symbolic _____Si_____AA______pIetMHgygozo_ 27distributed_actor_accessors9IndirectEO AA7MyActorC s5ErrorP"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitFTETF"
+// CHECK-SAME: , section "__TEXT, __swift5_acfunc, regular"
+
+/// -> `MyActor.complex`
+// CHECK:      @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTEHF" = private constant
+// CHECK-SAME: @"symbolic SaySiG_____SSSg__________AD______pIetMHgggngrzo_ 27distributed_actor_accessors3ObjC AA11LargeStructV AA7MyActorC s5ErrorP"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTETF"
+// CHECK-SAME: , section "__TEXT, __swift5_acfunc, regular"
+
+/// -> `MyOtherActor.empty`
+// CHECK:      @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTEHF" = private constant
+// CHECK-SAME: @"symbolic ___________pIetMHgzo_ 27distributed_actor_accessors12MyOtherActorC s5ErrorP"
+// CHECK-SAME: @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETF"
+// CHECK-SAME: , section "__TEXT, __swift5_acfunc, regular"
+
+// CHECK:      @llvm.used = appending global [{{.*}} x i8*] [
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTEHF"
+// CHECK-SAME: ], section "llvm.metadata"
+
 /// ---> Thunk and distributed method accessor for `simple1`
 
 /// Let's make sure that accessor loads the data from the buffer and calls expected accessor

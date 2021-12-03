@@ -401,6 +401,10 @@ public:
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
 
+  /// Emit type metadata recrods for functions that can be looked up by name at
+  /// runtime.
+  void emitAccessibleFunctions();
+
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.
   void emitBuiltinReflectionMetadata();
@@ -1037,11 +1041,14 @@ public:
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
+  void addAccessibleFunction(SILFunction *func,
+                             llvm::Function *thunk = nullptr);
 
   llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
   llvm::Constant *emitProtocolConformances(bool asContiguousArray);
   llvm::Constant *emitTypeMetadataRecords(bool asContiguousArray);
-  llvm::Constant *emitFieldDescriptors();
+
+  void emitAccessibleFunctions();
 
   llvm::Constant *getConstantSignedFunctionPointer(llvm::Constant *fn,
                                                    CanSILFunctionType fnType);
@@ -1170,6 +1177,11 @@ private:
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
+  /// List of all of the functions, which can be lookup by name
+  /// up at runtime. Second element is an optional "accessor" thunk
+  /// to call the given function through.
+  SmallVector<std::pair<SILFunction *, llvm::Function *>, 4>
+      AccessibleFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.

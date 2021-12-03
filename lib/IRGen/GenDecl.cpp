@@ -1272,6 +1272,11 @@ void IRGenerator::emitTypeMetadataRecords() {
   }
 }
 
+void IRGenerator::emitAccessibleFunctions() {
+  for (auto &m : *this)
+    m.second->emitAccessibleFunctions();
+}
+
 static void
 deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRecords(
     IRGenModule &IGM, CanType typeWithCanonicalMetadataPrespecialization,
@@ -3889,6 +3894,11 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
   ProtocolConformances.push_back(std::move(record));
 }
 
+void IRGenModule::addAccessibleFunction(SILFunction *func,
+                                        llvm::Function *thunk) {
+  AccessibleFunctions.push_back({func, thunk});
+}
+
 /// Emit the protocol conformance list and return it (if asContiguousArray is
 /// true, otherwise the records are emitted as individual globals and
 /// nullptr is returned).
@@ -4088,6 +4098,80 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
   }
 
   return nullptr;
+}
+
+void IRGenModule::emitAccessibleFunctions() {
+  if (AccessibleFunctions.empty())
+    return;
+
+  StringRef sectionName;
+  switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::GOFF:
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("Don't know how to emit accessible functions for "
+                     "the selected object format.");
+  case llvm::Triple::MachO:
+    sectionName = "__TEXT, __swift5_acfunc, regular";
+    break;
+  case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
+    sectionName = "swift5_accessible_functions";
+    break;
+  case llvm::Triple::XCOFF:
+  case llvm::Triple::COFF:
+    sectionName = ".sw5acfn$B";
+    break;
+  }
+
+  for (const auto &entry : AccessibleFunctions) {
+    SILFunction *func = entry.first;
+    llvm::Function *thunk = entry.second;
+
+    auto mangledRecordName =
+        LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
+
+    auto var = new llvm::GlobalVariable(
+        Module, AccessibleFunctionRecordTy, /*isConstant*/ true,
+        llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
+        mangledRecordName);
+
+    std::string mangledFunctionName =
+        LinkEntity::forSILFunction(func).mangleAsString();
+    llvm::Constant *name = getAddrOfGlobalString(
+        mangledFunctionName, /*willBeRelativelyAddressed*/ true);
+    llvm::Constant *relativeName = emitDirectRelativeReference(name, var, {});
+
+    GenericSignature signature;
+    if (auto *env = func->getGenericEnvironment()) {
+      signature = env->getGenericSignature();
+    }
+
+    llvm::Constant *type = getTypeRef(func->getLoweredFunctionType(), signature,
+                                      MangledTypeRefRole::Metadata)
+                               .first;
+    llvm::Constant *relativeType = emitDirectRelativeReference(type, var, {1});
+
+    llvm::Function *funcAddr =
+        thunk ? thunk : getAddrOfSILFunction(func, NotForDefinition);
+    llvm::Constant *relativeFuncAddr =
+        emitDirectRelativeReference(funcAddr, var, {2});
+
+    AccessibleFunctionFlags flagsVal;
+    flagsVal.setDistributed(func->isDistributed());
+
+    llvm::Constant *flags =
+        llvm::ConstantInt::get(Int32Ty, flagsVal.getOpaqueValue());
+
+    llvm::Constant *recordFields[] = {relativeName, relativeType,
+                                      relativeFuncAddr, flags};
+    auto record =
+        llvm::ConstantStruct::get(AccessibleFunctionRecordTy, recordFields);
+    var->setInitializer(record);
+    var->setSection(sectionName);
+    var->setAlignment(llvm::MaybeAlign(4));
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
+  }
 }
 
 /// Fetch a global reference to a reference to the given Objective-C class.

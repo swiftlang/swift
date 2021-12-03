@@ -2199,9 +2199,12 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.noteSwiftAsyncFunctionDef();
   }
 
-  // Generate accessor thunk for the `distributed` method.
+  // Emit distributed accessor, and mark the thunk as accessible
+  // by name at runtime through it.
   if (CurSILFn->isDistributed() && CurSILFn->isThunk()) {
     IGM.emitDistributedMethodAccessor(CurSILFn);
+    IGM.addAccessibleFunction(CurSILFn, IGM.getAddrOfDistributedMethodAccessor(
+                                            CurSILFn, NotForDefinition));
   }
 
   // Configure the dominance resolver.
