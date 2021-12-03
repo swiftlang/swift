@@ -1562,7 +1562,7 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
   using TargetValueMetadata<Runtime>::TargetValueMetadata;
 
-  const TargetEnumDescriptor<Runtime> *getDescription() const {
+  const swift::TargetEnumDescriptor<Runtime> *getDescription() const {
     return llvm::cast<TargetEnumDescriptor<Runtime>>(this->Description);
   }
 
@@ -1615,6 +1615,14 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
       return false;
 
     return trailingFlags->isCanonicalStaticSpecialization();
+  }
+
+  bool hasSpareBits() const {
+    return getDescription()->hasSpareBits();
+  }
+
+  size_t getEnumSpareBits() const {
+    return getDescription()->getEnumSpareBits();
   }
 
   const MetadataTrailingFlags *getTrailingFlags() const {
@@ -4821,8 +4829,9 @@ public:
   size_t getEnumSpareBits() const {
     assert(hasSpareBits());
     auto header = *this->template getTrailingObjects<EnumSpareBitsHeader>();
-    size_t length = header.bytes;
-    EnumSpareBitsChunk *chunks = this->template getTrailingObjects<EnumSpareBitsChunk>();
+    size_t length = header.bytesCount;
+//    EnumSpareBitsChunk *chunks = this->template getTrailingObjects<EnumSpareBitsChunk>();
+    auto chunks = this->template getTrailingObjects<EnumSpareBitsChunk>();
     // TODO: Convert mask data into some sort of SpareBits object
 
     return length;

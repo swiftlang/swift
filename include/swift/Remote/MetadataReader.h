@@ -32,7 +32,7 @@
 
 #include <vector>
 #include <unordered_map>
-
+#include <iostream>
 #include <inttypes.h>
 
 namespace swift {
@@ -781,9 +781,17 @@ public:
     case MetadataKind::Class:
       return readNominalTypeFromClassMetadata(Meta, skipArtificialSubclasses);
     case MetadataKind::Struct:
-    case MetadataKind::Enum:
     case MetadataKind::Optional:
       return readNominalTypeFromMetadata(Meta);
+    case MetadataKind::Enum: {
+      auto d = readNominalTypeFromMetadata(Meta);
+      auto enumMeta = cast<TargetEnumMetadata<Runtime>>(Meta);
+//      auto hasSpareBits = enumMeta->hasSpareBits();
+      //     auto spareBitsLength = enumMeta->getEnumSpareBits();
+      // 
+      //
+      return d;
+    }
     case MetadataKind::Tuple: {
       auto tupleMeta = cast<TargetTupleTypeMetadata<Runtime>>(Meta);
 
@@ -1020,12 +1028,24 @@ public:
     auto buffer = (uint8_t *)nullptr;
     unsigned available = 0; // Size of data in buffer
 
-    // In the first read, just grab the initial flag value...
-    unsigned sizeEstimate = sizeof(ContextDescriptorFlags);
+    // We get a big perf win by reading more data initially,
+    // but we don't want to overrun a page.  Here's a conservative
+    // guess of how much space is left in the page.
+    unsigned long spaceInPage = 256UL - (address & 0xff);
+
+    // TODO: Some clients (`heap`) map an entire VM region; for
+    // those clients, it would be best to just tell them the
+    // starting remote address and have them tell us the local
+    // address and number of available bytes.  That would always
+    // obtain the entire descriptor with a single `readBytes` call.
+
+    // Initial read:  At least enough to get all the flags.  More if we can.
+    unsigned sizeEstimate = std::max(sizeof(ContextDescriptorFlags), spaceInPage);
     while (available < sizeEstimate) {
       // The first `available` bytes have already been read, so grow
-      // the buffer and read more bytes to fulfill `sizeEstimate`
-      auto newbuffer = (uint8_t *)realloc(buffer, sizeEstimate);
+      // the buffer and read at least enough bytes to fulfill `sizeEstimate`
+      auto newSize = sizeEstimate;
+      auto newbuffer = (uint8_t *)realloc(buffer, newSize);
       if (!newbuffer) {
         free(buffer);
         return nullptr;
@@ -1033,11 +1053,11 @@ public:
       buffer = newbuffer;
       if (!Reader->readBytes(RemoteAddress(address + available),
                              buffer + available,
-                             sizeEstimate - available)) {
+                             newSize - available)) {
         free(buffer);
         return nullptr;
       }
-      available = sizeEstimate;
+      available = newSize;
 
       // Based on the data so far, update our guess of the full descriptor size.
 
@@ -1053,7 +1073,7 @@ public:
         break;
 
       // For types that use trailing objects, ask the trailing object logic to
-      // look at what we have so far and tell us whether we're done or not.
+      // estimate the total size based on what we have so far.
       case ContextDescriptorKind::Extension: {
         sizeEstimate = TargetExtensionContextDescriptor<Runtime>::totalSizeOfPartialObject(buffer, available);
         break;
@@ -1085,13 +1105,26 @@ public:
 
       // We don't know about this kind of context.
       default:
+        free(buffer);
         return nullptr;
       }
     }
 
     // After exiting loop above, `sizeEstimate` is the true size of the
-    // descriptor with all trailing objects and buffer holds at least that much
-    // data.
+    // descriptor with all trailing objects and buffer holds `available` bytes
+    // (which is at least as large as `sizeEstimate`)
+
+    // If we're significantly over-allocated, copy to a more
+    // appropriately-sized buffer.
+    if (sizeEstimate < (available - available / 4)) {
+      auto newbuffer = (uint8_t *)malloc(sizeEstimate);
+      if (newbuffer != nullptr) {
+        memcpy(newbuffer, buffer, sizeEstimate);
+        free(buffer);
+        buffer = newbuffer;
+        available = sizeEstimate;
+      }
+    }
 
     // Insert the final object into the descriptor cache and return it
     OwnedContextDescriptorRef readResult(buffer);

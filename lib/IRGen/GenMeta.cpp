@@ -1518,7 +1518,7 @@ namespace {
 
     bool needsSpareBitMask() const {
       // TODO: Fix this
-      return false;
+      return true;
     }
 
     
@@ -1599,6 +1599,8 @@ namespace {
     void maybeAddSpareBitMask() {
       if (needsSpareBitMask()) {
         // TODO: Add spare bit mask data
+	B.addInt32(4); // Number of bytes in mask
+	B.addInt32(0x11223300); // First 32 bits of mask
       }
     }
   };
@@ -4834,6 +4836,7 @@ namespace {
       if (hasTrailingFlags()) {
         init.addInt64(0);
       }
+      // TODO: Add spare bits if appropriate
       Size structSize = init.getNextOffsetFromGlobal();
 
       auto global = init.finishAndCreateGlobal("", IGM.getPointerAlignment(),

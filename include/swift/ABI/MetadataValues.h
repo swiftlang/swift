@@ -1458,7 +1458,11 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     Class_HasVTable = 15,
 
     /// Set if the context descriptor includes a spare bit mask
-    Enum_HasSpareBits = 9
+    Enum_HasSpareBits = 9,
+
+    /// Set if this is a "simple" Multi-payload enum that uses
+    /// a trailing tag to discriminate cases (no XIs or spare bits)
+    Enum_SimpleMPE = 10
   };
 
 public:
@@ -1529,6 +1533,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Enum_HasSpareBits,
                                 enum_hasSpareBits,
                                 enum_setHasSpareBits)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Enum_SimpleMPE,
+                                enum_simpleMPE,
+                                enum_setSimpleMPE)
 };
 
 /// Extra flags for resilient classes, since we need more than 16 bits of
