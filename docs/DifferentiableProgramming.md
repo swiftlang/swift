@@ -936,7 +936,7 @@ derivative values.
 ```swift
 // In the standard library:
 //
-//     func derivative<T: FloatingPoint, R>(
+//     func gradient<T: FloatingPoint, R>(
 //         of body: @escaping @differentiable (T) -> R
 //     ) -> (T) -> R where T.TangentVector: FloatingPoint
 
@@ -944,7 +944,7 @@ derivative values.
 func f(_ x: Float) -> Float {
     x * x
 }
-let dfdx = derivative(of: f)
+let dfdx = gradient(of: f)
 dfdx(3) // 6
 ```
 
