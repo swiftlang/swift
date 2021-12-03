@@ -132,6 +132,9 @@ public:
 
   friend bool operator==(const ActorIsolation &lhs,
                          const ActorIsolation &rhs) {
+    if (lhs.isGlobalActor() && rhs.isGlobalActor())
+      return areTypesEqual(lhs.globalActor, rhs.globalActor);
+
     if (lhs.kind != rhs.kind)
       return false;
 
@@ -146,7 +149,7 @@ public:
 
     case GlobalActor:
     case GlobalActorUnsafe:
-      return areTypesEqual(lhs.globalActor, rhs.globalActor);
+      llvm_unreachable("Global actors handled above");
     }
   }
 
