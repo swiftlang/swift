@@ -178,6 +178,13 @@ set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
 # End of user-configurable options.
 #
 
+# Remove llvm-project/llvm/include directory from -I search part when building
+# the stdlib. We have our own fork of LLVM includes (Support, ADT) in
+# stdlib/include/llvm and we don't want to silently use headers from LLVM.
+get_property(stdlib_include_directories DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
+list(REMOVE_ITEM stdlib_include_directories "${LLVM_MAIN_INCLUDE_DIR}")
+set_property(DIRECTORY PROPERTY INCLUDE_DIRECTORIES ${stdlib_include_directories})
+
 include(AddSwiftStdlib)
 
 # Create convenience targets for the Swift standard library.

@@ -108,6 +108,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH]]([[T0:%.*]] : @owned $Cat):
 // CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [lexical] [[T0]]
+// CHECK-NEXT: debug_value [[BORROWED_T0]] : $Cat
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK-NEXT: end_borrow [[BORROWED_T0]]
 // CHECK-NEXT: destroy_value [[T0]]

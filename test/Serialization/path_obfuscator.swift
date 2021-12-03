@@ -1,3 +1,4 @@
+// REQUIRES: VENDOR=apple
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t.module-cache)
 // RUN: %target-swift-frontend -emit-module -o %t/Foo.swiftmodule %s -parse-as-library -serialized-path-obfuscate /FOO=/CHANGED_FOO -serialized-path-obfuscate /BAR=/CHANGED_BAR -I /FOO/contents -I /BAR/contents -module-name Foo -serialize-debugging-options

@@ -398,22 +398,12 @@ NOTE(generic_parameter_inferred_from_result_context,none,
 ERROR(cannot_pass_type_to_non_ephemeral,none,
       "cannot pass %0 to parameter; argument %1 must be a pointer that "
       "outlives the call%select{| to %3}2", (Type, StringRef, bool, DeclName))
-WARNING(cannot_pass_type_to_non_ephemeral_warning,none,
-        "passing %0 to parameter, but argument %1 should be a pointer that "
-        "outlives the call%select{| to %3}2", (Type, StringRef, bool, DeclName))
 ERROR(cannot_use_inout_non_ephemeral,none,
       "cannot use inout expression here; argument %0 must be a pointer that "
       "outlives the call%select{| to %2}1", (StringRef, bool, DeclName))
-WARNING(cannot_use_inout_non_ephemeral_warning,none,
-        "inout expression creates a temporary pointer, but argument %0 should "
-        "be a pointer that outlives the call%select{| to %2}1",
-        (StringRef, bool, DeclName))
 ERROR(cannot_construct_dangling_pointer,none,
       "initialization of %0 results in a dangling %select{|buffer }1pointer",
       (Type, unsigned))
-WARNING(cannot_construct_dangling_pointer_warning,none,
-        "initialization of %0 results in a dangling %select{|buffer }1pointer",
-        (Type, unsigned))
 NOTE(ephemeral_pointer_argument_conversion_note,none,
      "implicit argument conversion from %0 to %1 produces a pointer valid only "
      "for the duration of the call%select{| to %3}2",
@@ -1881,9 +1871,6 @@ WARNING(spi_attribute_on_import_of_public_module,none,
         (DeclName, StringRef))
 
 // Opaque return types
-ERROR(structural_opaque_types_are_experimental,none,
-      "'opaque' types cannot be nested inside other types; "
-      "structural 'opaque' types are an experimental feature", ())
 ERROR(opaque_type_invalid_constraint,none,
       "an 'opaque' type must specify only 'Any', 'AnyObject', protocols, "
       "and/or a base class", ())
@@ -4878,6 +4865,10 @@ ERROR(opaque_type_unsupported_pattern,none,
 ERROR(opaque_type_in_protocol_requirement,none,
       "'some' type cannot be the return type of a protocol requirement; did you mean to add an associated type?",
       ())
+ERROR(opaque_type_in_parameter,none,
+      "'some' cannot appear in parameter position in result "
+      "type %0",
+      (Type))
 
 // Function differentiability
 ERROR(attr_only_on_parameters_of_differentiable,none,

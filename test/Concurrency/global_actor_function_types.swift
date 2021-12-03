@@ -16,7 +16,7 @@ struct OtherGlobalActor {
 func testConversions(f: @escaping @SomeGlobalActor (Int) -> Void, g: @escaping (Int) -> Void) {
   let _: Int = f // expected-error{{cannot convert value of type '@SomeGlobalActor (Int) -> Void' to specified type 'Int'}}
 
-  let _: (Int) -> Void = f // expected-error{{converting function value of type '@SomeGlobalActor (Int) -> Void' to '(Int) -> Void' loses global actor 'SomeGlobalActor'}}
+  let _: (Int) -> Void = f // expected-warning{{converting function value of type '@SomeGlobalActor (Int) -> Void' to '(Int) -> Void' loses global actor 'SomeGlobalActor'}}
   let _: @SomeGlobalActor (Int) -> Void = g // okay
 
   // FIXME: this could be better.
@@ -119,7 +119,7 @@ func testTypesNonConcurrencyContext() { // expected-note{{add '@SomeGlobalActor'
   let f1 = onSomeGlobalActor // expected-note{{calls to let 'f1' from outside of its actor context are implicitly asynchronous}}
   let f2 = onSomeGlobalActorUnsafe
 
-  let _: () -> Int = f1 // expected-error{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+  let _: () -> Int = f1 // expected-warning{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
   let _: () -> Int = f2
 
   _ = f1() // expected-error{{call to global actor 'SomeGlobalActor'-isolated let 'f1' in a synchronous nonisolated context}}

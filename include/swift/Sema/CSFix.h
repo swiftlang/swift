@@ -650,9 +650,9 @@ class ContextualMismatch : public ConstraintFix {
   Type LHS, RHS;
 
   ContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                     ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
-        RHS(rhs) {}
+                     ConstraintLocator *locator, bool warning)
+      : ConstraintFix(cs, FixKind::ContextualMismatch, locator, warning),
+        LHS(lhs), RHS(rhs) {}
 
 protected:
   ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
@@ -741,9 +741,9 @@ public:
 /// Mark function type as being part of a global actor.
 class MarkGlobalActorFunction final : public ContextualMismatch {
   MarkGlobalActorFunction(ConstraintSystem &cs, Type lhs, Type rhs,
-                         ConstraintLocator *locator)
+                         ConstraintLocator *locator, bool warning)
       : ContextualMismatch(cs, FixKind::MarkGlobalActorFunction, lhs, rhs,
-                           locator) {
+                           locator, warning) {
   }
 
 public:
@@ -752,7 +752,8 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static MarkGlobalActorFunction *create(ConstraintSystem &cs, Type lhs,
-                                         Type rhs, ConstraintLocator *locator);
+                                         Type rhs, ConstraintLocator *locator,
+                                         bool warning);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::MarkGlobalActorFunction;
@@ -787,9 +788,10 @@ public:
 /// function types, repair it by adding @Sendable attribute.
 class AddSendableAttribute final : public ContextualMismatch {
   AddSendableAttribute(ConstraintSystem &cs, FunctionType *fromType,
-                       FunctionType *toType, ConstraintLocator *locator)
+                       FunctionType *toType, ConstraintLocator *locator,
+                       bool warning)
       : ContextualMismatch(cs, FixKind::AddSendableAttribute, fromType, toType,
-                           locator) {
+                           locator, warning) {
     assert(fromType->isSendable() != toType->isSendable());
   }
 
@@ -801,7 +803,8 @@ public:
   static AddSendableAttribute *create(ConstraintSystem &cs,
                                       FunctionType *fromType,
                                       FunctionType *toType,
-                                      ConstraintLocator *locator);
+                                      ConstraintLocator *locator,
+                                      bool warning);
 
   static bool classof(ConstraintFix *fix) {
     return fix->getKind() == FixKind::AddSendableAttribute;

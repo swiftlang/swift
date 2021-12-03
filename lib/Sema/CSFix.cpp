@@ -201,39 +201,41 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
 bool MarkGlobalActorFunction::diagnose(const Solution &solution,
                                       bool asNote) const {
   DroppedGlobalActorFunctionAttr failure(
-      solution, getFromType(), getToType(), getLocator());
+      solution, getFromType(), getToType(), getLocator(), isWarning());
   return failure.diagnose(asNote);
 }
 
 MarkGlobalActorFunction *
 MarkGlobalActorFunction::create(ConstraintSystem &cs, Type lhs, Type rhs,
-                               ConstraintLocator *locator) {
+                               ConstraintLocator *locator, bool warning) {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
     locator = cs.getConstraintLocator(
         locator, LocatorPathElt::ArgumentAttribute::forGlobalActor());
 
-  return new (cs.getAllocator()) MarkGlobalActorFunction(cs, lhs, rhs, locator);
+  return new (cs.getAllocator()) MarkGlobalActorFunction(
+      cs, lhs, rhs, locator, warning);
 }
 
 bool AddSendableAttribute::diagnose(const Solution &solution,
                                       bool asNote) const {
   AttributedFuncToTypeConversionFailure failure(
       solution, getFromType(), getToType(), getLocator(),
-      AttributedFuncToTypeConversionFailure::Concurrent);
+      AttributedFuncToTypeConversionFailure::Concurrent, isWarning());
   return failure.diagnose(asNote);
 }
 
 AddSendableAttribute *
 AddSendableAttribute::create(ConstraintSystem &cs,
-                               FunctionType *fromType,
-                               FunctionType *toType,
-                               ConstraintLocator *locator) {
+                             FunctionType *fromType,
+                             FunctionType *toType,
+                             ConstraintLocator *locator,
+                             bool warning) {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
     locator = cs.getConstraintLocator(
         locator, LocatorPathElt::ArgumentAttribute::forConcurrent());
 
   return new (cs.getAllocator()) AddSendableAttribute(
-      cs, fromType, toType, locator);
+      cs, fromType, toType, locator, warning);
 }
 bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {
   LabelingFailure failure(solution, getLocator(), getLabels());
@@ -369,7 +371,8 @@ bool ContextualMismatch::diagnoseForAmbiguity(
 ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {
-  return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
+  return new (cs.getAllocator()) ContextualMismatch(
+      cs, lhs, rhs, locator, /*warning=*/false);
 }
 
 bool AllowWrappedValueMismatch::diagnose(const Solution &solution, bool asError) const {
