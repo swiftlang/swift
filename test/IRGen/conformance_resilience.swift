@@ -22,7 +22,7 @@ public func getConformance<T>(_ w: Wrapper<T>) {
 public func getConformance(_ w: ConcreteWrapper) {
   // CHECK: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s18resilient_protocol15ConcreteWrapperVMa"([[INT]] 0)
   // CHECK: [[META:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
-  // CHECK: call swiftcc void @"$s22conformance_resilience14useConformanceyyx18resilient_protocol22OtherResilientProtocolRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* [[META]], i8** @"$s18resilient_protocol15ConcreteWrapperVAA22OtherResilientProtocolAAWP")
+  // CHECK: call swiftcc void @"$s22conformance_resilience14useConformanceyyx18resilient_protocol22OtherResilientProtocolRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* [[META]], i8** {{%[0-9]+|@"\$s18resilient_protocol15ConcreteWrapperVAA22OtherResilientProtocolAAWP"}})
   // CHECK: ret void
   useConformance(w)
 }

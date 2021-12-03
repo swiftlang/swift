@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/sil_witness_tables_external_conformance.swift
-// RUN: %target-swift-frontend -I %t -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -primary-file %s -emit-ir | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-import-type
 
 // REQUIRES: CPU=x86_64
 
@@ -36,7 +36,7 @@ struct Conformer: Q, QQ {
   func qMethod() {}
 }
 
-// CHECK: [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE:@"\$s39sil_witness_tables_external_conformance17ExternalConformerVAA0F1PAAWP"]] = external{{( dllimport)?}} global i8*, align 8
+// CHECK-DIRECT: [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE:@"\$s39sil_witness_tables_external_conformance17ExternalConformerVAA0F1PAAWP"]] = external{{( dllimport)?}} global i8*, align 8
 // CHECK: [[CONFORMER_Q_WITNESS_TABLE:@"\$s18sil_witness_tables9ConformerVAA1QAAWP"]] = hidden constant [3 x i8*] [
 // CHECK:   i8* bitcast ([5 x i8*]* [[CONFORMER_P_WITNESS_TABLE:@"\$s18sil_witness_tables9ConformerVAA1PAAWP"]] to i8*),
 // CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @"$s18sil_witness_tables9ConformerVAA1QA2aDP7qMethod{{[_0-9a-zA-Z]*}}FTW" to i8*)
@@ -66,7 +66,8 @@ func erasure(c: Conformer) -> QQ {
 
 // CHECK-LABEL: define hidden swiftcc void @"$s18sil_witness_tables15externalErasure1c0a1_b1_c1_D12_conformance9ExternalP_pAD0G9ConformerV_tF"(%T39sil_witness_tables_external_conformance9ExternalPP* noalias nocapture sret({{.*}}) %0)
 // CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %T39sil_witness_tables_external_conformance9ExternalPP, %T39sil_witness_tables_external_conformance9ExternalPP* %0, i32 0, i32 2
-// CHECK-NEXT:    store i8** [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE]], i8*** %2, align 8
+// CHECK-DIRECT-NEXT:    store i8** [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE]], i8*** %2, align 8
+// CHECK-INDIRECT-NEXT:    store i8** %2, i8*** %3, align 8
 func externalErasure(c: ExternalConformer) -> ExternalP {
   return c
 }

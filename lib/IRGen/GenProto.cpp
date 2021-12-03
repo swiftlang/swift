@@ -910,6 +910,12 @@ static bool isDependentConformance(
   if (!conformance)
     return false;
 
+  if (IGM.getOptions().LazyInitializeProtocolConformances) {
+    const auto *MD = rootConformance->getDeclContext()->getParentModule();
+    if (MD != IGM.getSwiftModule())
+      return true;
+  }
+
   // Check whether we've visited this conformance already.  If so,
   // optimistically assume it's fine --- we want the maximal fixed point.
   if (!visited.insert(conformance).second)
