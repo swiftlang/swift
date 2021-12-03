@@ -5,7 +5,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: linux
 
-// REQUIRES: rdar_CodaFi
+// REQUIRES: rdar86028226
 
 struct Boom: Error {}
 
