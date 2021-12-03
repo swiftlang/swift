@@ -13,7 +13,9 @@
 #ifndef SWIFT_IDE_CODECOMPLETION_H
 #define SWIFT_IDE_CODECOMPLETION_H
 
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
@@ -697,7 +699,94 @@ enum class CodeCompletionResultKind : uint8_t {
   MAX_VALUE = BuiltinOperator
 };
 
-class CodeCompletionResult;
+/// The type returned by a code completion item. It is canonicalized and can be
+/// instantiated in different \c ASTContexts.
+class CodeCompletionResultType {
+
+  /// The USR of the type. Used to re-instantiate the type in different \c
+  /// ASTContexts.
+  std::string USR;
+
+  /// If a type has already been computed from the USR, it is cached here.
+  Type Ty;
+
+  /// The \c ASTContext in which \c Ty lives. Must be stored separately from
+  /// \c Ty because the \c ASTContext in which \c Ty lives might get destroyed,
+  /// thus making the pointer inside \c Ty invalid.
+  ASTContext *ContextOfTy;
+
+  /// Maps USRs to \c CodeCompletionResultTypes that have already been
+  /// constructed.
+  static llvm::StringMap<CodeCompletionResultType *> USRCache;
+
+  /// Maps Types to \c CodeCompletionResultTypes that have already been
+  /// constructed.
+  static llvm::DenseMap<Type, CodeCompletionResultType *> TypeCache;
+
+  CodeCompletionResultType(StringRef USR) : USR(USR) {}
+
+public:
+  /// Create an \c CodeCompletionResultType from an \c ASTContext's \c Type.
+  static CodeCompletionResultType *fromType(Type Ty) {
+    auto ResFromType = TypeCache.find(Ty);
+    if (ResFromType != TypeCache.end()) {
+      return ResFromType->second;
+    }
+    CodeCompletionResultType *Res;
+    // FIXME: We can't compute USRs for archetypes. If the type contains an
+    // archetype, create a new CodeCompletionResultType so that multiple
+    // archetypes aren't unified to the same ASTContextIndependent type.
+    // Once we round-trip via the USR, this will produce a null type.
+    if (Ty && !Ty->hasArchetype()) {
+      SmallString<32> USR;
+      llvm::raw_svector_ostream OS(USR);
+      printTypeUSR(Ty, OS);
+      Res = CodeCompletionResultType::fromUSR(USR);
+    } else {
+      Res = new CodeCompletionResultType("");
+    }
+    // We already know the Type. Cache it so it doesn't have to be recomputed.
+    Res->Ty = Ty;
+    if (Ty) {
+      Res->ContextOfTy = &Ty->getASTContext();
+    } else {
+      Res->ContextOfTy = nullptr;
+    }
+
+    TypeCache[Ty] = Res;
+
+    return Res;
+  }
+
+  /// Create a type from a USR. The USR will only get demangled once a \c Type
+  /// inside an \c ASTContext is requested using \c getType.
+  static CodeCompletionResultType *fromUSR(StringRef USR) {
+    auto ResFromUSR = USRCache.find(USR);
+    if (ResFromUSR != USRCache.end()) {
+      return ResFromUSR->second;
+    }
+    auto Res = new CodeCompletionResultType(USR);
+
+    USRCache[USR] = Res;
+    return Res;
+  }
+
+  /// Return the \c Type within the given \p Ctx.
+  Type getType(ASTContext &Ctx) {
+    if (!Ty || ContextOfTy != &Ctx) {
+      if (USR.empty()) {
+        Ty = Type();
+      } else {
+        Ty = Demangle::getTypeForMangling(Ctx, USR);
+      }
+    }
+    return Ty;
+  }
+
+  /// Return the USR of this type, which identifies the type independent of the
+  /// \c ASTContext.
+  StringRef getUSR() const { return USR; }
+};
 
 /// The parts of a \c CodeCompletionResult that are not dependent on the context
 /// it appears in and can thus be cached.
@@ -710,6 +799,13 @@ class ContextFreeCodeCompletionResult {
   StringRef ModuleName;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
+  /// The type of the element produced by the expression. Can be
+  ///  - \c nullptr if the completion result doesn't produce something that's
+  ///    valid inside an expression, e.g. a keyword
+  ///  - A null type if the completion result produces something that's valid
+  ///    inside an expression but the result type isn't known
+  ///  - A proper type if the type produced by this completion result is known.
+  CodeCompletionResultType *ResultType;
 
   ContextFreeNotRecommendedReason NotRecommended;
   CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
@@ -733,6 +829,7 @@ public:
       CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem,
       CodeCompletionString *CompletionString, StringRef ModuleName,
       StringRef BriefDocComment, ArrayRef<StringRef> AssociatedUSRs,
+      CodeCompletionResultType *ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       StringRef DiagnosticMessage)
@@ -740,7 +837,8 @@ public:
         KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
+        ResultType(ResultType), NotRecommended(NotRecommended),
+        DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage) {
     assert((NotRecommended == ContextFreeNotRecommendedReason::None) ==
                (DiagnosticSeverity == CodeCompletionDiagnosticSeverity::None) &&
@@ -766,13 +864,14 @@ public:
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, CodeCompletionString *CompletionString,
       CodeCompletionOperatorKind KnownOperatorKind, StringRef BriefDocComment,
+      CodeCompletionResultType *ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       StringRef DiagnosticMessage)
       : ContextFreeCodeCompletionResult(
             Kind, /*AssociatedKind=*/0, KnownOperatorKind,
             /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
-            BriefDocComment, /*AssociatedUSRs=*/{}, NotRecommended,
+            BriefDocComment, /*AssociatedUSRs=*/{}, ResultType, NotRecommended,
             DiagnosticSeverity, DiagnosticMessage) {}
 
   /// Constructs a \c Keyword result.
@@ -782,12 +881,14 @@ public:
   /// same \c CodeCompletionResultSink as the result itself.
   ContextFreeCodeCompletionResult(CodeCompletionKeywordKind Kind,
                                   CodeCompletionString *CompletionString,
-                                  StringRef BriefDocComment)
+                                  StringRef BriefDocComment,
+                                  CodeCompletionResultType *ResultType)
       : ContextFreeCodeCompletionResult(
             CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
             CodeCompletionOperatorKind::None, /*IsSystem=*/false,
             CompletionString, /*ModuleName=*/"", BriefDocComment,
-            /*AssociatedUSRs=*/{}, ContextFreeNotRecommendedReason::None,
+            /*AssociatedUSRs=*/{}, ResultType,
+            ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
 
   /// Constructs a \c Literal result.
@@ -796,13 +897,15 @@ public:
   /// result, typically by storing them in the same \c CodeCompletionResultSink
   /// as the result itself.
   ContextFreeCodeCompletionResult(CodeCompletionLiteralKind LiteralKind,
-                                  CodeCompletionString *CompletionString)
+                                  CodeCompletionString *CompletionString,
+                                  CodeCompletionResultType *ResultType)
       : ContextFreeCodeCompletionResult(
             CodeCompletionResultKind::Literal,
             static_cast<uint8_t>(LiteralKind), CodeCompletionOperatorKind::None,
             /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
             /*BriefDocComment=*/"",
-            /*AssociatedUSRs=*/{}, ContextFreeNotRecommendedReason::None,
+            /*AssociatedUSRs=*/{}, ResultType,
+            ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
 
   /// Constructs a \c Declaration result.
@@ -813,7 +916,7 @@ public:
   ContextFreeCodeCompletionResult(
       CodeCompletionString *CompletionString, const Decl *AssociatedDecl,
       StringRef ModuleName, StringRef BriefDocComment,
-      ArrayRef<StringRef> AssociatedUSRs,
+      ArrayRef<StringRef> AssociatedUSRs, CodeCompletionResultType *ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       StringRef DiagnosticMessage)
@@ -822,7 +925,7 @@ public:
             static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
             CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
             CompletionString, ModuleName, BriefDocComment, AssociatedUSRs,
-            NotRecommended, DiagnosticSeverity, DiagnosticMessage) {
+            ResultType, NotRecommended, DiagnosticSeverity, DiagnosticMessage) {
     assert(AssociatedDecl && "should have a decl");
   }
 
@@ -856,6 +959,8 @@ public:
 
   ArrayRef<StringRef> getAssociatedUSRs() const { return AssociatedUSRs; }
 
+  CodeCompletionResultType *getResultType() const { return ResultType; }
+
   ContextFreeNotRecommendedReason getNotRecommendedReason() const {
     return NotRecommended;
   }
@@ -884,6 +989,40 @@ public:
   getCodeCompletionOperatorKind(CodeCompletionString *str);
   static CodeCompletionDeclKind getCodeCompletionDeclKind(const Decl *D);
   static bool getDeclIsSystem(const Decl *D);
+};
+
+/// The expected contextual type(s) for code-completion.
+struct ExpectedTypeContext {
+  /// Possible types of the code completion expression.
+  llvm::SmallVector<Type, 4> possibleTypes;
+
+  /// Pre typechecked type of the expression at the completion position.
+  Type idealType;
+
+  /// Whether the `ExpectedTypes` comes from a single-expression body, e.g.
+  /// `foo({ here })`.
+  ///
+  /// Since the input may be incomplete, we take into account that the types are
+  /// only a hint.
+  bool isImplicitSingleExpressionReturn = false;
+  bool preferNonVoid = false;
+
+  bool empty() const { return possibleTypes.empty(); }
+  bool requiresNonVoid() const {
+    if (isImplicitSingleExpressionReturn)
+      return false;
+    if (preferNonVoid)
+      return true;
+    if (possibleTypes.empty())
+      return false;
+    return std::all_of(possibleTypes.begin(), possibleTypes.end(),
+                       [](Type Ty) { return !Ty->isVoid(); });
+  }
+
+  ExpectedTypeContext() = default;
+  ExpectedTypeContext(ArrayRef<Type> types, bool isImplicitSingleExprReturn)
+      : possibleTypes(types.begin(), types.end()),
+        isImplicitSingleExpressionReturn(isImplicitSingleExprReturn) {}
 };
 
 /// A single code completion result enriched with information that depend on
@@ -945,8 +1084,7 @@ private:
   static_assert(int(ExpectedTypeRelation::MAX_VALUE) < 1 << 3, "");
 
 public:
-  /// Enrich a \c ContextFreeCodeCompletionResult with the following contextual
-  /// information.
+  /// Memberwise initializer
   CodeCompletionResult(ContextFreeCodeCompletionResult ContextFree,
                        SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair, uint8_t NumBytesToErase,
@@ -959,6 +1097,19 @@ public:
         DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage), NumBytesToErase(NumBytesToErase),
         TypeDistance(TypeDistance) {}
+
+  /// Enrich a \c ContextFreeCodeCompletionResult with the following contextual
+  /// information.
+  /// This computes the type relation between the completion item and its
+  /// expected type context.
+  CodeCompletionResult(ContextFreeCodeCompletionResult ContextFree,
+                       SemanticContextKind SemanticContext,
+                       CodeCompletionFlair Flair, uint8_t NumBytesToErase,
+                       const ExpectedTypeContext &TypeContext,
+                       const DeclContext *DC,
+                       ContextualNotRecommendedReason NotRecommended,
+                       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
+                       StringRef DiagnosticMessage);
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {
     return ContextFree;

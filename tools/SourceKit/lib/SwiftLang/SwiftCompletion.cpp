@@ -910,7 +910,8 @@ static void transformAndForwardResults(
     ContextFreeCodeCompletionResult contextFreeResult(
         CodeCompletionResultKind::BuiltinOperator, completionString,
         CodeCompletionOperatorKind::None,
-        /*BriefDocComment=*/"", ContextFreeNotRecommendedReason::None,
+        /*BriefDocComment=*/"", /*ResultType=*/nullptr,
+        ContextFreeNotRecommendedReason::None,
         CodeCompletionDiagnosticSeverity::None,
         /*DiagnosticMessage=*/"");
     CodeCompletion::SwiftResult paren(

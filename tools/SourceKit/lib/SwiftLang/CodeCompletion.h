@@ -125,7 +125,6 @@ class CompletionBuilder {
   CompletionSink &sink;
   SwiftResult &current;
   bool modified = false;
-  Completion::ExpectedTypeRelation typeRelation;
   SemanticContextKind semanticContext;
   CodeCompletionFlair flair;
   CodeCompletionString *completionString;
@@ -142,11 +141,6 @@ public:
   void setModuleImportDepth(Optional<uint8_t> value) {
     assert(!value || *value <= Completion::maxModuleImportDepth);
     moduleImportDepth = value;
-  }
-
-  void setExpectedTypeRelation(Completion::ExpectedTypeRelation Relation) {
-    modified = true;
-    typeRelation = Relation;
   }
 
   void setSemanticContext(SemanticContextKind kind) {

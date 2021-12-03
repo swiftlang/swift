@@ -93,30 +93,6 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
       if (info.completionContext->typeContextKind ==
               TypeContextKind::Required &&
           result->getKind() == CodeCompletionResultKind::Declaration) {
-        // FIXME: because other-module results are cached, they will not be
-        // given a type-relation of invalid.  As a hack, we look at the text of
-        // the result type and look for 'Void'.
-        bool isVoid = false;
-        auto chunks = result->getCompletionString()->getChunks();
-        for (auto i = chunks.begin(), e = chunks.end(); i != e; ++i) {
-          using ChunkKind = ide::CodeCompletionString::Chunk::ChunkKind;
-          bool isVoid = false;
-          if (i->is(ChunkKind::TypeAnnotation)) {
-            isVoid = i->getText() == "Void";
-            break;
-          } else if (i->is(ChunkKind::TypeAnnotationBegin)) {
-            auto n = i + 1, t = i + 2;
-            isVoid =
-                // i+1 has text 'Void'.
-                n != e && n->hasText() && n->getText() == "Void" &&
-                // i+2 terminates the group.
-                (t == e || t->endsPreviousNestedGroup(i->getNestingLevel()));
-            break;
-          }
-        }
-        if (isVoid)
-          builder.setExpectedTypeRelation(
-              Completion::ExpectedTypeRelation::Invalid);
       }
     }
 
@@ -157,7 +133,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     ContextFreeCodeCompletionResult contextFreeResult(
         CodeCompletionResultKind::Pattern, completionString,
         CodeCompletionOperatorKind::None, /*BriefDocComment=*/"",
-        ContextFreeNotRecommendedReason::None,
+        /*ResultType=*/nullptr, ContextFreeNotRecommendedReason::None,
         CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     CodeCompletion::SwiftResult swiftResult(
         contextFreeResult, SemanticContextKind::Local,
@@ -1136,7 +1112,6 @@ bool LimitedResultView::walk(CodeCompletionView::Walker &walker) const {
 
 CompletionBuilder::CompletionBuilder(CompletionSink &sink, SwiftResult &base)
     : sink(sink), current(base) {
-  typeRelation = current.getExpectedTypeRelation();
   semanticContext = current.getSemanticContext();
   flair = current.getFlair();
   completionString =
@@ -1191,11 +1166,13 @@ Completion *CompletionBuilder::finish() {
           currentContextFree.getModuleName(),
           currentContextFree.getBriefDocComment(),
           currentContextFree.getAssociatedUSRs(),
+          currentContextFree.getResultType(),
           currentContextFree.getNotRecommendedReason(),
           currentContextFree.getDiagnosticSeverity(),
           currentContextFree.getDiagnosticMessage());
       base = SwiftResult(contextFreeResult, semanticContext, flair,
-                         current.getNumBytesToErase(), typeRelation,
+                         current.getNumBytesToErase(),
+                         current.getExpectedTypeRelation(),
                          current.getContextualNotRecommendedReason(),
                          current.getContextualDiagnosticSeverity(),
                          current.getContextualDiagnosticMessage());
@@ -1203,11 +1180,13 @@ Completion *CompletionBuilder::finish() {
       ContextFreeCodeCompletionResult ContextFreeResult(
           currentContextFree.getKind(), completionString, opKind,
           currentContextFree.getBriefDocComment(),
+          currentContextFree.getResultType(),
           currentContextFree.getNotRecommendedReason(),
           currentContextFree.getDiagnosticSeverity(),
           currentContextFree.getDiagnosticMessage());
       base = SwiftResult(ContextFreeResult, semanticContext, flair,
-                         current.getNumBytesToErase(), typeRelation,
+                         current.getNumBytesToErase(),
+                         current.getExpectedTypeRelation(),
                          current.getContextualNotRecommendedReason(),
                          current.getContextualDiagnosticSeverity(),
                          current.getContextualDiagnosticMessage());
