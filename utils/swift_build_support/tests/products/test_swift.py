@@ -61,6 +61,7 @@ class SwiftTestCase(unittest.TestCase):
             enable_experimental_differentiable_programming=False,
             enable_experimental_concurrency=False,
             enable_experimental_distributed=False,
+            build_swift_stdlib_static_print=False,
             enable_experimental_string_processing=False)
 
         # Setup shell
@@ -95,6 +96,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
+            '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
@@ -114,6 +116,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
+            '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
