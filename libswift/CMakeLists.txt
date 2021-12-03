@@ -34,28 +34,39 @@ else()
     set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0)
     set(b1_deps swift-frontend-bootstrapping1 symlink-headers-bootstrapping1)
     if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
-      set(b0_deps ${b0_deps} swiftCore-bootstrapping0)
-      set(b1_deps ${b1_deps} swiftCore-bootstrapping1)
+      list(APPEND b0_deps swiftCore-bootstrapping0)
+      list(APPEND b1_deps swiftCore-bootstrapping1)
       if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(b0_deps ${b0_deps} swiftSwiftOnoneSupport-bootstrapping0)
-        set(b1_deps ${b1_deps} swiftSwiftOnoneSupport-bootstrapping1)
+        list(APPEND b0_deps swiftSwiftOnoneSupport-bootstrapping0)
+        list(APPEND b1_deps swiftSwiftOnoneSupport-bootstrapping1)
       endif()
       if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-        set(b0_deps ${b0_deps} swiftDarwin-bootstrapping0)
-        set(b1_deps ${b1_deps} swiftDarwin-bootstrapping1)
+        list(APPEND b0_deps swiftDarwin-bootstrapping0)
+        list(APPEND b1_deps swiftDarwin-bootstrapping1)
       endif()
     endif()
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+      set(platform ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
+      set(compatibility_libs
+          "swiftCompatibility50-${platform}"
+          "swiftCompatibility51-${platform}"
+          "swiftCompatibilityDynamicReplacements-${platform}")
+
+      list(APPEND b0_deps ${compatibility_libs})
+      list(APPEND b1_deps ${compatibility_libs})
+    endif()
+
 
     # Bootstrapping - stage 1, using the compiler from level 0
 
-    add_libswift("libswift-bootstrapping1"
+    add_libswift(libswift-bootstrapping1
       SWIFT_EXEC "${CMAKE_BINARY_DIR}/bootstrapping0/bin/swiftc"
       DEPENDS ${b0_deps}
       BOOTSTRAPPING 1)
 
     # The final build, using the compiler from stage 1
 
-    add_libswift("libswift"
+    add_libswift(libswift
         SWIFT_EXEC "${CMAKE_BINARY_DIR}/bootstrapping1/bin/swiftc"
         DEPENDS ${b1_deps})
 
