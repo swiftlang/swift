@@ -1,6 +1,4 @@
-#!/usr/bin/env python -u
-
-from __future__ import print_function
+#!/usr/bin/env python3 -u
 
 import os
 import sys
