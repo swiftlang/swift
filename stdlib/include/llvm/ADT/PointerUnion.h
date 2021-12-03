@@ -94,6 +94,13 @@ namespace pointer_union_detail {
     static constexpr int NumLowBitsAvailable = lowBitsAvailable<PTs...>();
   };
 
+  /// Implement assignment in terms of construction.
+  template <typename Derived, typename T> struct AssignableFrom {
+    Derived &operator=(T t) {
+      return static_cast<Derived &>(*this) = Derived(t);
+    }
+  };
+
   template <typename Derived, typename ValTy, int I, typename ...Types>
   class PointerUnionMembers;
 
@@ -191,7 +198,7 @@ public:
   }
 
   /// Returns the current pointer if it is of the specified pointer type,
-  /// otherwise returns null.
+  /// otherwises returns null.
   template <typename T> T dyn_cast() const {
     if (is<T>())
       return get<T>();

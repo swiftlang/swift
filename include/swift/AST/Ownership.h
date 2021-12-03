@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdint.h>
@@ -116,6 +117,9 @@ optionalityOf(ReferenceOwnership ownership) {
   }
   llvm_unreachable("impossible");
 }
+
+/// Diagnostic printing of \c StaticSpellingKind.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, ReferenceOwnership RO);
 
 /// Different kinds of value ownership supported by Swift.
 enum class ValueOwnership : uint8_t {

@@ -7,7 +7,7 @@ if(SWIFT_BUILD_DYNAMIC_STDLIB)
                            LINK_LIBRARIES
                              swiftReflection
                            C_COMPILE_FLAGS
-                             ${SWIFT_RUNTIME_CXX_FLAGS} -DswiftRemoteMirror_EXPORTS -I${LLVM_MAIN_INCLUDE_DIR}
+                             ${SWIFT_RUNTIME_CXX_FLAGS} -DswiftRemoteMirror_EXPORTS
                            LINK_FLAGS
                              ${SWIFT_RUNTIME_LINK_FLAGS}
                            INCORPORATE_OBJECT_LIBRARIES swiftLLVMSupport

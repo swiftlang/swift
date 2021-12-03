@@ -21,8 +21,7 @@
 #include <stdlib.h>
 #endif
 
-#if defined(__linux__) || defined(__GNU__) || defined(__HAIKU__) || defined(__wasi__) || \
-    defined(__Fuchsia__) || defined(__EMSCRIPTEN__)
+#if defined(__linux__) || defined(__GNU__) || defined(__HAIKU__) || defined(__wasi__)
 #include <endian.h>
 #elif defined(_AIX)
 #include <sys/machine.h>
@@ -36,10 +35,6 @@
 #else
 #define BYTE_ORDER LITTLE_ENDIAN
 #endif
-#elif defined(__MVS__)
-#define BIG_ENDIAN 4321
-#define LITTLE_ENDIAN 1234
-#define BYTE_ORDER BIG_ENDIAN
 #else
 #if !defined(BYTE_ORDER) && !defined(_WIN32)
 #include <machine/endian.h>
