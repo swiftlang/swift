@@ -33,9 +33,9 @@ class C1 : P1, P2 {
 
   func method1() { }
 
-  @GenericGlobalActor<String> func method2() { } // expected-error{{instance method 'method2()' isolated to global actor 'GenericGlobalActor<String>' can not satisfy corresponding requirement from protocol 'P1' isolated to global actor 'GenericGlobalActor<Int>'}}
+  @GenericGlobalActor<String> func method2() { } // expected-warning{{instance method 'method2()' isolated to global actor 'GenericGlobalActor<String>' can not satisfy corresponding requirement from protocol 'P1' isolated to global actor 'GenericGlobalActor<Int>'}}
   @GenericGlobalActor<String >func method3() { }
-  @GlobalActor func method4() { } // expected-error{{instance method 'method4()' isolated to global actor 'GlobalActor' can not satisfy corresponding requirement from protocol 'P1'}}
+  @GlobalActor func method4() { } // expected-warning{{instance method 'method4()' isolated to global actor 'GlobalActor' can not satisfy corresponding requirement from protocol 'P1'}}
 
   // Okay: we can ignore the mismatch in global actor types for 'async' methods.
   func asyncMethod1() async { }
