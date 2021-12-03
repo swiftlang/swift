@@ -78,7 +78,7 @@ func test001() {
 // CATCH1-DAG:  Decl[Class]/CurrModule/TypeRelation[Convertible]:             Error1[#Error1#]; name=Error1{{$}}
 // CATCH1-DAG:  Keyword[let]/None:                  let{{; name=.+$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
-// CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]/IsSystem: NSError[#NSError#]{{; name=.+$}}
+// CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]/IsSystem/TypeRelation[Convertible]: NSError[#NSError#]{{; name=.+$}}
 }
 
 func test002() {

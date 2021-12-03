@@ -2169,6 +2169,10 @@ public:
         expectedTypeContext.possibleTypes.push_back(T);
   }
 
+  const ExpectedTypeContext &getExpectedTypeContext() const {
+    return expectedTypeContext;
+  }
+
   void setIdealExpectedType(Type Ty) {
     expectedTypeContext.idealType = Ty;
   }
@@ -6735,7 +6739,8 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                      CompletionContext.CodeCompletionKind, DC,
                      /*Sink=*/nullptr);
 
-  Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
+  Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC,
+                                   Lookup.getExpectedTypeContext());
 }
 
 void deliverUnresolvedMemberResults(
@@ -7488,7 +7493,8 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
 static MutableArrayRef<CodeCompletionResult *>
 copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
                           CodeCompletionCache::Value &source, bool onlyTypes,
-                          bool onlyPrecedenceGroups) {
+                          bool onlyPrecedenceGroups, DeclContext *DC,
+                          const ExpectedTypeContext &TypeContext) {
 
   // We will be adding foreign results (from another sink) into TargetSink.
   // TargetSink should have an owning pointer to the allocator that keeps the
@@ -7548,8 +7554,7 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
     auto contextualResult = new (*targetSink.Allocator) CodeCompletionResult(
         *contextFreeResult, SemanticContextKind::OtherModule,
         CodeCompletionFlair(),
-        /*numBytesToErase=*/0,
-        CodeCompletionResult::ExpectedTypeRelation::Unknown,
+        /*numBytesToErase=*/0, TypeContext, DC,
         ContextualNotRecommendedReason::None,
         CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     targetSink.Results.push_back(contextualResult);
@@ -7561,8 +7566,8 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
 
 void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     CodeCompletionContext &context,
-    ArrayRef<RequestedCachedModule> requestedModules,
-    DeclContext *DC) {
+    ArrayRef<RequestedCachedModule> requestedModules, DeclContext *DC,
+    const ExpectedTypeContext &TypeContext) {
 
   // Use the current SourceFile as the DeclContext so that we can use it to
   // perform qualified lookup, and to get the correct visibility for
@@ -7600,8 +7605,9 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       context.Cache.set(R.Key, *V);
     }
     assert(V.hasValue());
-    auto newItems = copyCodeCompletionResults(
-        context.getResultSink(), **V, R.OnlyTypes, R.OnlyPrecedenceGroups);
+    auto newItems =
+        copyCodeCompletionResults(context.getResultSink(), **V, R.OnlyTypes,
+                                  R.OnlyPrecedenceGroups, DC, TypeContext);
     postProcessResults(newItems, context.CodeCompletionKind, DC,
                        &context.getResultSink());
   }

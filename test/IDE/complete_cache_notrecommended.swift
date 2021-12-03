@@ -25,7 +25,7 @@ func testSync() -> Int{
 // 'async'-ness in the cache. (rdar://78317170)
 
 // GLOBAL_IN_SYNC: Begin completions
-// GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]: globalAsyncFunc()[' async'][#Int#];
+// GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/TypeRelation[Identical]: globalAsyncFunc()[' async'][#Int#];
 // GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended: deprecatedFunc()[#Void#];
 // GLOBAL_IN_SYNC-DAG: Decl[Class]/OtherModule[MyModule]:  MyActor[#MyActor#];
 // GLOBAL_IN_SYNC: End completions
@@ -33,7 +33,7 @@ func testSync() -> Int{
 func testAsync() async -> Int {
     #^GLOBAL_IN_ASYNC^#
 // GLOBAL_IN_ASYNC: Begin completions
-// GLOBAL_IN_ASYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]: globalAsyncFunc()[' async'][#Int#];
+// GLOBAL_IN_ASYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/TypeRelation[Identical]: globalAsyncFunc()[' async'][#Int#];
 // GLOBAL_IN_ASYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended: deprecatedFunc()[#Void#];
 // GLOBAL_IN_ASYNC-DAG: Decl[Class]/OtherModule[MyModule]:  MyActor[#MyActor#];
 // GLOBAL_IN_ASYNC: End completions

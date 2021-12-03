@@ -51,7 +51,7 @@ func testUnknown() {
 // BOOLCONTEXT-LABEL: }
 // BOOLCONTEXT-LABEL: key.name: "Int",
 // BOOLCONTEXT:       key.typename: "Int",
-// BOOLCONTEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
+// BOOLCONTEXT:       key.typerelation: source.codecompletion.typerelation.unrelated,
 // BOOLCONTEXT-LABEL: }
 // BOOLCONTEXT-LABEL: key.name: "nil",
 // BOOLCONTEXT:       key.typename: "",
@@ -68,7 +68,7 @@ func testUnknown() {
 // OPTIONALCONTEXT-LABEL: }
 // OPTIONALCONTEXT-LABEL: key.name: "Int",
 // OPTIONALCONTEXT:       key.typename: "Int",
-// OPTIONALCONTEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
+// OPTIONALCONTEXT:       key.typerelation: source.codecompletion.typerelation.convertible,
 // OPTIONALCONTEXT-LABEL: }
 // OPTIONALCONTEXT-LABEL: key.name: "nil",
 // OPTIONALCONTEXT:       key.typename: "Int?",
@@ -84,7 +84,7 @@ func testUnknown() {
 // VOIDCONTEXT-LABEL: }
 // VOIDCONTEXT-LABEL: key.name: "Int",
 // VOIDCONTEXT:       key.typename: "Int",
-// VOIDCONTEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
+// VOIDCONTEXT:       key.typerelation: source.codecompletion.typerelation.unrelated,
 // VOIDCONTEXT-LABEL: }
 // VOIDCONTEXT-LABEL: key.name: "nil",
 // VOIDCONTEXT:       key.typename: "",

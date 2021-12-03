@@ -1400,7 +1400,8 @@ public:
   virtual void
   handleResultsAndModules(CodeCompletionContext &context,
                           ArrayRef<RequestedCachedModule> requestedModules,
-                          DeclContext *DC) = 0;
+                          DeclContext *DC,
+                          const ExpectedTypeContext &TypeContext) = 0;
 };
 
 /// A simplified code completion consumer interface that clients can use to get
@@ -1411,7 +1412,8 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
   // Implement the CodeCompletionConsumer interface.
   void handleResultsAndModules(CodeCompletionContext &context,
                                ArrayRef<RequestedCachedModule> requestedModules,
-                               DeclContext *DCForModules) override;
+                               DeclContext *DCForModules,
+                               const ExpectedTypeContext &TypeContext) override;
 
   /// Clients should override this method to receive \p Results.
   virtual void handleResults(CodeCompletionContext &context) = 0;
