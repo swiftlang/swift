@@ -1808,6 +1808,15 @@ void ModuleDecl::collectBasicSourceFileInfo(
   }
 }
 
+void ModuleDecl::collectSerializedSearchPath(
+    llvm::function_ref<void(StringRef)> callback) const {
+  for (const FileUnit *fileUnit : getFiles()) {
+    if (auto *serialized = dyn_cast<LoadedFile>(fileUnit)) {
+      serialized->collectSerializedSearchPath(callback);
+    }
+  }
+}
+
 Fingerprint ModuleDecl::getFingerprint() const {
   StableHasher hasher = StableHasher::defaultHasher();
   SmallVector<Fingerprint, 16> FPs;
