@@ -5,6 +5,8 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: linux
 
+// REQUIRES: rdar_CodaFi
+
 struct Boom: Error {}
 
 func boom() async throws -> Int {
