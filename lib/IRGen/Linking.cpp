@@ -504,6 +504,12 @@ std::string LinkEntity::mangleAsString() const {
     Result.append("TF");
     return Result;
   }
+
+  case Kind::AccessibleFunctionRecord: {
+    std::string Result(getSILFunction()->getName());
+    Result.append("HF");
+    return Result;
+  }
   }
   llvm_unreachable("bad entity kind!");
 }
@@ -805,6 +811,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::PublicExternal;
   case Kind::PartialApplyForwarder:
   case Kind::DistributedMethodAccessor:
+  case Kind::AccessibleFunctionRecord:
     return SILLinkage::Private;
   }
   llvm_unreachable("bad link entity kind");
@@ -897,6 +904,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::PartialApplyForwarder:
   case Kind::KnownAsyncFunctionPointer:
   case Kind::DistributedMethodAccessor:
+  case Kind::AccessibleFunctionRecord:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -1023,6 +1031,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     return IGM.AsyncFunctionPointerTy;
   case Kind::PartialApplyForwarder:
     return IGM.FunctionPtrTy;
+  case Kind::AccessibleFunctionRecord:
+    return IGM.AccessibleFunctionRecordTy;
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -1053,6 +1063,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::MethodDescriptorAllocator:
   case Kind::OpaqueTypeDescriptor:
   case Kind::OpaqueTypeDescriptorRecord:
+  case Kind::AccessibleFunctionRecord:
     return Alignment(4);
   case Kind::AsyncFunctionPointer:
   case Kind::DispatchThunkAsyncFunctionPointer:
@@ -1208,6 +1219,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ReflectionFieldDescriptor:
   case Kind::CoroutineContinuationPrototype:
   case Kind::DifferentiabilityWitness:
+  case Kind::AccessibleFunctionRecord:
     return false;
 
   case Kind::AsyncFunctionPointer:
@@ -1348,9 +1360,10 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
     return getUnderlyingEntityForAsyncFunctionPointer()
         .getDeclContextForEmission();
 
-  case Kind::DistributedMethodAccessor: {
-    auto *methodDC = getSILFunction()->getDeclContext();
-    return methodDC->getParentModule();
+  case Kind::DistributedMethodAccessor:
+  case Kind::AccessibleFunctionRecord: {
+    auto *funcDC = getSILFunction()->getDeclContext();
+    return funcDC->getParentModule();
   }
   }
   llvm_unreachable("invalid decl kind");

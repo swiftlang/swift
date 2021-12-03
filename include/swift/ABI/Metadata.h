@@ -5036,6 +5036,29 @@ public:
   uint32_t getFlags() { return flags; }
 };
 
+/// An "accessible" function that can be looked up based on a string key,
+/// and then called through a fully-abstracted entry point whose arguments
+/// can be constructed in code.
+template <typename Runtime>
+struct TargetAccessibleFunctionRecord final {
+public:
+  /// The name of the function, which is a unique string assigned to the
+  /// function so it can be looked up later.
+  RelativeDirectPointer<const char, /*nullable*/ false> Name;
+
+  /// The Swift function type, encoded as a mangled name.
+  RelativeDirectPointer<const char, /*nullable*/ false> FunctionType;
+
+  /// The fully-abstracted function to call.
+  RelativeDirectPointer<bool(void *outValue, void *outError, void **args,
+                             uint32_t numArgs),
+                        /*nullable*/ false>
+      Function;
+
+  /// Flags providing more information about the function.
+  AccessibleFunctionFlags Flags;
+};
+
 } // end namespace swift
 
 #pragma clang diagnostic pop
