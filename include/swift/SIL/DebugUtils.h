@@ -327,6 +327,34 @@ struct DebugVarCarryingInst {
   }
 };
 
+/// Attempt to discover a StringRef varName for the value \p value. If we fail,
+/// we return the name "unknown".
+inline StringRef getDebugVarName(SILValue value) {
+  if (auto *asi = dyn_cast<AllocStackInst>(value)) {
+    DebugVarCarryingInst debugVar(asi);
+    if (auto varInfo = debugVar.getVarInfo()) {
+      return varInfo->Name;
+    } else {
+      if (auto *decl = debugVar.getDecl()) {
+        return decl->getBaseName().userFacingName();
+      }
+    }
+  }
+
+  StringRef varName = "unknown";
+  if (auto *use = getSingleDebugUse(value)) {
+    DebugVarCarryingInst debugVar(use->getUser());
+    if (auto varInfo = debugVar.getVarInfo()) {
+      varName = varInfo->Name;
+    } else {
+      if (auto *decl = debugVar.getDecl()) {
+        varName = decl->getBaseName().userFacingName();
+      }
+    }
+  }
+  return varName;
+}
+
 } // end namespace swift
 
 #endif // SWIFT_SIL_DEBUGUTILS_H
