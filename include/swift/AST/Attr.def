@@ -700,7 +700,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeConst,
   126)
 
 SIMPLE_DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
-  OnFunc | OnConstructor |
+  OnFunc | OnConstructor | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIStableToRemove,
   127)
