@@ -3,5 +3,5 @@
 import Swift
 
 func addressOnlyMove<T>(t: T) -> T {
-    _move(t) // expected-error {{move() used on a generic or existential value}}
+    _move(t) // expected-error {{_move applied to value that the compiler does not know how to check. Please file a bug or an enhancement request!}}
 }

@@ -1793,6 +1793,10 @@ struct SILDebugVariable {
            Implicit == V.Implicit && Type == V.Type && Loc == V.Loc &&
            Scope == V.Scope;
   }
+
+  bool isLet() const { return Name.size() && Constant; }
+
+  bool isVar() const { return Name.size() && !Constant; }
 };
 
 /// A DebugVariable where storage for the strings has been
@@ -2004,7 +2008,20 @@ public:
     auto VI = TailAllocatedDebugVariable(RawValue);
     return VI.get(getDecl(), getTrailingObjects<char>(), AuxVarType, VarDeclLoc,
                   VarDeclScope, DIExprElements);
-  };
+  }
+
+  bool isLet() const {
+    if (auto varInfo = getVarInfo())
+      return varInfo->isLet();
+    return false;
+  }
+
+  bool isVar() const {
+    if (auto varInfo = getVarInfo())
+      return varInfo->isVar();
+    return false;
+  }
+
   void setArgNo(unsigned N) {
     auto RawValue = SILNode::Bits.AllocStackInst.VarInfo;
     auto VI = TailAllocatedDebugVariable(RawValue);
