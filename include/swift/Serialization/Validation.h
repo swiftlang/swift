@@ -103,9 +103,17 @@ struct ValidationInfo {
 ///
 /// \sa validateSerializedAST()
 class ExtendedValidationInfo {
+  struct SearchPath {
+    StringRef Path;
+    bool IsFramework;
+    bool IsSystem;
+  };
+
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
   StringRef SDKPath;
   StringRef ModuleABIName;
+  std::vector<SearchPath> SearchPaths;
+
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -124,6 +132,13 @@ public:
   void setSDKPath(StringRef path) {
     assert(SDKPath.empty());
     SDKPath = path;
+  }
+
+  llvm::ArrayRef<SearchPath> getSerializedSearchPaths() const {
+    return SearchPaths;
+  }
+  void addSerializedSearchPath(StringRef path, bool isFramework, bool isSystem) {
+    SearchPaths.push_back({ path, isFramework, isSystem  });
   }
 
   ArrayRef<StringRef> getExtraClangImporterOptions() const {

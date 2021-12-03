@@ -164,11 +164,13 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
     status = Status::SDKMismatch;
     return error(status);
   }
-
-  for (const auto &searchPath : Core->SearchPaths) {
-    ctx.addSearchPath(
-        ctx.SearchPathOpts.SearchPathRemapper.remapPath(searchPath.Path),
-        searchPath.IsFramework, searchPath.IsSystem);
+  
+  if (ctx.SearchPathOpts.LoadSerializedSearchPathsForDebugging) {
+    for (const auto &searchPath : Core->SearchPaths) {
+      ctx.addSearchPath(
+          ctx.SearchPathOpts.SearchPathRemapper.remapPath(searchPath.Path),
+          searchPath.IsFramework, searchPath.IsSystem);
+    }
   }
 
   auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());

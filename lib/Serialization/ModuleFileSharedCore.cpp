@@ -352,7 +352,8 @@ static ValidationInfo validateControlBlock(
 
 static bool validateInputBlock(
     llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
-    SmallVectorImpl<SerializationOptions::FileDependency> &dependencies) {
+    SmallVectorImpl<SerializationOptions::FileDependency> &dependencies,
+    ExtendedValidationInfo *extendedInfo) {
   SmallVector<StringRef, 4> dependencyDirectories;
   SmallString<256> dependencyFullPathBuffer;
 
@@ -409,6 +410,14 @@ static bool validateInputBlock(
     case input_block::DEPENDENCY_DIRECTORY:
       dependencyDirectories.push_back(blobData);
       break;
+    case input_block::SEARCH_PATH: {
+      bool isFramework = scratch[0] != 0;
+      bool isSystem = scratch[1] != 0;
+
+      if (extendedInfo)
+        extendedInfo->addSerializedSearchPath(blobData, isFramework, isSystem);
+      break;
+    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -480,7 +489,7 @@ ValidationInfo serialization::validateSerializedAST(
         result.status = Status::Malformed;
         return result;
       }
-      if (validateInputBlock(cursor, scratch, *dependencies)) {
+      if (validateInputBlock(cursor, scratch, *dependencies, extendedInfo)) {
         result.status = Status::Malformed;
         return result;
       }

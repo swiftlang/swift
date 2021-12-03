@@ -87,6 +87,13 @@ public:
   /// as the context loading it.
   bool EnableSameSDKCheck = true;
 
+  /// When \c true, any modules loaded by this frontend will have the content of
+  /// their search path block appended to the list of search paths of this
+  /// frontend.
+  ///
+  /// This option exists solely for use by LLDB.
+  bool LoadSerializedSearchPathsForDebugging = false;
+
   /// A set of compiled modules that may be ready to use.
   std::vector<std::string> CandidateCompiledModules;
 

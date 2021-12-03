@@ -1072,40 +1072,38 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         IsConcurrencyChecked.emit(ScratchRecord);
       }
 
-      if (options.SerializeOptionsForDebugging) {
-        options_block::SDKPathLayout SDKPath(Out);
-        options_block::XCCLayout XCC(Out);
+      options_block::SDKPathLayout SDKPath(Out);
+      options_block::XCCLayout XCC(Out);
 
-        const auto &PathRemapper = options.DebuggingOptionsPrefixMap;
-        SDKPath.emit(
-            ScratchRecord,
-            PathRemapper.remapPath(M->getASTContext().SearchPathOpts.SDKPath));
-        auto &Opts = options.ExtraClangOptions;
-        for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) {
-          StringRef arg(*Arg);
-          if (arg.startswith("-ivfsoverlay")) {
-            // FIXME: This is a hack and calls for a better design.
-            //
-            // Filter out any -ivfsoverlay options that include an
-            // unextended-module-overlay.yaml overlay. By convention the Xcode
-            // buildsystem uses these while *building* mixed Objective-C and
-            // Swift frameworks; but they should never be used to *import* the
-            // module defined in the framework.
-            auto Next = std::next(Arg);
-            if (Next != E &&
-                StringRef(*Next).endswith("unextended-module-overlay.yaml")) {
-              ++Arg;
-              continue;
-            }
-          } else if (arg.startswith("-fdebug-prefix-map=")) {
-            // We don't serialize the debug prefix map flags as these
-            // contain absoute paths that are not usable on different
-            // machines. These flags are not necessary to compile the
-            // clang modules again so are safe to remove.
+      const auto &PathRemapper = options.DebuggingOptionsPrefixMap;
+      SDKPath.emit(
+          ScratchRecord,
+          PathRemapper.remapPath(M->getASTContext().SearchPathOpts.SDKPath));
+      auto &Opts = options.ExtraClangOptions;
+      for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) {
+        StringRef arg(*Arg);
+        if (arg.startswith("-ivfsoverlay")) {
+          // FIXME: This is a hack and calls for a better design.
+          //
+          // Filter out any -ivfsoverlay options that include an
+          // unextended-module-overlay.yaml overlay. By convention the Xcode
+          // buildsystem uses these while *building* mixed Objective-C and
+          // Swift frameworks; but they should never be used to *import* the
+          // module defined in the framework.
+          auto Next = std::next(Arg);
+          if (Next != E &&
+              StringRef(*Next).endswith("unextended-module-overlay.yaml")) {
+            ++Arg;
             continue;
           }
-          XCC.emit(ScratchRecord, arg);
+        } else if (arg.startswith("-fdebug-prefix-map=")) {
+          // We don't serialize the debug prefix map flags as these
+          // contain absoute paths that are not usable on different
+          // machines. These flags are not necessary to compile the
+          // clang modules again so are safe to remove.
+          continue;
         }
+        XCC.emit(ScratchRecord, arg);
       }
     }
   }
@@ -1156,18 +1154,16 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::DependencyDirectoryLayout DependencyDirectory(Out);
   input_block::ModuleInterfaceLayout ModuleInterface(Out);
 
-  if (options.SerializeOptionsForDebugging) {
-    const auto &PathMapper = options.DebuggingOptionsPrefixMap;
-    const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
-    // Put the framework search paths first so that they'll be preferred upon
-    // deserialization.
-    for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
-                      PathMapper.remapPath(framepath.Path));
-    for (auto &path : searchPathOpts.ImportSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
-                      PathMapper.remapPath(path));
-  }
+  const auto &PathMapper = options.DebuggingOptionsPrefixMap;
+  const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
+  // Put the framework search paths first so that they'll be preferred upon
+  // deserialization.
+  for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
+    SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
+                    PathMapper.remapPath(framepath.Path));
+  for (auto &path : searchPathOpts.ImportSearchPaths)
+    SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
+                    PathMapper.remapPath(path));
 
   // Note: We're not using StringMap here because we don't need to own the
   // strings.

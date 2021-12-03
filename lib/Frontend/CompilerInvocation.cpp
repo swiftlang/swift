@@ -2272,6 +2272,21 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
   for (StringRef Arg : extendedInfo.getExtraClangImporterOptions())
     extraClangArgs.push_back(Arg.str());
 
+  if (!getSearchPathOptions().LoadSerializedSearchPathsForDebugging)
+    return info.status;
+  
+  for (const auto &searchPath : extendedInfo.getSerializedSearchPaths()) {
+    if (searchPath.IsFramework) {
+      getSearchPathOptions().FrameworkSearchPaths.push_back({
+        getSearchPathOptions().SearchPathRemapper.remapPath(searchPath.Path),
+        searchPath.IsSystem
+      });
+    } else {
+      getSearchPathOptions().ImportSearchPaths.push_back(
+          getSearchPathOptions().SearchPathRemapper.remapPath(searchPath.Path));
+    }
+  }
+
   return info.status;
 }
 

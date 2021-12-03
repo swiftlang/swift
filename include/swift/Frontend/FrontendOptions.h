@@ -177,11 +177,6 @@ public:
   /// Ignore .swiftsourceinfo file when trying to get source locations from module imported decls.
   bool IgnoreSwiftSourceInfo = false;
 
-  /// When true, emitted module files will always contain options for the
-  /// debugger to use. When unset, the options will only be present if the
-  /// module appears to not be a public module.
-  Optional<bool> SerializeOptionsForDebugging;
-
   /// When true the debug prefix map entries will be applied to debugging
   /// options before serialization. These can be reconstructed at debug time by
   /// applying the inverse map in SearchPathOptions.SearchPathRemapper.
