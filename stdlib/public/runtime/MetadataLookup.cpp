@@ -429,7 +429,9 @@ ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
     result.ImportInfo->collect</*asserting*/true>(component);
   }
 
+#ifndef NDEBUG
   assert(stage != AfterName && "no components?");
+#endif
 
   // Record the full identity.
   result.FullIdentity =

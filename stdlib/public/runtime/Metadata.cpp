@@ -3262,7 +3262,9 @@ swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
                                const ClassDescriptor *description) {
   assert(metadata->isTypeMetadata());
 
+#ifndef NDEBUG
   assert(isAncestorOf(metadata, description));
+#endif
 
   auto *vtable = description->getVTableDescriptor();
   assert(vtable != nullptr);
@@ -4021,9 +4023,11 @@ swift::swift_getExistentialTypeMetadata(
   
   // Ensure that the "class constraint" bit is set whenever we have a
   // superclass or a one of the protocols is class-bound.
+#ifndef NDEBUG
   assert(classConstraint == ProtocolClassConstraint::Class ||
          (!superclassConstraint &&
           !anyProtocolIsClassBound(numProtocols, protocols)));
+#endif
   ExistentialCacheEntry::Key key = {
     superclassConstraint, classConstraint, (uint32_t)numProtocols, protocols
   };
