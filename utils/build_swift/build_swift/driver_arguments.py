@@ -975,6 +975,9 @@ def create_argument_parser():
     option('--build-swift-stdlib-unittest-extra', toggle_true,
            help='Build optional StdlibUnittest components')
 
+    option('--build-swift-stdlib-static-print', toggle_true,
+           help='Build constant_vprintf support')
+
     option(['-S', '--skip-build'], store_true,
            help='generate build directory only without building')
 

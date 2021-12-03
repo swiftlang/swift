@@ -202,6 +202,7 @@ normalize_boolean_spelling(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 normalize_boolean_spelling(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
 normalize_boolean_spelling(SWIFT_HAVE_LIBXML2)
 normalize_boolean_spelling(SWIFT_INCLUDE_TOOLS)
+normalize_boolean_spelling(SWIFT_STDLIB_STATIC_PRINT)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 set(profdata_merge_worker
