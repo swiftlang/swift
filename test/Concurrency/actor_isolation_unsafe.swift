@@ -30,7 +30,7 @@ struct S3_P1: P1 {
 }
 
 struct S4_P1: P1 {
-  @SomeGlobalActor func onMainActor() { } // expected-error{{instance method 'onMainActor()' isolated to global actor 'SomeGlobalActor' can not satisfy corresponding requirement from protocol 'P1' isolated to global actor 'MainActor'}}
+  @SomeGlobalActor func onMainActor() { } // expected-warning{{instance method 'onMainActor()' isolated to global actor 'SomeGlobalActor' can not satisfy corresponding requirement from protocol 'P1' isolated to global actor 'MainActor'}}
 }
 
 @MainActor(unsafe)

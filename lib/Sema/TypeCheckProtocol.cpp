@@ -2868,6 +2868,8 @@ bool ConformanceChecker::checkActorIsolation(
   // unsuitable as a witness.
   bool isCrossActor = false;
   bool witnessIsUnsafe = false;
+  DiagnosticBehavior behavior = SendableCheckContext(
+      witness->getInnermostDeclContext()).defaultDiagnosticBehavior();
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(
@@ -3091,8 +3093,6 @@ bool ConformanceChecker::checkActorIsolation(
   }
 
   case ActorIsolationRestriction::Unsafe:
-    break;
-
   case ActorIsolationRestriction::Unrestricted:
     // The witness is completely unrestricted, so ignore any annotations on
     // the requirement.
@@ -3155,43 +3155,23 @@ bool ConformanceChecker::checkActorIsolation(
   // However, we allow this case when the requirement was imported, because
   // it might not have been annotated.
   if (witnessGlobalActor && !requirementGlobalActor) {
-    // If the requirement was imported from Objective-C, it may not have been
-    // annotated appropriately. Allow the mismatch.
+    // If the requirement was imported from Objective-C, downgrade to a warning
+    // because it may not have been annotated appropriately.
     if (requirement->hasClangNode())
-      return false;
-
-    // If the witness is "unsafe", allow the mismatch.
-    if (witnessIsUnsafe)
-      return false;
+      behavior = std::max(behavior, DiagnosticBehavior::Warning);
 
     witness->diagnose(
         diag::global_actor_isolated_witness, witness->getDescriptiveKind(),
-        witness->getName(), witnessGlobalActor, Proto->getName());
+        witness->getName(), witnessGlobalActor, Proto->getName())
+      .limitBehavior(behavior);
     requirement->diagnose(diag::decl_declared_here, requirement->getName());
-    return true;
+    return behavior == DiagnosticBehavior::Unspecified;
   }
 
-  // If the requirement has a global actor but the witness does not, we have
-  // an isolation error.
+  // If the requirement has a global actor but the witness does not, it's
+  // fine.
   if (requirementGlobalActor && !witnessGlobalActor) {
-    // If the requirement's global actor was "unsafe", we allow this.
-    if (requirementIsUnsafe)
-      return false;
-
-    if (isCrossActor) {
-      return diagnoseNonSendableTypesInReference(
-        witness, DC, witness->getLoc(),
-        ConcurrentReferenceKind::CrossActor);
-    }
-
-    witness->diagnose(
-        diag::global_actor_isolated_requirement, witness->getDescriptiveKind(),
-        witness->getName(), requirementGlobalActor, Proto->getName())
-      .fixItInsert(
-        witness->getAttributeInsertionLoc(/*forModifier=*/false),
-      "@" + requirementGlobalActor.getString());
-    requirement->diagnose(diag::decl_declared_here, requirement->getName());
-    return true;
+    return false;
   }
 
   // Both have global actors but they differ, so this is an isolation error.
@@ -3199,9 +3179,10 @@ bool ConformanceChecker::checkActorIsolation(
   witness->diagnose(
       diag::global_actor_isolated_requirement_witness_conflict,
       witness->getDescriptiveKind(), witness->getName(), witnessGlobalActor,
-      Proto->getName(), requirementGlobalActor);
+      Proto->getName(), requirementGlobalActor)
+    .limitBehavior(behavior);
   requirement->diagnose(diag::decl_declared_here, requirement->getName());
-  return true;
+  return behavior == DiagnosticBehavior::Unspecified;
 }
 
 bool ConformanceChecker::checkObjCTypeErasedGenerics(

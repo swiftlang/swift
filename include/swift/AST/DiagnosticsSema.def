@@ -4553,10 +4553,6 @@ ERROR(actor_isolated_witness,none,
 ERROR(distributed_actor_isolated_witness,none,
      "distributed actor-isolated %0 %1 cannot be used to satisfy a protocol requirement",
      (DescriptiveDeclKind, DeclName))
-ERROR(global_actor_isolated_requirement,none,
-      "%0 %1 must be isolated to the global actor %2 to satisfy corresponding "
-      "requirement from protocol %3",
-      (DescriptiveDeclKind, DeclName, Type, Identifier))
 ERROR(global_actor_isolated_witness,none,
       "%0 %1 isolated to global actor %2 can not satisfy corresponding "
       "requirement from protocol %3",
