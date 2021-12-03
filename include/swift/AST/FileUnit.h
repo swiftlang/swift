@@ -405,6 +405,8 @@ public:
   virtual void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {}
 
+  virtual void collectSerializedSearchPath(
+      llvm::function_ref<void(StringRef)> callback) const {}
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||
            file->getKind() == FileUnitKind::ClangModule ||

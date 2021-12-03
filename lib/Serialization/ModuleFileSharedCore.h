@@ -149,7 +149,7 @@ private:
   SmallVector<Dependency, 8> Dependencies;
 
   struct SearchPath {
-    StringRef Path;
+    std::string Path;
     bool IsFramework;
     bool IsSystem;
   };
@@ -374,7 +374,7 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
       bool isFramework, bool requiresOSSAModules,
-      serialization::ValidationInfo &info);
+      serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
   Status error(Status issue) {
@@ -464,7 +464,7 @@ private:
   /// Loads data from #ModuleDocInputBuffer.
   ///
   /// Returns false if there was an error.
-  bool readModuleDocIfPresent();
+  bool readModuleDocIfPresent(PathObfuscator &pathRecoverer);
 
   /// Reads the source loc block, which contains USR to decl location mapping.
   ///
@@ -474,7 +474,7 @@ private:
   /// Loads data from #ModuleSourceInfoInputBuffer.
   ///
   /// Returns false if there was an error.
-  bool readModuleSourceInfoIfPresent();
+  bool readModuleSourceInfoIfPresent(PathObfuscator &pathRecoverer);
 
   /// Read an on-disk decl hash table stored in
   /// \c sourceinfo_block::DeclUSRSLayout format.
@@ -510,12 +510,13 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework, bool requiresOSSAModules,
+       PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, info);
+        requiresOSSAModules, info, pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
       core->allocateBuffer(path, moduleInterfacePath);
