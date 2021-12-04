@@ -2864,6 +2864,17 @@ static void emitDeclaredHereIfNeeded(DiagnosticEngine &diags,
 
 bool ConformanceChecker::checkActorIsolation(
     ValueDecl *requirement, ValueDecl *witness) {
+  /// Retrieve a concrete witness for Sendable checking.
+  auto getConcreteWitness = [&] {
+    if (auto genericEnv = witness->getInnermostDeclContext()
+            ->getGenericEnvironmentOfContext()) {
+      return ConcreteDeclRef(
+          witness, genericEnv->getForwardingSubstitutionMap());
+    }
+
+    return ConcreteDeclRef(witness);
+  };
+
   // Ensure that the witness is not actor-isolated in a manner that makes it
   // unsuitable as a witness.
   bool isCrossActor = false;
@@ -3014,8 +3025,8 @@ bool ConformanceChecker::checkActorIsolation(
 
   case ActorIsolationRestriction::CrossActorSelf: {
     if (diagnoseNonSendableTypesInReference(
-        witness, DC, witness->getLoc(),
-        ConcurrentReferenceKind::CrossActor)) {
+            getConcreteWitness(), DC, witness->getLoc(),
+            ConcurrentReferenceKind::CrossActor)) {
       return true;
     }
 
@@ -3145,8 +3156,8 @@ bool ConformanceChecker::checkActorIsolation(
       return false;
 
     return diagnoseNonSendableTypesInReference(
-      witness, DC, witness->getLoc(),
-      ConcurrentReferenceKind::CrossActor);
+        getConcreteWitness(), DC, witness->getLoc(),
+        ConcurrentReferenceKind::CrossActor);
   }
 
   // If the witness has a global actor but the requirement does not, we have

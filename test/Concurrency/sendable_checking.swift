@@ -53,3 +53,15 @@ func testCV(
   // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   acceptSendableFn(fn) // expected-error{{passing non-sendable parameter 'fn' to function expecting a @Sendable closure}}
 }
+
+// rdar://83942484 - spurious Sendable diagnostics
+@available(SwiftStdlib 5.1, *)
+public protocol MyProto {
+    func foo<F>(aFoo: F) async where F: Sendable
+}
+
+@available(SwiftStdlib 5.1, *)
+public actor MyActor: MyProto {
+  public func foo<F>(aFoo: F) async where F: Sendable { }
+  public func bar<B>(aBar: B) async where B: Sendable { }
+}
