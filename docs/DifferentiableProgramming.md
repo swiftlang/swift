@@ -1911,7 +1911,7 @@ result (labeled `value`) and a differential (labeled `differential`). The
 differential is a linear map (`@differentiable(linear)`) function that takes the
 `TangentVector` nested types of all of the types of the original function's
 parameters to differentiate with respect to, and returns the `TangentVector`
-nested type of the orgiinal function's result type.
+nested type of the original function's result type.
 
 ###### Differentiability parameters
 
