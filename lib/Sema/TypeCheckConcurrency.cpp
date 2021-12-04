@@ -428,9 +428,19 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
       // nonisolated, they need cross-actor restrictions (e.g., for Sendable).
       if (auto *ctor = dyn_cast<ConstructorDecl>(decl))
         if (!ctor->isConvenienceInit())
-          if (auto *parent = dyn_cast<ClassDecl>(ctor->getParent()))
-              if (parent->isAnyActor())
-                return forActorSelf(parent, /*isCrossActor=*/true);
+          if (auto *parent = ctor->getParent()->getSelfClassDecl())
+            if (parent->isAnyActor())
+              return forActorSelf(parent, /*isCrossActor=*/true);
+
+      // `nonisolated let` members are cross-actor as well.
+      if (auto var = dyn_cast<VarDecl>(decl)) {
+        if (var->isInstanceMember() && var->isLet()) {
+          if (auto parent = var->getDeclContext()->getSelfClassDecl()) {
+            if (parent->isActor() && !parent->isDistributedActor())
+              return forActorSelf(parent, /*isCrossActor=*/true);
+          }
+        }
+      }
 
       return forUnrestricted();
 
@@ -3214,18 +3224,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If this declaration has one of the actor isolation attributes, report
   // that.
   if (isolationFromAttr) {
-    // Nonisolated declarations must involve Sendable types.
-    if (*isolationFromAttr == ActorIsolation::Independent) {
-      SubstitutionMap subs;
-      if (auto genericEnv = value->getInnermostDeclContext()
-              ->getGenericEnvironmentOfContext()) {
-        subs = genericEnv->getForwardingSubstitutionMap();
-      }
-      diagnoseNonSendableTypesInReference(
-          ConcreteDeclRef(value, subs), value->getDeclContext(),
-          value->getLoc(), ConcurrentReferenceKind::Nonisolated);
-    }
-
     // Classes with global actors have additional rules regarding inheritance.
     if (isolationFromAttr->isGlobalActor()) {
       if (auto classDecl = dyn_cast<ClassDecl>(value))
