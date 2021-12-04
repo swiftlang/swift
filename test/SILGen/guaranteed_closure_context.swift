@@ -22,7 +22,7 @@ func guaranteed_captures() {
   // CHECK: [[IMMUTABLE_RETAINABLE:%.*]] = apply {{.*}} -> @owned C
   // CHECK: [[B_IMMUTABLE_RETAINABLE:%.*]] = begin_borrow [lexical] [[IMMUTABLE_RETAINABLE]] : $C
   let immutableRetainable = C()
-  // CHECK: [[IMMUTABLE_ADDRESS_ONLY:%.*]] = alloc_stack $P
+  // CHECK: [[IMMUTABLE_ADDRESS_ONLY:%.*]] = alloc_stack [lexical] $P
   let immutableAddressOnly: P = C()
 
   func captureEverything() {

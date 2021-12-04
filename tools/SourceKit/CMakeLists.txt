@@ -52,8 +52,6 @@ include(AddSwiftSourceKit)
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   # Choose a deployment target if none was set.
-  set(SOURCEKIT_DEPLOYMENT_TARGET "" CACHE STRING
-      "Deployment target for SourceKit.")
   if (NOT SOURCEKIT_DEPLOYMENT_TARGET)
     execute_process(COMMAND sw_vers -productVersion
                     OUTPUT_VARIABLE SOURCEKIT_DEPLOYMENT_TARGET

@@ -899,10 +899,12 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
       std::make_shared<clang::CompilerInvocation>(*Impl.Invocation);
   invocation->getPreprocessorOpts().DisablePCHOrModuleValidation =
       clang::DisableValidationForModuleKind::None;
-  invocation->getPreprocessorOpts().AllowPCHWithCompilerErrors = false;
   invocation->getHeaderSearchOpts().ModulesValidateSystemHeaders = true;
   invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
   invocation->getLangOpts()->CacheGeneratedPCH = true;
+  // If the underlying invocation is allowing PCH errors, then it "can be read",
+  // even if it has its error bit set. Thus, don't override
+  // `AllowPCHWithCompilerErrors`.
 
   // ClangImporter::create adds a remapped MemoryBuffer that we don't need
   // here.  Moreover, it's a raw pointer owned by the preprocessor options; if
@@ -1408,7 +1410,8 @@ bool ClangImporter::Implementation::importHeader(
   // Don't even try to load the bridging header if the Clang AST is in a bad
   // state. It could cause a crash.
   auto &clangDiags = getClangASTContext().getDiagnostics();
-  if (clangDiags.hasUnrecoverableErrorOccurred())
+  if (clangDiags.hasUnrecoverableErrorOccurred() &&
+      !getClangInstance()->getPreprocessorOpts().AllowPCHWithCompilerErrors)
     return true;
 
   assert(adapter);
@@ -1508,7 +1511,8 @@ bool ClangImporter::Implementation::importHeader(
                       getBufferImporterForDiagnostics());
 
   // FIXME: What do we do if there was already an error?
-  if (!hadError && clangDiags.hasErrorOccurred()) {
+  if (!hadError && clangDiags.hasErrorOccurred() &&
+      !getClangInstance()->getPreprocessorOpts().AllowPCHWithCompilerErrors) {
     diagnose(diagLoc, diag::bridging_header_error, headerName);
     return true;
   }
@@ -1711,7 +1715,8 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
       FrontendOpts, std::make_unique<clang::GeneratePCHAction>());
   emitInstance->ExecuteAction(*action);
 
-  if (emitInstance->getDiagnostics().hasErrorOccurred()) {
+  if (emitInstance->getDiagnostics().hasErrorOccurred() &&
+      !emitInstance->getPreprocessorOpts().AllowPCHWithCompilerErrors) {
     Impl.diagnose({}, diag::bridging_header_pch_error,
                   outputPCHPath, headerPath);
     return true;
@@ -1771,7 +1776,8 @@ bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
       std::make_unique<clang::GenerateModuleFromModuleMapAction>());
   emitInstance->ExecuteAction(*action);
 
-  if (emitInstance->getDiagnostics().hasErrorOccurred()) {
+  if (emitInstance->getDiagnostics().hasErrorOccurred() &&
+      !FrontendOpts.AllowPCMWithCompilerErrors) {
     Impl.diagnose({}, diag::emit_pcm_error, outputPath, moduleMapPath);
     return true;
   }

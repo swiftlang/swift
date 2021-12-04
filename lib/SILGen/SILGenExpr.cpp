@@ -1027,7 +1027,8 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
-                                                 bool hasDynamicLifetime) {
+                                                 bool hasDynamicLifetime,
+                                                 bool isLexical) {
   ty = ty.getObjectType();
   Optional<SILDebugVariable> DbgVar;
   if (auto *VD = loc.getAsASTNode<VarDecl>())
@@ -1042,7 +1043,8 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
         DbgVar = SILDebugVariable(VD->isLet(), 0);
         loc = SILLocation(VD);
       }
-  auto alloc = B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime);
+  auto *alloc =
+      B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime, isLexical);
   enterDeallocStackCleanup(alloc);
   return alloc;
 }

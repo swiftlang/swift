@@ -1976,9 +1976,13 @@ public:
   /// Whether the alloc_stack instruction corresponds to a source-level VarDecl.
   bool isLexical() const { return lexical; }
 
-  /// If this is a lexical borrow, eliminate the lexical bit. If this borrow
-  /// doesn't have a lexical bit, do not do anything.
+  /// If this is a lexical alloc_stack, eliminate the lexical bit. If this
+  /// alloc_stack doesn't have a lexical bit, do not do anything.
   void removeIsLexical() { lexical = false; }
+
+  /// If this is not a lexical alloc_stack, set the lexical bit. If this
+  /// alloc_stack is already lexical, this does nothing.
+  void setIsLexical() { lexical = true; }
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {

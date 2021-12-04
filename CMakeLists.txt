@@ -93,6 +93,10 @@ option(SWIFT_BUILD_DYNAMIC_STDLIB
 option(SWIFT_BUILD_STATIC_STDLIB
     "Build static variants of the Swift standard library"
     FALSE)
+    
+option(SWIFT_STDLIB_STATIC_PRINT
+    "Build compile-time evaluated vprintf()"
+    FALSE)
 
 option(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY
     "Build dynamic variants of the Swift SDK overlay"

@@ -661,51 +661,52 @@ namespace {
         return Super::getFixedExtraInhabitantMask(IGM); \
       } \
     }
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  class AddressOnly##Name##ClassExistentialTypeInfo final : \
-      public AddressOnlyClassExistentialTypeInfoBase< \
-                                  AddressOnly##Name##ClassExistentialTypeInfo, \
-                                  FixedTypeInfo> { \
-    bool IsOptional; \
-  public: \
-    AddressOnly##Name##ClassExistentialTypeInfo( \
-        ArrayRef<const ProtocolDecl *> protocols, \
-        llvm::Type *ty, \
-        SpareBitVector &&spareBits, \
-        Size size, Alignment align, \
-        ReferenceCounting refcounting, \
-        bool isOptional) \
-      : AddressOnlyClassExistentialTypeInfoBase(protocols, refcounting, \
-                                                ty, size, std::move(spareBits), \
-                                                align, IsNotPOD, \
-                                                IsNotBitwiseTakable, \
-                                                IsFixedSize), \
-        IsOptional(isOptional) {} \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                          SILType T) const override { \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
-    } \
-    void emitValueAssignWithCopy(IRGenFunction &IGF, \
-                                 Address dest, Address src) const { \
-      IGF.emit##Name##CopyAssign(dest, src, Refcounting); \
-    } \
-    void emitValueInitializeWithCopy(IRGenFunction &IGF, \
-                                     Address dest, Address src) const { \
-      IGF.emit##Name##CopyInit(dest, src, Refcounting); \
-    } \
-    void emitValueAssignWithTake(IRGenFunction &IGF, \
-                                Address dest, Address src) const { \
-      IGF.emit##Name##TakeAssign(dest, src, Refcounting); \
-    } \
-    void emitValueInitializeWithTake(IRGenFunction &IGF, \
-                                    Address dest, Address src) const { \
-      IGF.emit##Name##TakeInit(dest, src, Refcounting); \
-    } \
-    void emitValueDestroy(IRGenFunction &IGF, Address addr) const { \
-      IGF.emit##Name##Destroy(addr, Refcounting); \
-    } \
-    StringRef getStructNameSuffix() const { return "." #name "ref"; } \
-    REF_STORAGE_HELPER(Name, FixedTypeInfo) \
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                    \
+  class AddressOnly##Name##ClassExistentialTypeInfo final                      \
+      : public AddressOnlyClassExistentialTypeInfoBase<                        \
+            AddressOnly##Name##ClassExistentialTypeInfo, FixedTypeInfo> {      \
+    bool IsOptional;                                                           \
+                                                                               \
+  public:                                                                      \
+    AddressOnly##Name##ClassExistentialTypeInfo(                               \
+        ArrayRef<const ProtocolDecl *> protocols, llvm::Type *ty,              \
+        SpareBitVector &&spareBits, Size size, Alignment align,                \
+        ReferenceCounting refcounting, bool isOptional)                        \
+        : AddressOnlyClassExistentialTypeInfoBase(                             \
+              protocols, refcounting, ty, size, std::move(spareBits), align,   \
+              IsNotPOD, IsNotBitwiseTakable, IsFixedSize),                     \
+          IsOptional(isOptional) {}                                            \
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,                    \
+                                          SILType T) const override {          \
+      if (Refcounting == ReferenceCounting::Native) {                          \
+        return IGM.typeLayoutCache.getOrCreateScalarEntry(                     \
+            *this, T, ScalarKind::Native##Name##Reference);                    \
+      } else {                                                                 \
+        return IGM.typeLayoutCache.getOrCreateScalarEntry(                     \
+            *this, T, ScalarKind::Unknown##Name##Reference);                   \
+      }                                                                        \
+    }                                                                          \
+    void emitValueAssignWithCopy(IRGenFunction &IGF, Address dest,             \
+                                 Address src) const {                          \
+      IGF.emit##Name##CopyAssign(dest, src, Refcounting);                      \
+    }                                                                          \
+    void emitValueInitializeWithCopy(IRGenFunction &IGF, Address dest,         \
+                                     Address src) const {                      \
+      IGF.emit##Name##CopyInit(dest, src, Refcounting);                        \
+    }                                                                          \
+    void emitValueAssignWithTake(IRGenFunction &IGF, Address dest,             \
+                                 Address src) const {                          \
+      IGF.emit##Name##TakeAssign(dest, src, Refcounting);                      \
+    }                                                                          \
+    void emitValueInitializeWithTake(IRGenFunction &IGF, Address dest,         \
+                                     Address src) const {                      \
+      IGF.emit##Name##TakeInit(dest, src, Refcounting);                        \
+    }                                                                          \
+    void emitValueDestroy(IRGenFunction &IGF, Address addr) const {            \
+      IGF.emit##Name##Destroy(addr, Refcounting);                              \
+    }                                                                          \
+    StringRef getStructNameSuffix() const { return "." #name "ref"; }          \
+    REF_STORAGE_HELPER(Name, FixedTypeInfo)                                    \
   };
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   class Loadable##Name##ClassExistentialTypeInfo final \
@@ -731,7 +732,16 @@ namespace {
     } \
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
                                           SILType T) const override { \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
+      ScalarKind kind; \
+      switch (Refcounting) { \
+        case ReferenceCounting::Native:  kind = ScalarKind::NativeStrongReference; break; \
+        case ReferenceCounting::ObjC:    kind = ScalarKind::ObjCReference; break; \
+        case ReferenceCounting::Block:   kind = ScalarKind::BlockReference; break; \
+        case ReferenceCounting::Unknown: kind = ScalarKind::UnknownReference; break; \
+        case ReferenceCounting::Bridge:  kind = ScalarKind::BridgeReference; break; \
+        case ReferenceCounting::Error:   kind = ScalarKind::ErrorReference; break; \
+      } \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, kind); \
     } \
     llvm::Type *getValueType() const { \
       return ValueType; \
@@ -778,7 +788,7 @@ namespace {
                                       spareBits, align, IsPOD, IsFixedSize) {} \
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
                                           SILType T) const override { \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, ScalarKind::POD); \
     } \
     const LoadableTypeInfo & \
     getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const { \
@@ -847,7 +857,8 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(
+        *this, T, ScalarKind::ExistentialReference);
   }
 
   Address projectWitnessTable(IRGenFunction &IGF, Address obj,
@@ -995,7 +1006,31 @@ class ClassExistentialTypeInfo final
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    // We can't create an objc typeinfo by itself, so don't destructure if we
+    // have one
+    if (Refcounting == ReferenceCounting::ObjC) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+
+    /// The storage type of a class existential is a struct containing
+    /// a refcounted pointer to the class instance value followed by
+    /// witness table pointers for each conformed-to protocol.
+    std::vector<TypeLayoutEntry *> alignedGroup;
+    const TypeInfo &typeinfo = Refcounting == ReferenceCounting::Native
+                                   ? IGM.getNativeObjectTypeInfo()
+                                   : IGM.getUnknownObjectTypeInfo();
+
+    alignedGroup.push_back(IGM.typeLayoutCache.getOrCreateScalarEntry(
+        typeinfo, T, refcountingToScalarKind(Refcounting)));
+    for (unsigned i = 0; i < getNumStoredProtocols(); i++) {
+      alignedGroup.push_back(IGM.typeLayoutCache.getOrCreateScalarEntry(
+          IGM.getWitnessTablePtrTypeInfo(),
+          SILType::getBuiltinIntegerType(IGM.getPointerSize().getValue(),
+                                         IGM.Context),
+          ScalarKind::POD));
+    }
+
+    return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(alignedGroup, 0);
   }
 
   /// Given an explosion with multiple pointer elements in them, pack them
@@ -1327,7 +1362,8 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
+                                                      ScalarKind::POD);
   }
 
   void emitValueRetain(IRGenFunction &IGF, llvm::Value *value,
@@ -1353,17 +1389,27 @@ class ErrorExistentialTypeInfo : public HeapTypeInfo<ErrorExistentialTypeInfo>
   ReferenceCounting Refcounting;
 
 public:
-  ErrorExistentialTypeInfo(llvm::PointerType *storage,
-                           Size size, SpareBitVector spareBits,
-                           Alignment align,
+  ErrorExistentialTypeInfo(llvm::PointerType *storage, Size size,
+                           SpareBitVector spareBits, Alignment align,
                            const ProtocolDecl *errorProto,
                            ReferenceCounting refcounting)
-    : HeapTypeInfo(storage, size, spareBits, align), ErrorProto(errorProto),
-      Refcounting(refcounting) {}
+      : HeapTypeInfo(refcounting, storage, size, spareBits, align),
+        ErrorProto(errorProto), Refcounting(refcounting) {}
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+    ScalarKind kind;
+    switch (Refcounting) {
+    case ReferenceCounting::Native:
+      kind = ScalarKind::NativeStrongReference;
+      break;
+    case ReferenceCounting::Error:
+      kind = ScalarKind::ErrorReference;
+      break;
+    default:
+      llvm_unreachable("unsupported refcounting type");
+    }
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, kind);
   }
 
   ReferenceCounting getReferenceCounting() const {
@@ -2237,6 +2283,25 @@ void irgen::emitDeallocateBoxedOpaqueExistentialBuffer(
 
   auto *deallocateFun = getDeallocateBoxedOpaqueExistentialBufferFunction(
       IGF.IGM, existLayout);
+  auto *bufferAddr = IGF.Builder.CreateBitCast(
+      existentialContainer.getAddress(),
+      IGF.IGM.getExistentialPtrTy(existLayout.getNumTables()));
+  auto *call = IGF.Builder.CreateCall(deallocateFun, {bufferAddr});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  call->setDoesNotThrow();
+  return;
+}
+
+void irgen::emitDestroyBoxedOpaqueExistentialBuffer(
+    IRGenFunction &IGF, SILType existentialType, Address existentialContainer) {
+
+  // Project to the existential buffer in the existential container.
+  auto &existentialTI =
+      IGF.getTypeInfo(existentialType).as<OpaqueExistentialTypeInfo>();
+  OpaqueExistentialLayout existLayout = existentialTI.getLayout();
+
+  auto *deallocateFun =
+      getDestroyBoxedOpaqueExistentialBufferFunction(IGF.IGM, existLayout);
   auto *bufferAddr = IGF.Builder.CreateBitCast(
       existentialContainer.getAddress(),
       IGF.IGM.getExistentialPtrTy(existLayout.getNumTables()));

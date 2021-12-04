@@ -472,7 +472,11 @@ public:
     }
 
     if (needsTemporaryBuffer) {
-      address = SGF.emitTemporaryAllocation(vd, lowering.getLoweredType());
+      bool isLexical =
+          SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule());
+      address =
+          SGF.emitTemporaryAllocation(vd, lowering.getLoweredType(),
+                                      false /*hasDynamicLifetime*/, isLexical);
       if (isUninitialized)
         address = SGF.B.createMarkUninitializedVar(vd, address);
       DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, lowering);

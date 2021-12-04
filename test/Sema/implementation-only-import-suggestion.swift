@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // REQUIRES: VENDOR=apple
+// REQUIRES: asserts
 
 /// Prepare the SDK.
 // RUN: cp -r %S/Inputs/public-private-sdk %t/sdk
@@ -34,11 +35,11 @@
 // RUN:   -library-level other -D PUBLIC_IMPORTS
 #if PUBLIC_IMPORTS
 import PublicSwift
-import PrivateSwift // expected-warning{{private module 'PrivateSwift' is imported publicly from the public module 'main'}}
+import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'main'}}
 
 import PublicClang
-import PublicClang_Private // expected-warning{{private module 'PublicClang_Private' is imported publicly from the public module 'main'}}
-import FullyPrivateClang // expected-warning{{private module 'FullyPrivateClang' is imported publicly from the public module 'main'}}
+import PublicClang_Private // expected-error{{private module 'PublicClang_Private' is imported publicly from the public module 'main'}}
+import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'main'}}
 import main // expected-warning{{'implementation-only-import-suggestion.swift' is part of module 'main'; ignoring import}}
 
 /// Expect no warnings with implementation-only imports.

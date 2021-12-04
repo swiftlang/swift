@@ -605,7 +605,7 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   if (dc->getParentModule()->isConcurrencyChecked())
     return true;
 
-  return contextUsesConcurrencyFeatures(dc);
+  return contextRequiresStrictConcurrencyChecking(dc);
 }
 
 /// Determine the default diagnostic behavior for this language mode.
@@ -3518,7 +3518,13 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (isolation == overriddenIsolation)
     return;
 
-  // If both are actor-instance isolated, we're done.
+  // If the overriding declaration is non-isolated, it's okay.
+  if (isolation.isIndependent() || isolation.isUnspecified())
+    return;
+
+  // If both are actor-instance isolated, we're done. This wasn't caught by
+  // the equality case above because the nominal type describing the actor
+  // will differ when we're overriding.
   if (isolation.getKind() == overriddenIsolation.getKind() &&
       (isolation.getKind() == ActorIsolation::ActorInstance ||
        isolation.getKind() == ActorIsolation::DistributedActorInstance))
@@ -3529,56 +3535,6 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (overridden->hasClangNode() && !overriddenIsolation)
     return;
 
-  // If the overridden declaration uses an unsafe global actor, we can do
-  // anything except be actor-isolated or have a different global actor.
-  if (overriddenIsolation == ActorIsolation::GlobalActorUnsafe) {
-    switch (isolation) {
-    case ActorIsolation::Independent:
-    case ActorIsolation::Unspecified:
-      return;
-
-    case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
-      // Diagnose below.
-      break;
-
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      // The global actors don't match; diagnose it.
-      if (overriddenIsolation.getGlobalActor()->isEqual(
-              isolation.getGlobalActor()))
-        return;
-
-      // Diagnose below.
-      break;
-    }
-  }
-
-  // If the overriding declaration uses an unsafe global actor, we can do
-  // anything that doesn't actively conflict with the overridden isolation.
-  if (isolation == ActorIsolation::GlobalActorUnsafe) {
-    switch (overriddenIsolation) {
-    case ActorIsolation::Unspecified:
-      return;
-
-    case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
-    case ActorIsolation::Independent:
-      // Diagnose below.
-      break;
-
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      // The global actors don't match; diagnose it.
-      if (overriddenIsolation.getGlobalActor()->isEqual(
-              isolation.getGlobalActor()))
-        return;
-
-      // Diagnose below.
-      break;
-    }
-  }
-
   // Isolation mismatch. Diagnose it.
   value->diagnose(
       diag::actor_isolation_override_mismatch, isolation,
@@ -3586,7 +3542,11 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   overridden->diagnose(diag::overridden_here);
 }
 
-bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
+bool swift::contextRequiresStrictConcurrencyChecking(const DeclContext *dc) {
+  // If Swift >= 6, everything uses strict concurrency checking.
+  if (dc->getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+    return true;
+
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
       // A closure with an explicit global actor or nonindependent
@@ -4071,7 +4031,7 @@ Type swift::adjustVarTypeForConcurrency(
   if (!var->predatesConcurrency())
     return type;
 
-  if (contextUsesConcurrencyFeatures(dc))
+  if (contextRequiresStrictConcurrencyChecking(dc))
     return type;
 
   bool isLValue = false;
@@ -4193,7 +4153,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     unsigned numApplies, bool isMainDispatchQueue) {
   // Apply unsafe concurrency features to the given function type.
   fnType = applyUnsafeConcurrencyToFunctionType(
-      fnType, decl, contextUsesConcurrencyFeatures(dc), numApplies,
+      fnType, decl, contextRequiresStrictConcurrencyChecking(dc), numApplies,
       isMainDispatchQueue);
 
   Type globalActorType;
@@ -4208,7 +4168,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     case ActorIsolation::GlobalActorUnsafe:
       // Only treat as global-actor-qualified within code that has adopted
       // Swift Concurrency features.
-      if (!contextUsesConcurrencyFeatures(dc))
+      if (!contextRequiresStrictConcurrencyChecking(dc))
         return fnType;
 
       LLVM_FALLTHROUGH;
@@ -4250,7 +4210,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 }
 
 bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {
-  return contextUsesConcurrencyFeatures(dc);
+  return contextRequiresStrictConcurrencyChecking(dc);
 }
 
 AbstractFunctionDecl const *swift::isActorInitOrDeInitContext(
