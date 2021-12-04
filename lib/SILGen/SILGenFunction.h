@@ -981,12 +981,16 @@ public:
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
   SILValue emitSelfDecl(VarDecl *selfDecl);
-  
+
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
+  ///
+  /// \p isLexical if set to true, this is a temporary that we are using for a
+  /// local let that we need to mark with the lexical flag.
   SILValue emitTemporaryAllocation(SILLocation loc, SILType ty,
-                                   bool hasDynamicLifetime = false);
-  
+                                   bool hasDynamicLifetime = false,
+                                   bool isLexical = false);
+
   /// Prepares a buffer to receive the result of an expression, either using the
   /// 'emit into' initialization buffer if available, or allocating a temporary
   /// allocation if not.
