@@ -60,16 +60,17 @@
 // CHECK:   func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>
 
 // CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<Int32>
+
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscript(_ x: Bool) -> UnsafeMutablePointer<Bool>
+
+// CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Bool) -> UnsafePointer<Bool>
 
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Double) -> UnsafePointer<Double>
 
-// CHECK:   @available(*, unavailable, message: "use subscript")
-// CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<Int32>
-
-// CHECK:   @available(*, unavailable, message: "use subscript")
-// CHECK:   mutating func __operatorSubscript(_ x: Bool) -> UnsafeMutablePointer<Bool>
 // CHECK: }
 
 
