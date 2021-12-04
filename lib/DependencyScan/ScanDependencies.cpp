@@ -336,7 +336,7 @@ static void discoverCrosssImportOverlayDependencies(
 template <typename T>
 void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
                           const T &value, unsigned indentLevel,
-                          bool trailingComma);
+                          bool trailingComma, bool nested = false);
 
 /// Write a string value as JSON.
 void writeJSONValue(llvm::raw_ostream &out, StringRef value,
@@ -442,11 +442,31 @@ void writeJSONValue(llvm::raw_ostream &out, const std::vector<T> &values,
 template <typename T>
 void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
                           const T &value, unsigned indentLevel,
-                          bool trailingComma) {
+                          bool trailingComma, bool nested) {
   out.indent(indentLevel * 2);
   writeJSONValue(out, fieldName, indentLevel);
   out << ": ";
-  writeJSONValue(out, value, indentLevel);
+  auto updatedIndentLevel = indentLevel;
+  
+  if (nested) {
+    // This is a hack to "fix" a format for a value that should be a nested
+    // set of strings. Currently only capturedPCMArgs (clang) is expected to
+    // in the nested format, which supposedly only contains one set of strings.
+    // Adjust the indentation to account for the nested brackets.
+    updatedIndentLevel += 1;
+    out << "[\n";
+    out.indent(updatedIndentLevel * 2);
+  }
+
+  writeJSONValue(out, value, updatedIndentLevel);
+
+  if (nested) {
+    // If nested, add an extra closing brack with a correct indentation.
+    out << "\n";
+    out.indent(indentLevel * 2);
+    out << "]";
+  }
+
   if (trailingComma)
     out << ",";
   out << "\n";
@@ -720,7 +740,7 @@ static void writeJSON(llvm::raw_ostream &out,
 
       // Captured PCM arguments.
       writeJSONSingleField(out, "capturedPCMArgs", clangDeps->captured_pcm_args, 5,
-                           /*trailingComma=*/false);
+                           /*trailingComma=*/false, /*nested=*/true);
     }
 
     out.indent(4 * 2);
