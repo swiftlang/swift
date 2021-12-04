@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift  -disable-availability-checking -swift-version 6
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 @_predatesConcurrency func unsafelySendableClosure(_ closure: @Sendable () -> Void) { }
 

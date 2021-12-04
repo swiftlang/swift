@@ -165,10 +165,15 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
     return error(status);
   }
 
-  for (const auto &searchPath : Core->SearchPaths) {
-    ctx.addSearchPath(
+  StringRef SDKPath = ctx.SearchPathOpts.SDKPath;
+  if (SDKPath.empty() ||
+      !Core->ModuleInputBuffer->getBufferIdentifier().startswith(SDKPath)) {
+    for (const auto &searchPath : Core->SearchPaths) {
+      ctx.addSearchPath(
         ctx.SearchPathOpts.SearchPathRemapper.remapPath(searchPath.Path),
-        searchPath.IsFramework, searchPath.IsSystem);
+        searchPath.IsFramework,
+        searchPath.IsSystem);
+    }
   }
 
   auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
