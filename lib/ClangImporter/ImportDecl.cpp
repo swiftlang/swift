@@ -9751,39 +9751,33 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
     E->loadAllMembers();
 }
 
-static void loadAllMembersOfRecordDecl(StructDecl *recordDecl) {
-  auto &ctx = recordDecl->getASTContext();
+void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
+    StructDecl *recordDecl) {
   auto clangRecord = cast<clang::RecordDecl>(recordDecl->getClangDecl());
 
-  // This is only to keep track of the members we've already seen.
-  llvm::SmallPtrSet<Decl *, 16> addedMembers;
-  for (auto member : recordDecl->getCurrentMembersWithoutLoading())
-    addedMembers.insert(member);
-
-  for (auto member : clangRecord->decls()) {
-    auto namedDecl = dyn_cast<clang::NamedDecl>(member);
-    if (!namedDecl)
-      continue;
-
-    // Don't try to load ourselves (this will create an infinite loop).
-    if (auto possibleSelf = dyn_cast<clang::RecordDecl>(member))
-      if (possibleSelf->getDefinition() == clangRecord)
-        continue;
-
+  // Import all of the members.
+  llvm::SmallVector<Decl *, 16> members;
+  for (const clang::Decl *m : clangRecord->decls()) {
+    auto nd = dyn_cast<clang::NamedDecl>(m);
     // Currently, we don't import unnamed bitfields.
-    if (isa<clang::FieldDecl>(member) &&
-        cast<clang::FieldDecl>(member)->isUnnamedBitfield())
+    if (isa<clang::FieldDecl>(m) &&
+        cast<clang::FieldDecl>(m)->isUnnamedBitfield())
       continue;
 
-    auto name = ctx.getClangModuleLoader()->importName(namedDecl);
-    if (!name)
-      continue;
+    if (nd && nd == nd->getCanonicalDecl() &&
+        nd->getDeclContext() == clangRecord &&
+        isVisibleClangEntry(nd))
+      insertMembersAndAlternates(nd, members);
+  }
 
-    for (auto found : recordDecl->lookupDirect(name)) {
-      if (addedMembers.insert(found).second &&
-          found->getDeclContext() == recordDecl)
-        recordDecl->addMember(found);
-    }
+  // Add the members here.
+  for (auto member: members) {
+    // FIXME: constructors are added eagerly, but shouldn't be
+    // FIXME: subscripts are added eagerly, but shouldn't be
+    if (!isa<AccessorDecl>(member) &&
+        !isa<SubscriptDecl>(member) &&
+        !isa<ConstructorDecl>(member))
+      recordDecl->addMember(member);
   }
 }
 
@@ -9819,13 +9813,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   }
 
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
-    // We haven't loaded any members yet, so tell our context that it still has
-    // lazy members. Otherwise, we won't be able to look up any individual
-    // members (lazily) in "loadAllMembersOfRecordDecl".
-    cast<StructDecl>(D)->setHasLazyMembers(true);
     loadAllMembersOfRecordDecl(cast<StructDecl>(D));
-    // Now that all members are loaded, mark the context as lazily complete.
-    cast<StructDecl>(D)->setHasLazyMembers(false);
     return;
   }
 

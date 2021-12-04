@@ -1743,7 +1743,7 @@ func foo<T, U, V>(_ x: T, _ y: U, _ z: V) -> W { ... }
 
 // Transpose with respect to `x` and `z`, requiring that `T` and `V` to conform
 // to `Differentiable & AdditiveArithmetic` and equal their corresponding
-`TangentVector` types.
+// `TangentVector` types.
 @transpose(of: foo, wrt: (x, z))
 func _<
     T: Differentiable & AdditiveArithmetic,
