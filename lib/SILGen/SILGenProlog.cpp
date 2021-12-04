@@ -290,10 +290,12 @@ struct ArgumentInitHelper {
       }
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
-      if (auto AllocStack = dyn_cast<AllocStackInst>(value))
-        AllocStack->setArgNo(ArgNo);
-      else
+      if (auto *allocStack = dyn_cast<AllocStackInst>(value)) {
+        allocStack->setArgNo(ArgNo);
+        allocStack->setIsLexical();
+      } else {
         SGF.B.createDebugValueAddr(loc, value, varinfo);
+      }
     }
     SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(value);
   }
