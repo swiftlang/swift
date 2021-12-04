@@ -220,9 +220,6 @@ foreach(sdk ${SWIFT_SDKS})
 ${libpthread}
 ${android_libraries}
 -lswiftCore
-${libicu_i18n_a}
-${libicu_uc_a}
-${libicu_data_a}
 -lstdc++
 -lm
 -Xlinker -export-dynamic
