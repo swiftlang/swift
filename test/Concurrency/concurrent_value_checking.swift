@@ -157,7 +157,7 @@ func testUnsafeSendableInAsync() async {
 // ----------------------------------------------------------------------
 // Sendable restriction on key paths.
 // ----------------------------------------------------------------------
-class NC: Hashable { // expected-note 3{{class 'NC' does not conform to the 'Sendable' protocol}}
+class NC: Hashable { // expected-note 2{{class 'NC' does not conform to the 'Sendable' protocol}}
   func hash(into: inout Hasher) { }
   static func==(_: NC, _: NC) -> Bool { true }
 }
@@ -174,9 +174,12 @@ func testKeyPaths(dict: [NC: Int], nc: NC) {
 // Sendable restriction on nonisolated declarations.
 // ----------------------------------------------------------------------
 actor ANI {
-  // FIXME: improve diagnostics to talk about nonisolated
-  nonisolated let nc = NC() // expected-warning{{cannot use property 'nc' with a non-sendable type 'NC' across actors}}
-  nonisolated func f() -> NC? { nil } // expected-warning{{cannot call function returning non-sendable type 'NC?' across actors}}
+  nonisolated let nc = NC()
+  nonisolated func f() -> NC? { nil }
+}
+
+func testANI(ani: ANI) async {
+  _ = ani.nc // expected-warning{{cannot use property 'nc' with a non-sendable type 'NC' across actors}}
 }
 
 // ----------------------------------------------------------------------
