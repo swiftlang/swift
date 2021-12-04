@@ -11,6 +11,10 @@ function(add_sourcekit_default_compiler_flags target)
   if(${SWIFT_HOST_VARIANT_SDK} STREQUAL WINDOWS)
     swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH}
       ${SWIFT_HOST_VARIANT_ARCH}_INCLUDE)
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
+      set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-I")
+      set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-I")
+    endif()
     target_include_directories(${target} SYSTEM PRIVATE
       ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
   endif()
