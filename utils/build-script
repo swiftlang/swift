@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # This source file is part of the Swift.org open source project
 #
@@ -8,9 +8,13 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+
 """
 The ultimate tool for building Swift.
 """
+
+
+from __future__ import absolute_import, print_function, unicode_literals
 
 import json
 import os
@@ -27,6 +31,8 @@ from build_swift.build_swift.constants import BUILD_SCRIPT_IMPL_PATH
 from build_swift.build_swift.constants import SWIFT_BUILD_ROOT
 from build_swift.build_swift.constants import SWIFT_REPO_NAME
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
+
+import six
 
 from swift_build_support.swift_build_support import build_script_invocation
 from swift_build_support.swift_build_support import shell
@@ -113,7 +119,7 @@ class JSONDumper(json.JSONEncoder):
     def default(self, o):
         if hasattr(o, '__dict__'):
             return vars(o)
-        return str(o)
+        return six.text_type(o)
 
 
 def print_xcodebuild_versions(file=sys.stdout):
@@ -500,7 +506,7 @@ def main_preset():
     try:
         preset_parser.read_files(args.preset_file_names)
     except presets.PresetError as e:
-        fatal_error(str(e))
+        fatal_error(six.text_type(e))
 
     if args.show_presets:
         for name in sorted(preset_parser.preset_names,
@@ -521,7 +527,7 @@ def main_preset():
             args.preset,
             vars=args.preset_substitutions)
     except presets.PresetError as e:
-        fatal_error(str(e))
+        fatal_error(six.text_type(e))
 
     preset_args = migration.migrate_swift_sdks(preset.args)
 
