@@ -137,8 +137,10 @@ import SubE
 // CHECK-NEXT: "C"
 
 // CHECK: "capturedPCMArgs": [
-// CHECK-NEXT:   "-Xcc",
-// CHECK-NEXT:   "-fapinotes-swift-version=4"
+// CHECK-NEXT:   [,
+// CHECK-NEXT:     "-Xcc",
+// CHECK-NEXT:     "-fapinotes-swift-version=4"
+// CHECK-NEXT:   ]
 // CHECK-NEXT: ]
 
 /// --------Swift module E
