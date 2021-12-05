@@ -2,10 +2,14 @@ include(CheckIncludeFiles)
 check_include_files("xpc/xpc.h" HAVE_XPC_H)
 
 if(HAVE_XPC_H AND SWIFT_BUILD_SOURCEKIT)
-  set(BUILD_SOURCEKIT_XPC_SERVICE TRUE)
+  set(BUILD_SOURCEKIT_XPC_SERVICE_default TRUE)
 else()
-  set(BUILD_SOURCEKIT_XPC_SERVICE FALSE)
+  set(BUILD_SOURCEKIT_XPC_SERVICE_default FALSE)
 endif()
+
+option(BUILD_SOURCEKIT_XPC_SERVICE
+  "Whether or not the SourceKit XPC service should be built"
+  ${BUILD_SOURCEKIT_XPC_SERVICE_default})
 
 # Add generated libSyntax headers to global dependencies.
 list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
