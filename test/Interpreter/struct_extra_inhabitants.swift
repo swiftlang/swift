@@ -15,6 +15,9 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://86054209
+// REQUIRES: swift_test_mode_optimize_none
+
 // CHECK-NOT: Type verification
 
 import Swift
