@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Just a comment :)
+
 #define DEBUG_TYPE "type-metadata-layout"
 
 #include "swift/ABI/MetadataValues.h"
