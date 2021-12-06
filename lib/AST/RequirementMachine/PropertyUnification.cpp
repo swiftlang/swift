@@ -350,6 +350,10 @@ void PropertyBag::addProperty(
     return;
   }
 
+  case Symbol::Kind::ConcreteConformance:
+    // FIXME
+    return;
+
   case Symbol::Kind::Name:
   case Symbol::Kind::GenericParam:
   case Symbol::Kind::AssociatedType:

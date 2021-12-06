@@ -349,6 +349,7 @@ Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
       case Symbol::Kind::Layout:
       case Symbol::Kind::Superclass:
       case Symbol::Kind::ConcreteType:
+      case Symbol::Kind::ConcreteConformance:
         llvm_unreachable("Term has invalid root symbol");
       }
     }

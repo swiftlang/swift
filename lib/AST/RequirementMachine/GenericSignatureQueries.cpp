@@ -240,6 +240,7 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
     case Symbol::Kind::Layout:
     case Symbol::Kind::Superclass:
     case Symbol::Kind::ConcreteType:
+    case Symbol::Kind::ConcreteConformance:
       llvm_unreachable("Property symbol cannot appear in a type term");
     }
 

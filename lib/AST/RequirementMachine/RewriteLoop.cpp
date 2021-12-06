@@ -170,7 +170,7 @@ void RewriteStep::applyDecompose(RewritePathEvaluator &evaluator,
     // concrete type symbol.
     const auto &term = evaluator.getCurrentTerm();
     auto symbol = term.back();
-    if (!symbol.isSuperclassOrConcreteType()) {
+    if (!symbol.hasSubstitutions()) {
       llvm::errs() << "Expected term with superclass or concrete type symbol"
                    << " on A stack\n";
       evaluator.dump(llvm::errs());
@@ -201,7 +201,7 @@ void RewriteStep::applyDecompose(RewritePathEvaluator &evaluator,
     // updating with new substitutions.
     auto &term = *(evaluator.A.end() - numSubstitutions - 1);
     auto symbol = term.back();
-    if (!symbol.isSuperclassOrConcreteType()) {
+    if (!symbol.hasSubstitutions()) {
       llvm::errs() << "Expected term with superclass or concrete type symbol"
                    << " on A stack\n";
       evaluator.dump(llvm::errs());
