@@ -43,6 +43,21 @@ namespace rewriting {
 class MutableTerm;
 class Term;
 
+/// A new rule introduced during property map construction, as a result of
+/// unifying two property symbols that apply to the same common suffix term.
+struct InducedRule {
+  MutableTerm LHS;
+  MutableTerm RHS;
+  RewritePath Path;
+
+  InducedRule(MutableTerm LHS, MutableTerm RHS, RewritePath Path)
+    : LHS(LHS), RHS(RHS), Path(Path) {}
+
+  // FIXME: Eventually all induced rules will have a rewrite path.
+  InducedRule(MutableTerm LHS, MutableTerm RHS)
+    : LHS(LHS), RHS(RHS) {}
+};
+
 /// Stores a convenient representation of all "property-like" rewrite rules of
 /// the form T.[p] => T, where [p] is a property symbol, for some term 'T'.
 class PropertyBag {
@@ -88,7 +103,7 @@ class PropertyBag {
   void addProperty(Symbol property,
                    unsigned ruleID,
                    RewriteContext &ctx,
-                   SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
+                   SmallVectorImpl<InducedRule> &inducedRules,
                    bool debug);
   void copyPropertiesFrom(const PropertyBag *next,
                           RewriteContext &ctx);
@@ -186,18 +201,18 @@ public:
 private:
   void clear();
   void addProperty(Term key, Symbol property, unsigned ruleID,
-                   SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules);
+                   SmallVectorImpl<InducedRule> &inducedRules);
 
   void computeConcreteTypeInDomainMap();
   void concretizeNestedTypesFromConcreteParents(
-                   SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const;
+                   SmallVectorImpl<InducedRule> &inducedRules) const;
 
   void concretizeNestedTypesFromConcreteParent(
                    Term key, RequirementKind requirementKind,
                    CanType concreteType, ArrayRef<Term> substitutions,
                    ArrayRef<const ProtocolDecl *> conformsTo,
                    llvm::TinyPtrVector<ProtocolConformance *> &conformances,
-                   SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const;
+                   SmallVectorImpl<InducedRule> &inducedRules) const;
 
   MutableTerm computeConstraintTermForTypeWitness(
       Term key, CanType concreteType, CanType typeWitness,

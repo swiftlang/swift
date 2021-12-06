@@ -90,15 +90,14 @@ namespace {
     ArrayRef<Term> lhsSubstitutions;
     ArrayRef<Term> rhsSubstitutions;
     RewriteContext &ctx;
-    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules;
+    SmallVectorImpl<InducedRule> &inducedRules;
     bool debug;
 
   public:
     ConcreteTypeMatcher(ArrayRef<Term> lhsSubstitutions,
                         ArrayRef<Term> rhsSubstitutions,
                         RewriteContext &ctx,
-                        SmallVectorImpl<std::pair<MutableTerm,
-                                                  MutableTerm>> &inducedRules,
+                        SmallVectorImpl<InducedRule> &inducedRules,
                         bool debug)
         : lhsSubstitutions(lhsSubstitutions),
           rhsSubstitutions(rhsSubstitutions),
@@ -205,7 +204,7 @@ namespace {
 /// Returns true if a conflict was detected.
 static bool unifyConcreteTypes(
     Symbol lhs, Symbol rhs, RewriteContext &ctx,
-    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
+    SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
   auto lhsType = lhs.getConcreteType();
   auto rhsType = rhs.getConcreteType();
@@ -253,7 +252,7 @@ static bool unifyConcreteTypes(
 /// that gets recorded in the property map.
 static Symbol unifySuperclasses(
     Symbol lhs, Symbol rhs, RewriteContext &ctx,
-    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
+    SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
   if (debug) {
     llvm::dbgs() << "% Unifying " << lhs << " with " << rhs << "\n";
@@ -310,7 +309,7 @@ static Symbol unifySuperclasses(
 
 void PropertyBag::addProperty(
     Symbol property, unsigned ruleID, RewriteContext &ctx,
-    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
+    SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
 
   switch (property.getKind()) {
@@ -395,7 +394,7 @@ void PropertyMap::computeConcreteTypeInDomainMap() {
 }
 
 void PropertyMap::concretizeNestedTypesFromConcreteParents(
-    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const {
+    SmallVectorImpl<InducedRule> &inducedRules) const {
   for (const auto &props : Entries) {
     if (props->getConformsTo().empty())
       continue;
@@ -478,7 +477,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     CanType concreteType, ArrayRef<Term> substitutions,
     ArrayRef<const ProtocolDecl *> conformsTo,
     llvm::TinyPtrVector<ProtocolConformance *> &conformances,
-    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const {
+    SmallVectorImpl<InducedRule> &inducedRules) const {
   assert(requirementKind == RequirementKind::SameType ||
          requirementKind == RequirementKind::Superclass);
 

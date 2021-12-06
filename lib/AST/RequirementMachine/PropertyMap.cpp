@@ -311,7 +311,7 @@ void PropertyMap::clear() {
 /// key. Must be called in monotonically non-decreasing key order.
 void PropertyMap::addProperty(
     Term key, Symbol property, unsigned ruleID,
-    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) {
+    SmallVectorImpl<InducedRule> &inducedRules) {
   assert(property.isProperty());
   assert(*System.getRule(ruleID).isPropertyRule() == property);
   auto *props = getOrCreateProperties(key);
@@ -371,7 +371,7 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
 
   // Merging multiple superclass or concrete type rules can induce new rules
   // to unify concrete type constructor arguments.
-  SmallVector<std::pair<MutableTerm, MutableTerm>, 3> inducedRules;
+  SmallVector<InducedRule, 3> inducedRules;
 
   for (const auto &bucket : properties) {
     for (auto property : bucket) {
@@ -392,7 +392,9 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
   // where the left hand side is not already equivalent to the right hand side.
   unsigned addedNewRules = 0;
   for (auto pair : inducedRules) {
-    if (System.addRule(pair.first, pair.second)) {
+    // FIXME: Eventually, all induced rules will have a rewrite path.
+    if (System.addRule(pair.LHS, pair.RHS,
+                       pair.Path.empty() ? nullptr : &pair.Path)) {
       ++addedNewRules;
 
       const auto &newRule = System.getRules().back();
