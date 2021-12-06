@@ -738,7 +738,7 @@ function(_compile_swift_files
       # stdlib in the current stage is not built yet.
       if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
         set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "DYLD_LIBRARY_PATH=${bs_lib_dir}")
-      elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+      elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD")
         set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "LD_LIBRARY_PATH=${bs_lib_dir}")
       else()
         message(FATAL_ERROR "TODO: bootstrapping support for ${SWIFT_HOST_VARIANT_SDK}")
