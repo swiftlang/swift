@@ -445,15 +445,20 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
-                                    unsigned bindingIndex) {
+                                    unsigned bindingIndex,
+                                    bool leaveClosureBodiesUnchecked) {
   assert(!PBD->isInitializerChecked(bindingIndex) &&
          PBD->getInit(bindingIndex));
 
   auto &Ctx = PBD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  (void)evaluateOrDefault(
-      Ctx.evaluator, PatternBindingEntryRequest{PBD, bindingIndex}, nullptr);
-  TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
+
+  TypeCheckExprOptions options;
+  if (leaveClosureBodiesUnchecked)
+    options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
+
+  TypeChecker::typeCheckPatternBinding(PBD, bindingIndex,
+                                       /*patternType=*/Type(), options);
 }
 
 bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
