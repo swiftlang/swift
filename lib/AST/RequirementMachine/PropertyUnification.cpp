@@ -309,19 +309,21 @@ static Symbol unifySuperclasses(
 }
 
 void PropertyBag::addProperty(
-    Symbol property, RewriteContext &ctx,
+    Symbol property, unsigned ruleID, RewriteContext &ctx,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
     bool debug) {
 
   switch (property.getKind()) {
   case Symbol::Kind::Protocol:
     ConformsTo.push_back(property.getProtocol());
+    ConformsToRules.push_back(ruleID);
     return;
 
   case Symbol::Kind::Layout:
-    if (!Layout)
+    if (!Layout) {
       Layout = property.getLayoutConstraint();
-    else
+      LayoutRule = ruleID;
+    } else
       Layout = Layout.merge(property.getLayoutConstraint());
 
     return;
@@ -334,6 +336,7 @@ void PropertyBag::addProperty(
                                      ctx, inducedRules, debug);
     } else {
       Superclass = property;
+      SuperclassRule = ruleID;
     }
 
     return;
@@ -345,6 +348,7 @@ void PropertyBag::addProperty(
                                 ctx, inducedRules, debug);
     } else {
       ConcreteType = property;
+      ConcreteTypeRule = ruleID;
     }
 
     return;

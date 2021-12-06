@@ -190,7 +190,9 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   // Conformances and the layout constraint, if any, can be copied over
   // unmodified.
   ConformsTo = next->ConformsTo;
+  ConformsToRules = next->ConformsToRules;
   Layout = next->Layout;
+  LayoutRule = next->LayoutRule;
 
   // If the property bag of V has superclass or concrete type
   // substitutions {X1, ..., Xn}, then the property bag of
@@ -200,12 +202,31 @@ void PropertyBag::copyPropertiesFrom(const PropertyBag *next,
   if (next->Superclass) {
     Superclass = next->Superclass->prependPrefixToConcreteSubstitutions(
         prefix, ctx);
+    SuperclassRule = next->SuperclassRule;
   }
 
   if (next->ConcreteType) {
     ConcreteType = next->ConcreteType->prependPrefixToConcreteSubstitutions(
         prefix, ctx);
+    ConcreteTypeRule = next->ConcreteTypeRule;
   }
+}
+
+void PropertyBag::verify(const RewriteSystem &system) const {
+#ifndef NDEBUG
+  assert(ConformsTo.size() == ConformsToRules.size());
+  for (unsigned i : indices(ConformsTo)) {
+    auto symbol = system.getRule(ConformsToRules[i]).getLHS().back();
+    assert(symbol.getKind() == Symbol::Kind::Protocol);
+    assert(symbol.getProtocol() == ConformsTo[i]);
+  }
+
+  // FIXME: Once unification introduces new rules, add asserts requiring
+  // that the layout, superclass and concrete type symbols match, as above
+  assert(!Layout.isNull() == LayoutRule.hasValue());
+  assert(Superclass.hasValue() == SuperclassRule.hasValue());
+  assert(ConcreteType.hasValue() == ConcreteTypeRule.hasValue());
+#endif
 }
 
 PropertyMap::~PropertyMap() {
@@ -289,11 +310,12 @@ void PropertyMap::clear() {
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
 void PropertyMap::addProperty(
-    Term key, Symbol property,
+    Term key, Symbol property, unsigned ruleID,
     SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) {
   assert(property.isProperty());
+  assert(*System.getRule(ruleID).isPropertyRule() == property);
   auto *props = getOrCreateProperties(key);
-  props->addProperty(property, Context,
+  props->addProperty(property, ruleID, Context,
                      inducedRules, Debug.contains(DebugFlags::ConcreteUnification));
 }
 
@@ -314,11 +336,17 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
                               unsigned maxDepth) {
   clear();
 
+  struct Property {
+    Term key;
+    Symbol symbol;
+    unsigned ruleID;
+  };
+
   // PropertyMap::addRule() requires that shorter rules are added
   // before longer rules, so that it can perform lookups on suffixes and call
   // PropertyBag::copyPropertiesFrom(). However, we don't have to perform a
   // full sort by term order here; a bucket sort by term length suffices.
-  SmallVector<std::vector<std::pair<Term, Symbol>>, 4> properties;
+  SmallVector<std::vector<Property>, 4> properties;
 
   for (const auto &rule : System.getRules()) {
     if (rule.isSimplified())
@@ -336,7 +364,9 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
     unsigned length = rhs.size();
     if (length >= properties.size())
       properties.resize(length + 1);
-    properties[length].emplace_back(rhs, *property);
+
+    unsigned ruleID = System.getRuleID(rule);
+    properties[length].push_back({rhs, *property, ruleID});
   }
 
   // Merging multiple superclass or concrete type rules can induce new rules
@@ -344,8 +374,8 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
   SmallVector<std::pair<MutableTerm, MutableTerm>, 3> inducedRules;
 
   for (const auto &bucket : properties) {
-    for (auto pair : bucket) {
-      addProperty(pair.first, pair.second, inducedRules);
+    for (auto property : bucket) {
+      addProperty(property.key, property.symbol, property.ruleID, inducedRules);
     }
   }
 
@@ -371,6 +401,9 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
     }
   }
 
+  // Check invariants of the constructed property map.
+  verify();
+
   if (System.getRules().size() > maxIterations)
     return std::make_pair(CompletionResult::MaxIterations, addedNewRules);
 
@@ -385,4 +418,11 @@ void PropertyMap::dump(llvm::raw_ostream &out) const {
     out << "\n";
   }
   out << "}\n";
+}
+
+void PropertyMap::verify() const {
+#ifndef NDEBUG
+  for (const auto &props : Entries)
+    props->verify(System);
+#endif
 }

@@ -41,7 +41,6 @@ enum class RequirementKind : unsigned;
 namespace rewriting {
 
 class MutableTerm;
-class RewriteContext;
 class Term;
 
 /// Stores a convenient representation of all "property-like" rewrite rules of
@@ -55,11 +54,20 @@ class PropertyBag {
   /// All protocols this type conforms to.
   llvm::TinyPtrVector<const ProtocolDecl *> ConformsTo;
 
+  /// The corresponding protocol conformance rules.
+  llvm::SmallVector<unsigned, 1> ConformsToRules;
+
   /// The most specific layout constraint this type satisfies.
   LayoutConstraint Layout;
 
+  /// The corresponding layout rule for the above.
+  Optional<unsigned> LayoutRule;
+
   /// The most specific superclass constraint this type satisfies.
   Optional<Symbol> Superclass;
+
+  /// The corresponding superclass rule for the above.
+  Optional<unsigned> SuperclassRule;
 
   /// All concrete conformances of Superclass to the protocols in the
   /// ConformsTo list.
@@ -68,6 +76,9 @@ class PropertyBag {
   /// The most specific concrete type constraint this type satisfies.
   Optional<Symbol> ConcreteType;
 
+  /// The corresponding layout rule for the above.
+  Optional<unsigned> ConcreteTypeRule;
+
   /// All concrete conformances of ConcreteType to the protocols in the
   /// ConformsTo list.
   llvm::TinyPtrVector<ProtocolConformance *> ConcreteConformances;
@@ -75,6 +86,7 @@ class PropertyBag {
   explicit PropertyBag(Term key) : Key(key) {}
 
   void addProperty(Symbol property,
+                   unsigned ruleID,
                    RewriteContext &ctx,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules,
                    bool debug);
@@ -128,6 +140,8 @@ public:
   getConformsToExcludingSuperclassConformances() const;
 
   MutableTerm getPrefixAfterStrippingKey(const MutableTerm &lookupTerm) const;
+
+  void verify(const RewriteSystem &system) const;
 };
 
 /// Stores all rewrite rules of the form T.[p] => T, where [p] is a property
@@ -171,7 +185,7 @@ public:
 
 private:
   void clear();
-  void addProperty(Term key, Symbol property,
+  void addProperty(Term key, Symbol property, unsigned ruleID,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules);
 
   void computeConcreteTypeInDomainMap();
@@ -188,6 +202,8 @@ private:
   MutableTerm computeConstraintTermForTypeWitness(
       Term key, CanType concreteType, CanType typeWitness,
       const MutableTerm &subjectType, ArrayRef<Term> substitutions) const;
+
+  void verify() const;
 };
 
 } // end namespace rewriting
