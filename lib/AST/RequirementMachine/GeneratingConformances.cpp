@@ -64,6 +64,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include "RewriteContext.h"
 #include "RewriteSystem.h"
 
 using namespace swift;
@@ -681,7 +682,14 @@ void RewriteSystem::computeGeneratingConformances(
     }
   }
 
+  Context.ConformanceRulesHistogram.add(conformanceRules.size());
+
   computeCandidateConformancePaths(conformancePaths);
+
+  for (const auto &pair : conformancePaths) {
+    if (pair.second.size() > 1)
+      Context.GeneratingConformancesHistogram.add(pair.second.size());
+  }
 
   if (Debug.contains(DebugFlags::GeneratingConformances)) {
     llvm::dbgs() << "Initial set of equations:\n";
