@@ -671,6 +671,16 @@ RequirementMachine *RewriteContext::getRequirementMachine(
 /// We print stats in the destructor, which should get executed at the end of
 /// a compilation job.
 RewriteContext::~RewriteContext() {
+  for (const auto &pair : Machines)
+    delete pair.second;
+
+  Machines.clear();
+
+  for (const auto &pair : Components)
+    delete pair.second.Machine;
+
+  Components.clear();
+
   if (Context.LangOpts.AnalyzeRequirementMachine) {
     llvm::dbgs() << "--- Requirement Machine Statistics ---\n";
     llvm::dbgs() << "\n* Symbol kind:\n";
@@ -690,14 +700,4 @@ RewriteContext::~RewriteContext() {
     llvm::dbgs() << "\n* Generating conformance equations:\n";
     GeneratingConformancesHistogram.dump(llvm::dbgs());
   }
-
-  for (const auto &pair : Machines)
-    delete pair.second;
-
-  Machines.clear();
-
-  for (const auto &pair : Components)
-    delete pair.second.Machine;
-
-  Components.clear();
 }
