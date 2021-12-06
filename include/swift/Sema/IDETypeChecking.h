@@ -47,7 +47,8 @@ namespace swift {
   struct PrintOptions;
 
   /// Typecheck binding initializer at \p bindingIndex.
-  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
+  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex,
+                               bool leaveClosureBodiesUnchecked);
 
   /// Check if T1 is convertible to T2.
   ///
