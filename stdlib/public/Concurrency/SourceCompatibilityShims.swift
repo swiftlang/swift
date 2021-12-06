@@ -295,7 +295,7 @@ extension ThrowingTaskGroup {
 }
 
 @available(SwiftStdlib 5.1, *)
-@available(*, deprecated, message: "please use UnsafeContination<..., Error>")
+@available(*, deprecated, message: "please use UnsafeContinuation<..., Error>")
 public typealias UnsafeThrowingContinuation<T> = UnsafeContinuation<T, Error>
 
 @available(SwiftStdlib 5.1, *)
