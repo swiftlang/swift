@@ -227,6 +227,10 @@ public:
 
   int compare(Symbol other, RewriteContext &ctx) const;
 
+  Symbol withConcreteSubstitutions(
+      ArrayRef<Term> substitutions,
+      RewriteContext &ctx) const;
+
   Symbol transformConcreteSubstitutions(
       llvm::function_ref<Term(Term)> fn,
       RewriteContext &ctx) const;

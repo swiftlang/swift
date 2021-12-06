@@ -312,14 +312,7 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
     }
 
     // Build the new symbol with the new substitutions.
-    auto newSymbol = (symbol.getKind() == Symbol::Kind::Superclass
-                      ? Symbol::forSuperclass(symbol.getSuperclass(),
-                                              substitutions, ctx)
-                      : Symbol::forConcreteType(symbol.getConcreteType(),
-                                                substitutions, ctx));
-
-    // Update the term with the new symbol.
-    term.back() = newSymbol;
+    term.back() = symbol.withConcreteSubstitutions(substitutions, ctx);
 
     // Pop the substitutions from the A stack.
     A.resize(A.size() - numSubstitutions);

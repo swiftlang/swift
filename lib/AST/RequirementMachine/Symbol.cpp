@@ -646,6 +646,31 @@ int Symbol::compare(Symbol other, RewriteContext &ctx) const {
   return result;
 }
 
+Symbol Symbol::withConcreteSubstitutions(
+    ArrayRef<Term> substitutions,
+    RewriteContext &ctx) const {
+  switch (getKind()) {
+  case Kind::Superclass:
+    return Symbol::forSuperclass(getSuperclass(), substitutions, ctx);
+
+  case Kind::ConcreteType:
+    return Symbol::forConcreteType(getConcreteType(), substitutions, ctx);
+
+  case Kind::ConcreteConformance:
+    return Symbol::forConcreteConformance(getConcreteType(), substitutions,
+                                          getProtocol(), ctx);
+
+  case Kind::GenericParam:
+  case Kind::Name:
+  case Kind::Protocol:
+  case Kind::AssociatedType:
+  case Kind::Layout:
+    break;
+  }
+
+  llvm_unreachable("Bad symbol kind");
+}
+
 /// For a superclass or concrete type symbol
 ///
 ///   [concrete: Foo<X1, ..., Xn>]
@@ -679,26 +704,7 @@ Symbol Symbol::transformConcreteSubstitutions(
   if (!anyChanged)
     return *this;
 
-  switch (getKind()) {
-  case Kind::Superclass:
-    return Symbol::forSuperclass(getSuperclass(), substitutions, ctx);
-
-  case Kind::ConcreteType:
-    return Symbol::forConcreteType(getConcreteType(), substitutions, ctx);
-
-  case Kind::ConcreteConformance:
-    return Symbol::forConcreteConformance(getConcreteType(), substitutions,
-                                          getProtocol(), ctx);
-
-  case Kind::GenericParam:
-  case Kind::Name:
-  case Kind::Protocol:
-  case Kind::AssociatedType:
-  case Kind::Layout:
-    break;
-  }
-
-  llvm_unreachable("Bad symbol kind");
+  return withConcreteSubstitutions(substitutions, ctx);
 }
 
 /// Print the symbol using our mnemonic representation.

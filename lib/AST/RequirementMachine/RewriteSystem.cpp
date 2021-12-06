@@ -285,33 +285,7 @@ void RewriteSystem::simplifySubstitutions(MutableTerm &term,
   }
 
   // Build the new symbol with simplified substitutions.
-  switch (symbol.getKind()) {
-  case Symbol::Kind::Superclass:
-    term.back() = Symbol::forSuperclass(symbol.getSuperclass(),
-                                        newSubstitutions, Context);
-    return;
-
-  case Symbol::Kind::ConcreteType:
-    term.back() = Symbol::forConcreteType(symbol.getConcreteType(),
-                                          newSubstitutions, Context);
-    return;
-
-  case Symbol::Kind::ConcreteConformance:
-    term.back() = Symbol::forConcreteConformance(symbol.getConcreteType(),
-                                                 newSubstitutions,
-                                                 symbol.getProtocol(),
-                                                 Context);
-    return;
-
-  case Symbol::Kind::Protocol:
-  case Symbol::Kind::Name:
-  case Symbol::Kind::AssociatedType:
-  case Symbol::Kind::GenericParam:
-  case Symbol::Kind::Layout:
-    break;
-  }
-
-  llvm_unreachable("Bad symbol kind");
+  term.back() = symbol.withConcreteSubstitutions(newSubstitutions, Context);
 }
 
 /// Adds a rewrite rule, returning true if the new rule was non-trivial.
