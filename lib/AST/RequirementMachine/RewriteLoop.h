@@ -16,7 +16,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/DenseMap.h"
 
-
 #include "Symbol.h"
 #include "Term.h"
 
@@ -29,48 +28,8 @@ namespace swift {
 namespace rewriting {
 
 class RewriteSystem;
+struct RewritePathEvaluator;
 
-/// A rewrite path is a list of instructions for a two-stack interpreter.
-///
-/// - ApplyRewriteRule and AdjustConcreteType manipulate the term at the top of
-///   the A stack.
-///
-/// - Shift moves a term from A to B (if not inverted) or B to A (if inverted).
-///
-/// - Decompose splits off the substitutions from a superclass or concrete type
-///   symbol at the top of the A stack (if not inverted) or assembles a new
-///   superclass or concrete type symbol at the top of the A stack
-///   (if inverted).
-struct RewritePathEvaluator {
-  SmallVector<MutableTerm, 2> A;
-  SmallVector<MutableTerm, 2> B;
-
-  explicit RewritePathEvaluator(const MutableTerm &term) {
-    A.push_back(term);
-  }
-
-  void checkA() const;
-  void checkB() const;
-
-  MutableTerm &getCurrentTerm();
-
-  /// We're "in context" if we're in the middle of rewriting concrete
-  /// substitutions.
-  bool isInContext() const {
-    assert(A.size() > 0);
-    return (A.size() > 1 || B.size() > 0);
-  }
-
-  void dump(llvm::raw_ostream &out) const;
-};
-
-/// Return value of RewriteStep::applyRewriteRule();
-struct AppliedRewriteStep {
-  Term lhs;
-  Term rhs;
-  MutableTerm prefix;
-  MutableTerm suffix;
-};
 
 /// Records an evaluation step in a rewrite path.
 struct RewriteStep {
@@ -181,21 +140,6 @@ struct RewriteStep {
     Inverse = !Inverse;
   }
 
-  AppliedRewriteStep applyRewriteRule(RewritePathEvaluator &evaluator,
-                                      const RewriteSystem &system) const;
-
-  MutableTerm applyAdjustment(RewritePathEvaluator &evaluator,
-                              const RewriteSystem &system) const;
-
-  void applyShift(RewritePathEvaluator &evaluator,
-                  const RewriteSystem &system) const;
-
-  void applyDecompose(RewritePathEvaluator &evaluator,
-                      const RewriteSystem &system) const;
-
-  void apply(RewritePathEvaluator &evaluator,
-             const RewriteSystem &system) const;
-
   bool isInverseOf(const RewriteStep &other) const;
 
   bool maybeSwapRewriteSteps(RewriteStep &other,
@@ -303,6 +247,63 @@ public:
       const RewriteSystem &system) const;
 
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
+};
+
+/// Return value of RewritePathEvaluator::applyRewriteRule();
+struct AppliedRewriteStep {
+  Term lhs;
+  Term rhs;
+  MutableTerm prefix;
+  MutableTerm suffix;
+};
+
+/// A rewrite path is a list of instructions for a two-stack interpreter.
+///
+/// - ApplyRewriteRule and AdjustConcreteType manipulate the term at the top of
+///   the A stack.
+///
+/// - Shift moves a term from A to B (if not inverted) or B to A (if inverted).
+///
+/// - Decompose splits off the substitutions from a superclass or concrete type
+///   symbol at the top of the A stack (if not inverted) or assembles a new
+///   superclass or concrete type symbol at the top of the A stack
+///   (if inverted).
+struct RewritePathEvaluator {
+  SmallVector<MutableTerm, 2> A;
+  SmallVector<MutableTerm, 2> B;
+
+  explicit RewritePathEvaluator(const MutableTerm &term) {
+    A.push_back(term);
+  }
+
+  void checkA() const;
+  void checkB() const;
+
+  MutableTerm &getCurrentTerm();
+
+  /// We're "in context" if we're in the middle of rewriting concrete
+  /// substitutions.
+  bool isInContext() const {
+    assert(A.size() > 0);
+    return (A.size() > 1 || B.size() > 0);
+  }
+
+  void apply(const RewriteStep &step,
+             const RewriteSystem &system);
+
+  AppliedRewriteStep applyRewriteRule(const RewriteStep &step,
+                                      const RewriteSystem &system);
+
+  MutableTerm applyAdjustment(const RewriteStep &step,
+                              const RewriteSystem &system);
+
+  void applyShift(const RewriteStep &step,
+                  const RewriteSystem &system);
+
+  void applyDecompose(const RewriteStep &step,
+                      const RewriteSystem &system);
+
+  void dump(llvm::raw_ostream &out) const;
 };
 
 } // end namespace rewriting

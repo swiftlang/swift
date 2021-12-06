@@ -138,7 +138,7 @@ void RewriteLoop::findProtocolConformanceRules(
       }
     }
 
-    step.apply(evaluator, system);
+    evaluator.apply(step, system);
   }
 }
 

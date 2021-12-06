@@ -99,7 +99,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
       break;
     }
 
-    step.apply(evaluator, system);
+    evaluator.apply(step, system);
   }
 
   // Collect all rules that we saw exactly once in empty context.
@@ -844,7 +844,7 @@ void RewriteSystem::verifyRewriteLoops() const {
     RewritePathEvaluator evaluator(loop.Basepoint);
 
     for (const auto &step : loop.Path) {
-      step.apply(evaluator, *this);
+      evaluator.apply(step, *this);
     }
 
     if (evaluator.getCurrentTerm() != loop.Basepoint) {
