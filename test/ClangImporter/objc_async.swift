@@ -45,6 +45,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.bestName("hello")
   let _: Int = await slowServer.customize("hello")
 
+  slowServer.unavailableMethod() // expected-warning{{'unavailableMethod' is unavailable from asynchronous contexts}}
+
   let _: String = await slowServer.dance("slide")
   let _: String = await slowServer.__leap(17)
 

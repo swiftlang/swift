@@ -27,6 +27,7 @@ namespace swift {
   class ApplyExpr;
   class AvailableAttr;
   class Expr;
+  class ClosureExpr;
   class InFlightDiagnostic;
   class Decl;
   class ProtocolConformanceRef;
