@@ -9331,6 +9331,13 @@ ClangImporter::Implementation::importDeclContextOf(
   switch (context.getKind()) {
   case EffectiveClangContext::DeclContext: {
     auto dc = context.getAsDeclContext();
+
+    // For C++-Interop in cases where #ifdef __cplusplus surround an extern "C"
+    // you want to first check if the TU decl is the parent of this extern "C"
+    // decl (aka LinkageSpecDecl) and then proceed.
+    if (dc->getDeclKind() == clang::Decl::LinkageSpec)
+      dc = dc->getParent();
+
     if (dc->isTranslationUnit()) {
       if (auto *module = getClangModuleForDecl(decl))
         return module;
