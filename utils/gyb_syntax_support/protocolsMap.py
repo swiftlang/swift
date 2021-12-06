@@ -10,28 +10,20 @@ SYNTAX_BUILDABLE_EXPRESSIBLE_AS_CONFORMANCES = {
         'MemberDeclListItem',
         'SyntaxBuildable'
     ],
+    'ExprBuildable': [
+        'CodeBlockItem'
+    ],
     'ExprList': [
         'ConditionElement',
-        'SyntaxBuildable'
-    ],
-    'IdentifierPattern': [
-        'PatternBuildable'
     ],
     'MemberDeclList': [
         'MemberDeclBlock'
     ],
-    'FunctionCallExpr': [
-        'CodeBlockItem',
-        'ExprBuildable'
-    ],
     'SequenceExpr': [
-        'CodeBlockItem',
-        'ExprBuildable',
         'TupleExprElement'
     ],
     'SimpleTypeIdentifier': [
         'TypeAnnotation',
-        'TypeBuildable',
         'TypeExpr'
     ],
     'StmtBuildable': [

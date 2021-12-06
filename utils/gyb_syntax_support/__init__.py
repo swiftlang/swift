@@ -211,6 +211,9 @@ def syntax_collection_element_to_collection_mapping():
                 node.collection_element_type, 
                 node.collection_element, 
                 node.is_token())
+            
+            if syntax_child_type == 'SyntaxBuildable':
+                continue
 
             if syntax_child_type not in collection_map:
                 collection_map[syntax_child_type] = []
