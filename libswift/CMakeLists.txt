@@ -20,7 +20,7 @@ else()
 
   add_subdirectory(Sources)
 
-  if(${LIBSWIFT_BUILD_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE-WITH-HOSTLIBS")
+  if(${LIBSWIFT_BUILD_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
 
     if (NOT SWIFT_EXEC_FOR_LIBSWIFT)
       message(FATAL_ERROR "Need a swift toolchain for building libswift")
