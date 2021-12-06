@@ -5,7 +5,7 @@
 import _Distributed
 
 distributed actor DA {
-  typealias Transport = AnyActorTransport
+  typealias Transport = AnyDistributedActorSystem
 }
 
 extension DA {

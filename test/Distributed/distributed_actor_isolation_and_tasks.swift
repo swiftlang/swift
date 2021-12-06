@@ -5,7 +5,7 @@
 import _Distributed
 
 /// Use the existential wrapper as the default actor transport.
-typealias DefaultActorTransport = AnyActorTransport
+typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
 
 struct SomeLogger {}
 struct Logger {
@@ -21,7 +21,7 @@ distributed actor Philosopher {
   let INITIALIZED: Int
   let outside: Int = 1
 
-  init(transport: AnyActorTransport) {
+  init(transport: AnyDistributedActorSystem) {
     self.log = Logger(label: "name")
     self.INITIALIZED = 1
   }
@@ -30,10 +30,10 @@ distributed actor Philosopher {
 
   func test() {
     _ = self.id
-    _ = self.actorTransport
+    _ = self.actorSystem
     Task {
       _ = self.id
-      _ = self.actorTransport
+      _ = self.actorSystem
 
       self.log.info("READY!")
       _ = self.variable
@@ -42,7 +42,7 @@ distributed actor Philosopher {
 
     Task.detached {
       _ = self.id
-      _ = self.actorTransport
+      _ = self.actorSystem
 
       // This is an interesting case, since we have a real local `self` and
       // yet are not isolated to the same actor in this detached task...
@@ -57,12 +57,12 @@ distributed actor Philosopher {
   }
 }
 
-func test_outside(transport: AnyActorTransport) async throws {
+func test_outside(transport: AnyDistributedActorSystem) async throws {
   _ = try await Philosopher(transport: transport).dist()
   _ = Philosopher(transport: transport).log // expected-error{{distributed actor-isolated property 'log' can only be referenced inside the distributed actor}}
 
   _ = Philosopher(transport: transport).id
-  _ = Philosopher(transport: transport).actorTransport
+  _ = Philosopher(transport: transport).actorSystem
 }
 
 func test_outside_isolated(phil: isolated Philosopher) async throws {

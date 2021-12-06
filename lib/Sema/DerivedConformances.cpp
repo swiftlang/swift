@@ -193,6 +193,10 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   if (*knownProtocol == KnownProtocolKind::Comparable) {
     tryDiagnoseFailedComparableDerivation(DC, nominal);
   }
+
+  if (*knownProtocol == KnownProtocolKind::DistributedActor) {
+    tryDiagnoseFailedDistributedActorDerivation(DC, nominal);
+  }
 }
 
 void DerivedConformance::diagnoseAnyNonConformingMemberTypes(
@@ -316,8 +320,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if(name.isSimpleName(ctx.Id_id))
       return getRequirement(KnownProtocolKind::DistributedActor);
 
-    // DistributedActor.actorTransport
-    if(name.isSimpleName(ctx.Id_actorTransport))
+    // DistributedActor.actorSystem
+    if(name.isSimpleName(ctx.Id_actorSystem))
       return getRequirement(KnownProtocolKind::DistributedActor);
 
     return nullptr;
@@ -359,12 +363,12 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::Hashable);
     }
 
-    // static DistributedActor.resolve(_:using:)
+    // static DistributedActor.resolve(id:using:)
     if (name.isCompoundName() && name.getBaseName() == ctx.Id_resolve &&
         func->isStatic()) {
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 2 &&
-          argumentNames[0] == Identifier() &&
+          argumentNames[0] == ctx.Id_id &&
           argumentNames[1] == ctx.Id_using) {
         return getRequirement(KnownProtocolKind::DistributedActor);
       }

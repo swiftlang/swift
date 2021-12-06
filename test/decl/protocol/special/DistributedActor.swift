@@ -5,7 +5,7 @@
 import _Distributed
 
 /// Use the existential wrapper as the default actor transport.
-typealias DefaultActorTransport = AnyActorTransport
+typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
 
 distributed actor D1 {
   var x: Int = 17
@@ -13,10 +13,10 @@ distributed actor D1 {
 
 distributed actor D2 {
   // expected-error@-1{{actor 'D2' has no initializers}}
-  let actorTransport: String
-  // expected-error@-1{{property 'actorTransport' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
-  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'actorTransport'}}
-  // expected-note@-3{{stored property 'actorTransport' without initial value prevents synthesized initializers}}
+  let actorSystem: String
+  // expected-error@-1{{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-error@-2{{invalid redeclaration of synthesized implementation for protocol requirement 'actorSystem'}}
+  // expected-note@-3{{stored property 'actorSystem' without initial value prevents synthesized initializers}}
 }
 
 distributed actor D3 {
@@ -27,10 +27,10 @@ distributed actor D3 {
 
 distributed actor D4 {
   // expected-error@-1{{actor 'D4' has no initializers}}
-  let actorTransport: String
-  // expected-error@-1{{invalid redeclaration of synthesized implementation for protocol requirement 'actorTransport'}}
-  // expected-error@-2{{property 'actorTransport' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
-  // expected-note@-3{{stored property 'actorTransport' without initial value prevents synthesized initializers}}
+  let actorSystem: String
+  // expected-error@-1{{invalid redeclaration of synthesized implementation for protocol requirement 'actorSystem'}}
+  // expected-error@-2{{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-note@-3{{stored property 'actorSystem' without initial value prevents synthesized initializers}}
   let id: AnyActorIdentity
   // expected-error@-1{{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
   // expected-note@-2{{stored property 'id' without initial value prevents synthesized initializers}}

@@ -5,7 +5,7 @@
 import _Distributed
 
 /// Use the existential wrapper as the default actor transport.
-typealias DefaultActorTransport = AnyActorTransport
+typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
 
 // ==== -----------------------------------------------------------------------
 // MARK: Distributed actor protocols

@@ -9,9 +9,9 @@ import _Distributed
 distributed actor Philosopher {
   let philosophy: String
 
-  typealias Transport = AnyActorTransport
+  typealias Transport = AnyDistributedActorSystem
 
-  init(transport: AnyActorTransport) {
+  init(transport: AnyDistributedActorSystem) {
     philosophy = "Epistemology"
   }
 

@@ -5,14 +5,14 @@
 import _Distributed
 
 /// Use the existential wrapper as the default actor transport.
-typealias DefaultActorTransport = AnyActorTransport
+typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
 
 class SomeClass {}
 
 distributed actor MyDistActor {
   let localOnlyField: SomeClass
 
-  init(transport: AnyActorTransport) {
+  init(transport: AnyDistributedActorSystem) {
     self.localOnlyField = SomeClass()
   }
 }
@@ -31,12 +31,12 @@ distributed actor MyDistActor {
 // CHECK:   [[RAW_BOOL:%[0-9]+]] = struct_extract [[IS_REMOTE]] : $Bool, #Bool._value
 // CHECK:   cond_br [[RAW_BOOL]], [[REMOTE_BB:bb[0-9]+]], [[LOCAL_BB:bb[0-9]+]]
 
-// *** If local... invoke transport.resignIdentity()
+// *** If local... invoke transport.resignID()
 // CHECK: [[LOCAL_BB]]:
 // CHECK:   [[ID_REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
-// CHECK:   [[TPORT_REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorTransport
-// CHECK:   [[RESIGN:%[0-9]+]] = witness_method $AnyActorTransport, #ActorTransport.resignIdentity : <Self where Self : ActorTransport> (Self) -> (Self.Identity) -> ()
-// CHECK:   apply [[RESIGN]]<AnyActorTransport>([[ID_REF]], [[TPORT_REF]])
+// CHECK:   [[TPORT_REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
+// CHECK:   [[RESIGN:%[0-9]+]] = witness_method $AnyDistributedActorSystem, #DistributedActorSystem.resignID : <Self where Self : DistributedActorSystem> (Self) -> (Self.Identity) -> ()
+// CHECK:   apply [[RESIGN]]<AnyDistributedActorSystem>([[ID_REF]], [[TPORT_REF]])
 // CHECK:   br [[CONTINUE:bb[0-9]+]]
 
 // *** If remote...
@@ -57,9 +57,9 @@ distributed actor MyDistActor {
 // *** only destroy the id and transport if remote ***
 // CHECK: [[REMOTE_BB_DEALLOC]]:
             // *** destroy transport ***
-// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorTransport
+// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
-// CHECK:   destroy_addr [[ACCESS]] : $*AnyActorTransport
+// CHECK:   destroy_addr [[ACCESS]] : $*AnyDistributedActorSystem
 // CHECK:   end_access [[ACCESS]]
             // *** destroy identity ***
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
@@ -76,9 +76,9 @@ distributed actor MyDistActor {
 // CHECK:   destroy_addr [[ACCESS]] : $*SomeClass
 // CHECK:   end_access [[ACCESS]]
             // *** the rest of this part is identical to the remote case ***
-// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorTransport
+// CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]
-// CHECK:   destroy_addr [[ACCESS]] : $*AnyActorTransport
+// CHECK:   destroy_addr [[ACCESS]] : $*AnyDistributedActorSystem
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   [[REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
 // CHECK:   [[ACCESS:%[0-9]+]] = begin_access [deinit] [static] [[REF]]

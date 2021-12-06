@@ -42,17 +42,17 @@ struct ActorAddress: ActorIdentity {
 }
 
 @available(SwiftStdlib 5.6, *)
-struct FakeTransport: ActorTransport {
+struct FakeActorSystem: DistributedActorSystem {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented \(#function)")
   }
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
+  func resolve<Act>(id: ID, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor {
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor {
     .init(ActorAddress(parse: ""))
   }
@@ -62,18 +62,18 @@ struct FakeTransport: ActorTransport {
     print("\(#function):\(actor)")
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {}
+  func resignID(_ id: AnyActorIdentity) {}
 }
 
 @available(SwiftStdlib 5.6, *)
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.6, *)
 func test_initializers() {
   let address = ActorAddress(parse: "")
-  let transport = FakeTransport()
+  let transport = FakeActorSystem()
 
   _ = SomeSpecificDistributedActor(transport: transport)
   _ = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
@@ -81,14 +81,14 @@ func test_initializers() {
 
 @available(SwiftStdlib 5.6, *)
 func test_address() {
-  let transport = FakeTransport()
+  let transport = FakeActorSystem()
 
   let actor = SomeSpecificDistributedActor(transport: transport)
   _ = actor.id
 }
 
 @available(SwiftStdlib 5.6, *)
-func test_run(transport: FakeTransport) async {
+func test_run(transport: FakeActorSystem) async {
   let actor = SomeSpecificDistributedActor(transport: transport)
 
   print("before") // CHECK: before
@@ -97,7 +97,7 @@ func test_run(transport: FakeTransport) async {
 }
 
 @available(SwiftStdlib 5.6, *)
-func test_echo(transport: FakeTransport) async {
+func test_echo(transport: FakeActorSystem) async {
   let actor = SomeSpecificDistributedActor(transport: transport)
 
   let echo = try! await actor.echo(int: 42)
@@ -107,7 +107,7 @@ func test_echo(transport: FakeTransport) async {
 @available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
-    await test_run(transport: FakeTransport())
-    await test_echo(transport: FakeTransport())
+    await test_run(transport: FakeActorSystem())
+    await test_echo(transport: FakeActorSystem())
   }
 }

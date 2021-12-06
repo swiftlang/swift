@@ -22,7 +22,7 @@ struct FakeActorID: ActorIdentity {
   let id: UInt64
 }
 
-enum FakeTransportError: ActorTransportError {
+enum FakeActorSystemError: DistributedActorSystemError {
   case unsupportedActorIdentity(AnyActorIdentity)
 }
 
@@ -33,7 +33,7 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-final class FakeTransport: ActorTransport {
+final class FakeActorSystem: DistributedActorSystem {
 
   deinit {
     print("deinit \(self)")
@@ -43,16 +43,16 @@ final class FakeTransport: ActorTransport {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
+  func resolve<Act>(id: ID, as actorType: Act.Type)
   throws -> Act?
       where Act: DistributedActor {
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor {
     let id = ActorAddress(parse: "xxx")
-    print("assignIdentity type:\(actorType), id:\(id)")
+    print("assignID type:\(actorType), id:\(id)")
     return .init(id)
   }
 
@@ -60,19 +60,19 @@ final class FakeTransport: ActorTransport {
     print("actorReady actor:\(actor), id:\(actor.id)")
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {
-    print("resignIdentity id:\(id)")
+  func resignID(_ id: AnyActorIdentity) {
+    print("assignID id:\(id)")
   }
 }
 
 @available(SwiftStdlib 5.6, *)
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
 func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
-  var transport: FakeTransport? = FakeTransport()
+  var transport: FakeActorSystem? = FakeActorSystem()
 
   let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport!)
 
@@ -80,12 +80,12 @@ func test_remote() async {
   print("done") // CHECK: done
 
   print("remote.id = \(remote.id)") // CHECK: remote.id = AnyActorIdentity(ActorAddress(address: "sact://127.0.0.1/example#1234"))
-  print("remote.transport = \(remote.actorTransport)") // CHECK: remote.transport = main.FakeTransport
+  print("remote.transport = \(remote.actorSystem)") // CHECK: remote.transport = main.FakeActorSystem
 
   // only once we exit the function and the remote is released, the transport has no more references
   // CHECK-DAG: deinit AnyActorIdentity(ActorAddress(address: "sact://127.0.0.1/example#1234"))
   // transport must deinit after the last actor using it does deinit
-  // CHECK-DAG: deinit main.FakeTransport
+  // CHECK-DAG: deinit main.FakeActorSystem
 }
 
 @main struct Main {

@@ -10,6 +10,6 @@ import _Distributed
 
 @available(SwiftStdlib 5.6, *)
 public distributed actor MyActor {
-  public typealias Transport = AnyActorTransport
+  public typealias Transport = AnyDistributedActorSystem
   // nothing
 }

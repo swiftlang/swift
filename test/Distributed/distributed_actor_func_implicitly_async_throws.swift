@@ -5,7 +5,7 @@
 import _Distributed
 
 /// Use the existential wrapper as the default actor transport.
-typealias DefaultActorTransport = AnyActorTransport
+typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
 
 @available(SwiftStdlib 5.6, *)
 distributed actor D {
@@ -93,6 +93,6 @@ func test_outside(distributed: D) async throws {
 
   // special: the actorAddress may always be referred to
   _ = distributed.id // ok
-  _ = distributed.actorTransport // ok
+  _ = distributed.actorSystem // ok
 }
 

@@ -10,6 +10,14 @@
 import _Distributed
 
 distributed actor DA: CustomStringConvertible {
+  typealias ActorSystem = FakeActorSystem
+//  typealias ID = FakeActorSystem.ActorID
+
+//  struct Boom: Error {}
+//  static func resolve(id: FakeActorSystem.ActorID, using system: ActorSystem) throws -> DA {
+//    throw Boom()
+//  }
+
   nonisolated var description: String {
     "DA(\(self.id))"
   }
@@ -17,7 +25,7 @@ distributed actor DA: CustomStringConvertible {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Hashable, Sendable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address
@@ -37,37 +45,61 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-struct FakeTransport: ActorTransport {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    print("FakeTransport.decodeIdentity from:\(decoder)")
-    let address = try ActorAddress(from: decoder)
-    return AnyActorIdentity(address)
-  }
+final class FakeActorSystem: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias Invocation = FakeInvocation
+  typealias SerializationRequirement = Codable
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor {
-    print("resolve type:\(actorType), address:\(identity)")
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor, Act.ID == ActorID  {
+    print("resolve type:\(actorType), address:\(id)")
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
-      where Act: DistributedActor {
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
+      where Act: DistributedActor, Act.ID == ActorID {
     let address = ActorAddress(parse: "xxx")
     print("assign type:\(actorType), address:\(address)")
-    return .init(address)
+    return address
   }
 
-  public func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
     print("ready actor:\(actor), address:\(actor.id)")
   }
 
-  func resignIdentity(_ identity: AnyActorIdentity) {
-    print("resign address:\(identity)")
+  func resignID(_ id: ActorID) {
+    print("resign address:\(id)")
+  }
+
+  func makeInvocation() -> Invocation {
+    .init()
+  }
+}
+
+struct FakeInvocation: DistributedTargetInvocation {
+  typealias ArgumentDecoder = FakeArgumentDecoder
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
+  mutating func doneRecording() throws {}
+
+  // === Receiving / decoding -------------------------------------------------
+
+  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
+  mutating func decodeReturnType() throws -> Any.Type? { nil }
+  mutating func decodeErrorType() throws -> Any.Type? { nil }
+
+  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
+    typealias SerializationRequirement = Codable
   }
 }
 
 @available(SwiftStdlib 5.5, *)
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Test Coding ------------------------------------------------------------
 
@@ -77,9 +109,9 @@ class TestEncoder: Encoder {
 
   var data: String? = nil
 
-  init(transport: ActorTransport) {
+  init(system: FakeActorSystem) {
     self.codingPath = []
-    self.userInfo = [.actorTransportKey: transport]
+    self.userInfo = [.actorSystemKey: system]
   }
 
   func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> {
@@ -121,9 +153,8 @@ class TestEncoder: Encoder {
     func encode(_ value: UInt64) throws { fatalError("Not implemented: \(#function)") }
     func encode<T: Encodable>(_ value: T) throws {
       print("encode: \(value)")
-      if let identity = value as? AnyActorIdentity {
-        self.parent.data =
-            (identity.underlying as! ActorAddress).address
+      if let address = value as? ActorAddress {
+        self.parent.data = address.address
       }
     }
   }
@@ -138,9 +169,9 @@ class TestDecoder: Decoder {
   let encoder: TestEncoder
   let data: String
 
-  init(encoder: TestEncoder, transport: ActorTransport, data: String) {
+  init(encoder: TestEncoder, system: FakeActorSystem, data: String) {
     self.encoder = encoder
-    self.userInfo = [.actorTransportKey: transport]
+    self.userInfo = [.actorSystemKey: system]
     self.data = data
   }
 
@@ -189,19 +220,19 @@ class TestDecoder: Decoder {
 // ==== Execute ----------------------------------------------------------------
 
 func test() {
-  let transport = FakeTransport()
+  let system = FakeActorSystem()
 
   // CHECK: assign type:DA, address:ActorAddress(address: "xxx")
-  let da = DA(transport: transport)
+  let da = DA(system: system)
 
   // CHECK: encode: AnyActorIdentity(ActorAddress(address: "xxx"))
-  // CHECK: FakeTransport.decodeIdentity from:main.TestDecoder
-  let encoder = TestEncoder(transport: transport)
+  // CHECK: FakeActorSystem.decodeIdentity from:main.TestDecoder
+  let encoder = TestEncoder(system: system)
   let data = try! encoder.encode(da)
 
   // CHECK: decode String -> xxx
   // CHECK: decode ActorAddress -> ActorAddress(address: "xxx")
-  let da2 = try! DA(from: TestDecoder(encoder: encoder, transport: transport, data: data))
+  let da2 = try! DA(from: TestDecoder(encoder: encoder, system: system, data: data))
 
   // CHECK: decoded da2: DA(AnyActorIdentity(ActorAddress(address: "xxx")))
   print("decoded da2: \(da2)")

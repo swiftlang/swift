@@ -523,6 +523,7 @@ swift::matchWitness(
              llvm::function_ref<
                      RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
                    > finalize) {
+
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -542,12 +543,14 @@ swift::matchWitness(
   }
 
   // If we're currently validating the witness, bail out.
-  if (witness->isRecursiveValidation())
+  if (witness->isRecursiveValidation()) {
     return RequirementMatch(witness, MatchKind::Circularity);
+  }
   
   // If the witness is invalid, record that and stop now.
-  if (witness->isInvalid())
+  if (witness->isInvalid()) {
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
+  }
 
   // Get the requirement and witness attributes.
   const auto &reqAttrs = req->getAttrs();
@@ -3646,21 +3649,23 @@ filterProtocolRequirements(
 
 /// Prune the set of missing witnesses for the given conformance, eliminating
 /// any requirements that do not actually need to satisfied.
-static ArrayRef<MissingWitness> pruneMissingWitnesses(
+static ArrayRef<MissingWitness> pruneMissingWitnesses( // FIXME: this does not remove the missing witness note here!!!
     ConformanceChecker &checker,
     ProtocolDecl *proto,
     NormalProtocolConformance *conformance,
     ArrayRef<MissingWitness> missingWitnesses,
     SmallVectorImpl<MissingWitness> &scratch) {
-  if (missingWitnesses.empty())
+  if (missingWitnesses.empty()) {
     return missingWitnesses;
+  }
 
   // For an @objc protocol defined in Objective-C, the Clang importer might
   // have imported the same underlying Objective-C declaration as more than
   // one Swift declaration. If we aren't in an imported @objc protocol, there
   // is nothing to do.
-  if (!proto->isObjC())
+  if (!proto->isObjC()) {
     return missingWitnesses;
+  }
 
   // Consider each of the missing witnesses to remove any that should not
   // longer be considered "missing".
@@ -3672,8 +3677,9 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses(
 
     // Local function to skip this particular witness.
     auto skipWitness = [&] {
-      if (removedAny)
+      if (removedAny) {
         return;
+      }
 
       // This is the first witness we skipped. Copy all of the earlier
       // missing witnesses over.
@@ -3722,8 +3728,9 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses(
     skipWitness();
   }
 
-  if (removedAny)
+  if (removedAny) {
     return scratch;
+  }
 
   return missingWitnesses;
 }
@@ -3745,6 +3752,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     auto requirement = Missing.requirement;
     auto matches = Missing.matches;
     auto nominal = Adoptee->getAnyNominal();
+
     diagnoseOrDefer(requirement, true,
       [requirement, matches, nominal](NormalProtocolConformance *conformance) {
         auto dc = conformance->getDeclContext();
@@ -3752,8 +3760,9 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
         // Possibly diagnose reason for automatic derivation failure
         DerivedConformance::tryDiagnoseFailedDerivation(dc, nominal, protocol);
         // Diagnose each of the matches.
-        for (const auto &match : matches)
+        for (const auto &match : matches) {
           diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
+        }
       });
   }
 
@@ -4147,7 +4156,6 @@ static bool isRawRepresentableGenericFunction(
 ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
-
   auto *nominal = Adoptee->getAnyNominal();
 
   // Resolve all associated types before trying to resolve this witness.
@@ -4200,7 +4208,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   auto &ctx = getASTContext();
   bool isEquatableConformance = (Conformance->getProtocol() ==
                                  ctx.getProtocol(KnownProtocolKind::Equatable));
-
   if (findBestWitness(requirement,
                       considerRenames ? &ignoringNames : nullptr,
                       Conformance,
@@ -4515,8 +4522,10 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   // Attempt to derive the witness.
   auto derived =
       TypeChecker::deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
-  if (!derived)
+
+  if (!derived) {
     return ResolveWitnessResult::ExplicitFailed;
+  }
 
   // Try to match the derived requirement.
   auto match = matchWitness(ReqEnvironmentCache, Proto, Conformance, DC,
@@ -4896,12 +4905,15 @@ void ConformanceChecker::resolveValueWitnesses() {
     auto finalizeWitness = [&] {
       // Find the witness.
       auto witness = Conformance->getWitnessUncached(requirement).getDecl();
-      if (!witness) return;
+      if (!witness) {
+        return;
+      }
 
       auto &C = witness->getASTContext();
 
-      if (checkActorIsolation(requirement, witness))
+      if (checkActorIsolation(requirement, witness)) {
         return;
+      }
 
       // Ensure that Actor.unownedExecutor is implemented within the
       // actor class itself.  But if this somehow resolves to the
@@ -5322,6 +5334,7 @@ void ConformanceChecker::diagnoseOrDefer(
   if (SuppressDiagnostics) {
     // Stash this in the ASTContext for later emission.
     auto conformance = Conformance;
+
     getASTContext().addDelayedConformanceDiag(
         conformance,
         {requirement, [conformance, fn] { fn(conformance); }, isError});
