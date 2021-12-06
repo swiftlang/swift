@@ -654,6 +654,11 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
         continue;
       }
 
+      if (isa<DeinitExistentialAddrInst>(Op->getUser())) {
+        eraseInstFromFunction(*Op->getUser());
+        continue;
+      }
+
       if (!isa<DeallocStackInst>(Op->getUser()))
         continue;
 

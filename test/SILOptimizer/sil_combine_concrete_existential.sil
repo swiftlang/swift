@@ -692,6 +692,35 @@ bb0(%0 : $ResourceKitProtocol, %1 : $ViewController):
   return %19 : $()
 }
 
+sil @calleWhichThrows : $@convention(thin) () -> (@out S, @error Error)
+
+// CHECK-LABEL: sil @initExistentialWithDeinitExistential
+// CHECK:     [[S:%[0-9]+]] = alloc_stack $S
+// CHECK-NOT: init_existential_addr
+// CHECK:     try_apply %{{[0-9]+}}([[S]])
+// CHECK:     destroy_addr [[S]] : $*S
+// CHECK:     dealloc_stack [[S]] : $*S
+// CHECK: } // end sil function 'initExistentialWithDeinitExistential'
+sil @initExistentialWithDeinitExistential : $@convention(thin) () -> @error Error {
+bb0:
+  %4 = alloc_stack $PPP
+  %5 = function_ref @calleWhichThrows : $@convention(thin) () -> (@out S, @error Error)
+  %6 = init_existential_addr %4 : $*PPP, $S
+  try_apply %5(%6) : $@convention(thin) () -> (@out S, @error Error), normal bb1, error bb3
+
+bb1(%8 : $()):
+  destroy_addr %4 : $*PPP
+  dealloc_stack %4 : $*PPP
+  %18 = tuple ()
+  return %18 : $()
+
+
+bb3(%20 : $Error):
+  deinit_existential_addr %4 : $*PPP
+  dealloc_stack %4 : $*PPP
+  throw %20 : $Error
+}
+
 sil_vtable SubscriptionViewControllerBuilder {}
 sil_vtable SubscriptionViewController {}
 sil_vtable ViewController  {}
