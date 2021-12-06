@@ -46,7 +46,42 @@ struct AccessibleFunctionsSection {
   const AccessibleFunctionRecord *end() const { return End; }
 };
 
+struct AccessibleFunctionCacheEntry {
+private:
+  const char *Name;
+  size_t NameLength;
+
+  const AccessibleFunctionRecord *Func;
+
+public:
+  AccessibleFunctionCacheEntry(llvm::StringRef name,
+                               const AccessibleFunctionRecord *func)
+      : Func(func) {
+    char *Name = reinterpret_cast<char *>(malloc(name.size()));
+    memcpy(Name, name.data(), name.size());
+
+    this->Name = Name;
+    this->NameLength = name.size();
+  }
+
+  const AccessibleFunctionRecord *getFunction() const { return Func; }
+
+  bool matchesKey(llvm::StringRef name) {
+    return name == llvm::StringRef{Name, NameLength};
+  }
+
+  friend llvm::hash_code hash_value(const AccessibleFunctionCacheEntry &value) {
+    return hash_value(llvm::StringRef{value.Name, value.NameLength});
+  }
+
+  template <class... T>
+  static size_t getExtraAllocationSize(T &&...ignored) {
+    return 0;
+  }
+};
+
 struct AccessibleFunctionsState {
+  ConcurrentReadableHashMap<AccessibleFunctionCacheEntry> Cache;
   ConcurrentReadableArray<AccessibleFunctionsSection> SectionsToScan;
 
   AccessibleFunctionsState() {
@@ -77,4 +112,44 @@ void swift::addImageAccessibleFunctionsBlockCallback(const void *functions,
                                                      uintptr_t size) {
   Functions.get();
   addImageAccessibleFunctionsBlockCallbackUnsafe(functions, size);
+}
+
+static const AccessibleFunctionRecord *
+_searchForFunctionRecord(AccessibleFunctionsState &S, llvm::StringRef name) {
+  for (const auto &section : S.SectionsToScan.snapshot()) {
+    for (auto &record : section) {
+      auto recordName =
+          swift::Demangle::makeSymbolicMangledNameStringRef(record.Name.get());
+      if (recordName == name)
+        return &record;
+    }
+  }
+  return nullptr;
+}
+
+static const AccessibleFunctionRecord *
+_findAccessibleFunction(llvm::StringRef name) {
+  auto &S = Functions.get();
+
+  // Look for an existing entry.
+  {
+    auto snapshot = S.Cache.snapshot();
+    if (auto E = snapshot.find(name))
+      return E->getFunction();
+  }
+
+  // If entry doesn't exist (either record doesn't exist, hasn't been loaded, or
+  // requested yet), let's try to find it and add to the cache.
+
+  auto *function = _searchForFunctionRecord(S, name);
+  if (function) {
+    S.Cache.getOrInsert(
+        name, [&](AccessibleFunctionCacheEntry *entry, bool created) {
+          if (created)
+            new (entry) AccessibleFunctionCacheEntry{name, function};
+          return true;
+        });
+  }
+
+  return function;
 }
