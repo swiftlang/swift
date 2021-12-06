@@ -1,4 +1,10 @@
 SYNTAX_BUILDABLE_EXPRESSIBLE_AS_CONFORMANCES = {
+    'AccessorList': [
+        'AccessorBlock'
+    ],
+    'CodeBlockItemList': [
+        'CodeBlock'
+    ],
     'DeclBuildable': [
         'CodeBlockItem',
         'MemberDeclListItem',
@@ -14,6 +20,15 @@ SYNTAX_BUILDABLE_EXPRESSIBLE_AS_CONFORMANCES = {
     'MemberDeclList': [
         'MemberDeclBlock'
     ],
+    'FunctionCallExpr': [
+        'CodeBlockItem',
+        'ExprBuildable'
+    ],
+    'SequenceExpr': [
+        'CodeBlockItem',
+        'ExprBuildable',
+        'TupleExprElement'
+    ],
     'SimpleTypeIdentifier': [
         'TypeAnnotation',
         'TypeBuildable',
@@ -24,6 +39,7 @@ SYNTAX_BUILDABLE_EXPRESSIBLE_AS_CONFORMANCES = {
         'SyntaxBuildable'
     ],
     'TokenSyntax': [
-        'BinaryOperatorExpr'
+        'BinaryOperatorExpr',
+        'DeclModifier'
     ]
 }
