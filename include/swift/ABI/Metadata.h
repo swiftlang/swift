@@ -5059,6 +5059,8 @@ public:
   AccessibleFunctionFlags Flags;
 };
 
+using AccessibleFunctionRecord = TargetAccessibleFunctionRecord<InProcess>;
+
 } // end namespace swift
 
 #pragma clang diagnostic pop

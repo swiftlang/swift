@@ -81,6 +81,13 @@ void swift_addNewDSOImage(const void *addr) {
         replacements, dynamic_replacements.length, replacements_some,
         dynamic_replacements_some.length);
   }
+
+  const auto &accessible_funcs_section = sections->swift5_accessible_functions;
+  const void *functions =
+      reinterpret_cast<void *>(accessible_funcs_section.start);
+  if (accessible_funcs_section.length)
+    swift::addImageAccessibleFunctionsBlockCallback(
+        functions, accessible_funcs_section.length);
 }
 
 void swift::initializeProtocolLookup() {
@@ -129,6 +136,21 @@ void swift::initializeTypeMetadataRecordLookup() {
 }
 
 void swift::initializeDynamicReplacementLookup() {
+}
+
+void swift::initializeAccessibleFunctionsLookup() {
+  const swift::MetadataSections *sections = registered;
+  while (true) {
+    const swift::MetadataSectionRange &functions =
+        sections->swift5_accessible_functions;
+    if (functions.length)
+      addImageAccessibleFunctionsBlockCallbackUnsafe(
+          reinterpret_cast<void *>(functions.start), functions.length);
+
+    if (sections->next == registered)
+      break;
+    sections = sections->next;
+  }
 }
 
 #ifndef NDEBUG
