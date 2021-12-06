@@ -1545,7 +1545,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       
   case tok::string_literal:  // "foo"
     return parseExprStringLiteral();
-  
+
+  case tok::regex_literal:
+    return parseExprRegexLiteral();
+
   case tok::kw_nil:
     ExprContext.setCreateSyntax(SyntaxKind::NilLiteralExpr);
     return makeParserResult(new (Context)

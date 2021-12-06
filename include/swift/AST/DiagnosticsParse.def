@@ -91,6 +91,9 @@ ERROR(forbidden_interpolated_string,none,
 ERROR(forbidden_extended_escaping_string,none,
       "%0 cannot be an extended escaping string literal", (StringRef))
 
+ERROR(regex_literal_parsing_error,none,
+      "%0", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -107,9 +110,6 @@ ERROR(lex_unprintable_ascii_character,none,
       "unprintable ASCII character found in source file", ())
 ERROR(lex_invalid_utf8,none,
       "invalid UTF-8 found in source file", ())
-
-NOTE(lex_experimental_regex_strawperson,none,
-     "'%0'", (StringRef))
 
 ERROR(lex_single_quote_string,none,
       "single-quoted string literal found, use '\"'", ())
@@ -139,6 +139,9 @@ ERROR(lex_invalid_escape_delimiter,none,
       "too many '#' characters in delimited escape", ())
 ERROR(lex_invalid_closing_delimiter,none,
       "too many '#' characters in closing delimiter", ())
+
+ERROR(lex_unterminated_regex,none,
+      "unterminated regex literal", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
       "invalid unicode scalar", ())

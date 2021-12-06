@@ -2790,7 +2790,11 @@ namespace {
 
       return expr;
     }
-    
+
+    Expr *visitRegexLiteralExpr(RegexLiteralExpr *expr) {
+      return simplifyExprType(expr);
+    }
+
     Expr *visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
       switch (expr->getKind()) {
 #define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
