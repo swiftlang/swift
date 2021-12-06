@@ -73,19 +73,41 @@ struct RewriteStep {
     /// new substitutions replace the substitutions in that symbol.
     ///
     /// The RuleID field encodes the number of substitutions.
-    Decompose
+    Decompose,
+
+    /// If not inverted: the top of the A stack must be a term ending in a
+    /// concrete type symbol [concrete: C] followed by a protocol symbol [P].
+    /// These two symbols are combined into a single concrete conformance
+    /// symbol [concrete: C : P].
+    ///
+    /// If inverted: the top of the A stack must be a term ending in a
+    /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
+    /// with the concrete type symbol [concrete: C] followed by the protocol
+    /// symbol [P].
+    ConcreteConformance,
+
+    /// If not inverted: the top of the A stack must be a term ending in a
+    /// superclass symbol [superclass: C] followed by a protocol symbol [P].
+    /// These two symbols are combined into a single concrete conformance
+    /// symbol [concrete: C : P].
+    ///
+    /// If inverted: the top of the A stack must be a term ending in a
+    /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
+    /// with the superclass symbol [superclass: C] followed by the protocol
+    /// symbol [P].
+    SuperclassConformance
   };
 
   /// The rewrite step kind.
-  StepKind Kind : 2;
+  StepKind Kind : 3;
 
   /// The size of the left whisker, which is the position within the term where
   /// the rule is being applied. In A.(X => Y).B, this is |A|=1.
-  unsigned StartOffset : 15;
+  unsigned StartOffset : 14;
 
   /// The size of the right whisker, which is the length of the remaining suffix
   /// after the rule is applied. In A.(X => Y).B, this is |B|=1.
-  unsigned EndOffset : 15;
+  unsigned EndOffset : 14;
 
   /// If Kind is ApplyRewriteRule, the index of the rule in the rewrite system.
   ///
@@ -130,6 +152,16 @@ struct RewriteStep {
   static RewriteStep forDecompose(unsigned numSubstitutions, bool inverse) {
     return RewriteStep(Decompose, /*startOffset=*/0, /*endOffset=*/0,
                        /*ruleID=*/numSubstitutions, inverse);
+  }
+
+  static RewriteStep forConcreteConformance(bool inverse) {
+    return RewriteStep(ConcreteConformance, /*startOffset=*/0, /*endOffset=*/0,
+                       /*ruleID=*/0, inverse);
+  }
+
+  static RewriteStep forSuperclassConformance(bool inverse) {
+    return RewriteStep(SuperclassConformance, /*startOffset=*/0, /*endOffset=*/0,
+                       /*ruleID=*/0, inverse);
   }
 
   bool isInContext() const {
@@ -302,6 +334,9 @@ struct RewritePathEvaluator {
 
   void applyDecompose(const RewriteStep &step,
                       const RewriteSystem &system);
+
+  void applyConcreteConformance(const RewriteStep &step,
+                                const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
 };

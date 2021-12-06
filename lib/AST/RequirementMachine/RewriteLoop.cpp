@@ -61,6 +61,20 @@ void RewriteStep::dump(llvm::raw_ostream &out,
     out << RuleID << ")";
     break;
   }
+  case ConcreteConformance: {
+    evaluator.applyConcreteConformance(*this, system);
+
+    out << (Inverse ? "ConcreteConformance⁻¹"
+                    : "ConcreteConformance");
+    break;
+  }
+  case SuperclassConformance: {
+    evaluator.applyConcreteConformance(*this, system);
+
+    out << (Inverse ? "SuperclassConformance⁻¹"
+                    : "SuperclassConformance");
+    break;
+  }
   }
 }
 
@@ -312,6 +326,69 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
   }
 }
 
+void
+RewritePathEvaluator::applyConcreteConformance(const RewriteStep &step,
+                                               const RewriteSystem &system) {
+  checkA();
+  auto &term = A.back();
+
+  auto &ctx = system.getRewriteContext();
+
+  if (!step.Inverse) {
+    assert(term.size() > 2);
+    auto concreteType = *(term.end() - 2);
+    auto proto = *(term.end() - 1);
+    assert(proto.getKind() == Symbol::Kind::Protocol);
+
+    MutableTerm newTerm(term.begin(), term.end() - 2);
+    if (step.Kind == RewriteStep::ConcreteConformance) {
+      assert(concreteType.getKind() == Symbol::Kind::ConcreteType);
+
+      newTerm.add(Symbol::forConcreteConformance(
+          concreteType.getConcreteType(),
+          concreteType.getSubstitutions(),
+          proto.getProtocol(),
+          ctx));
+    } else {
+      assert(step.Kind == RewriteStep::SuperclassConformance);
+      assert(concreteType.getKind() == Symbol::Kind::Superclass);
+
+      newTerm.add(Symbol::forConcreteConformance(
+          concreteType.getSuperclass(),
+          concreteType.getSubstitutions(),
+          proto.getProtocol(),
+          ctx));
+    }
+
+    term = newTerm;
+  } else {
+    assert(term.size() > 1);
+    auto concreteConformance = term.back();
+    assert(concreteConformance.getKind() == Symbol::Kind::ConcreteConformance);
+
+    MutableTerm newTerm(term.begin(), term.end() - 1);
+
+    if (step.Kind == RewriteStep::ConcreteConformance) {
+      newTerm.add(Symbol::forConcreteType(
+          concreteConformance.getConcreteType(),
+          concreteConformance.getSubstitutions(),
+          ctx));
+    } else {
+      assert(step.Kind == RewriteStep::SuperclassConformance);
+      newTerm.add(Symbol::forSuperclass(
+          concreteConformance.getConcreteType(),
+          concreteConformance.getSubstitutions(),
+          ctx));
+    }
+
+    newTerm.add(Symbol::forProtocol(
+        concreteConformance.getProtocol(),
+        ctx));
+
+    term = newTerm;
+  }
+}
+
 void RewritePathEvaluator::apply(const RewriteStep &step,
                                  const RewriteSystem &system) {
   switch (step.Kind) {
@@ -329,6 +406,11 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
 
   case RewriteStep::Decompose:
     applyDecompose(step, system);
+    break;
+
+  case RewriteStep::ConcreteConformance:
+  case RewriteStep::SuperclassConformance:
+    applyConcreteConformance(step, system);
     break;
   }
 }
