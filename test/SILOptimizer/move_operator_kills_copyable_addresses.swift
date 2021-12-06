@@ -144,7 +144,7 @@ public func conditionalBadConsumingUseLoop2<T>(_ x: T) {
 
 // This is ok, no uses after.
 public func simpleMoveOfParameter<T>(_ x: T) -> () {
-    let _ = _move(x) // expected-error {{_move applied to value that the compiler does not know how to check}}
+    let _ = _move(x) // expected-error {{_move applied to value that the compiler does not support checking}}
 }
 
 public func simpleMoveOfOwnedParameter<T>(_ x: __owned T) -> () {
@@ -269,12 +269,12 @@ public class TPair<T> {
 // TODO: Emit a better error here! We should state that we are applying _move to
 // a class field and that is illegal.
 public func performMoveOnOneEltOfTPair<T>(_ p: TPair<T>) {
-    let _ = _move(p.x) // expected-error {{_move applied to value that the compiler does not know how to check. Please file a bug or an enhancement request!}}
+    let _ = _move(p.x) // expected-error {{_move applied to value that the compiler does not support checking}}
     nonConsumingUse(p.y)
 }
 
 public func performMoveOnOneEltOfTPair2<T>(_ p: __owned TPair<T>) {
-    let _ = _move(p.x) // expected-error {{_move applied to value that the compiler does not know how to check. Please file a bug or an enhancement request!}}
+    let _ = _move(p.x) // expected-error {{_move applied to value that the compiler does not support checking}}
     nonConsumingUse(p.y)
 }
 
@@ -284,7 +284,7 @@ public func performMoveOnOneEltOfTPair2<T>(_ p: __owned TPair<T>) {
 
 public func performMoveOnVar<T>(_ p: T) {
     var x = p
-    let _ = _move(x)
+    let _ = _move(x) // expected-error {{_move applied to value that the compiler does not support checking}}
     x = p
     nonConsumingUse(x)
 }
