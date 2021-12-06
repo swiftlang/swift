@@ -35,6 +35,7 @@ class Histogram {
   unsigned Start;
   std::vector<unsigned> Buckets;
   unsigned OverflowBucket;
+  unsigned MaxValue = 0;
 
   const unsigned MaxWidth = 40;
 
@@ -73,6 +74,9 @@ public:
       ++OverflowBucket;
     else
       ++Buckets[value];
+
+    if (value > MaxValue)
+      MaxValue = value;
   }
 
   /// Print a nice-looking graphical representation of the histogram.
@@ -140,6 +144,8 @@ public:
 
     out << std::string(maxLabelWidth, ' ') << " | ";
     out << "Total: " << sumValues << "\n";
+    out << std::string(maxLabelWidth, ' ') << " | ";
+    out << "Max:   " << MaxValue << "\n";
   }
 };
 
