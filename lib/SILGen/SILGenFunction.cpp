@@ -522,6 +522,9 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
 
   if (fd->isDistributedActorFactory()) {
+    fprintf(stderr, "[%s:%d] (%s) the factory: \n", __FILE__, __LINE__, __FUNCTION__);
+    fd->dump();
+    fprintf(stderr, "[%s:%d] (%s) ----------\n", __FILE__, __LINE__, __FUNCTION__);
     // Synthesize the factory function body
     emitDistributedActorFactory(fd);
   } else {

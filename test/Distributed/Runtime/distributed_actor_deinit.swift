@@ -17,19 +17,19 @@ actor A {}
 
 @available(SwiftStdlib 5.6, *)
 distributed actor DA {
-  init(transport: FakeTransport) {}
+  init(transport: FakeActorSystem) {}
 }
 
 @available(SwiftStdlib 5.6, *)
 distributed actor DA_userDefined {
-  init(transport: FakeTransport) {}
+  init(transport: FakeActorSystem) {}
 
   deinit {}
 }
 
 @available(SwiftStdlib 5.6, *)
 distributed actor DA_userDefined2 {
-  init(transport: FakeTransport) {}
+  init(transport: FakeActorSystem) {}
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -42,7 +42,7 @@ distributed actor DA_state {
   var name = "Hello"
   var age = 42
 
-  init(transport: FakeTransport) {}
+  init(transport: FakeActorSystem) {}
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -61,7 +61,7 @@ struct ActorAddress: ActorIdentity {
 }
 
 @available(SwiftStdlib 5.6, *)
-final class FakeTransport: @unchecked Sendable, ActorTransport {
+final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
 
   var n = 0
 
@@ -70,37 +70,37 @@ final class FakeTransport: @unchecked Sendable, ActorTransport {
     fatalError("not implemented \(#function)")
   }
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
+  func resolve<Act>(id: ID, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor {
-    print("resolve type:\(actorType), address:\(identity)")
+    print("resolve type:\(actorType), address:\(id)")
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
-      where Act: DistributedActor {
+  func assignID<Act>(_ actorType: Act.Type) -> Act.ID
+      where Act: DistributedActor, Act.ID == ActorID {
     n += 1
     let address = ActorAddress(parse: "addr-\(n)")
     print("assign type:\(actorType), address:\(address)")
-    return .init(address)
+    return address
   }
 
   public func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
     print("ready actor:\(actor), address:\(actor.id)")
   }
 
-  func resignIdentity(_ identity: AnyActorIdentity) {
-    print("resign address:\(identity)")
+  func resignID(id: ID) {
+    print("resign address:\(id)")
   }
 }
 
 @available(SwiftStdlib 5.6, *)
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.6, *)
 func test() {
-  let transport = FakeTransport()
+  let transport = FakeActorSystem()
 
   // no lifecycle things make sense for a normal actor, double check we didn't emit them
   print("before A")

@@ -10,9 +10,9 @@
 import _Distributed
 
 distributed actor LocalWorker {
-  typealias Transport = FakeTransport
+  typealias Transport = FakeActorSystem
 
-  init(transport: FakeTransport) {}
+  init(transport: FakeActorSystem) {}
 
   distributed func function() async throws -> String {
     "local:"
@@ -46,18 +46,18 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-struct FakeTransport: ActorTransport {
+struct FakeActorSystem: DistributedActorSystem {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
+  func resolve<Act>(id: ID, as actorType: Act.Type)
   throws -> Act?
       where Act: DistributedActor {
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor {
     let id = ActorAddress(parse: "xxx")
     print("assign type:\(actorType), id:\(id)")
@@ -68,18 +68,18 @@ struct FakeTransport: ActorTransport {
     print("ready actor:\(actor), id:\(actor.id)")
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {
+  func resignID(_ id: AnyActorIdentity) {
     print("ready id:\(id)")
   }
 }
 
 @available(SwiftStdlib 5.5, *)
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
 func test_local() async throws {
-  let transport = FakeTransport()
+  let transport = FakeActorSystem()
 
   let worker = LocalWorker(transport: transport)
   let x = try await worker.function()
@@ -91,7 +91,7 @@ func test_local() async throws {
 
 func test_remote() async throws {
   let address = ActorAddress(parse: "")
-  let transport = FakeTransport()
+  let transport = FakeActorSystem()
 
   let worker = try LocalWorker.resolve(.init(address), using: transport)
   let x = try await worker.function()

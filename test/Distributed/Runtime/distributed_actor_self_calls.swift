@@ -39,17 +39,17 @@ struct ActorAddress: ActorIdentity {
   }
 }
 
-struct FakeTransport: ActorTransport {
+struct FakeActorSystem: DistributedActorSystem {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented \(#function)")
   }
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
+  func resolve<Act>(id: ID, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor {
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor {
     .init(ActorAddress(parse: ""))
   }
@@ -59,19 +59,19 @@ struct FakeTransport: ActorTransport {
     print("\(#function):\(actor)")
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {}
+  func resignID(_ id: AnyActorIdentity) {}
 }
 
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
-func test(transport: FakeTransport) async {
+func test(transport: FakeActorSystem) async {
   _ = Philosopher(transport: transport)
 }
 
 @main struct Main {
   static func main() async {
-    await test(transport: FakeTransport())
+    await test(transport: FakeActorSystem())
   }
 }

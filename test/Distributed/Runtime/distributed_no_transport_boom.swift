@@ -33,17 +33,17 @@ struct ActorAddress: ActorIdentity {
 }
 
 @available(SwiftStdlib 5.6, *)
-struct FakeTransport: ActorTransport {
+struct FakeActorSystem: DistributedActorSystem {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type) throws -> Act?
+  func resolve<Act>(id: ID, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor {
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor {
     let id = ActorAddress(parse: "xxx")
     print("assign type:\(actorType), id:\(id)")
@@ -54,25 +54,25 @@ struct FakeTransport: ActorTransport {
     print("ready actor:\(actor), id:\(actor.id)")
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {
+  func resignID(_ id: AnyActorIdentity) {
     print("ready id:\(id)")
   }
 }
 
 @available(SwiftStdlib 5.6, *)
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.6, *)
 func test_remote() async {
   let address = ActorAddress(parse: "")
-  let transport = FakeTransport()
+  let transport = FakeActorSystem()
 
   let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
   _ = try! await remote.hello() // let it crash!
 
-  // CHECK: SOURCE_DIR/test/Distributed/Runtime/distributed_no_transport_boom.swift:{{[0-9]+}}: Fatal error: Invoked remote placeholder function '_remote_hello' on remote distributed actor of type 'main.SomeSpecificDistributedActor'. Configure an appropriate 'ActorTransport' for this actor to resolve this error (e.g. by depending on some specific transport library).
+  // CHECK: SOURCE_DIR/test/Distributed/Runtime/distributed_no_transport_boom.swift:{{[0-9]+}}: Fatal error: Invoked remote placeholder function '_remote_hello' on remote distributed actor of type 'main.SomeSpecificDistributedActor'. Configure an appropriate 'DistributedActorSystem' for this actor to resolve this error (e.g. by depending on some specific transport library).
 }
 
 @available(SwiftStdlib 5.6, *)

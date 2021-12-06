@@ -4327,8 +4327,8 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
       if (baseName == DeclBaseName::createConstructor()) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
-        } else if (argumentNames.front() == Context.Id_transport) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActorTransport);
+        } else if (argumentNames.front() == Context.Id_system) {
+          action.emplace(ImplicitMemberAction::ResolveDistributedActorSystem);
         }
       } else if (!baseName.isSpecial() &&
            baseName.getIdentifier() == Context.Id_encode &&
@@ -7383,6 +7383,18 @@ AbstractFunctionDecl::getDistributedActorRemoteFuncDecl() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
       GetDistributedRemoteFuncRequest{mutableThis},
+      nullptr);
+}
+
+ValueDecl*
+NominalTypeDecl::getDistributedActorIDProperty() const {
+  if (!this->isDistributedActor())
+    return nullptr;
+
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedActorIDPropertyRequest{mutableThis},
       nullptr);
 }
 

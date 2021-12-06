@@ -19,23 +19,23 @@ enum MyError: Error {
 
 @available(SwiftStdlib 5.6, *)
 distributed actor PickATransport1 {
-  init(kappa transport: FakeTransport, other: Int) {}
+  init(kappa transport: FakeActorSystem, other: Int) {}
 }
 
 @available(SwiftStdlib 5.6, *)
 distributed actor PickATransport2 {
-  init(other: Int, theTransport: FakeTransport) async {}
+  init(other: Int, theTransport: FakeActorSystem) async {}
 }
 
 @available(SwiftStdlib 5.6, *)
 distributed actor LocalWorker {
-  init(transport: FakeTransport) {}
+  init(transport: FakeActorSystem) {}
 }
 
 @available(SwiftStdlib 5.6, *)
 distributed actor Bug_CallsReadyTwice {
   var x: Int
-  init(transport: FakeTransport, wantBug: Bool) async {
+  init(transport: FakeActorSystem, wantBug: Bool) async {
     if wantBug {
       self.x = 1
     }
@@ -45,7 +45,7 @@ distributed actor Bug_CallsReadyTwice {
 
 @available(SwiftStdlib 5.6, *)
 distributed actor Throwy {
-  init(transport: FakeTransport, doThrow: Bool) throws {
+  init(transport: FakeActorSystem, doThrow: Bool) throws {
     if doThrow {
       throw MyError.test
     }
@@ -55,7 +55,7 @@ distributed actor Throwy {
 @available(SwiftStdlib 5.6, *)
 distributed actor ThrowBeforeFullyInit {
   var x: Int
-  init(transport: FakeTransport, doThrow: Bool) throws {
+  init(transport: FakeActorSystem, doThrow: Bool) throws {
     if doThrow {
       throw MyError.test
     }
@@ -77,17 +77,17 @@ struct ActorAddress: ActorIdentity {
 var nextID: Int = 1
 
 @available(SwiftStdlib 5.6, *)
-struct FakeTransport: ActorTransport {
+struct FakeActorSystem: DistributedActorSystem {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
+  func resolve<Act>(id: ID, as actorType: Act.Type)
       throws -> Act? where Act: DistributedActor {
     fatalError("not implemented:\(#function)")
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
       where Act: DistributedActor {
     let id = ActorAddress(parse: "\(nextID)")
     nextID += 1
@@ -99,7 +99,7 @@ struct FakeTransport: ActorTransport {
     print("ready actor:\(actor), id:\(actor.id)")
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {
+  func resignID(_ id: AnyActorIdentity) {
     print("resign id:\(id)")
   }
 }
@@ -108,7 +108,7 @@ struct FakeTransport: ActorTransport {
 
 @available(SwiftStdlib 5.6, *)
 func test() async {
-  let transport = FakeTransport()
+  let transport = FakeActorSystem()
 
   // NOTE: All allocated distributed actors should be saved in this array, so
   // that they will be deallocated together at the end of this test!

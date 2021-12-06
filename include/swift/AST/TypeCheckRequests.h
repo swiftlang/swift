@@ -1009,6 +1009,24 @@ public:
     bool isCached() const { return true; }
 };
 
+/// Obtain the 'id' property of a 'distributed actor'.
+class GetDistributedActorIDPropertyRequest :
+    public SimpleRequest<GetDistributedActorIDPropertyRequest,
+                         ValueDecl *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ValueDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
 /// Retrieve the static "shared" property within a global actor that provides
 /// the actor instance representing the global actor.
 ///
@@ -2189,8 +2207,8 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveEncodable,
   ResolveDecodable,
   ResolveDistributedActor,
-  ResolveDistributedActorIdentity,
-  ResolveDistributedActorTransport,
+  ResolveDistributedActorID,
+  ResolveDistributedActorSystem,
 };
 
 class ResolveImplicitMemberRequest

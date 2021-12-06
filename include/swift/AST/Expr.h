@@ -1216,7 +1216,7 @@ public:
 
   /// Set whether this reference must account for a `throw` occurring for reasons
   /// other than the function implementation itself throwing, e.g. an
-  /// `ActorTransport` implementing a `distributed func` call throwing a
+  /// `DistributedActorSystem` implementing a `distributed func` call throwing a
   /// networking error.
   void setImplicitlyThrows(bool isImplicitlyThrows) {
     Bits.DeclRefExpr.IsImplicitlyThrows = isImplicitlyThrows;
@@ -1596,7 +1596,7 @@ public:
 
   /// Set whether this reference must account for a `throw` occurring for reasons
   /// other than the function implementation itself throwing, e.g. an
-  /// `ActorTransport` implementing a `distributed func` call throwing a
+  /// `DistributedActorSystem` implementing a `distributed func` call throwing a
   /// networking error.
   void setImplicitlyThrows(bool isImplicitlyThrows) {
     Bits.LookupExpr.IsImplicitlyThrows = isImplicitlyThrows;

@@ -1030,7 +1030,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     M = getLoadedModule(Id_Concurrency);
     break;
   case KnownProtocolKind::DistributedActor:
-  case KnownProtocolKind::ActorTransport:
+  case KnownProtocolKind::DistributedActorSystem:
   case KnownProtocolKind::ActorIdentity:
     M = getLoadedModule(Id_Distributed);
     break;

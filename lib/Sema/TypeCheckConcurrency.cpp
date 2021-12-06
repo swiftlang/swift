@@ -3518,6 +3518,12 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (isolation == overriddenIsolation)
     return;
 
+  // FIXME: do we need this?
+  if (overriddenIsolation == ActorIsolation::Unspecified &&
+      isolation == ActorIsolation::Independent) {
+    return;
+  }
+
   // If both are actor-instance isolated, we're done.
   if (isolation.getKind() == overriddenIsolation.getKind() &&
       (isolation.getKind() == ActorIsolation::ActorInstance ||

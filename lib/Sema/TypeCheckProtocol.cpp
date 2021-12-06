@@ -3843,6 +3843,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
           // If the protocol member decl is in the same file of the stub,
           // we can directly associate the fixit with the note issued to the
           // requirement.
+          fprintf(stderr, "[%s:%d] (%s) 222222222\n", __FILE__, __LINE__, __FUNCTION__);
+          VD->dump();
           Diags
               .diagnose(VD, diag::no_witnesses, getProtocolRequirementKind(VD),
                         VD->getName(), RequirementType, true)
@@ -3850,6 +3852,13 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
         } else {
           // Otherwise, we have to issue another note to carry the fixit,
           // because editor may assume the fixit is in the same file with the note.
+          fprintf(stderr, "[%s:%d] (%s) 111111111\n", __FILE__, __LINE__, __FUNCTION__);
+          fprintf(stderr, "[%s:%d] (%s) SELF NOMINAL:::::::::::::::::::::::::::::::::::::::::::::::::::::::\n", __FILE__, __LINE__, __FUNCTION__);
+          DC->getSelfNominalTypeDecl()->dump();
+          fprintf(stderr, "[%s:%d] (%s) ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: REQUIRED:\n", __FILE__, __LINE__, __FUNCTION__);
+          fprintf(stderr, "[%s:%d] (%s) REQUIRED:\n", __FILE__, __LINE__, __FUNCTION__);
+          VD->dump();
+          fprintf(stderr, "[%s:%d] (%s) ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: DIAGNOSE:\n", __FILE__, __LINE__, __FUNCTION__);
           Diags.diagnose(VD, diag::no_witnesses, getProtocolRequirementKind(VD),
                          VD->getName(), RequirementType, false);
           if (EditorMode) {
@@ -3858,6 +3867,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
           }
         }
       } else {
+        fprintf(stderr, "[%s:%d] (%s) 333333333\n", __FILE__, __LINE__, __FUNCTION__);
+        VD->dump();
         Diags.diagnose(VD, diag::no_witnesses, getProtocolRequirementKind(VD),
                        VD->getName(), RequirementType, true);
       }
@@ -4625,6 +4636,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
 ResolveWitnessResult
 ConformanceChecker::resolveWitnessTryingAllStrategies(ValueDecl *requirement) {
   decltype(&ConformanceChecker::resolveWitnessViaLookup) strategies[] = {
+      // TODO(distributed): Could insert an early "EARLY ViaDerivation" here
       &ConformanceChecker::resolveWitnessViaLookup,
       &ConformanceChecker::resolveWitnessViaDerivation,
       &ConformanceChecker::resolveWitnessViaDefault};
@@ -5296,6 +5308,8 @@ void swift::diagnoseConformanceFailure(Type T,
     }
   }
 
+  fprintf(stderr, "[%s:%d] (%s) DUMP: type_does_not_conform\n", __FILE__, __LINE__, __FUNCTION__);
+  T->dump();
   diags.diagnose(ComplainLoc, diag::type_does_not_conform,
                  T, Proto->getDeclaredInterfaceType());
 }
@@ -5309,6 +5323,10 @@ void ConformanceChecker::diagnoseOrDefer(
   if (SuppressDiagnostics) {
     // Stash this in the ASTContext for later emission.
     auto conformance = Conformance;
+
+    fprintf(stderr, "[%s:%d] (%s) DUMP: requirement\n", __FILE__, __LINE__, __FUNCTION__);
+    requirement->dump();
+
     getASTContext().addDelayedConformanceDiag(
         conformance,
         {requirement, [conformance, fn] { fn(conformance); }, isError});

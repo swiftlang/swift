@@ -31,17 +31,17 @@ struct ActorAddress: ActorIdentity {
 }
 
 @available(SwiftStdlib 5.6, *)
-struct FakeTransport: ActorTransport {
+struct FakeActorSystem: DistributedActorSystem {
   func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
     fatalError("not implemented:\(#function)")
   }
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
+  func resolve<Act>(id: ID, as actorType: Act.Type)
   throws -> Act? where Act: DistributedActor {
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
           where Act: DistributedActor {
     let id = ActorAddress(parse: "xxx")
     return .init(id)
@@ -50,15 +50,15 @@ struct FakeTransport: ActorTransport {
   func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {
+  func resignID(_ id: AnyActorIdentity) {
   }
 }
 
 @available(SwiftStdlib 5.5, *)
-typealias DefaultActorTransport = FakeTransport
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test() async throws {
-  let transport = FakeTransport()
+  let transport = FakeActorSystem()
 
   let local = Capybara(transport: transport)
   // await local.eat() // SHOULD ERROR

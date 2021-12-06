@@ -316,8 +316,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if(name.isSimpleName(ctx.Id_id))
       return getRequirement(KnownProtocolKind::DistributedActor);
 
-    // DistributedActor.actorTransport
-    if(name.isSimpleName(ctx.Id_actorTransport))
+    // DistributedActor.actorSystem
+    if(name.isSimpleName(ctx.Id_actorSystem))
       return getRequirement(KnownProtocolKind::DistributedActor);
 
     return nullptr;

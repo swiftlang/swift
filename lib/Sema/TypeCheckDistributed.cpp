@@ -210,7 +210,7 @@ void swift::checkDistributedActorProperties(const ClassDecl *decl) {
         continue;
 
       auto id = prop->getName();
-      if (id == C.Id_actorTransport || id == C.Id_id) {
+      if (id == C.Id_actorSystem || id == C.Id_id) {
         prop->diagnose(diag::distributed_actor_user_defined_special_property,
                       id);
       }
@@ -231,11 +231,11 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
   // matches the actor transport type of the actor.
   SmallVector<ParamDecl*, 2> transportParams;
   int transportParamsCount = 0;
-  Type transportTy = ctor->mapTypeIntoContext(
-      getDistributedActorTransportType(const_cast<ClassDecl *>(decl)));
+  Type actorSystemTy = ctor->mapTypeIntoContext(
+      getDistributedActorSystemType(const_cast<ClassDecl *>(decl)));
   for (auto param : *ctor->getParameters()) {
     auto paramTy = ctor->mapTypeIntoContext(param->getInterfaceType());
-    if (paramTy->isEqual(transportTy)) {
+    if (paramTy->isEqual(actorSystemTy)) {
       transportParamsCount += 1;
       transportParams.push_back(param);
     }
@@ -245,7 +245,7 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
   if (transportParamsCount == 0) {
     ctor->diagnose(diag::distributed_actor_designated_ctor_missing_transport_param,
                    ctor->getName());
-    // TODO(distributed): offer fixit to insert 'transport: ActorTransport'
+    // TODO(distributed): offer fixit to insert 'transport: DistributedActorSystem'
     return;
   }
 
@@ -255,7 +255,7 @@ void swift::checkDistributedActorConstructor(const ClassDecl *decl, ConstructorD
 
   // TODO(distributed): rdar://81824959 report the error on the offending (2nd) matching parameter
   //                    Or maybe we can issue a note about the other offending params?
-  ctor->diagnose(diag::distributed_actor_designated_ctor_must_have_one_transport_param,
+  ctor->diagnose(diag::distributed_actor_designated_ctor_must_have_one_distributedactorsystem_param,
                  ctor->getName(), transportParamsCount);
 }
 
@@ -284,9 +284,20 @@ void TypeChecker::checkDistributedActor(ClassDecl *decl) {
   // ==== Properties
   // --- Check for any illegal re-definitions
   checkDistributedActorProperties(decl);
+  // --- Synthesize the 'id' property here rather than via derived conformance
+  //     because the 'DerivedConformanceDistributedActor' won't trigger for 'id'
+  //     because it has a default impl via 'Identifiable' (ObjectIdentifier)
+  //     which we do not want.
+  (void)decl->getDistributedActorIDProperty();
+
+  fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  decl->dump();
+  fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) ============================================================\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
-Type swift::getDistributedActorTransportType(NominalTypeDecl *actor) {
+Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
   assert(actor->isDistributedActor());
   auto &ctx = actor->getASTContext();
 
@@ -294,42 +305,96 @@ Type swift::getDistributedActorTransportType(NominalTypeDecl *actor) {
   if (!protocol)
     return ErrorType::get(ctx);
 
-  // Dig out the actor transport type.
+  // Dig out the actor system type.
   auto module = actor->getParentModule();
   Type selfType = actor->getSelfInterfaceType();
   auto conformance = module->lookupConformance(selfType, protocol);
-  return conformance.getTypeWitnessByName(selfType, ctx.Id_Transport);
+  return conformance.getTypeWitnessByName(selfType, ctx.Id_ActorSystem);
 }
 
-Type swift::getDistributedActorIdentityType(NominalTypeDecl *actor) {
+Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   assert(actor->isDistributedActor());
   auto &ctx = actor->getASTContext();
+//
+//  fprintf(stderr, "[%s:%d] (%s) !!!!! getDistributedActorIDType\n", __FILE__, __LINE__, __FUNCTION__);
+//
+////  auto actorSystemType = getDistributedActorSystemType(actor);
+////  auto distActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
+////  if (!distActorProto)
+////    return ErrorType::get(ctx);
+////
+////
+////  auto module = actor->getParentModule();
+////  auto conformance = module->lookupConformance(actorSystemType, distActorProto);
+////  auto aidType = conformance.getTypeWitnessByName(actorSystemType, ctx.Id_ActorID);
+////  aidType->dump();
+////  return aidType;
+//
+////  auto actorSystemType = getDistributedActorSystemType(actor);
+//  auto distActorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+//  if (!distActorProto) {
+//    fprintf(stderr, "[%s:%d] (%s) !!!!!!!!!! no actor protocol!!!\n", __FILE__, __LINE__, __FUNCTION__);
+//    return ErrorType::get(ctx);
+//  }
+//
+//  fprintf(stderr, "[%s:%d] (%s) !!!!!!!!!! actor:::::\n", __FILE__, __LINE__, __FUNCTION__);
+//  actor->dump();
+//
+//  fprintf(stderr, "[%s:%d] (%s) !!!!!!!!!! actor SELF: \n", __FILE__, __LINE__, __FUNCTION__);
+//
+//  auto module = actor->getParentModule();
+//  Type selfType = actor->getSelfInterfaceType();
+//  selfType->dump();
+//  auto conformance = module->lookupConformance(selfType, distActorProto);
+//
+//  fprintf(stderr, "[%s:%d] (%s) !!!!!!!!!! CONformance: \n", __FILE__, __LINE__, __FUNCTION__);
+//  conformance.dump();
+//  auto aidType = conformance.getTypeWitnessByName(selfType, ctx.Id_ID);
+//  fprintf(stderr, "[%s:%d] (%s) !!!!! conformance.getTypeWitnessByName(selfType, ctx.Id_ID)\n", __FILE__, __LINE__, __FUNCTION__);
+//  aidType->dump();
+//  assert(aidType);
+//  return aidType;
 
   auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
   if (!actorProtocol)
     return ErrorType::get(ctx);
 
-  AssociatedTypeDecl *transportDecl =
-      actorProtocol->getAssociatedType(ctx.Id_Transport);
-  if (!transportDecl)
+  AssociatedTypeDecl *actorSystemDecl =
+      actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
+  if (!actorSystemDecl)
     return ErrorType::get(ctx);
 
-  auto transportProtocol = ctx.getProtocol(KnownProtocolKind::ActorTransport);
-  if (!transportProtocol)
+  fprintf(stderr, "[%s:%d] (%s) system: \n", __FILE__, __LINE__, __FUNCTION__);
+  actorSystemDecl->dump();
+
+  auto actorSystemProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActorSystem);
+  if (!actorSystemProtocol)
     return ErrorType::get(ctx);
 
-  AssociatedTypeDecl *identityDecl =
-      transportProtocol->getAssociatedType(ctx.getIdentifier("Identity"));
-  if (!identityDecl)
+  AssociatedTypeDecl *idAssocTypeDecl =
+      actorSystemProtocol->getAssociatedType(ctx.Id_ActorID);
+  if (!idAssocTypeDecl)
     return ErrorType::get(ctx);
+
+  fprintf(stderr, "[%s:%d] (%s) id of assoc type: \n", __FILE__, __LINE__, __FUNCTION__);
+  idAssocTypeDecl->dump();
 
   auto module = actor->getParentModule();
   Type selfType = actor->getSelfInterfaceType();
   auto conformance = module->lookupConformance(selfType, actorProtocol);
   Type dependentType = actorProtocol->getSelfInterfaceType();
-  dependentType = DependentMemberType::get(dependentType, transportDecl);
-  dependentType = DependentMemberType::get(dependentType, identityDecl);
-  return dependentType.subst(
+  dependentType = DependentMemberType::get(dependentType, actorSystemDecl);
+  dependentType = DependentMemberType::get(dependentType, idAssocTypeDecl);
+  auto t = dependentType.subst(
       SubstitutionMap::getProtocolSubstitutions(
         actorProtocol, selfType, conformance));
+
+  fprintf(stderr, "[%s:%d] (%s) the detected type of ID: \n", __FILE__, __LINE__, __FUNCTION__);
+  t->dump();
+
+  if (auto *NAT = dyn_cast<TypeAliasType>(t.getPointer())) {
+    fprintf(stderr, "[%s:%d] (%s) IS AN ALIAS\n", __FILE__, __LINE__, __FUNCTION__);
+  }
+
+  return t;
 }

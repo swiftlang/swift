@@ -33,7 +33,7 @@ struct E: Actor {
 // ==== -----------------------------------------------------------------------
 
 distributed actor DA: DistributedActor {
-  typealias Transport = AnyActorTransport
+  typealias Transport = AnyDistributedActorSystem
 }
 
 actor A2: DistributedActor {
@@ -41,15 +41,15 @@ actor A2: DistributedActor {
   nonisolated var id: AnyActorIdentity {
     fatalError()
   }
-  nonisolated var actorTransport: AnyActorTransport {
+  nonisolated var actorSystem: AnyDistributedActorSystem {
     fatalError()
   }
 
-  init(transport: AnyActorTransport) {
+  init(transport: AnyDistributedActorSystem) {
     fatalError()
   }
 
-  static func resolve(_ identity: AnyActorIdentity, using transport: AnyActorTransport) throws -> Self {
+  static func resolve(id: ID, using system: AnyDistributedActorSystem) throws -> Self {
     fatalError()
   }
 }
@@ -59,14 +59,14 @@ final class C2: DistributedActor {
   nonisolated var id: AnyActorIdentity {
     fatalError()
   }
-  nonisolated var actorTransport: AnyActorTransport {
+  nonisolated var actorSystem: AnyDistributedActorSystem {
     fatalError()
   }
 
-  required init(transport: AnyActorTransport) {
+  required init(transport: AnyDistributedActorSystem) {
     fatalError()
   }
-  static func resolve(_ identity: AnyActorIdentity, using transport: AnyActorTransport) throws -> Self {
+  static func resolve(id: ID, using system: AnyDistributedActorSystem) throws -> Self {
     fatalError()
   }
 }

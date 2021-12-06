@@ -6,12 +6,12 @@ import _Distributed
 
 /// Use the existential wrapper as the default actor transport.
 @available(SwiftStdlib 5.6, *)
-typealias DefaultActorTransport = AnyActorTransport
+typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
 
 @available(SwiftStdlib 5.6, *)
 distributed actor Capybara { }
 
 @available(SwiftStdlib 5.6, *)
-func test(identity: AnyActorIdentity, transport: AnyActorTransport) async throws {
+func test(id: ID, transport: AnyDistributedActorSystem) async throws {
   let _: Capybara = try Capybara.resolve(identity, using: transport)
 }

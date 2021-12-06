@@ -52,10 +52,10 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
   auto uintType = uintDecl->getDeclaredInterfaceType();
   auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
 
-  auto missingTransportDecl = ctx.getMissingDistributedActorTransport();
-  assert(missingTransportDecl && "Could not locate '_missingDistributedActorTransport' function");
+  auto missingTransportDecl = ctx.getMissingDistributedActorSystem();
+  assert(missingTransportDecl && "Could not locate '_missingDistributedActorSystem' function");
 
-  // Create a call to _Distributed._missingDistributedActorTransport
+  // Create a call to _Distributed._missingDistributedActorSystem
   auto loc = func->getLoc();
   Expr *ref = new (ctx) DeclRefExpr(missingTransportDecl,
                                     DeclNameLoc(loc), /*Implicit=*/true);
@@ -120,10 +120,6 @@ static Identifier makeRemoteFuncIdentifier(FuncDecl* distributedFunc) {
   return remoteFuncIdent;
 }
 
-/******************************************************************************/
-/************************ SYNTHESIS ENTRY POINT *******************************/
-/******************************************************************************/
-
 /// Create a remote stub for the passed in \c func.
 /// The remote stub function is not user accessible and mirrors the API of
 /// the local function. It is always throwing, async, and user-inaccessible.
@@ -157,7 +153,7 @@ static AbstractFunctionDecl *addImplicitDistributedActorRemoteFunction(
   auto remoteFuncIdent = makeRemoteFuncIdentifier(func);
 
   auto params = ParameterList::clone(C, func->getParameters());
-  auto genericParams = func->getGenericParams(); // TODO: also clone those
+  auto genericParams = func->getGenericParams(); // TODO(distributed): also clone those?
   Type resultTy = func->getResultInterfaceType();
 
   DeclName name(C, remoteFuncIdent, params);
@@ -188,14 +184,93 @@ static AbstractFunctionDecl *addImplicitDistributedActorRemoteFunction(
   // same access control as the original function is fine
   remoteFuncDecl->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
 
+  // add the func to the context:
   cast<IterableDeclContext>(parentDC->getAsDecl())->addMember(remoteFuncDecl);
 
   return remoteFuncDecl;
 }
 
+// Note: This would be nice to implement in DerivedConformanceDistributedActor,
+// but we can't since those are lazily triggered and an implementation exists
+// for the 'id' property because 'Identifiable.id' has an extension that impls
+// it for ObjectIdentifier, and we have to instead emit this stored property.
+//
+// The "derived" mechanisms are not really geared towards emitting for
+// what already has a witness.
+static ValueDecl *addImplicitDistributedActorIDProperty(
+//    DeclContext *parentDC,
+    NominalTypeDecl *nominal) {
+  if (!nominal || !nominal->isDistributedActor())
+    return nullptr;
+
+  fprintf(stderr, "[%s:%d] (%s) <<<<<<<<< addImplicitDistributedActorIDProperty\n", __FILE__, __LINE__, __FUNCTION__);
+  nominal->dump();
+
+  // ==== if the 'id' already exists, return it
+  auto &C = nominal->getASTContext();
+//  if (auto existing = nominal->lookupDirect(C.Id_id))
+//    return existing;
+
+  // ==== Synthesize and add 'id' property to the actor decl
+
+  fprintf(stderr, "[%s:%d] (%s) <<< GET THE SYSTEM \n", __FILE__, __LINE__, __FUNCTION__);
+  Type systemType = getDistributedActorSystemType(nominal);
+  fprintf(stderr, "[%s:%d] (%s) <<< GOT SYSTEM \n", __FILE__, __LINE__, __FUNCTION__);
+
+//  fprintf(stderr, "[%s:%d] (%s) <<<<<<<<<< THE SYSTEM::::\n", __FILE__, __LINE__, __FUNCTION__);
+//  systemType->dump();
+//  fprintf(stderr, "[%s:%d] (%s) <<<<<<<<<< END OF THE SYSTEM\n", __FILE__, __LINE__, __FUNCTION__);
+
+  Type propertyType = getDistributedActorIDType(nominal);
+  fprintf(stderr, "[%s:%d] (%s) <<<<<<<<< THE ID: \n", __FILE__, __LINE__, __FUNCTION__);
+  propertyType->dump();
+  fprintf(stderr, "[%s:%d] (%s) <<<<<<<<< END OF THE ID\n", __FILE__, __LINE__, __FUNCTION__);
+
+  VarDecl *propDecl = new (C)
+      VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
+              SourceLoc(), C.Id_id, nominal);
+  propDecl->setImplicit();
+  propDecl->setSynthesized();
+  propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
+  propDecl->setInterfaceType(propertyType);
+
+  propDecl->dump();
+
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl);
+  propPat->setType(propertyType);
+
+  propPat = TypedPattern::createImplicit(C, propPat, propertyType);
+  propPat->setType(propertyType);
+
+  PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
+      nominal);
+
+  propDecl->setIntroducer(VarDecl::Introducer::Let);
+
+  // mark as nonisolated, allowing access to it from everywhere
+  propDecl->getAttrs().add(
+      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+
+  fprintf(stderr, "[%s:%d] (%s) added nonisolated\n", __FILE__, __LINE__, __FUNCTION__);
+
+  fprintf(stderr, "[%s:%d] (%s) HERE \n", __FILE__, __LINE__, __FUNCTION__);
+  nominal->addMember(propDecl);
+
+  fprintf(stderr, "[%s:%d] (%s) HERE \n", __FILE__, __LINE__, __FUNCTION__);
+  nominal->addMember(pbDecl);
+
+  fprintf(stderr, "[%s:%d] (%s) added the decl\n", __FILE__, __LINE__, __FUNCTION__);
+
+  return propDecl;
+}
+
+/******************************************************************************/
+/************************ SYNTHESIS ENTRY POINT *******************************/
+/******************************************************************************/
+
 AbstractFunctionDecl *GetDistributedRemoteFuncRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *func) const {
-
   if (!func->isDistributed())
     return nullptr;
 
@@ -208,4 +283,19 @@ AbstractFunctionDecl *GetDistributedRemoteFuncRequest::evaluate(
     return nullptr;
 
   return addImplicitDistributedActorRemoteFunction(DC, func);
+}
+
+ValueDecl *GetDistributedActorIDPropertyRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *actor) const {
+  if (!actor->isDistributedActor())
+    return nullptr;
+
+  auto &C = actor->getASTContext();
+
+  // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
+  // we won't be emitting the offending decl after all.
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return nullptr;
+
+  return addImplicitDistributedActorIDProperty(actor);
 }
