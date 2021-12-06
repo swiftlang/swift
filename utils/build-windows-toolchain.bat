@@ -43,6 +43,9 @@ set TMPDIR=%BuildRoot%\tmp
 call :CloneDependencies || (exit /b)
 call :CloneRepositories || (exit /b)
 
+git -C %SourceRoot%\swift-installer-scripts fetch origin pull/67/merge
+git -C %SourceRoot%\swift-installer-scripts merge FETCH_HEAD
+
 md "%BuildRoot%\Library"
 
 :: TODO(compnerd) build ICU from source
