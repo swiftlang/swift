@@ -1199,11 +1199,17 @@ namespace {
 
     void consume(IRGenFunction &IGF, Explosion &explosion,
                  Atomicity atomicity) const override {
-      (void)explosion.claimAll();
+      for (auto scalarTy: ScalarTypes) {
+        (void)scalarTy;
+        (void)explosion.claimNext();
+      }
     }
     
     void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const override {
-      (void)explosion.claimAll();
+      for (auto scalarTy: ScalarTypes) {
+        (void)scalarTy;
+        (void)explosion.claimNext();
+      }
     }
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
