@@ -172,6 +172,8 @@ class PropertyMap {
   using ConcreteTypeInDomain = std::pair<CanType, ArrayRef<const ProtocolDecl *>>;
   llvm::DenseMap<ConcreteTypeInDomain, Term> ConcreteTypeInDomainMap;
 
+  llvm::DenseSet<std::pair<unsigned, unsigned>> ConcreteConformanceRules;
+
   DebugOptions Debug;
 
   PropertyBag *getOrCreateProperties(Term key);
@@ -217,6 +219,15 @@ private:
   MutableTerm computeConstraintTermForTypeWitness(
       Term key, CanType concreteType, CanType typeWitness,
       const MutableTerm &subjectType, ArrayRef<Term> substitutions) const;
+
+  void recordConcreteConformanceRules(
+      SmallVectorImpl<InducedRule> &inducedRules);
+
+  void recordConcreteConformanceRule(
+    unsigned concreteRuleID,
+    unsigned conformanceRuleID,
+    const ProtocolDecl *proto,
+    SmallVectorImpl<InducedRule> &inducedRules);
 
   void verify() const;
 };

@@ -388,6 +388,10 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
   // the concrete type witnesses in the concrete type's conformance.
   concretizeNestedTypesFromConcreteParents(inducedRules);
 
+  // Finally, introduce concrete conformance rules, relating conformance rules
+  // to concrete type and superclass rules.
+  recordConcreteConformanceRules(inducedRules);
+
   // Some of the induced rules might be trivial; only count the induced rules
   // where the left hand side is not already equivalent to the right hand side.
   unsigned addedNewRules = 0;

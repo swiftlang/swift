@@ -648,3 +648,152 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 
   return constraintType;
 }
+
+void PropertyMap::recordConcreteConformanceRules(
+    SmallVectorImpl<InducedRule> &inducedRules) {
+  for (const auto &props : Entries) {
+    if (props->getConformsTo().empty())
+      continue;
+
+    if (props->ConcreteType) {
+      unsigned concreteRuleID = *props->ConcreteTypeRule;
+
+      // The GSB drops all conformance requirements on a type parameter equated
+      // to a concrete type, even if the concrete type doesn't conform. That is,
+      //
+      // protocol P {}
+      // <T where T : P, T == Int>
+      //
+      // minimizes as
+      //
+      // <T where T == Int>.
+      for (unsigned i : indices(props->ConformsTo)) {
+        auto *proto = props->ConformsTo[i];
+        auto conformanceRuleID = props->ConformsToRules[i];
+        recordConcreteConformanceRule(concreteRuleID, conformanceRuleID, proto,
+                                      inducedRules);
+      }
+    }
+
+    if (props->Superclass) {
+      unsigned superclassRuleID = *props->SuperclassRule;
+
+      // For superclass rules, we only introduce a concrete conformance if the
+      // superclass actually conforms. Otherwise, it is totally fine to have a
+      // signature like
+      //
+      // protocol P {}
+      // class C {}
+      // <T  where T : P, T : C>
+      //
+      // There is no relation between P and C here.
+
+      // The conformances in SuperclassConformances should appear in the same
+      // order as the protocols in ConformsTo.
+      auto conformanceIter = props->SuperclassConformances.begin();
+
+      for (unsigned i : indices(props->ConformsTo)) {
+        if (conformanceIter == props->SuperclassConformances.end())
+          break;
+
+        auto *proto = props->ConformsTo[i];
+        if (proto != (*conformanceIter)->getProtocol())
+          continue;
+
+        unsigned conformanceRuleID = props->ConformsToRules[i];
+        recordConcreteConformanceRule(superclassRuleID, conformanceRuleID, proto,
+                                      inducedRules);
+        ++conformanceIter;
+      }
+
+      assert(conformanceIter == props->SuperclassConformances.end());
+    }
+  }
+}
+
+void PropertyMap::recordConcreteConformanceRule(
+    unsigned concreteRuleID,
+    unsigned conformanceRuleID,
+    const ProtocolDecl *proto,
+    SmallVectorImpl<InducedRule> &inducedRules) {
+  if (!ConcreteConformanceRules.insert(
+        std::make_pair(concreteRuleID, conformanceRuleID)).second) {
+    // We've already emitted this rule.
+    return;
+  }
+
+  const auto &concreteRule = System.getRule(concreteRuleID);
+  const auto &conformanceRule = System.getRule(conformanceRuleID);
+
+  auto conformanceSymbol = *conformanceRule.isPropertyRule();
+  assert(conformanceSymbol.getKind() == Symbol::Kind::Protocol);
+  assert(conformanceSymbol.getProtocol() == proto);
+
+  auto concreteSymbol = *concreteRule.isPropertyRule();
+  assert(concreteSymbol.getKind() == Symbol::Kind::ConcreteType ||
+         concreteSymbol.getKind() == Symbol::Kind::Superclass);
+
+  RewritePath path;
+
+  // We have a pair of rules T.[P] and T'.[concrete: C].
+  // Either T == T', or T is a prefix of T', or T' is a prefix of T.
+  //
+  // Let T'' be the longest of T and T'.
+  MutableTerm rhs(concreteRule.getRHS().size() > conformanceRule.getRHS().size()
+                  ? concreteRule.getRHS()
+                  : conformanceRule.getRHS());
+
+  // First, apply the conformance rule in reverse to obtain T''.[P].
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/rhs.size() - conformanceRule.getRHS().size(),
+      /*endOffset=*/0,
+      /*ruleID=*/conformanceRuleID,
+      /*inverse=*/true));
+
+  // Now, apply the concrete type rule in reverse to obtain T''.[concrete: C].[P].
+  path.add(RewriteStep::forRewriteRule(
+      /*startOffset=*/rhs.size() - concreteRule.getRHS().size(),
+      /*endOffset=*/1,
+      /*ruleID=*/concreteRuleID,
+      /*inverse=*/true));
+
+  // Apply a concrete type adjustment to the concrete symbol if T' is shorter
+  // than T.
+  unsigned adjustment = rhs.size() - concreteRule.getRHS().size();
+  if (adjustment > 0 &&
+      !concreteSymbol.getSubstitutions().empty()) {
+    // FIXME: This needs an endOffset!
+    path.add(RewriteStep::forAdjustment(adjustment, /*inverse=*/false));
+
+    concreteSymbol = concreteSymbol.prependPrefixToConcreteSubstitutions(
+        MutableTerm(rhs.begin(), rhs.begin() + adjustment),
+        Context);
+  }
+
+  // Now, transform T''.[concrete: C].[P] into T''.[concrete: C : P].
+  Symbol concreteConformanceSymbol = [&]() {
+    if (concreteSymbol.getKind() == Symbol::Kind::ConcreteType) {
+      path.add(RewriteStep::forConcreteConformance(/*inverse=*/false));
+      return Symbol::forConcreteConformance(
+          concreteSymbol.getConcreteType(),
+          concreteSymbol.getSubstitutions(),
+          proto, Context);
+    } else {
+      assert(concreteSymbol.getKind() == Symbol::Kind::Superclass);
+      path.add(RewriteStep::forSuperclassConformance(/*inverse=*/false));
+      return Symbol::forConcreteConformance(
+          concreteSymbol.getSuperclass(),
+          concreteSymbol.getSubstitutions(),
+          proto, Context);
+    }
+  }();
+
+  MutableTerm lhs(rhs);
+  lhs.add(concreteConformanceSymbol);
+
+  // The path turns T'' (RHS) into T''.[concrete: C : P] (LHS), but we need
+  // it to go in the other direction.
+  path.invert();
+
+  inducedRules.emplace_back(std::move(lhs), std::move(rhs), std::move(path));
+}
