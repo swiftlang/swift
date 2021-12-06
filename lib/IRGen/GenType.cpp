@@ -1135,8 +1135,7 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                        ScalarKind::POD);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
     }
 
     unsigned getExplosionSize() const override {
@@ -1257,8 +1256,7 @@ namespace {
                          IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                        ScalarKind::Immovable);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
@@ -2352,7 +2350,7 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    llvm_unreachable("Cannot construct type layout for legacy types");
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
   }
 
   virtual unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
