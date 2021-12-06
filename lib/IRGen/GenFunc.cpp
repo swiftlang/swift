@@ -156,8 +156,7 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                        ScalarKind::POD);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
     }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -224,13 +223,7 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-      if (isPOD(ResilienceExpansion::Maximal)) {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                          ScalarKind::POD);
-      } else {
-        return IGM.typeLayoutCache.getOrCreateScalarEntry(
-            *this, T, ScalarKind::ThickFunc);
-      }
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
     }
 
     static Size getFirstElementSize(IRGenModule &IGM) {
@@ -392,19 +385,20 @@ namespace {
                         public FuncSignatureInfo
   {
   public:
-    BlockTypeInfo(CanSILFunctionType ty, llvm::PointerType *storageType,
+    BlockTypeInfo(CanSILFunctionType ty,
+                  llvm::PointerType *storageType,
                   Size size, SpareBitVector spareBits, Alignment align)
-        : HeapTypeInfo(ReferenceCounting::Block, storageType, size, spareBits,
-                       align),
-          FuncSignatureInfo(ty) {}
+      : HeapTypeInfo(storageType, size, spareBits, align),
+        FuncSignatureInfo(ty)
+    {
+    }
 
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Block;
     }
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(
-          *this, T, ScalarKind::BlockReference);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
     }
   };
   
@@ -426,8 +420,7 @@ namespace {
     
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(
-          *this, T, ScalarKind::BlockStorage);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
     }
     // The lowered type should be an LLVM struct comprising the block header
     // (IGM.ObjCBlockStructTy) as its first element and the capture as its
