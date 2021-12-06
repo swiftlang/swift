@@ -1341,7 +1341,8 @@ namespace {
       // };
 
       assert(fields.getNextOffsetFromGlobal() == size);
-      return buildGlobalVariable(fields, "_CATEGORY_", /*const*/ true);
+      return buildGlobalVariable(fields, "_CATEGORY_", /*const*/ true,
+                                 llvm::GlobalVariable::InternalLinkage);
     }
     
     llvm::Constant *emitProtocol() {
@@ -1501,7 +1502,8 @@ namespace {
       // statically. Otherwise, the ObjC runtime may slide the InstanceSize
       // based on changing base class layout.
       return buildGlobalVariable(fields, dataSuffix,
-                               /*const*/ forMeta || FieldLayout->isFixedSize());
+                               /*const*/ forMeta || FieldLayout->isFixedSize(),
+                               llvm::GlobalVariable::InternalLinkage);
     }
 
   private:
@@ -1766,12 +1768,8 @@ namespace {
         return null();
       }
 
-      auto *gv_as_const =  buildGlobalVariable(array, "_PROTOCOL_METHOD_TYPES_",
-                               /*const*/ true,
-                               /*likage*/ llvm::GlobalVariable::WeakAnyLinkage);
-      llvm::GlobalValue *gv = (llvm::GlobalValue *)gv_as_const;
-      gv->setVisibility(llvm::GlobalValue::HiddenVisibility);
-      return gv;
+      return buildGlobalVariable(array, "_PROTOCOL_METHOD_TYPES_",
+                                 /*const*/ true);
     }
 
     void buildExtMethodTypes(ConstantArrayBuilder &array,
@@ -2173,7 +2171,7 @@ namespace {
     template <class B>
     llvm::Constant *buildGlobalVariable(B &fields, StringRef nameBase, bool isConst,
                       llvm::GlobalValue::LinkageTypes linkage =
-                          llvm::GlobalVariable::InternalLinkage) {
+                          llvm::GlobalVariable::WeakAnyLinkage) {
       llvm::SmallString<64> nameBuffer;
       auto var =
         fields.finishAndCreateGlobal(Twine(nameBase) 
@@ -2184,6 +2182,9 @@ namespace {
                                      IGM.getPointerAlignment(),
                                      /*constant*/ true,
                                      linkage);
+      if (linkage == llvm::GlobalVariable::WeakAnyLinkage) {
+        var->setVisibility(llvm::GlobalValue::HiddenVisibility);
+      }
 
       switch (IGM.TargetInfo.OutputObjectFormat) {
       case llvm::Triple::MachO:
