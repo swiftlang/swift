@@ -501,7 +501,7 @@ bb0(%x):
 
 
 // Differential: apply differentials to tangent values.
-sil @df_foo : $(Float, foo_bb0_DF_src_0_wrt_0) -> (Float) {
+sil @df_f : $(Float, f_bb0_DF_src_0_wrt_0) -> (Float) {
 bb0(%dx, %df_struct):
   %df_sin = struct_extract %df_struct, #df_sin
   %dy1 = apply %df_sin(%dx)
