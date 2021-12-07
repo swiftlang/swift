@@ -427,9 +427,6 @@ namespace {
     RValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
     RValue visitBooleanLiteralExpr(BooleanLiteralExpr *E, SGFContext C);
 
-    RValue emitStringLiteral(Expr *E, StringRef Str, SGFContext C,
-                             StringLiteralExpr::Encoding encoding);
-        
     RValue visitStringLiteralExpr(StringLiteralExpr *E, SGFContext C);
     RValue visitLoadExpr(LoadExpr *E, SGFContext C);
     RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
@@ -478,6 +475,7 @@ namespace {
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
+    RValue visitRegexLiteralExpr(RegexLiteralExpr *E, SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
@@ -2527,6 +2525,10 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 
   return SGF.emitApplyAllocatingInitializer(
       E, E->getInitializer(), std::move(resultInitArgs), Type(), C);
+}
+
+RValue RValueEmitter::visitRegexLiteralExpr(RegexLiteralExpr *E, SGFContext C) {
+  return SGF.emitRValue(E->getSemanticExpr());
 }
 
 RValue RValueEmitter::
