@@ -720,7 +720,7 @@ bb0(%x):
 
 
 // VJP: replaces all function applications with VJP applications.
-sil @vjp_foo : $(Float) -> (Float) -> Float {
+sil @vjp_f : $(Float) -> (Float) -> Float {
 bb0(%x):
   (%pb_sin) = apply @vjp_sin(%x)
   (%pb_cos) = apply @vjp_cos(%x)
