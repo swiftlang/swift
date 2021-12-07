@@ -749,7 +749,7 @@ struct f_bb0_PB_src_0_wrt_0 {
 }
 
 // VJP: replaces all function applications with VJP applications.
-sil @vjp_foo : $(Float) -> (Float, (Float) -> Float) {
+sil @vjp_f : $(Float) -> (Float, (Float) -> Float) {
 bb0(%x):
   (%y1, %pb_sin) = apply @vjp_sin(%x)
   (%y2, %pb_cos) = apply @vjp_cos(%x)
