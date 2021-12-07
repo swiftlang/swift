@@ -519,7 +519,7 @@ To dive deeper into the differential struct, the reason why we need these "calle
 
 These structs consist of two different types of values: the differential function that maps to the original function call which we got from the second element of the JVP call, and also branching enums.
 
-In order to define the differential struct type, we preemptively go over the entire function we are going to differentiate in order to generate the struct. Using the same approach as with `JVPEmitter` when emitting code in the differential, we visit all instructions that we deem are needed to take the derivative of. We then calculate the expected differential type of the function, and add that as a field to the struct.
+In order to define the differential struct type, we preemptively go over the entire function we are going to differentiate in order to generate the struct. When emitting code in the differential we visit all instructions that we deem are needed to take the derivative of the function. We then calculate the expected differential type of the function, and add that as a field to the struct.
 
 ```swift
 func foo(_ x: Float) -> Float {
