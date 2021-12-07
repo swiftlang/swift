@@ -78,7 +78,6 @@ set(SWIFTLIB_ESSENTIAL
   Hasher.swift
   Hashing.swift
   HashTable.swift
-  ICU.swift
   Identifiable.swift
   Indices.swift
   InputStream.swift
@@ -239,29 +238,6 @@ set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 set(swift_core_framework_depends)
 set(swift_core_private_link_libraries)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
-if(SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-  list(APPEND swift_core_link_flags "-all_load")
-  list(APPEND swift_core_private_link_libraries icucore)
-else()
-  # With the GNU linker the equivalent of -all_load is to tell the linker
-  # --whole-archive before the archive and --no-whole-archive after (without
-  # the second, it causes errors when the system libraries are told to
-  # include everything). The best way to get it in there, according to the
-  # documentation, is to put the flags in the target_link_libraries setting.
-
-  # TODO: However, for the moment this actually makes things explode with an
-  # incomplete runtime. This should be turned back on when more of the porting
-  # effort has been completed.
-  #set(LINK_FLAGS
-  #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
-  if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
-    list(APPEND swift_core_private_link_libraries
-      ${SWIFT_${SWIFT_PRIMARY_VARIANT_SDK}_${SWIFT_PRIMARY_VARIANT_ARCH}_ICU_UC}
-      ${SWIFT_${SWIFT_PRIMARY_VARIANT_SDK}_${SWIFT_PRIMARY_VARIANT_ARCH}_ICU_I18N})
-  else()
-    list(APPEND swift_core_private_link_libraries -licui18nswift -licuucswift -licudataswift)
-  endif()
-endif()
 
 if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL CYGWIN)
   # TODO(compnerd) cache this variable to permit re-configuration
@@ -343,29 +319,6 @@ if(${LIBSWIFT_BUILD_MODE} STREQUAL "BOOTSTRAPPING")
 
   set(b0_deps symlink-headers-bootstrapping0)
   set(b1_deps symlink-headers-bootstrapping1)
-
-  if(SWIFT_PATH_TO_LIBICU_BUILD)
-    foreach(bootstrapping "0" "1")
-      # Need to symlink the libicu libraries to be able to run
-      # the bootstrapping compiler with a custom library path.
-      get_bootstrapping_path(output_dir
-          "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" "${bootstrapping}")
-      if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-        message("TODO: support for copying ICU libraries on Windows")
-      endif()
-      set(target "symlink-icu-bootstrapping${bootstrapping}")
-      add_custom_target(${target})
-      add_custom_command(TARGET ${target} POST_BUILD
-       COMMAND
-          "${CMAKE_COMMAND}" "-E" "make_directory" "${output_dir}"
-        COMMAND
-          "ln" "-s" "-f" "${SWIFT_PATH_TO_LIBICU_BUILD}/lib/libicu*" "."
-        WORKING_DIRECTORY "${output_dir}"
-        COMMENT "symlink ICU libraries for bootstrapping stage ${bootstrapping}")
-    endforeach()
-    set(b0_deps ${b0_deps} symlink-icu-bootstrapping0)
-    set(b1_deps ${b1_deps} symlink-icu-bootstrapping1)
-  endif()
 
   list(FIND SWIFT_STDLIB_LIBRARY_BUILD_TYPES "SHARED" index_of_shared)
   if(index_of_shared EQUAL -1)
