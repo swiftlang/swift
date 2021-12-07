@@ -1079,7 +1079,6 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
       Invocation, convertFileContentsToInputs(Contents));
 
   Invocation.getLangOptions().CollectParsedToken = true;
-  Invocation.getTypeCheckerOptions().CancellationFlag = CancellationFlag;
 
   if (FileSystem != llvm::vfs::getRealFileSystem()) {
     CompIns.getSourceMgr().setFileSystem(FileSystem);
@@ -1091,6 +1090,7 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     Error = "compilation setup failed";
     return nullptr;
   }
+  CompIns.getASTContext().CancellationFlag = CancellationFlag;
   if (CompIns.loadStdlibIfNeeded()) {
     LOG_WARN_FUNC("Loading the stdlib failed");
     Error = "Loading the stdlib failed";
