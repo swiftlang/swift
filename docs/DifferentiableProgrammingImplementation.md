@@ -282,7 +282,7 @@ The differentiation transform canonicalizes `differentiable_function` instructio
 ## The differentiation transform
 
 The differentiation transform is a SIL mandatory pass that implements automatic differentiation. This is the "magic" in the differentiation system that automatically generates derivative functions. This involves a few steps:
-- **Activity analysis**: static analysis that answers what values need a derivative.
+- [**Activity analysis**](#activity-analysis): static analysis that answers what values need a derivative.
 - **Differentiability checking**: errors are produced for non-differentiable operations and warnings are produced for accidental data flow mistakes.
 - **Automatic differentiation**: generate derivative functions.
 
