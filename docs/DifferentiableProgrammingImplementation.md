@@ -986,7 +986,7 @@ Below is a list of anticipated infrastructure changes to the Swift differentiati
 
 Differential-first automatic differentiation is currently a work-in-progress. It is not yet at parity with the existing pullback-first (i.e. reverse-mode) automatic differentiation support.
 
-See [here](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md#differential-operators) for more information about forward-mode differential operators in Swift.
+See [here](DifferentiableProgramming.md#differential-operators) for more information about forward-mode differential operators in Swift.
 
 ### Linear maps and transposition
 
