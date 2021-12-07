@@ -973,7 +973,7 @@ Alternatives:
 - Make reabstraction thunk JVPs/VJPs take a "JVP/VJP" function-typed argument instead of a `@differentiable` function-typed argument.
     - This seems more efficient because reabstraction thunk JVPs/VJPs only need to call the original function’s JVP/VJP - the other elements of the `@differentiable` function are not relevant.
     - It may be possible that the derivative of a reabstraction thunk is simply a reabstraction thunk for the derivative function’s type. If so, this would be a significant simplification: within the reabstraction thunk derivative, we can simply call another reabstraction thunk and avoid other code generation (e.g. reabstraction thunk differential/pullback functions).
-    - `JVPEmitter::visitApplyInst` and `VJPEmitter::visitApplyInst` need special case logic to transform the single `apply` in reabstraction thunks into an `apply` of the “JVP/VJP” function-typed argument.
+    - `JVPCloner::visitApplyInst` and `VJPCloner::visitApplyInst` need special case logic to transform the single `apply` in reabstraction thunks into an `apply` of the "JVP/VJP" function-typed argument.
 
 ## Future directions and infrastructural changes
 
