@@ -42,10 +42,8 @@ sil [ossa] @callee_optional_d_guaranteed: $@convention(thin) (@guaranteed Option
 // Hoist over br.
 // CHECK-LABEL: sil [ossa] @hoist_over_branch_1 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[INSTANCE]]
@@ -64,10 +62,8 @@ bl1:
 // Hoist over cond_br.
 // CHECK-LABEL: sil [ossa] @hoist_over_branch_2 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
 // CHECK:         cond_br undef, [[BL1:bb[0-9]+]], [[BL2:bb[0-9]+]]
 // CHECK:       [[BL1]]:
 // CHECK:         br [[EXIT:bb[0-9]+]]
@@ -95,10 +91,8 @@ exit:
 // Hoist over two brs.
 // CHECK-LABEL: sil [ossa] @hoist_over_branch_3 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
 // CHECK:         cond_br undef, [[BL1:bb[0-9]+]], [[BL2:bb[0-9]+]]
 // CHECK:       [[BL1]]:
 // CHECK:         br [[EXIT:bb[0-9]+]]
@@ -125,15 +119,12 @@ exit:
 // Don't hoist over 1 / 2 brs.
 // CHECK-LABEL: sil [ossa] @hoist_over_branch_4 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         cond_br undef, [[BL1:bb[0-9]+]], [[BL2:bb[0-9]+]]
 // CHECK:       [[BL1]]:
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[BL2]]:
-// CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[INSTANCE]]
@@ -156,10 +147,8 @@ exit:
 // Hoist over switch_enum destinations.
 // CHECK-LABEL: sil [ossa] @hoist_over_branch_5 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C, [[CASE:%[^,]+]] : $OneOfThree):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         {{%[0-9]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME]])
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK:         {{%[0-9]+}} = apply [[CALLEE_GUARANTEED]]([[INSTANCE]])
 // CHECK:         switch_enum [[CASE]] : $OneOfThree, case #OneOfThree.one!enumelt: [[ONE_DEST:bb[0-9]+]], case #OneOfThree.two!enumelt: [[TWO_DEST:bb[0-9]+]], case #OneOfThree.three!enumelt: [[THREE_DEST:bb[0-9]+]]
 // CHECK:       [[ONE_DEST]]:
 // CHECK:         br [[EXIT:bb[0-9]+]]

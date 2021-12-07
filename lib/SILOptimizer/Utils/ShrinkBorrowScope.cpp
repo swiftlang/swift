@@ -54,6 +54,8 @@ class ShrinkBorrowScope {
   SmallPtrSet<SILBasicBlock *, 8> blocksWithReachedTops;
   SmallPtrSet<SILBasicBlock *, 8> blocksToEndAtTop;
 
+  llvm::SmallDenseMap<ApplySite, size_t> transitiveUsesPerApplySite;
+
   // The list of blocks to look for new points at which to insert end_borrows
   // in.  A block must not be processed if all of its successors have not yet
   // been.  For that reason, it is necessary to allow the same block to be
@@ -81,6 +83,12 @@ public:
     });
   }
 
+  bool isBarrierApply(SILInstruction *instruction) {
+    // For now, treat every apply (that doesn't use the borrowed value) as a
+    // barrier.
+    return isa<ApplySite>(instruction);
+  }
+
   bool mayAccessPointer(SILInstruction *instruction) {
     if (!instruction->mayReadOrWriteMemory())
       return false;
@@ -100,9 +108,70 @@ public:
   }
 
   bool isDeinitBarrier(SILInstruction *instruction) {
-    return users.contains(instruction) || instruction->maySynchronize() ||
-           mayAccessPointer(instruction, value) ||
-           mayLoadWeakOrUnowned(instruction, value);
+    return isBarrierApply(instruction) || instruction->maySynchronize() ||
+           mayAccessPointer(instruction) || mayLoadWeakOrUnowned(instruction);
+  }
+
+  bool canReplaceValueWithBorrowedValue(SILValue value) {
+    while (true) {
+      auto *instruction = value.getDefiningInstruction();
+      if (!instruction)
+        return false;
+      if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
+        value = cvi->getOperand();
+        continue;
+      } else if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
+        if (bbi == introducer) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  size_t usesInApply(ApplySite apply) {
+    if (auto count = transitiveUsesPerApplySite.lookup(apply))
+      return count;
+    return 0;
+  }
+
+  bool tryHoistOverInstruction(SILInstruction *instruction) {
+    if (users.contains(instruction)) {
+      if (auto apply = ApplySite::isa(instruction)) {
+        SmallVector<int, 2> rewritableArgumentIndices;
+        auto count = apply.getNumArguments();
+        for (unsigned index = 0; index < count; ++index) {
+          auto argument = apply.getArgument(index);
+          if (canReplaceValueWithBorrowedValue(argument)) {
+            rewritableArgumentIndices.push_back(index);
+          }
+        }
+        if (rewritableArgumentIndices.size() != usesInApply(apply)) {
+          return false;
+        }
+        // We can rewrite all the arguments which are transitive uses of the
+        // borrow.
+        for (auto index : rewritableArgumentIndices) {
+          auto argument = apply.getArgument(index);
+          auto borrowee = introducer->getOperand();
+          if (auto *cvi = dyn_cast<CopyValueInst>(argument)) {
+            cvi->setOperand(borrowee);
+          } else {
+            apply.setArgument(index, borrowee);
+          }
+        }
+        return true;
+      } else if (auto *bbi = dyn_cast<BeginBorrowInst>(instruction)) {
+        if (bbi->isLexical() &&
+            canReplaceValueWithBorrowedValue(bbi->getOperand())) {
+          auto borrowee = introducer->getOperand();
+          bbi->setOperand(borrowee);
+          return true;
+        }
+      }
+      return false;
+    }
+    return !isDeinitBarrier(instruction);
   }
 };
 
@@ -136,6 +205,9 @@ bool ShrinkBorrowScope::populateUsers() {
   for (auto *usePoint : usePoints) {
     auto *user = usePoint->getUser();
     users.insert(user);
+    if (auto apply = ApplySite::isa(user)) {
+      ++transitiveUsesPerApplySite[apply];
+    }
   }
   return true;
 }
@@ -195,7 +267,7 @@ void ShrinkBorrowScope::findBarriers() {
         barrier = instruction;
         break;
       }
-      if (isDeinitBarrier(instruction, borrowedValue.value)) {
+      if (!tryHoistOverInstruction(instruction)) {
         barrier = instruction;
         break;
       }
