@@ -321,7 +321,7 @@ func f(_ X: Float) -> Float {
 // Useful values are in all caps.
 // These values contribute to the output (`result`).
 @differentiable
-func foo(_ X: Float) -> Float {
+func f(_ X: Float) -> Float {
     let SINX = sin(X)
     let COS3 = cos(3) // 3 should be treated as if capitalized.
     let RESULT = SINX * COS3
