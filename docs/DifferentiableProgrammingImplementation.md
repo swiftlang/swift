@@ -486,7 +486,7 @@ struct f_bb0_DF_src_0_wrt_0 {
 }
 
 // JVP: replaces all function applications with JVP applications.
-sil @jvp_foo : $(Float) -> (Float, (Float) -> Float) {
+sil @jvp_f : $(Float) -> (Float, (Float) -> Float) {
 bb0(%x):
   (%y1, %df_sin) = apply @jvp_sin(%x)
   (%y2, %df_cos) = apply @jvp_cos(%x)
