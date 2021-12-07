@@ -1907,6 +1907,11 @@ public:
     E->getInitializer().dump(OS);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitRegexLiteralExpr(RegexLiteralExpr *E) {
+    printCommon(E, "regex_literal_expr");
+    printRec(E->getSemanticExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     printCommon(E, "object_literal") 

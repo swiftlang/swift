@@ -20,6 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/ExperimentalRegexBridging.h"
 #include "swift/Syntax/Trivia.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
@@ -29,13 +30,6 @@
 #include "llvm/ADT/Twine.h"
 // FIXME: Figure out if this can be migrated to LLVM.
 #include "clang/Basic/CharInfo.h"
-
-// Regex parser delivered via libSwift
-#include "swift/Parse/ExperimentalRegexBridging.h"
-static ParseRegexStrawperson parseRegexStrawperson = nullptr;
-void Parser_registerParseRegexStrawperson(ParseRegexStrawperson fn) {
-  parseRegexStrawperson = fn;
-}
 
 #include <limits>
 
@@ -1795,9 +1789,6 @@ static void validateMultilineIndents(const Token &Str,
 
 /// Emit diagnostics for single-quote string and suggest replacement
 /// with double-quoted equivalent.
-///
-/// Or, if we're in experimental regex mode, we will emit a custom
-/// error message instead, determined by the Swift library.
 void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
                                              const char *TokEnd) {
   assert(*TokStart == '\'' && TokEnd[-1] == '\'');
@@ -1806,15 +1797,6 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
 
   auto startLoc = Lexer::getSourceLoc(TokStart);
   auto endLoc = Lexer::getSourceLoc(TokEnd);
-
-  if (LangOpts.EnableExperimentalStringProcessing) {
-    if (parseRegexStrawperson) {
-      auto copy = std::string(TokStart, TokEnd-TokStart);
-      auto msg = parseRegexStrawperson(copy.c_str());
-      assert(msg != nullptr);
-      Diags->diagnose(startLoc, diag::lex_experimental_regex_strawperson, msg);
-    }
-  }
 
   SmallString<32> replacement;
   replacement.push_back('"');
@@ -1969,6 +1951,37 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
   }
 }
 
+void Lexer::lexRegexLiteral(const char *TokStart) {
+  assert(*TokStart == '\'');
+
+  bool HadError = false;
+  while (true) {
+    // Check if we reached the end of the literal without terminating.
+    if (CurPtr >= BufferEnd || *CurPtr == '\n' || *CurPtr == '\r') {
+      diagnose(TokStart, diag::lex_unterminated_regex);
+      return formToken(tok::unknown, TokStart);
+    }
+
+    const auto *CharStart = CurPtr;
+    uint32_t CharValue = validateUTF8CharacterAndAdvance(CurPtr, BufferEnd);
+    if (CharValue == ~0U) {
+      diagnose(CharStart, diag::lex_invalid_utf8);
+      HadError = true;
+      continue;
+    }
+    if (CharValue == '\\' && (*CurPtr == '\'' || *CurPtr == '\\')) {
+      // Skip escaped delimiter or \.
+      CurPtr++;
+    } else if (CharValue == '\'') {
+      // End of literal, stop.
+      break;
+    }
+  }
+  if (HadError)
+    return formToken(tok::unknown, TokStart);
+
+  formToken(tok::regex_literal, TokStart);
+}
 
 /// lexEscapedIdentifier:
 ///   identifier ::= '`' identifier '`'
@@ -2513,8 +2526,16 @@ void Lexer::lexImpl() {
   case '5': case '6': case '7': case '8': case '9':
     return lexNumber();
 
-  case '"':
   case '\'':
+    // If we have experimental string processing enabled, and have the parsing
+    // logic for regex literals, lex a single quoted string as a regex literal.
+    if (LangOpts.EnableExperimentalStringProcessing &&
+        Parser_hasParseRegexStrawperson()) {
+      return lexRegexLiteral(TokStart);
+    }
+    // Otherwise lex as a string literal and emit a diagnostic.
+    LLVM_FALLTHROUGH;
+  case '"':
     return lexStringLiteral();
       
   case '`':

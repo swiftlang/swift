@@ -1233,6 +1233,7 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
     case ExprKind::BooleanLiteral: return "boolean";
     case ExprKind::StringLiteral: return "string";
     case ExprKind::InterpolatedStringLiteral: return "string";
+    case ExprKind::RegexLiteral: return "regular expression";
     case ExprKind::MagicIdentifierLiteral:
       return MagicIdentifierLiteralExpr::getKindString(
           cast<MagicIdentifierLiteralExpr>(LE)->getKind());
