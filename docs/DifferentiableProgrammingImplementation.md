@@ -274,8 +274,7 @@ The differentiation transform canonicalizes `differentiable_function` instructio
 // After differentiation transform:
 %fn_ref = function_ref @fn : $@convention(thin) (Float) -> Float
 %fn_jvp_ref = function_ref @fn_jvp : $@convention(thin) (Float) -> (Float, (Float) -> Float)
-%fn_vjp_ref = function_ref @fn_vjp
-    : $@convention(thin) (Float) -> (Float, (Float) -> Float)
+%fn_vjp_ref = function_ref @fn_vjp : $@convention(thin) (Float) -> (Float, (Float) -> Float)
 %diff_fn = differentiable_function [wrt 0] %fn_ref with {%fn_jvp_ref, %fn_vjp_ref}
 // `@fn_jvp` and `@fn_vjp` may be generated.
 ```
