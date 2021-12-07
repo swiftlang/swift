@@ -482,7 +482,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
       SmallString<128> storage;
       {
         llvm::raw_svector_ostream OS(storage);
-        if (ide::printModuleUSR(Mod, OS, /*useRealNameIfAliased=*/true))
+        if (ide::printModuleUSR(Mod, OS))
           return true;
         result.USR = stringStorage.copyString(OS.str());
       }
