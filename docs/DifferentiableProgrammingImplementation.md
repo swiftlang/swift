@@ -169,7 +169,7 @@ This document will explain the internals of the differentiation system via illus
 
 ### Syntax
 
-The `@differentiable` declaration attribute marks “function-like” declarations ([function declarations](https://docs.swift.org/swift-book/LanguageGuide/Functions.html#ID159), [initializers](https://docs.swift.org/swift-book/LanguageGuide/Initialization.html), [properties](https://docs.swift.org/swift-book/LanguageGuide/Properties.html#ID608), and [subscripts](https://docs.swift.org/swift-book/LanguageGuide/Subscripts.html)) as differentiable.
+The `@differentiable` declaration attribute marks "function-like" declarations ([function declarations](https://docs.swift.org/swift-book/LanguageGuide/Functions.html#ID159), [initializers](https://docs.swift.org/swift-book/LanguageGuide/Initialization.html), [properties](https://docs.swift.org/swift-book/LanguageGuide/Properties.html#ID608), and [subscripts](https://docs.swift.org/swift-book/LanguageGuide/Subscripts.html)) as differentiable.
 
 > TODO: Add `@differentiable` declaration attribute examples.
 
