@@ -1001,10 +1001,6 @@ See [here](https://github.com/apple/swift/blob/main/docs/DifferentiableProgrammi
 - VJP functions will be removed throughout the differentiation system.
 - Pullback function generation will change to use transposition.
 
-## How to contribute? 🤔
-
-[JIRA link to AutoDiff starter bugs](https://bugs.swift.org/issues/?jql=project%20%3D%20TF%20AND%20status%20%3D%20Open%20AND%20component%20in%20(Autodiff)%20AND%20labels%20in%20(StarterBug)). As of the time of this writing, there are no open starter bugs. If you are interested in helping with differentiable programming in Swift, please email [swift@tensorflow.org](mailto:swift@tensorflow.org) and we can help you find some starter tasks.
-
 ## Acknowledgements
 
 Please see [here](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md#acknowledgements) for a list of people who have influenced the design and the implementation of differentiable programming in Swift.
