@@ -812,7 +812,7 @@ In general, tangent transformation rules are simpler because the tangent transfo
 
 Swift organizes code into [modules](Modules.rst). Modules enforce access controls on what code can be used outside of them.
 
-Differentiation is designed with modules and access levels in mind. `@differentiable` declaration attributes act like a “differentiability contract”: declarations marked with the attribute can be differentiated from other modules. This is because the differentiation transform is guaranteed to fill in all SIL differentiability witnesses with derivatives functions. Conversely, declarations not marked with `@differentiable` cannot be differentiated from other modules because they do not have registered derivative functions and are essentially opaque (their bodies may not be exposed).
+Differentiation is designed with modules and access levels in mind. `@differentiable` declaration attributes act like a "differentiability contract": declarations marked with the attribute can be differentiated from other modules. This is because the differentiation transform is guaranteed to fill in all SIL differentiability witnesses with derivatives functions. Conversely, declarations not marked with `@differentiable` cannot be differentiated from other modules because they do not have registered derivative functions and are essentially opaque (their bodies may not be exposed).
 
 This design makes differentiation modular. The compiler does not need access to the bodies of cross-module declarations in order to differentiate them; it simply looks up their registered derivatives.
 
