@@ -88,7 +88,7 @@ build_target_toolchain() {
     -D CMAKE_AR="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/bin/llvm-ar" \
     -D CMAKE_C_COMPILER_LAUNCHER="$(which sccache)" \
     -D CMAKE_CXX_COMPILER_LAUNCHER="$(which sccache)" \
-    -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr/lib/clang/10.0.0/" \
+    -D CMAKE_INSTALL_PREFIX="$DIST_TOOLCHAIN_SDK/usr/lib/clang/13.0.0/" \
     -D CMAKE_SYSROOT="${WASI_SYSROOT_PATH}" \
     -G Ninja \
     -S "$SOURCE_PATH/llvm-project/compiler-rt"
