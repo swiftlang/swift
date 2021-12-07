@@ -536,7 +536,7 @@ struct f_bb0_DF_src_0_wrt_0 {
 In order to handle control flow, we need to create a struct for each basic block. In addition to this, we need an enum field that has the successor basic block struct as a payload value on the enum case. The reason this is required is that control flow is dynamic and what route we take down the control flow is determined during runtime. As such, we need to dynamically create instances of these structs, and be able to handle every control flow path. For example:
 
 ```swift
-func bar(_ x: Float) -> Float {
+func m(_ x: Float) -> Float {
   var retVal = f(x) // bb0
   if x < 5 {
     retVal = g(retVal) // bb1
