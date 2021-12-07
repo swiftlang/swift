@@ -643,6 +643,10 @@ public:
 
 private:
   std::vector<ReflectionInfo> ReflectionInfos;
+
+  /// Index of the next Reflection Info that should be processed.
+  /// This assumes that Reflection Infos are never removed from the vector.
+  size_t FirstUnprocessedReflectionInfoIndex = 0;
     
   llvm::Optional<std::string> normalizeReflectionName(RemoteRef<char> name);
   bool reflectionNameMatches(RemoteRef<char> reflectionName,
