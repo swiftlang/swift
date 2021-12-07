@@ -4491,6 +4491,10 @@ ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %1 %2 in "
       "concurrently-executing code",
       (bool, DescriptiveDeclKind, DeclName))
+ERROR(non_sendable_capture,none,
+      "capture of %1 with non-sendable type %0 in a `@Sendable` closure",
+      (Type, DeclName))
+
 NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",

@@ -99,7 +99,7 @@ func test_nonsendableContinuation() async throws {
 
   let _: NotSendable = try await withUnsafeThrowingContinuation { continuation in
     Task {
-      continuation.resume(returning: NotSendable()) // expected-warning{{cannot use parameter 'continuation' with a non-sendable type 'UnsafeContinuation<NotSendable, Error>' from concurrently-executed code}}
+      continuation.resume(returning: NotSendable()) // expected-warning{{capture of 'continuation' with non-sendable type 'UnsafeContinuation<NotSendable, Error>' in a `@Sendable` closure}}
     }
   }
 }
