@@ -152,7 +152,7 @@ extension DistributedActorSystem {
   /// The reason for this API using a `ResultHandler` rather than returning values directly,
   /// is that thanks to this approach it can avoid any existential boxing, and can serve the most
   /// latency sensitive-use-cases.
-  func executeDistributedFunc<Act, ResultHandler>(
+  func executeDistributedTarget<Act, ResultHandler>(
       on actor: Act,
       mangledMethodName: String,
       invocation: Self.Invocation,
@@ -160,22 +160,17 @@ extension DistributedActorSystem {
   ) async throws where Act: DistributedActor,
                        Act.ID == ActorID,
                        ResultHandler: DistributedTargetInvocationResultHandler {
-    return try await _executeDistributedTarget(
-        on: actor,
-        mangledMethodName: mangledMethodName,
-        invocation: invocation,
-        handler: handler
-    )
+    fatalError("TODO: synthesize and invoke the _executedDistributedTarget")
   }
 }
 
 @available(SwiftStdlib 5.6, *)
-@_silgen_name("swift_distributed_executeDistributedFunc")
-func _executeDistributedTarget(
-    on actor: AnyObject, //Act,
-    mangledMethodName: String,
-    invocation: Any, // : DistributedTargetInvocation
-    handler: Any // : DistributedTargetInvocationResultHandler
+@_silgen_name("swift_distributed_execute_target")
+func _executedDistributedTarget(
+  on actor: AnyObject, // DistributedActor
+  _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
+  argumentBuffer: Builtin.RawPointer, // HeterogeneousBuffer of arguments
+  resultBuffer: Builtin.RawPointer
 ) async throws
 
 //  {
@@ -287,7 +282,7 @@ public struct RemoteCallTarget {
 /// Since every actor system is going to deal with a concrete invocation type, they may
 /// implement decoding them whichever way is most optimal for the given transport.
 ///
-/// Once decided, the invocation must be passed to `_executeDistributedTarget`
+/// Once decided, the invocation must be passed to `executeDistributedTarget`
 /// which will decode the substitutions, argument values, return and error types (in that order).
 ///
 /// Note that the decoding will be provided the specific types that the sending side used to preform the call,
