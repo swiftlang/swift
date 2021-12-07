@@ -160,7 +160,7 @@ Here is how differentiation fits into each of the stages of compilation:
 The differentiation system in Swift needs to handle two main things: `@differentiable` declaration attributes and differentiable function type conversion.
 
 Both of these trigger "differentiation" by the compiler:
-- The compiler verifies that every declaration with `@differentiable` attributes is indeed differentiable (according to the parameter indices and generic requirements of the attributes). All lowered SIL differentiability witnesses should be “filled in” with corresponding derivative functions.
+- The compiler verifies that every declaration with the `@differentiable` attribute is indeed differentiable (according to the parameter indices and generic requirements of the attributes). All lowered SIL differentiability witnesses should be "filled in" with corresponding derivative functions.
 - The compiler ensures that every conversion from a normal function to a differentiable function is valid.
 
 This document will explain the internals of the differentiation system via illustrative examples of the two triggers.
