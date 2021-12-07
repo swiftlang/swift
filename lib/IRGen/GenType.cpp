@@ -2182,6 +2182,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
+  case TypeKind::Existential:
+    return convertExistentialType(cast<ExistentialType>(ty));
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     llvm_unreachable("can't convert dependent type");

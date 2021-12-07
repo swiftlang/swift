@@ -190,6 +190,9 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
     return cast<ProtocolType>(type)->requiresClass();
   case TypeKind::ProtocolComposition:
     return cast<ProtocolCompositionType>(type)->requiresClass();
+  case TypeKind::Existential:
+    return isReferenceTypeImpl(cast<ExistentialType>(type).getConstraintType(),
+                               sig, functionsCount);
 
   case TypeKind::UnboundGeneric:
     return isa<ClassDecl>(cast<UnboundGenericType>(type)->getDecl());
@@ -293,6 +296,12 @@ ExistentialLayout TypeBase::getExistentialLayout() {
 }
 
 ExistentialLayout CanType::getExistentialLayout() {
+  if (auto existential = dyn_cast<ExistentialType>(*this))
+    return existential->getConstraintType()->getExistentialLayout();
+
+  if (auto metatype = dyn_cast<ExistentialMetatypeType>(*this))
+    return metatype->getInstanceType()->getExistentialLayout();
+
   if (auto proto = dyn_cast<ProtocolType>(*this))
     return ExistentialLayout(proto);
 
@@ -1441,6 +1450,12 @@ CanType TypeBase::computeCanonicalType() {
     Type Composition = ProtocolCompositionType::get(C, CanProtos,
                                                     PCT->hasExplicitAnyObject());
     Result = Composition.getPointer();
+    break;
+  }
+  case TypeKind::Existential: {
+    auto *existential = cast<ExistentialType>(this);
+    auto constraint = existential->getConstraintType()->getCanonicalType();
+    Result = ExistentialType::get(constraint);
     break;
   }
   case TypeKind::ExistentialMetatype: {
@@ -5236,6 +5251,19 @@ case TypeKind::Id:
       *this : InOutType::get(objectTy);
   }
 
+  case TypeKind::Existential: {
+    auto *existential = cast<ExistentialType>(base);
+    auto constraint = existential->getConstraintType().transformRec(fn);
+    if (!constraint || constraint->hasError())
+      return constraint;
+
+    if (constraint.getPointer() ==
+        existential->getConstraintType().getPointer())
+      return *this;
+
+    return ExistentialType::get(constraint);
+  }
+
   case TypeKind::ProtocolComposition: {
     auto pc = cast<ProtocolCompositionType>(base);
     SmallVector<Type, 4> substMembers;
@@ -5428,6 +5456,10 @@ ReferenceCounting TypeBase::getReferenceCounting() {
       return superclass->getReferenceCounting();
     return ReferenceCounting::Unknown;
   }
+
+  case TypeKind::Existential:
+    return cast<ExistentialType>(type)->getConstraintType()
+        ->getReferenceCounting();
 
   case TypeKind::Function:
   case TypeKind::GenericFunction:

@@ -4706,6 +4706,12 @@ public:
         protocols);
   }
 
+  void
+  visitExistentialType(const ExistentialType *existential) {
+    using namespace decls_block;
+    serializeSimpleWrapper<ExistentialTypeLayout>(existential->getConstraintType());
+  }
+
   void visitReferenceStorageType(const ReferenceStorageType *refTy) {
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
@@ -4882,6 +4888,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<NestedArchetypeTypeLayout>();
   registerDeclTypeAbbr<SequenceArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
+  registerDeclTypeAbbr<ExistentialTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();

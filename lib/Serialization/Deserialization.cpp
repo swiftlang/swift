@@ -5606,6 +5606,18 @@ public:
     return ProtocolCompositionType::get(ctx, protocols, hasExplicitAnyObject);
   }
 
+  Expected<Type> deserializeExistentialType(ArrayRef<uint64_t> scratch,
+                                            StringRef blobData) {
+    TypeID constraintID;
+    decls_block::ExistentialTypeLayout::readRecord(scratch, constraintID);
+
+    auto constraintType = MF.getTypeChecked(constraintID);
+    if (!constraintType)
+      return constraintType.takeError();
+
+    return ExistentialType::get(constraintType.get());
+  }
+
   Expected<Type> deserializeDependentMemberType(ArrayRef<uint64_t> scratch,
                                                 StringRef blobData) {
     TypeID baseID;

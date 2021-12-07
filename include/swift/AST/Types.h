@@ -5199,6 +5199,42 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
+/// An existential type, spelled with \c any .
+///
+/// In Swift 5 mode, a plain protocol name in type
+/// context is an implicit existential type.
+class ExistentialType final : public TypeBase {
+  Type ConstraintType;
+
+  ExistentialType(Type constraintType,
+                  const ASTContext *canonicalContext,
+                  RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Existential, canonicalContext, properties),
+        ConstraintType(constraintType) {}
+
+public:
+  static ExistentialType *get(Type constraint);
+
+  Type getConstraintType() const { return ConstraintType; }
+
+  bool requiresClass() const {
+    if (auto protocol = ConstraintType->getAs<ProtocolType>())
+      return protocol->requiresClass();
+
+    if (auto composition = ConstraintType->getAs<ProtocolCompositionType>())
+      return composition->requiresClass();
+
+    return false;
+  }
+
+  static bool classof(const TypeBase *type) {
+    return type->getKind() == TypeKind::Existential;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(ExistentialType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getConstraintType)
+END_CAN_TYPE_WRAPPER(ExistentialType, Type)
+
 /// LValueType - An l-value is a handle to a physical object.  The
 /// type of that object uniquely determines the type of an l-value
 /// for it.
@@ -6154,7 +6190,9 @@ inline bool TypeBase::isAnyExistentialType() {
 }
 
 inline bool CanType::isExistentialTypeImpl(CanType type) {
-  return isa<ProtocolType>(type) || isa<ProtocolCompositionType>(type);
+  return (isa<ProtocolType>(type) ||
+          isa<ProtocolCompositionType>(type) ||
+          isa<ExistentialType>(type));
 }
 
 inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
@@ -6167,6 +6205,8 @@ inline bool TypeBase::isClassExistentialType() {
     return pt->requiresClass();
   if (auto pct = dyn_cast<ProtocolCompositionType>(T))
     return pct->requiresClass();
+  if (auto existential = dyn_cast<ExistentialType>(T))
+    return existential->requiresClass();
   return false;
 }
 
@@ -6427,6 +6467,9 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   case TypeKind::ExistentialMetatype:
     return !cast<const AnyMetatypeType>(this)->hasRepresentation();
 
+  case TypeKind::Existential:
+    return false;
+
   case TypeKind::NestedArchetype:
     return cast<NestedArchetypeType>(this)->getParent()->hasSimpleTypeRepr();
       
@@ -6436,8 +6479,6 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
 
   case TypeKind::ProtocolComposition: {
     // 'Any', 'AnyObject' and single protocol compositions are simple
-    // FIXME: single protocol compositions spelled with `any` are not
-    // simple.
     auto composition = cast<const ProtocolCompositionType>(this);
     auto memberCount = composition->getMembers().size();
     if (composition->hasExplicitAnyObject())

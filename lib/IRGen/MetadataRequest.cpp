@@ -1729,6 +1729,12 @@ namespace {
       return emitExistentialTypeMetadata(type, request);
     }
 
+    MetadataResponse
+    visitExistentialType(CanExistentialType type,
+                         DynamicMetadataRequest request) {
+      return emitExistentialTypeMetadata(type, request);
+    }
+
     MetadataResponse visitReferenceStorageType(CanReferenceStorageType type,
                                                DynamicMetadataRequest request) {
       llvm_unreachable("reference storage type should have been converted by "
