@@ -589,7 +589,7 @@ extension UnsafeRawPointer {
   }
 }
 
-extension AutoreleasingUnsafeMutablePointer: Sendable { }
+extension AutoreleasingUnsafeMutablePointer { }
 
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.

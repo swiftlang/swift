@@ -749,10 +749,6 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
-extension UnsafeBufferPointer: Sendable { }
-extension UnsafeBufferPointer.Iterator: Sendable { }
-extension UnsafeMutableBufferPointer: Sendable { }
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:
