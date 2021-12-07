@@ -331,7 +331,6 @@ func f(_ X: Float) -> Float {
 
 // Active values are in all caps.
 // These values are varied and useful, and thus need a derivative.
-// Non-active values are gray. They do not need a derivative.
 @differentiable
 func f(_ X: Float) -> Float {
     let SINX = sin(X)
