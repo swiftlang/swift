@@ -413,7 +413,7 @@ gradient(at: Float(4), in: { x in x * x * x })
 
 ## Derivative code generation ([automatic differentiation](https://en.wikipedia.org/wiki/Automatic_differentiation))
 
-For both triggers (1) and (2) above, the differentiation transform needs to generate derivative functions. This “derivative function generation” is the bulk of differentiation transform; it is [automatic differentiation](https://en.wikipedia.org/wiki/Automatic_differentiation) implemented as a SIL-to-SIL function transformation.
+For both triggers (1) and (2) above, the differentiation transform needs to generate derivative functions. This "derivative function generation" is the bulk of differentiation transform; it is [automatic differentiation](https://en.wikipedia.org/wiki/Automatic_differentiation) implemented as a SIL-to-SIL function transformation.
 
 Derivative code generation takes the following steps:
 - JVP generation and differential generation.
