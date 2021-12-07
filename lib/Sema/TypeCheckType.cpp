@@ -1423,6 +1423,21 @@ static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
   }
 }
 
+static LookupTypeResult preferSwiftTypes(LookupTypeResult results) {
+  if (results.size() == 1)
+    return results;
+  LookupTypeResult newResults;
+  for (auto cur: results) {
+    if (cur.Member->getClangNode()) {
+      continue;
+    }
+    newResults.addResult(cur);
+  }
+  if (newResults.size() == 1)
+    return newResults;
+  return results;
+}
+
 /// Resolve the given identifier type representation as a qualified
 /// lookup within the given parent type, returning the type it
 /// references.
@@ -1532,6 +1547,9 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
   if (parentTy->mayHaveMembers())
     memberTypes = TypeChecker::lookupMemberType(
         DC, parentTy, comp->getNameRef(), lookupOptions);
+
+  // Prefer Swift types over Clang types.
+  memberTypes = preferSwiftTypes(memberTypes);
 
   // Name lookup was ambiguous. Complain.
   // FIXME: Could try to apply generic arguments first, and see whether
