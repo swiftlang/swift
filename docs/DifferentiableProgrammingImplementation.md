@@ -61,7 +61,7 @@ gradient(at: 4, in: { x in x * x * x }) // 48.0
 ## Overview
 
 Swift supports first-class, language-integrated differentiable programming. This includes the following components:
-- [The `Differentiable` protocol](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md#the-differentiable-protocol): a protocol that generalizes all data structures that can be a parameter or result of a differentiable function.
+- [The `Differentiable` protocol](DifferentiableProgramming.md#the-differentiable-protocol): a protocol that generalizes all data structures that can be a parameter or result of a differentiable function.
 - [The `@differentiable` declaration attribute](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md#the-differentiable-declaration-attribute): used to mark function-like declarations (function declarations, initializers, properties, and subscripts) as being differentiable.
 - [Differentiable function types](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md#differentiable-function-types): subtypes of normal function types, with a different runtime representation and calling convention. Differentiable function types have differentiable parameters and results.
 - [Differential operators](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md#differential-operators): core differentiation APIs. Differential operators are higher-order functions that take `@differentiable` functions as inputs and return derivative functions or evaluate derivative values.
