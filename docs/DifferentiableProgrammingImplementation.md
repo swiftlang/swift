@@ -71,7 +71,7 @@ Swift supports first-class, language-integrated differentiable programming. This
 
 ### JVP and VJP functions
 
-A JVP (Jacobian-vector products) function is a forward-mode derivative function. A VJP (vector-Jacobian products) function is a reverse-mode derivative function.
+A JVP (Jacobian-vector product) function is a [forward-mode](DifferentiableProgramming.md#automatic-differentiation) derivative function. A VJP (vector-Jacobian product) function is a [reverse-mode](DifferentiableProgramming.md#automatic-differentiation) derivative function.
 
 ### Typing rules
 
