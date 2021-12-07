@@ -55,7 +55,7 @@ gradient(at: 4, in: { x in x * x * x }) // 48.0
 ```
 
 > NOTE:
-> - Please see the [Swift Differentiable Programming Manifesto](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md) for background and a holistic overview of differentiable programming in Swift.
+> - Please see the [Swift Differentiable Programming Manifesto](DifferentiableProgramming.md) for background and a holistic overview of differentiable programming in Swift.
 > - This document describes the current implementation of differentiation in Swift. Some details may differ from [Swift Differentiable Programming Manifesto](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md), which describes the final design for differentiation in Swift. As the implementation of differentiation changes, this document will be updated accordingly.
 
 ## Overview
