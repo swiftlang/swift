@@ -737,7 +737,7 @@ bb0(%x):
 }
 ```
 
-As explained above in the “JVP and differential generation” section, closures do not exist in SIL. A more accurate, closure-free pseudocode looks like:
+As explained above in the "JVP and differential generation" section, closures do not exist in SIL. A more accurate, closure-free pseudocode looks like:
 
 ```swift
 // Struct containing pullback functions.
