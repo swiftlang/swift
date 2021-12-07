@@ -292,7 +292,7 @@ Activity analysis is a static SIL data flow analysis that determines exactly wha
 
 ```swift
 @differentiable
-func foo(_ x: Float) -> Float {
+func f(_ x: Float) -> Float {
     let result = sin(x) * cos(3)
     print(result)
     return result
