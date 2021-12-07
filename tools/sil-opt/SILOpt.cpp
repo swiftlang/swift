@@ -106,14 +106,14 @@ EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
 
 static llvm::cl::opt<bool> EnableExperimentalLexicalLifetimes(
-    "enable-experimental-lexical-lifetimes",
+    "enable-lexical-lifetimes",
     llvm::cl::desc("Enable experimental lexical lifetimes. Mutually exclusive "
                    "with disable-lexical-lifetimes."));
 
 static llvm::cl::opt<bool> DisableLexicalLifetimes(
     "disable-lexical-lifetimes",
     llvm::cl::desc("Disable the default early lexical lifetimes. Mutually "
-                   "exclusive with enable-experimental-lexical-lifetimes"));
+                   "exclusive with enable-lexical-lifetimes"));
 
 static llvm::cl::opt<bool>
 EnableExperimentalMoveOnly("enable-experimental-move-only",
@@ -534,7 +534,7 @@ int main(int argc, char **argv) {
   if (enableExperimentalLexicalLifetimes && DisableLexicalLifetimes) {
     fprintf(
         stderr,
-        "Error! Can not specify both -enable-experimental-lexical-lifetimes "
+        "Error! Can not specify both -enable-lexical-lifetimes "
         "and -disable-lexical-lifetimes!\n");
     exit(-1);
   }
