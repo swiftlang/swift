@@ -3073,17 +3073,17 @@ getClangModule(llvm::PointerUnion<const ModuleDecl *, const void *> Union) {
   return static_cast<const clang::Module *>(Union.get<const void *>());
 }
 
-StringRef ModuleEntity::getName() const {
+StringRef ModuleEntity::getName(bool useRealNameIfAliased) const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
-    return SwiftMod->getName().str();
+    return useRealNameIfAliased ? SwiftMod->getRealName().str() : SwiftMod->getName().str();
   return getClangModule(Mod)->Name;
 }
 
-std::string ModuleEntity::getFullName() const {
+std::string ModuleEntity::getFullName(bool useRealNameIfAliased) const {
   assert(!Mod.isNull());
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
-    return std::string(SwiftMod->getName());
+    return std::string(useRealNameIfAliased ? SwiftMod->getRealName() : SwiftMod->getName());
   return getClangModule(Mod)->getFullModuleName();
 }
 

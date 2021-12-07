@@ -482,14 +482,14 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
       SmallString<128> storage;
       {
         llvm::raw_svector_ostream OS(storage);
-        if (ide::printModuleUSR(Mod, OS))
+        if (ide::printModuleUSR(Mod, OS, /*useRealNameIfAliased=*/true))
           return true;
         result.USR = stringStorage.copyString(OS.str());
       }
       storage.clear();
       {
         llvm::raw_svector_ostream OS(storage);
-        OS << Mod.getFullName();
+        OS << Mod.getFullName(/*useRealNameIfAliased=*/true);
         result.name = stringStorage.copyString(OS.str());
       }
     }
@@ -1119,8 +1119,11 @@ bool IndexSwiftASTWalker::visitImports(
     if (!IsClangModuleOpt.hasValue())
       continue;
     bool IsClangModule = *IsClangModuleOpt;
-
-    StringRef ModuleName = Mod->getNameStr();
+    // Use module real name in case module aliasing is used.
+    // For example, if a file being indexed has `import Foo`
+    // and `-module-alias Foo=Bar` is passed, treat Foo as an
+    // alias and Bar as the real module name as its dependency.
+    StringRef ModuleName = Mod->getRealName().str();
 
     // If this module is an underscored cross-import overlay, use the name
     // of the underlying module that declared it instead.

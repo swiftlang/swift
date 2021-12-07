@@ -47,8 +47,14 @@ bool printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS);
 bool printValueDeclUSR(const ValueDecl *D, raw_ostream &OS);
 
 /// Prints out the USR for the given ModuleEntity.
+/// \param useRealNameIfAliased Whether to use the module's real name in case
+///                             module aliasing is used. For example, if a file
+///                             has `import Foo` and `-module-alias Foo=Bar` is
+///                             passed, treat Foo as an alias and Bar as the real
+///                             module name as its dependency. This only applies
+///                             to Swift modules.
 /// \returns true if it failed, false on success.
-bool printModuleUSR(ModuleEntity Mod, raw_ostream &OS);
+bool printModuleUSR(ModuleEntity Mod, raw_ostream &OS, bool useRealNameIfAliased = false);
 
 /// Prints out the accessor USR for the given storage Decl.
 /// \returns true if it failed, false on success.

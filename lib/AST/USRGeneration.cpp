@@ -278,9 +278,9 @@ swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
   return NewMangler.mangleLocalTypeDecl(D);
 }
 
-bool ide::printModuleUSR(ModuleEntity Mod, raw_ostream &OS) {
+bool ide::printModuleUSR(ModuleEntity Mod, raw_ostream &OS, bool useRealNameIfAliased) {
   if (auto *D = Mod.getAsSwiftModule()) {
-    StringRef moduleName = D->getName().str();
+    StringRef moduleName = useRealNameIfAliased ? D->getRealName().str() : D->getNameStr();
     return clang::index::generateFullUSRForTopLevelModuleName(moduleName, OS);
   } else if (auto ClangM = Mod.getAsClangModule()) {
     return clang::index::generateFullUSRForModule(ClangM, OS);
