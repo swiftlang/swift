@@ -1342,6 +1342,8 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     SILValue addr;
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst))
       addr = copyAddr->getDest();
+    else if (auto *moveAddr = dyn_cast<MarkUnresolvedMoveAddrInst>(inst))
+      addr = moveAddr->getDest();
     else if (auto *assign = dyn_cast<AssignInst>(inst))
       addr = assign->getDest();
     else if (auto *assign = dyn_cast<AssignByWrapperInst>(inst))
@@ -2410,7 +2412,7 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     CA->setIsInitializationOfDest(InitKind);
     return;
   }
-  
+
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   if (auto *SW = dyn_cast<Store##Name##Inst>(Inst)) { \
     if (SW->isInitializationOfDest()) \

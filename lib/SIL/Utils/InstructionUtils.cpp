@@ -631,6 +631,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
     return RuntimeEffect::MetaData;
   }
+  // Equialent to a copy_addr [init]
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst: {
+    return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
+  }
+
   case SILInstructionKind::StoreInst:
     switch (cast<StoreInst>(inst)->getOwnershipQualifier()) {
       case StoreOwnershipQualifier::Unqualified:

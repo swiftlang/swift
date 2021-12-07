@@ -1108,7 +1108,14 @@ public:
 #undef RECURSIVE_INST_VISITOR
 
   bool visitCopyAddrInst(CopyAddrInst *cai) {
-    if (currentOp.get()->getOperandNumber() == 1 || cai->isTakeOfSrc())
+    if (currentOp.get()->getOperandNumber() == CopyAddrInst::Dest ||
+        cai->isTakeOfSrc())
+      markCurrentOpAsMutation();
+    return true;
+  }
+
+  bool visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *mai) {
+    if (currentOp.get()->getOperandNumber() == MarkUnresolvedMoveAddrInst::Dest)
       markCurrentOpAsMutation();
     return true;
   }
