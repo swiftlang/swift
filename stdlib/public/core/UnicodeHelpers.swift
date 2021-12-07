@@ -388,7 +388,7 @@ extension _StringGuts {
     _internalInvariant(self.isForeign)
 
     // Both a fast-path for single-code-unit graphemes and validation:
-    //   ICU treats isolated surrogates as isolated graphemes
+    //    treat isolated surrogates as isolated graphemes
     let count = end &- start
     if start &- end == 1 {
       return Character(String(self.foreignErrorCorrectedScalar(
