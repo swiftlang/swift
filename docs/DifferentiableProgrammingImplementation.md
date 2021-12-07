@@ -307,37 +307,37 @@ Activity analysis classifies values in a function into these categories:
 Here is the result of activity analysis for this example:
 
 ```swift
-// Varied values are in all caps.
+// Varied values are surrounded by asterisks.
 // These values depend on the input (`x`).
 @differentiable
-func f(_ X: Float) -> Float {
-    let SINX = sin(X)
+func f(_ **x**: Float) -> Float {
+    let **sinx** = sin(**x**)
     let cos3 = cos(3)
-    let RESULT = SINX * cos3
-    print(RESULT)
-    return RESULT
+    let **result** = **sinx** * cos3
+    print(**result**)
+    return **result**
 }
 
-// Useful values are in all caps.
+// Useful values are surrounded by asterisks.
 // These values contribute to the output (`result`).
 @differentiable
-func f(_ X: Float) -> Float {
-    let SINX = sin(X)
-    let COS3 = cos(3) // 3 should be treated as if capitalized.
-    let RESULT = SINX * COS3
-    print(RESULT)
-    return RESULT
+func f(_ **x**: Float) -> Float {
+    let **sinx** = sin(**x**)
+    let **cos3** = cos(**3**)
+    let **result** = **sinx** * **cos3**
+    print(**result**)
+    return **result**
 }
 
-// Active values are in all caps.
+// Active values are surrounded by asterisks.
 // These values are varied and useful, and thus need a derivative.
 @differentiable
-func f(_ X: Float) -> Float {
-    let SINX = sin(X)
+func f(_ **x**: Float) -> Float {
+    let **sinx** = sin(**x**)
     let cos3 = cos(3)
-    let RESULT = SINX * cos3
+    let **result** = **sinx** * cos3
     let void = print(result)
-    return RESULT
+    return **result**
 }
 ```
 
