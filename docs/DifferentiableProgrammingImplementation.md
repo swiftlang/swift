@@ -128,7 +128,7 @@ Here is a description of the main phases in compilation:[†](https://www.swift.
 - **Parsing**: The parser takes Swift source code and generates an abstract syntax tree (AST) without type information. Warnings and errors are produced for grammatical problems in source code.
 - **Type checking**: The type checker takes the parsed AST and transforms it into a fully type-checked form, performing type inference. Warnings and errors are produced for semantic problems in source code.
 - **SIL generation**: The Swift Intermediate Language (SIL) is a high-level intermediate language for Swift suitable for analysis and optimization. The SIL generation phase lowers the type-checked AST into ["raw" SIL](SIL.rst#silgen).
-- **SIL mandatory passes**: The SIL mandatory passes perform analyses that diagnose user errors and lower to "canonical" SIL, including data flow diagnostics and mandatory inlining.
+- **SIL mandatory passes**: The SIL mandatory passes perform analyses (diagnosing user errors) and lowering (down to canonical SIL).
 - **SIL optimizations passes**: The SIL optimization passes perform additional high-level optimizations to SIL.
 - **LLVM IR generation**: IR generation lowers SIL to LLVM IR. LLVM performs further optimizations and generates machine code.
 
