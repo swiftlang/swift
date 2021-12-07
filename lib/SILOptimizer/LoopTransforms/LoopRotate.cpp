@@ -69,6 +69,7 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
   llvm::DenseSet<SILInstruction *> invariants;
   int cost = 0;
   for (auto &instRef : *bb) {
+    OwnershipForwardingMixin *ofm = nullptr;
     auto *inst = &instRef;
     if (auto *MI = dyn_cast<MethodInst>(inst)) {
       if (MI->getMember().isForeign)
@@ -95,6 +96,9 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
     } else if (isa<IntegerLiteralInst>(inst)) {
       moves.push_back(inst);
       invariants.insert(inst);
+    } else if ((ofm = OwnershipForwardingMixin::get(inst)) &&
+               ofm->getForwardingOwnershipKind() == OwnershipKind::Guaranteed) {
+      return false;
     } else if (!inst->mayHaveSideEffects() && !inst->mayReadFromMemory()
                && !isa<TermInst>(inst) && !isa<AllocationInst>(inst)
                && /* not marked mayhavesideffects */
