@@ -527,7 +527,7 @@ func f(_ x: Float) -> Float {
   return 2 * x // only active in one result!
 }
 
-struct foo_bb0_DF_src_0_wrt_0 {
+struct f_bb0_DF_src_0_wrt_0 {
   var df_sin: (Float) -> Float
   var df_mul: (Float) -> Float
 }
