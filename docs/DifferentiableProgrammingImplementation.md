@@ -1,23 +1,5 @@
 # Swift Differentiable Programming Implementation Overview
 
-> Philip Turner: This note ensures changes aren't buried under a comment thread until they're individually approved. In addition, some section hyperlinks might break in a PR comment. Each line in this header will be deleted as it is approved. 
-> 
-> After that is done, the document can be merged into `tensorflow/swift-apis@main` and hyperlinked in the [Differentiable Programming Manifesto](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md). The original Google Doc will receive a deprecation notice like the old [Differentiable Programming Manifesto Draft](https://docs.google.com/document/d/1bPepWLfRQa6CtXqKA8CDQ87uZHixNav-TFjLSisuKag/edit). This action will commence the resurrection of S4TF.
-> 
-> - [ ] I went ahead and added myself to the list of authors/contributors. In addition, I added a table of contents and merged some otherwise line-separated text in [Terminology](#terminology) to make it more legible in Markdown.
-> 
-> - [ ] Certain comments and instances of the 🚧 emoji were converted into TODO asides.
->
-> - [ ] The links are unchanged, with an exception. There is an [outdated Google Docs draft](https://docs.google.com/document/d/1bPepWLfRQa6CtXqKA8CDQ87uZHixNav-TFjLSisuKag/edit) that was transferred into the Differentiable Programming Manifesto. I mapped all of those links to appropriate sections in the new location.
->
-> - [ ] Explicit function conversion (in [Differentiable function type conversion](#differentiable-function-type-conversion)) no longer works as of Swift 5.5. May I put a warning there to alert readers?
->
-> - [ ] I added a note in the [Registration](#registration) section, warning that the custom differentiation tutorial is not up to date. When Swift supports online DocC, we can replace it. For more context - [\[1\]](https://github.com/tensorflow/swift-apis/issues/1185#issuecomment-986038594) [\[2\]](https://github.com/tensorflow/swift-apis/issues/1185#issuecomment-986100609) under the "Requesting assistance" issue.
->
-> - [ ] The highlighting for [Activity analysis](#activity-analysis) doesn't work in Markdown. I changed the highlighted syntax in that section to all caps.
->
-> ---
-
 - Authors: [Dan Zheng](https://github.com/dan-zheng), [Bart Chrzaszcz](https://github.com/bartchr808), [Philip Turner](https://github.com/philipturner)
 - Status: Draft, work in progress.
 
