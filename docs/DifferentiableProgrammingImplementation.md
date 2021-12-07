@@ -688,7 +688,7 @@ bb3(args…, %bb3_payload_ptr):
   return (%orig_result, %diff_bar_instance)
 ```
 
-- Here we do the same thing as we have been doing, which is partially applying the overall bb0 struct we created in bb0:
+- Here we do the same thing as we have been doing, which is partially applying the overall `StructBB0` struct we created in basic block 0:
     - `%bb0_struct = alloc_stack $StructBB0`
         - This has the nested differential structs for all other relevant differential structs for all other basics blocks, and we partially apply it for the differential of `m` and return the original result and differential tuple pair
 
