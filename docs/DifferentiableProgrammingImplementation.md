@@ -592,7 +592,7 @@ Another additional transformation that is done in the JVP is the creation of tra
 > NOTE: The SIL code below is simplified in both naming and how each instruction looks like. For more information regarding how each instruction looks like in actual code, refer to [SIL.rst](SIL.rst).
 
 ```swift
-func bar(_ x: Float) -> Float {
+func m(_ x: Float) -> Float {
   var retVal = f(x)
   if x < 5 {
     retVal = g(retVal)
