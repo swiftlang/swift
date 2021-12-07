@@ -929,8 +929,13 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
   if (!proto)
     return;
 
-  SmallVector<ProtocolConformance *, 2> conformances;
-  if (nominal->lookupConformance(proto, conformances))
+  // Look for a conformance. If it's present and not (directly) missing,
+  // we're done.
+  auto conformance = nominal->getParentModule()->lookupConformance(
+      nominal->getDeclaredInterfaceType(), proto, /*allowMissing=*/true);
+  if (conformance &&
+      !(isa<BuiltinProtocolConformance>(conformance.getConcrete()) &&
+        cast<BuiltinProtocolConformance>(conformance.getConcrete())->isMissing()))
     return;
 
   // Diagnose it.
