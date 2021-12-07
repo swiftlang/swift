@@ -425,7 +425,7 @@ In the sections below, let us dig into derivative code generation for the follow
 
 ```swift
 @differentiable
-func foo(_ x: Float) -> Float {
+func f(_ x: Float) -> Float {
     return sin(x) * cos(x)
 }
 
