@@ -27,6 +27,7 @@
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Atomic.h"
+#include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Mutex.h"
@@ -2003,4 +2004,28 @@ bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
 bool DefaultActorImpl::isDistributedRemote() {
   auto state = CurrentState.load(std::memory_order_relaxed);
   return state.Flags.isDistributedRemote();
+}
+
+static const AccessibleFunctionRecord *
+findDistributedAccessor(const char *targetNameStart, size_t targetNameLength) {
+  if (auto *func = runtime::swift_findAccessibleFunction(targetNameStart,
+                                                         targetNameLength)) {
+    assert(func->Flags.isDistributed());
+    return func;
+  }
+  return nullptr;
+}
+
+SWIFT_CC(swiftasync)
+void swift_distributed_execute_target(
+    OpaqueValue *resultPointer,
+    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    DefaultActor *actor,
+    const char *targetNameStart, size_t targetNameLength,
+    void *argumentBuffer,
+    void *resultBuffer,
+    ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+    AsyncContext *callContext) {
+  auto *accessor = findDistributedAccessor(targetNameStart, targetNameLength);
+  (void)accessor;
 }

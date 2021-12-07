@@ -184,3 +184,13 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 @_silgen_name("swift_distributedActor_remote_initialize")
 func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
+
+// ==== Remote target accesss -------------------------------------------------
+
+@_silgen_name("swift_distributed_execute_target")
+func _executeDistributedTarget(
+    on: AnyObject,
+    _ targetName: UnsafePointer<UInt8>,
+    _ targetNameLength: UInt,
+    argumentBuffer: Builtin.RawPointer,
+    resultBuffer: Builtin.RawPointer) async throws
