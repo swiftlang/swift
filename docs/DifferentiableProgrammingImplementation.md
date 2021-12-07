@@ -916,8 +916,7 @@ Notice `%6 = differentiable_function [parameters 0] %5` in `@main`: this trigger
 
 ```swift
 // AD__$sS2fIegnr_S2fIegyd_TR__vjp_src_0_wrt_0
-sil hidden [serializable] [ossa] @AD__$sS2fIegnr_S2fIegyd_TR__vjp_src_0_wrt_0 : $@conven
-tion(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float)
+sil hidden [serializable] [ossa] @AD__$sS2fIegnr_S2fIegyd_TR__vjp_src_0_wrt_0 : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float)
 -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // %0                                             // user: %3
 // %1                                             // user: %5
