@@ -2597,7 +2597,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         ${libicu_enable_debug} \
                         --enable-renaming --with-library-suffix=swift \
                         --libdir=${ICU_TMPLIBDIR} \
-                        --enable-shared --enable-static \
+                        --enable-shared --enable-static --enable-rpath \
                         --enable-strict --disable-icuio \
                         --disable-plugins --disable-dyload --disable-extras \
                         --disable-samples --disable-layoutex --with-data-packaging=auto
