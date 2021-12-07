@@ -763,7 +763,7 @@ bb0(%x):
 }
 
 // Pullback: apply pullbacks to adjoint values.
-sil @pb_foo : $(Float, foo_bb0_PB_src_0_wrt_0) -> (Float) {
+sil @pb_f : $(Float, f_bb0_PB_src_0_wrt_0) -> (Float) {
 bb0(%dy3, %pb_struct):
   // All "adjoint values" in the pullback are zero-initialized.
   // %dx = 0, %dy1 = 0, %dy2 = 0
