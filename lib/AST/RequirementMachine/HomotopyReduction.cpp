@@ -354,7 +354,7 @@ isCandidateForDeletion(unsigned ruleID,
   // means that the set of generating conformances is always a superset
   // (or equal to) of the set of minimal protocol conformance
   // requirements that homotopy reduction alone would produce.
-  if (rule.isProtocolConformanceRule()) {
+  if (rule.isAnyConformanceRule()) {
     if (!redundantConformances)
       return false;
 
@@ -634,7 +634,7 @@ void RewriteSystem::verifyRedundantConformances(
            "Permanent rule cannot be redundant");
     assert(!rule.isIdentityConformanceRule() &&
            "Identity conformance cannot be redundant");
-    assert(rule.isProtocolConformanceRule() &&
+    assert(rule.isAnyConformanceRule() &&
            "Redundant conformance is not a conformance rule?");
 
     if (!rule.isRedundant()) {

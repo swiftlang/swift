@@ -89,7 +89,7 @@ void RewriteLoop::findProtocolConformanceRules(
   for (unsigned ruleID : redundantRules) {
     const auto &rule = system.getRule(ruleID);
 
-    if (auto *proto = rule.isProtocolConformanceRule()) {
+    if (auto *proto = rule.isAnyConformanceRule()) {
       if (rule.isIdentityConformanceRule()) {
         result[proto].SawIdentityConformance = true;
         continue;
@@ -116,7 +116,7 @@ void RewriteLoop::findProtocolConformanceRules(
         if (rule.isIdentityConformanceRule())
           break;
 
-        if (auto *proto = rule.isProtocolConformanceRule()) {
+        if (auto *proto = rule.isAnyConformanceRule()) {
           if (step.StartOffset > 0 &&
               step.EndOffset == 0) {
             // Record the prefix term that is left unchanged by this rewrite step.
@@ -171,7 +171,7 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
 
 #ifndef NDEBUG
   const auto &rule = getRule(step.RuleID);
-  assert(rule.isProtocolConformanceRule());
+  assert(rule.isAnyConformanceRule());
   assert(!rule.isIdentityConformanceRule());
 #endif
 
@@ -199,7 +199,7 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
     MutableTerm term, unsigned ruleID,
     SmallVectorImpl<unsigned> &result) const {
   const auto &rule = getRule(ruleID);
-  assert(rule.isProtocolConformanceRule());
+  assert(rule.isAnyConformanceRule());
   assert(!rule.isIdentityConformanceRule());
 
   // Compute domain(V).
@@ -412,14 +412,26 @@ void RewriteSystem::computeCandidateConformancePaths(
 bool RewriteSystem::isValidConformancePath(
     llvm::SmallDenseSet<unsigned, 4> &visited,
     llvm::DenseSet<unsigned> &redundantConformances,
-    const llvm::SmallVectorImpl<unsigned> &path,
+    const llvm::SmallVectorImpl<unsigned> &path, bool allowConcrete,
     const llvm::MapVector<unsigned, SmallVector<unsigned, 2>> &parentPaths,
     const llvm::MapVector<unsigned,
                           std::vector<SmallVector<unsigned, 2>>>
         &conformancePaths) const {
-  for (unsigned ruleID : path) {
+
+  unsigned lastIdx = path.size() - 1;
+
+  for (unsigned ruleIdx : indices(path)) {
+    unsigned ruleID = path[ruleIdx];
     if (visited.count(ruleID) > 0)
       return false;
+
+    bool isLastElement = (ruleIdx == lastIdx);
+
+    if (!allowConcrete || !isLastElement) {
+      if (getRule(ruleID).getLHS().back().getKind()
+          == Symbol::Kind::ConcreteConformance)
+        return false;
+    }
 
     if (redundantConformances.count(ruleID)) {
       SWIFT_DEFER {
@@ -433,6 +445,7 @@ bool RewriteSystem::isValidConformancePath(
       bool foundValidConformancePath = false;
       for (const auto &otherPath : found->second) {
         if (isValidConformancePath(visited, redundantConformances, otherPath,
+                                   allowConcrete && isLastElement,
                                    parentPaths, conformancePaths)) {
           foundValidConformancePath = true;
           break;
@@ -454,6 +467,7 @@ bool RewriteSystem::isValidConformancePath(
       // `T.[P.]A : Q', we want to make sure that we have a
       // non-redundant derivation for 'T : P'.
       if (!isValidConformancePath(visited, redundantConformances, found->second,
+                                  /*allowConcrete=*/false,
                                   parentPaths, conformancePaths)) {
         return false;
       }
@@ -581,7 +595,8 @@ void RewriteSystem::verifyGeneratingConformanceEquations(
 static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
   // The last element is a protocol symbol, because this is the left hand side
   // of a conformance rule.
-  assert(lhs.back().getKind() == Symbol::Kind::Protocol);
+  assert(lhs.back().getKind() == Symbol::Kind::Protocol ||
+         lhs.back().getKind() == Symbol::Kind::ConcreteConformance);
 
   // The second to last symbol is either an associated type, protocol or generic
   // parameter symbol.
@@ -664,7 +679,7 @@ void RewriteSystem::computeGeneratingConformances(
     if (rule.containsUnresolvedSymbols())
       continue;
 
-    if (!rule.isProtocolConformanceRule())
+    if (!rule.isAnyConformanceRule())
       continue;
 
     conformanceRules.push_back(ruleID);
@@ -757,6 +772,7 @@ void RewriteSystem::computeGeneratingConformances(
       visited.insert(ruleID);
 
       if (isValidConformancePath(visited, redundantConformances, path,
+                                 /*allowConcrete=*/true,
                                  parentPaths, conformancePaths)) {
         redundantConformances.insert(ruleID);
         break;

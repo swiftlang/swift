@@ -141,9 +141,9 @@ RequirementMachine::buildRequirementsFromRules(
       }
 
       case Symbol::Kind::ConcreteConformance:
-        // FIXME
-        llvm::errs() << "Concrete conformance: " << rule << "\n";
-        break;
+        // "Concrete conformance requirements" are not recorded in the generic
+        // signature.
+        return;
 
       case Symbol::Kind::Name:
       case Symbol::Kind::AssociatedType:

@@ -82,6 +82,8 @@ public:
 
   const ProtocolDecl *isProtocolConformanceRule() const;
 
+  const ProtocolDecl *isAnyConformanceRule() const;
+
   bool isIdentityConformanceRule() const;
 
   bool isProtocolRefinementRule() const;
@@ -379,7 +381,7 @@ private:
   bool isValidConformancePath(
       llvm::SmallDenseSet<unsigned, 4> &visited,
       llvm::DenseSet<unsigned> &redundantConformances,
-      const llvm::SmallVectorImpl<unsigned> &path,
+      const llvm::SmallVectorImpl<unsigned> &path, bool allowConcrete,
       const llvm::MapVector<unsigned, SmallVector<unsigned, 2>> &parentPaths,
       const llvm::MapVector<unsigned,
                             std::vector<SmallVector<unsigned, 2>>>
