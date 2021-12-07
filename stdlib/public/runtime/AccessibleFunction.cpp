@@ -18,9 +18,9 @@
 #include "Private.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Metadata.h"
-#include "Private.h"
 
 #include <cstdint>
 
@@ -127,9 +127,13 @@ _searchForFunctionRecord(AccessibleFunctionsState &S, llvm::StringRef name) {
   return nullptr;
 }
 
-static const AccessibleFunctionRecord *
-_findAccessibleFunction(llvm::StringRef name) {
+SWIFT_RUNTIME_STDLIB_SPI
+const AccessibleFunctionRecord *
+swift::runtime::swift_findAccessibleFunction(const char *targetNameStart,
+                                             size_t targetNameLength) {
   auto &S = Functions.get();
+
+  llvm::StringRef name{targetNameStart, targetNameLength};
 
   // Look for an existing entry.
   {
