@@ -201,9 +201,10 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   if (Found != FieldTypeInfoCache.end())
     return Found->second;
 
-  // On failure, fill out the cache with everything we know about.
-  std::vector<std::pair<std::string, const TypeRef *>> Fields;
-  for (auto &Info : ReflectionInfos) {
+  // On failure, fill out the cache, ReflectionInfo by ReflectionInfo,
+  // until we find the field desciptor we're looking for.
+  while (FirstUnprocessedReflectionInfoIndex < ReflectionInfos.size()) {
+    auto &Info = ReflectionInfos[FirstUnprocessedReflectionInfoIndex];
     for (auto FD : Info.Field) {
       if (!FD->hasMangledTypeName())
         continue;
@@ -211,12 +212,14 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
       if (auto NormalizedName = normalizeReflectionName(CandidateMangledName))
         FieldTypeInfoCache[*NormalizedName] = FD;
     }
-  }
 
-  // We've filled the cache with everything we know about now. Try the cache again.
-  Found = FieldTypeInfoCache.find(MangledName);
-  if (Found != FieldTypeInfoCache.end())
-    return Found->second;
+    // Since we're done with the current ReflectionInfo, increment early in
+    // case we get a cache hit.
+    ++FirstUnprocessedReflectionInfoIndex;
+    Found = FieldTypeInfoCache.find(MangledName);
+    if (Found != FieldTypeInfoCache.end())
+      return Found->second;
+  }
 
   return nullptr;
 }
