@@ -219,10 +219,8 @@ bb3:
 //
 // CHECK-LABEL: sil [ossa] @testLocalBorrowPostDomDestroy : $@convention(thin) (@owned C) -> () {
 // CHECK:        [[OUTERCOPY:%.*]] = copy_value %0 : $C
-// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow %0 : $C
 // CHECK-NOT:    copy_value
-// CHECK:        end_borrow [[BORROW]] : $C
-// CHECK-NEXT:   cond_br undef, bb1, bb2
+// CHECK:   cond_br undef, bb1, bb2
 // CHECK:      bb1:
 // CHECK-NEXT:   [[COPY:%.*]] = copy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:   apply %{{.*}}([[COPY]]) : $@convention(thin) (@owned C) -> ()
@@ -262,10 +260,8 @@ bb3:
 //
 // CHECK-LABEL: sil [ossa] @testLocalBorrowNoPostDomDestroy : $@convention(thin) (@owned C) -> () {
 // CHECK:        [[OUTERCOPY:%.*]] = copy_value %0 : $C
-// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow %0 : $C
 // CHECK-NOT:    copy_value
-// CHECK:        end_borrow [[BORROW]] : $C
-// CHECK-NEXT:   cond_br undef, bb1, bb2
+// CHECK:   cond_br undef, bb1, bb2
 // CHECK:      bb1:
 // CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@owned C) -> ()
@@ -305,10 +301,8 @@ bb3:
 
 // CHECK-LABEL: sil [ossa] @testLocalBorrowDoubleConsume : $@convention(thin) (@owned C) -> () {
 // CHECK:   [[OUTERCOPY:%.*]] = copy_value %0 : $C
-// CHECK-NEXT:  begin_borrow %0 : $C
 // CHECK-NOT:   copy
-// CHECK:       end_borrow
-// CHECK-NEXT:  cond_br undef, bb1, bb2
+// CHECK:  cond_br undef, bb1, bb2
 // CHECK:     bb1:
 // CHECK-NEXT:  apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:  [[ARGCOPY:%.*]] = copy_value [[OUTERCOPY]] : $C
@@ -398,11 +392,9 @@ bb3:
 // CHECK:        [[ALLOC:%.*]] = alloc_ref $C
 // CHECK-NEXT:   [[B1:%.*]] = begin_borrow [[ALLOC]]
 // CHECK-NOT:    copy
-// CHECK:        [[B2:%.*]] = begin_borrow [[ALLOC]]
 // CHECK-NOT:    copy
 // CHECK:        end_borrow [[B1]] : $C
-// CHECK-NEXT:   apply %0([[B2]]) : $@convention(thin) (@guaranteed C) -> ()
-// CHECK-NEXT:   end_borrow [[B2]] : $C
+// CHECK:        apply %0([[ALLOC]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   return [[ALLOC]] : $C
 // CHECK-LABEL: } // end sil function 'testInterleavedBorrow'
 sil [ossa] @testInterleavedBorrow : $@convention(thin) () -> @owned C {
@@ -429,17 +421,12 @@ bb0:
 //
 // CHECK-LABEL: sil [ossa] @testInterleavedBorrowCrossBlock : $@convention(thin) () -> @owned C {
 // CHECK:        [[ALLOC:%.*]] = alloc_ref $C
-// CHECK:        [[B1:%.*]] = begin_borrow [[ALLOC]]
-// CHECK:        apply %{{.*}}([[B1]]) : $@convention(thin) (@guaranteed C) -> ()
-// CHECK-NEXT:   [[B2:%.*]] = begin_borrow [[ALLOC]]
-// CHECK-NEXT:   end_borrow [[B1]] : $C
+// CHECK:        apply %{{.*}}([[ALLOC]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 // CHECK:      bb1:
-// CHECK:        apply %{{.*}}([[B2]]) : $@convention(thin) (@guaranteed C) -> ()
-// CHECK-NEXT:   end_borrow [[B2]] : $C
+// CHECK:        apply %{{.*}}([[ALLOC]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
-// CHECK-NEXT:   end_borrow [[B2]] : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   return [[ALLOC]] : $C
@@ -685,10 +672,8 @@ bb3(%borrowphi : @guaranteed $C):
 // CHECK-LABEL: sil [ossa] @testNestedReborrowOutsideUse : $@convention(thin) () -> () {
 // CHECK:        [[ALLOC:%.*]] = alloc_ref $C
 // CHECK:      bb3([[BORROWPHI:%.*]] : @guaranteed $C):
-// CHECK-NEXT:   begin_borrow [[BORROWPHI]] : $C
 // CHECK-NOT:    copy
-// CHECK:        end_borrow
-// CHECK-NEXT:   end_borrow
+// CHECK:        end_borrow [[BORROWPHI]]
 // CHECK-NEXT:   destroy_value [[ALLOC]] : $C
 // CHECK-LABEL: } // end sil function 'testNestedReborrowOutsideUse'
 sil [ossa] @testNestedReborrowOutsideUse : $@convention(thin) () -> () {
@@ -763,23 +748,15 @@ bb3(%borrow3 : @guaranteed $C, %copy3 : @owned $C):
 
 // Test conversion from struct_extract to destructure.
 //
-// TODO: Remove the inner borrow scope becaues its outer value is
-// already guaranteed and it only has instantaneous uses. Then shrink
-// the outer borrow scope, hoist the destructure, rewrite the destroy
-// to be of the destructured valud, and finally also remove the dead
-// outer borrow scope. See rdar://79149830 (Shrink borrow scopes in
-// CanonicalizeBorrowScope)
-//
 // CHECK-LABEL: sil [ossa] @testDestructureConversion : $@convention(thin) (@owned Wrapper) -> () {
 // CHECK: bb0(%0 : @owned $Wrapper):
 // CHECK-NOT: copy
-// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $Wrapper
-// CHECK:   [[SPLIT:%.*]] = destructure_struct [[BORROW]] : $Wrapper
+// CHECK:   [[SPLIT:%.*]] = destructure_struct %0 : $Wrapper
 // CHECK:   [[BORROWINNER:%.*]] = begin_borrow [[SPLIT]] : $HasObjectAndInt
 // CHECK:   debug_value [[BORROWINNER]] : $HasObjectAndInt, let, name "self", argno 1
 // CHECK:   struct_extract [[BORROWINNER]] : $HasObjectAndInt, #HasObjectAndInt.value
 // CHECK:   end_borrow [[BORROWINNER]] : $HasObjectAndInt
-// CHECK:   destroy_value %0 : $Wrapper
+// CHECK:   destroy_value [[SPLIT]] : $HasObjectAndInt
 // CHECK-LABEL: } // end sil function 'testDestructureConversion'
 sil [ossa] @testDestructureConversion : $@convention(thin) (@owned Wrapper) -> () {
 bb0(%0 : @owned $Wrapper):
@@ -973,17 +950,13 @@ bb0(%0 : @owned $HasObjectAndInt):
 
 // Test removing copies within an outer borrow scope with no outer uses.
 //
-// TODO: The redundant borrow scope should be removed by a SemanticARC pass.
-//
 // CHECK-LABEL: sil [ossa] @testBorrowCopy : $@convention(thin) (@guaranteed C) -> Int64 {
 // CHECK: bb0(%0 : @guaranteed $C):
 // CHECK-NEXT:  %1 = begin_borrow %0 : $C
-// CHECK-NEXT:  %2 = begin_borrow %1 : $C
-// CHECK-NEXT:  %3 = ref_element_addr %2 : $C, #C.a
-// CHECK-NEXT:  %4 = load [trivial] %3 : $*Int64
-// CHECK-NEXT:  end_borrow %2 : $C
+// CHECK-NEXT:  %2 = ref_element_addr %1 : $C, #C.a
+// CHECK-NEXT:  %3 = load [trivial] %2 : $*Int64
 // CHECK-NEXT:  end_borrow %1 : $C
-// CHECK-NEXT:  return %4 : $Int64
+// CHECK-NEXT:  return %3 : $Int64
 // CHECK-LABEL: } // end sil function 'testBorrowCopy'
 sil [ossa] @testBorrowCopy : $@convention(thin) (@guaranteed C) -> Int64 {
 bb0(%0 : @guaranteed $C):
