@@ -333,7 +333,7 @@ func f(_ X: Float) -> Float {
 // These values are varied and useful, and thus need a derivative.
 // Non-active values are gray. They do not need a derivative.
 @differentiable
-func foo(_ X: Float) -> Float {
+func f(_ X: Float) -> Float {
     let SINX = sin(X)
     let cos3 = cos(3)
     let RESULT = SINX * cos3
