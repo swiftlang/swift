@@ -788,6 +788,10 @@ clang::QualType ClangTypeConverter::visitArchetypeType(ArchetypeType *type) {
   return getClangIdType(ClangASTContext);
 }
 
+clang::QualType ClangTypeConverter::visitDependentMemberType(DependentMemberType *type) {
+  return convert(type->getBase());
+}
+
 clang::QualType ClangTypeConverter::visitDynamicSelfType(DynamicSelfType *type) {
   // Dynamic Self is equivalent to 'instancetype', which is treated as
   // 'id' within the Objective-C type system.

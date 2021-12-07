@@ -652,6 +652,26 @@ DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
   return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
 }
 
+/// Determine whether the given nominal type that is within the current module
+/// has an explicit Sendable.
+static bool hasExplicitSendableConformance(NominalTypeDecl *nominal) {
+  ASTContext &ctx = nominal->getASTContext();
+
+  // Look for any conformance to `Sendable`.
+  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
+  if (!proto)
+    return false;
+
+  // Look for a conformance. If it's present and not (directly) missing,
+  // we're done.
+  auto conformance = nominal->getParentModule()->lookupConformance(
+      nominal->getDeclaredInterfaceType(), proto, /*allowMissing=*/true);
+  return conformance &&
+      !(isa<BuiltinProtocolConformance>(conformance.getConcrete()) &&
+        cast<BuiltinProtocolConformance>(
+          conformance.getConcrete())->isMissing());
+}
+
 /// Determine the diagnostic behavior for a Sendable reference to the given
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
@@ -659,7 +679,8 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
   // Determine whether the type was explicitly non-Sendable.
   auto nominalModule = nominal->getParentModule();
   bool isExplicitlyNonSendable = nominalModule->isConcurrencyChecked() ||
-      isExplicitSendableConformance();
+      isExplicitSendableConformance() ||
+      hasExplicitSendableConformance(nominal);
 
   // Determine whether this nominal type is visible via a @_predatesConcurrency
   // import.
@@ -924,18 +945,8 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
         /*treatUsableFromInlineAsPublic=*/true).isPublic())
     return;
 
-  // Look for any conformance to `Sendable`.
-  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
-  if (!proto)
-    return;
-
-  // Look for a conformance. If it's present and not (directly) missing,
-  // we're done.
-  auto conformance = nominal->getParentModule()->lookupConformance(
-      nominal->getDeclaredInterfaceType(), proto, /*allowMissing=*/true);
-  if (conformance &&
-      !(isa<BuiltinProtocolConformance>(conformance.getConcrete()) &&
-        cast<BuiltinProtocolConformance>(conformance.getConcrete())->isMissing()))
+  // If the conformance is explicitly stated, do nothing.
+  if (hasExplicitSendableConformance(nominal))
     return;
 
   // Diagnose it.
