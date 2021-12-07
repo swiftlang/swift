@@ -589,7 +589,7 @@ So now, this differential struct is a nested data structure, which consists of a
 
 Another additional transformation that is done in the JVP is the creation of trampoline blocks. These are basic blocks which deal with handling the transition from one basic block to another, specifically regarding the differential structs. For a concrete example, we would roughly have the following SIL code for the control flow function above:
 
-> NOTE: The SIL code below is simplified in both naming and how each instruction looks like. For more information regarding how each instruction looks like in actual code, refer to [SIL.rst](https://github.com/apple/swift/blob/tensorflow/docs/SIL.rst).
+> NOTE: The SIL code below is simplified in both naming and how each instruction looks like. For more information regarding how each instruction looks like in actual code, refer to [SIL.rst](SIL.rst).
 
 ```swift
 func bar(_ x: Float) -> Float {
