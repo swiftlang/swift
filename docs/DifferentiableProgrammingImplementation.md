@@ -741,7 +741,7 @@ As explained above in the "JVP and differential generation" section, closures do
 
 ```swift
 // Struct containing pullback functions.
-// Partially-applied to `@pb_foo` in `@vjp_foo`.
+// Partially-applied to `@pb_f` in `@vjp_f`.
 struct f_bb0_PB_src_0_wrt_0 {
   let pb_sin: (Float) -> Float
   let pb_cos: (Float) -> Float
