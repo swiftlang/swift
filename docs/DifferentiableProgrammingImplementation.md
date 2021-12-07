@@ -478,7 +478,7 @@ Here is what the more accurate, closure-free SIL pseudocode looks like:
 
 ```swift
 // Struct containing differential functions.
-// Partially-applied to `@df_foo` in `@jvp_foo`.
+// Partially-applied to `@df_f` in `@jvp_f`.
 struct f_bb0_DF_src_0_wrt_0 {
   var df_sin: (Float) -> Float
   var df_cos: (Float) -> Float
