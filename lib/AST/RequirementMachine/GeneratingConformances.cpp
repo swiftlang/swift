@@ -549,9 +549,9 @@ void RewriteSystem::verifyGeneratingConformanceEquations(
 
       if (baseTerm != otherTerm) {
         llvm::errs() << "Invalid equation: ";
-        llvm::errs() << "\n";
         dumpGeneratingConformanceEquation(llvm::errs(),
                                           pair.first, pair.second);
+        llvm::errs() << "\n";
         llvm::errs() << "Invalid conformance path:\n";
         llvm::errs() << "Expected: " << baseTerm << "\n";
         llvm::errs() << "Got: " << otherTerm << "\n\n";

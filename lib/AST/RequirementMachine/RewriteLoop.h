@@ -139,8 +139,9 @@ struct RewriteStep {
     return RewriteStep(ApplyRewriteRule, startOffset, endOffset, ruleID, inverse);
   }
 
-  static RewriteStep forAdjustment(unsigned offset, bool inverse) {
-    return RewriteStep(AdjustConcreteType, /*startOffset=*/0, /*endOffset=*/0,
+  static RewriteStep forAdjustment(unsigned offset, unsigned endOffset,
+                                   bool inverse) {
+    return RewriteStep(AdjustConcreteType, /*startOffset=*/0, endOffset,
                        /*ruleID=*/offset, inverse);
   }
 
@@ -317,8 +318,9 @@ struct RewritePathEvaluator {
   AppliedRewriteStep applyRewriteRule(const RewriteStep &step,
                                       const RewriteSystem &system);
 
-  MutableTerm applyAdjustment(const RewriteStep &step,
-                              const RewriteSystem &system);
+  std::pair<MutableTerm, MutableTerm>
+  applyAdjustment(const RewriteStep &step,
+                  const RewriteSystem &system);
 
   void applyShift(const RewriteStep &step,
                   const RewriteSystem &system);
