@@ -97,6 +97,7 @@ static void swiftCodeCompleteImpl(
     unsigned Offset, ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const CodeCompletion::Options &opts,
+    SourceKitCancellationToken CancellationToken,
     llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback) {
   assert(Callback && "Must provide callback to receive results");
 
@@ -108,7 +109,7 @@ static void swiftCodeCompleteImpl(
   CompletionContext.setCallPatternHeuristics(opts.callPatternHeuristics);
 
   Lang.performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem,
+      UnresolvedInputFile, Offset, Args, FileSystem, CancellationToken,
       [&](CancellableResult<SwiftLangSupport::CompletionLikeOperationParams>
               ParamsResult) {
         ParamsResult.mapAsync<CodeCompleteResult>(
@@ -116,7 +117,8 @@ static void swiftCodeCompleteImpl(
               Lang.getCompletionInstance()->codeComplete(
                   CIParams.Invocation, Args, FileSystem,
                   CIParams.completionBuffer, Offset, CIParams.DiagC,
-                  CompletionContext, DeliverTransformed);
+                  CompletionContext, CIParams.CancellationFlag,
+                  DeliverTransformed);
             },
             Callback);
       });
@@ -185,7 +187,8 @@ deliverCodeCompleteResults(SourceKit::CodeCompletionConsumer &SKConsumer,
 void SwiftLangSupport::codeComplete(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     OptionsDictionary *options, SourceKit::CodeCompletionConsumer &SKConsumer,
-    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) {
+    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken) {
 
   CodeCompletion::Options CCOpts;
   if (options) {
@@ -206,7 +209,7 @@ void SwiftLangSupport::codeComplete(
 
   swiftCodeCompleteImpl(
       *this, UnresolvedInputFile, Offset, Args, fileSystem, CCOpts,
-      [&](CancellableResult<CodeCompleteResult> Result) {
+      CancellationToken, [&](CancellableResult<CodeCompleteResult> Result) {
         deliverCodeCompleteResults(SKConsumer, CCOpts, Result);
       });
 }
@@ -903,7 +906,8 @@ static void transformAndForwardResults(
     CodeCompletion::SessionCacheRef session,
     const NameToPopularityMap *nameToPopularity,
     CodeCompletion::Options options, unsigned offset, StringRef filterText,
-    unsigned resultOffset, unsigned maxResults) {
+    unsigned resultOffset, unsigned maxResults,
+    SourceKitCancellationToken CancellationToken) {
 
   CodeCompletion::CompletionSink innerSink;
   Completion *exactMatch = nullptr;
@@ -1012,7 +1016,8 @@ static void transformAndForwardResults(
 
     swiftCodeCompleteImpl(
         lang, buffer.get(), str.size(), cargs, session->getFileSystem(),
-        options, [&](CancellableResult<CodeCompleteResult> Result) {
+        options, CancellationToken,
+        [&](CancellableResult<CodeCompleteResult> Result) {
           CallbackCalled = true;
           switch (Result.getKind()) {
           case CancellableResultKind::Success: {
@@ -1087,7 +1092,8 @@ void SwiftLangSupport::codeCompleteOpen(
     StringRef name, llvm::MemoryBuffer *inputBuf, unsigned offset,
     OptionsDictionary *options, ArrayRef<FilterRule> rawFilterRules,
     GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args,
-    Optional<VFSOptions> vfsOptions) {
+    Optional<VFSOptions> vfsOptions,
+    SourceKitCancellationToken CancellationToken) {
   StringRef filterText;
   unsigned resultOffset = 0;
   unsigned maxResults = 0;
@@ -1127,7 +1133,7 @@ void SwiftLangSupport::codeCompleteOpen(
   bool CodeCompleteDidFail = false;
   bool CallbackCalled = false;
   swiftCodeCompleteImpl(
-      *this, inputBuf, offset, args, fileSystem, CCOpts,
+      *this, inputBuf, offset, args, fileSystem, CCOpts, CancellationToken,
       [&](CancellableResult<CodeCompleteResult> Result) {
         CallbackCalled = true;
         switch (Result.getKind()) {
@@ -1189,7 +1195,8 @@ void SwiftLangSupport::codeCompleteOpen(
   }
 
   transformAndForwardResults(consumer, *this, session, nameToPopularity, CCOpts,
-                             offset, filterText, resultOffset, maxResults);
+                             offset, filterText, resultOffset, maxResults,
+                             CancellationToken);
 }
 
 void SwiftLangSupport::codeCompleteClose(
@@ -1205,6 +1212,7 @@ void SwiftLangSupport::codeCompleteClose(
 
 void SwiftLangSupport::codeCompleteUpdate(
     StringRef name, unsigned offset, OptionsDictionary *options,
+    SourceKitCancellationToken CancellationToken,
     GroupedCodeCompletionConsumer &consumer) {
   auto session = CCSessions.get(name, offset);
   if (!session) {
@@ -1234,7 +1242,8 @@ void SwiftLangSupport::codeCompleteUpdate(
   }
 
   transformAndForwardResults(consumer, *this, session, nameToPopularity, CCOpts,
-                             offset, filterText, resultOffset, maxResults);
+                             offset, filterText, resultOffset, maxResults,
+                             CancellationToken);
 }
 
 swift::ide::CodeCompletionCache &SwiftCompletionCache::getCache() {

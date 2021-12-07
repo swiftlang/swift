@@ -286,6 +286,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
         Callback) {
   llvm::PrettyStackTraceString trace(
@@ -338,6 +339,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
                       symbolOpts, tmpSM, tmpDiags));
+  tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx->evaluator);
@@ -502,12 +504,18 @@ bool CompletionInstance::performCachedOperationIfPossible(
     // The diagnostic engine is keeping track of state which might modify
     // parsing and type checking behaviour. Clear the flags.
     CI.getDiags().resetHadAnyError();
+    CI.getASTContext().CancellationFlag = CancellationFlag;
 
     if (DiagC)
       CI.addDiagnosticConsumer(DiagC);
 
-    Callback(CancellableResult<CompletionInstanceResult>::success(
-        {CI, /*reusingASTContext=*/true, /*DidFindCodeCompletionToken=*/true}));
+    if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed)) {
+      Callback(CancellableResult<CompletionInstanceResult>::cancelled());
+    } else {
+      Callback(CancellableResult<CompletionInstanceResult>::success(
+          {CI, /*reusingASTContext=*/true,
+           /*DidFindCodeCompletionToken=*/true}));
+    }
 
     if (DiagC)
       CI.removeDiagnosticConsumer(DiagC);
@@ -523,11 +531,13 @@ void CompletionInstance::performNewOperation(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
         Callback) {
   llvm::PrettyStackTraceString trace("While performing new completion");
 
-  auto isCachedCompletionRequested = ArgsHash.hasValue();
+  // If ArgsHash is None we shouldn't cache the compiler instance.
+  bool ShouldCacheCompilerInstance = ArgsHash.hasValue();
 
   auto TheInstance = std::make_unique<CompilerInstance>();
 
@@ -536,7 +546,6 @@ void CompletionInstance::performNewOperation(
   Invocation.getFrontendOptions().IntermoduleDependencyTracking =
       IntermoduleDepTrackingMode::ExcludeSystem;
 
-  bool DidFindCodeCompletionToken = false;
   {
     auto &CI = *TheInstance;
     if (DiagC)
@@ -557,6 +566,7 @@ void CompletionInstance::performNewOperation(
           "failed to setup compiler instance"));
       return;
     }
+    CI.getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI.getASTContext().evaluator);
 
     // If we're expecting a standard library, but there either isn't one, or it
@@ -570,19 +580,32 @@ void CompletionInstance::performNewOperation(
 
     CI.performParseAndResolveImportsOnly();
 
-    DidFindCodeCompletionToken = CI.getCodeCompletionFile()
-                                     ->getDelayedParserState()
-                                     ->hasCodeCompletionDelayedDeclState();
+    bool DidFindCodeCompletionToken = CI.getCodeCompletionFile()
+                                          ->getDelayedParserState()
+                                          ->hasCodeCompletionDelayedDeclState();
+    ShouldCacheCompilerInstance &= DidFindCodeCompletionToken;
 
-    Callback(CancellableResult<CompletionInstanceResult>::success(
-        {CI, /*ReuisingASTContext=*/false, DidFindCodeCompletionToken}));
+    auto CancellationFlag = CI.getASTContext().CancellationFlag;
+    if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed)) {
+      Callback(CancellableResult<CompletionInstanceResult>::cancelled());
+      // The completion instance may be in an invalid state when it's been
+      // cancelled. Don't cache it.
+      ShouldCacheCompilerInstance = false;
+    } else {
+      Callback(CancellableResult<CompletionInstanceResult>::success(
+          {CI, /*ReuisingASTContext=*/false, DidFindCodeCompletionToken}));
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        ShouldCacheCompilerInstance = false;
+      }
+    }
   }
 
   // Cache the compiler instance if fast completion is enabled.
   // If we didn't find a code compleiton token, we can't cache the instance
   // because performCachedOperationIfPossible wouldn't have an old code
   // completion state to compare the new one to.
-  if (isCachedCompletionRequested && DidFindCodeCompletionToken)
+  if (ShouldCacheCompilerInstance)
     cacheCompilerInstance(std::move(TheInstance), *ArgsHash);
 }
 
@@ -623,8 +646,25 @@ void swift::ide::CompletionInstance::performOperation(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<CompletionInstanceResult>)>
         Callback) {
+  // Compute the signature of the invocation.
+  llvm::hash_code ArgsHash(0);
+  for (auto arg : Args)
+    ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
+
+  // Concurrent completions will block so that they have higher chance to use
+  // the cached completion instance.
+  std::lock_guard<std::mutex> lock(mtx);
+
+  if (performCachedOperationIfPossible(ArgsHash, FileSystem, completionBuffer,
+                                       Offset, DiagC, CancellationFlag,
+                                       Callback)) {
+    // We were able to reuse a cached AST. Callback has already been invoked
+    // and we don't need to build a new AST. We are done.
+    return;
+  }
 
   // Always disable source location resolutions from .swiftsourceinfo file
   // because they're somewhat heavy operations and aren't needed for completion.
@@ -637,24 +677,8 @@ void swift::ide::CompletionInstance::performOperation(
   // We don't need token list.
   Invocation.getLangOptions().CollectParsedToken = false;
 
-  // Compute the signature of the invocation.
-  llvm::hash_code ArgsHash(0);
-  for (auto arg : Args)
-    ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
-
-  // Concurrent completions will block so that they have higher chance to use
-  // the cached completion instance.
-  std::lock_guard<std::mutex> lock(mtx);
-
-  if (performCachedOperationIfPossible(ArgsHash, FileSystem, completionBuffer,
-                                       Offset, DiagC, Callback)) {
-    // We were able to reuse a cached AST. Callback has already been invoked
-    // and we don't need to build a new AST. We are done.
-    return;
-  }
-
   performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
-                      Offset, DiagC, Callback);
+                      Offset, DiagC, CancellationFlag, Callback);
 }
 
 void swift::ide::CompletionInstance::codeComplete(
@@ -662,17 +686,21 @@ void swift::ide::CompletionInstance::codeComplete(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC, ide::CodeCompletionContext &CompletionContext,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback) {
   using ResultType = CancellableResult<CodeCompleteResult>;
 
   struct ConsumerToCallbackAdapter
       : public SimpleCachingCodeCompletionConsumer {
     SwiftCompletionInfo SwiftContext;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag;
     llvm::function_ref<void(ResultType)> Callback;
     bool HandleResultsCalled = false;
 
-    ConsumerToCallbackAdapter(llvm::function_ref<void(ResultType)> Callback)
-        : Callback(Callback) {}
+    ConsumerToCallbackAdapter(
+        std::shared_ptr<std::atomic<bool>> CancellationFlag,
+        llvm::function_ref<void(ResultType)> Callback)
+        : CancellationFlag(CancellationFlag), Callback(Callback) {}
 
     void setContext(swift::ASTContext *context,
                     const swift::CompilerInvocation *invocation,
@@ -685,20 +713,28 @@ void swift::ide::CompletionInstance::codeComplete(
 
     void handleResults(CodeCompletionContext &context) override {
       HandleResultsCalled = true;
-      MutableArrayRef<CodeCompletionResult *> Results = context.takeResults();
-      assert(SwiftContext.swiftASTContext);
-      Callback(ResultType::success({Results, SwiftContext}));
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        Callback(ResultType::cancelled());
+      } else {
+        MutableArrayRef<CodeCompletionResult *> Results = context.takeResults();
+        assert(SwiftContext.swiftASTContext);
+        Callback(ResultType::success({Results, SwiftContext}));
+      }
     }
   };
 
   performOperation(
       Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      CancellationFlag,
       [&](CancellableResult<CompletionInstanceResult> CIResult) {
         CIResult.mapAsync<CodeCompleteResult>(
-            [&CompletionContext](auto &Result, auto DeliverTransformed) {
+            [&CompletionContext, &CancellationFlag](auto &Result,
+                                                    auto DeliverTransformed) {
               CompletionContext.ReusingASTContext = Result.DidReuseAST;
               CompilerInstance &CI = Result.CI;
-              ConsumerToCallbackAdapter Consumer(DeliverTransformed);
+              ConsumerToCallbackAdapter Consumer(CancellationFlag,
+                                                 DeliverTransformed);
 
               std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
                   ide::makeCodeCompletionCallbacksFactory(CompletionContext,
@@ -737,32 +773,43 @@ void swift::ide::CompletionInstance::typeContextInfo(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<TypeContextInfoResult>)>
         Callback) {
   using ResultType = CancellableResult<TypeContextInfoResult>;
 
   struct ConsumerToCallbackAdapter : public ide::TypeContextInfoConsumer {
     bool ReusingASTContext;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag;
     llvm::function_ref<void(ResultType)> Callback;
     bool HandleResultsCalled = false;
 
-    ConsumerToCallbackAdapter(bool ReusingASTContext,
-                              llvm::function_ref<void(ResultType)> Callback)
-        : ReusingASTContext(ReusingASTContext), Callback(Callback) {}
+    ConsumerToCallbackAdapter(
+        bool ReusingASTContext,
+        std::shared_ptr<std::atomic<bool>> CancellationFlag,
+        llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext),
+          CancellationFlag(CancellationFlag), Callback(Callback) {}
 
     void handleResults(ArrayRef<ide::TypeContextInfoItem> Results) override {
       HandleResultsCalled = true;
-      Callback(ResultType::success({Results, ReusingASTContext}));
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        Callback(ResultType::cancelled());
+      } else {
+        Callback(ResultType::success({Results, ReusingASTContext}));
+      }
     }
   };
 
   performOperation(
       Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      CancellationFlag,
       [&](CancellableResult<CompletionInstanceResult> CIResult) {
         CIResult.mapAsync<TypeContextInfoResult>(
-            [](auto &Result, auto DeliverTransformed) {
-              ConsumerToCallbackAdapter Consumer(Result.DidReuseAST,
-                                                 DeliverTransformed);
+            [&CancellationFlag](auto &Result, auto DeliverTransformed) {
+              ConsumerToCallbackAdapter Consumer(
+                  Result.DidReuseAST, CancellationFlag, DeliverTransformed);
               std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
                   ide::makeTypeContextInfoCallbacksFactory(Consumer));
 
@@ -793,6 +840,7 @@ void swift::ide::CompletionInstance::conformingMethodList(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC, ArrayRef<const char *> ExpectedTypeNames,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
     llvm::function_ref<void(CancellableResult<ConformingMethodListResults>)>
         Callback) {
   using ResultType = CancellableResult<ConformingMethodListResults>;
@@ -800,26 +848,37 @@ void swift::ide::CompletionInstance::conformingMethodList(
   struct ConsumerToCallbackAdapter
       : public swift::ide::ConformingMethodListConsumer {
     bool ReusingASTContext;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag;
     llvm::function_ref<void(ResultType)> Callback;
     bool HandleResultsCalled = false;
 
-    ConsumerToCallbackAdapter(bool ReusingASTContext,
-                              llvm::function_ref<void(ResultType)> Callback)
-        : ReusingASTContext(ReusingASTContext), Callback(Callback) {}
+    ConsumerToCallbackAdapter(
+        bool ReusingASTContext,
+        std::shared_ptr<std::atomic<bool>> CancellationFlag,
+        llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext),
+          CancellationFlag(CancellationFlag), Callback(Callback) {}
 
     void handleResult(const ide::ConformingMethodListResult &result) override {
       HandleResultsCalled = true;
-      Callback(ResultType::success({&result, ReusingASTContext}));
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        Callback(ResultType::cancelled());
+      } else {
+        Callback(ResultType::success({&result, ReusingASTContext}));
+      }
     }
   };
 
   performOperation(
       Invocation, Args, FileSystem, completionBuffer, Offset, DiagC,
+      CancellationFlag,
       [&](CancellableResult<CompletionInstanceResult> CIResult) {
         CIResult.mapAsync<ConformingMethodListResults>(
-            [&ExpectedTypeNames](auto &Result, auto DeliverTransformed) {
-              ConsumerToCallbackAdapter Consumer(Result.DidReuseAST,
-                                                 DeliverTransformed);
+            [&ExpectedTypeNames, &CancellationFlag](auto &Result,
+                                                    auto DeliverTransformed) {
+              ConsumerToCallbackAdapter Consumer(
+                  Result.DidReuseAST, CancellationFlag, DeliverTransformed);
               std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
                   ide::makeConformingMethodListCallbacksFactory(
                       ExpectedTypeNames, Consumer));
