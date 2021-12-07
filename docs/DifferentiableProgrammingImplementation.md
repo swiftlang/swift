@@ -1005,4 +1005,4 @@ See [here](https://github.com/apple/swift/blob/main/docs/DifferentiableProgrammi
 
 Please see [here](DifferentiableProgramming.md#acknowledgements) for a list of people who have influenced the design and the implementation of differentiable programming in Swift.
 
-Some content is borrowed from the [Swift Differentiable Programming Manifesto](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md) by Richard Wei and [Probabilistic & Differentiable Programming Summit '19 slides](https://twitter.com/rxwei/status/1144688743468527617) - thank you Richard.
+Some content is borrowed from the [Swift Differentiable Programming Manifesto](DifferentiableProgramming.md) by Richard Wei and [Probabilistic & Differentiable Programming Summit '19 slides](https://twitter.com/rxwei/status/1144688743468527617) - thank you Richard.
