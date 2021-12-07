@@ -493,7 +493,7 @@ bb0(%x):
   (%y3, %df_mul) = apply @jvp_mul(%y1, %y2)
   // Partially-apply to get a differential.
   %df_struct = struct $f_bb0_DF_src_0_wrt_0 (%df_sin, %df_cos, %df_mul)
-  %df = partial_apply @df_foo(%df_struct)
+  %df = partial_apply @df_f(%df_struct)
   // Return tuple of original result and differential.
   %result = tuple (%y3, %df)
   return %result
