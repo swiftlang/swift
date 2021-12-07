@@ -996,7 +996,7 @@ We plan to add support for:
 - Linear map function types (`@differentiable(linear)` function types), which are a subtype of `@differentiable` (and infinitely differentiable) function types.
 - Linear map transposition as a first-class operation. This unlocks a correspondence between forward-mode and reverse-mode differentiation: `differentials and pullbacks are transposes of each other`.
 
-See [here](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md#linear-maps) for more information about linear maps. With linear maps and transposition, the differentiation system will change in the following ways:
+See [here](DifferentiableProgramming.md#linear-maps) for more information about linear maps. With linear maps and transposition, the differentiation system will change in the following ways:
 - All JVP functions will return a `@differentiable(linear)`-typed differential instead of a normal function-typed differential.
 - VJP functions will be removed throughout the differentiation system.
 - Pullback function generation will change to use transposition.
