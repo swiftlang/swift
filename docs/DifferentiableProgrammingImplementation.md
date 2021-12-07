@@ -785,7 +785,7 @@ The sections above explain derivative code generation, focusing on the transform
 
 Multiple basic blocks and control flow basic block terminators (`cond_br`, `switch_enum`, etc) require special derivative code generation rules.
 
-> TODO: **Explain the control flow differentiation approach.** The approach is novel and highly worth documenting. [See “Control Flow Differentiation” slides](https://drive.google.com/corp/drive/folders/1y1FeJenXhoz_8xPw0ftVPngJUO_MdmRX) for an overview.
+> TODO: **Explain the control flow differentiation approach.** The approach is novel and highly worth documenting. [See "Control Flow Differentiation" slides](https://drive.google.com/corp/drive/folders/1y1FeJenXhoz_8xPw0ftVPngJUO_MdmRX) for an overview.
 
 - Original functions may have instructions other than `apply`. This includes the entire SIL [instruction set](https://github.com/apple/swift/blob/master/docs/SIL.rst#instruction-set):
     - Memory-related operations: `alloc_stack`, `dealloc_stack`, `load`, `store`, etc.
