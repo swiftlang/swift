@@ -3082,6 +3082,11 @@ for host in "${ALL_HOSTS[@]}"; do
     host_install_destdir=$(get_host_install_destdir ${host})
     host_install_prefix=$(get_host_install_prefix ${host})
 
+    # Skip this pass if flag is set and we are cross compiling and it's the local host.
+    if [[ "${SKIP_LOCAL_HOST_INSTALL}" ]] && [[ $(has_cross_compile_hosts) ]] && [[ ${host} == ${LOCAL_HOST} ]]; then
+        continue
+    fi
+
     # Identify the destdirs to pass to lipo. Must happen even if the install action
     # is to be skipped.
     if [[ $(should_include_host_in_lipo ${host}) ]]; then
@@ -3090,11 +3095,6 @@ for host in "${ALL_HOSTS[@]}"; do
 
     # Skip this pass when the only action to execute can't match.
     if ! [[ $(should_execute_host_actions_for_phase ${host} install) ]]; then
-        continue
-    fi
-
-    # Skip this pass if flag is set and we are cross compiling and it's the local host.
-    if [[ "${SKIP_LOCAL_HOST_INSTALL}" ]] && [[ $(has_cross_compile_hosts) ]] && [[ ${host} == ${LOCAL_HOST} ]]; then
         continue
     fi
 
