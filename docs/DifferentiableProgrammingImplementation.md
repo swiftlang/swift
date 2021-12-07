@@ -220,7 +220,7 @@ Swift supports ergonomic implicit function conversions:
 
 ```swift
 // Takes a differentiable function argument.
-func f(_ x: @differentiable (Float) -> Float) {}
+func f(_ x: @differentiable (Float) -> Float) { }
 
 // Calling `f` with a function declaration reference triggers an implicit
 // `@differentiable` function type conversion.
