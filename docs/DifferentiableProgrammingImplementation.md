@@ -779,7 +779,7 @@ bb0(%dy3, %pb_struct):
 
 ## Derivative code generation details
 
-The sections above explain derivative code generation, focusing on the transformation rules for function applications (i.e. the `apply` instruction). However, SIL functions are often more complex than just “a single basic block of function applications”:
+The sections above explain derivative code generation, focusing on the transformation rules for function applications (i.e. the `apply` instruction). However, SIL functions are often more complex than just "a single basic block of function applications":
 
 - Original functions may involve control flow (conditionals, loops, `guard` and `switch` statements, etc) to express conditional operations. Such functions in SIL have multiple basic blocks and control-flow-related instructions.
 
