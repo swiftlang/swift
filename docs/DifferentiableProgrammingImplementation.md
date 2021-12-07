@@ -419,7 +419,7 @@ Derivative code generation takes the following steps:
 - JVP generation and differential generation.
 - VJP generation and pullback generation.
 
-Eventually, after forward-mode differentiation and linear maps are implemented, we will switch to a final “JVP → differential → pullback generation” approach. See [Probabilistic & Differentiable Programming Summit '19 slides](https://drive.google.com/corp/drive/folders/1y1FeJenXhoz_8xPw0ftVPngJUO_MdmRX) for more information about that approach. For now, this document will describe the current derivative code generation approach.
+Eventually, after forward-mode differentiation and linear maps are implemented, we will switch to a final "JVP → differential → pullback generation" approach. See [Probabilistic & Differentiable Programming Summit '19 slides](https://drive.google.com/corp/drive/folders/1y1FeJenXhoz_8xPw0ftVPngJUO_MdmRX) for more information about that approach. For now, this document will describe the current derivative code generation approach.
 
 In the sections below, let us dig into derivative code generation for the following function-to-differentiate (“original function”):
 
