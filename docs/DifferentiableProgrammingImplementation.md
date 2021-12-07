@@ -921,8 +921,7 @@ tion(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out
 -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // %0                                             // user: %3
 // %1                                             // user: %5
-bb0(%0 : $Float, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed Float) -> @out Flo
-at):
+bb0(%0 : $Float, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed Float) -> @out Float):
   %2 = alloc_stack $Float                         // users: %19, %12, %3
   store %0 to [trivial] %2 : $*Float              // id: %3
   %4 = alloc_stack $Float                         // users: %18, %17, %12
