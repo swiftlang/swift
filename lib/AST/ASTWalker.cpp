@@ -1153,11 +1153,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitRegexLiteralExpr(RegexLiteralExpr *E) {
-    if (auto *newExpr = doIt(E->getSemanticExpr())) {
-      E->setSemanticExpr(newExpr);
-    } else {
-      return nullptr;
-    }
     return E;
   }
 

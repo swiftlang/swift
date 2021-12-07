@@ -354,6 +354,10 @@ public:
   /// imported.
   bool shouldImportSwiftConcurrency() const;
 
+  /// Whether the Swift String Processing support library should be implicitly
+  /// imported.
+  bool shouldImportSwiftStringProcessing() const;
+
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.
@@ -532,6 +536,14 @@ public:
   /// Whether the Swift Concurrency support library can be imported
   /// i.e. if it can be found.
   bool canImportSwiftConcurrency() const;
+
+  /// Verify that if an implicit import of the `StringProcessing` module if
+  /// expected, it can actually be imported. Emit a warning, otherwise.
+  void verifyImplicitStringProcessingImport();
+
+  /// Whether the Swift String Processing support library can be imported
+  /// i.e. if it can be found.
+  bool canImportSwiftStringProcessing() const;
 
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
