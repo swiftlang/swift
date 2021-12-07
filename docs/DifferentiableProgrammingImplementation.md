@@ -242,7 +242,7 @@ let diffFunction: @differentiable (Float) -> Float = function
 
 ### Type checking
 
-Differentiable function types are a subtype of normal function types. See [here](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md#function-subtyping-and-runtime-representation) for more information about type checking rules.
+Differentiable function types are a subtype of normal function types. See [here](DifferentiableProgramming.md#function-subtyping-and-runtime-representation) for more information about type checking rules.
 
 Differentiable function conversion is represented in the AST as an explicit [DifferentiableFunctionExpr](https://github.com/apple/swift/blob/8b7ab1143e260d7bb1db3b98e24f7fe28dc7f0f0/include/swift/AST/Expr.h#L2923) expression. Example output from `swiftc -dump-ast` for the explicit conversion example above:
 
