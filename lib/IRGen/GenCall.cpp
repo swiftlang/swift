@@ -4982,15 +4982,7 @@ void irgen::emitAsyncReturn(
     arguments.push_back(arg);
 
   Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end_async, arguments);
-
-  if (IGF.IGM.AsyncTailCallKind == llvm::CallInst::TCK_MustTail) {
-    Builder.CreateUnreachable();
-  } else {
-    // If target doesn't support musttail (e.g. WebAssembly), the function
-    // passed to coro.end.async can return control back to the caller.
-    // So use ret void instead of unreachable to allow it.
-    Builder.CreateRetVoid();
-  }
+  Builder.CreateUnreachable();
 }
 
 void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
