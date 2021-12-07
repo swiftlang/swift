@@ -112,7 +112,7 @@ For usage examples of the `@derivative` attribute, please see:
 - [This mailing list response](https://groups.google.com/a/tensorflow.org/d/msg/swift/k62Uwnc-EYc/Cncb7mxtCAAJ), which shows how to use the `@derivative` attribute to register a derivative for `ax^2 + bx + c`.
 > NOTE: The custom differentiation tutorial does not reflect the current state of differentiation in Swift. You can use it as a general guide to differentiation, but its code samples will not compile.
 
-Note that derivative functions are defined as “JVP/VJP functions taking original arguments”, rather than just the “returned differential/pullback” functions. This is because differential/pullback functions may need to refer to intermediate values computed by the original function - this is possible when they are returned closures that capture values.
+Note that derivative functions are defined as "JVP/VJP functions taking original arguments", rather than just the "returned differential/pullback" functions. This is because differential/pullback functions may need to refer to intermediate values computed by the original function - this is possible when they are returned closures that capture values.
 
 > TODO: Write a canonical explanation of JVP and VJP functions and a `@derivative` attribute usage guide.
 
