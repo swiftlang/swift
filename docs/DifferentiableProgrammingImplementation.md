@@ -142,7 +142,7 @@ Here is how differentiation fits into each of the stages of compilation:
     - `@differentiable` attributes are type-checked and verified.
     - `@differentiable` function types are type-checked: this includes conversions to and from normal function types. Conversion from a normal function to a differentiable function is represented as an explicit `DifferentiableFunctionExpr` expression.
 - **SIL generation**
-    - `@differentiable` AST declaration attributes are lowered to [SIL differentiability witnesses](https://github.com/apple/swift/blob/master/docs/SIL.rst#differentiability-witnesses).
+    - `@differentiable` AST declaration attributes are lowered to [SIL differentiability witnesses](SIL.rst#differentiability-witnesses).
     - `DifferentiableFunctionExpr` function conversion expressions are lowered to the `differentiable_function` SIL instruction.
 - **SIL mandatory passes**
     - The differentiation transform is a SIL mandatory pass that implements [automatic differentiation](https://en.wikipedia.org/wiki/Automatic_differentiation).
