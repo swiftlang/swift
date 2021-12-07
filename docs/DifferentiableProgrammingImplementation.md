@@ -222,7 +222,7 @@ Swift supports ergonomic implicit function conversions:
 // Takes a differentiable function argument.
 func f(_ x: @differentiable (Float) -> Float) {}
 
-// Calling `foo` with a function declaration reference triggers an implicit
+// Calling `f` with a function declaration reference triggers an implicit
 // `@differentiable` function type conversion.
 func identity(_ x: Float) -> Float { x }
 silly(identity)
