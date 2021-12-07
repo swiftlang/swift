@@ -755,7 +755,7 @@ bb0(%x):
   (%y2, %pb_cos) = apply @vjp_cos(%x)
   (%y3, %pb_mul) = apply @vjp_mul(%y1, %y2)
   // Partially-apply to get a pullback.
-  %pb_struct = struct $foo_bb0_PB_src_0_wrt_0 (%pb_sin, %pb_cos, %pb_mul)
+  %pb_struct = struct $f_bb0_PB_src_0_wrt_0 (%pb_sin, %pb_cos, %pb_mul)
   %pb = partial_apply @pb_foo(%pb_struct)
   // Return tuple of original result and pullback.
   %result = tuple (%y3, %pb)
