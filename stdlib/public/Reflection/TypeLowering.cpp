@@ -24,6 +24,7 @@
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "swift/Basic/Unreachable.h"
+#include <iostream>
 
 #ifdef DEBUG_TYPE_LOWERING
   #define DEBUG_LOG(expr) expr;
@@ -35,36 +36,36 @@ namespace swift {
 namespace reflection {
 
 void TypeInfo::dump() const {
-  dump(stderr);
+  dump(std::cerr);
 }
 
 namespace {
 
 class PrintTypeInfo {
-  FILE *file;
+  std::ostream &stream;
   unsigned Indent;
 
-  FILE * &indent(unsigned Amount) {
+  std::ostream &indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
-      fprintf(file, " ");
-    return file;
+      stream << " ";
+    return stream;
   }
 
-  FILE * &printHeader(const std::string &name) {
-    fprintf(indent(Indent), "(%s", name.c_str());
-    return file;
+  std::ostream &printHeader(const std::string &name) {
+    indent(Indent) << "(" << name;
+    return stream;
   }
 
-  FILE * &printField(const std::string &name, const std::string &value) {
+  std::ostream &printField(const std::string &name, const std::string &value) {
     if (!name.empty())
-      fprintf(file, " %s=%s", name.c_str(), value.c_str());
+      stream << " " << name << "=" << value;
     else
-      fprintf(file, " %s", value.c_str());
-    return file;
+      stream << " " << name;
+    return stream;
   }
 
   void printRec(const TypeInfo &TI) {
-    fprintf(file, "\n");
+    stream << "\n";
 
     Indent += 2;
     print(TI);
@@ -82,13 +83,13 @@ class PrintTypeInfo {
   void printFields(const RecordTypeInfo &TI) {
     Indent += 2;
     for (auto Field : TI.getFields()) {
-      fprintf(file, "\n");
+      stream << "\n";
       printHeader("field");
       if (!Field.Name.empty())
         printField("name", Field.Name);
       printField("offset", std::to_string(Field.Offset));
       printRec(Field.TI);
-      fprintf(file, ")");
+      stream << ")";
     }
     Indent -= 2;
   }
@@ -98,7 +99,7 @@ class PrintTypeInfo {
     int Index = -1;
     for (auto Case : TI.getCases()) {
       Index += 1;
-      fprintf(file, "\n");
+      stream << "\n";
       printHeader("case");
       if (!Case.Name.empty())
         printField("name", Case.Name);
@@ -107,26 +108,26 @@ class PrintTypeInfo {
         printField("offset", std::to_string(Case.Offset));
         printRec(Case.TI);
       }
-      fprintf(file, ")");
+      stream << ")";
     }
     Indent -= 2;
   }
 
 public:
-  PrintTypeInfo(FILE *file, unsigned Indent)
-    : file(file), Indent(Indent) {}
+  PrintTypeInfo(std::ostream &stream, unsigned Indent)
+      : stream(stream), Indent(Indent) {}
 
   void print(const TypeInfo &TI) {
     switch (TI.getKind()) {
     case TypeInfoKind::Invalid:
       printHeader("invalid");
-      fprintf(file, ")");
+      stream << ")";
       return;
 
     case TypeInfoKind::Builtin:
       printHeader("builtin");
       printBasic(TI);
-      fprintf(file, ")");
+      stream << ")";
       return;
 
     case TypeInfoKind::Record: {
@@ -165,7 +166,7 @@ public:
       }
       printBasic(TI);
       printFields(RecordTI);
-      fprintf(file, ")");
+      stream << ")";
       return;
     }
 
@@ -184,7 +185,7 @@ public:
       }
       printBasic(TI);
       printCases(EnumTI);
-      fprintf(file, ")");
+      stream << ")";
       return;
     }
 
@@ -207,7 +208,7 @@ public:
         break;
       }
 
-      fprintf(file, ")");
+      stream << ")";
       return;
     }
     }
@@ -218,9 +219,9 @@ public:
 
 } // end anonymous namespace
 
-void TypeInfo::dump(FILE *file, unsigned Indent) const {
-  PrintTypeInfo(file, Indent).print(*this);
-  fprintf(file, "\n");
+void TypeInfo::dump(std::ostream &stream, unsigned Indent) const {
+  PrintTypeInfo(stream, Indent).print(*this);
+  stream << "\n";
 }
 
 BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
