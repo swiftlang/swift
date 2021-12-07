@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-lexical-lifetimes -module-name borrow -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-lexical-lifetimes -module-name borrow -parse-stdlib %s | %FileCheck %s
 
 import Swift
 

@@ -2105,7 +2105,7 @@ namespace {
         // If this is a multi-statement closure, let's mark result
         // as potential hole right away.
         return Type(CS.createTypeVariable(
-            resultLocator, shouldTypeCheckInEnclosingExpression(closure)
+            resultLocator, CS.participatesInInference(closure)
                                ? 0
                                : TVO_CanBindToHole));
       }();
@@ -2627,7 +2627,7 @@ namespace {
       // genreation only if closure is going to participate
       // in the type-check. This allows us to delay validation of
       // multi-statement closures until body is opened.
-      if (shouldTypeCheckInEnclosingExpression(closure) &&
+      if (CS.participatesInInference(closure) &&
           collectVarRefs.hasErrorExprs) {
         return Type();
       }

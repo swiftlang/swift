@@ -1793,6 +1793,10 @@ struct SILDebugVariable {
            Implicit == V.Implicit && Type == V.Type && Loc == V.Loc &&
            Scope == V.Scope;
   }
+
+  bool isLet() const { return Name.size() && Constant; }
+
+  bool isVar() const { return Name.size() && !Constant; }
 };
 
 /// A DebugVariable where storage for the strings has been
@@ -2004,7 +2008,20 @@ public:
     auto VI = TailAllocatedDebugVariable(RawValue);
     return VI.get(getDecl(), getTrailingObjects<char>(), AuxVarType, VarDeclLoc,
                   VarDeclScope, DIExprElements);
-  };
+  }
+
+  bool isLet() const {
+    if (auto varInfo = getVarInfo())
+      return varInfo->isLet();
+    return false;
+  }
+
+  bool isVar() const {
+    if (auto varInfo = getVarInfo())
+      return varInfo->isVar();
+    return false;
+  }
+
   void setArgNo(unsigned N) {
     auto RawValue = SILNode::Bits.AllocStackInst.VarInfo;
     auto VI = TailAllocatedDebugVariable(RawValue);
@@ -7422,6 +7439,35 @@ class MoveValueInst
 public:
   bool getAllowDiagnostics() const { return allowDiagnostics; }
   void setAllowsDiagnostics(bool newValue) { allowDiagnostics = newValue; }
+};
+
+/// Equivalent to a copy_addr to [init] except that it is used for diagnostics
+/// and should not be pattern matched. During the diagnostic passes, the "move
+/// function" checker for addresses always converts this to a copy_addr [init]
+/// (if we emitted a diagnostic and proved we could not emit a move here) or a
+/// copy_addr [take][init] if we can. So this should never occur in canonical
+/// SIL.
+class MarkUnresolvedMoveAddrInst
+    : public InstructionBase<SILInstructionKind::MarkUnresolvedMoveAddrInst,
+                             NonValueInstruction>,
+      public CopyLikeInstruction {
+  friend class SILBuilder;
+
+  FixedOperandList<2> Operands;
+
+  MarkUnresolvedMoveAddrInst(SILDebugLocation DebugLoc, SILValue srcAddr,
+                             SILValue takeAddr)
+      : InstructionBase(DebugLoc), Operands(this, srcAddr, takeAddr) {}
+
+public:
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  void setSrc(SILValue V) { Operands[Src].set(V); }
+  void setDest(SILValue V) { Operands[Dest].set(V); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
 /// Given an object reference, return true iff it is non-nil and refers
