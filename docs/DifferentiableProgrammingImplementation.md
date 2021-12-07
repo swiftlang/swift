@@ -451,7 +451,7 @@ Finally, the JVP returns a tuple of the original result and the generated differ
 
 ```swift
 // JVP: replaces all function applications with JVP applications.
-sil @jvp_foo : $(Float) -> (Float, (Float) -> Float) {
+sil @jvp_f : $(Float) -> (Float, (Float) -> Float) {
 bb0(%x):
   (%y1, %df_sin) = apply @jvp_sin(%x)
   (%y2, %df_cos) = apply @jvp_cos(%x)
