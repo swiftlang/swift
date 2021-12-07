@@ -838,7 +838,7 @@ Here is the pseudocode of the main logic of the differentiation transform.
             - If the attribute is missing the VJP function, generate a VJP function.
         - Produce a reference to the JVP/VJP to fill in the `differentiable_function` instruction.
 
-JVP/VJP function generation is explained above. The pseudocode above does not mention how [non-differentiability errors](https://github.com/apple/swift/blob/main/docs/DifferentiableProgramming.md#static-analysis) are handled. If a non-differentiable operation is encountered while processing a SIL differentiability witness or a `differentiable_function` instruction, the transform stops processing the item, continues onto the next item, and finally stops compilation after all items are processed.
+JVP/VJP function generation is explained above. The pseudocode above does not mention how [non-differentiability errors](DifferentiableProgramming.md#static-analysis) are handled. If a non-differentiable operation is encountered while processing a SIL differentiability witness or a `differentiable_function` instruction, the transform stops processing the item, continues onto the next item, and finally stops compilation after all items are processed.
 
 ## Special cases
 
