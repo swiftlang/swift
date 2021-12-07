@@ -522,7 +522,7 @@ These structs consist of two different types of values: the differential functio
 In order to define the differential struct type, we preemptively go over the entire function we are going to differentiate in order to generate the struct. When emitting code in the differential we visit all instructions that we deem are needed to take the derivative of the function. We then calculate the expected differential type of the function, and add that as a field to the struct.
 
 ```swift
-func foo(_ x: Float) -> Float {
+func f(_ x: Float) -> Float {
   let a = sin(x)
   return 2 * x // only active in one result!
 }
