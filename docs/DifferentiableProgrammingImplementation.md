@@ -229,7 +229,7 @@ silly(identity)
 
 // Calling `foo` with a closure literal also triggers an implicit
 // `@differentiable` function type conversion.
-silly({ x in x } )
+f({ x in x })
 ```
 
 Explicit conversion is also possible:
