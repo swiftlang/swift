@@ -225,7 +225,7 @@ func f(_ x: @differentiable (Float) -> Float) {}
 // Calling `f` with a function declaration reference triggers an implicit
 // `@differentiable` function type conversion.
 func identity(_ x: Float) -> Float { x }
-silly(identity)
+f(identity)
 
 // Calling `foo` with a closure literal also triggers an implicit
 // `@differentiable` function type conversion.
