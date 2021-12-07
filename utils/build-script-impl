@@ -1943,6 +1943,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
+                        -DSWIFT_INCLUDE_TEST_BINARIES:BOOL=FALSE
                     )
                 fi
 
