@@ -443,7 +443,7 @@ bb0(%x):
 
 ### Overview
 
-Generated JVP functions are clones of the original function, with function applications replaced with JVP applications. Each JVP application returns the original result of the application in addition to a differential value (named “callee differential” to distinguish it from the “generated differential function”).
+Generated JVP functions are clones of the original function, with function applications replaced with JVP applications. Each JVP application returns the original result of the application in addition to a differential value (named "callee differential" to distinguish it from the "generated differential function").
 
 The generated differential function takes the partial derivative with respect to inputs and returns the partial derivative with respect to the output. There is a mapping between active values in the original function and their tangent values (i.e. partial derivatives) in the differential function. The differential captures the “callee differentials” from the JVP, and replaces original function applications using original values with “callee differential” applications using tangent values.
 
