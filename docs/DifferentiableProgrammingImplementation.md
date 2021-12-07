@@ -430,7 +430,7 @@ func f(_ x: Float) -> Float {
 }
 
 // Simplified SIL pseudocode.
-sil @foo : $(Float) -> Float {
+sil @f : $(Float) -> Float {
 bb0(%x):
   %y1 = apply @sin(%x)
   %y2 = apply @cos(%x)
