@@ -31,6 +31,7 @@ class SILModule;
 class SILValue;
 class DeadEndBlocks;
 class PrunedLiveness;
+struct BorrowedValue;
 
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v);
@@ -102,6 +103,15 @@ inline bool isForwardingConsume(SILValue value) {
 /// on borrow-introducing values.
 bool findInnerTransitiveGuaranteedUses(
     SILValue guaranteedValue, SmallVectorImpl<Operand *> *usePoints = nullptr);
+
+/// Like findInnerTransitiveGuaranteedUses except that rather than it being a
+/// precondition that the provided value not be a BorrowedValue, it is a [type-
+/// system-enforced] precondition that the provided value be a BorrowedValue.
+///
+/// TODO: Merge with findInnerTransitiveGuaranteedUses.
+bool findInnerTransitiveGuaranteedUsesOfBorrowedValue(
+    BorrowedValue borrowedValue,
+    SmallVectorImpl<Operand *> *usePoints = nullptr);
 
 /// Find leaf "use points" of a guaranteed value within its enclosing borrow
 /// scope (without looking through reborrows). To find the use points of the

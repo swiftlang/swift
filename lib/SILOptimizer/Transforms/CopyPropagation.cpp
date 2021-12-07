@@ -75,6 +75,9 @@ struct CanonicalDefWorklist {
   CanonicalDefWorklist(bool canonicalizeBorrows)
       : canonicalizeBorrows(canonicalizeBorrows) {}
 
+  // Update the worklist for the def corresponding to \p bbi, a BeginBorrow.
+  void updateForBorrow(BeginBorrowInst *bbi) { borrowedValues.insert(bbi); }
+
   // Update the worklist for the def corresponding to \p copy, which is usually
   // a CopyValue, but may be any owned value such as the operand of a
   // DestroyValue (to force lifetime shortening).
@@ -414,11 +417,15 @@ void CopyPropagation::run() {
   InstructionDeleter deleter(std::move(callbacks));
   bool changed = false;
 
-  // Driver: Find all copied defs.
+  GraphNodeWorklist<BeginBorrowInst *, 16> beginBorrowsToShrink;
+
+  // Driver: Find all copied or borrowed defs.
   for (auto &bb : *f) {
     for (auto &i : bb) {
       if (auto *copy = dyn_cast<CopyValueInst>(&i)) {
         defWorklist.updateForCopy(copy);
+      } else if (auto *borrow = dyn_cast<BeginBorrowInst>(&i)) {
+        beginBorrowsToShrink.insert(borrow);
       } else if (canonicalizeAll) {
         if (auto *destroy = dyn_cast<DestroyValueInst>(&i)) {
           defWorklist.updateForCopy(destroy->getOperand());
@@ -426,6 +433,14 @@ void CopyPropagation::run() {
       }
     }
   }
+
+  // NOTE: We assume that the function is in reverse post order so visiting the
+  //       blocks and pushing begin_borrows as we see them and then popping them
+  //       off the end will result in shrinking inner borrow scopes first.
+  while (auto *bbi = beginBorrowsToShrink.pop()) {
+    shrinkBorrowScope(bbi, deleter);
+  }
+
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
   CanonicalizeOSSALifetime canonicalizer(pruneDebug, poisonRefs,
