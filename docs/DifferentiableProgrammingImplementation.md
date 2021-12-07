@@ -830,7 +830,7 @@ Here is the pseudocode of the main logic of the differentiation transform.
     - If `differentiable_function` has JVP and VJP values, do nothing. It is already canonical.
     - If `differentiable_function` is missing JVP and VJP:
         - If the `differentiable_function`’s original function operand is an `differentiable_function_extract [original]` instruction, get the operand of that instruction. Do `differentiable_function_extract [jvp/vjp]` instruction from that operand to get the JVP/VJP. Continue.
-        - Otherwise, get the “original function reference” (`function_ref`, `witness_method`, or `class_method` instruction) underlying the `differentiable_function`’s original function operand.
+        - Otherwise, get the "original function reference" (`function_ref`, `witness_method`, or `class_method` instruction) underlying the `differentiable_function`’s original function operand.
         - Look up a `@differentiable` declaration attribute on the “original function reference” whose parameter indices are a minimal superset of the `differentiable_function`’s parameter indices.
             - If no such attribute exists, create an empty attribute with the `differentiable_function`’s parameter indices.
         - Process the minimal superset SIL differentiability witness:
