@@ -54,17 +54,6 @@ set(CMAKE_CXX_EXTENSIONS NO)
 include(SwiftUtils)
 include(CheckSymbolExists)
 include(CMakeDependentOption)
-include(CheckLanguage)
-
-# Enable Swift for the host compiler build if we have the language. It is
-# optional until we have a bootstrap story.
-check_language(Swift)
-if(CMAKE_Swift_COMPILER)
-  enable_language(Swift)
-else()
-  message(STATUS "WARNING! Did not find a host compiler swift?! Can not build
-                  any compiler host sources written in Swift")
-endif()
 
 #
 # User-configurable options that control the inclusion and default build
