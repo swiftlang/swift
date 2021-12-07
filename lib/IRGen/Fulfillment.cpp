@@ -99,6 +99,10 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::ProtocolComposition:
     return false;
 
+  // Existential types have constraint types.
+  case TypeKind::Existential:
+    return false;
+
   // Metatypes have instance types.
   case TypeKind::Metatype:
   case TypeKind::ExistentialMetatype:

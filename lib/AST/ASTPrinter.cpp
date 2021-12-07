@@ -5329,6 +5329,11 @@ public:
     }
   }
 
+  void visitExistentialType(ExistentialType *T) {
+    Printer << "any ";
+    visit(T->getConstraintType());
+  }
+
   void visitLValueType(LValueType *T) {
     Printer << "@lvalue ";
     visit(T->getObjectType());

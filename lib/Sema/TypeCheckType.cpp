@@ -1834,6 +1834,8 @@ namespace {
                                    TypeResolutionOptions options);
     NeverNullType resolveCompositionType(CompositionTypeRepr *repr,
                                          TypeResolutionOptions options);
+    NeverNullType resolveExistentialType(ExistentialTypeRepr *repr,
+                                         TypeResolutionOptions options);
     NeverNullType resolveMetatypeType(MetatypeTypeRepr *repr,
                                       TypeResolutionOptions options);
     NeverNullType resolveProtocolType(ProtocolTypeRepr *repr,
@@ -3721,6 +3723,32 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   // AnyObject type in the standard library.
   return ProtocolCompositionType::get(getASTContext(), Members,
                                       /*HasExplicitAnyObject=*/false);
+}
+
+NeverNullType
+TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  auto constraintType = resolveType(repr->getConstraint(), options);
+
+  auto anyStart = repr->getAnyLoc();
+  auto anyEnd = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, anyStart);
+  if (!constraintType->isExistentialType() &&
+      !constraintType->is<ExistentialMetatypeType>()) {
+    diagnose(repr->getLoc(), diag::any_not_existential,
+             constraintType->isTypeParameter(),
+             constraintType)
+      .fixItRemove({anyStart, anyEnd});
+    return constraintType;
+  }
+
+  // Warn about `any Any` and `any AnyObject`.
+  if (constraintType->isAny() || constraintType->isAnyObject()) {
+    diagnose(repr->getLoc(), diag::unnecessary_any,
+             constraintType)
+      .fixItRemove({anyStart, anyEnd});
+  }
+
+  return ExistentialType::get(constraintType);
 }
 
 NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,

@@ -269,6 +269,20 @@ class TypeMatcher {
     TRIVIAL_CASE(SILBoxType)
     TRIVIAL_CASE(ProtocolCompositionType)
 
+    bool visitExistentialType(CanExistentialType firstExistential,
+                              Type secondType,
+                              Type sugaredFirstType) {
+      if (auto secondExistential = secondType->getAs<ExistentialType>()) {
+        return this->visit(firstExistential.getConstraintType(),
+                           secondExistential->getConstraintType(),
+                           sugaredFirstType->castTo<ExistentialType>()
+                               ->getConstraintType());
+      }
+
+      return mismatch(firstExistential.getPointer(), secondType,
+                      sugaredFirstType);
+    }
+
     bool visitLValueType(CanLValueType firstLValue, Type secondType,
                          Type sugaredFirstType) {
       if (auto secondLValue = secondType->getAs<LValueType>()) {

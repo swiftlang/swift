@@ -1660,6 +1660,12 @@ static void extractDirectlyReferencedNominalTypes(
     return;
   }
 
+  if (auto existential = type->getAs<ExistentialType>()) {
+    extractDirectlyReferencedNominalTypes(
+        existential->getConstraintType(), decls);
+    return;
+  }
+
   llvm_unreachable("Not a type containing nominal types?");
 }
 

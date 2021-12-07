@@ -1251,6 +1251,11 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return appendExistentialLayout(layout, sig, forDecl);
     }
 
+    case TypeKind::Existential: {
+      auto constraint = cast<ExistentialType>(tybase)->getConstraintType();
+      return appendType(constraint, sig, forDecl);
+    }
+
     case TypeKind::UnboundGeneric:
     case TypeKind::Class:
     case TypeKind::Enum:

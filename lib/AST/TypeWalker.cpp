@@ -163,6 +163,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
+  bool visitExistentialType(ExistentialType *ty) {
+    return doIt(ty->getConstraintType());
+  }
+
   bool visitLValueType(LValueType *ty) {
     return doIt(ty->getObjectType());
   }
