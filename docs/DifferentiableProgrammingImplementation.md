@@ -227,7 +227,7 @@ func f(_ x: @differentiable (Float) -> Float) {}
 func identity(_ x: Float) -> Float { x }
 f(identity)
 
-// Calling `foo` with a closure literal also triggers an implicit
+// Calling `f` with a closure literal also triggers an implicit
 // `@differentiable` function type conversion.
 f({ x in x })
 ```
