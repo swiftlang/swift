@@ -1262,6 +1262,9 @@ public:
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
 
   void visitCopyAddrInst(CopyAddrInst *i);
+  void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *mai) {
+    llvm_unreachable("Valid only when ownership is enabled");
+  }
   void visitDestroyAddrInst(DestroyAddrInst *i);
 
   void visitBindMemoryInst(BindMemoryInst *i);

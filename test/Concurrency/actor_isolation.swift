@@ -617,7 +617,8 @@ func checkLocalFunctions() async {
 
   // Escaping closures can make the local function execute concurrently.
   acceptConcurrentClosure {
-    local2()
+    local2() // expected-warning{{capture of 'local2()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+    // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
 
   print(i)
@@ -626,7 +627,8 @@ func checkLocalFunctions() async {
   var k = 17
   func local4() {
     acceptConcurrentClosure {
-      local3()
+      local3() // expected-warning{{capture of 'local3()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+      // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     }
   }
 

@@ -146,6 +146,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
+  // Before we promote any loads, perform _move checking for addresses.
+  P.addMoveKillsCopyableAddressesChecker();
+
   // Promote loads as necessary to ensure we have enough SSA formation to emit
   // SSA based diagnostics.
   P.addPredictableMemoryAccessOptimizations();

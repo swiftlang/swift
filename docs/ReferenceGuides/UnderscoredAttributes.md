@@ -634,3 +634,8 @@ calls a runtime function which allocates memory or locks, respectively.
 The `@_noLocks` attribute implies `@_noAllocation` because a memory allocation
 also locks.
 
+## `@_unavailableFromAsync`
+
+Marks a synchronous API as being unavailable from asynchronous contexts. Direct
+usage of annotated API from asynchronous contexts will result in a warning from
+the compiler.

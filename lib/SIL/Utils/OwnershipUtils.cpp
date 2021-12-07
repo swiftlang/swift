@@ -701,17 +701,18 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
     }
     // First, eliminate "end point uses" that we just need to check liveness at
     // and do not need to check transitive uses of.
-    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) || isIncidentalUse(user)
-        || isa<StoreInst>(user) || isa<DestroyAddrInst>(user)
-        || isa<AssignInst>(user) || isa<YieldInst>(user)
-        || isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user)
-        || isa<EndApplyInst>(user) || isa<LoadWeakInst>(user)
-        || isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user)
-        || isa<BeginUnpairedAccessInst>(user)
-        || isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user)
-        || isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user)
-        || isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)
-        || isa<IsUniqueInst>(user)) {
+    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
+        isa<MarkUnresolvedMoveAddrInst>(user) || isIncidentalUse(user) ||
+        isa<StoreInst>(user) || isa<DestroyAddrInst>(user) ||
+        isa<AssignInst>(user) || isa<YieldInst>(user) ||
+        isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user) ||
+        isa<EndApplyInst>(user) || isa<LoadWeakInst>(user) ||
+        isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user) ||
+        isa<BeginUnpairedAccessInst>(user) ||
+        isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
+        isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
+        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
+        isa<IsUniqueInst>(user)) {
       leafUse(op);
       continue;
     }

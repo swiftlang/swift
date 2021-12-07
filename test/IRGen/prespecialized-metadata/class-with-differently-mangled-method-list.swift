@@ -20,7 +20,7 @@ func consume<T>(_ t: T) {
 }
 
 func doit() {
-  //      CHECK: @"_INSTANCE_METHODS_$s4main5ClazzCyAA1SVGMf" = internal constant
+  //      CHECK: @"_INSTANCE_METHODS_$s4main5ClazzCyAA1SVGMf" = weak hidden constant
   consume(Clazz<S>.self)
 }
 

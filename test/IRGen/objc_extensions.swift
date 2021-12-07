@@ -16,7 +16,7 @@ import objc_extension_base
 // CHECK: [[CATEGORY_NAME:@.*]] = private constant [16 x i8] c"objc_extensions\00"
 // CHECK: [[METHOD_TYPE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 
-// CHECK-LABEL: @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions" = internal constant
+// CHECK-LABEL: @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions" = weak hidden constant
 // CHECK-SAME:   i64 1,
 // CHECK-SAME:   @_PROTOCOL__TtP15objc_extensions11NewProtocol_
 
@@ -84,7 +84,7 @@ extension Gizmo {
 class Hoozit : NSObject {
 }
 
-// CHECK-LABEL: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = internal constant
+// CHECK-LABEL: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = weak hidden constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
@@ -94,7 +94,7 @@ class Hoozit : NSObject {
 // CHECK:   }]
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
-// CHECK-LABEL: @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = internal constant
+// CHECK-LABEL: @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = weak hidden constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
@@ -120,7 +120,7 @@ extension Hoozit {
 
 class SwiftOnly { }
 
-// CHECK-LABEL: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions9SwiftOnly_$_objc_extensions" = internal constant
+// CHECK-LABEL: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions9SwiftOnly_$_objc_extensions" = weak hidden constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
@@ -175,7 +175,7 @@ class NSDogcow : NSObject {}
 
 // CHECK: [[NAME:@.*]] = private unnamed_addr constant [5 x i8] c"woof\00"
 // CHECK: [[ATTR:@.*]] = private unnamed_addr constant [7 x i8] c"Tq,N,D\00"
-// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_extensions8NSDogcow_$_objc_extensions" = internal constant {{.*}} [[NAME]], {{.*}} [[ATTR]], {{.*}}, section "__DATA, {{.*}}", align 8
+// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_extensions8NSDogcow_$_objc_extensions" = weak hidden constant {{.*}} [[NAME]], {{.*}} [[ATTR]], {{.*}}, section "__DATA, {{.*}}", align 8
 extension NSDogcow {
   @NSManaged var woof: Int
 }

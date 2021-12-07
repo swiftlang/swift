@@ -235,7 +235,7 @@ namespace {
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
       }
       if (getFields().empty()) {
         return IGM.typeLayoutCache.getEmptyEntry();
@@ -280,7 +280,7 @@ namespace {
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
       if (!IGM.getOptions().ForceStructTypeLayouts) {
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+        return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
       }
       if (getFields().empty()) {
         return IGM.typeLayoutCache.getEmptyEntry();

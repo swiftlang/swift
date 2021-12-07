@@ -45,6 +45,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.bestName("hello")
   let _: Int = await slowServer.customize("hello")
 
+  slowServer.unavailableMethod() // expected-warning{{'unavailableMethod' is unavailable from asynchronous contexts}}
+
   let _: String = await slowServer.dance("slide")
   let _: String = await slowServer.__leap(17)
 
@@ -126,22 +128,22 @@ func testSendableAttrs(
 
   doSomethingConcurrently {
     print(sendableClass)               // no-error
-    print(nonSendableClass)            // expected-warning{{cannot use parameter 'nonSendableClass' with a non-sendable type 'NonSendableClass' from concurrently-executed code}}
+    print(nonSendableClass)            // expected-warning{{capture of 'nonSendableClass' with non-sendable type 'NonSendableClass' in a `@Sendable` closure}}
 
     print(sendableEnum)                // no-error
-    print(nonSendableEnum)             // expected-warning{{cannot use parameter 'nonSendableEnum' with a non-sendable type 'NonSendableEnum' from concurrently-executed code}}
+    print(nonSendableEnum)             // expected-warning{{capture of 'nonSendableEnum' with non-sendable type 'NonSendableEnum' in a `@Sendable` closure}}
 
     print(sendableOptions)             // no-error
-    print(nonSendableOptions)          // expected-warning{{cannot use parameter 'nonSendableOptions' with a non-sendable type 'NonSendableOptions' from concurrently-executed code}}
+    print(nonSendableOptions)          // expected-warning{{capture of 'nonSendableOptions' with non-sendable type 'NonSendableOptions' in a `@Sendable` closure}}
 
     print(sendableError)               // no-error
     print(nonSendableError)            // no-error--we don't respect `@_nonSendable` on `ns_error_domain` types because all errors are Sendable
 
     print(sendableStringEnum)          // no-error
-    print(nonSendableStringEnum)       // expected-warning{{cannot use parameter 'nonSendableStringEnum' with a non-sendable type 'NonSendableStringEnum' from concurrently-executed code}}
+    print(nonSendableStringEnum)       // expected-warning{{capture of 'nonSendableStringEnum' with non-sendable type 'NonSendableStringEnum' in a `@Sendable` closure}}
 
     print(sendableStringStruct)        // no-error
-    print(nonSendableStringStruct)     // expected-warning{{cannot use parameter 'nonSendableStringStruct' with a non-sendable type 'NonSendableStringStruct' from concurrently-executed code}}
+    print(nonSendableStringStruct)     // expected-warning{{capture of 'nonSendableStringStruct' with non-sendable type 'NonSendableStringStruct' in a `@Sendable` closure}}
   }
 }
 

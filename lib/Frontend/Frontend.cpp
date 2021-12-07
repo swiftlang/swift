@@ -546,7 +546,7 @@ bool CompilerInstance::setUpModuleLoaders() {
   // If implicit modules are disabled, we need to install an explicit module
   // loader.
   bool ExplicitModuleBuild = Invocation.getFrontendOptions().DisableImplicitModules;
-  if (ExplicitModuleBuild) {
+  if (ExplicitModuleBuild || !Invocation.getSearchPathOptions().ExplicitSwiftModuleMap.empty()) {
     auto ESML = ExplicitSwiftModuleLoader::create(
         *Context,
         getDependencyTracker(), MLM,
@@ -554,7 +554,9 @@ bool CompilerInstance::setUpModuleLoaders() {
         IgnoreSourceInfoFile);
     this->DefaultSerializedLoader = ESML.get();
     Context->addModuleLoader(std::move(ESML));
-  } else {
+  }
+
+  if (!ExplicitModuleBuild) {
     if (MLM != ModuleLoadingMode::OnlySerialized) {
       // We only need ModuleInterfaceLoader for implicit modules.
       auto PIML = ModuleInterfaceLoader::create(
