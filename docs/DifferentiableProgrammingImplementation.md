@@ -696,7 +696,7 @@ bb3(args…, %bb3_payload_ptr):
 
 Similar to generated JVP functions, generated VJP functions are clones of the original function, with function applications replaced with VJP applications. Each VJP application returns the original result of application in addition to a pullback value (named "callee pullback" to distinguish it from the "generated pullback function").
 
-The generated pullback function takes the partial derivatives with respect to outputs and returns the partial derivative with respect to the input. There is a mapping between _active values in the original function_ and their _adjoint values (i.e. partial derivatives) in the pullback function_. The pullback captures the “callee pullbacks” from the VJP, and replaces _original function applications using original values_ with _“callee pullback” applications using adjoint values_.
+The generated pullback function takes the partial derivatives with respect to outputs and returns the partial derivative with respect to the input. There is a mapping between _active values in the original function_ and their _adjoint values (i.e. partial derivatives) in the pullback function_. The pullback captures the "callee pullbacks" from the VJP, and replaces _original function applications using original values_ with _"callee pullback" applications using adjoint values_.
 
 Finally, the VJP returns a tuple of the original result and the generated pullback function.
 
