@@ -330,6 +330,7 @@ SYNTAX_TOKENS = [
             classification='FloatingLiteral', serialization_code=112),
     Literal('StringLiteral', 'string_literal',
             classification='StringLiteral', serialization_code=113),
+    Literal('RegexLiteral', 'regex_literal', serialization_code=124),
 
     Misc('Unknown', 'unknown', serialization_code=115),
     Misc('Identifier', 'identifier', classification='Identifier',

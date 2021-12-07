@@ -5179,7 +5179,7 @@ public:
     if (isExpressionAlreadyTooComplex)
       return true;
 
-    auto CancellationFlag = getASTContext().TypeCheckerOpts.CancellationFlag;
+    auto CancellationFlag = getASTContext().CancellationFlag;
     if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
       return true;
 

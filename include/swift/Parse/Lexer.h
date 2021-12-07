@@ -595,6 +595,8 @@ private:
   void lexStringLiteral(unsigned CustomDelimiterLen = 0);
   void lexEscapedIdentifier();
 
+  void lexRegexLiteral(const char *TokStart);
+
   void tryLexEditorPlaceholder();
   const char *findEndOfCurlyQuoteStringLiteral(const char *,
                                                bool EmitDiagnostics);
