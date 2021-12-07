@@ -310,7 +310,7 @@ Here is the result of activity analysis for this example:
 // Varied values are in all caps.
 // These values depend on the input (`x`).
 @differentiable
-func foo(_ X: Float) -> Float {
+func f(_ X: Float) -> Float {
     let SINX = sin(X)
     let cos3 = cos(3)
     let RESULT = SINX * cos3
