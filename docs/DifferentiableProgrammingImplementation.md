@@ -959,7 +959,7 @@ at):
 <unknown>:0: note: opaque non-'@differentiable' function is not differentiable
 ```
 
-To support reabstraction thunk generation, we must find a way to avoid this “opaque non-@differentiable function” error. One straightforward solution is to change when the `@differentiable` function is formed:
+To support reabstraction thunk generation, we must find a way to avoid this "opaque non-@differentiable function" error. One straightforward solution is to change when the `@differentiable` function is formed:
 - Make the reabstraction thunk JVP/VJP take a `@differentiable` function-typed argument.
 - Make reabstraction thunk JVP/VJP callers construct and pass a `@differentiable` function-typed value.
 
