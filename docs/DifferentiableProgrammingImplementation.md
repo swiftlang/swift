@@ -602,7 +602,7 @@ func m(_ x: Float) -> Float {
   return j(retVal)
 }
 
-bb0(args…):
+bb0(args...):
   // ...
   // %diff_func is the differential of `f` gotten from a JVP call earlier in the 
   // basic block code.
@@ -611,10 +611,10 @@ bb0(args…):
   %bb0_diff_field = struct_element_addr %bb0_struct.diff_f
   store %diff_func to %bb0_diff_field // store diff func.
   %bb0_payload_ptr = address_to_pointer %bb0_struct
-  cond_br %condition, bb0_bb1_tramp(args…, %bb0_payload_ptr), 
-                      bb0_bb2_tramp(args…, %bb0_payload_ptr)
+  cond_br %condition, bb0_bb1_tramp(args..., %bb0_payload_ptr), 
+                      bb0_bb2_tramp(args..., %bb0_payload_ptr)
 
-bb0_bb1_trampbb1(args…, %bb0_payload_ptr):
+bb0_bb1_trampbb1(args..., %bb0_payload_ptr):
   %bb0_succ = enum $EnumBB0.BB1 // bb0 succ inst.
   %succ_addr = struct_element_addr %bb0_payload_ptr.succ // bb0 succ address.
   // store the memory alloc’d struct to the succ field in bb0.
@@ -623,9 +623,9 @@ bb0_bb1_trampbb1(args…, %bb0_payload_ptr):
   %bb1_payload_addr = init_enum_data_addr %succ_addr.BB1
   // Can’t pass addresses to basic blocks, need to convert to pointer.
   %bb1_payload_ptr = address_to_pointer %bb1_payload_addr
-  br bb1(args…, %bb1_payload_ptr)
+  br bb1(args..., %bb1_payload_ptr)
 
-bb0_bb2_tramp(args…, %bb0_struct):
+bb0_bb2_tramp(args..., %bb0_struct):
   %bb0_succ = enum $EnumBB0.BB2 // bb0 succ inst.
   %succ_addr = struct_element_addr %bb0_struct.succ // bb0 succ address.
   // store the memory alloc’d struct to the succ field in bb0.
@@ -634,17 +634,17 @@ bb0_bb2_tramp(args…, %bb0_struct):
   %bb2_payload_addr = init_enum_data_addr %succ_addr.BB2
   // Can’t pass addresses to basic blocks, need to convert to pointer.
   %bb2_payload_ptr = address_to_pointer %bb2_payload_addr
-  br bb2(args…, %bb2_payload_ptr)
+  br bb2(args..., %bb2_payload_ptr)
 
-bb1(args…, %bb1_payload_ptr):
+bb1(args..., %bb1_payload_ptr):
   // ...
   // %diff_func_ is the differential of `g` gotten from a JVP call earlier in the 
   // basic block code.
   %bb1_diff_field = struct_element_addr %bb1_payload_ptr.diff_g
   store %diff_func to %bb1_diff_field : $*(Float) -> Float // store diff func.
-  br bb1_bb3_tramp(args…, %bb1_payload_ptr)
+  br bb1_bb3_tramp(args..., %bb1_payload_ptr)
 
-bb1_bb3_trampbb1(args…, %bb1_payload_ptr):
+bb1_bb3_trampbb1(args..., %bb1_payload_ptr):
   %succ_addr = enum $EnumBB1.BB3 // bb1 succ inst.
   // get bb1 succ address from inside bb0
   %succ_addr = struct_element_addr %bb1_payload_ptr.succ // bb1 succ address.
@@ -654,17 +654,17 @@ bb1_bb3_trampbb1(args…, %bb1_payload_ptr):
   %bb3_payload_addr = init_enum_data_addr %succ_addr.BB3
   // Can’t pass addresses to basic blocks, need to convert to pointer.
   %bb3_payload_ptr = address_to_pointer %bb3_payload_addr
-  br bb3(args…, %bb3_payload_ptr)
+  br bb3(args..., %bb3_payload_ptr)
 
-bb2(args…, %bb2_payload_ptr):
+bb2(args..., %bb2_payload_ptr):
   // ...
   // %diff_func_h is the differential of `h` gotten from a JVP call earlier in the 
   // basic block code.
   %bb2_diff_field = struct_element_addr %bb2_payload_ptr.diff_h
   store %diff_func_h to %bb2_diff_field // store diff func.
-  br bb2_bb3_tramp(args…, %bb2_payload_ptr)
+  br bb2_bb3_tramp(args..., %bb2_payload_ptr)
 
-bb2_bb3_tramp(args…, %bb0_struct, %bb2_payload_ptr):
+bb2_bb3_tramp(args..., %bb0_struct, %bb2_payload_ptr):
   %55 = enum $EnumBB2, #EnumBB2.BB3!enumelt.1, undef : $StructBB3 // bb2 succ inst.
   // get bb2 succ address from inside bb0.
   %succ_addr = struct_element_addr %bb2_payload_ptr : $*StructBB2, #StructBB2.succ
@@ -674,9 +674,9 @@ bb2_bb3_tramp(args…, %bb0_struct, %bb2_payload_ptr):
   %bb3_payload_addr = init_enum_data_addr %succ_addr.BB3
   // Can’t pass addresses to basic blocks, need to convert to pointer.
   %bb3_payload_ptr = address_to_pointer %bb3_payload_addr
-  br bb3(args…, %bb3_payload_ptr)
+  br bb3(args..., %bb3_payload_ptr)
 
-bb3(args…, %bb3_payload_ptr):
+bb3(args..., %bb3_payload_ptr):
   // %diff_func_j is the differential of `j` gotten from a JVP call earlier in the 
   // basic block code.
   %bb3_diff_field = struct_element_addr %bb3_payload_ptr.diff_j
