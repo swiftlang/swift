@@ -749,10 +749,27 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                            /*Implicit=*/true);
     }
 
+    auto isInClosureContext = [&](ValueDecl *decl) -> bool {
+      auto *DC = decl->getDeclContext();
+      do {
+        if (dyn_cast<ClosureExpr>(DC))
+          return true;
+      } while ((DC = DC->getParent()));
+
+      return false;
+    };
+
     llvm::SmallVector<ValueDecl *, 4> outerAlternatives;
     (void)findNonMembers(Lookup.outerResults(), UDRE->getRefKind(),
                          /*breakOnMember=*/false, outerAlternatives,
-                         /*isValid=*/[](ValueDecl *choice) -> bool {
+                         /*isValid=*/[&](ValueDecl *choice) -> bool {
+                           // Values that are defined in a closure
+                           // that hasn't been type-checked yet,
+                           // cannot be outer candidates.
+                           if (isInClosureContext(choice)) {
+                             return choice->hasInterfaceType() &&
+                                    !choice->isInvalid();
+                           }
                            return !choice->isInvalid();
                          });
 
