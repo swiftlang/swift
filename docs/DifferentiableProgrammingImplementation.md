@@ -107,10 +107,7 @@ The VJP function returns a tuple with two elements:
 
 JVP and VJP functions can be registered using the `@derivative` attribute. JVP functions should return a tuple with labels `(value: ..., differential: ...)`. VJP functions should return a tuple with labels `(value: ..., pullback: ...)`.
 
-For usage examples of the `@derivative` attribute, please see:
-- [The custom differentiation tutorial](https://github.com/tensorflow/swift/blob/master/docs/site/tutorials/custom_differentiation.ipynb), which shows how to use the `@derivative` attribute to register a derivative for `e^x`.
-- [This mailing list response](https://groups.google.com/a/tensorflow.org/d/msg/swift/k62Uwnc-EYc/Cncb7mxtCAAJ), which shows how to use the `@derivative` attribute to register a derivative for `ax^2 + bx + c`.
-> NOTE: The custom differentiation tutorial does not reflect the current state of differentiation in Swift. You can use it as a general guide to differentiation, but its code samples will not compile.
+For usage examples of the `@derivative` attribute, please see [this mailing list response](https://groups.google.com/a/tensorflow.org/d/msg/swift/k62Uwnc-EYc/Cncb7mxtCAAJ), which shows how to use the `@derivative` attribute to register a derivative for `ax^2 + bx + c`.
 
 Note that derivative functions are defined as "JVP/VJP functions taking original arguments", rather than just the "returned differential/pullback" functions. This is because differential/pullback functions may need to refer to intermediate values computed by the original function - this is possible when they are returned closures that capture values.
 
