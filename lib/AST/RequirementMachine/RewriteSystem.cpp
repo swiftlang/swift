@@ -43,12 +43,39 @@ Optional<Symbol> Rule::isPropertyRule() const {
   return property;
 }
 
-/// If this is a rule of the form T.[p] => T where [p] is a protocol symbol,
-/// return the protocol, otherwise return nullptr.
+/// If this is a rule of the form T.[P] => T where [P] is a protocol symbol,
+/// return the protocol P, otherwise return nullptr.
 const ProtocolDecl *Rule::isProtocolConformanceRule() const {
   if (auto property = isPropertyRule()) {
     if (property->getKind() == Symbol::Kind::Protocol)
       return property->getProtocol();
+  }
+
+  return nullptr;
+}
+
+/// If this is a rule of the form T.[concrete: C : P] => T where
+/// [concrete: C : P] is a concrete conformance symbol, return the protocol P,
+/// otherwise return nullptr.
+const ProtocolDecl *Rule::isAnyConformanceRule() const {
+  if (auto property = isPropertyRule()) {
+    switch (property->getKind()) {
+    case Symbol::Kind::ConcreteConformance:
+    case Symbol::Kind::Protocol:
+      return property->getProtocol();
+
+    case Symbol::Kind::Layout:
+    case Symbol::Kind::Superclass:
+    case Symbol::Kind::ConcreteType:
+      return nullptr;
+
+    case Symbol::Kind::Name:
+    case Symbol::Kind::AssociatedType:
+    case Symbol::Kind::GenericParam:
+      break;
+    }
+
+    llvm_unreachable("Bad symbol kind");
   }
 
   return nullptr;
