@@ -268,7 +268,7 @@ static void createDistributedActorFactory_resolve(
 ///     using system: Self.ActorSystem
 /// ) throws -> Self
 /// \endverbatim
-void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) {
+void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distributed): rename
   /// NOTE: this will only be reached if the resolve function is actually
   ///       demanded. For example, by declaring the actor as `public` or
   ///       having at least one call to the resolve function.

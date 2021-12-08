@@ -56,6 +56,7 @@ void emitDistributedActorSystemWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName,
     SILValue actorSystem, SILType actorType, ArrayRef<SILValue> args,
     Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets) {
+  fprintf(stderr, "[%s:%d] (%s) Prepare call: %s ========================================================================\n", __FILE__, __LINE__, __FUNCTION__, methodName.getBaseName().getIdentifier().str().str().c_str());
   auto &F = B.getFunction();
   auto &M = B.getModule();
   auto &C = F.getASTContext();
@@ -121,6 +122,8 @@ void emitDistributedActorSystemWitnessCall(
     subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
   }
 
+  Optional<SILValue> temporaryActorIDBuffer;
+
   // If the self parameter is indirect but the actorSystem is a value, put it
   // into a temporary allocation.
   auto methodSILFnTy = methodSILTy.castTo<SILFunctionType>();
@@ -134,10 +137,50 @@ void emitDistributedActorSystemWitnessCall(
     temporaryActorSystemBuffer = SILValue(buf);
   }
 
-  // Call the method.
-  SmallVector<SILValue, 2> allArgs(args.begin(), args.end());
-  allArgs.push_back(temporaryActorSystemBuffer ? *temporaryActorSystemBuffer
-                                               : actorSystem);
+  // === Call the method.
+  // --- Push the arguments
+  SmallVector<SILValue, 2> allArgs;
+  auto params = methodSILFnTy->getParameters();
+  for (size_t i = 0; i < args.size(); ++i) {
+    auto arg = args[i];
+    if (params[i].isFormalIndirect() &&
+        !arg->getType().isAddress() &&
+        methodName.getBaseIdentifier() != C.Id_assignID) { // FIXME: we want to detect and NOT handle $@thick DA.Type here - how to?
+      fprintf(stderr, "[%s:%d] (%s) push arg, make pointer\n", __FILE__, __LINE__, __FUNCTION__);
+      auto buf = B.createAllocStack(loc, arg->getType(), None);
+      auto argCopy = B.emitCopyValueOperation(loc, arg);
+      B.emitStoreValueOperation(
+          loc, argCopy, buf, StoreOwnershipQualifier::Init);
+      temporaryActorIDBuffer = SILValue(buf);
+
+      arg->getType().dump();
+      fprintf(stderr, "[%s:%d] (%s) made into: %s\n", __FILE__, __LINE__, __FUNCTION__, (*temporaryActorIDBuffer)->getType().getMangledName().c_str());
+      (*temporaryActorIDBuffer)->getType().dump();
+
+      allArgs.push_back(*temporaryActorIDBuffer);
+//    } else if (methodName.getBaseName().getIdentifier() == C.Id_assignID) {
+//      fprintf(stderr, "[%s:%d] (%s) push arg, ACTOR, make pointer\n", __FILE__, __LINE__, __FUNCTION__);
+//      arg->dump();
+//      auto buf = B.createAllocStack(loc, arg->getType(), None);
+//      auto argCopy = B.emitCopyValueOperation(loc, arg);
+//      B.emitStoreValueOperation(
+//          loc, argCopy, buf, StoreOwnershipQualifier::Init);
+//      temporaryActorIDBuffer = SILValue(buf);
+//
+//      arg->getType().dump();
+//      fprintf(stderr, "[%s:%d] (%s) made into: %s\n", __FILE__, __LINE__, __FUNCTION__, (*temporaryActorIDBuffer)->getType().getMangledName().c_str());
+//      (*temporaryActorIDBuffer)->getType().dump();
+//
+//      allArgs.push_back(*temporaryActorIDBuffer);
+    } else {
+      fprintf(stderr, "[%s:%d] (%s) push arg, directly\n", __FILE__, __LINE__, __FUNCTION__);
+      arg->getType().dump();
+      allArgs.push_back(arg);
+    }
+  }
+  // Push the self argument
+  auto selfArg = temporaryActorSystemBuffer ? *temporaryActorSystemBuffer : actorSystem;
+  allArgs.push_back(selfArg);
 
   SILInstruction *apply;
   if (tryTargets) {
@@ -164,7 +207,17 @@ void emitDistributedActorSystemWitnessCall(
     }
   };
 
-  // If we had to create a buffer to pass the actorSystem
+  // ==== If we had to create a buffers we need to clean them up
+  // --- Cleanup id buffer
+  if (temporaryActorIDBuffer) {
+    emitCleanup([&](SILBuilder & builder) {
+      auto value = builder.emitLoadValueOperation(
+          loc, *temporaryActorIDBuffer, LoadOwnershipQualifier::Take);
+      builder.emitDestroyValueOperation(loc, value);
+      builder.createDeallocStack(loc, *temporaryActorIDBuffer);
+    });
+  }
+  // --- Cleanup actorSystem buffer
   if (temporaryActorSystemBuffer) {
     emitCleanup([&](SILBuilder & builder) {
       auto value = builder.emitLoadValueOperation(

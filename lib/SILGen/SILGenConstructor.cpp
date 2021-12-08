@@ -955,6 +955,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     else
       B.createReturn(returnLoc, selfArg.forward(*this));
   }
+
+  fprintf(stderr, "[%s:%d] (%s) CONSTRUCTOR =====\n", __FILE__, __LINE__, __FUNCTION__);
+  F.dump();
+  fprintf(stderr, "[%s:%d] (%s) END CONSTRUCTOR =====\n", __FILE__, __LINE__, __FUNCTION__);
 }
 
 static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
