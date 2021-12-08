@@ -680,6 +680,9 @@ struct GenericSignatureBuilder::Implementation {
   /// requirements.
   bool RebuildingWithoutRedundantConformances = false;
 
+  /// Whether we are building a protocol requirement signature.
+  bool BuildingProtocolRequirementSignature = false;
+
   /// A mapping of redundant explicit requirements to the best root requirement
   /// that implies them. Built by computeRedundantRequirements().
   using RedundantRequirementMap =
@@ -2313,6 +2316,11 @@ void GenericSignatureBuilder::addConditionalRequirements(
   if (Impl->RebuildingWithoutRedundantConformances)
     return;
 
+  // We do not perform requirement inference, including conditional requirement
+  // inference, inside protocols.
+  if (Impl->BuildingProtocolRequirementSignature)
+    return;
+
   // Abstract conformances don't have associated decl-contexts/modules, but also
   // don't have conditional requirements.
   if (conformance.isConcrete()) {
@@ -3399,10 +3407,12 @@ void EquivalenceClass::modified(GenericSignatureBuilder &builder) {
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(
-                               ASTContext &ctx)
+                               ASTContext &ctx,
+                               bool requirementSignature)
   : Context(ctx), Diags(Context.Diags), Impl(new Implementation) {
   if (auto *Stats = Context.Stats)
     ++Stats->getFrontendCounters().NumGenericSignatureBuilders;
+  Impl->BuildingProtocolRequirementSignature = requirementSignature;
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(
@@ -8833,7 +8843,8 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   }
 
   auto buildViaGSB = [&]() {
-    GenericSignatureBuilder builder(proto->getASTContext());
+    GenericSignatureBuilder builder(proto->getASTContext(),
+                                    /*requirementSignature=*/true);
 
     // Add all of the generic parameters.
     for (auto gp : *proto->getGenericParams())

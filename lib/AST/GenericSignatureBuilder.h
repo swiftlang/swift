@@ -496,7 +496,8 @@ private:
 
 public:
   /// Construct a new generic signature builder.
-  explicit GenericSignatureBuilder(ASTContext &ctx);
+  explicit GenericSignatureBuilder(ASTContext &ctx,
+                                   bool requirementSignature=false);
   GenericSignatureBuilder(GenericSignatureBuilder &&);
   ~GenericSignatureBuilder();
 
