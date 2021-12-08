@@ -33,9 +33,9 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "swift/Runtime/Config.h"
+//#include "swift/Runtime/Config.h"
 
-SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+//SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 inline static void swift_unreachable(const char *msg) {
   assert(false && msg);
   (void)msg;

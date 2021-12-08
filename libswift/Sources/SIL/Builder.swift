@@ -12,59 +12,20 @@
 
 import SILBridging
 
-/// A utility to create new instructions at a given insertion point.
-public struct Builder {
-  let insertionPoint: Instruction
-  let location: Location
-  private let passContext: BridgedPassContext
+public typealias Builder = swift.SILBuilder
 
-  private var bridgedInsPoint: BridgedInstruction { insertionPoint.bridged }
-
-  private func notifyInstructionsChanged() {
-    PassContext_notifyChanges(passContext, instructionsChanged)
-  }
-
-  private func notifyCallsChanged() {
-    PassContext_notifyChanges(passContext, callsChanged)
-  }
-
-  private func notifyBranchesChanged() {
-    PassContext_notifyChanges(passContext, branchesChanged)
-  }
-
-  public init(insertionPoint: Instruction, location: Location,
-              passContext: BridgedPassContext) {
-    self.insertionPoint = insertionPoint
-    self.location = location;
-    self.passContext = passContext
-  }
-
-  public func createBuiltinBinaryFunction(name: String,
-      operandType: Type, resultType: Type, arguments: [Value]) -> BuiltinInst {
-    notifyInstructionsChanged()
-    return arguments.withBridgedValues { valuesRef in
-      return name.withBridgedStringRef { nameStr in
-        let bi = SILBuilder_createBuiltinBinaryFunction(
-          bridgedInsPoint, location.bridgedLocation, nameStr,
-          operandType.bridged, resultType.bridged, valuesRef)
-        return bi.getAs(BuiltinInst.self)
-      }
-    }
-  }
-
-  public func createCondFail(condition: Value, message: String) -> CondFailInst {
-    notifyInstructionsChanged()
-    return message.withBridgedStringRef { messageStr in
-      let cf = SILBuilder_createCondFail(
-        bridgedInsPoint, location.bridgedLocation, condition.bridged, messageStr)
-      return cf.getAs(CondFailInst.self)
-    }
+extension Builder {
+  public init(at insertionPoint: Instruction) {
+    self = SILBuilder_init(insertionPoint.bridged)
   }
   
-  public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
-    notifyInstructionsChanged()
-    let literal = SILBuilder_createIntegerLiteral(
-      bridgedInsPoint, location.bridgedLocation, type.bridged, value)
-    return literal.getAs(IntegerLiteralInst.self)
+  public mutating func createIntegerLiteral(at loc: Location, type: Type, value: Int) -> IntegerLiteralInst {
+    let ilPtr = createIntegerLiteral(
+      unsafeBitCast(loc, to: swift.SILLocation.self),
+      unsafeBitCast(type, to: swift.SILType.self),
+      value)
+    let ilInst = Unmanaged<Instruction>.fromOpaque(UnsafeRawPointer(ilPtr)!)
+      .takeUnretainedValue()
+    return ilInst as! IntegerLiteralInst
   }
 }
