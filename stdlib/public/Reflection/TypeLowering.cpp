@@ -1951,7 +1951,6 @@ public:
         if (Stride == 0)
           Stride = 1;
 
-/*
         auto PayloadSize = EnumTypeInfo::getPayloadSizeForCases(Cases);
 
         if (FixedDescriptor->mpeDoesNotUseSpareBits()) {
@@ -1963,14 +1962,15 @@ public:
           // Compiler marked this as using spare bits
           // TODO: Get the mask from wherever the compiler stashed it
           BitMask spareBitsMask(PayloadSize);
+/*
           if (readSpareBitsMask(XYZ, spareBitsMask) && !spareBitsMask.isZero()) {
             // Use compiler-provided spare bit information
             return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
               Size, Alignment, Stride, NumExtraInhabitants,
               BitwiseTakable, Cases, spareBitsMask);
           }
-        }
 */
+        }
 
         // If there was no compiler data, try computing the mask ourselves
         // (This is less robust, but necessary to support images from older

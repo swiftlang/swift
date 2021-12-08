@@ -351,6 +351,11 @@ public:
 
   // - Least significant 16 bits are the alignment.
   // - Bit 16 is 'bitwise takable'.
+  // - For Multi-payload enums:
+  //   = Bit 17 indicates this uses a separate tag field
+  //   = Bit 18 indicates this uses spare bits (TODO: store the spare bits somewhere)
+  //   = If neither is set, this is an old binary; the
+  //     reflection library will make an educated guess in that case
   // - Remaining bits are reserved.
   uint32_t AlignmentAndFlags;
 
@@ -359,6 +364,14 @@ public:
 
   bool isBitwiseTakable() const {
     return (AlignmentAndFlags >> 16) & 1;
+  }
+
+  bool mpeDoesNotUseSpareBits() const {
+    return (AlignmentAndFlags >> 17) & 1;
+  }
+
+  bool mpeUsesSpareBits() const {
+    return (AlignmentAndFlags >> 18) & 1;
   }
 
   uint32_t getAlignment() const {
