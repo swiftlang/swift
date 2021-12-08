@@ -147,6 +147,8 @@ namespace {
         addNSObjectHeader();
         HeaderSize = CurSize;
         break;
+      case ReferenceCounting::None:
+        break;
       case ReferenceCounting::Block:
       case ReferenceCounting::Unknown:
       case ReferenceCounting::Bridge:
@@ -215,7 +217,7 @@ namespace {
     void addFieldsForClassImpl(ClassDecl *rootClass, SILType rootClassType,
                                ClassDecl *theClass, SILType classType,
                                bool superclass) {
-      if (theClass->hasClangNode()) {
+      if (theClass->hasClangNode() && !theClass->isForeignReferenceType()) {
         Options |= ClassMetadataFlags::ClassHasObjCAncestry;
         return;
       }
