@@ -15,12 +15,12 @@ import Swift
 /// A type that represents a globally-unique actor that can be used to isolate
 /// various declarations anywhere in the program.
 ///
-/// A type that conforms to the `GlobalActor` protocol and is marked with the
+/// A type that conforms to the `GlobalActor` protocol and is marked with
 /// the `@globalActor` attribute can be used as a custom attribute. Such types
 /// are called global actor types, and can be applied to any declaration to
 /// specify that such types are isolated to that global actor type. When using
 /// such a declaration from another actor (or from nonisolated code),
-/// synchronization is performed through the \c shared actor instance to ensure
+/// synchronization is performed through the shared actor instance to ensure
 /// mutually-exclusive access to the declaration.
 @available(SwiftStdlib 5.1, *)
 public protocol GlobalActor {

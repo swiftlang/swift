@@ -259,6 +259,7 @@ foreach(sdk ${SWIFT_SDKS})
     # Generate the static-stdlib-args.lnk file used by -static-stdlib option for
     # 'GenericUnix' (eg linux)
     if(${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF)
+      string(TOLOWER "${sdk}" lowercase_sdk)
       if(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB)
         set(libicu_i18n_a -licui18nswift)
         set(libicu_uc_a -licuucswift)
@@ -292,9 +293,6 @@ foreach(sdk ${SWIFT_SDKS})
 ${libpthread}
 ${android_libraries}
 -lswiftCore
-${libicu_i18n_a}
-${libicu_uc_a}
-${libicu_data_a}
 -lstdc++
 -lm
 -Xlinker -export-dynamic

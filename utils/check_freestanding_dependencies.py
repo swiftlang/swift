@@ -30,14 +30,6 @@ args = parser.parse_args()
 # intended to depend on as few platform symbols/APIs as possible.
 #
 ################################################################################
-icu_dependencies = [
-    "_u_charAge", "_u_charName", "_u_getIntPropertyValue", "_u_getNumericValue",
-    "_u_hasBinaryProperty", "_u_strToLower", "_u_strToTitle", "_u_strToUpper",
-    "_ubrk_close", "_ubrk_following", "_ubrk_open", "_ubrk_preceding",
-    "_ubrk_setText", "_ubrk_setUText", "_unorm2_getNFCInstance",
-    "_unorm2_hasBoundaryBefore", "_unorm2_normalize",
-    "_unorm2_spanQuickCheckYes", "_utext_openUChars", "_utext_openUTF8",
-]
 cxx_dependencies = [
     "___cxa_guard_acquire", "___cxa_guard_release",
 ]
@@ -57,7 +49,7 @@ common_expected_dependencies = [
     "_posix_memalign", "_putc", "_read", "_realloc", "_snprintf", "_strchr",
     "_strcmp", "_strdup", "_strlen", "_strncmp", "_strtod_l", "_strtof_l",
     "_strtol", "_strtold_l", "_vsnprintf", "_write",
-] + icu_dependencies + cxx_dependencies + math_dependencies
+] + cxx_dependencies + math_dependencies
 vendor_apple_specific_dependencies = [
     "___stack_chk_fail", "___stack_chk_guard",
     "_getsectiondata", "__dyld_register_func_for_add_image",

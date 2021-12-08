@@ -8,6 +8,7 @@ extern "C" {
 typedef const char *(* ParseRegexStrawperson)(const char *);
 
 void Parser_registerParseRegexStrawperson(ParseRegexStrawperson fn);
+bool Parser_hasParseRegexStrawperson();
 
 #ifdef __cplusplus
 } // extern "C"
