@@ -112,11 +112,12 @@ struct UsesSameTypedDefaultDerivedWithoutSatisfyingReqts: SameTypedDefaultDerive
 // SR-12199
 
 protocol SR_12199_P1 {
-  associatedtype Assoc
+  associatedtype Assoc // expected-note {{'Assoc' declared here}}
 }
 
 enum SR_12199_E {}
 
 protocol SR_12199_P2: SR_12199_P1 where Assoc == SR_12199_E {
   associatedtype Assoc: SR_12199_E // expected-error {{type 'Self.Assoc' constrained to non-protocol, non-class type 'SR_12199_E'}}
+  // expected-warning@-1 {{redeclaration of associated type 'Assoc' from protocol 'SR_12199_P1' is better expressed as a 'where' clause on the protocol}}
 }

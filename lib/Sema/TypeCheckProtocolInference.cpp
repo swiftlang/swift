@@ -819,6 +819,7 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
     // FIXME: The RequirementMachine will assert on re-entrant construction.
     // We should find a more principled way of breaking this cycle.
     if (ctx.isRecursivelyConstructingRequirementMachine(sig.getCanonicalSignature()) ||
+        ctx.isRecursivelyConstructingRequirementMachine(conformedProto) ||
         conformedProto->isComputingRequirementSignature())
       continue;
 

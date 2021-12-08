@@ -139,8 +139,9 @@ struct RewriteStep {
     return RewriteStep(ApplyRewriteRule, startOffset, endOffset, ruleID, inverse);
   }
 
-  static RewriteStep forAdjustment(unsigned offset, bool inverse) {
-    return RewriteStep(AdjustConcreteType, /*startOffset=*/0, /*endOffset=*/0,
+  static RewriteStep forAdjustment(unsigned offset, unsigned endOffset,
+                                   bool inverse) {
+    return RewriteStep(AdjustConcreteType, /*startOffset=*/0, endOffset,
                        /*ruleID=*/offset, inverse);
   }
 
@@ -221,13 +222,6 @@ public:
 
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
-  bool computeFreelyReducedPath();
-
-  bool computeCyclicallyReducedLoop(MutableTerm &basepoint,
-                                    const RewriteSystem &system);
-
-  bool computeLeftCanonicalForm(const RewriteSystem &system);
-
   void invert();
 
   void dump(llvm::raw_ostream &out,
@@ -265,8 +259,6 @@ public:
     assert(!Deleted);
     Deleted = true;
   }
-
-  void normalize(const RewriteSystem &system);
 
   bool isInContext(const RewriteSystem &system) const;
 
@@ -326,8 +318,9 @@ struct RewritePathEvaluator {
   AppliedRewriteStep applyRewriteRule(const RewriteStep &step,
                                       const RewriteSystem &system);
 
-  MutableTerm applyAdjustment(const RewriteStep &step,
-                              const RewriteSystem &system);
+  std::pair<MutableTerm, MutableTerm>
+  applyAdjustment(const RewriteStep &step,
+                  const RewriteSystem &system);
 
   void applyShift(const RewriteStep &step,
                   const RewriteSystem &system);
