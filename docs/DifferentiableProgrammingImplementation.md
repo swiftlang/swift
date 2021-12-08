@@ -1,6 +1,6 @@
 # Swift Differentiable Programming Implementation Overview
 
-- Authors: [Dan Zheng](https://github.com/dan-zheng), [Bart Chrzaszcz](https://github.com/bartchr808), [Philip Turner](https://github.com/philipturner)
+- Authors: [Dan Zheng](https://github.com/dan-zheng), [Bart Chrzaszcz](https://github.com/bartchr808)
 - Status: Draft, work in progress.
 
 ## Table of contents
