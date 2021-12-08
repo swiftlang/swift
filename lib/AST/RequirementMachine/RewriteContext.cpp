@@ -59,7 +59,9 @@ RewriteContext::RewriteContext(ASTContext &ctx)
       RuleTrieHistogram(16, /*Start=*/1),
       RuleTrieRootHistogram(16),
       PropertyTrieHistogram(16, /*Start=*/1),
-      PropertyTrieRootHistogram(16) {
+      PropertyTrieRootHistogram(16),
+      ConformanceRulesHistogram(16),
+      GeneratingConformancesHistogram(8, /*Start=*/2) {
   auto debugFlags = StringRef(ctx.LangOpts.DebugRequirementMachine);
   if (!debugFlags.empty())
     Debug = parseDebugFlags(debugFlags);
@@ -349,6 +351,7 @@ Type getTypeForSymbolRange(Iter begin, Iter end, Type root,
       case Symbol::Kind::Layout:
       case Symbol::Kind::Superclass:
       case Symbol::Kind::ConcreteType:
+      case Symbol::Kind::ConcreteConformance:
         llvm_unreachable("Term has invalid root symbol");
       }
     }
@@ -668,6 +671,16 @@ RequirementMachine *RewriteContext::getRequirementMachine(
 /// We print stats in the destructor, which should get executed at the end of
 /// a compilation job.
 RewriteContext::~RewriteContext() {
+  for (const auto &pair : Machines)
+    delete pair.second;
+
+  Machines.clear();
+
+  for (const auto &pair : Components)
+    delete pair.second.Machine;
+
+  Components.clear();
+
   if (Context.LangOpts.AnalyzeRequirementMachine) {
     llvm::dbgs() << "--- Requirement Machine Statistics ---\n";
     llvm::dbgs() << "\n* Symbol kind:\n";
@@ -682,15 +695,9 @@ RewriteContext::~RewriteContext() {
     PropertyTrieHistogram.dump(llvm::dbgs());
     llvm::dbgs() << "\n* Property trie root fanout:\n";
     PropertyTrieRootHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Conformance rules:\n";
+    ConformanceRulesHistogram.dump(llvm::dbgs());
+    llvm::dbgs() << "\n* Generating conformance equations:\n";
+    GeneratingConformancesHistogram.dump(llvm::dbgs());
   }
-
-  for (const auto &pair : Machines)
-    delete pair.second;
-
-  Machines.clear();
-
-  for (const auto &pair : Components)
-    delete pair.second.Machine;
-
-  Components.clear();
 }
