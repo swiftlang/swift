@@ -699,6 +699,15 @@ enum class CodeCompletionResultKind : uint8_t {
   MAX_VALUE = BuiltinOperator
 };
 
+class CodeCompletionResultType;
+
+/// Compute all the supertypes that \p ResultType as seen from \p ResultType's
+/// module. This includes all superclasses and protocols that \p ResultType
+/// conforms to within its own module. Retroactive conformances in downstream
+/// modules are not considered because they might not be present when using the
+/// type in a different module.
+SmallVector<CodeCompletionResultType *, 2> computeSupertypes(Type ResultType);
+
 /// The type returned by a code completion item. It is canonicalized and can be
 /// instantiated in different \c ASTContexts.
 class CodeCompletionResultType {
@@ -715,6 +724,9 @@ class CodeCompletionResultType {
   /// thus making the pointer inside \c Ty invalid.
   ASTContext *ContextOfTy;
 
+  /// See \c computeSupertypes.
+  std::vector<CodeCompletionResultType *> Supertypes;
+
   /// Maps USRs to \c CodeCompletionResultTypes that have already been
   /// constructed.
   static llvm::StringMap<CodeCompletionResultType *> USRCache;
@@ -723,15 +735,30 @@ class CodeCompletionResultType {
   /// constructed.
   static llvm::DenseMap<Type, CodeCompletionResultType *> TypeCache;
 
-  CodeCompletionResultType(StringRef USR) : USR(USR) {}
+  CodeCompletionResultType(StringRef USR,
+                           ArrayRef<CodeCompletionResultType *> Supertypes)
+      : USR(USR), Supertypes(Supertypes) {}
 
 public:
   /// Create an \c CodeCompletionResultType from an \c ASTContext's \c Type.
   static CodeCompletionResultType *fromType(Type Ty) {
+    /// Canonicalize the type. We don't consider metatypes and instance types
+    /// different for code completion purposes, normalize to instance types.
+    if (Ty) {
+      Ty = Ty->getCanonicalType();
+    }
+    if (Ty) {
+      if (auto MT = Ty->getAs<MetatypeType>()) {
+        Ty = MT->getInstanceType();
+      }
+    }
     auto ResFromType = TypeCache.find(Ty);
     if (ResFromType != TypeCache.end()) {
       return ResFromType->second;
     }
+
+    auto Supertypes = computeSupertypes(Ty);
+
     CodeCompletionResultType *Res;
     // FIXME: We can't compute USRs for archetypes. If the type contains an
     // archetype, create a new CodeCompletionResultType so that multiple
@@ -741,17 +768,13 @@ public:
       SmallString<32> USR;
       llvm::raw_svector_ostream OS(USR);
       printTypeUSR(Ty, OS);
-      Res = CodeCompletionResultType::fromUSR(USR);
+      Res = CodeCompletionResultType::fromUSR(USR, Supertypes);
     } else {
-      Res = new CodeCompletionResultType("");
+      Res = new CodeCompletionResultType("", Supertypes);
     }
     // We already know the Type. Cache it so it doesn't have to be recomputed.
     Res->Ty = Ty;
-    if (Ty) {
-      Res->ContextOfTy = &Ty->getASTContext();
-    } else {
-      Res->ContextOfTy = nullptr;
-    }
+    Res->ContextOfTy = Ty ? &Ty->getASTContext() : nullptr;
 
     TypeCache[Ty] = Res;
 
@@ -760,12 +783,15 @@ public:
 
   /// Create a type from a USR. The USR will only get demangled once a \c Type
   /// inside an \c ASTContext is requested using \c getType.
-  static CodeCompletionResultType *fromUSR(StringRef USR) {
+  /// \p Supertypes are supertypes of the type with the given \p USR as computed
+  /// by \c computeSupertypes.
+  static CodeCompletionResultType *
+  fromUSR(StringRef USR, ArrayRef<CodeCompletionResultType *> Supertypes) {
     auto ResFromUSR = USRCache.find(USR);
     if (ResFromUSR != USRCache.end()) {
       return ResFromUSR->second;
     }
-    auto Res = new CodeCompletionResultType(USR);
+    auto Res = new CodeCompletionResultType(USR, Supertypes);
 
     USRCache[USR] = Res;
     return Res;
@@ -778,9 +804,19 @@ public:
         Ty = Type();
       } else {
         Ty = Demangle::getTypeForMangling(Ctx, USR);
+        assert(!Ty ||
+               Ty->isCanonical() &&
+                   "Types in CodeCompletionResultType must be canonical.");
+        assert(!Ty ||
+               !Ty->is<MetatypeType>() &&
+                   "Types in CodeCompletionResultType must be instance types.");
       }
     }
     return Ty;
+  }
+
+  ArrayRef<CodeCompletionResultType *> getSupertypes() const {
+    return Supertypes;
   }
 
   /// Return the USR of this type, which identifies the type independent of the

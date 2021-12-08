@@ -325,6 +325,31 @@ llvm::StringMap<CodeCompletionResultType *> CodeCompletionResultType::USRCache;
 llvm::DenseMap<Type, CodeCompletionResultType *>
     CodeCompletionResultType::TypeCache;
 
+SmallVector<CodeCompletionResultType *, 2>
+swift::ide::computeSupertypes(Type ResultType) {
+  if (!ResultType) {
+    return {};
+  }
+
+  SmallVector<CodeCompletionResultType *, 2> Result;
+  if (auto NT = ResultType->getAs<NominalType>()) {
+    auto Conformances = NT->getDecl()->getAllConformances();
+    Result.reserve(Conformances.size());
+    for (auto Conformance : Conformances) {
+      if (Conformance->isVisibleFrom(NT->getDecl()->getModuleContext())) {
+        Result.push_back(CodeCompletionResultType::fromType(
+            Conformance->getProtocol()->getDeclaredInterfaceType()));
+      }
+    }
+  }
+  Type Superclass = ResultType->getSuperclass();
+  while (Superclass) {
+    Result.push_back(CodeCompletionResultType::fromType(Superclass));
+    Superclass = Superclass->getSuperclass();
+  }
+  return Result;
+}
+
 CodeCompletionDeclKind
 ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   switch (D->getKind()) {
@@ -7547,14 +7572,96 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       return true;
     };
   }
+
+  struct ContextualType {
+    /// The contextual type.
+    CodeCompletionResultType *Ty;
+    /// Whether a match against this type should be considered convertible
+    /// instead of identical. For optional context types, we also add the
+    /// non-optional types as contextual types, but only consider them
+    /// convertible.
+    bool IsConvertible;
+  };
+
+  CodeCompletionResultType *voidType =
+      CodeCompletionResultType::fromType(DC->getASTContext().getVoidType());
+
+  SmallVector<ContextualType, 4> contextualTypes;
+  for (auto possibleTy : TypeContext.possibleTypes) {
+    contextualTypes.push_back({CodeCompletionResultType::fromType(possibleTy),
+                               /*IsConvertible=*/false});
+    auto unwrappedOptionalType = possibleTy->getOptionalObjectType();
+    while (unwrappedOptionalType) {
+      contextualTypes.push_back(
+          {CodeCompletionResultType::fromType(unwrappedOptionalType),
+           /*IsConvertible=*/true});
+      unwrappedOptionalType = unwrappedOptionalType->getOptionalObjectType();
+    }
+    // If the contextual type is an opaque return type, make the protocol a
+    // contextual type. E.g. func foo() -> some View { #^COMPLETE^# }
+    // should show items conforming to `View` as convertible.
+    if (auto opaqueType = possibleTy->getAs<ArchetypeType>()) {
+      for (auto proto : opaqueType->getConformsTo()) {
+        contextualTypes.push_back({CodeCompletionResultType::fromType(
+                                       proto->getDeclaredInterfaceType()),
+                                   /*IsConvertible=*/false});
+      }
+    }
+  }
   for (auto contextFreeResult : source.Results) {
     if (!shouldIncludeResult(contextFreeResult)) {
       continue;
     }
+
+    // Compute the type relation
+    CodeCompletionResult::ExpectedTypeRelation TypeRelation =
+        CodeCompletionResult::ExpectedTypeRelation::Unknown;
+    if (contextFreeResult->getResultType() == nullptr) {
+      // If the result has a nullptr ResultType, it's not a compleiton result
+      // that has a sensible "result type", so the type relation is
+      // NotApplicable.
+      TypeRelation = CodeCompletionResult::ExpectedTypeRelation::NotApplicable;
+    } else if (contextFreeResult->getResultType() != voidType) {
+      // Void is not convertible to anything and we don't report Void <-> Void
+      // identical matches. So we don't have to check anything if the result
+      // returns Void.
+      for (auto &contextualType : contextualTypes) {
+        if (contextualType.Ty == voidType) {
+          // We don't report Void <-> Void matches because that would boost
+          // methods returning Void in e.g.
+          // func foo() { #^COMPLETE^# }
+          // because #^COMPLETE^# is implicitly returned. That's not very
+          // helpful though.
+          continue;
+        }
+        if (contextualType.Ty == contextFreeResult->getResultType()) {
+          if (contextualType.IsConvertible) {
+            TypeRelation = std::max(
+                TypeRelation,
+                CodeCompletionResult::ExpectedTypeRelation::Convertible);
+          } else {
+            TypeRelation =
+                std::max(TypeRelation,
+                         CodeCompletionResult::ExpectedTypeRelation::Identical);
+          }
+          continue;
+        }
+        for (auto *supertype :
+             contextFreeResult->getResultType()->getSupertypes()) {
+          if (supertype == contextualType.Ty) {
+            TypeRelation = std::max(
+                TypeRelation,
+                CodeCompletionResult::ExpectedTypeRelation::Convertible);
+            break;
+          }
+        }
+      }
+    }
+
     auto contextualResult = new (*targetSink.Allocator) CodeCompletionResult(
         *contextFreeResult, SemanticContextKind::OtherModule,
         CodeCompletionFlair(),
-        /*numBytesToErase=*/0, TypeContext, DC,
+        /*numBytesToErase=*/0, TypeRelation,
         ContextualNotRecommendedReason::None,
         CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     targetSink.Results.push_back(contextualResult);
