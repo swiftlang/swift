@@ -62,6 +62,9 @@ class Swift(product.Product):
         # Add experimental string processing flag.
         self.cmake_options.extend(self._enable_experimental_string_processing)
 
+        # Add freestanding related flags.
+        self.cmake_options.extend(self._freestanding_is_darwin)
+
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -170,6 +173,11 @@ updated without updating swift.py?")
     def _enable_experimental_string_processing(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL',
                  self.args.enable_experimental_string_processing)]
+
+    @property
+    def _freestanding_is_darwin(self):
+        return [('SWIFT_FREESTANDING_IS_DARWIN:BOOL',
+                 self.args.swift_freestanding_is_darwin)]
 
     @classmethod
     def get_dependencies(cls):

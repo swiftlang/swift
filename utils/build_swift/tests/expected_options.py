@@ -218,6 +218,7 @@ EXPECTED_DEFAULTS = {
     'swift_disable_dead_stripping': False,
     'swift_darwin_module_archs': None,
     'swift_darwin_supported_archs': None,
+    'swift_freestanding_is_darwin': False,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_max_parallel_lto_link_jobs':
@@ -681,6 +682,7 @@ EXPECTED_OPTIONS = [
     StrOption('--stdlib-deployment-targets'),
     StrOption('--swift-darwin-module-archs'),
     StrOption('--swift-darwin-supported-archs'),
+    SetTrueOption('--swift-freestanding-is-darwin'),
 
     PathOption('--android-deploy-device-path'),
     PathOption('--android-icu-i18n'),
