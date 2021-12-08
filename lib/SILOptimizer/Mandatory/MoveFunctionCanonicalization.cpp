@@ -39,23 +39,9 @@ using namespace swift;
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
-/// Attempts to perform several small optimizations to setup both the address
-/// and object checkers. Returns true if we made a change to the IR.
-static bool tryConvertSimpleMoveFromAllocStackTemporary(
-    MarkUnresolvedMoveAddrInst *markMoveAddr, AliasAnalysis *aa) {
-  LLVM_DEBUG(llvm::dbgs() << "Trying to fix up: " << *markMoveAddr);
-
-  // We need a non-lexical alloc_stack as our source.
-  auto *asi = dyn_cast<AllocStackInst>(markMoveAddr->getSrc());
-  if (!asi || asi->isLexical()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "    Source isnt an alloc_stack or is lexical... Bailing!\n");
-    return false;
-  }
-
-  DestroyAddrInst *dai = nullptr;
-  CopyAddrInst *cai = nullptr;
-  StoreInst *si = nullptr;
+static bool findInitAndDestroyForAllocation(
+    AllocStackInst *asi, MarkUnresolvedMoveAddrInst *markMoveAddr,
+    CopyAddrInst *&cai, DestroyAddrInst *&dai, StoreInst *&si) {
   for (auto *use : asi->getUses()) {
     auto *user = use->getUser();
     LLVM_DEBUG(llvm::dbgs() << "    Visiting User: " << *user);
@@ -113,6 +99,86 @@ static bool tryConvertSimpleMoveFromAllocStackTemporary(
     return false;
   }
 
+  return true;
+}
+
+static bool
+tryHandlingLoadableVarMovePattern(MarkUnresolvedMoveAddrInst *markMoveAddr,
+                                  StoreInst *si, AliasAnalysis *aa) {
+  auto *li = dyn_cast<LoadInst>(si->getSrc());
+  if (!li || li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy ||
+      li->getParent() != si->getParent())
+    return false;
+
+  LLVM_DEBUG(llvm::dbgs() << "Found LI: " << *li);
+  SILValue operand = stripAccessMarkers(li->getOperand());
+  auto *originalASI = dyn_cast<AllocStackInst>(operand);
+  if (!originalASI || !originalASI->isLexical() || !originalASI->isVar())
+    return false;
+
+  LLVM_DEBUG(llvm::dbgs() << "Found OriginalASI: " << *originalASI);
+  // Make sure that there aren't any side-effect having instructions in
+  // between our load/store.
+  LLVM_DEBUG(llvm::dbgs() << "Checking for uses in between LI and SI.\n");
+  auto range =
+      llvm::make_range(std::next(li->getIterator()), si->getIterator());
+  if (!llvm::none_of(range, [&](SILInstruction &iter) {
+        if (!iter.mayHaveSideEffects()) {
+          LLVM_DEBUG(llvm::dbgs() << "Found no side effect inst: " << iter);
+          return false;
+        }
+
+        if (auto *dvi = dyn_cast<DestroyAddrInst>(&iter)) {
+          if (aa->isNoAlias(dvi->getOperand(), originalASI)) {
+            // We are going to be extending the lifetime of our
+            // underlying value, not shrinking it so we can ignore
+            // destroy_addr on other non-aliasing values.
+            LLVM_DEBUG(llvm::dbgs() << "Found no alias destroy_addr: " << iter);
+            return false;
+          }
+        }
+
+        // Ignore end of scope markers with side-effects.
+        if (isEndOfScopeMarker(&iter)) {
+          LLVM_DEBUG(llvm::dbgs() << "Found end of scope marker: " << iter);
+          return false;
+        }
+
+        LLVM_DEBUG(llvm::dbgs()
+                   << "        Found side-effect inst... Bailing!: " << iter);
+        return true;
+      })) {
+    return false;
+  }
+
+  // Ok, we know our original lexical alloc_stack is not written to in between
+  // the load/store. Move the mark_move_addr onto the lexical alloc_stack.
+  LLVM_DEBUG(llvm::dbgs() << "        Doing loadable var!\n");
+  markMoveAddr->setSrc(originalASI);
+  return true;
+}
+
+/// Attempts to perform several small optimizations to setup both the address
+/// and object checkers. Returns true if we made a change to the IR.
+static bool tryConvertSimpleMoveFromAllocStackTemporary(
+    MarkUnresolvedMoveAddrInst *markMoveAddr, AliasAnalysis *aa,
+    InstructionDeleter &deleter) {
+  LLVM_DEBUG(llvm::dbgs() << "Trying to fix up: " << *markMoveAddr);
+
+  // We need a non-lexical alloc_stack as our source.
+  auto *asi = dyn_cast<AllocStackInst>(markMoveAddr->getSrc());
+  if (!asi || asi->isLexical()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "    Source isnt an alloc_stack or is lexical... Bailing!\n");
+    return false;
+  }
+
+  DestroyAddrInst *dai = nullptr;
+  CopyAddrInst *cai = nullptr;
+  StoreInst *si = nullptr;
+  if (!findInitAndDestroyForAllocation(asi, markMoveAddr, cai, dai, si))
+    return false;
+
   // If we did not find an (init | store) or destroy_addr, just bail.
   if (!(cai || si) || !dai) {
     LLVM_DEBUG(llvm::dbgs()
@@ -122,7 +188,7 @@ static bool tryConvertSimpleMoveFromAllocStackTemporary(
 
   assert(bool(cai) != bool(si));
 
-  // Otherwise, lets walk from cai to markMoveAddr and make sure there aren't
+  // Otherwise, lets walk from cai/si to markMoveAddr and make sure there aren't
   // any side-effect having instructions in between them.
   //
   // NOTE: We know that cai must be before the markMoveAddr in the block since
@@ -160,11 +226,11 @@ static bool tryConvertSimpleMoveFromAllocStackTemporary(
       }))
     return false;
 
-  LLVM_DEBUG(llvm::dbgs() << "        Success! Performing optimization!\n");
   // Ok, we can perform our optimization! Change move_addr's source to be the
   // original copy_addr's src and add add uses of the stack location to an
   // instruction deleter. We will eliminate them later.
   if (cai) {
+    LLVM_DEBUG(llvm::dbgs() << "        Success! Performing optimization!\n");
     markMoveAddr->setSrc(cai->getSrc());
     return true;
   }
@@ -177,8 +243,8 @@ static bool tryConvertSimpleMoveFromAllocStackTemporary(
   // re-materialized into an alloc_stack. In this example remembering that
   // mark_unresolved_move_addr is a copy_addr [init], we try to move the MUMA
   // onto the original lexical alloc_stack.
-  //
-  // TODO: Implement.
+  if (tryHandlingLoadableVarMovePattern(markMoveAddr, si, aa))
+    return true;
 
   // If we do not have a load [copy], transform this mark_resolved_move_addr
   // into a move_value [diagnostic] + store [init]. Predictable mem opts is
@@ -188,7 +254,11 @@ static bool tryConvertSimpleMoveFromAllocStackTemporary(
   auto *newValue = builder.createMoveValue(si->getLoc(), si->getSrc());
   newValue->setAllowsDiagnostics(true);
   si->setSrc(newValue);
-  markMoveAddr->eraseFromParent();
+  si->setDest(markMoveAddr->getDest());
+  deleter.forceTrackAsDead(markMoveAddr);
+  deleter.forceTrackAsDead(dai);
+
+  LLVM_DEBUG(llvm::dbgs() << "        Success! Performing optimization!\n");
   return true;
 }
 
@@ -217,6 +287,7 @@ class MoveFunctionCanonicalization : public SILFunctionTransform {
            "Should only run on Raw SIL");
 
     auto *aa = getAnalysis<AliasAnalysis>(fn);
+    InstructionDeleter deleter;
 
     for (auto &block : *fn) {
       for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
@@ -228,12 +299,14 @@ class MoveFunctionCanonicalization : public SILFunctionTransform {
         // the mark_unresolved_move_addr is always on the operand regardless if
         // in the caller we materalized the address into a temporary.
         if (auto *markMoveAddr = dyn_cast<MarkUnresolvedMoveAddrInst>(inst)) {
-          madeChange |=
-              tryConvertSimpleMoveFromAllocStackTemporary(markMoveAddr, aa);
+          madeChange |= tryConvertSimpleMoveFromAllocStackTemporary(
+              markMoveAddr, aa, deleter);
           continue;
         }
       }
     }
+
+    deleter.cleanupDeadInstructions();
 
     if (madeChange) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
