@@ -302,13 +302,9 @@ class ASTBuildOperation
   const SwiftInvocationRef InvokRef;
   const IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
 
-  /// The contents of all explicit input files of the compiler invoation.
+  /// The contents of all explicit input files of the compiler invoation, which
+  /// can be determined at construction time of the \c ASTBuildOperation.
   const std::vector<FileContentRef> FileContents;
-
-  /// Stamps of files used to build the AST. \c Stamps contains the stamps of
-  /// all explicit input files, which can be determined at construction time of
-  /// the \c ASTBuildOperation.
-  const std::vector<BufferStamp> Stamps;
 
   /// \c DependencyStamps contains the stamps of all module depenecies needed
   /// for the AST build. These stamps are only known after the AST is built.
@@ -369,10 +365,8 @@ class ASTBuildOperation
   }
 
   /// Create a vector of \c FileContents containing all files explicitly
-  /// referenced by the compiler invocation and a vector of buffer stamps of
-  /// those files.
-  std::pair<std::vector<FileContentRef>, std::vector<BufferStamp>>
-  fileContentsAndStampsForFilesInCompilerInvocation();
+  /// referenced by the compiler invocation.
+  std::vector<FileContentRef> fileContentsForFilesInCompilerInvocation();
 
 public:
   ASTBuildOperation(IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
@@ -380,14 +374,10 @@ public:
                     std::function<void(void)> DidFinishCallback)
       : InvokRef(InvokRef), FileSystem(FileSystem), ASTManager(ASTManager),
         DidFinishCallback(DidFinishCallback) {
-    auto FileContentsAndStamps =
-        fileContentsAndStampsForFilesInCompilerInvocation();
     // const_cast is fine here. We just want to guard against modifying these
     // fields later on. It's fine to set them in the constructor.
     const_cast<std::vector<FileContentRef> &>(this->FileContents) =
-        std::move(FileContentsAndStamps.first);
-    const_cast<std::vector<BufferStamp> &>(this->Stamps) =
-        FileContentsAndStamps.second;
+        fileContentsForFilesInCompilerInvocation();
   }
 
   ~ASTBuildOperation() {
@@ -413,7 +403,7 @@ public:
 
   size_t getMemoryCost() {
     return sizeof(*this) + getVectorMemoryCost(FileContents) +
-           getVectorMemoryCost(Stamps) + Result.getMemoryCost();
+           Result.getMemoryCost();
   }
 
   /// Schedule building this AST on the given \p Queue.
@@ -849,16 +839,14 @@ SwiftASTManager::Implementation::getMemoryBuffer(
   return nullptr;
 }
 
-std::pair<std::vector<FileContentRef>, std::vector<BufferStamp>>
-ASTBuildOperation::fileContentsAndStampsForFilesInCompilerInvocation() {
+std::vector<FileContentRef>
+ASTBuildOperation::fileContentsForFilesInCompilerInvocation() {
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
   std::string Error; // is ignored
 
   std::vector<FileContentRef> FileContents;
-  std::vector<BufferStamp> Stamps;
   FileContents.reserve(
       Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
-  Stamps.reserve(Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
 
   // IMPORTANT: The computation of stamps must match the one in
   // matchesSourceState.
@@ -875,35 +863,25 @@ ASTBuildOperation::fileContentsAndStampsForFilesInCompilerInvocation() {
       Content->Buffer =
           llvm::WritableMemoryBuffer::getNewMemBuffer(0, Filename);
     }
-    Stamps.push_back(Content->Stamp);
     FileContents.push_back(Content);
   }
-  assert(Stamps.size() ==
-         Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
   assert(FileContents.size() ==
          Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
-  return std::make_pair(FileContents, Stamps);
+  return FileContents;
 }
 
 bool ASTBuildOperation::matchesSourceState(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> OtherFileSystem) {
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
 
-  // Check if the inputs changed.
-  std::vector<BufferStamp> InputStamps;
-  InputStamps.reserve(
-      Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
-  // IMPORTANT: The computation of stamps must match the one in
-  // snapshotAndStampsForFilesInCompilerInvocation.
-  for (const auto &input :
-       Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    InputStamps.push_back(
-        ASTManager->Impl.getBufferStamp(input.getFileName(), OtherFileSystem));
+  auto Inputs = Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs();
+  for (size_t I = 0; I < Inputs.size(); I++) {
+    if (getFileContents()[I]->Stamp !=
+        ASTManager->Impl.getBufferStamp(Inputs[I].getFileName(),
+                                        OtherFileSystem)) {
+      return false;
+    }
   }
-  assert(InputStamps.size() ==
-         Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
-  if (Stamps != InputStamps)
-    return false;
 
   for (auto &Dependency : DependencyStamps) {
     if (Dependency.second !=
