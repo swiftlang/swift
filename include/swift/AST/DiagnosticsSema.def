@@ -3668,6 +3668,9 @@ ERROR(builtin_string_literal_broken_proto,none,
 ERROR(string_literal_broken_proto,none,
       "protocol 'ExpressibleByStringLiteral' is broken", ())
 
+ERROR(regex_decl_broken,none,
+      "cannot find 'Regex' type in scope", ())
+
 // Array literals
 ERROR(should_use_dictionary_literal,none,
       "dictionary of type %0 cannot be %select{used|initialized}1 "
@@ -4491,6 +4494,10 @@ ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %1 %2 in "
       "concurrently-executing code",
       (bool, DescriptiveDeclKind, DeclName))
+ERROR(non_sendable_capture,none,
+      "capture of %1 with non-sendable type %0 in a `@Sendable` closure",
+      (Type, DeclName))
+
 NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",

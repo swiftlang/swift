@@ -652,6 +652,26 @@ DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
   return defaultSendableDiagnosticBehavior(fromDC->getASTContext().LangOpts);
 }
 
+/// Determine whether the given nominal type that is within the current module
+/// has an explicit Sendable.
+static bool hasExplicitSendableConformance(NominalTypeDecl *nominal) {
+  ASTContext &ctx = nominal->getASTContext();
+
+  // Look for any conformance to `Sendable`.
+  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
+  if (!proto)
+    return false;
+
+  // Look for a conformance. If it's present and not (directly) missing,
+  // we're done.
+  auto conformance = nominal->getParentModule()->lookupConformance(
+      nominal->getDeclaredInterfaceType(), proto, /*allowMissing=*/true);
+  return conformance &&
+      !(isa<BuiltinProtocolConformance>(conformance.getConcrete()) &&
+        cast<BuiltinProtocolConformance>(
+          conformance.getConcrete())->isMissing());
+}
+
 /// Determine the diagnostic behavior for a Sendable reference to the given
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
@@ -659,7 +679,8 @@ DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
   // Determine whether the type was explicitly non-Sendable.
   auto nominalModule = nominal->getParentModule();
   bool isExplicitlyNonSendable = nominalModule->isConcurrencyChecked() ||
-      isExplicitSendableConformance();
+      isExplicitSendableConformance() ||
+      hasExplicitSendableConformance(nominal);
 
   // Determine whether this nominal type is visible via a @_predatesConcurrency
   // import.
@@ -924,13 +945,8 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
         /*treatUsableFromInlineAsPublic=*/true).isPublic())
     return;
 
-  // Look for any conformance to `Sendable`.
-  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
-  if (!proto)
-    return;
-
-  SmallVector<ProtocolConformance *, 2> conformances;
-  if (nominal->lookupConformance(proto, conformances))
+  // If the conformance is explicitly stated, do nothing.
+  if (hasExplicitSendableConformance(nominal))
     return;
 
   // Diagnose it.
@@ -1243,6 +1259,29 @@ namespace {
       return false;
     }
 
+    /// Check closure captures for Sendable violations.
+    void checkClosureCaptures(AbstractClosureExpr *closure) {
+      if (!isSendableClosure(closure, /*forActorIsolation=*/false))
+        return;
+
+      SmallVector<CapturedValue, 2> captures;
+      closure->getCaptureInfo().getLocalCaptures(captures);
+      for (const auto &capture : captures) {
+        if (capture.isDynamicSelfMetadata())
+          continue;
+        if (capture.isOpaqueValue())
+          continue;
+
+        auto decl = capture.getDecl();
+        Type type = getDeclContext()
+            ->mapTypeIntoContext(decl->getInterfaceType())
+            ->getReferenceStorageReferent();
+        diagnoseNonSendableTypes(
+            type, getDeclContext(), capture.getLoc(),
+            diag::non_sendable_capture, decl->getName());
+      }
+    }
+
   public:
     ActorIsolationChecker(const DeclContext *dc) : ctx(dc->getASTContext()) {
       contextStack.push_back(dc);
@@ -1315,6 +1354,7 @@ namespace {
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         closure->setActorIsolation(determineClosureIsolation(closure));
+        checkClosureCaptures(closure);
         contextStack.push_back(closure);
         return { true, expr };
       }
@@ -2233,9 +2273,7 @@ namespace {
         if (!var->supportsMutation() ||
             (ctx.LangOpts.EnableExperimentalFlowSensitiveConcurrentCaptures &&
              parent.dyn_cast<LoadExpr *>())) {
-          return diagnoseNonSendableTypesInReference(
-              valueRef, getDeclContext(), loc,
-              ConcurrentReferenceKind::LocalCapture);
+          return false;
         }
 
         // Otherwise, we have concurrent access. Complain.

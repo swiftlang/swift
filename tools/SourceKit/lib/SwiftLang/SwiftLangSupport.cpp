@@ -999,6 +999,7 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    SourceKitCancellationToken CancellationToken,
     llvm::function_ref<void(CancellableResult<CompletionLikeOperationParams>)>
         PerformOperation) {
   assert(FileSystem);
@@ -1058,8 +1059,13 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   // Pin completion instance.
   auto CompletionInst = getCompletionInstance();
 
-  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(),
-                                          &CIDiags};
+  auto CancellationFlag = std::make_shared<std::atomic<bool>>(false);
+  ReqTracker->setCancellationHandler(CancellationToken, [CancellationFlag] {
+    CancellationFlag->store(true, std::memory_order_relaxed);
+  });
+
+  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(), &CIDiags,
+                                          CancellationFlag};
   PerformOperation(
       CancellableResult<CompletionLikeOperationParams>::success(Params));
 }

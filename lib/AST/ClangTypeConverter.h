@@ -126,6 +126,7 @@ private:
   clang::QualType visitBuiltinIntegerType(BuiltinIntegerType *type);
   clang::QualType visitBuiltinFloatType(BuiltinFloatType *type);
   clang::QualType visitArchetypeType(ArchetypeType *type);
+  clang::QualType visitDependentMemberType(DependentMemberType *type);
   clang::QualType visitSILFunctionType(SILFunctionType *type);
   clang::QualType visitGenericTypeParamType(GenericTypeParamType *type);
   clang::QualType visitDynamicSelfType(DynamicSelfType *type);

@@ -1102,10 +1102,7 @@ bool SILInstruction::mayHaveSideEffects() const {
   if (mayTrap())
     return true;
 
-  MemoryBehavior B = getMemoryBehavior();
-  return B == MemoryBehavior::MayWrite ||
-    B == MemoryBehavior::MayReadWrite ||
-    B == MemoryBehavior::MayHaveSideEffects;
+  return mayWriteToMemory();
 }
 
 bool SILInstruction::mayRelease() const {
@@ -1167,6 +1164,10 @@ bool SILInstruction::mayRelease() const {
     return CopyAddr->isInitializationOfDest() ==
            IsInitialization_t::IsNotInitialization;
   }
+  // mark_unresolved_move_addr is equivalent to a copy_addr [init], so a release
+  // does not occur.
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst:
+    return false;
 
   case SILInstructionKind::BuiltinInst: {
     auto *BI = cast<BuiltinInst>(this);
@@ -1367,6 +1368,12 @@ bool SILInstruction::mayTrap() const {
   default:
     return false;
   }
+}
+
+bool SILInstruction::maySynchronize() const {
+  // TODO: We need side-effect analysis and library annotation for this to be
+  //       a reasonable API.  For now, this is just a placeholder.
+  return isa<FullApplySite>(this);
 }
 
 bool SILInstruction::isMetaInstruction() const {

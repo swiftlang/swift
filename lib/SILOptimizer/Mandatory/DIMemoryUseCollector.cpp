@@ -762,6 +762,23 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    if (auto *MAI = dyn_cast<MarkUnresolvedMoveAddrInst>(User)) {
+      // If this is the source of the copy_addr, then this is a load.  If it is
+      // the destination, then this is an unknown assignment.  Note that we'll
+      // revisit this instruction and add it to Uses twice if it is both a load
+      // and store to the same aggregate.
+      DIUseKind Kind;
+      if (Op->getOperandNumber() == 0)
+        Kind = DIUseKind::Load;
+      else if (InStructSubElement)
+        Kind = DIUseKind::PartialStore;
+      else
+        Kind = DIUseKind::Initialization;
+
+      addElementUses(BaseEltNo, PointeeType, User, Kind);
+      continue;
+    }
+
     // The apply instruction does not capture the pointer when it is passed
     // through 'inout' arguments or for indirect returns.  InOut arguments are
     // treated as uses and may-store's, but an indirect return is treated as a
@@ -1484,6 +1501,13 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
       if (CAI->getDest() == I) {
         UseInfo.trackStoreToSelf(CAI);
         Kind = DIUseKind::InitOrAssign;
+      }
+    }
+
+    if (auto *MAI = dyn_cast<MarkUnresolvedMoveAddrInst>(User)) {
+      if (MAI->getDest() == I) {
+        UseInfo.trackStoreToSelf(MAI);
+        Kind = DIUseKind::Initialization;
       }
     }
 

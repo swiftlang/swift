@@ -428,7 +428,6 @@ endfunction()
 #     [SHARED]
 #     [STATIC]
 #     [OBJECT]
-#     [PURE_SWIFT]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
 #     source1 [source2 source3 ...])
 #
@@ -447,18 +446,13 @@ endfunction()
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
-# PURE_SWIFT
-#   This has two effects if set: we do not use llvm_update_compile_flags to
-#   generate cflags/etc and we leave the linking mode of the library as swift.
-#
 # source1 ...
 #   Sources to add into this library.
 function(add_swift_host_library name)
   set(options
         SHARED
         STATIC
-        OBJECT
-        PURE_SWIFT)
+        OBJECT)
   set(single_parameter_options)
   set(multiple_parameter_options
         LLVM_LINK_COMPONENTS)
@@ -521,9 +515,7 @@ function(add_swift_host_library name)
   if (LLVM_COMMON_DEPENDS)
     add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
   endif()
-  if (NOT ASHL_PURE_SWIFT)
-    llvm_update_compile_flags(${name})
-  endif()
+  llvm_update_compile_flags(${name})
   swift_common_llvm_config(${name} ${ASHL_LLVM_LINK_COMPONENTS})
   set_output_directory(${name}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
@@ -582,11 +574,7 @@ function(add_swift_host_library name)
       NO_SONAME YES)
   endif()
 
-  # Always link as CXX even if we have swift content unless we only contain
-  # swift content signaled via us being marked "PURE_SWIFT".
-  if (NOT ASHL_PURE_SWIFT)
-    set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
-  endif()
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
 
   if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
     target_link_options(${name} PRIVATE
@@ -594,30 +582,6 @@ function(add_swift_host_library name)
     if(SWIFT_COMPILER_VERSION)
       target_link_options(${name} PRIVATE
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
-    endif()
-
-    # If we found a swift compiler and are going to use swift code in swift
-    # host side tools but link with clang, add the appropriate -L paths so we
-    # find all of the necessary swift libraries on Darwin.
-    if (NOT ASHL_PURE_SWIFT)
-      if (CMAKE_Swift_COMPILER)
-        # Add in the toolchain directory so we can grab compatibility libraries
-        get_filename_component(TOOLCHAIN_BIN_DIR ${CMAKE_Swift_COMPILER} DIRECTORY)
-        get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
-        target_link_directories(${name} PUBLIC ${TOOLCHAIN_LIB_DIR})
-
-        # Add in the SDK directory for the host platform.
-        #
-        # NOTE: We do this /after/ target_link_directorying TOOLCHAIN_LIB_DIR to
-        # ensure that we first find libraries from the toolchain, rather than
-        # from the SDK. The reason why this is important is that when we perform
-        # a stage2 build, this path is into the stage1 build. This is not a pure
-        # SDK and also contains compatibility libraries. We need to make sure
-        # that the compiler sees the actual toolchain's compatibility libraries
-        # first before the just built compability libraries or build errors occur.
-        target_link_directories(${name} PRIVATE
-          ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
-      endif()
     endif()
 
     # For now turn off on Darwin swift targets, debug info if we are compiling a static
@@ -945,25 +909,7 @@ function(add_swift_host_tool executable)
       set_property(TARGET ${executable} APPEND_STRING PROPERTY
                    LINK_FLAGS " -lobjc ")
 
-    else() # ASHT_HAS_LIBSWIFT AND LIBSWIFT_BUILD_MODE
-
-      # TODO: do we really need this? Do any tools which don't link libswift include other swift code?
-
-      # Add in the SDK directory for the host platform.
-      #
-      # NOTE: We do this /after/ target_link_directorying TOOLCHAIN_LIB_DIR to
-      # ensure that we first find libraries from the toolchain, rather than from
-      # the SDK.
-      target_link_directories(${executable} PRIVATE "${sdk_dir}")
-
-      # We also want to be able to find libraries from the base toolchain
-      # directory. This is so swiftc can rely on its own host side dylibs that may
-      # contain swift content.
-      list(APPEND RPATH_LIST "@executable_path/../lib")
-
-      # Also include the abi stable system stdlib in our rpath.
-      list(APPEND RPATH_LIST "/usr/lib/swift")
-    endif()
+    endif() # ASHT_HAS_LIBSWIFT AND LIBSWIFT_BUILD_MODE
 
     set_target_properties(${executable} PROPERTIES
       BUILD_WITH_INSTALL_RPATH YES

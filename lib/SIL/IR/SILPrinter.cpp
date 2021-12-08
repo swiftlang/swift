@@ -1703,6 +1703,11 @@ public:
     *this << getIDAndType(CI->getDest());
   }
 
+  void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *CI) {
+    *this << Ctx.getID(CI->getSrc()) << " to ";
+    *this << getIDAndType(CI->getDest());
+  }
+
   void visitBindMemoryInst(BindMemoryInst *BI) {
     *this << getIDAndType(BI->getBase()) << ", ";
     *this << getIDAndType(BI->getIndex()) << " to ";

@@ -1135,8 +1135,7 @@ namespace {
 
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                        ScalarKind::POD);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
     }
 
     unsigned getExplosionSize() const override {
@@ -1200,11 +1199,17 @@ namespace {
 
     void consume(IRGenFunction &IGF, Explosion &explosion,
                  Atomicity atomicity) const override {
-      (void)explosion.claimAll();
+      for (auto scalarTy: ScalarTypes) {
+        (void)scalarTy;
+        (void)explosion.claimNext();
+      }
     }
     
     void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const override {
-      (void)explosion.claimAll();
+      for (auto scalarTy: ScalarTypes) {
+        (void)scalarTy;
+        (void)explosion.claimNext();
+      }
     }
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
@@ -1257,8 +1262,7 @@ namespace {
                          IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                           SILType T) const override {
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                        ScalarKind::Immovable);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
@@ -1596,6 +1600,7 @@ IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   case ReferenceCounting::Block:
   case ReferenceCounting::Error:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
     llvm_unreachable("not implemented");
   }
 
@@ -2352,7 +2357,7 @@ public:
 
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
                                         SILType T) const override {
-    llvm_unreachable("Cannot construct type layout for legacy types");
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
   }
 
   virtual unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {

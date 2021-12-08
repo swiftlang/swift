@@ -545,7 +545,8 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
     auto args = type->getGenericArgs();
     assert((args.size() == 1) && "Optional should have 1 generic argument.");
     clang::QualType innerTy = convert(args[0]);
-    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()))
+    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()) ||
+        args[0]->isForeignReferenceType())
       return innerTy;
     return clang::QualType();
   }
@@ -786,6 +787,10 @@ clang::QualType ClangTypeConverter::visitArchetypeType(ArchetypeType *type) {
   // We see these in the case where we invoke an @objc function
   // through a protocol.
   return getClangIdType(ClangASTContext);
+}
+
+clang::QualType ClangTypeConverter::visitDependentMemberType(DependentMemberType *type) {
+  return convert(type->getBase());
 }
 
 clang::QualType ClangTypeConverter::visitDynamicSelfType(DynamicSelfType *type) {

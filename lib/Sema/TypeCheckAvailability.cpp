@@ -1787,10 +1787,13 @@ behaviorLimitForExplicitUnavailability(
   auto protoDecl = rootConf->getProtocol();
 
   // Soften errors about unavailable `Sendable` conformances depending on the
-  // concurrency checking mode
-  if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable) ||
-      protoDecl->isSpecificProtocol(KnownProtocolKind::UnsafeSendable)) {
-    return SendableCheckContext(fromDC).defaultDiagnosticBehavior();
+  // concurrency checking mode.
+  if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    SendableCheckContext checkContext(fromDC);
+    if (auto nominal = rootConf->getType()->getAnyNominal())
+      return checkContext.diagnosticBehavior(nominal);
+
+    return checkContext.defaultDiagnosticBehavior();
   }
 
   return DiagnosticBehavior::Unspecified;

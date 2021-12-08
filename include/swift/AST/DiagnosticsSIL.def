@@ -741,7 +741,7 @@ NOTE(sil_movekillscopyablevalue_use_here, none,
 NOTE(sil_movekillscopyablevalue_value_consumed_in_loop, none,
      "cyclic move here. move will occur multiple times in the loop", ())
 ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
-      "_move applied to value that the compiler does not supporting checking.",
+      "_move applied to value that the compiler does not support checking",
       ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

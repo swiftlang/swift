@@ -1262,6 +1262,9 @@ public:
   void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
 
   void visitCopyAddrInst(CopyAddrInst *i);
+  void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *mai) {
+    llvm_unreachable("Valid only when ownership is enabled");
+  }
   void visitDestroyAddrInst(DestroyAddrInst *i);
 
   void visitBindMemoryInst(BindMemoryInst *i);
@@ -2135,7 +2138,10 @@ static void emitDynamicSelfMetadata(IRGenSILFunction &IGF) {
     selfTy = metaTy.getInstanceType();
     switch (metaTy->getRepresentation()) {
     case MetatypeRepresentation::Thin:
-      llvm_unreachable("class metatypes are never thin");
+      assert(selfTy.isForeignReferenceType() &&
+             "Only foreign reference metatypes are allowed to be thin");
+      selfKind = IRGenFunction::ObjectReference;
+      break;
     case MetatypeRepresentation::Thick:
       selfKind = IRGenFunction::SwiftMetatype;
       break;

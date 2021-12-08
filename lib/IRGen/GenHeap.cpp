@@ -23,12 +23,11 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Intrinsics.h"
 
-#include "TypeLayout.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/SIL/SILModule.h"
 
 #include "ConstantBuilder.h"
@@ -58,7 +57,7 @@ namespace {
   public: \
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
                                         SILType T) const override { \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, ScalarKind::Nativeness##Name##Reference); \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T); \
     } \
     Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType, \
                                     llvm::Type *type, \
@@ -146,7 +145,7 @@ namespace {
     enum { IsScalarPOD = false }; \
     TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,                    \
                                           SILType T) const override {          \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, ScalarKind::Nativeness##Name##Reference);             \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);             \
     } \
     llvm::Type *getScalarType() const { \
       return ValueTypeAndIsOptional.getPointer(); \
@@ -549,25 +548,26 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
 }
 
 namespace {
-class BuiltinNativeObjectTypeInfo
+  class BuiltinNativeObjectTypeInfo
     : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
-public:
-  BuiltinNativeObjectTypeInfo(llvm::PointerType *storage, Size size,
-                                 SpareBitVector spareBits, Alignment align)
-      : HeapTypeInfo(ReferenceCounting::Native, storage, size, spareBits,
-                     align) {}
+  public:
+    BuiltinNativeObjectTypeInfo(llvm::PointerType *storage,
+                                 Size size, SpareBitVector spareBits,
+                                 Alignment align)
+    : HeapTypeInfo(storage, size, spareBits, align) {}
 
-  /// Builtin.NativeObject uses Swift native reference-counting.
-  ReferenceCounting getReferenceCounting() const {
-    return ReferenceCounting::Native;
-  }
-};
+    /// Builtin.NativeObject uses Swift native reference-counting.
+    ReferenceCounting getReferenceCounting() const {
+      return ReferenceCounting::Native;
+    }
+  };
 } // end anonymous namespace
 
 const LoadableTypeInfo *TypeConverter::convertBuiltinNativeObject() {
-  return new BuiltinNativeObjectTypeInfo(
-      IGM.RefCountedPtrTy, IGM.getPointerSize(), IGM.getHeapObjectSpareBits(),
-      IGM.getPointerAlignment());
+  return new BuiltinNativeObjectTypeInfo(IGM.RefCountedPtrTy,
+                                      IGM.getPointerSize(),
+                                      IGM.getHeapObjectSpareBits(),
+                                      IGM.getPointerAlignment());
 }
 
 unsigned IRGenModule::getReferenceStorageExtraInhabitantCount(
@@ -584,6 +584,7 @@ unsigned IRGenModule::getReferenceStorageExtraInhabitantCount(
     return getHeapObjectExtraInhabitantCount(*this);
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -613,6 +614,7 @@ SpareBitVector IRGenModule::getReferenceStorageSpareBits(
     return getHeapObjectSpareBits();
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -642,6 +644,7 @@ APInt IRGenModule::getReferenceStorageExtraInhabitantValue(unsigned bits,
     return getHeapObjectFixedExtraInhabitantValue(*this, bits, index, 0);
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -662,6 +665,7 @@ APInt IRGenModule::getReferenceStorageExtraInhabitantMask(
   case ReferenceCounting::Native:
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -681,6 +685,7 @@ llvm::Value *IRGenFunction::getReferenceStorageExtraInhabitantIndex(Address src,
     return getHeapObjectExtraInhabitantIndex(*this, src);
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -717,6 +722,7 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
     return storeHeapObjectExtraInhabitant(*this, index, dest);
   case ReferenceCounting::Block:
   case ReferenceCounting::ObjC:
+  case ReferenceCounting::None:
   case ReferenceCounting::Unknown:
     break;
   case ReferenceCounting::Bridge:
@@ -738,35 +744,30 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
   Builder.CreateStore(null, dest);
 }
 
-#define SOMETIMES_UNKNOWN(Name) \
-  const TypeInfo * \
-  TypeConverter::create##Name##StorageType(llvm::Type *valueType, \
-                                           ReferenceCounting style, \
-                                           bool isOptional) { \
-    auto &&spareBits = IGM.getReferenceStorageSpareBits( \
-                                             ReferenceOwnership::Name, style); \
-    switch (style) { \
-    case ReferenceCounting::Native: \
-      return new Native##Name##ReferenceTypeInfo(valueType, \
-                                   IGM.Name##ReferencePtrTy->getElementType(), \
-                                   IGM.getPointerSize(), \
-                                   IGM.getPointerAlignment(), \
-                                   std::move(spareBits), \
-                                   isOptional); \
-    case ReferenceCounting::ObjC: \
-    case ReferenceCounting::Block: \
-    case ReferenceCounting::Unknown: \
-      return new Unknown##Name##ReferenceTypeInfo(valueType, \
-                                   IGM.Name##ReferencePtrTy->getElementType(), \
-                                   IGM.getPointerSize(), \
-                                   IGM.getPointerAlignment(), \
-                                   std::move(spareBits), \
-                                   isOptional); \
-    case ReferenceCounting::Bridge: \
-    case ReferenceCounting::Error: \
-      llvm_unreachable("not supported!"); \
-    } \
-    llvm_unreachable("bad reference-counting style"); \
+#define SOMETIMES_UNKNOWN(Name)                                                \
+  const TypeInfo *TypeConverter::create##Name##StorageType(                    \
+      llvm::Type *valueType, ReferenceCounting style, bool isOptional) {       \
+    auto &&spareBits =                                                         \
+        IGM.getReferenceStorageSpareBits(ReferenceOwnership::Name, style);     \
+    switch (style) {                                                           \
+    case ReferenceCounting::Native:                                            \
+      return new Native##Name##ReferenceTypeInfo(                              \
+          valueType, IGM.Name##ReferencePtrTy->getElementType(),               \
+          IGM.getPointerSize(), IGM.getPointerAlignment(),                     \
+          std::move(spareBits), isOptional);                                   \
+    case ReferenceCounting::ObjC:                                              \
+    case ReferenceCounting::None:                                              \
+    case ReferenceCounting::Block:                                             \
+    case ReferenceCounting::Unknown:                                           \
+      return new Unknown##Name##ReferenceTypeInfo(                             \
+          valueType, IGM.Name##ReferencePtrTy->getElementType(),               \
+          IGM.getPointerSize(), IGM.getPointerAlignment(),                     \
+          std::move(spareBits), isOptional);                                   \
+    case ReferenceCounting::Bridge:                                            \
+    case ReferenceCounting::Error:                                             \
+      llvm_unreachable("not supported!");                                      \
+    }                                                                          \
+    llvm_unreachable("bad reference-counting style");                          \
   }
 #define ALWAYS_NATIVE(Name) \
   const TypeInfo * \
@@ -1011,6 +1012,8 @@ void IRGenFunction::emitStrongRelease(llvm::Value *value,
     return emitBridgeStrongRelease(value, atomicity);
   case ReferenceCounting::Error:
     return emitErrorStrongRelease(value);
+  case ReferenceCounting::None:
+    return; // This is a no-op if we don't have any ref-counting.
   }
 }
 
@@ -1036,6 +1039,8 @@ void IRGenFunction::emitStrongRetain(llvm::Value *value,
   case ReferenceCounting::Error:
     emitErrorStrongRetain(value);
     return;
+  case ReferenceCounting::None:
+    return; // This is a no-op if we don't have any ref-counting.
   }
 }
 
@@ -1053,43 +1058,47 @@ llvm::Type *IRGenModule::getReferenceType(ReferenceCounting refcounting) {
     return UnknownRefCountedPtrTy;
   case ReferenceCounting::Error:
     return ErrorPtrTy;
+  case ReferenceCounting::None:
+    return OpaquePtrTy;
   }
 
   llvm_unreachable("Not a valid ReferenceCounting.");
 }
 
 #define DEFINE_BINARY_OPERATION(KIND, RESULT, TYPE1, TYPE2)                    \
-RESULT IRGenFunction::emit##KIND(TYPE1 val1, TYPE2 val2,                       \
-                                 ReferenceCounting style) {                    \
-  switch (style) {                                                             \
-  case ReferenceCounting::Native:                                              \
-    return emitNative##KIND(val1, val2);                                       \
-  case ReferenceCounting::ObjC:                                                \
-  case ReferenceCounting::Unknown:                                             \
-    return emitUnknown##KIND(val1, val2);                                      \
-  case ReferenceCounting::Bridge:                                              \
-  case ReferenceCounting::Block:                                               \
-  case ReferenceCounting::Error:                                               \
-    llvm_unreachable("unsupported reference kind with reference storage");     \
-  }                                                                            \
-  llvm_unreachable("bad refcounting style");                                   \
-}
+  RESULT IRGenFunction::emit##KIND(TYPE1 val1, TYPE2 val2,                     \
+                                   ReferenceCounting style) {                  \
+    switch (style) {                                                           \
+    case ReferenceCounting::Native:                                            \
+      return emitNative##KIND(val1, val2);                                     \
+    case ReferenceCounting::ObjC:                                              \
+    case ReferenceCounting::Unknown:                                           \
+      return emitUnknown##KIND(val1, val2);                                    \
+    case ReferenceCounting::Bridge:                                            \
+    case ReferenceCounting::Block:                                             \
+    case ReferenceCounting::Error:                                             \
+    case ReferenceCounting::None:                                              \
+      llvm_unreachable("unsupported reference kind with reference storage");   \
+    }                                                                          \
+    llvm_unreachable("bad refcounting style");                                 \
+  }
 
 #define DEFINE_UNARY_OPERATION(KIND, RESULT, TYPE1)                            \
-RESULT IRGenFunction::emit##KIND(TYPE1 val1, ReferenceCounting style) {        \
-  switch (style) {                                                             \
-  case ReferenceCounting::Native:                                              \
-    return emitNative##KIND(val1);                                             \
-  case ReferenceCounting::ObjC:                                                \
-  case ReferenceCounting::Unknown:                                             \
-    return emitUnknown##KIND(val1);                                            \
-  case ReferenceCounting::Bridge:                                              \
-  case ReferenceCounting::Block:                                               \
-  case ReferenceCounting::Error:                                               \
-    llvm_unreachable("unsupported reference kind with reference storage");     \
-  }                                                                            \
-  llvm_unreachable("bad refcounting style");                                   \
-}
+  RESULT IRGenFunction::emit##KIND(TYPE1 val1, ReferenceCounting style) {      \
+    switch (style) {                                                           \
+    case ReferenceCounting::Native:                                            \
+      return emitNative##KIND(val1);                                           \
+    case ReferenceCounting::ObjC:                                              \
+    case ReferenceCounting::Unknown:                                           \
+      return emitUnknown##KIND(val1);                                          \
+    case ReferenceCounting::Bridge:                                            \
+    case ReferenceCounting::Block:                                             \
+    case ReferenceCounting::Error:                                             \
+    case ReferenceCounting::None:                                              \
+      llvm_unreachable("unsupported reference kind with reference storage");   \
+    }                                                                          \
+    llvm_unreachable("bad refcounting style");                                 \
+  }
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   DEFINE_BINARY_OPERATION(Name##CopyInit, void, Address, Address) \
@@ -1405,9 +1414,9 @@ namespace {
 class BoxTypeInfo : public HeapTypeInfo<BoxTypeInfo> {
 public:
   BoxTypeInfo(IRGenModule &IGM)
-      : HeapTypeInfo(ReferenceCounting::Native, IGM.RefCountedPtrTy,
-                     IGM.getPointerSize(), IGM.getHeapObjectSpareBits(),
-                     IGM.getPointerAlignment()) {}
+    : HeapTypeInfo(IGM.RefCountedPtrTy, IGM.getPointerSize(),
+                   IGM.getHeapObjectSpareBits(), IGM.getPointerAlignment())
+  {}
 
   ReferenceCounting getReferenceCounting() const {
     // Boxes are always native-refcounted.
@@ -1590,11 +1599,11 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // For fixed-sized types, we can emit concrete box metadata.
   auto &fixedTI = cast<FixedTypeInfo>(eltTI);
 
-  // Because we assume in enum's that payloads with a Builtin.NativeReference
-  // which is also the type for indirect enum cases have extra inhabitants of
-  // pointers we can't have a nil pointer as a representation for an empty box
-  // type -- nil conflicts with the extra inhabitants. We return a static
-  // singleton empty box object instead.
+  // Because we assume in enum's that payloads with a Builtin.NativeObject which
+  // is also the type for indirect enum cases have extra inhabitants of pointers
+  // we can't have a nil pointer as a representation for an empty box type --
+  // nil conflicts with the extra inhabitants. We return a static singleton
+  // empty box object instead.
   if (fixedTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     if (!EmptyBoxTI)
       EmptyBoxTI = new EmptyBoxTypeInfo(IGM);

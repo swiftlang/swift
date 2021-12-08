@@ -469,6 +469,7 @@ public:
     swift::CompilerInvocation &Invocation;
     llvm::MemoryBuffer *completionBuffer;
     swift::DiagnosticConsumer *DiagC;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag;
   };
 
   /// Execute \p PerformOperation sychronously with the parameters necessary to
@@ -477,6 +478,7 @@ public:
       llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
       ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      SourceKitCancellationToken CancellationToken,
       llvm::function_ref<
           void(swift::ide::CancellableResult<CompletionLikeOperationParams>)>
           PerformOperation);
@@ -492,24 +494,27 @@ public:
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
                    ArrayRef<const char *> Args) override;
 
-  void codeComplete(
-      llvm::MemoryBuffer *InputBuf, unsigned Offset,
-      OptionsDictionary *options,
-      SourceKit::CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
-      Optional<VFSOptions> vfsOptions) override;
+  void codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+                    OptionsDictionary *options,
+                    SourceKit::CodeCompletionConsumer &Consumer,
+                    ArrayRef<const char *> Args,
+                    Optional<VFSOptions> vfsOptions,
+                    SourceKitCancellationToken CancellationToken) override;
 
   void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
                         unsigned offset, OptionsDictionary *options,
                         ArrayRef<FilterRule> rawFilterRules,
                         GroupedCodeCompletionConsumer &consumer,
                         ArrayRef<const char *> args,
-                        Optional<VFSOptions> vfsOptions) override;
+                        Optional<VFSOptions> vfsOptions,
+                        SourceKitCancellationToken CancellationToken) override;
 
   void codeCompleteClose(StringRef name, unsigned offset,
                          GroupedCodeCompletionConsumer &consumer) override;
 
   void codeCompleteUpdate(StringRef name, unsigned offset,
                           OptionsDictionary *options,
+                          SourceKitCancellationToken CancellationToken,
                           GroupedCodeCompletionConsumer &consumer) override;
 
   void codeCompleteCacheOnDisk(StringRef path) override;
@@ -662,6 +667,7 @@ public:
   void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf, unsigned Offset,
                                 OptionsDictionary *options,
                                 ArrayRef<const char *> Args,
+                                SourceKitCancellationToken CancellationToken,
                                 TypeContextInfoConsumer &Consumer,
                                 Optional<VFSOptions> vfsOptions) override;
 
@@ -669,6 +675,7 @@ public:
                                OptionsDictionary *options,
                                ArrayRef<const char *> Args,
                                ArrayRef<const char *> ExpectedTypes,
+                               SourceKitCancellationToken CancellationToken,
                                ConformingMethodListConsumer &Consumer,
                                Optional<VFSOptions> vfsOptions) override;
 

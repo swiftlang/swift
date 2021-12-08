@@ -660,24 +660,27 @@ void SILInlineCloner::visitBuiltinInst(BuiltinInst *Inst) {
         auto otherResultAddr = getOpValue(Inst->getOperand(0));
         auto otherSrcAddr = getOpValue(Inst->getOperand(1));
         auto otherType = otherSrcAddr->getType();
-
-        if (!otherType.isLoadable(*Inst->getFunction())) {
-          // If otherType is not loadable, emit a diagnostic since it was used
-          // on a generic or existential value.
-          diagnose(Inst->getModule().getASTContext(),
-                   getOpLocation(Inst->getLoc()).getSourceLoc(),
-                   diag::move_operator_used_on_generic_or_existential_value);
-          return SILCloner<SILInlineCloner>::visitBuiltinInst(Inst);
-        }
+        auto opLoc = getOpLocation(Inst->getLoc());
 
         // If our otherType is loadable, convert it to move_value.
         getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-        // We stash otherValue in originalOtherValue in case we need to
-        // perform a writeback.
-        auto opLoc = getOpLocation(Inst->getLoc());
+
+        if (!otherType.isLoadable(*Inst->getFunction())) {
+          // If otherType is not loadable, convert the builtin to a
+          // mark_unresolved_move_addr. This builtin is a +1, but
+          // mark_unresolved_move_addr simulates a +0, so we put in our own
+          // destroy_addr.
+          getBuilder().createMarkUnresolvedMoveAddr(opLoc, otherSrcAddr,
+                                                    otherResultAddr);
+          getBuilder().createDestroyAddr(opLoc, otherSrcAddr);
+          auto *tup = getBuilder().createTuple(opLoc, {});
+          return recordFoldedValue(Inst, tup);
+        }
 
         assert(otherType.isAddress());
 
+        // We stash otherValue in originalOtherValue in case we need to
+        // perform a writeback.
         SILValue otherValue = getBuilder().emitLoadValueOperation(
             opLoc, otherSrcAddr, LoadOwnershipQualifier::Take);
 
@@ -904,6 +907,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyAddrInst:
+  case SILInstructionKind::MarkUnresolvedMoveAddrInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::RetainValueAddrInst:
   case SILInstructionKind::UnmanagedRetainValueInst:

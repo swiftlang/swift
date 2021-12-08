@@ -188,6 +188,103 @@ bool swift::findInnerTransitiveGuaranteedUses(
   return true;
 }
 
+/// Like findInnerTransitiveGuaranteedUses except that rather than it being a
+/// precondition that the provided value not be a BorrowedValue, it is a [type-
+/// system-enforced] precondition that the provided value be a BorrowedValue.
+///
+/// TODO: Merge with findInnerTransitiveGuaranteedUses.  Note that at the moment
+///       the two are _almost_ identical, but not quite because the other has a
+///       #if 0 and not just leaf uses but ALL uses are recorded.
+bool swift::findInnerTransitiveGuaranteedUsesOfBorrowedValue(
+    BorrowedValue borrowedValue, SmallVectorImpl<Operand *> *usePoints) {
+
+  auto recordUse = [&](Operand *use) {
+    if (usePoints && use->getOperandOwnership() != OperandOwnership::NonUse) {
+      usePoints->push_back(use);
+    }
+  };
+
+  // Push the value's immediate uses.
+  //
+  // TODO: The worklist can be a simple vector without any a membership check if
+  // destructures are changed to be represented as reborrows. Currently a
+  // destructure forwards multiple results! This means that the worklist could
+  // grow exponentially without the membership check. It's fine to do this
+  // membership check locally in this function (within a borrow scope) because
+  // it isn't needed for the immediate uses, only the transitive uses.
+  GraphNodeWorklist<Operand *, 8> worklist;
+  for (Operand *use : borrowedValue.value->getUses()) {
+    if (use->getOperandOwnership() != OperandOwnership::NonUse)
+      worklist.insert(use);
+  }
+
+  // --- Transitively follow forwarded uses and look for escapes.
+
+  // usePoints grows in this loop.
+  while (Operand *use = worklist.pop()) {
+    switch (use->getOperandOwnership()) {
+    case OperandOwnership::NonUse:
+    case OperandOwnership::TrivialUse:
+    case OperandOwnership::ForwardingConsume:
+    case OperandOwnership::DestroyingConsume:
+      llvm_unreachable("this operand cannot handle an inner guaranteed use");
+
+    case OperandOwnership::ForwardingUnowned:
+    case OperandOwnership::PointerEscape:
+      return false;
+
+    case OperandOwnership::InstantaneousUse:
+    case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::BitwiseEscape:
+    // Reborrow only happens when this is called on a value that creates a
+    // borrow scope.
+    case OperandOwnership::Reborrow:
+    // EndBorrow either happens when this is called on a value that creates a
+    // borrow scope, or when it is pushed as a use when processing a nested
+    // borrow.
+    case OperandOwnership::EndBorrow:
+      recordUse(use);
+      break;
+
+    case OperandOwnership::InteriorPointer:
+      if (InteriorPointerOperandKind::get(use) ==
+          InteriorPointerOperandKind::Invalid)
+        return false;
+      // If our base guaranteed value does not have any consuming uses (consider
+      // function arguments), we need to be sure to include interior pointer
+      // operands since we may not get a use from a end_scope instruction.
+      if (InteriorPointerOperand(use).findTransitiveUses(usePoints) !=
+          AddressUseKind::NonEscaping) {
+        return false;
+      }
+      break;
+
+    case OperandOwnership::ForwardingBorrow: {
+      ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
+        // Do not include transitive uses with 'none' ownership
+        if (result.getOwnershipKind() == OwnershipKind::None)
+          return true;
+        for (auto *resultUse : result->getUses()) {
+          if (resultUse->getOperandOwnership() != OperandOwnership::NonUse) {
+            worklist.insert(resultUse);
+          }
+        }
+        return true;
+      });
+      recordUse(use);
+      break;
+    }
+    case OperandOwnership::Borrow:
+      BorrowingOperand(use).visitExtendedScopeEndingUses([&](Operand *endUse) {
+        recordUse(endUse);
+        return true;
+      });
+      break;
+    }
+  }
+  return true;
+}
+
 // Find all use points of \p guaranteedValue within its borrow scope. All use
 // points will be dominated by \p guaranteedValue.
 //
@@ -701,17 +798,18 @@ swift::findTransitiveUsesForAddress(SILValue projectedAddress,
     }
     // First, eliminate "end point uses" that we just need to check liveness at
     // and do not need to check transitive uses of.
-    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) || isIncidentalUse(user)
-        || isa<StoreInst>(user) || isa<DestroyAddrInst>(user)
-        || isa<AssignInst>(user) || isa<YieldInst>(user)
-        || isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user)
-        || isa<EndApplyInst>(user) || isa<LoadWeakInst>(user)
-        || isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user)
-        || isa<BeginUnpairedAccessInst>(user)
-        || isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user)
-        || isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user)
-        || isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)
-        || isa<IsUniqueInst>(user)) {
+    if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
+        isa<MarkUnresolvedMoveAddrInst>(user) || isIncidentalUse(user) ||
+        isa<StoreInst>(user) || isa<DestroyAddrInst>(user) ||
+        isa<AssignInst>(user) || isa<YieldInst>(user) ||
+        isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user) ||
+        isa<EndApplyInst>(user) || isa<LoadWeakInst>(user) ||
+        isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user) ||
+        isa<BeginUnpairedAccessInst>(user) ||
+        isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
+        isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
+        isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
+        isa<IsUniqueInst>(user)) {
       leafUse(op);
       continue;
     }
@@ -1388,4 +1486,22 @@ void swift::visitTransitiveEndBorrows(
       }
     }
   }
+}
+
+/// Whether the specified lexical begin_borrow instruction is nested.
+///
+/// A begin_borrow [lexical] is nested if the borrowed value's lifetime is
+/// guaranteed by another lexical scope.  That happens if:
+/// - the value is a guaranteed argument to the function
+/// - the value is itself a begin_borrow [lexical]
+bool swift::isNestedLexicalBeginBorrow(BeginBorrowInst *bbi) {
+  assert(bbi->isLexical());
+  auto value = bbi->getOperand();
+  if (auto *outerBBI = dyn_cast<BeginBorrowInst>(value)) {
+    return outerBBI->isLexical();
+  }
+  if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {
+    return arg->getOwnershipKind() == OwnershipKind::Guaranteed;
+  }
+  return false;
 }

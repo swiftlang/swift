@@ -96,10 +96,12 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     case RewriteStep::AdjustConcreteType:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
+    case RewriteStep::ConcreteConformance:
+    case RewriteStep::SuperclassConformance:
       break;
     }
 
-    step.apply(evaluator, system);
+    evaluator.apply(step, system);
   }
 
   // Collect all rules that we saw exactly once in empty context.
@@ -210,6 +212,8 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
     case RewriteStep::AdjustConcreteType:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
+    case RewriteStep::ConcreteConformance:
+    case RewriteStep::SuperclassConformance:
       break;
     }
 
@@ -306,6 +310,8 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
     case RewriteStep::AdjustConcreteType:
     case RewriteStep::Shift:
     case RewriteStep::Decompose:
+    case RewriteStep::ConcreteConformance:
+    case RewriteStep::SuperclassConformance:
       newSteps.push_back(step);
       break;
     }
@@ -339,6 +345,10 @@ bool RewriteStep::isInverseOf(const RewriteStep &other) const {
 
   case RewriteStep::Decompose:
     return RuleID == other.RuleID;
+
+  case RewriteStep::ConcreteConformance:
+  case RewriteStep::SuperclassConformance:
+    return true;
   }
 
   assert(EndOffset == other.EndOffset && "Bad whiskering?");
@@ -465,7 +475,7 @@ bool RewritePath::computeCyclicallyReducedLoop(MutableTerm &basepoint,
       break;
 
     // Update the basepoint by applying the first step in the path.
-    left.apply(evaluator, system);
+    evaluator.apply(left, system);
 
     ++count;
   }
@@ -522,6 +532,8 @@ bool RewriteLoop::isInContext(const RewriteSystem &system) const {
       case RewriteStep::AdjustConcreteType:
       case RewriteStep::Shift:
       case RewriteStep::Decompose:
+      case RewriteStep::ConcreteConformance:
+      case RewriteStep::SuperclassConformance:
         break;
       }
 
@@ -529,7 +541,7 @@ bool RewriteLoop::isInContext(const RewriteSystem &system) const {
         break;
     }
 
-    step.apply(evaluator, system);
+    evaluator.apply(step, system);
   }
 
   return (minStartOffset > 0 || minEndOffset > 0);
@@ -844,7 +856,7 @@ void RewriteSystem::verifyRewriteLoops() const {
     RewritePathEvaluator evaluator(loop.Basepoint);
 
     for (const auto &step : loop.Path) {
-      step.apply(evaluator, *this);
+      evaluator.apply(step, *this);
     }
 
     if (evaluator.getCurrentTerm() != loop.Basepoint) {

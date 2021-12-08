@@ -24,8 +24,9 @@
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "llvm/ADT/Optional.h"
-#include <vector>
+#include <ostream>
 #include <unordered_map>
+#include <vector>
 
 namespace swift {
 namespace reflection {
@@ -209,7 +210,7 @@ struct ClosureContextInfo {
   unsigned NumBindings = 0;
 
   void dump() const;
-  void dump(FILE *file) const;
+  void dump(std::ostream &stream) const;
 };
 
 struct FieldTypeInfo {
@@ -643,6 +644,10 @@ public:
 
 private:
   std::vector<ReflectionInfo> ReflectionInfos;
+
+  /// Index of the next Reflection Info that should be processed.
+  /// This assumes that Reflection Infos are never removed from the vector.
+  size_t FirstUnprocessedReflectionInfoIndex = 0;
     
   llvm::Optional<std::string> normalizeReflectionName(RemoteRef<char> name);
   bool reflectionNameMatches(RemoteRef<char> reflectionName,
@@ -728,12 +733,12 @@ public:
   ///
 
   void dumpTypeRef(RemoteRef<char> MangledName,
-                   FILE *file, bool printTypeName = false);
-  void dumpFieldSection(FILE *file);
-  void dumpAssociatedTypeSection(FILE *file);
-  void dumpBuiltinTypeSection(FILE *file);
-  void dumpCaptureSection(FILE *file);
-  void dumpAllSections(FILE *file);
+                   std::ostream &stream, bool printTypeName = false);
+  void dumpFieldSection(std::ostream &stream);
+  void dumpAssociatedTypeSection(std::ostream &stream);
+  void dumpBuiltinTypeSection(std::ostream &stream);
+  void dumpCaptureSection(std::ostream &stream);
+  void dumpAllSections(std::ostream &stream);
 };
 
 

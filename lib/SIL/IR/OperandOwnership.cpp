@@ -143,6 +143,7 @@ OPERAND_OWNERSHIP(TrivialUse, CheckedCastAddrBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondBranch)
 OPERAND_OWNERSHIP(TrivialUse, CondFail)
 OPERAND_OWNERSHIP(TrivialUse, CopyAddr)
+OPERAND_OWNERSHIP(TrivialUse, MarkUnresolvedMoveAddr)
 OPERAND_OWNERSHIP(TrivialUse, DeallocStack)
 OPERAND_OWNERSHIP(TrivialUse, DeinitExistentialAddr)
 OPERAND_OWNERSHIP(TrivialUse, DestroyAddr)
@@ -855,9 +856,8 @@ BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedRemoteActor)
 
-// FIXME: Why do these reqiuire a borrowed value at all?
-BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffAllocateSubcontext)
-BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffProjectTopLevelSubcontext)
+BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffAllocateSubcontext)
+BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffProjectTopLevelSubcontext)
 
 // FIXME: ConvertTaskToJob is documented as taking NativePointer. It's operand's
 // ownership should be 'TrivialUse'.
