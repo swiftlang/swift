@@ -789,7 +789,7 @@ Multiple basic blocks and control flow basic block terminators (`cond_br`, `swit
     - Aggregate operations: `struct`, `tuple`, `enum`.
     - Projections: `struct_extract`, `tuple_extract`, `struct_element_addr`, `tuple_element_addr`.
 
-Many of these instructions have well-defined corresponding tangent instructions (for the differential) and adjoint instructions (for the pullback). It turns out that supporting transformations of a few common instructions is sufficient for many use cases (e.g. [deep learning APIs](https://github.com/tensorflow/swift-apis)). Here is a short table listing some of these instruction transformation rules:
+Many of these instructions have well-defined corresponding tangent instructions (for the differential) and adjoint instructions (for the pullback). It turns out that supporting transformations of a few common instructions is sufficient for many use cases. Here is a short table listing some of these instruction transformation rules:
 
 | Original | Tangent (differential) | Adjoint (pullback)
 | -------- | ---------------------- | ------------------ 
