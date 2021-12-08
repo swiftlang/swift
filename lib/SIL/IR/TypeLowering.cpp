@@ -51,6 +51,8 @@ namespace {
     /// Class metatypes have non-trivial representation due to the
     /// possibility of subclassing.
     bool visitClassType(CanClassType type) {
+      if (type->isForeignReferenceType())
+        return true;
       return false;
     }
     bool visitBoundGenericClassType(CanBoundGenericClassType type) {
@@ -1651,6 +1653,10 @@ namespace {
     TypeLowering *handleReference(CanType type,
                                   RecursiveProperties properties) {
       auto silType = SILType::getPrimitiveObjectType(type);
+      if (type.isForeignReferenceType())
+        return new (TC) TrivialTypeLowering(
+            silType, RecursiveProperties::forTrivial(), Expansion);
+
       return new (TC) ReferenceTypeLowering(silType, properties, Expansion);
     }
 

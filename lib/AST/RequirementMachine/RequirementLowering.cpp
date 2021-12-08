@@ -924,9 +924,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
       // Build the symbol [layout: L].
       auto layout =
         LayoutConstraint::getLayoutConstraint(
-          otherType->getClassOrBoundGenericClass()->usesObjCObjectModel()
-            ? LayoutConstraintKind::Class
-            : LayoutConstraintKind::NativeClass,
+          otherType->getClassOrBoundGenericClass()->getLayoutConstraintKind(),
           Context.getASTContext());
       auto layoutSymbol = Symbol::forLayout(layout, Context);
 

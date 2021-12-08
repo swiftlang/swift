@@ -1162,6 +1162,7 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
       witnessSurrogate = C.TheBridgeObjectType;
       break;
     case ReferenceCounting::Error:
+    case ReferenceCounting::None:
       break;
     }
   }
