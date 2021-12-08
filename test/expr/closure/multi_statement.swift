@@ -139,3 +139,42 @@ let _ = {
     print(i)
   }
 }
+
+func test_workaround_for_optional_void_result() {
+  func test<T>(_: (Int?) -> T?) {}
+
+  test {
+    guard let x = $0 else {
+      return // Ok
+    }
+
+    print(x)
+  }
+
+  test {
+    if $0! > 0 {
+      return
+    }
+
+    let _ = $0
+  }
+
+  func test_concrete(_: (Int) -> Void?) {
+  }
+
+  test_concrete {
+    guard let x = Optional($0) else {
+      return // Ok
+    }
+
+    print(x)
+  }
+
+  test_concrete {
+    if $0 > 0 {
+      return // Ok
+    }
+
+    let _ = $0
+  }
+}
