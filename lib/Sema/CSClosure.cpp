@@ -1473,11 +1473,13 @@ bool ConstraintSystem::applySolutionToBody(Solution &solution,
   auto closureType = cs.getType(closure)->castTo<FunctionType>();
   ClosureConstraintApplication application(
       solution, closure, closureType->getResult(), rewriteTarget);
-  application.visit(closure->getBody());
+  auto body = application.visit(closure->getBody());
 
-  if (application.hadError)
+  if (!body || application.hadError)
     return true;
 
+  closure->setBody(cast<BraceStmt>(body.get<Stmt *>()),
+                   closure->hasSingleExpressionBody());
   closure->setBodyState(ClosureExpr::BodyState::TypeCheckedWithSignature);
   return false;
 }
