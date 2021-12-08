@@ -518,7 +518,7 @@ void RewriteSystem::verifyGeneratingConformanceEquations(
     const auto &rule = getRule(pair.first);
     auto *proto = rule.getLHS().back().getProtocol();
 
-    MutableTerm baseTerm(rule.getLHS());
+    MutableTerm baseTerm(rule.getRHS());
     (void) simplify(baseTerm);
 
     for (const auto &path : pair.second) {
@@ -541,8 +541,23 @@ void RewriteSystem::verifyGeneratingConformanceEquations(
       }
 
       MutableTerm otherTerm;
-      for (unsigned otherRuleID : path) {
-        otherTerm.append(getRule(otherRuleID).getLHS());
+      for (unsigned i : indices(path)) {
+        unsigned otherRuleID = path[i];
+        const auto &rule = getRule(otherRuleID);
+
+        bool isLastElement = (i == path.size() - 1);
+        if ((isLastElement && !rule.isAnyConformanceRule()) ||
+            (!isLastElement && !rule.isProtocolConformanceRule())) {
+          llvm::errs() << "Equation term is not a conformance rule: ";
+          dumpGeneratingConformanceEquation(llvm::errs(),
+                                            pair.first, pair.second);
+          llvm::errs() << "\n";
+          llvm::errs() << "Term: " << rule << "\n";
+          dump(llvm::errs());
+          abort();
+        }
+
+        otherTerm.append(rule.getRHS());
       }
 
       (void) simplify(otherTerm);
