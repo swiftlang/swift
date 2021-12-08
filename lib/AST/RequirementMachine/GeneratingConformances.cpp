@@ -219,7 +219,7 @@ public:
 
   void verifyGeneratingConformanceEquations() const;
 
-  void computeGeneratingConformances();
+  void computeGeneratingConformances(bool firstPass);
 
   void verifyGeneratingConformances() const;
 
@@ -799,9 +799,36 @@ void GeneratingConformances::verifyGeneratingConformanceEquations() const {
 
 /// Find a minimal set of generating conformances by marking all other
 /// conformances redundant.
-void GeneratingConformances::computeGeneratingConformances() {
+///
+/// In the first pass, we only consider conformance requirements that are
+/// made redundant by concrete conformances.
+void GeneratingConformances::computeGeneratingConformances(
+    bool firstPass) {
   for (unsigned ruleID : ConformanceRules) {
     const auto &paths = ConformancePaths[ruleID];
+
+    if (firstPass) {
+      bool derivedViaConcrete = false;
+      for (const auto &path : paths) {
+        if (path.empty())
+          break;
+
+        if (System.getRule(path.back()).getLHS().back().getKind() ==
+            Symbol::Kind::ConcreteConformance) {
+          derivedViaConcrete = true;
+          break;
+        }
+      }
+
+      // If this rule doesn't involve concrete conformances it will be
+      // considered in the second pass.
+      if (!derivedViaConcrete)
+        continue;
+    } else {
+      // Ignore rules already determined to be redundant by the first pass.
+      if (RedundantConformances.count(ruleID) > 0)
+        continue;
+    }
 
     bool isProtocolRefinement = ProtocolRefinements.count(ruleID) > 0;
 
@@ -893,7 +920,8 @@ void RewriteSystem::computeGeneratingConformances(
   }
 
   builder.verifyGeneratingConformanceEquations();
-  builder.computeGeneratingConformances();
+  builder.computeGeneratingConformances(/*firstPass=*/true);
+  builder.computeGeneratingConformances(/*firstPass=*/false);
   builder.verifyGeneratingConformances();
 
   if (Debug.contains(DebugFlags::GeneratingConformances)) {
