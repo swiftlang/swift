@@ -31,6 +31,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
@@ -1492,6 +1493,15 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
                                                       GenericSignature sig,
                                                       bool inProtocolContext) {
   // FIXME: If we can directly reference constant type metadata, do so.
+  
+  if (type->isForeignReferenceType()) {
+    type->getASTContext().Diags.diagnose(
+        type->lookThroughAllOptionalTypes()
+            ->getClassOrBoundGenericClass()
+            ->getLoc(),
+        diag::foreign_reference_types_unsupported.ID, {});
+    exit(1);
+  }
 
   // Form a reference to the mangled name for this type.
   assert(!type->hasArchetype() && "type cannot contain archetypes");

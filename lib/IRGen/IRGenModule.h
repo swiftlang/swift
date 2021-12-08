@@ -823,6 +823,7 @@ public:
     case ReferenceCounting::Unknown:
     case ReferenceCounting::ObjC:
     case ReferenceCounting::Block:
+    case ReferenceCounting::None:
       return true;
 
     case ReferenceCounting::Bridge:
