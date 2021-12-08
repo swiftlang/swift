@@ -246,6 +246,10 @@ struct FileContent {
   explicit operator InputFile() const {
     return InputFile(Filename, IsPrimary, Buffer.get());
   }
+
+  size_t getMemoryCost() const {
+    return sizeof(*this) + Filename.size() + Buffer->getBufferSize();
+  }
 };
 
 /// An \c ASTBuildOperations builds an AST. Once the AST is built, it informs
@@ -400,8 +404,12 @@ public:
   }
 
   size_t getMemoryCost() {
-    return sizeof(*this) + getVectorMemoryCost(FileContents) +
-           Result.getMemoryCost();
+    size_t Cost = sizeof(*this) + getVectorMemoryCost(FileContents) +
+                  Result.getMemoryCost();
+    for (const FileContent &File : FileContents) {
+      Cost += File.getMemoryCost();
+    }
+    return Cost;
   }
 
   /// Schedule building this AST on the given \p Queue.
