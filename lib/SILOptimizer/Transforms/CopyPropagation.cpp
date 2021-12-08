@@ -438,7 +438,7 @@ void CopyPropagation::run() {
   //       blocks and pushing begin_borrows as we see them and then popping them
   //       off the end will result in shrinking inner borrow scopes first.
   while (auto *bbi = beginBorrowsToShrink.pop()) {
-    shrinkBorrowScope(bbi, deleter);
+    changed |= shrinkBorrowScope(bbi, deleter);
   }
 
   // canonicalizer performs all modifications through deleter's callbacks, so we
