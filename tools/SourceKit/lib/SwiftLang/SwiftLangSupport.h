@@ -160,6 +160,18 @@ public:
   SwiftEditorDocumentRef remove(StringRef FilePath);
 };
 
+struct SwiftCompletionCache
+    : public ThreadSafeRefCountedBase<SwiftCompletionCache> {
+  std::unique_ptr<swift::ide::CodeCompletionCache> inMemory;
+  std::unique_ptr<swift::ide::OnDiskCodeCompletionCache> onDisk;
+  /// Return the arena in which the results created and stored by the
+  /// \c inMemory and \c onDisk cache are stored.
+  const swift::ide::CodeCompletionResultTypeArenaRef &getResultTypeArena();
+  swift::ide::CodeCompletionCache &getCache();
+  SwiftCompletionCache() = default;
+  ~SwiftCompletionCache();
+};
+
 namespace CodeCompletion {
 
 /// Provides a thread-safe cache for code completion results that remain valid
@@ -173,6 +185,14 @@ class SessionCache : public ThreadSafeRefCountedBase<SessionCache> {
   std::unique_ptr<llvm::MemoryBuffer> buffer;
   std::vector<std::string> args;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem;
+  /// Pin the completion cache during a completion session.
+  /// Otherwise we might be mixing results from different caches during a code
+  /// complete update. These results from different caches might in turn have
+  /// their \c CodeCompletionResultTypes stored in different arenas and thus
+  /// the same USR might have two different \c CodeCompletionResultTypes
+  /// representation, breaking our type matching logic that just checks for
+  /// \c CodeCompletionResultTypes pointer equality.
+  IntrusiveRefCntPtr<SwiftCompletionCache> completionCache;
   CompletionSink sink;
   std::vector<Completion *> sortedCompletions;
   CompletionKind completionKind;
@@ -186,19 +206,28 @@ public:
                std::unique_ptr<llvm::MemoryBuffer> &&buffer,
                std::vector<std::string> &&args,
                llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
-               CompletionKind completionKind,
-               TypeContextKind typeContextKind, bool mayUseImplicitMemberExpr,
-               FilterRules filterRules)
+               const IntrusiveRefCntPtr<SwiftCompletionCache> &completionCache,
+               CompletionKind completionKind, TypeContextKind typeContextKind,
+               bool mayUseImplicitMemberExpr, FilterRules filterRules)
       : buffer(std::move(buffer)), args(std::move(args)),
-        fileSystem(std::move(fileSystem)), sink(std::move(sink)),
-        completionKind(completionKind), typeContextKind(typeContextKind),
+        fileSystem(std::move(fileSystem)), completionCache(completionCache),
+        sink(std::move(sink)), completionKind(completionKind),
+        typeContextKind(typeContextKind),
         completionMayUseImplicitMemberExpr(mayUseImplicitMemberExpr),
-        filterRules(std::move(filterRules)) {}
+        filterRules(std::move(filterRules)) {
+    assert(completionCache->getResultTypeArena() ==
+               this->sink.swiftSink.ResultTypeArena &&
+           "The completion cache must store its result types in the same arena "
+           "as the sink. Otherwise we don't have pointer equality for "
+           "CodeCompletionResultTypes");
+  }
   void setSortedCompletions(std::vector<Completion *> &&completions);
   ArrayRef<Completion *> getSortedCompletions();
   llvm::MemoryBuffer *getBuffer();
   ArrayRef<std::string> getCompilerArgs();
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem();
+  IntrusiveRefCntPtr<SwiftCompletionCache> getCompletionCache();
+  const swift::ide::CodeCompletionResultTypeArenaRef &getResultTypeArena();
   const FilterRules &getFilterRules();
   CompletionKind getCompletionKind();
   TypeContextKind getCompletionTypeContextKind();
@@ -246,15 +275,6 @@ public:
   bool remove(StringRef Name);
   SwiftInterfaceGenContextRef find(StringRef ModuleName,
                                    const swift::CompilerInvocation &Invok);
-};
-
-struct SwiftCompletionCache
-    : public ThreadSafeRefCountedBase<SwiftCompletionCache> {
-  std::unique_ptr<swift::ide::CodeCompletionCache> inMemory;
-  std::unique_ptr<swift::ide::OnDiskCodeCompletionCache> onDisk;
-  swift::ide::CodeCompletionCache &getCache();
-  SwiftCompletionCache() = default;
-  ~SwiftCompletionCache();
 };
 
 struct SwiftPopularAPI : public ThreadSafeRefCountedBase<SwiftPopularAPI> {

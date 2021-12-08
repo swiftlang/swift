@@ -701,12 +701,35 @@ enum class CodeCompletionResultKind : uint8_t {
 
 class CodeCompletionResultType;
 
+/// An arena in which \c CodeCompletionResultType are allocated. Two
+/// \c CodeCompletionResultType with the same USR are represented by the same
+/// object within one arena.
+class CodeCompletionResultTypeArena
+    : public llvm::ThreadSafeRefCountedBase<CodeCompletionResultTypeArena> {
+  friend class CodeCompletionResultType;
+
+  llvm::BumpPtrAllocator Allocator;
+
+  /// Maps USRs to \c CodeCompletionResultTypes that have already been
+  /// constructed.
+  llvm::StringMap<CodeCompletionResultType *> USRCache;
+
+  /// Maps Types to \c CodeCompletionResultTypes that have already been
+  /// constructed.
+  llvm::DenseMap<Type, CodeCompletionResultType *> TypeCache;
+};
+
+using CodeCompletionResultTypeArenaRef =
+    llvm::IntrusiveRefCntPtr<CodeCompletionResultTypeArena>;
+
 /// Compute all the supertypes that \p ResultType as seen from \p ResultType's
 /// module. This includes all superclasses and protocols that \p ResultType
 /// conforms to within its own module. Retroactive conformances in downstream
 /// modules are not considered because they might not be present when using the
 /// type in a different module.
-SmallVector<CodeCompletionResultType *, 2> computeSupertypes(Type ResultType);
+SmallVector<CodeCompletionResultType *, 2>
+computeSupertypes(Type ResultType,
+                  const CodeCompletionResultTypeArenaRef &ResultTypeArena);
 
 /// The type returned by a code completion item. It is canonicalized and can be
 /// instantiated in different \c ASTContexts.
@@ -727,32 +750,25 @@ class CodeCompletionResultType {
   /// See \c computeSupertypes.
   std::vector<CodeCompletionResultType *> Supertypes;
 
-  /// Maps USRs to \c CodeCompletionResultTypes that have already been
-  /// constructed.
-  static llvm::StringMap<CodeCompletionResultType *> USRCache;
-
-  /// Maps Types to \c CodeCompletionResultTypes that have already been
-  /// constructed.
-  static llvm::DenseMap<Type, CodeCompletionResultType *> TypeCache;
-
   CodeCompletionResultType(StringRef USR,
                            ArrayRef<CodeCompletionResultType *> Supertypes)
       : USR(USR), Supertypes(Supertypes) {}
 
 public:
   /// Create an \c CodeCompletionResultType from an \c ASTContext's \c Type.
-  static CodeCompletionResultType *fromType(Type Ty) {
+  static CodeCompletionResultType *
+  fromType(Type Ty, const CodeCompletionResultTypeArenaRef &Arena) {
     /// Canonicalize the type. We don't consider metatypes and instance types
     /// different for code completion purposes, normalize to instance types.
     if (Ty) {
       Ty = Ty->getCanonicalType();
     }
-    auto ResFromType = TypeCache.find(Ty);
-    if (ResFromType != TypeCache.end()) {
+    auto ResFromType = Arena->TypeCache.find(Ty);
+    if (ResFromType != Arena->TypeCache.end()) {
       return ResFromType->second;
     }
 
-    auto Supertypes = computeSupertypes(Ty);
+    auto Supertypes = computeSupertypes(Ty, Arena);
 
     CodeCompletionResultType *Res;
     // FIXME: We can't compute USRs for archetypes. If the type contains an
@@ -763,15 +779,15 @@ public:
       SmallString<32> USR;
       llvm::raw_svector_ostream OS(USR);
       printTypeUSR(Ty, OS);
-      Res = CodeCompletionResultType::fromUSR(USR, Supertypes);
+      Res = CodeCompletionResultType::fromUSR(USR, Supertypes, Arena);
     } else {
-      Res = new CodeCompletionResultType("", Supertypes);
+      Res = new (Arena->Allocator) CodeCompletionResultType("", Supertypes);
     }
     // We already know the Type. Cache it so it doesn't have to be recomputed.
     Res->Ty = Ty;
     Res->ContextOfTy = Ty ? &Ty->getASTContext() : nullptr;
 
-    TypeCache[Ty] = Res;
+    Arena->TypeCache[Ty] = Res;
 
     return Res;
   }
@@ -781,14 +797,15 @@ public:
   /// \p Supertypes are supertypes of the type with the given \p USR as computed
   /// by \c computeSupertypes.
   static CodeCompletionResultType *
-  fromUSR(StringRef USR, ArrayRef<CodeCompletionResultType *> Supertypes) {
-    auto ResFromUSR = USRCache.find(USR);
-    if (ResFromUSR != USRCache.end()) {
+  fromUSR(StringRef USR, ArrayRef<CodeCompletionResultType *> Supertypes,
+          const CodeCompletionResultTypeArenaRef &Arena) {
+    auto ResFromUSR = Arena->USRCache.find(USR);
+    if (ResFromUSR != Arena->USRCache.end()) {
       return ResFromUSR->second;
     }
-    auto Res = new CodeCompletionResultType(USR, Supertypes);
+    auto Res = new (Arena->Allocator) CodeCompletionResultType(USR, Supertypes);
 
-    USRCache[USR] = Res;
+    Arena->USRCache[USR] = Res;
     return Res;
   }
 
@@ -1302,6 +1319,10 @@ struct CodeCompletionResultSink {
   /// other sinks.
   std::vector<AllocatorPtr> ForeignAllocators;
 
+  /// The arena in which the \c CodeCompletionResultTypes for \c Results are
+  /// stored.
+  CodeCompletionResultTypeArenaRef ResultTypeArena;
+
   /// Whether to annotate the results with XML.
   bool annotateResult = false;
 
@@ -1321,8 +1342,10 @@ struct CodeCompletionResultSink {
   /// clang::Module * or swift::ModuleDecl *.
   std::pair<void *, StringRef> LastModule;
 
-  CodeCompletionResultSink()
-      : Allocator(std::make_shared<llvm::BumpPtrAllocator>()) {}
+  CodeCompletionResultSink(
+      const CodeCompletionResultTypeArenaRef &ResultTypeArena)
+      : Allocator(std::make_shared<llvm::BumpPtrAllocator>()),
+        ResultTypeArena(ResultTypeArena) {}
 };
 
 /// A utility for calculating the import depth of a given module. Direct imports
@@ -1350,9 +1373,11 @@ class CodeCompletionContext {
 
   /// A set of current completion results, not yet delivered to the
   /// consumer.
+  /// Has the same ResultTypeArena as \c Cache.
   CodeCompletionResultSink CurrentResults;
 
 public:
+  /// Has the same ResultTypeArena as \c CurrentResults.
   CodeCompletionCache &Cache;
   CompletionKind CodeCompletionKind = CompletionKind::None;
 
@@ -1380,8 +1405,7 @@ public:
   /// NOTE: Do not use this to change the behavior. This is only for debugging.
   bool ReusingASTContext = false;
 
-  CodeCompletionContext(CodeCompletionCache &Cache)
-      : Cache(Cache) {}
+  CodeCompletionContext(CodeCompletionCache &Cache);
 
   void setAnnotateResult(bool flag) { CurrentResults.annotateResult = flag; }
   bool getAnnotateResult() const { return CurrentResults.annotateResult; }

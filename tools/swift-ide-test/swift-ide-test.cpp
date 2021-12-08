@@ -1142,12 +1142,15 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             bool CodeCompletionAddInitsToTopLevel,
                             bool CodeCompletionCallPatternHeuristics,
                             bool CodeCompletionSourceText) {
+  CodeCompletionResultTypeArenaRef ResultTypeArena =
+      new CodeCompletionResultTypeArena();
+
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
         options::CompletionCachePath);
   }
-  ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
+  ide::CodeCompletionCache CompletionCache(ResultTypeArena, OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
   CompletionContext.setAnnotateResult(CodeCompletionAnnotateResults);
   CompletionContext.setAddInitsToTopLevel(CodeCompletionAddInitsToTopLevel);
@@ -1424,11 +1427,14 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
 
   CompletionInstance CompletionInst;
 
+  CodeCompletionResultTypeArenaRef ResultTypeArena =
+      new CodeCompletionResultTypeArena();
+
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty())
     OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
         options::CompletionCachePath);
-  ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
+  ide::CodeCompletionCache CompletionCache(ResultTypeArena, OnDiskCache.get());
 
   // Process tokens.
   SmallVector<StringRef, 0> FailedTokens;
@@ -1648,7 +1654,9 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   M->addFile(*SF);
   performImportResolution(*SF);
 
-  REPLCompletions REPLCompl;
+  CodeCompletionResultTypeArenaRef ResultTypeArena =
+      new CodeCompletionResultTypeArena();
+  REPLCompletions REPLCompl(ResultTypeArena);
   REPLCompl.populate(*SF, BufferText);
   llvm::outs() << "Begin completions\n";
   for (StringRef S : REPLCompl.getCompletionList()) {
@@ -4074,8 +4082,11 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
+    CodeCompletionResultTypeArenaRef ResultTypeArena =
+        new CodeCompletionResultTypeArena();
     for (StringRef filename : options::InputFilenames) {
-      auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(filename);
+      auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(
+          filename, ResultTypeArena);
       if (!resultsOpt) {
         // FIXME: error?
         continue;

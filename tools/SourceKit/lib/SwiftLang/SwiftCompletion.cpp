@@ -93,15 +93,15 @@ static UIdent getUIDForCodeCompletionKindToReport(CompletionKind kind) {
 }
 
 static void swiftCodeCompleteImpl(
-    SwiftLangSupport &Lang, llvm::MemoryBuffer *UnresolvedInputFile,
-    unsigned Offset, ArrayRef<const char *> Args,
+    SwiftLangSupport &Lang, IntrusiveRefCntPtr<SwiftCompletionCache> SwiftCache,
+    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+    ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const CodeCompletion::Options &opts,
     llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback) {
   assert(Callback && "Must provide callback to receive results");
 
-  auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
-  ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
+  ide::CodeCompletionContext CompletionContext(SwiftCache->getCache());
   CompletionContext.setAnnotateResult(opts.annotatedDescription);
   CompletionContext.setIncludeObjectLiterals(opts.includeObjectLiterals);
   CompletionContext.setAddInitsToTopLevel(opts.addInitsToTopLevel);
@@ -205,8 +205,8 @@ void SwiftLangSupport::codeComplete(
   }
 
   swiftCodeCompleteImpl(
-      *this, UnresolvedInputFile, Offset, Args, fileSystem, CCOpts,
-      [&](CancellableResult<CodeCompleteResult> Result) {
+      *this, getCodeCompletionCache(), UnresolvedInputFile, Offset, Args,
+      fileSystem, CCOpts, [&](CancellableResult<CodeCompleteResult> Result) {
         deliverCodeCompleteResults(SKConsumer, CCOpts, Result);
       });
 }
@@ -623,6 +623,21 @@ llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> CodeCompletion::SessionCache::ge
   llvm::sys::ScopedLock L(mtx);
   return fileSystem;
 }
+IntrusiveRefCntPtr<SwiftCompletionCache>
+CodeCompletion::SessionCache::getCompletionCache() {
+  llvm::sys::ScopedLock L(mtx);
+  return completionCache;
+}
+const CodeCompletionResultTypeArenaRef &
+CodeCompletion::SessionCache::getResultTypeArena() {
+  llvm::sys::ScopedLock L(mtx);
+  assert(completionCache->getResultTypeArena() ==
+             sink.swiftSink.ResultTypeArena &&
+         "The completion cache must store its result types in the same arena "
+         "as the sink. Otherwise we don't have pointer equality for "
+         "CodeCompletionResultTypes");
+  return completionCache->getResultTypeArena();
+}
 CompletionKind CodeCompletion::SessionCache::getCompletionKind() {
   llvm::sys::ScopedLock L(mtx);
   return completionKind;
@@ -902,7 +917,7 @@ static void transformAndForwardResults(
     CodeCompletion::Options options, unsigned offset, StringRef filterText,
     unsigned resultOffset, unsigned maxResults) {
 
-  CodeCompletion::CompletionSink innerSink;
+  CodeCompletion::CompletionSink innerSink(session->getResultTypeArena());
   Completion *exactMatch = nullptr;
   auto buildInnerResult = [&](ArrayRef<CodeCompletionString::Chunk> chunks) {
     auto *completionString =
@@ -1016,8 +1031,9 @@ static void transformAndForwardResults(
     bool CallbackCalled = false;
 
     swiftCodeCompleteImpl(
-        lang, buffer.get(), str.size(), cargs, session->getFileSystem(),
-        options, [&](CancellableResult<CodeCompleteResult> Result) {
+        lang, session->getCompletionCache(), buffer.get(), str.size(), cargs,
+        session->getFileSystem(), options,
+        [&](CancellableResult<CodeCompleteResult> Result) {
           CallbackCalled = true;
           switch (Result.getKind()) {
           case CancellableResultKind::Success: {
@@ -1114,8 +1130,10 @@ void SwiftLangSupport::codeCompleteOpen(
   CodeCompletion::FilterRules filterRules;
   translateFilterRules(rawFilterRules, filterRules);
 
+  auto swiftCache = getCodeCompletionCache(); // Pin the cache.
+
   // Set up the code completion consumer to pass results to organizer.
-  CodeCompletion::CompletionSink sink;
+  CodeCompletion::CompletionSink sink(swiftCache->getResultTypeArena());
   std::vector<Completion *> completions;
 
   NameToPopularityMap *nameToPopularity = nullptr;
@@ -1132,7 +1150,7 @@ void SwiftLangSupport::codeCompleteOpen(
   bool CodeCompleteDidFail = false;
   bool CallbackCalled = false;
   swiftCodeCompleteImpl(
-      *this, inputBuf, offset, args, fileSystem, CCOpts,
+      *this, swiftCache, inputBuf, offset, args, fileSystem, CCOpts,
       [&](CancellableResult<CodeCompleteResult> Result) {
         CallbackCalled = true;
         switch (Result.getKind()) {
@@ -1181,7 +1199,7 @@ void SwiftLangSupport::codeCompleteOpen(
   std::vector<std::string> argsCopy(args.begin(), args.end());
   SessionCacheRef session{new SessionCache(
       std::move(sink), std::move(bufferCopy), std::move(argsCopy), fileSystem,
-      completionKind, typeContextKind, mayUseImplicitMemberExpr,
+      swiftCache, completionKind, typeContextKind, mayUseImplicitMemberExpr,
       std::move(filterRules))};
   session->setSortedCompletions(std::move(completions));
 
@@ -1242,6 +1260,11 @@ void SwiftLangSupport::codeCompleteUpdate(
                              offset, filterText, resultOffset, maxResults);
 }
 
+const swift::ide::CodeCompletionResultTypeArenaRef &
+SwiftCompletionCache::getResultTypeArena() {
+  return inMemory->getResultTypeArena();
+}
+
 swift::ide::CodeCompletionCache &SwiftCompletionCache::getCache() {
   return *inMemory;
 }
@@ -1250,8 +1273,11 @@ SwiftCompletionCache::~SwiftCompletionCache() {}
 void SwiftLangSupport::codeCompleteCacheOnDisk(StringRef path) {
   ThreadSafeRefCntPtr<SwiftCompletionCache> newCache(new SwiftCompletionCache);
   newCache->onDisk = std::make_unique<ide::OnDiskCodeCompletionCache>(path);
-  newCache->inMemory =
-      std::make_unique<ide::CodeCompletionCache>(newCache->onDisk.get());
+  // Keep using the same ResultTypeArena to avoid recomputation of
+  // CodeCompletionResultTypes for already known USRs.
+  auto ResultTypeArena = CCCache->getResultTypeArena();
+  newCache->inMemory = std::make_unique<ide::CodeCompletionCache>(
+      ResultTypeArena, newCache->onDisk.get());
 
   CCCache = newCache; // replace the old cache.
 }

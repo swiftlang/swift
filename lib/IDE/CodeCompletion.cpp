@@ -321,12 +321,8 @@ void CodeCompletionString::dump() const {
   }
 }
 
-llvm::StringMap<CodeCompletionResultType *> CodeCompletionResultType::USRCache;
-llvm::DenseMap<Type, CodeCompletionResultType *>
-    CodeCompletionResultType::TypeCache;
-
-SmallVector<CodeCompletionResultType *, 2>
-swift::ide::computeSupertypes(Type ResultType) {
+SmallVector<CodeCompletionResultType *, 2> swift::ide::computeSupertypes(
+    Type ResultType, const CodeCompletionResultTypeArenaRef &ResultTypeArena) {
   if (!ResultType) {
     return {};
   }
@@ -338,13 +334,15 @@ swift::ide::computeSupertypes(Type ResultType) {
     for (auto Conformance : Conformances) {
       if (Conformance->isVisibleFrom(NT->getDecl()->getModuleContext())) {
         Result.push_back(CodeCompletionResultType::fromType(
-            Conformance->getProtocol()->getDeclaredInterfaceType()));
+            Conformance->getProtocol()->getDeclaredInterfaceType(),
+            ResultTypeArena));
       }
     }
   }
   Type Superclass = ResultType->getSuperclass();
   while (Superclass) {
-    Result.push_back(CodeCompletionResultType::fromType(Superclass));
+    Result.push_back(
+        CodeCompletionResultType::fromType(Superclass, ResultTypeArena));
     Superclass = Superclass->getSuperclass();
   }
   return Result;
@@ -1109,6 +1107,9 @@ void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
   }
 }
 
+CodeCompletionContext::CodeCompletionContext(CodeCompletionCache &Cache)
+    : CurrentResults(Cache.getResultTypeArena()), Cache(Cache) {}
+
 StringRef CodeCompletionContext::copyString(StringRef Str) {
   return ::copyString(*CurrentResults.Allocator, Str);
 }
@@ -1346,7 +1347,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   CompletionResultTypes.reserve(ResultTypes.size());
   for (auto ResultType : ResultTypes) {
     CompletionResultTypes.push_back(
-        CodeCompletionResultType::fromType(ResultType));
+        CodeCompletionResultType::fromType(ResultType, Sink.ResultTypeArena));
   }
 
   switch (Kind) {
@@ -7648,18 +7649,20 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
     };
   }
 
-  CodeCompletionResultType *voidType =
-      CodeCompletionResultType::fromType(DC->getASTContext().getVoidType());
+  CodeCompletionResultTypeArenaRef ResultTypeArena = targetSink.ResultTypeArena;
+  CodeCompletionResultType *voidType = CodeCompletionResultType::fromType(
+      DC->getASTContext().getVoidType(), ResultTypeArena);
 
   SmallVector<ContextualType, 4> contextualTypes;
   for (auto possibleTy : TypeContext.possibleTypes) {
-    contextualTypes.push_back({CodeCompletionResultType::fromType(possibleTy),
-                               /*IsConvertible=*/false});
+    contextualTypes.push_back(
+        {CodeCompletionResultType::fromType(possibleTy, ResultTypeArena),
+         /*IsConvertible=*/false});
     auto unwrappedOptionalType = possibleTy->getOptionalObjectType();
     while (unwrappedOptionalType) {
-      contextualTypes.push_back(
-          {CodeCompletionResultType::fromType(unwrappedOptionalType),
-           /*IsConvertible=*/true});
+      contextualTypes.push_back({CodeCompletionResultType::fromType(
+                                     unwrappedOptionalType, ResultTypeArena),
+                                 /*IsConvertible=*/true});
       unwrappedOptionalType = unwrappedOptionalType->getOptionalObjectType();
     }
     // If the contextual type is an opaque return type, make the protocol a
@@ -7667,9 +7670,10 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
     // should show items conforming to `View` as convertible.
     if (auto opaqueType = possibleTy->getAs<ArchetypeType>()) {
       for (auto proto : opaqueType->getConformsTo()) {
-        contextualTypes.push_back({CodeCompletionResultType::fromType(
-                                       proto->getDeclaredInterfaceType()),
-                                   /*IsConvertible=*/false});
+        contextualTypes.push_back(
+            {CodeCompletionResultType::fromType(
+                 proto->getDeclaredInterfaceType(), ResultTypeArena),
+             /*IsConvertible=*/false});
       }
     }
   }
@@ -7716,7 +7720,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       V = context.Cache.createValue();
       // Temporary sink in which we gather the result. The cache value retains
       // the sink's allocator.
-      CodeCompletionResultSink Sink;
+      CodeCompletionResultSink Sink(context.Cache.getResultTypeArena());
       Sink.annotateResult = context.getAnnotateResult();
       Sink.addInitsToTopLevel = context.getAddInitsToTopLevel();
       Sink.enableCallPatternHeuristics = context.getCallPatternHeuristics();

@@ -112,8 +112,14 @@ struct CompletionSink {
   swift::ide::CodeCompletionResultSink swiftSink;
   llvm::BumpPtrAllocator allocator;
 
+  CompletionSink(
+      const swift::ide::CodeCompletionResultTypeArenaRef &ResultTypeArena)
+      : swiftSink(ResultTypeArena) {}
+
   /// Adds references to a swift sink's allocators to keep its storage alive.
   void adoptSwiftSink(swift::ide::CodeCompletionResultSink &sink) {
+    assert(sink.ResultTypeArena == swiftSink.ResultTypeArena &&
+           "Cannot combine sinks with different ResultTypeArenas.");
     swiftSink.ForeignAllocators.insert(swiftSink.ForeignAllocators.end(),
                                        sink.ForeignAllocators.begin(),
                                        sink.ForeignAllocators.end());

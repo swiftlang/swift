@@ -74,7 +74,7 @@ private:
 
 public:
   /// Create an invalid completion set.
-  REPLCompletions();
+  REPLCompletions(const ide::CodeCompletionResultTypeArenaRef &ResultTypeArena);
 
   /// Create completion results for the given string.
   void populate(SourceFile &SF, StringRef EnteredCode);

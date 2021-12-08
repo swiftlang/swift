@@ -201,8 +201,10 @@ public:
 };
 } // namespace swift
 
-REPLCompletions::REPLCompletions()
-    : State(CompletionState::Invalid), CompletionContext(CompletionCache) {
+REPLCompletions::REPLCompletions(
+    const CodeCompletionResultTypeArenaRef &ResultTypeArena)
+    : State(CompletionState::Invalid), CompletionCache(ResultTypeArena),
+      CompletionContext(CompletionCache) {
   // Create a CodeCompletionConsumer.
   Consumer.reset(new REPLCodeCompletionConsumer(*this));
 

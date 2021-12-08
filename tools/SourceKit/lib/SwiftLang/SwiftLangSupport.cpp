@@ -289,7 +289,10 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
 
   // By default, just use the in-memory cache.
-  CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
+  CodeCompletionResultTypeArenaRef ResultTypeArena =
+      new CodeCompletionResultTypeArena();
+  CCCache->inMemory =
+      std::make_unique<ide::CodeCompletionCache>(ResultTypeArena);
 
   // Provide a default file system provider.
   setFileSystemProvider("in-memory-vfs", std::make_unique<InMemoryFileSystemProvider>());

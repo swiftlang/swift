@@ -65,7 +65,7 @@ CodeCompletionCache::get(const Key &K) {
       V = None;
       TheCache.remove(K);
     }
-  } else if (nextCache && (V = nextCache->get(K))) {
+  } else if (nextCache && (V = nextCache->get(K, ResultTypeArena))) {
     // Hit the chained cache. Update our own cache to match.
     setImpl(K, *V, /*setChain*/ false);
   }
@@ -93,8 +93,11 @@ void CodeCompletionCache::setImpl(const Key &K, ValueRefCntPtr V,
     nextCache->set(K, V);
 }
 
-CodeCompletionCache::CodeCompletionCache(OnDiskCodeCompletionCache *nextCache)
-    : Impl(new CodeCompletionCacheImpl()), nextCache(nextCache) {}
+CodeCompletionCache::CodeCompletionCache(
+    const CodeCompletionResultTypeArenaRef &ResultTypeArena,
+    OnDiskCodeCompletionCache *nextCache)
+    : Impl(new CodeCompletionCacheImpl()), nextCache(nextCache),
+      ResultTypeArena(ResultTypeArena) {}
 
 CodeCompletionCache::~CodeCompletionCache() {}
 
@@ -107,10 +110,11 @@ static constexpr uint32_t onDiskCompletionCacheVersion =
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
-static bool readCachedModule(llvm::MemoryBuffer *in,
-                             const CodeCompletionCache::Key &K,
-                             CodeCompletionCache::Value &V,
-                             bool allowOutOfDate = false) {
+static bool
+readCachedModule(llvm::MemoryBuffer *in, const CodeCompletionCache::Key &K,
+                 CodeCompletionCache::Value &V,
+                 const CodeCompletionResultTypeArenaRef &ResultTypeArena,
+                 bool allowOutOfDate = false) {
   const char *cursor = in->getBufferStart();
   const char *end = in->getBufferEnd();
 
@@ -197,7 +201,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
         auto T = getType(supertypeIndex);
         supertypes.push_back(T);
       }
-      res = CodeCompletionResultType::fromUSR(usr, supertypes);
+      res = CodeCompletionResultType::fromUSR(usr, supertypes, ResultTypeArena);
     }
     knownTypes[index] = res;
     return res;
@@ -495,8 +499,8 @@ static std::string getName(StringRef cacheDirectory,
   return std::string(name.str());
 }
 
-Optional<CodeCompletionCache::ValueRefCntPtr>
-OnDiskCodeCompletionCache::get(const Key &K) {
+Optional<CodeCompletionCache::ValueRefCntPtr> OnDiskCodeCompletionCache::get(
+    const Key &K, const CodeCompletionResultTypeArenaRef &ResultTypeArena) {
   // Try to find the cached file.
   auto bufferOrErr = llvm::MemoryBuffer::getFile(getName(cacheDirectory, K));
   if (!bufferOrErr)
@@ -504,7 +508,7 @@ OnDiskCodeCompletionCache::get(const Key &K) {
 
   // Read the cached results, failing if they are out of date.
   auto V = CodeCompletionCache::createValue();
-  if (!readCachedModule(bufferOrErr.get().get(), K, *V))
+  if (!readCachedModule(bufferOrErr.get().get(), K, *V, ResultTypeArena))
     return None;
 
   return V;
@@ -538,7 +542,9 @@ std::error_code OnDiskCodeCompletionCache::set(const Key &K, ValueRefCntPtr V) {
 }
 
 Optional<CodeCompletionCache::ValueRefCntPtr>
-OnDiskCodeCompletionCache::getFromFile(StringRef filename) {
+OnDiskCodeCompletionCache::getFromFile(
+    StringRef filename,
+    const CodeCompletionResultTypeArenaRef &ResultTypeArena) {
   // Try to find the cached file.
   auto bufferOrErr = llvm::MemoryBuffer::getFile(filename);
   if (!bufferOrErr)
@@ -550,7 +556,7 @@ OnDiskCodeCompletionCache::getFromFile(StringRef filename) {
 
   // Read the cached results.
   auto V = CodeCompletionCache::createValue();
-  if (!readCachedModule(bufferOrErr.get().get(), K, *V,
+  if (!readCachedModule(bufferOrErr.get().get(), K, *V, ResultTypeArena,
                         /*allowOutOfDate*/ true))
     return None;
 

@@ -32,6 +32,9 @@ class OnDiskCodeCompletionCache;
 class CodeCompletionCache {
   std::unique_ptr<CodeCompletionCacheImpl> Impl;
   OnDiskCodeCompletionCache *nextCache;
+  /// The arena in which the types for the completion results cached by this
+  /// \c CodeCompletionCache are stored.
+  CodeCompletionResultTypeArenaRef ResultTypeArena;
 
 public:
   /// Cache key.
@@ -71,12 +74,17 @@ public:
   };
   using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;
 
-  CodeCompletionCache(OnDiskCodeCompletionCache *nextCache = nullptr);
+  CodeCompletionCache(const CodeCompletionResultTypeArenaRef &ResultTypeArena,
+                      OnDiskCodeCompletionCache *nextCache = nullptr);
   ~CodeCompletionCache();
 
   static ValueRefCntPtr createValue();
   Optional<ValueRefCntPtr> get(const Key &K);
   void set(const Key &K, ValueRefCntPtr V) { setImpl(K, V, /*setChain*/ true); }
+
+  const CodeCompletionResultTypeArenaRef &getResultTypeArena() const {
+    return ResultTypeArena;
+  }
 
 private:
   void setImpl(const Key &K, ValueRefCntPtr V, bool setChain);
@@ -97,10 +105,13 @@ public:
   OnDiskCodeCompletionCache(Twine cacheDirectory);
   ~OnDiskCodeCompletionCache();
 
-  Optional<ValueRefCntPtr> get(const Key &K);
+  Optional<ValueRefCntPtr>
+  get(const Key &K, const CodeCompletionResultTypeArenaRef &ResultTypeArena);
   std::error_code set(const Key &K, ValueRefCntPtr V);
 
-  static Optional<ValueRefCntPtr> getFromFile(StringRef filename);
+  static Optional<ValueRefCntPtr>
+  getFromFile(StringRef filename,
+              const CodeCompletionResultTypeArenaRef &ResultTypeArena);
 };
 
 struct RequestedCachedModule {
