@@ -2921,16 +2921,16 @@ bool ConformanceChecker::checkActorIsolation(
       // witness this requirement. I.e. since checks to the distributed function
       // passed, it can be called through this protocol.
       if (witnessFunc && witnessFunc->isDistributed()) {
-        // If the requirement was also a 'distributed func' we most definitely
-        // can witness it with our 'distributed func' witness.
-        if (requirementFunc && requirementFunc->isDistributed()) {
-          return false;
-        }
-        if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
-          return false;
-        }
-
         if (requirementFunc) {
+          // If the requirement was also a 'distributed func' we most definitely
+          // can witness it with our 'distributed func' witness.
+          if (requirementFunc->isDistributed()) {
+            return false;
+          }
+          if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
+            return false;
+          }
+
           // The witness was distributed, but the requirement func was not
           // 'async throws', so we can suggest adding those to the protocol
           int suggestAddingModifiers = 0;
@@ -2954,22 +2954,24 @@ bool ConformanceChecker::checkActorIsolation(
 
       // witness is not 'distributed', if the requirement was though,
       // then we definitely must mark the witness distributed as well.
-      if (requirementFunc->isDistributed()) {
-        witness->diagnose(diag::note_add_distributed_to_decl,
-                          witness->getName(),
-                          witness->getDescriptiveKind())
-            .fixItInsert(witness->getAttributeInsertionLoc(true),
-                         "distributed ");
-        requirement->diagnose(diag::note_distributed_requirement_defined_here,
-                              requirement->getName());
-      } else if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
-        assert(!requirementFunc->isDistributed());
-        // If the requirement is 'async throws' we can add 'distributed' to the
-        // distributed actor function to witness the requirement.
-        witness->diagnose(diag::note_add_distributed_to_decl,
-                          witness->getName(), witness->getDescriptiveKind())
-            .fixItInsert(witness->getAttributeInsertionLoc(true),
-                         "distributed ");
+      if (requirementFunc) {
+        if (requirementFunc->isDistributed()) {
+          witness->diagnose(diag::note_add_distributed_to_decl,
+                            witness->getName(),
+                            witness->getDescriptiveKind())
+              .fixItInsert(witness->getAttributeInsertionLoc(true),
+                           "distributed ");
+          requirement->diagnose(diag::note_distributed_requirement_defined_here,
+                                requirement->getName());
+        } else if (requirementFunc->hasAsync() && requirementFunc->hasThrows()) {
+          assert(!requirementFunc->isDistributed());
+          // If the requirement is 'async throws' we can add 'distributed' to the
+          // distributed actor function to witness the requirement.
+          witness->diagnose(diag::note_add_distributed_to_decl,
+                            witness->getName(), witness->getDescriptiveKind())
+              .fixItInsert(witness->getAttributeInsertionLoc(true),
+                           "distributed ");
+        }
       }
 
       if (!requirementFunc->hasAsync() && !requirementFunc->isDistributed()) {

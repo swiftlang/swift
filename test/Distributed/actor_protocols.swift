@@ -1,8 +1,13 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 import _Distributed
+import FakeDistributedActorSystems
+
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== -----------------------------------------------------------------------
 
@@ -33,40 +38,44 @@ struct E: Actor {
 // ==== -----------------------------------------------------------------------
 
 distributed actor DA: DistributedActor {
-  typealias Transport = AnyDistributedActorSystem
+  typealias ActorSystem = FakeActorSystem
 }
 
 actor A2: DistributedActor {
   // expected-error@-1{{non-distributed actor type 'A2' cannot conform to the 'DistributedActor' protocol}} {{1-1=distributed }}
-  nonisolated var id: AnyActorIdentity {
+  // expected-error@-2{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
+  // expected-note@-3{{requirement specified as 'Self.ID' == 'Self.ActorSystem.ActorID' [with Self = A2]}}
+  nonisolated var id: ID {
     fatalError()
   }
-  nonisolated var actorSystem: AnyDistributedActorSystem {
+  nonisolated var actorSystem: ActorSystem {
     fatalError()
   }
 
-  init(transport: AnyDistributedActorSystem) {
+  init(system: FakeActorSystem) {
     fatalError()
   }
 
-  static func resolve(id: ID, using system: AnyDistributedActorSystem) throws -> Self {
+  static func resolve(id: ID, using system: FakeActorSystem) throws -> Self {
     fatalError()
   }
 }
 
 final class C2: DistributedActor {
   // expected-error@-1{{non-actor type 'C2' cannot conform to the 'Actor' protocol}}
-  nonisolated var id: AnyActorIdentity {
+  // expected-error@-2{{'DistributedActor' requires the types 'ObjectIdentifier' and 'FakeActorSystem.ActorID' (aka 'ActorAddress') be equivalent}}
+  // expected-note@-3{{requirement specified as 'Self.ID' == 'Self.ActorSystem.ActorID' [with Self = C2]}}
+  nonisolated var id: ID {
     fatalError()
   }
-  nonisolated var actorSystem: AnyDistributedActorSystem {
+  nonisolated var actorSystem: ActorSystem {
     fatalError()
   }
 
-  required init(transport: AnyDistributedActorSystem) {
+  required init(system: FakeActorSystem) {
     fatalError()
   }
-  static func resolve(id: ID, using system: AnyDistributedActorSystem) throws -> Self {
+  static func resolve(id: ID, using system: FakeActorSystem) throws -> Self {
     fatalError()
   }
 }

@@ -40,6 +40,9 @@ struct ActorAddress: Sendable, Hashable, Codable {
 }
 
 struct FakeActorSystem: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias Invocation = FakeInvocation
+  typealias SerializationRequirement = Codable
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor,
@@ -47,29 +50,55 @@ struct FakeActorSystem: DistributedActorSystem {
     return nil
   }
 
-  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
       where Act: DistributedActor {
-    .init(ActorAddress(parse: ""))
+    ActorAddress(parse: "")
   }
 
-  public func actorReady<Act>(_ actor: Act)
+  func actorReady<Act>(_ actor: Act)
       where Act: DistributedActor {
     print("\(#function):\(actor)")
   }
 
-  func resignID(_ id: AnyActorIdentity) {}
+  func resignID(_ id: ActorID) {}
+
+  func makeInvocation() -> Invocation {
+    .init()
+  }
+}
+
+struct FakeInvocation: DistributedTargetInvocation {
+  typealias ArgumentDecoder = FakeArgumentDecoder
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
+  mutating func doneRecording() throws {}
+
+  // === Receiving / decoding -------------------------------------------------
+
+  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
+  mutating func decodeReturnType() throws -> Any.Type? { nil }
+  mutating func decodeErrorType() throws -> Any.Type? { nil }
+
+  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
+    typealias SerializationRequirement = Codable
+  }
 }
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
-func test(transport: FakeActorSystem) async {
+func test(system: FakeActorSystem) async {
   _ = Philosopher(system: system)
 }
 
 @main struct Main {
   static func main() async {
-    await test(transport: FakeActorSystem())
+    await test(system: FakeActorSystem())
   }
 }

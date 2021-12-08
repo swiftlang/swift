@@ -1,11 +1,16 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 import _Distributed
+import FakeDistributedActorSystems
 
-/// Use the existential wrapper as the default actor transport.
-typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
+@available(SwiftStdlib 5.5, *)
+typealias DefaultDistributedActorSystem = FakeActorSystem
+
+// ==== ----------------------------------------------------------------------------------------------------------------
 
 distributed actor OK0 { }
 
@@ -31,7 +36,7 @@ distributed actor Bad12 {
 distributed actor OK2 {
   var x: Int
 
-  init(x: Int, transport: AnyDistributedActorSystem) { // ok
+  init(x: Int, system: FakeActorSystem) { // ok
     self.x = x
   }
 }
@@ -39,22 +44,22 @@ distributed actor OK2 {
 distributed actor Bad2 {
   var x: Int = 1
 
-  init(transport: AnyDistributedActorSystem, too many: AnyDistributedActorSystem) {
-    // expected-error@-1{{designated distributed actor initializer 'init(transport:too:)' must accept exactly one DistributedActorSystem parameter, found 2}}
+  init(system: FakeActorSystem, too many: FakeActorSystem) {
+    // expected-error@-1{{designated distributed actor initializer 'init(system:too:)' must accept exactly one DistributedActorSystem parameter, found 2}}
   }
 }
 
 distributed actor OK3 {
   var x: Int
 
-  init(y: Int, transport: AnyDistributedActorSystem) {
+  init(y: Int, system: FakeActorSystem) {
     self.x = y
   }
 }
 
 distributed actor OKMulti {
 
-  convenience init(y: Int, transport: AnyDistributedActorSystem) { // ok
+  convenience init(y: Int, system: FakeActorSystem) { // ok
     self.init(system: system)
   }
 
@@ -62,48 +67,9 @@ distributed actor OKMulti {
 
 distributed actor OKMultiDefaultValues {
 
-  convenience init(y: Int, transport: AnyDistributedActorSystem, x: Int = 1234) { // ok
+  convenience init(y: Int, system: FakeActorSystem, x: Int = 1234) { // ok
     self.init(system: system)
   }
 
 }
 
-// ==== ------------------------------------------------------------------------
-// MARK: Specific transport
-
-struct ActorAddress: Sendable, Hashable, Codable {
-  let address: String
-  init(parse address : String) {
-    self.address = address
-  }
-}
-
-struct FakeActorSystem: DistributedActorSystem {
-  typealias ActorID = ActorAddress
-
-  func resolve<Act>(id: ID, as actorType: Act.Type) throws -> Act?
-          where Act: DistributedActor, Act.ID == ActorID {
-    return nil
-  }
-
-  func assignID<Act>(_ actorType: Act.Type) -> ActorAddress
-          where Act: DistributedActor, Act.ID == ActorID {
-    ActorAddress(parse: "")
-  }
-
-  public func actorReady<Act>(_ actor: Act)
-          where Act: DistributedActor, Act.ID == ActorID {
-    print("\(#function):\(actor)")
-  }
-
-  func resignID(_ id: ActorAddress) {}
-}
-
-distributed actor OKSpecificTransportType {
-  typealias Transport = FakeActorSystem
-
-  init(y: Int, transport fake: FakeActorSystem) { // ok
-    // nothing
-  }
-
-}

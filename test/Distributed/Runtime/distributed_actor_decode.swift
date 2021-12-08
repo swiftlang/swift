@@ -46,7 +46,8 @@ final class FakeActorSystem: DistributedActorSystem {
   typealias SerializationRequirement = Codable
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor, Act.ID == ActorID  {
+      where Act: DistributedActor,
+            Act.ID == ActorID  {
     print("resolve type:\(actorType), address:\(id)")
     return nil
   }

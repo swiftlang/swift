@@ -56,7 +56,6 @@ void emitDistributedActorSystemWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName,
     SILValue actorSystem, SILType actorType, ArrayRef<SILValue> args,
     Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets) {
-  fprintf(stderr, "[%s:%d] (%s) Prepare call: %s ========================================================================\n", __FILE__, __LINE__, __FUNCTION__, methodName.getBaseName().getIdentifier().str().str().c_str());
   auto &F = B.getFunction();
   auto &M = B.getModule();
   auto &C = F.getASTContext();
@@ -146,35 +145,13 @@ void emitDistributedActorSystemWitnessCall(
     if (params[i].isFormalIndirect() &&
         !arg->getType().isAddress() &&
         !dyn_cast<AnyMetatypeType>(arg->getType().getASTType())) {
-      fprintf(stderr, "[%s:%d] (%s) push arg, make pointer\n", __FILE__, __LINE__, __FUNCTION__);
       auto buf = B.createAllocStack(loc, arg->getType(), None);
       auto argCopy = B.emitCopyValueOperation(loc, arg);
       B.emitStoreValueOperation(
           loc, argCopy, buf, StoreOwnershipQualifier::Init);
       temporaryActorIDBuffer = SILValue(buf);
-
-      arg->getType().dump();
-      fprintf(stderr, "[%s:%d] (%s) made into: %s\n", __FILE__, __LINE__, __FUNCTION__, (*temporaryActorIDBuffer)->getType().getMangledName().c_str());
-      (*temporaryActorIDBuffer)->getType().dump();
-
       allArgs.push_back(*temporaryActorIDBuffer);
-//    } else if (methodName.getBaseName().getIdentifier() == C.Id_assignID) {
-//      fprintf(stderr, "[%s:%d] (%s) push arg, ACTOR, make pointer\n", __FILE__, __LINE__, __FUNCTION__);
-//      arg->dump();
-//      auto buf = B.createAllocStack(loc, arg->getType(), None);
-//      auto argCopy = B.emitCopyValueOperation(loc, arg);
-//      B.emitStoreValueOperation(
-//          loc, argCopy, buf, StoreOwnershipQualifier::Init);
-//      temporaryActorIDBuffer = SILValue(buf);
-//
-//      arg->getType().dump();
-//      fprintf(stderr, "[%s:%d] (%s) made into: %s\n", __FILE__, __LINE__, __FUNCTION__, (*temporaryActorIDBuffer)->getType().getMangledName().c_str());
-//      (*temporaryActorIDBuffer)->getType().dump();
-//
-//      allArgs.push_back(*temporaryActorIDBuffer);
     } else {
-      fprintf(stderr, "[%s:%d] (%s) push arg, directly\n", __FILE__, __LINE__, __FUNCTION__);
-      arg->getType().dump();
       allArgs.push_back(arg);
     }
   }

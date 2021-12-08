@@ -44,6 +44,9 @@ public protocol DistributedActor:
   /// The type of transport used to communicate with actors of this type.
   associatedtype ActorSystem: DistributedActorSystem
 
+  /// The serialization requirement to apply to all distributed declarations inside the actor.
+  typealias SerializationRequirement = ActorSystem.SerializationRequirement
+
   /// Logical identity of this distributed actor.
   ///
   /// Many distributed actor references may be pointing at, logically, the same actor.

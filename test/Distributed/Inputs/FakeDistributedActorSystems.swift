@@ -1,26 +1,19 @@
-// RUN:  %target-swift-emit-silgen %s -enable-experimental-distributed -disable-availability-checking | %FileCheck %s --dump-input=fail
-// REQUIRES: concurrency
-// REQUIRES: distributed
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift open source project
+//
+// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0
+//
+// See LICENSE.txt for license information
+// See CONTRIBUTORS.txt for the list of Swift project authors
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
 
 import _Distributed
 
-distributed actor DA {
-  typealias ActorSystem = FakeActorSystem
-}
-
-extension DA {
-  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s17distributed_thunk2DAC1fyyFTE : $@convention(method) @async (@guaranteed DA) -> @error Error
-  // CHECK: function_ref @swift_distributed_actor_is_remote
-
-  // Call the actor function
-  // CHECK: function_ref @$s17distributed_thunk2DAC1fyyF : $@convention(method) (@guaranteed DA) -> ()
-
-  // ... or the remote thunk
-  // CHECK: dynamic_function_ref @$s17distributed_thunk2DAC9_remote_fyyYaKF : $@convention(method) @async (@guaranteed DA) -> @error Error
-  distributed func f() { }
-}
-
-// ==== ----------------------------------------------------------------------------------------------------------------
 // ==== Fake Address -----------------------------------------------------------
 
 public struct ActorAddress: Hashable, Sendable, Codable {
@@ -97,4 +90,3 @@ public struct FakeInvocation: DistributedTargetInvocation {
     public typealias SerializationRequirement = Codable
   }
 }
-

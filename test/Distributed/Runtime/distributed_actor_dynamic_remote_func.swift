@@ -12,7 +12,7 @@ import _Distributed
 distributed actor LocalWorker {
   typealias Transport = FakeActorSystem
 
-  init(transport: FakeActorSystem) {}
+  init(system: FakeActorSystem) {}
 
   distributed func function() async throws -> String {
     "local:"
@@ -47,18 +47,22 @@ struct ActorAddress: Sendable, Hashable, Codable {
 }
 
 struct FakeActorSystem: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias Invocation = FakeInvocation
+  typealias SerializationRequirement = Codable
 
-  func resolve<Act>(id: ID, as actorType: Act.Type)
-  throws -> Act?
-      where Act: DistributedActor {
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     return nil
   }
 
-  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
-      where Act: DistributedActor {
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     let id = ActorAddress(parse: "xxx")
     print("assign type:\(actorType), id:\(id)")
-    return .init(id)
+    return id
   }
 
   func actorReady<Act>(_ actor: Act)
@@ -67,10 +71,37 @@ struct FakeActorSystem: DistributedActorSystem {
     print("ready actor:\(actor), id:\(actor.id)")
   }
 
-  func resignID(_ id: AnyActorIdentity) {
+  func resignID(_ id: ActorID) {
     print("ready id:\(id)")
   }
+
+  func makeInvocation() -> Invocation {
+    .init()
+  }
 }
+
+struct FakeInvocation: DistributedTargetInvocation {
+  typealias ArgumentDecoder = FakeArgumentDecoder
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
+  mutating func doneRecording() throws {}
+
+  // === Receiving / decoding -------------------------------------------------
+
+  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
+  mutating func decodeReturnType() throws -> Any.Type? { nil }
+  mutating func decodeErrorType() throws -> Any.Type? { nil }
+
+  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
+    typealias SerializationRequirement = Codable
+  }
+}
+
 
 @available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
@@ -84,7 +115,7 @@ func test_local() async throws {
   let x = try await worker.function()
   print("call: \(x)")
   // CHECK: assign type:LocalWorker, id:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.LocalWorker, id:AnyActorIdentity([[ADDRESS]])
+  // CHECK: ready actor:main.LocalWorker, id:[[ADDRESS]]
   // CHECK: call: local:
 }
 
@@ -92,7 +123,7 @@ func test_remote() async throws {
   let address = ActorAddress(parse: "")
   let system = FakeActorSystem()
 
-  let worker = try LocalWorker.resolve(.init(address), using: transport)
+  let worker = try LocalWorker.resolve(id: address, using: system)
   let x = try await worker.function()
   print("call: \(x)")
   // CHECK: call: _cluster_remote_function():

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -10,7 +10,6 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.6, *)
 distributed actor SomeSpecificDistributedActor {
 
   distributed func hello() async throws {
@@ -33,7 +32,6 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
 struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
@@ -41,7 +39,6 @@ struct ActorAddress: Sendable, Hashable, Codable {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 struct FakeActorSystem: DistributedActorSystem {
   typealias ActorID = ActorAddress
   typealias Invocation = FakeInvocation
@@ -59,7 +56,7 @@ struct FakeActorSystem: DistributedActorSystem {
     ActorAddress(parse: "")
   }
 
-  public func actorReady<Act>(_ actor: Act)
+  func actorReady<Act>(_ actor: Act)
       where Act: DistributedActor,
             Act.ID == ActorID {
     print("\(#function):\(actor)")
@@ -94,12 +91,10 @@ struct FakeInvocation: DistributedTargetInvocation {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
 func test_initializers() {
   let address = ActorAddress(parse: "")
   let system = FakeActorSystem()
@@ -108,7 +103,6 @@ func test_initializers() {
   _ = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
 }
 
-@available(SwiftStdlib 5.6, *)
 func test_address() {
   let system = FakeActorSystem()
 
@@ -116,7 +110,6 @@ func test_address() {
   _ = actor.id
 }
 
-@available(SwiftStdlib 5.6, *)
 func test_run(system: FakeActorSystem) async {
   let actor = SomeSpecificDistributedActor(system: system)
 
@@ -125,7 +118,6 @@ func test_run(system: FakeActorSystem) async {
   print("after") // CHECK: after
 }
 
-@available(SwiftStdlib 5.6, *)
 func test_echo(system: FakeActorSystem) async {
   let actor = SomeSpecificDistributedActor(system: system)
 
@@ -133,7 +125,6 @@ func test_echo(system: FakeActorSystem) async {
   print("echo: \(echo)") // CHECK: echo: 42
 }
 
-@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     await test_run(system: FakeActorSystem())

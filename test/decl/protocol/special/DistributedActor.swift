@@ -5,7 +5,7 @@
 import _Distributed
 
 /// Use the existential wrapper as the default actor transport.
-typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 distributed actor D1 {
   var x: Int = 17

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -12,24 +12,20 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.6, *)
 actor A {}
 
-@available(SwiftStdlib 5.6, *)
 distributed actor DA {
-  init(transport: FakeActorSystem) {}
+  init(system: FakeActorSystem) {}
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor DA_userDefined {
-  init(transport: FakeActorSystem) {}
+  init(system: FakeActorSystem) {}
 
   deinit {}
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor DA_userDefined2 {
-  init(transport: FakeActorSystem) {}
+  init(system: FakeActorSystem) {}
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -37,12 +33,11 @@ distributed actor DA_userDefined2 {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor DA_state {
   var name = "Hello"
   var age = 42
 
-  init(transport: FakeActorSystem) {}
+  init(system: FakeActorSystem) {}
 
   deinit {
     print("Deinitializing \(self.id)")
@@ -52,7 +47,6 @@ distributed actor DA_state {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
 struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
@@ -60,7 +54,6 @@ struct ActorAddress: Sendable, Hashable, Codable {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
   typealias ActorID = ActorAddress
   typealias Invocation = FakeDistributedInvocation
@@ -120,12 +113,10 @@ struct FakeDistributedTargetInvocationArgumentDecoder: DistributedTargetInvocati
   typealias SerializationRequirement = Codable
 }
 
-@available(SwiftStdlib 5.6, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
 func test() {
   let system = FakeActorSystem()
 
@@ -171,13 +162,12 @@ func test() {
   // a remote actor should not resign it's address, it was never "assigned" it
   let address = ActorAddress(parse: "remote-1")
   _ = { () -> DA_userDefined2 in
-    try! DA_userDefined2.resolve(id: address, using: transport)
+    try! DA_userDefined2.resolve(id: address, using: system)
   }()
   // CHECK-NEXT: resolve type:DA_userDefined2, address:ActorAddress(address: "[[ADDR5:remote-1]]")
   // CHECK-NEXT: Deinitializing
 }
 
-@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     test()

@@ -61,25 +61,17 @@ static SILValue emitActorPropertyReference(
 static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
                                SILValue actorSelf,
                                VarDecl* prop, SILValue value) {
-  fprintf(stderr, "[%s:%d] (%s) Initialize property: %s\n", __FILE__, __LINE__, __FUNCTION__, prop->getNameStr().str().c_str());
-  value->dump();
-  fprintf(stderr, "[%s:%d] (%s) IS KIND: %d\n", __FILE__, __LINE__, __FUNCTION__, value->getKind());
   Type formalType = SGF.F.mapTypeIntoContext(prop->getInterfaceType());
   SILType loweredType = SGF.getLoweredType(formalType);
 
   auto fieldAddr = emitActorPropertyReference(SGF, loc, actorSelf, prop);
 
   if (loweredType.isAddressOnly(SGF.F)) {
-    fprintf(stderr, "[%s:%d] (%s) IS ADDRESS ONLY\n", __FILE__, __LINE__, __FUNCTION__);
     SGF.B.createCopyAddr(loc, value, fieldAddr, IsNotTake, IsInitialization);
   } else {
-    fprintf(stderr, "[%s:%d] (%s) ELSE\n", __FILE__, __LINE__, __FUNCTION__);
     if (value->getType().isAddress()) {
-    fprintf(stderr, "[%s:%d] (%s) ELSE, IS ADDR\n", __FILE__, __LINE__, __FUNCTION__);
       value = SGF.B.createTrivialLoadOr(
           loc, value, LoadOwnershipQualifier::Take);
-//      auto managed = ManagedValue::forUnmanaged(value);
-//      managed.borrow(SGF, loc);
     } else {
       value = SGF.B.emitCopyValueOperation(loc, value);
     }
@@ -90,7 +82,6 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
     if (value->getType().isAddress()) {
       SGF.B.createDestroyAddr(loc, value);
     }
-
   }
 }
 
@@ -406,8 +397,6 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
     Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
     B.createThrow(loc, error);
   }
-
-  F.dump();
 }
 
 // MARK: transport.resignID()

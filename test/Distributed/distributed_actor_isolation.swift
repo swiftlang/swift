@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking -verify-ignore-unknown
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -6,16 +8,12 @@
 //  generated code but right now a few are, because of Sendability checks -- need to track it down more.
 
 import _Distributed
+import FakeDistributedActorSystems
 
-/// Use the existential wrapper as the default actor transport.
-typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
+@available(SwiftStdlib 5.5, *)
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
-struct ActorAddress: Sendable, Hashable, Codable {
-  let address: String
-  init(parse address : String) {
-    self.address = address
-  }
-}
+// ==== ----------------------------------------------------------------------------------------------------------------
 
 actor LocalActor_1 {
   let name: String = "alice"
@@ -144,7 +142,7 @@ func test_outside(
 ) async throws {
   // ==== properties
   _ = distributed.id // ok
-  distributed.id = AnyActorIdentity(ActorAddress(parse: "mock://1.1.1.1:8080/#123121")) // expected-error{{cannot assign to property: 'id' is immutable}})
+  distributed.id = ActorAddress(parse: "mock://1.1.1.1:8080/#123121") // expected-error{{cannot assign to property: 'id' is immutable}}
 
   _ = local.name // ok, special case that let constants are okey
   let _: String = local.mutable // ok, special case that let constants are okey
@@ -190,16 +188,16 @@ func test_params(
 
 // Actor initializer isolation (through typechecking only!)
 distributed actor DijonMustard {
-  nonisolated init(transport: AnyDistributedActorSystem) {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
+  nonisolated init(system: FakeActorSystem) {} // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in Swift 6}} {{3-15=}}
 
-  convenience init(conv: AnyDistributedActorSystem) {
-    self.init(transport: conv)
+  convenience init(conv: FakeActorSystem) {
+    self.init(system: conv)
     self.f() // expected-error {{actor-isolated instance method 'f()' can not be referenced from a non-isolated context}}
   }
 
   func f() {} // expected-note {{distributed actor-isolated instance method 'f()' declared here}}
 
-  nonisolated convenience init(conv2: AnyDistributedActorSystem) { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
-    self.init(transport: conv2)
+  nonisolated convenience init(conv2: FakeActorSystem) { // expected-warning {{'nonisolated' on an actor's convenience initializer is redundant; this is an error in Swift 6}} {{3-15=}}
+    self.init(system: conv2)
   }
 }

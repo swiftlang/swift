@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,34 +8,27 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// Flaky CI test
-// REQUIRES: radar84649015
-
 import _Distributed
 
 enum MyError: Error {
   case test
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor PickATransport1 {
-  init(kappa transport: FakeActorSystem, other: Int) {}
+  init(kappa system: FakeActorSystem, other: Int) {}
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor PickATransport2 {
-  init(other: Int, theTransport: FakeActorSystem) async {}
+  init(other: Int, thesystem: FakeActorSystem) async {}
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor LocalWorker {
-  init(transport: FakeActorSystem) {}
+  init(system: FakeActorSystem) {}
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor Bug_CallsReadyTwice {
   var x: Int
-  init(transport: FakeActorSystem, wantBug: Bool) async {
+  init(system: FakeActorSystem, wantBug: Bool) async {
     if wantBug {
       self.x = 1
     }
@@ -43,19 +36,17 @@ distributed actor Bug_CallsReadyTwice {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor Throwy {
-  init(transport: FakeActorSystem, doThrow: Bool) throws {
+  init(system: FakeActorSystem, doThrow: Bool) throws {
     if doThrow {
       throw MyError.test
     }
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor ThrowBeforeFullyInit {
   var x: Int
-  init(transport: FakeActorSystem, doThrow: Bool) throws {
+  init(system: FakeActorSystem, doThrow: Bool) throws {
     if doThrow {
       throw MyError.test
     }
@@ -65,7 +56,6 @@ distributed actor ThrowBeforeFullyInit {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
 struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address: String) {
@@ -76,20 +66,27 @@ struct ActorAddress: Sendable, Hashable, Codable {
 // global to track available IDs
 var nextID: Int = 1
 
-@available(SwiftStdlib 5.6, *)
 struct FakeActorSystem: DistributedActorSystem {
+  public typealias ActorID = ActorAddress
+  public typealias Invocation = FakeInvocation
+  public typealias SerializationRequirement = Codable
 
-  func resolve<Act>(id: ID, as actorType: Act.Type)
-      throws -> Act? where Act: DistributedActor {
+  init() {
+    print("Initialized new FakeActorSystem")
+  }
+
+  public func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+            Act.ID == ActorID  {
     fatalError("not implemented:\(#function)")
   }
 
-  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
       where Act: DistributedActor {
     let id = ActorAddress(parse: "\(nextID)")
     nextID += 1
     print("assign type:\(actorType), id:\(id)")
-    return .init(id)
+    return id
   }
 
   func actorReady<Act>(_ actor: Act)
@@ -98,14 +95,42 @@ struct FakeActorSystem: DistributedActorSystem {
     print("ready actor:\(actor), id:\(actor.id)")
   }
 
-  func resignID(_ id: AnyActorIdentity) {
+  func resignID(_ id: ActorID) {
     print("resign id:\(id)")
+  }
+
+
+  public func makeInvocation() -> Invocation {
+    .init()
   }
 }
 
+public struct FakeInvocation: DistributedTargetInvocation {
+  public typealias ArgumentDecoder = FakeArgumentDecoder
+  public typealias SerializationRequirement = Codable
+
+  public mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
+  public mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
+  public mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
+  public mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
+  public mutating func doneRecording() throws {}
+
+  // === Receiving / decoding -------------------------------------------------
+
+  public mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  public mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
+  public mutating func decodeReturnType() throws -> Any.Type? { nil }
+  public mutating func decodeErrorType() throws -> Any.Type? { nil }
+
+  public struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
+    public typealias SerializationRequirement = Codable
+  }
+}
+
+typealias DefaultDistributedActorSystem = FakeActorSystem
+
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
 func test() async {
   let system = FakeActorSystem()
 
@@ -116,15 +141,15 @@ func test() async {
 
   test.append(LocalWorker(system: system))
   // CHECK: assign type:LocalWorker, id:ActorAddress(address: "[[ID1:.*]]")
-  // CHECK: ready actor:main.LocalWorker, id:AnyActorIdentity(ActorAddress(address: "[[ID1]]"))
+  // CHECK: ready actor:main.LocalWorker, id:ActorAddress(address: "[[ID1]]")
 
-  test.append(PickATransport1(kappa: transport, other: 0))
+  test.append(PickATransport1(kappa: system, other: 0))
   // CHECK: assign type:PickATransport1, id:ActorAddress(address: "[[ID2:.*]]")
-  // CHECK: ready actor:main.PickATransport1, id:AnyActorIdentity(ActorAddress(address: "[[ID2]]"))
+  // CHECK: ready actor:main.PickATransport1, id:ActorAddress(address: "[[ID2]]")
 
   test.append(try? Throwy(system: system, doThrow: false))
   // CHECK: assign type:Throwy, id:ActorAddress(address: "[[ID3:.*]]")
-  // CHECK: ready actor:main.Throwy, id:AnyActorIdentity(ActorAddress(address: "[[ID3]]"))
+  // CHECK: ready actor:main.Throwy, id:ActorAddress(address: "[[ID3]]")
 
   test.append(try? Throwy(system: system, doThrow: true))
   // CHECK: assign type:Throwy, id:ActorAddress(address: "[[ID4:.*]]")
@@ -136,23 +161,22 @@ func test() async {
 
   test.append(await PickATransport2(other: 1, thesystem: system))
   // CHECK: assign type:PickATransport2, id:ActorAddress(address: "[[ID6:.*]]")
-  // CHECK: ready actor:main.PickATransport2, id:AnyActorIdentity(ActorAddress(address: "[[ID6]]"))
+  // CHECK: ready actor:main.PickATransport2, id:ActorAddress(address: "[[ID6]]")
 
   test.append(await Bug_CallsReadyTwice(system: system, wantBug: true))
     // CHECK: assign type:Bug_CallsReadyTwice, id:ActorAddress(address: "[[ID7:.*]]")
-    // CHECK:      ready actor:main.Bug_CallsReadyTwice, id:AnyActorIdentity(ActorAddress(address: "[[ID7]]"))
-    // CHECK-NEXT: ready actor:main.Bug_CallsReadyTwice, id:AnyActorIdentity(ActorAddress(address: "[[ID7]]"))
+    // CHECK:      ready actor:main.Bug_CallsReadyTwice, id:ActorAddress(address: "[[ID7]]")
+    // CHECK-NEXT: ready actor:main.Bug_CallsReadyTwice, id:ActorAddress(address: "[[ID7]]")
 
-  // CHECK-DAG: resign id:AnyActorIdentity(ActorAddress(address: "[[ID1]]"))
-  // CHECK-DAG: resign id:AnyActorIdentity(ActorAddress(address: "[[ID2]]"))
-  // CHECK-DAG: resign id:AnyActorIdentity(ActorAddress(address: "[[ID3]]"))
-  // MISSING-CHECK-DAG: resign id:AnyActorIdentity(ActorAddress(address: "[[ID4]]")) // FIXME: should eventually work (rdar://84533820).
-  // MISSING-CHECK-DAG: resign id:AnyActorIdentity(ActorAddress(address: "[[ID5]]")) // FIXME: should eventually work (rdar://84533820).
-  // CHECK-DAG: resign id:AnyActorIdentity(ActorAddress(address: "[[ID6]]"))
-  // CHECK-DAG: resign id:AnyActorIdentity(ActorAddress(address: "[[ID7]]"))
+  // CHECK-DAG: resign id:ActorAddress(address: "[[ID1]]")
+  // CHECK-DAG: resign id:ActorAddress(address: "[[ID2]]")
+  // CHECK-DAG: resign id:ActorAddress(address: "[[ID3]]")
+  // MISSING-CHECK-DAG: resign id:ActorAddress(address: "[[ID4]]") // FIXME: should eventually work (rdar://84533820).
+  // MISSING-CHECK-DAG: resign id:ActorAddress(address: "[[ID5]]") // FIXME: should eventually work (rdar://84533820).
+  // CHECK-DAG: resign id:ActorAddress(address: "[[ID6]]")
+  // CHECK-DAG: resign id:ActorAddress(address: "[[ID7]]")
 }
 
-@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     await test()

@@ -13,8 +13,8 @@
 import _Distributed
 import def_distributed
 
-func testDoSomethingDistributed(transport: AnyDistributedActorSystem) {
-  let _: DA = DA(transport: transport)
+func testDoSomethingDistributed(system: FakeActorSystem) {
+  let _: DA = DA(system: system)
 }
 
 extension DA {

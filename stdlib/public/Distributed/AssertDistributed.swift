@@ -28,6 +28,6 @@ public func _missingDistributedActorSystem(
     Invoked remote placeholder function '\(functionName)' on remote \
     distributed actor of type '\(className)'. Configure an appropriate \
     'DistributedActorSystem' for this actor to resolve this error (e.g. by depending \
-    on some specific transport library).
+    on some specific actor system library).
     """, file: file, line: line)
 }

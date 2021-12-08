@@ -1,11 +1,13 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 import _Distributed
+import FakeDistributedActorSystems
 
-/// Use the existential wrapper as the default actor transport.
-typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== ------------------------------------------------------------------------
 // MARK: Protocols

@@ -22,7 +22,6 @@ distributed actor Capybara {
 
 
 // ==== Fake Transport ---------------------------------------------------------
-@available(SwiftStdlib 5.6, *)
 struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address: String) {
@@ -30,18 +29,20 @@ struct ActorAddress: Sendable, Hashable, Codable {
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 struct FakeActorSystem: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias Invocation = FakeInvocation
+  typealias SerializationRequirement = Codable
 
-  func resolve<Act>(id: ID, as actorType: Act.Type)
+  func resolve<Act>(id: ActorID, as actorType: Act.Type)
   throws -> Act? where Act: DistributedActor {
     return nil
   }
 
-  func assignID<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
           where Act: DistributedActor {
     let id = ActorAddress(parse: "xxx")
-    return .init(id)
+    return id
   }
 
   func actorReady<Act>(_ actor: Act)
@@ -49,7 +50,33 @@ struct FakeActorSystem: DistributedActorSystem {
       Act.ID == ActorID {
   }
 
-  func resignID(_ id: AnyActorIdentity) {
+  func resignID(_ id: ActorID) {
+  }
+
+  func makeInvocation() -> Invocation {
+    .init()
+  }
+}
+
+struct FakeInvocation: DistributedTargetInvocation {
+  typealias ArgumentDecoder = FakeArgumentDecoder
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
+  mutating func doneRecording() throws {}
+
+  // === Receiving / decoding -------------------------------------------------
+
+  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
+  mutating func decodeReturnType() throws -> Any.Type? { nil }
+  mutating func decodeErrorType() throws -> Any.Type? { nil }
+
+  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
+    typealias SerializationRequirement = Codable
   }
 }
 
@@ -68,7 +95,7 @@ func test() async throws {
   // CHECK: valueWhenLocal: watermelon
   print("valueWhenLocal: \(valueWhenLocal ?? "nil")")
 
-  let remote = try Capybara.resolve(local.id, using: transport)
+  let remote = try Capybara.resolve(id: local.id, using: system)
   let valueWhenRemote: String? = await remote.whenLocal { __secretlyKnownToBeLocal in
     __secretlyKnownToBeLocal.eat()
   }
@@ -77,7 +104,6 @@ func test() async throws {
   print("valueWhenRemote: \(valueWhenRemote ?? "nil")")
 }
 
-@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     try! await test()
