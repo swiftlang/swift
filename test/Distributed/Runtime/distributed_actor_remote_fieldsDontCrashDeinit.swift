@@ -86,7 +86,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 @available(SwiftStdlib 5.6, *)
 func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
-  let transport = FakeActorSystem()
+  let system = FakeActorSystem()
 
   var remote: SomeSpecificDistributedActor? =
       try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)

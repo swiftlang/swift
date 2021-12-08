@@ -215,7 +215,7 @@ func test_remote_invoke(address: ActorAddress, transport: FakeActorSystem) async
   let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
   assert(__isRemoteActor(remote) == true, "should be remote")
 
-  let local = SomeSpecificDistributedActor(transport: transport)
+  let local = SomeSpecificDistributedActor(system: system)
   assert(__isRemoteActor(local) == false, "should be local")
 
   print("local isRemote: \(__isRemoteActor(local))")
@@ -248,8 +248,8 @@ func test_remote_invoke(address: ActorAddress, transport: FakeActorSystem) async
 @main struct Main {
   static func main() async {
     let address = ActorAddress(address: "")
-    let transport = FakeActorSystem()
+    let system = FakeActorSystem()
 
-    await test_remote_invoke(address: address, transport: transport)
+    await test_remote_invoke(address: address, system: system)
   }
 }

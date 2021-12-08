@@ -127,7 +127,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 
 @available(SwiftStdlib 5.6, *)
 func test() {
-  let transport = FakeActorSystem()
+  let system = FakeActorSystem()
 
   // no lifecycle things make sense for a normal actor, double check we didn't emit them
   print("before A")
@@ -137,14 +137,14 @@ func test() {
   // CHECK: after A
 
   _ = { () -> DA in
-    DA(transport: transport)
+    DA(system: system)
   }()
   // CHECK: assign type:DA, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA, address:ActorAddress(address: "[[ADDR1:addr-[0-9]]]")
   // CHECK: resign address:ActorAddress(address: "[[ADDR1]]")
 
   _ = { () -> DA_userDefined in
-    DA_userDefined(transport: transport)
+    DA_userDefined(system: system)
   }()
   // CHECK: assign type:DA_userDefined, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_userDefined, address:ActorAddress(address: "[[ADDR2:addr-[0-9]]]")
@@ -152,7 +152,7 @@ func test() {
 
   // resign must happen as the _last thing_ after user-deinit completed
   _ = { () -> DA_userDefined2 in
-    DA_userDefined2(transport: transport)
+    DA_userDefined2(system: system)
   }()
   // CHECK: assign type:DA_userDefined2, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_userDefined2, address:ActorAddress(address: "[[ADDR3:addr-[0-9]]]")
@@ -161,7 +161,7 @@ func test() {
 
   // resign must happen as the _last thing_ after user-deinit completed
   _ = { () -> DA_state in
-    DA_state(transport: transport)
+    DA_state(system: system)
   }()
   // CHECK: assign type:DA_state, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.DA_state, address:ActorAddress(address: "[[ADDR4:addr-[0-9]]]")

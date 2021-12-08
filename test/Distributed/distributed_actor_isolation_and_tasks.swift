@@ -58,11 +58,11 @@ distributed actor Philosopher {
 }
 
 func test_outside(transport: AnyDistributedActorSystem) async throws {
-  _ = try await Philosopher(transport: transport).dist()
-  _ = Philosopher(transport: transport).log // expected-error{{distributed actor-isolated property 'log' can only be referenced inside the distributed actor}}
+  _ = try await Philosopher(system: system).dist()
+  _ = Philosopher(system: system).log // expected-error{{distributed actor-isolated property 'log' can only be referenced inside the distributed actor}}
 
-  _ = Philosopher(transport: transport).id
-  _ = Philosopher(transport: transport).actorSystem
+  _ = Philosopher(system: system).id
+  _ = Philosopher(system: system).actorSystem
 }
 
 func test_outside_isolated(phil: isolated Philosopher) async throws {

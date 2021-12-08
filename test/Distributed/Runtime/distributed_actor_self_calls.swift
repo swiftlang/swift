@@ -65,7 +65,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 // ==== Execute ----------------------------------------------------------------
 
 func test(transport: FakeActorSystem) async {
-  _ = Philosopher(transport: transport)
+  _ = Philosopher(system: system)
 }
 
 @main struct Main {

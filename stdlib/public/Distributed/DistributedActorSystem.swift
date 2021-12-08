@@ -160,13 +160,13 @@ extension DistributedActorSystem {
   ) async throws where Act: DistributedActor,
                        Act.ID == ActorID,
                        ResultHandler: DistributedTargetInvocationResultHandler {
-    fatalError("TODO: synthesize and invoke the _executedDistributedTarget")
+    fatalError("TODO: synthesize and invoke the _executeDistributedTarget")
   }
 }
 
 @available(SwiftStdlib 5.6, *)
 @_silgen_name("swift_distributed_execute_target")
-func _executedDistributedTarget(
+func _executeDistributedTarget(
   on actor: AnyObject, // DistributedActor
   _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
   argumentBuffer: Builtin.RawPointer, // HeterogeneousBuffer of arguments

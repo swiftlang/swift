@@ -107,14 +107,14 @@ struct FakeActorSystem: DistributedActorSystem {
 
 @available(SwiftStdlib 5.6, *)
 func test() async {
-  let transport = FakeActorSystem()
+  let system = FakeActorSystem()
 
   // NOTE: All allocated distributed actors should be saved in this array, so
   // that they will be deallocated together at the end of this test!
   // This convention helps ensure that the test is not flaky.
   var test: [DistributedActor?] = []
 
-  test.append(LocalWorker(transport: transport))
+  test.append(LocalWorker(system: system))
   // CHECK: assign type:LocalWorker, id:ActorAddress(address: "[[ID1:.*]]")
   // CHECK: ready actor:main.LocalWorker, id:AnyActorIdentity(ActorAddress(address: "[[ID1]]"))
 
@@ -122,23 +122,23 @@ func test() async {
   // CHECK: assign type:PickATransport1, id:ActorAddress(address: "[[ID2:.*]]")
   // CHECK: ready actor:main.PickATransport1, id:AnyActorIdentity(ActorAddress(address: "[[ID2]]"))
 
-  test.append(try? Throwy(transport: transport, doThrow: false))
+  test.append(try? Throwy(system: system, doThrow: false))
   // CHECK: assign type:Throwy, id:ActorAddress(address: "[[ID3:.*]]")
   // CHECK: ready actor:main.Throwy, id:AnyActorIdentity(ActorAddress(address: "[[ID3]]"))
 
-  test.append(try? Throwy(transport: transport, doThrow: true))
+  test.append(try? Throwy(system: system, doThrow: true))
   // CHECK: assign type:Throwy, id:ActorAddress(address: "[[ID4:.*]]")
   // CHECK-NOT: ready
 
-  test.append(try? ThrowBeforeFullyInit(transport: transport, doThrow: true))
+  test.append(try? ThrowBeforeFullyInit(system: system, doThrow: true))
   // CHECK: assign type:ThrowBeforeFullyInit, id:ActorAddress(address: "[[ID5:.*]]")
   // CHECK-NOT: ready
 
-  test.append(await PickATransport2(other: 1, theTransport: transport))
+  test.append(await PickATransport2(other: 1, thesystem: system))
   // CHECK: assign type:PickATransport2, id:ActorAddress(address: "[[ID6:.*]]")
   // CHECK: ready actor:main.PickATransport2, id:AnyActorIdentity(ActorAddress(address: "[[ID6]]"))
 
-  test.append(await Bug_CallsReadyTwice(transport: transport, wantBug: true))
+  test.append(await Bug_CallsReadyTwice(system: system, wantBug: true))
     // CHECK: assign type:Bug_CallsReadyTwice, id:ActorAddress(address: "[[ID7:.*]]")
     // CHECK:      ready actor:main.Bug_CallsReadyTwice, id:AnyActorIdentity(ActorAddress(address: "[[ID7]]"))
     // CHECK-NEXT: ready actor:main.Bug_CallsReadyTwice, id:AnyActorIdentity(ActorAddress(address: "[[ID7]]"))

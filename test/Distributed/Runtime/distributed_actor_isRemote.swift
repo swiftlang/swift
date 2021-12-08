@@ -90,9 +90,9 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 @available(SwiftStdlib 5.6, *)
 func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
-  let transport = FakeActorSystem()
+  let system = FakeActorSystem()
 
-  let local = SomeSpecificDistributedActor(transport: transport)
+  let local = SomeSpecificDistributedActor(system: system)
   assert(__isLocalActor(local) == true, "should be local")
   assert(__isRemoteActor(local) == false, "should be local")
   print("isRemote(local) = \(__isRemoteActor(local))") // CHECK: isRemote(local) = false

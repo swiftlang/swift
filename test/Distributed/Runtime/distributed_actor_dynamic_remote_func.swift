@@ -78,9 +78,9 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 // ==== Execute ----------------------------------------------------------------
 
 func test_local() async throws {
-  let transport = FakeActorSystem()
+  let system = FakeActorSystem()
 
-  let worker = LocalWorker(transport: transport)
+  let worker = LocalWorker(system: system)
   let x = try await worker.function()
   print("call: \(x)")
   // CHECK: assign type:LocalWorker, id:[[ADDRESS:.*]]
@@ -90,7 +90,7 @@ func test_local() async throws {
 
 func test_remote() async throws {
   let address = ActorAddress(parse: "")
-  let transport = FakeActorSystem()
+  let system = FakeActorSystem()
 
   let worker = try LocalWorker.resolve(.init(address), using: transport)
   let x = try await worker.function()

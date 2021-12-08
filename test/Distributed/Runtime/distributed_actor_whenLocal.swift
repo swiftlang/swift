@@ -57,9 +57,9 @@ struct FakeActorSystem: DistributedActorSystem {
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 func test() async throws {
-  let transport = FakeActorSystem()
+  let system = FakeActorSystem()
 
-  let local = Capybara(transport: transport)
+  let local = Capybara(system: system)
   // await local.eat() // SHOULD ERROR
   let valueWhenLocal: String? = await local.whenLocal { __secretlyKnownToBeLocal in
     __secretlyKnownToBeLocal.eat()
