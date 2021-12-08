@@ -103,7 +103,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
 static constexpr uint32_t onDiskCompletionCacheVersion =
-    6; // Add supertypes to cache
+    6; // Add supertypes to cache + allow multipe result types
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -241,7 +241,11 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
     auto diagMessageIndex = read32le(cursor);
-    auto resultTypeUsrIndex = read32le(cursor);
+    auto resultTypeCount = read32le(cursor);
+    SmallVector<CodeCompletionResultType *, 2> resultTypes;
+    for (size_t i = 0; i < resultTypeCount; ++i) {
+      resultTypes.push_back(getType(read32le(cursor)));
+    }
 
     auto assocUSRCount = read32le(cursor);
     SmallVector<StringRef, 4> assocUSRs;
@@ -253,18 +257,17 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto moduleName = getString(moduleIndex);
     auto briefDocComment = getString(briefDocIndex);
     auto diagMessage = getString(diagMessageIndex);
-    auto resultType = getType(resultTypeUsrIndex);
 
     ContextFreeCodeCompletionResult *result = nullptr;
     if (kind == CodeCompletionResultKind::Declaration) {
       result = new (*V.Allocator) ContextFreeCodeCompletionResult(
           CodeCompletionResultKind::Declaration, static_cast<uint8_t>(declKind),
           opKind, isSystem, string, moduleName, briefDocComment,
-          copyArray(*V.Allocator, ArrayRef<StringRef>(assocUSRs)), resultType,
+          copyArray(*V.Allocator, ArrayRef<StringRef>(assocUSRs)), resultTypes,
           notRecommended, diagSeverity, diagMessage);
     } else {
       result = new (*V.Allocator) ContextFreeCodeCompletionResult(
-          kind, string, opKind, /*BriefDocComment=*/"", resultType,
+          kind, string, opKind, /*BriefDocComment=*/"", resultTypes,
           notRecommended, diagSeverity, diagMessage);
     }
 
@@ -432,7 +435,11 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(addString(R->getModuleName()));      // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
       LE.write(addString(R->getDiagnosticMessage())); // index into strings
-      LE.write(addType(R->getResultType()));          // index into types
+      auto resultTypes = R->getResultTypes();
+      LE.write(static_cast<uint32_t>(resultTypes.size()));
+      for (auto ResultType : resultTypes) {
+        LE.write(addType(ResultType)); // index into types
+      }
 
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
       for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {

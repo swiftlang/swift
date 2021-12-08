@@ -1225,11 +1225,10 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
   return Result;
 }
 
-static CodeCompletionResult::ExpectedTypeRelation
-calculateResultTypeRelation(CodeCompletionResultType *CompletionResultType,
-                            const ExpectedTypeContext &TypeContext,
-                            const DeclContext *DC) {
-  if (CompletionResultType == nullptr) {
+static CodeCompletionResult::ExpectedTypeRelation calculateResultTypeRelation(
+    ArrayRef<CodeCompletionResultType *> CompletionResultTypes,
+    const ExpectedTypeContext &TypeContext, const DeclContext *DC) {
+  if (CompletionResultTypes.empty()) {
     // CompletionResultType = nullptr indicates that the completion item
     // doesn't produce something that has a sensible result type associated with
     // it, so the type relation is not applicable.
@@ -1239,25 +1238,18 @@ calculateResultTypeRelation(CodeCompletionResultType *CompletionResultType,
   if (!DC) {
     return CodeCompletionResult::ExpectedTypeRelation::Unknown;
   }
-  Type ResultType = CompletionResultType->getType(DC->getASTContext());
-  if (!ResultType) {
-    return CodeCompletionResult::ExpectedTypeRelation::Unknown;
-  }
 
-  auto TypeRelation = calculateMaxTypeRelation(ResultType, TypeContext, DC);
-  // Override the type relation for NominalTypes. Use the better relation
-  // for the metatypes and the instance type. For example,
-  //
-  //   func receiveInstance(_: Int) {}
-  //   func receiveMetatype(_: Int.Type) {}
-  //
-  // We want to suggest 'Int' as 'Identical' for both arguments.
-  if (auto Metatype = ResultType->getAs<MetatypeType>()) {
-    auto DeclaredTypeRelation =
-        calculateMaxTypeRelation(Metatype->getInstanceType(), TypeContext, DC);
-    TypeRelation = std::max(TypeRelation, DeclaredTypeRelation);
+  CodeCompletionResult::ExpectedTypeRelation Relation =
+      CodeCompletionResult::ExpectedTypeRelation::Unknown;
+  for (auto CompletionResultType : CompletionResultTypes) {
+    Type ResultType = CompletionResultType->getType(DC->getASTContext());
+    if (!ResultType) {
+      continue;
+    }
+    Relation = std::max(Relation,
+                        calculateMaxTypeRelation(ResultType, TypeContext, DC));
   }
-  return TypeRelation;
+  return Relation;
 }
 
 CodeCompletionResult::CodeCompletionResult(
@@ -1271,7 +1263,7 @@ CodeCompletionResult::CodeCompletionResult(
       Flair(Flair.toRaw()), NotRecommended(NotRecommended),
       DiagnosticSeverity(DiagnosticSeverity),
       DiagnosticMessage(DiagnosticMessage), NumBytesToErase(NumBytesToErase),
-      TypeDistance(calculateResultTypeRelation(ContextFree.getResultType(),
+      TypeDistance(calculateResultTypeRelation(ContextFree.getResultTypes(),
                                                TypeContext, DC)) {}
 
 CodeCompletionOperatorKind
@@ -1350,9 +1342,11 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   // Store context free result in an optional because
   // ContextFreeCodeCompletionResult doesn't have a default constructor.
   Optional<ContextFreeCodeCompletionResult> ContextFreeResult;
-  CodeCompletionResultType *CompletionResultType = nullptr;
-  if (ResultType) {
-    CompletionResultType = CodeCompletionResultType::fromType(*ResultType);
+  SmallVector<CodeCompletionResultType *, 2> CompletionResultTypes;
+  CompletionResultTypes.reserve(ResultTypes.size());
+  for (auto ResultType : ResultTypes) {
+    CompletionResultTypes.push_back(
+        CodeCompletionResultType::fromType(ResultType));
   }
 
   switch (Kind) {
@@ -1395,7 +1389,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         CCS, AssociatedDecl, ModuleName,
         copyString(*Sink.Allocator, BriefDocComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
-        CompletionResultType, ContextFreeNotRecReason,
+        CompletionResultTypes, ContextFreeNotRecReason,
         ContextFreeDiagnosticSeverity, ContextFreeDiagnosticMessage);
     break;
   }
@@ -1403,20 +1397,20 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResultKind::Keyword:
     ContextFreeResult.emplace(KeywordKind, CCS,
                               copyString(*Sink.Allocator, BriefDocComment),
-                              CompletionResultType);
+                              CompletionResultTypes);
     break;
   case CodeCompletionResultKind::BuiltinOperator:
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult.emplace(Kind, CCS, CodeCompletionOperatorKind::None,
                               copyString(*Sink.Allocator, BriefDocComment),
-                              CompletionResultType,
+                              CompletionResultTypes,
                               ContextFreeNotRecommendedReason::None,
                               CodeCompletionDiagnosticSeverity::None,
                               /*DiagnosticMessage=*/"");
     break;
   case CodeCompletionResultKind::Literal:
     assert(LiteralKind.hasValue());
-    ContextFreeResult.emplace(*LiteralKind, CCS, CompletionResultType);
+    ContextFreeResult.emplace(*LiteralKind, CCS, CompletionResultTypes);
     break;
   }
 
@@ -2472,7 +2466,7 @@ public:
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       PO.setBaseType(typeContext->getDeclaredTypeInContext());
     Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO);
-    Builder.setResultType(T, expectedTypeContext, CurrDeclContext);
+    Builder.setResultTypes({T}, expectedTypeContext, CurrDeclContext);
   }
 
   void addTypeAnnotationForImplicitlyUnwrappedOptional(
@@ -2495,7 +2489,7 @@ public:
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       PO.setBaseType(typeContext->getDeclaredTypeInContext());
     Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, suffix);
-    Builder.setResultType(T, expectedTypeContext, CurrDeclContext);
+    Builder.setResultTypes({T}, expectedTypeContext, CurrDeclContext);
   }
 
   /// For printing in code completion results, replace archetypes with
@@ -3011,8 +3005,8 @@ public:
     Builder.addRightParen();
     Builder.addTypeAnnotation("Selector");
     // This function is called only if the context type is 'Selector'.
-    Builder.setResultType(Ctx.getSelectorType(), expectedTypeContext,
-                          CurrDeclContext);
+    Builder.setResultTypes({Ctx.getSelectorType()}, expectedTypeContext,
+                           CurrDeclContext);
   }
 
   void addPoundKeyPath(bool needPound) {
@@ -3030,8 +3024,8 @@ public:
                                     /*IsVarArg=*/false);
     Builder.addRightParen();
     Builder.addTypeAnnotation("String");
-    Builder.setResultType(Ctx.getStringType(), expectedTypeContext,
-                          CurrDeclContext);
+    Builder.setResultTypes({Ctx.getStringType()}, expectedTypeContext,
+                           CurrDeclContext);
   }
 
   SemanticContextKind getSemanticContextKind(const ValueDecl *VD) {
@@ -3363,7 +3357,8 @@ public:
         Builder.addTypeAnnotation(TypeStr);
       }
 
-      Builder.setResultType(ResultType, expectedTypeContext, CurrDeclContext);
+      Builder.setResultTypes({ResultType}, expectedTypeContext,
+                             CurrDeclContext);
 
       if (isUnresolvedMemberIdealType(ResultType))
         Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
@@ -3565,8 +3560,16 @@ public:
 
     addTypeAnnotation(Builder, NTD->getDeclaredType());
 
-    Builder.setResultType(NTD->getInterfaceType(), expectedTypeContext,
-                          CurrDeclContext);
+    // Override the type relation for NominalTypes. Use the better relation
+    // for the metatypes and the instance type. For example,
+    //
+    //   func receiveInstance(_: Int) {}
+    //   func receiveMetatype(_: Int.Type) {}
+    //
+    // We want to suggest 'Int' as 'Identical' for both arguments.
+    Builder.setResultTypes(
+        {NTD->getInterfaceType(), NTD->getDeclaredInterfaceType()},
+        expectedTypeContext, CurrDeclContext);
   }
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
@@ -4431,7 +4434,8 @@ public:
     }
     if (literalType) {
       addTypeAnnotation(builder, literalType);
-      builder.setResultType(literalType, expectedTypeContext, CurrDeclContext);
+      builder.setResultTypes({literalType}, expectedTypeContext,
+                             CurrDeclContext);
     }
   }
 
@@ -4588,7 +4592,7 @@ public:
       for (auto T : expectedTypeContext.possibleTypes) {
         if (T && T->is<TupleType>() && !T->isVoid()) {
           addTypeAnnotation(builder, T);
-          builder.setResultType(T, expectedTypeContext, CurrDeclContext);
+          builder.setResultTypes({T}, expectedTypeContext, CurrDeclContext);
           break;
         }
       }
@@ -7515,6 +7519,77 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
   Lookup.lookupExternalModuleDecls(module, accessPath, needLeadingDot);
 }
 
+/// Only for use in \c calculateCachedTypeRelation.
+struct ContextualType {
+  /// The contextual type.
+  CodeCompletionResultType *Ty;
+  /// Whether a match against this type should be considered convertible
+  /// instead of identical. For optional context types, we also add the
+  /// non-optional types as contextual types, but only consider them
+  /// convertible.
+  bool IsConvertible;
+};
+
+/// Calculates the type relation for a cached code completion item. For
+/// performance reasons, this does not consult the type checker, but only
+/// considers the supertypes stored inside the \p resultTypes.
+///
+/// Technically, we might miss some conversions like
+///  - retroactive conformances inside another module (because we can’t cache
+///    them if that other module isn’t imported)
+///  - complex generic conversions (just too complicated to model using USRs)
+///
+///  So if a type is not convertible, we report \c Unknown instead of
+///  \c Unrelated.
+static CodeCompletionResult::ExpectedTypeRelation
+calculateCachedTypeRelation(ArrayRef<CodeCompletionResultType *> resultTypes,
+                            ArrayRef<ContextualType> contextualTypes,
+                            CodeCompletionResultType *voidType) {
+  using TypeRelation = CodeCompletionResult::ExpectedTypeRelation;
+  if (resultTypes.empty()) {
+    // If the result has a nullptr ResultType, it's not a compleiton result
+    // that has a sensible "result type", so the type relation is
+    // NotApplicable.
+    return TypeRelation::NotApplicable;
+  }
+  TypeRelation result = TypeRelation::Unknown;
+  for (auto resultType : resultTypes) {
+    if (resultType == voidType) {
+      // Void is not convertible to anything and we don't report Void <->
+      // Void identical matches (see below). So we don't have to check anything
+      // if the result returns Void.
+      continue;
+    }
+
+    for (auto &contextualType : contextualTypes) {
+      if (contextualType.Ty == voidType) {
+        // We don't report Void <-> Void matches because that would boost
+        // methods returning Void in e.g.
+        // func foo() { #^COMPLETE^# }
+        // because #^COMPLETE^# is implicitly returned. But that's not very
+        // helpful.
+        continue;
+      }
+      if (contextualType.Ty == resultType) {
+        result = std::max(result, contextualType.IsConvertible
+                                      ? TypeRelation::Convertible
+                                      : TypeRelation::Identical);
+      }
+      if (result >= TypeRelation::Convertible) {
+        // We can't improve the result further by looking at its supertypes.
+        continue;
+      }
+      for (auto *supertype : resultType->getSupertypes()) {
+        if (supertype == contextualType.Ty) {
+          result = std::max(result, TypeRelation::Convertible);
+          break;
+        }
+      }
+    }
+  }
+  return result;
+}
+
 static MutableArrayRef<CodeCompletionResult *>
 copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
                           CodeCompletionCache::Value &source, bool onlyTypes,
@@ -7573,16 +7648,6 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
     };
   }
 
-  struct ContextualType {
-    /// The contextual type.
-    CodeCompletionResultType *Ty;
-    /// Whether a match against this type should be considered convertible
-    /// instead of identical. For optional context types, we also add the
-    /// non-optional types as contextual types, but only consider them
-    /// convertible.
-    bool IsConvertible;
-  };
-
   CodeCompletionResultType *voidType =
       CodeCompletionResultType::fromType(DC->getASTContext().getVoidType());
 
@@ -7613,50 +7678,9 @@ copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       continue;
     }
 
-    // Compute the type relation
     CodeCompletionResult::ExpectedTypeRelation TypeRelation =
-        CodeCompletionResult::ExpectedTypeRelation::Unknown;
-    if (contextFreeResult->getResultType() == nullptr) {
-      // If the result has a nullptr ResultType, it's not a compleiton result
-      // that has a sensible "result type", so the type relation is
-      // NotApplicable.
-      TypeRelation = CodeCompletionResult::ExpectedTypeRelation::NotApplicable;
-    } else if (contextFreeResult->getResultType() != voidType) {
-      // Void is not convertible to anything and we don't report Void <-> Void
-      // identical matches. So we don't have to check anything if the result
-      // returns Void.
-      for (auto &contextualType : contextualTypes) {
-        if (contextualType.Ty == voidType) {
-          // We don't report Void <-> Void matches because that would boost
-          // methods returning Void in e.g.
-          // func foo() { #^COMPLETE^# }
-          // because #^COMPLETE^# is implicitly returned. That's not very
-          // helpful though.
-          continue;
-        }
-        if (contextualType.Ty == contextFreeResult->getResultType()) {
-          if (contextualType.IsConvertible) {
-            TypeRelation = std::max(
-                TypeRelation,
-                CodeCompletionResult::ExpectedTypeRelation::Convertible);
-          } else {
-            TypeRelation =
-                std::max(TypeRelation,
-                         CodeCompletionResult::ExpectedTypeRelation::Identical);
-          }
-          continue;
-        }
-        for (auto *supertype :
-             contextFreeResult->getResultType()->getSupertypes()) {
-          if (supertype == contextualType.Ty) {
-            TypeRelation = std::max(
-                TypeRelation,
-                CodeCompletionResult::ExpectedTypeRelation::Convertible);
-            break;
-          }
-        }
-      }
-    }
+        calculateCachedTypeRelation(contextFreeResult->getResultTypes(),
+                                    contextualTypes, voidType);
 
     auto contextualResult = new (*targetSink.Allocator) CodeCompletionResult(
         *contextFreeResult, SemanticContextKind::OtherModule,

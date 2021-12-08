@@ -747,11 +747,6 @@ public:
     if (Ty) {
       Ty = Ty->getCanonicalType();
     }
-    if (Ty) {
-      if (auto MT = Ty->getAs<MetatypeType>()) {
-        Ty = MT->getInstanceType();
-      }
-    }
     auto ResFromType = TypeCache.find(Ty);
     if (ResFromType != TypeCache.end()) {
       return ResFromType->second;
@@ -807,9 +802,6 @@ public:
         assert(!Ty ||
                Ty->isCanonical() &&
                    "Types in CodeCompletionResultType must be canonical.");
-        assert(!Ty ||
-               !Ty->is<MetatypeType>() &&
-                   "Types in CodeCompletionResultType must be instance types.");
       }
     }
     return Ty;
@@ -835,13 +827,17 @@ class ContextFreeCodeCompletionResult {
   StringRef ModuleName;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
-  /// The type of the element produced by the expression. Can be
-  ///  - \c nullptr if the completion result doesn't produce something that's
-  ///    valid inside an expression, e.g. a keyword
-  ///  - A null type if the completion result produces something that's valid
-  ///    inside an expression but the result type isn't known
-  ///  - A proper type if the type produced by this completion result is known.
-  CodeCompletionResultType *ResultType;
+  /// The types that can be produced by the expression. This is not a single
+  /// unique type because for code completion we consider e.g. \c Int as
+  /// producing both an \c Int metatype and an \c Int instance type.
+  /// Can
+  ///  - be empty if the completion result doesn't produce something that's
+  ///    valid inside an expression, e.g. a keyword.
+  ///  - contain a null type if the completion result produces something that's
+  ///    valid inside an expression but the result type isn't known.
+  ///  - contain proper types if the type produced by this completion result is
+  ///    known.
+  llvm::SmallVector<CodeCompletionResultType *, 2> ResultTypes;
 
   ContextFreeNotRecommendedReason NotRecommended;
   CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
@@ -865,7 +861,7 @@ public:
       CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem,
       CodeCompletionString *CompletionString, StringRef ModuleName,
       StringRef BriefDocComment, ArrayRef<StringRef> AssociatedUSRs,
-      CodeCompletionResultType *ResultType,
+      ArrayRef<CodeCompletionResultType *> ResultTypes,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       StringRef DiagnosticMessage)
@@ -873,8 +869,8 @@ public:
         KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        ResultType(ResultType), NotRecommended(NotRecommended),
-        DiagnosticSeverity(DiagnosticSeverity),
+        ResultTypes(ResultTypes.begin(), ResultTypes.end()),
+        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
         DiagnosticMessage(DiagnosticMessage) {
     assert((NotRecommended == ContextFreeNotRecommendedReason::None) ==
                (DiagnosticSeverity == CodeCompletionDiagnosticSeverity::None) &&
@@ -895,19 +891,19 @@ public:
   /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
   ///
   /// \note The caller must ensure that the \p CompletionString and all the
-  /// \c Ref types outlive this result, typically by storing them in the same
+  /// \c StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, CodeCompletionString *CompletionString,
       CodeCompletionOperatorKind KnownOperatorKind, StringRef BriefDocComment,
-      CodeCompletionResultType *ResultType,
+      ArrayRef<CodeCompletionResultType *> ResultTypes,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       StringRef DiagnosticMessage)
       : ContextFreeCodeCompletionResult(
             Kind, /*AssociatedKind=*/0, KnownOperatorKind,
             /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
-            BriefDocComment, /*AssociatedUSRs=*/{}, ResultType, NotRecommended,
+            BriefDocComment, /*AssociatedUSRs=*/{}, ResultTypes, NotRecommended,
             DiagnosticSeverity, DiagnosticMessage) {}
 
   /// Constructs a \c Keyword result.
@@ -915,10 +911,10 @@ public:
   /// \note The caller must ensure that the \p CompletionString and
   /// \p BriefDocComment outlive this result, typically by storing them in the
   /// same \c CodeCompletionResultSink as the result itself.
-  ContextFreeCodeCompletionResult(CodeCompletionKeywordKind Kind,
-                                  CodeCompletionString *CompletionString,
-                                  StringRef BriefDocComment,
-                                  CodeCompletionResultType *ResultType)
+  ContextFreeCodeCompletionResult(
+      CodeCompletionKeywordKind Kind, CodeCompletionString *CompletionString,
+      StringRef BriefDocComment,
+      ArrayRef<CodeCompletionResultType *> ResultType)
       : ContextFreeCodeCompletionResult(
             CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
             CodeCompletionOperatorKind::None, /*IsSystem=*/false,
@@ -932,27 +928,29 @@ public:
   /// \note The caller must ensure that the \p CompletionString outlives this
   /// result, typically by storing them in the same \c CodeCompletionResultSink
   /// as the result itself.
-  ContextFreeCodeCompletionResult(CodeCompletionLiteralKind LiteralKind,
-                                  CodeCompletionString *CompletionString,
-                                  CodeCompletionResultType *ResultType)
+  ContextFreeCodeCompletionResult(
+      CodeCompletionLiteralKind LiteralKind,
+      CodeCompletionString *CompletionString,
+      ArrayRef<CodeCompletionResultType *> ResultTypes)
       : ContextFreeCodeCompletionResult(
             CodeCompletionResultKind::Literal,
             static_cast<uint8_t>(LiteralKind), CodeCompletionOperatorKind::None,
             /*IsSystem=*/false, CompletionString, /*ModuleName=*/"",
             /*BriefDocComment=*/"",
-            /*AssociatedUSRs=*/{}, ResultType,
+            /*AssociatedUSRs=*/{}, ResultTypes,
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"") {}
 
   /// Constructs a \c Declaration result.
   ///
   /// \note The caller must ensure that the \p CompletionString and all the
-  /// \c Ref types outlive this result, typically by storing them in the same
+  /// \c StringRefs outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
   ContextFreeCodeCompletionResult(
       CodeCompletionString *CompletionString, const Decl *AssociatedDecl,
       StringRef ModuleName, StringRef BriefDocComment,
-      ArrayRef<StringRef> AssociatedUSRs, CodeCompletionResultType *ResultType,
+      ArrayRef<StringRef> AssociatedUSRs,
+      ArrayRef<CodeCompletionResultType *> ResultTypes,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       StringRef DiagnosticMessage)
@@ -961,7 +959,8 @@ public:
             static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
             CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
             CompletionString, ModuleName, BriefDocComment, AssociatedUSRs,
-            ResultType, NotRecommended, DiagnosticSeverity, DiagnosticMessage) {
+            ResultTypes, NotRecommended, DiagnosticSeverity,
+            DiagnosticMessage) {
     assert(AssociatedDecl && "should have a decl");
   }
 
@@ -995,7 +994,9 @@ public:
 
   ArrayRef<StringRef> getAssociatedUSRs() const { return AssociatedUSRs; }
 
-  CodeCompletionResultType *getResultType() const { return ResultType; }
+  ArrayRef<CodeCompletionResultType *> getResultTypes() const {
+    return ResultTypes;
+  }
 
   ContextFreeNotRecommendedReason getNotRecommendedReason() const {
     return NotRecommended;

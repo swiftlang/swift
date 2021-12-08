@@ -59,14 +59,14 @@ class CodeCompletionResultBuilder {
   StringRef BriefDocComment;
 
   /// The result type that this completion item produces.
-  ///  - None: The item doesn't have a sensible result type, like a keyword
-  ///  - Null type: The result type of the item is not known
-  ///  - Proper type: The completion item produces an expression of the
+  ///  - Empty: The item doesn't have a sensible result type, like a keyword
+  ///  - Contains null type: The result type of the item is not known
+  ///  - Contains proper type: The completion item produces an expression of the
   ///    specified type.
   ///
   /// We assume that a completion item produces an expression of unknown type
   /// by default.
-  Optional<Type> ResultType = Type();
+  SmallVector<Type, 2> ResultTypes = {Type()};
 
   /// The context in which this completion item is used. Used to compute the
   /// type relation to \c ResultType.
@@ -139,13 +139,17 @@ public:
 
   /// Indicate that the code completion item does not produce something with a
   /// sensible result type, like a keyword or a method override suggestion.
-  void setDoesNotProduceResultType() { ResultType = None; }
+  void setDoesNotProduceResultType() { ResultTypes = {}; }
 
-  /// Set the result type of this code completion item and the context that the
+  /// Set the result types of this code completion item and the context that the
   /// item may be used in.
-  void setResultType(Type ResultType, const ExpectedTypeContext &TypeContext,
-                     const DeclContext *DC) {
-    this->ResultType = ResultType;
+  /// An item might have multiple result types because we consider e.g. \c Int
+  /// as producing both an \c Int metatype and an \c Int instance type.
+  void setResultTypes(ArrayRef<Type> ResultTypes,
+                      const ExpectedTypeContext &TypeContext,
+                      const DeclContext *DC) {
+    this->ResultTypes =
+        SmallVector<Type, 2>(ResultTypes.begin(), ResultTypes.end());
     this->TypeContext = TypeContext;
     this->DC = DC;
   }

@@ -1166,7 +1166,7 @@ Completion *CompletionBuilder::finish() {
           currentContextFree.getModuleName(),
           currentContextFree.getBriefDocComment(),
           currentContextFree.getAssociatedUSRs(),
-          currentContextFree.getResultType(),
+          currentContextFree.getResultTypes(),
           currentContextFree.getNotRecommendedReason(),
           currentContextFree.getDiagnosticSeverity(),
           currentContextFree.getDiagnosticMessage());
@@ -1180,7 +1180,7 @@ Completion *CompletionBuilder::finish() {
       ContextFreeCodeCompletionResult ContextFreeResult(
           currentContextFree.getKind(), completionString, opKind,
           currentContextFree.getBriefDocComment(),
-          currentContextFree.getResultType(),
+          currentContextFree.getResultTypes(),
           currentContextFree.getNotRecommendedReason(),
           currentContextFree.getDiagnosticSeverity(),
           currentContextFree.getDiagnosticMessage());
