@@ -51,6 +51,8 @@ class CMark(cmake_product.CMakeProduct):
         """
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING',
                                   self.args.cmark_build_variant)
+        self.cmake_options.define('CMAKE_INSTALL_PREFIX:PATH',
+                                  self.args.install_prefix)
 
         (platform, arch) = host_target.split('-')
 
