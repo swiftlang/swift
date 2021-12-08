@@ -295,7 +295,7 @@ struct ModuleRebuildInfo {
                 StringRef prebuiltCacheDir, SourceLoc loc,
                 DiagArgs &&...diagArgs) {
     diags.diagnose(loc, std::forward<DiagArgs>(diagArgs)...);
-    auto SDKVer = getSDKBuildVersion(ctx.SearchPathOpts.SDKPath);
+    auto SDKVer = getSDKBuildVersion(ctx.SearchPathOpts.getSDKPath());
     llvm::SmallString<64> buffer = prebuiltCacheDir;
     llvm::sys::path::append(buffer, "SystemVersion.plist");
     auto PBMVer = getSDKBuildVersionFromPlist(buffer.str());
@@ -382,7 +382,7 @@ class ModuleInterfaceLoaderImpl {
     if (!dep.isSDKRelative())
       return dep.getPath();
 
-    path::native(ctx.SearchPathOpts.SDKPath, scratch);
+    path::native(ctx.SearchPathOpts.getSDKPath(), scratch);
     llvm::sys::path::append(scratch, dep.getPath());
     return StringRef(scratch.data(), scratch.size());
   }
@@ -562,7 +562,7 @@ class ModuleInterfaceLoaderImpl {
   }
 
   bool canInterfaceHavePrebuiltModule() {
-    StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
+    StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
     if (!sdkPath.empty() &&
         hasPrefix(path::begin(interfacePath), path::end(interfacePath),
                   path::begin(sdkPath), path::end(sdkPath))) {
@@ -607,7 +607,7 @@ class ModuleInterfaceLoaderImpl {
   Optional<StringRef>
   computeFallbackPrebuiltModulePath(llvm::SmallString<256> &scratch) {
     namespace path = llvm::sys::path;
-    StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
+    StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
 
     // Check if this is a public interface file from the SDK.
     if (sdkPath.empty() ||
@@ -1296,17 +1296,19 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   GenericArgs.push_back(ArgSaver.save(genericSubInvocation.getLangOptions()
     .EffectiveLanguageVersion.asAPINotesVersionString()));
 
-  genericSubInvocation.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
-  genericSubInvocation.setFrameworkSearchPaths(SearchPathOpts.FrameworkSearchPaths);
-  if (!SearchPathOpts.SDKPath.empty()) {
+  genericSubInvocation.setImportSearchPaths(
+      SearchPathOpts.getImportSearchPaths());
+  genericSubInvocation.setFrameworkSearchPaths(
+      SearchPathOpts.getFrameworkSearchPaths());
+  if (!SearchPathOpts.getSDKPath().empty()) {
     // Add -sdk arguments to the module building commands.
     // Module building commands need this because dependencies sometimes use
     // sdk-relative paths (prebuilt modules for example). Without -sdk, the command
     // will not be able to local these dependencies, leading to unnecessary
     // building from textual interfaces.
     GenericArgs.push_back("-sdk");
-    GenericArgs.push_back(ArgSaver.save(SearchPathOpts.SDKPath));
-    genericSubInvocation.setSDKPath(SearchPathOpts.SDKPath);
+    GenericArgs.push_back(ArgSaver.save(SearchPathOpts.getSDKPath()));
+    genericSubInvocation.setSDKPath(SearchPathOpts.getSDKPath().str());
   }
 
   genericSubInvocation.getFrontendOptions().InputMode

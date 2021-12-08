@@ -430,7 +430,7 @@ static void diagnoseNoSuchModule(ModuleDecl *importingModule,
     ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
   }
 
-  if (ctx.SearchPathOpts.SDKPath.empty() &&
+  if (ctx.SearchPathOpts.getSDKPath().empty() &&
       llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
     ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
     ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);

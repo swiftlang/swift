@@ -1078,7 +1078,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 
         const auto &PathRemapper = options.DebuggingOptionsPrefixMap;
         const auto &PathObfuscator = options.PathObfuscator;
-        auto sdkPath = M->getASTContext().SearchPathOpts.SDKPath;
+        auto sdkPath = M->getASTContext().SearchPathOpts.getSDKPath();
         SDKPath.emit(
             ScratchRecord,
             PathObfuscator.obfuscate(PathRemapper.remapPath(sdkPath)));
@@ -1164,10 +1164,10 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     // Put the framework search paths first so that they'll be preferred upon
     // deserialization.
-    for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
+    for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths())
       SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
                       PathObfuscator.obfuscate(PathMapper.remapPath(framepath.Path)));
-    for (auto &path : searchPathOpts.ImportSearchPaths)
+    for (const auto &path : searchPathOpts.getImportSearchPaths())
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
                       PathObfuscator.obfuscate(PathMapper.remapPath(path)));
   }

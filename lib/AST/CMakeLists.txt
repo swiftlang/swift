@@ -88,6 +88,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/RewriteSystem.cpp
   RequirementMachine/Symbol.cpp
   RequirementMachine/Term.cpp
+  SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp
   SubstitutionMap.cpp

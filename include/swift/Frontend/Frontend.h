@@ -170,20 +170,20 @@ public:
   }
 
   void setImportSearchPaths(const std::vector<std::string> &Paths) {
-    SearchPathOpts.ImportSearchPaths = Paths;
+    SearchPathOpts.setImportSearchPaths(Paths);
   }
 
   ArrayRef<std::string> getImportSearchPaths() const {
-    return SearchPathOpts.ImportSearchPaths;
+    return SearchPathOpts.getImportSearchPaths();
   }
 
   void setFrameworkSearchPaths(
              const std::vector<SearchPathOptions::FrameworkSearchPath> &Paths) {
-    SearchPathOpts.FrameworkSearchPaths = Paths;
+    SearchPathOpts.setFrameworkSearchPaths(Paths);
   }
 
   ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
-    return SearchPathOpts.FrameworkSearchPaths;
+    return SearchPathOpts.getFrameworkSearchPaths();
   }
 
   void setExtraClangArgs(const std::vector<std::string> &Args) {
@@ -229,9 +229,7 @@ public:
 
   void setSDKPath(const std::string &Path);
 
-  StringRef getSDKPath() const {
-    return SearchPathOpts.SDKPath;
-  }
+  StringRef getSDKPath() const { return SearchPathOpts.getSDKPath(); }
 
   LangOptions &getLangOptions() {
     return LangOpts;
