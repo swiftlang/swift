@@ -25,7 +25,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Basic/Unreachable.h"
-
+#include <ostream>
 namespace swift {
 namespace reflection {
 
@@ -177,7 +177,7 @@ public:
   }
 
   void dump() const;
-  void dump(FILE *file, unsigned Indent = 0) const;
+  void dump(std::ostream &stream, unsigned Indent = 0) const;
 
   /// Build a demangle tree from this TypeRef.
   Demangle::NodePointer getDemangling(Demangle::Demangler &Dem) const;

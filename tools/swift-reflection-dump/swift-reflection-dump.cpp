@@ -627,7 +627,7 @@ static ReflectionContextHolder makeReflectionContextForObjectFiles(
 
 static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
                                     StringRef Arch, ActionType Action,
-                                    FILE *file) {
+                                    std::ostream &stream) {
   // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
   // once they go out of scope, we can no longer do anything.
   std::vector<OwningBinary<Binary>> BinaryOwners;
@@ -653,14 +653,14 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
     ObjectOwners.push_back(std::move(ObjectOwner));
     ObjectFiles.push_back(O);
   }
-  
+
   auto context = makeReflectionContextForObjectFiles(ObjectFiles);
   auto &builder = context.Builder;
 
   switch (Action) {
   case ActionType::DumpReflectionSections:
     // Dump everything
-    builder.dumpAllSections(file);
+    builder.dumpAllSections(stream);
     break;
   case ActionType::DumpTypeLowering: {
     for (std::string Line; std::getline(std::cin, Line);) {
@@ -676,19 +676,19 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       if (Result.isError()) {
         auto *error = Result.getError();
         char *str = error->copyErrorString();
-        fprintf(file, "Invalid typeref:%s - %s\n", Line.c_str(), str);
+        stream << "Invalid typeref:" << Line << " - " << str << "\n";
         error->freeErrorString(str);
         continue;
       }
       auto TypeRef = Result.getType();
 
-      TypeRef->dump(file);
+      TypeRef->dump(stream);
       auto *TypeInfo = builder.getTypeConverter().getTypeInfo(TypeRef, nullptr);
       if (TypeInfo == nullptr) {
-        fprintf(file, "Invalid lowering\n");
+        stream << "Invalid lowering\n";
         continue;
       }
-      TypeInfo->dump(file);
+      TypeInfo->dump(stream);
     }
     break;
   }
@@ -702,5 +702,5 @@ int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Dump\n");
   return doDumpReflectionSections(options::BinaryFilename,
                                   options::Architecture, options::Action,
-                                  stdout);
+                                  std::cout);
 }
