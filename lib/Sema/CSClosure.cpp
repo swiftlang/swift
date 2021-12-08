@@ -25,6 +25,16 @@ using namespace swift::constraints;
 
 namespace {
 
+// Produce an implicit empty tuple expression.
+Expr *getVoidExpr(ASTContext &ctx) {
+  auto *voidExpr = TupleExpr::createEmpty(ctx,
+                                          /*LParenLoc=*/SourceLoc(),
+                                          /*RParenLoc=*/SourceLoc(),
+                                          /*Implicit=*/true);
+  voidExpr->setType(ctx.TheEmptyTupleType);
+  return voidExpr;
+}
+
 /// Find any type variable references inside of an AST node.
 class TypeVariableRefFinder : public ASTWalker {
   ConstraintSystem &CS;
@@ -829,14 +839,9 @@ private:
       resultExpr = returnStmt->getResult();
       assert(resultExpr && "non-empty result without expression?");
     } else {
-      auto &ctx = closure->getASTContext();
       // If this is simplify `return`, let's create an empty tuple
       // which is also useful if contextual turns out to be e.g. `Void?`.
-      resultExpr = TupleExpr::createEmpty(ctx,
-                                          /*LParenLoc=*/SourceLoc(),
-                                          /*RParenLoc=*/SourceLoc(),
-                                          /*Implicit=*/true);
-      resultExpr->setType(ctx.TheEmptyTupleType);
+      resultExpr = getVoidExpr(closure->getASTContext());
     }
 
     SolutionApplicationTarget target(resultExpr, closure, CTP_ReturnStmt,
@@ -1283,7 +1288,64 @@ private:
       }
     }
 
+    // Source compatibility workaround.
+    //
+    // func test<T>(_: () -> T?) {
+    //   ...
+    // }
+    //
+    // A multi-statement closure passed to `test` that has an optional
+    // `Void` result type inferred from the body allows:
+    //   - empty `return`(s);
+    //   - to skip `return nil` or `return ()` at the end.
+    //
+    // Implicit `return ()` has to be inserted as the last element
+    // of the body if there is none. This wasn't needed before SE-0326
+    // because result type was (incorrectly) inferred as `Void` due to
+    // the body being skipped.
+    if (!closure->hasSingleExpressionBody() &&
+        closure->getBody() == braceStmt) {
+      if (resultType->getOptionalObjectType() &&
+          resultType->lookThroughAllOptionalTypes()->isVoid() &&
+          !braceStmt->getLastElement().isStmt(StmtKind::Return)) {
+        return addImplicitVoidReturn(braceStmt);
+      }
+    }
+
     return braceStmt;
+  }
+
+  ASTNode addImplicitVoidReturn(BraceStmt *braceStmt) {
+    auto &ctx = closure->getASTContext();
+    auto &cs = solution.getConstraintSystem();
+
+    auto *resultExpr = getVoidExpr(ctx);
+    cs.cacheExprTypes(resultExpr);
+
+    auto *returnStmt = new (ctx) ReturnStmt(SourceLoc(), resultExpr,
+                                            /*implicit=*/true);
+
+    // For a target for newly created result and apply a solution
+    // to it, to make sure that optional injection happens required
+    // number of times.
+    {
+      SolutionApplicationTarget target(resultExpr, closure, CTP_ReturnStmt,
+                                       resultType,
+                                       /*isDiscarded=*/false);
+      cs.setSolutionApplicationTarget(returnStmt, target);
+
+      visitReturnStmt(returnStmt);
+    }
+
+    // Re-create brace statement with an additional `return` at the end.
+
+    SmallVector<ASTNode, 4> elements;
+    elements.append(braceStmt->getElements().begin(),
+                    braceStmt->getElements().end());
+    elements.push_back(returnStmt);
+
+    return BraceStmt::create(ctx, braceStmt->getLBraceLoc(), elements,
+                             braceStmt->getRBraceLoc());
   }
 
   ASTNode visitReturnStmt(ReturnStmt *returnStmt) {
