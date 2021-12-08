@@ -145,12 +145,95 @@ void RewriteLoop::findProtocolConformanceRules(
   }
 }
 
+namespace {
+
+/// Utility class to encapsulate some shared state.
+class GeneratingConformances {
+  const RewriteSystem &System;
+  RewriteContext &Context;
+
+  // All conformance rules, sorted by (isExplicit(), getLHS()), with non-explicit
+  // rules with longer left hand sides coming first.
+  //
+  // The idea here is that we want less canonical rules to be eliminated first,
+  // but we prefer to eliminate non-explicit rules, in an attempt to keep protocol
+  // conformance rules in the same protocol as they were originally defined in.
+  SmallVector<unsigned, 4> ConformanceRules;
+
+  // Maps a conformance rule to a conformance path deriving the subject type's
+  // base type. For example, consider the following conformance rule:
+  //
+  //   T.[P:A].[Q:B].[R] => T.[P:A].[Q:B]
+  //
+  // The subject type is T.[P:A].[Q:B]; in order to derive the metadata, we need
+  // the witness table for T.[P:A] : [Q] first, by computing a conformance access
+  // path for the term T.[P:A].[Q], known as the 'parent path'.
+  llvm::MapVector<unsigned, SmallVector<unsigned, 2>> ParentPaths;
+
+  // Maps a conformance rule to a list of paths. Each path in the list is a unique
+  // derivation of the conformance in terms of other conformance rules.
+  llvm::MapVector<unsigned, std::vector<SmallVector<unsigned, 2>>> ConformancePaths;
+
+  // The set of conformance rules which are protocol refinements, that is rules of
+  // the form [P].[Q] => [P].
+  llvm::DenseSet<unsigned> ProtocolRefinements;
+
+  // This is the result.
+  llvm::DenseSet<unsigned> &RedundantConformances;
+
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term,
+      SmallVectorImpl<unsigned> &result) const;
+  void decomposeTermIntoConformanceRuleLeftHandSides(
+      MutableTerm term, unsigned ruleID,
+      SmallVectorImpl<unsigned> &result) const;
+
+  bool isValidConformancePath(
+      llvm::SmallDenseSet<unsigned, 4> &visited,
+      const llvm::SmallVectorImpl<unsigned> &path, bool allowConcrete) const;
+
+  bool isValidRefinementPath(
+      const llvm::SmallVectorImpl<unsigned> &path) const;
+
+  void dumpConformancePath(
+      llvm::raw_ostream &out,
+      const SmallVectorImpl<unsigned> &path) const;
+
+  void dumpGeneratingConformanceEquation(
+      llvm::raw_ostream &out,
+      unsigned baseRuleID,
+      const std::vector<SmallVector<unsigned, 2>> &paths) const;
+
+public:
+  explicit GeneratingConformances(const RewriteSystem &system,
+                                  llvm::DenseSet<unsigned> &redundantConformances)
+    : System(system),
+      Context(system.getRewriteContext()),
+      RedundantConformances(redundantConformances) {}
+
+  void collectConformanceRules();
+
+  void computeCandidateConformancePaths();
+
+  void dumpGeneratingConformanceEquations(llvm::raw_ostream &out) const;
+
+  void verifyGeneratingConformanceEquations() const;
+
+  void computeGeneratingConformances();
+
+  void verifyGeneratingConformances() const;
+
+  void dumpGeneratingConformances(llvm::raw_ostream &out) const;
+};
+
+} // end namespace
+
 /// Write the term as a product of left hand sides of protocol conformance
 /// rules.
 ///
 /// The term should be irreducible, except for a protocol symbol at the end.
 void
-RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
+GeneratingConformances::decomposeTermIntoConformanceRuleLeftHandSides(
     MutableTerm term, SmallVectorImpl<unsigned> &result) const {
   assert(term.back().getKind() == Symbol::Kind::Protocol);
 
@@ -158,7 +241,7 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
   // reduces to T in a single step, via a rule V.[P] => V, where
   // T == U.V.
   RewritePath steps;
-  bool simplified = simplify(term, &steps);
+  bool simplified = System.simplify(term, &steps);
   if (!simplified) {
     llvm::errs() << "Term does not conform to protocol: " << term << "\n";
     abort();
@@ -170,7 +253,7 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
   const auto &step = *steps.begin();
 
 #ifndef NDEBUG
-  const auto &rule = getRule(step.RuleID);
+  const auto &rule = System.getRule(step.RuleID);
   assert(rule.isAnyConformanceRule());
   assert(!rule.isIdentityConformanceRule());
 #endif
@@ -195,10 +278,10 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
 /// product of left hand sdies of conformance rules. The term U should
 /// be irreducible.
 void
-RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
+GeneratingConformances::decomposeTermIntoConformanceRuleLeftHandSides(
     MutableTerm term, unsigned ruleID,
     SmallVectorImpl<unsigned> &result) const {
-  const auto &rule = getRule(ruleID);
+  const auto &rule = System.getRule(ruleID);
   assert(rule.isAnyConformanceRule());
   assert(!rule.isIdentityConformanceRule());
 
@@ -228,368 +311,6 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
 
   // Add the rule V => V.[P].
   result.push_back(ruleID);
-}
-
-/// Use homotopy information to discover all ways of writing the left hand side
-/// of each conformance rule as a product of left hand sides of other conformance
-/// rules.
-///
-/// Each conformance rule (Vi.[P] => Vi) can always be written in terms of itself,
-/// so the first term of each disjunction is always (Vi.[P] => Vi).
-///
-/// Conformance rules can also be circular, so not every choice of disjunctions
-/// produces a valid result; for example, if you have these definitions:
-///
-///   protocol P {
-///     associatedtype T : P
-///   }
-///
-///   struct G<X, Y> where X : P, X.T == Y, Y : P, Y.T == X {}
-///
-/// We have three conformance rules:
-///
-///   [P:T].[P] => [P:T]
-///   <X>.[P] => <X>
-///   <Y>.[P] => <Y>
-///
-/// The first rule, <X>.[P] => <X> has an alternate conformance path:
-///
-///   (<Y>.[P]).([P:T].[P])
-///
-/// The second rule similarly has an alternate conformance path:
-///
-///   (<X>.[P]).([P:T].[P])
-///
-/// This gives us the following initial set of candidate conformance paths:
-///
-///   [P:T].[P] := ([P:T].[P])
-///   <X>.[P] := (<X>.[P]) ∨ (<Y>.[P]).([P:T].[P])
-///   <Y>.[P] := (<Y>.[P]) ∨ (<X>.[P]).([P:T].[P])
-///
-/// One valid solution is the following set of assignments:
-///
-///   [P:T].[P] := ([P:T].[P])
-///   <X>.[P] := (<X>.[P])
-///   <Y>.[P] := (<X>.[P]).([P:T].[P])
-///
-/// That is, we can choose to eliminate <X>.[P], but not <Y>.[P], or vice
-/// versa; but it is never valid to eliminate both.
-void RewriteSystem::computeCandidateConformancePaths(
-    llvm::MapVector<unsigned,
-                    std::vector<SmallVector<unsigned, 2>>> &conformancePaths) const {
-  for (const auto &loop : Loops) {
-    if (loop.isDeleted())
-      continue;
-
-    llvm::SmallDenseMap<const ProtocolDecl *,
-                        ProtocolConformanceRules, 2> result;
-
-    loop.findProtocolConformanceRules(result, *this);
-
-    if (result.empty())
-      continue;
-
-    if (Debug.contains(DebugFlags::GeneratingConformances)) {
-      llvm::dbgs() << "Candidate homotopy generator: ";
-      loop.dump(llvm::dbgs(), *this);
-      llvm::dbgs() << "\n";
-    }
-
-    for (const auto &pair : result) {
-      const auto *proto = pair.first;
-      const auto &inEmptyContext = pair.second.RulesInEmptyContext;
-      const auto &inContext = pair.second.RulesInContext;
-      bool sawIdentityConformance = pair.second.SawIdentityConformance;
-
-      // No rules appear without context.
-      if (inEmptyContext.empty())
-        continue;
-
-      if (Debug.contains(DebugFlags::GeneratingConformances)) {
-        llvm::dbgs() << "* Protocol " << proto->getName() << ":\n";
-        llvm::dbgs() << "** Conformance rules not in context:\n";
-        for (unsigned ruleID : inEmptyContext) {
-          llvm::dbgs() << "-- (#" << ruleID << ") " << getRule(ruleID) << "\n";
-        }
-
-        llvm::dbgs() << "** Conformance rules in context:\n";
-        for (auto pair : inContext) {
-          llvm::dbgs() << "-- " << pair.first;
-          unsigned ruleID = pair.second;
-          llvm::dbgs() << " (#" << ruleID << ") " << getRule(ruleID) << "\n";
-        }
-
-        if (sawIdentityConformance) {
-          llvm::dbgs() << "** Equivalent to identity conformance\n";
-        }
-
-        llvm::dbgs() << "\n";
-      }
-
-      // Two conformance rules in empty context (T.[P] => T) and (T'.[P] => T)
-      // are interchangeable, and contribute a trivial pair of conformance
-      // equations expressing that each one can be written in terms of the
-      // other:
-      //
-      //   (T.[P] => T) := (T'.[P])
-      //   (T'.[P] => T') := (T.[P])
-      for (unsigned candidateRuleID : inEmptyContext) {
-        for (unsigned otherRuleID : inEmptyContext) {
-          if (otherRuleID == candidateRuleID)
-            continue;
-
-          SmallVector<unsigned, 2> path;
-          path.push_back(otherRuleID);
-          conformancePaths[candidateRuleID].push_back(path);
-        }
-      }
-
-      // If a rewrite loop contains a conformance rule (T.[P] => T) together
-      // with the identity conformance ([P].[P] => [P]), both in empty context,
-      // the conformance rule (T.[P] => T) is equivalent to the *empty product*
-      // of conformance rules; that is, it is trivially redundant.
-      if (sawIdentityConformance) {
-        for (unsigned candidateRuleID : inEmptyContext) {
-          SmallVector<unsigned, 2> emptyPath;
-          conformancePaths[candidateRuleID].push_back(emptyPath);
-        }
-      }
-
-      // Suppose a rewrite loop contains a conformance rule (T.[P] => T) in
-      // empty context, and a conformance rule (V.[P] => V) in non-empty left
-      // context U.
-      //
-      // The rewrite loop looks something like this:
-      //
-      //     ... ⊗ (T.[P] => T) ⊗ ... ⊗ U.(V => V.[P]) ⊗ ...
-      //    ^                                               ^
-      //    |                                               |
-      //    + basepoint ========================= basepoint +
-      //
-      // We can decompose U into a product of conformance rules:
-      //
-      //    (V1.[P1] => V1)...(Vn.[Pn] => Vn),
-      //
-      // Note that (V1)...(Vn) is canonically equivalent to U.
-      //
-      // Now, we can record a candidate decomposition of (T.[P] => T) as a
-      // product of conformance rules:
-      //
-      //    (T.[P] => T) := (V1.[P1] => V1)...(Vn.[Pn] => Vn).(V.[P] => V)
-      //
-      // Again, note that (V1)...(Vn).V is canonically equivalent to U.V,
-      // and therefore T.
-      for (auto pair : inContext) {
-        // We have a term U, and a rule V.[P] => V.
-        SmallVector<unsigned, 2> conformancePath;
-
-        // Simplify U to get U'.
-        MutableTerm term = pair.first;
-        (void) simplify(term);
-
-        // Write U'.[domain(V)] as a product of left hand sides of protocol
-        // conformance rules.
-        decomposeTermIntoConformanceRuleLeftHandSides(term, pair.second,
-                                                      conformancePath);
-
-        // This decomposition defines a conformance access path for each
-        // conformance rule we saw in empty context.
-        for (unsigned otherRuleID : inEmptyContext)
-          conformancePaths[otherRuleID].push_back(conformancePath);
-      }
-    }
-  }
-}
-
-/// Determines if \p path can be expressed without any of the conformance
-/// rules appearing in \p redundantConformances, by possibly substituting
-/// any occurrences of the redundant rules with alternate definitions
-/// appearing in \p conformancePaths.
-///
-/// The \p conformancePaths map sends conformance rules to a list of
-/// disjunctions, where each disjunction is a product of other conformance
-/// rules.
-bool RewriteSystem::isValidConformancePath(
-    llvm::SmallDenseSet<unsigned, 4> &visited,
-    llvm::DenseSet<unsigned> &redundantConformances,
-    const llvm::SmallVectorImpl<unsigned> &path, bool allowConcrete,
-    const llvm::MapVector<unsigned, SmallVector<unsigned, 2>> &parentPaths,
-    const llvm::MapVector<unsigned,
-                          std::vector<SmallVector<unsigned, 2>>>
-        &conformancePaths) const {
-
-  unsigned lastIdx = path.size() - 1;
-
-  for (unsigned ruleIdx : indices(path)) {
-    unsigned ruleID = path[ruleIdx];
-    if (visited.count(ruleID) > 0)
-      return false;
-
-    bool isLastElement = (ruleIdx == lastIdx);
-
-    if (!allowConcrete || !isLastElement) {
-      if (getRule(ruleID).getLHS().back().getKind()
-          == Symbol::Kind::ConcreteConformance)
-        return false;
-    }
-
-    if (redundantConformances.count(ruleID)) {
-      SWIFT_DEFER {
-        visited.erase(ruleID);
-      };
-      visited.insert(ruleID);
-
-      auto found = conformancePaths.find(ruleID);
-      assert(found != conformancePaths.end());
-
-      bool foundValidConformancePath = false;
-      for (const auto &otherPath : found->second) {
-        if (isValidConformancePath(visited, redundantConformances, otherPath,
-                                   allowConcrete && isLastElement,
-                                   parentPaths, conformancePaths)) {
-          foundValidConformancePath = true;
-          break;
-        }
-      }
-
-      if (!foundValidConformancePath)
-        return false;
-    }
-
-    auto found = parentPaths.find(ruleID);
-    if (found != parentPaths.end()) {
-      SWIFT_DEFER {
-        visited.erase(ruleID);
-      };
-      visited.insert(ruleID);
-
-      // If 'req' is based on some other conformance requirement
-      // `T.[P.]A : Q', we want to make sure that we have a
-      // non-redundant derivation for 'T : P'.
-      if (!isValidConformancePath(visited, redundantConformances, found->second,
-                                  /*allowConcrete=*/false,
-                                  parentPaths, conformancePaths)) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
-/// Rules of the form [P].[Q] => [P] encode protocol refinement and can only
-/// be redundant if they're equivalent to a sequence of other protocol
-/// refinements.
-///
-/// This helps ensure that the inheritance clause of a protocol is complete
-/// and correct, allowing name lookup to find associated types of inherited
-/// protocols while building the protocol requirement signature.
-bool RewriteSystem::isValidRefinementPath(
-    const llvm::SmallVectorImpl<unsigned> &path) const {
-  for (unsigned ruleID : path) {
-    if (!getRule(ruleID).isProtocolRefinementRule())
-      return false;
-  }
-
-  return true;
-}
-
-void RewriteSystem::dumpConformancePath(
-    llvm::raw_ostream &out,
-    const SmallVectorImpl<unsigned> &path) const {
-  if (path.empty()) {
-    out << "1";
-    return;
-  }
-
-  for (unsigned ruleID : path)
-    out << "(" << getRule(ruleID).getLHS() << ")";
-}
-
-void RewriteSystem::dumpGeneratingConformanceEquation(
-    llvm::raw_ostream &out,
-    unsigned baseRuleID,
-    const std::vector<SmallVector<unsigned, 2>> &paths) const {
-  out << getRule(baseRuleID).getLHS() << " := ";
-
-  bool first = true;
-  for (const auto &path : paths) {
-    if (!first)
-      out << " ∨ ";
-    else
-      first = false;
-
-    dumpConformancePath(out, path);
-  }
-}
-
-void RewriteSystem::verifyGeneratingConformanceEquations(
-    const llvm::MapVector<unsigned,
-                          std::vector<SmallVector<unsigned, 2>>>
-        &conformancePaths) const {
-#ifndef NDEBUG
-  for (const auto &pair : conformancePaths) {
-    const auto &rule = getRule(pair.first);
-    auto *proto = rule.getLHS().back().getProtocol();
-
-    MutableTerm baseTerm(rule.getRHS());
-    (void) simplify(baseTerm);
-
-    for (const auto &path : pair.second) {
-      if (path.empty())
-        continue;
-
-      const auto &otherRule = getRule(path.back());
-      auto *otherProto = otherRule.getLHS().back().getProtocol();
-
-      if (proto != otherProto) {
-        llvm::errs() << "Invalid equation: ";
-        dumpGeneratingConformanceEquation(llvm::errs(),
-                                          pair.first, pair.second);
-        llvm::errs() << "\n";
-        llvm::errs() << "Mismatched conformance:\n";
-        llvm::errs() << "Base rule: " << rule << "\n";
-        llvm::errs() << "Final rule: " << otherRule << "\n\n";
-        dump(llvm::errs());
-        abort();
-      }
-
-      MutableTerm otherTerm;
-      for (unsigned i : indices(path)) {
-        unsigned otherRuleID = path[i];
-        const auto &rule = getRule(otherRuleID);
-
-        bool isLastElement = (i == path.size() - 1);
-        if ((isLastElement && !rule.isAnyConformanceRule()) ||
-            (!isLastElement && !rule.isProtocolConformanceRule())) {
-          llvm::errs() << "Equation term is not a conformance rule: ";
-          dumpGeneratingConformanceEquation(llvm::errs(),
-                                            pair.first, pair.second);
-          llvm::errs() << "\n";
-          llvm::errs() << "Term: " << rule << "\n";
-          dump(llvm::errs());
-          abort();
-        }
-
-        otherTerm.append(rule.getRHS());
-      }
-
-      (void) simplify(otherTerm);
-
-      if (baseTerm != otherTerm) {
-        llvm::errs() << "Invalid equation: ";
-        dumpGeneratingConformanceEquation(llvm::errs(),
-                                          pair.first, pair.second);
-        llvm::errs() << "\n";
-        llvm::errs() << "Invalid conformance path:\n";
-        llvm::errs() << "Expected: " << baseTerm << "\n";
-        llvm::errs() << "Got: " << otherTerm << "\n\n";
-        dump(llvm::errs());
-        abort();
-      }
-    }
-  }
-#endif
 }
 
 static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
@@ -636,40 +357,12 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
   llvm_unreachable("Bad symbol kind");
 }
 
-/// Computes a minimal set of generating conformances, assuming that homotopy
-/// reduction has already eliminated all redundant rewrite rules that are not
-/// conformance rules.
-void RewriteSystem::computeGeneratingConformances(
-    llvm::DenseSet<unsigned> &redundantConformances) {
-  // All conformance rules, sorted by (isExplicit(), getLHS()), with non-explicit
-  // rules with longer left hand sides coming first.
-  //
-  // The idea here is that we want less canonical rules to be eliminated first,
-  // but we prefer to eliminate non-explicit rules, in an attempt to keep protocol
-  // conformance rules in the same protocol as they were originally defined in.
-  SmallVector<unsigned, 4> conformanceRules;
-
-  // Maps a conformance rule to a conformance path deriving the subject type's
-  // base type. For example, consider the following conformance rule:
-  //
-  //   T.[P:A].[Q:B].[R] => T.[P:A].[Q:B]
-  //
-  // The subject type is T.[P:A].[Q:B]; in order to derive the metadata, we need
-  // the witness table for T.[P:A] : [Q] first, by computing a conformance access
-  // path for the term T.[P:A].[Q], known as the 'parent path'.
-  llvm::MapVector<unsigned, SmallVector<unsigned, 2>> parentPaths;
-
-  // Maps a conformance rule to a list of paths. Each path in the list is a unique
-  // derivation of the conformance in terms of other conformance rules.
-  llvm::MapVector<unsigned, std::vector<SmallVector<unsigned, 2>>> conformancePaths;
-
-  // The set of conformance rules which are protocol refinements, that is rules of
-  // the form [P].[Q] => [P].
-  llvm::DenseSet<unsigned> protocolRefinements;
-
+/// Collect conformance rules and parent paths, and record an initial
+/// equation where each conformance is equivalent to itself.
+void GeneratingConformances::collectConformanceRules() {
   // Prepare the initial set of equations.
-  for (unsigned ruleID : indices(Rules)) {
-    const auto &rule = getRule(ruleID);
+  for (unsigned ruleID : indices(System.getRules())) {
+    const auto &rule = System.getRule(ruleID);
     if (rule.isPermanent())
       continue;
 
@@ -682,17 +375,17 @@ void RewriteSystem::computeGeneratingConformances(
     if (!rule.isAnyConformanceRule())
       continue;
 
-    conformanceRules.push_back(ruleID);
+    ConformanceRules.push_back(ruleID);
 
     // Initially, every non-redundant conformance rule can be expressed
     // as itself.
     SmallVector<unsigned, 2> path;
     path.push_back(ruleID);
-    conformancePaths[ruleID].push_back(path);
+    ConformancePaths[ruleID].push_back(path);
 
     // Save protocol refinement relations in a side table.
     if (rule.isProtocolRefinementRule()) {
-      protocolRefinements.insert(ruleID);
+      ProtocolRefinements.insert(ruleID);
       continue;
     }
 
@@ -704,51 +397,23 @@ void RewriteSystem::computeGeneratingConformances(
       MutableTerm mutTerm(lhs.begin(), lhs.end() - 2);
       assert(!mutTerm.empty());
 
-      bool simplified = simplify(mutTerm);
+      bool simplified = System.simplify(mutTerm);
       assert(!simplified || rule.isSimplified());
       (void) simplified;
 
       mutTerm.add(Symbol::forProtocol(parentProto, Context));
 
       // Get a conformance path for X.[P] and record it.
-      decomposeTermIntoConformanceRuleLeftHandSides(mutTerm, parentPaths[ruleID]);
+      decomposeTermIntoConformanceRuleLeftHandSides(mutTerm, ParentPaths[ruleID]);
     }
   }
-
-  Context.ConformanceRulesHistogram.add(conformanceRules.size());
-
-  computeCandidateConformancePaths(conformancePaths);
-
-  for (const auto &pair : conformancePaths) {
-    if (pair.second.size() > 1)
-      Context.GeneratingConformancesHistogram.add(pair.second.size());
-  }
-
-  if (Debug.contains(DebugFlags::GeneratingConformances)) {
-    llvm::dbgs() << "Initial set of equations:\n";
-    for (const auto &pair : conformancePaths) {
-      llvm::dbgs() << "- ";
-      dumpGeneratingConformanceEquation(llvm::dbgs(),
-                                        pair.first, pair.second);
-      llvm::dbgs() << "\n";
-    }
-
-    llvm::dbgs() << "Parent paths:\n";
-    for (const auto &pair : parentPaths) {
-      llvm::dbgs() << "- " << getRule(pair.first).getLHS() << ": ";
-      dumpConformancePath(llvm::dbgs(), pair.second);
-      llvm::dbgs() << "\n";
-    }
-  }
-
-  verifyGeneratingConformanceEquations(conformancePaths);
 
   // Sort the list of conformance rules in reverse order; we're going to try
   // to minimize away less canonical rules first.
-  std::sort(conformanceRules.begin(), conformanceRules.end(),
+  std::sort(ConformanceRules.begin(), ConformanceRules.end(),
             [&](unsigned lhs, unsigned rhs) -> bool {
-              const auto &lhsRule = getRule(lhs);
-              const auto &rhsRule = getRule(rhs);
+              const auto &lhsRule = System.getRule(lhs);
+              const auto &rhsRule = System.getRule(rhs);
 
               if (lhsRule.isExplicit() != rhsRule.isExplicit())
                 return !lhsRule.isExplicit();
@@ -756,11 +421,389 @@ void RewriteSystem::computeGeneratingConformances(
               return lhsRule.getLHS().compare(rhsRule.getLHS(), Context) > 0;
             });
 
-  // Find a minimal set of generating conformances.
-  for (unsigned ruleID : conformanceRules) {
-    const auto &paths = conformancePaths[ruleID];
+  Context.ConformanceRulesHistogram.add(ConformanceRules.size());
+}
 
-    bool isProtocolRefinement = protocolRefinements.count(ruleID) > 0;
+/// Use homotopy information to discover all ways of writing the left hand side
+/// of each conformance rule as a product of left hand sides of other conformance
+/// rules.
+///
+/// Each conformance rule (Vi.[P] => Vi) can always be written in terms of itself,
+/// so the first term of each disjunction is always (Vi.[P] => Vi).
+///
+/// Conformance rules can also be circular, so not every choice of disjunctions
+/// produces a valid result; for example, if you have these definitions:
+///
+///   protocol P {
+///     associatedtype T : P
+///   }
+///
+///   struct G<X, Y> where X : P, X.T == Y, Y : P, Y.T == X {}
+///
+/// We have three conformance rules:
+///
+///   [P:T].[P] => [P:T]
+///   <X>.[P] => <X>
+///   <Y>.[P] => <Y>
+///
+/// The first rule, <X>.[P] => <X> has an alternate conformance path:
+///
+///   (<Y>.[P]).([P:T].[P])
+///
+/// The second rule similarly has an alternate conformance path:
+///
+///   (<X>.[P]).([P:T].[P])
+///
+/// This gives us the following initial set of candidate conformance paths:
+///
+///   [P:T].[P] := ([P:T].[P])
+///   <X>.[P] := (<X>.[P]) ∨ (<Y>.[P]).([P:T].[P])
+///   <Y>.[P] := (<Y>.[P]) ∨ (<X>.[P]).([P:T].[P])
+///
+/// One valid solution is the following set of assignments:
+///
+///   [P:T].[P] := ([P:T].[P])
+///   <X>.[P] := (<X>.[P])
+///   <Y>.[P] := (<X>.[P]).([P:T].[P])
+///
+/// That is, we can choose to eliminate <X>.[P], but not <Y>.[P], or vice
+/// versa; but it is never valid to eliminate both.
+void GeneratingConformances::computeCandidateConformancePaths() {
+  for (const auto &loop : System.getLoops()) {
+    if (loop.isDeleted())
+      continue;
+
+    llvm::SmallDenseMap<const ProtocolDecl *,
+                        ProtocolConformanceRules, 2> result;
+
+    loop.findProtocolConformanceRules(result, System);
+
+    if (result.empty())
+      continue;
+
+    if (System.getDebugOptions().contains(DebugFlags::GeneratingConformances)) {
+      llvm::dbgs() << "Candidate homotopy generator: ";
+      loop.dump(llvm::dbgs(), System);
+      llvm::dbgs() << "\n";
+    }
+
+    for (const auto &pair : result) {
+      const auto *proto = pair.first;
+      const auto &inEmptyContext = pair.second.RulesInEmptyContext;
+      const auto &inContext = pair.second.RulesInContext;
+      bool sawIdentityConformance = pair.second.SawIdentityConformance;
+
+      // No rules appear without context.
+      if (inEmptyContext.empty())
+        continue;
+
+      if (System.getDebugOptions().contains(DebugFlags::GeneratingConformances)) {
+        llvm::dbgs() << "* Protocol " << proto->getName() << ":\n";
+        llvm::dbgs() << "** Conformance rules not in context:\n";
+        for (unsigned ruleID : inEmptyContext) {
+          llvm::dbgs() << "-- (#" << ruleID << ") " << System.getRule(ruleID) << "\n";
+        }
+
+        llvm::dbgs() << "** Conformance rules in context:\n";
+        for (auto pair : inContext) {
+          llvm::dbgs() << "-- " << pair.first;
+          unsigned ruleID = pair.second;
+          llvm::dbgs() << " (#" << ruleID << ") " << System.getRule(ruleID) << "\n";
+        }
+
+        if (sawIdentityConformance) {
+          llvm::dbgs() << "** Equivalent to identity conformance\n";
+        }
+
+        llvm::dbgs() << "\n";
+      }
+
+      // Two conformance rules in empty context (T.[P] => T) and (T'.[P] => T)
+      // are interchangeable, and contribute a trivial pair of conformance
+      // equations expressing that each one can be written in terms of the
+      // other:
+      //
+      //   (T.[P] => T) := (T'.[P])
+      //   (T'.[P] => T') := (T.[P])
+      for (unsigned candidateRuleID : inEmptyContext) {
+        for (unsigned otherRuleID : inEmptyContext) {
+          if (otherRuleID == candidateRuleID)
+            continue;
+
+          SmallVector<unsigned, 2> path;
+          path.push_back(otherRuleID);
+          ConformancePaths[candidateRuleID].push_back(path);
+        }
+      }
+
+      // If a rewrite loop contains a conformance rule (T.[P] => T) together
+      // with the identity conformance ([P].[P] => [P]), both in empty context,
+      // the conformance rule (T.[P] => T) is equivalent to the *empty product*
+      // of conformance rules; that is, it is trivially redundant.
+      if (sawIdentityConformance) {
+        for (unsigned candidateRuleID : inEmptyContext) {
+          SmallVector<unsigned, 2> emptyPath;
+          ConformancePaths[candidateRuleID].push_back(emptyPath);
+        }
+      }
+
+      // Suppose a rewrite loop contains a conformance rule (T.[P] => T) in
+      // empty context, and a conformance rule (V.[P] => V) in non-empty left
+      // context U.
+      //
+      // The rewrite loop looks something like this:
+      //
+      //     ... ⊗ (T.[P] => T) ⊗ ... ⊗ U.(V => V.[P]) ⊗ ...
+      //    ^                                               ^
+      //    |                                               |
+      //    + basepoint ========================= basepoint +
+      //
+      // We can decompose U into a product of conformance rules:
+      //
+      //    (V1.[P1] => V1)...(Vn.[Pn] => Vn),
+      //
+      // Note that (V1)...(Vn) is canonically equivalent to U.
+      //
+      // Now, we can record a candidate decomposition of (T.[P] => T) as a
+      // product of conformance rules:
+      //
+      //    (T.[P] => T) := (V1.[P1] => V1)...(Vn.[Pn] => Vn).(V.[P] => V)
+      //
+      // Again, note that (V1)...(Vn).V is canonically equivalent to U.V,
+      // and therefore T.
+      for (auto pair : inContext) {
+        // We have a term U, and a rule V.[P] => V.
+        SmallVector<unsigned, 2> conformancePath;
+
+        // Simplify U to get U'.
+        MutableTerm term = pair.first;
+        (void) System.simplify(term);
+
+        // Write U'.[domain(V)] as a product of left hand sides of protocol
+        // conformance rules.
+        decomposeTermIntoConformanceRuleLeftHandSides(term, pair.second,
+                                                      conformancePath);
+
+        // This decomposition defines a conformance access path for each
+        // conformance rule we saw in empty context.
+        for (unsigned otherRuleID : inEmptyContext)
+          ConformancePaths[otherRuleID].push_back(conformancePath);
+      }
+    }
+  }
+
+  for (const auto &pair : ConformancePaths) {
+    if (pair.second.size() > 1)
+      Context.GeneratingConformancesHistogram.add(pair.second.size());
+  }
+}
+
+/// Determines if \p path can be expressed without any of the conformance
+/// rules appearing in \p redundantConformances, by possibly substituting
+/// any occurrences of the redundant rules with alternate definitions
+/// appearing in \p conformancePaths.
+///
+/// The \p conformancePaths map sends conformance rules to a list of
+/// disjunctions, where each disjunction is a product of other conformance
+/// rules.
+bool GeneratingConformances::isValidConformancePath(
+    llvm::SmallDenseSet<unsigned, 4> &visited,
+    const llvm::SmallVectorImpl<unsigned> &path, bool allowConcrete) const {
+
+  unsigned lastIdx = path.size() - 1;
+
+  for (unsigned ruleIdx : indices(path)) {
+    unsigned ruleID = path[ruleIdx];
+    if (visited.count(ruleID) > 0)
+      return false;
+
+    bool isLastElement = (ruleIdx == lastIdx);
+
+    // Concrete conformances cannot appear in the middle of a conformance path.
+    if (!allowConcrete || !isLastElement) {
+      if (System.getRule(ruleID).getLHS().back().getKind()
+          == Symbol::Kind::ConcreteConformance)
+        return false;
+    }
+
+    if (RedundantConformances.count(ruleID)) {
+      SWIFT_DEFER {
+        visited.erase(ruleID);
+      };
+      visited.insert(ruleID);
+
+      auto found = ConformancePaths.find(ruleID);
+      assert(found != ConformancePaths.end());
+
+      bool foundValidConformancePath = false;
+      for (const auto &otherPath : found->second) {
+        if (isValidConformancePath(visited, otherPath,
+                                   allowConcrete && isLastElement)) {
+          foundValidConformancePath = true;
+          break;
+        }
+      }
+
+      if (!foundValidConformancePath)
+        return false;
+    }
+
+    auto found = ParentPaths.find(ruleID);
+    if (found != ParentPaths.end()) {
+      SWIFT_DEFER {
+        visited.erase(ruleID);
+      };
+      visited.insert(ruleID);
+
+      // If 'req' is based on some other conformance requirement
+      // `T.[P.]A : Q', we want to make sure that we have a
+      // non-redundant derivation for 'T : P'.
+      if (!isValidConformancePath(visited, found->second,
+                                  /*allowConcrete=*/false)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+/// Rules of the form [P].[Q] => [P] encode protocol refinement and can only
+/// be redundant if they're equivalent to a sequence of other protocol
+/// refinements.
+///
+/// This helps ensure that the inheritance clause of a protocol is complete
+/// and correct, allowing name lookup to find associated types of inherited
+/// protocols while building the protocol requirement signature.
+bool GeneratingConformances::isValidRefinementPath(
+    const llvm::SmallVectorImpl<unsigned> &path) const {
+  for (unsigned ruleID : path) {
+    if (!System.getRule(ruleID).isProtocolRefinementRule())
+      return false;
+  }
+
+  return true;
+}
+
+void GeneratingConformances::dumpGeneratingConformanceEquations(
+    llvm::raw_ostream &out) const {
+  out << "Initial set of equations:\n";
+  for (const auto &pair : ConformancePaths) {
+    out << "- ";
+    dumpGeneratingConformanceEquation(out, pair.first, pair.second);
+    out << "\n";
+  }
+
+  out << "Parent paths:\n";
+  for (const auto &pair : ParentPaths) {
+    out << "- " << System.getRule(pair.first).getLHS() << ": ";
+    dumpConformancePath(out, pair.second);
+    out << "\n";
+  }
+}
+
+void GeneratingConformances::dumpConformancePath(
+    llvm::raw_ostream &out,
+    const SmallVectorImpl<unsigned> &path) const {
+  if (path.empty()) {
+    out << "1";
+    return;
+  }
+
+  for (unsigned ruleID : path)
+    out << "(" << System.getRule(ruleID).getLHS() << ")";
+}
+
+void GeneratingConformances::dumpGeneratingConformanceEquation(
+    llvm::raw_ostream &out,
+    unsigned baseRuleID,
+    const std::vector<SmallVector<unsigned, 2>> &paths) const {
+  out << System.getRule(baseRuleID).getLHS() << " := ";
+
+  bool first = true;
+  for (const auto &path : paths) {
+    if (!first)
+      out << " ∨ ";
+    else
+      first = false;
+
+    dumpConformancePath(out, path);
+  }
+}
+
+void GeneratingConformances::verifyGeneratingConformanceEquations() const {
+#ifndef NDEBUG
+  for (const auto &pair : ConformancePaths) {
+    const auto &rule = System.getRule(pair.first);
+    auto *proto = rule.getLHS().back().getProtocol();
+
+    MutableTerm baseTerm(rule.getRHS());
+    (void) System.simplify(baseTerm);
+
+    for (const auto &path : pair.second) {
+      if (path.empty())
+        continue;
+
+      const auto &otherRule = System.getRule(path.back());
+      auto *otherProto = otherRule.getLHS().back().getProtocol();
+
+      if (proto != otherProto) {
+        llvm::errs() << "Invalid equation: ";
+        dumpGeneratingConformanceEquation(llvm::errs(),
+                                          pair.first, pair.second);
+        llvm::errs() << "\n";
+        llvm::errs() << "Mismatched conformance:\n";
+        llvm::errs() << "Base rule: " << rule << "\n";
+        llvm::errs() << "Final rule: " << otherRule << "\n\n";
+        System.dump(llvm::errs());
+        abort();
+      }
+
+      MutableTerm otherTerm;
+      for (unsigned i : indices(path)) {
+        unsigned otherRuleID = path[i];
+        const auto &rule = System.getRule(otherRuleID);
+
+        bool isLastElement = (i == path.size() - 1);
+        if ((isLastElement && !rule.isAnyConformanceRule()) ||
+            (!isLastElement && !rule.isProtocolConformanceRule())) {
+          llvm::errs() << "Equation term is not a conformance rule: ";
+          dumpGeneratingConformanceEquation(llvm::errs(),
+                                            pair.first, pair.second);
+          llvm::errs() << "\n";
+          llvm::errs() << "Term: " << rule << "\n";
+          System.dump(llvm::errs());
+          abort();
+        }
+
+        otherTerm.append(rule.getRHS());
+      }
+
+      (void) System.simplify(otherTerm);
+
+      if (baseTerm != otherTerm) {
+        llvm::errs() << "Invalid equation: ";
+        dumpGeneratingConformanceEquation(llvm::errs(),
+                                          pair.first, pair.second);
+        llvm::errs() << "\n";
+        llvm::errs() << "Invalid conformance path:\n";
+        llvm::errs() << "Expected: " << baseTerm << "\n";
+        llvm::errs() << "Got: " << otherTerm << "\n\n";
+        System.dump(llvm::errs());
+        abort();
+      }
+    }
+  }
+#endif
+}
+
+/// Find a minimal set of generating conformances by marking all other
+/// conformances redundant.
+void GeneratingConformances::computeGeneratingConformances() {
+  for (unsigned ruleID : ConformanceRules) {
+    const auto &paths = ConformancePaths[ruleID];
+
+    bool isProtocolRefinement = ProtocolRefinements.count(ruleID) > 0;
 
     for (const auto &path : paths) {
       // Only consider a protocol refinement rule to be redundant if it is
@@ -771,47 +814,89 @@ void RewriteSystem::computeGeneratingConformances(
       llvm::SmallDenseSet<unsigned, 4> visited;
       visited.insert(ruleID);
 
-      if (isValidConformancePath(visited, redundantConformances, path,
-                                 /*allowConcrete=*/true,
-                                 parentPaths, conformancePaths)) {
-        redundantConformances.insert(ruleID);
+      if (isValidConformancePath(visited, path,
+                                 /*allowConcrete=*/true)) {
+        RedundantConformances.insert(ruleID);
         break;
       }
     }
   }
+}
 
-  // Check invariants.
+/// Check invariants.
+void GeneratingConformances::verifyGeneratingConformances() const {
 #ifndef NDEBUG
-  for (const auto &pair : conformancePaths) {
-    if (redundantConformances.count(pair.first) > 0)
-      continue;
+  for (const auto &pair : ConformancePaths) {
+    unsigned ruleID = pair.first;
+    const auto &rule = System.getRule(ruleID);
 
-    const auto &rule = getRule(pair.first);
+    if (RedundantConformances.count(ruleID) > 0) {
+      // Check that redundant conformances are recoverable via
+      // generating conformances.
+      llvm::SmallDenseSet<unsigned, 4> visited;
+
+      llvm::SmallVector<unsigned, 1> path;
+      path.push_back(ruleID);
+
+      if (!isValidConformancePath(visited, path,
+                                  /*allowConcrete=*/true)) {
+        llvm::errs() << "Redundant conformance is not recoverable:\n";
+        llvm::errs() << rule << "\n\n";
+        System.dump(llvm::errs());
+        abort();
+      }
+
+      continue;
+    }
 
     if (rule.isRedundant()) {
       llvm::errs() << "Generating conformance is redundant: ";
       llvm::errs() << rule << "\n\n";
-      dump(llvm::errs());
+      System.dump(llvm::errs());
       abort();
     }
 
     if (rule.getLHS().containsUnresolvedSymbols()) {
       llvm::errs() << "Generating conformance contains unresolved symbols: ";
       llvm::errs() << rule << "\n\n";
-      dump(llvm::errs());
+      System.dump(llvm::errs());
       abort();
     }
   }
 #endif
+}
+
+void GeneratingConformances::dumpGeneratingConformances(
+    llvm::raw_ostream &out) const {
+  out << "Generating conformances:\n";
+
+  for (const auto &pair : ConformancePaths) {
+    if (RedundantConformances.count(pair.first) > 0)
+      continue;
+
+    out << "- " << System.getRule(pair.first) << "\n";
+  }
+}
+
+/// Computes a minimal set of generating conformances, assuming that homotopy
+/// reduction has already eliminated all redundant rewrite rules that are not
+/// conformance rules.
+void RewriteSystem::computeGeneratingConformances(
+    llvm::DenseSet<unsigned> &redundantConformances) {
+  GeneratingConformances builder(*this, redundantConformances);
+
+  builder.collectConformanceRules();
+  builder.computeCandidateConformancePaths();
 
   if (Debug.contains(DebugFlags::GeneratingConformances)) {
-    llvm::dbgs() << "Generating conformances:\n";
+    builder.dumpGeneratingConformanceEquations(llvm::dbgs());
+  }
 
-    for (const auto &pair : conformancePaths) {
-      if (redundantConformances.count(pair.first) > 0)
-        continue;
+  builder.verifyGeneratingConformanceEquations();
+  builder.computeGeneratingConformances();
+  builder.verifyGeneratingConformances();
 
-      llvm::dbgs() << "- " << getRule(pair.first) << "\n";
-    }
+  if (Debug.contains(DebugFlags::GeneratingConformances)) {
+    builder.dumpGeneratingConformances(llvm::dbgs());
   }
 }

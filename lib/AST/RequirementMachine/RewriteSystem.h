@@ -242,6 +242,8 @@ public:
   /// Return the rewrite context used for allocating memory.
   RewriteContext &getRewriteContext() const { return Context; }
 
+  DebugOptions getDebugOptions() const { return Debug; }
+
   void initialize(bool recordLoops,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
                   std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
@@ -261,6 +263,10 @@ public:
 
   const Rule &getRule(unsigned ruleID) const {
     return Rules[ruleID];
+  }
+
+  ArrayRef<RewriteLoop> getLoops() const {
+    return Loops;
   }
 
   bool addRule(MutableTerm lhs, MutableTerm rhs,
@@ -342,6 +348,9 @@ private:
   void performHomotopyReduction(
       const llvm::DenseSet<unsigned> *redundantConformances);
 
+  void computeGeneratingConformances(
+      llvm::DenseSet<unsigned> &redundantConformances);
+
 public:
   void minimizeRewriteSystem();
 
@@ -359,53 +368,6 @@ private:
       llvm::DenseSet<unsigned> redundantConformances) const;
 
   void verifyMinimizedRules() const;
-
-  //////////////////////////////////////////////////////////////////////////////
-  ///
-  /// Generating conformances
-  ///
-  //////////////////////////////////////////////////////////////////////////////
-
-  void decomposeTermIntoConformanceRuleLeftHandSides(
-      MutableTerm term,
-      SmallVectorImpl<unsigned> &result) const;
-  void decomposeTermIntoConformanceRuleLeftHandSides(
-      MutableTerm term, unsigned ruleID,
-      SmallVectorImpl<unsigned> &result) const;
-
-  void computeCandidateConformancePaths(
-      llvm::MapVector<unsigned,
-                      std::vector<SmallVector<unsigned, 2>>>
-          &conformancePaths) const;
-
-  bool isValidConformancePath(
-      llvm::SmallDenseSet<unsigned, 4> &visited,
-      llvm::DenseSet<unsigned> &redundantConformances,
-      const llvm::SmallVectorImpl<unsigned> &path, bool allowConcrete,
-      const llvm::MapVector<unsigned, SmallVector<unsigned, 2>> &parentPaths,
-      const llvm::MapVector<unsigned,
-                            std::vector<SmallVector<unsigned, 2>>>
-          &conformancePaths) const;
-
-  bool isValidRefinementPath(
-      const llvm::SmallVectorImpl<unsigned> &path) const;
-
-  void dumpConformancePath(
-      llvm::raw_ostream &out,
-      const SmallVectorImpl<unsigned> &path) const;
-
-  void dumpGeneratingConformanceEquation(
-      llvm::raw_ostream &out,
-      unsigned baseRuleID,
-      const std::vector<SmallVector<unsigned, 2>> &paths) const;
-
-  void verifyGeneratingConformanceEquations(
-      const llvm::MapVector<unsigned,
-                            std::vector<SmallVector<unsigned, 2>>>
-          &conformancePaths) const;
-
-  void computeGeneratingConformances(
-      llvm::DenseSet<unsigned> &redundantConformances);
 
 public:
   void dump(llvm::raw_ostream &out) const;
