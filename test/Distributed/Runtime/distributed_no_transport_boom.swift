@@ -25,7 +25,7 @@ distributed actor SomeSpecificDistributedActor {
 // ==== Fake Transport ---------------------------------------------------------
 
 @available(SwiftStdlib 5.6, *)
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address
@@ -34,12 +34,10 @@ struct ActorAddress: ActorIdentity {
 
 @available(SwiftStdlib 5.6, *)
 struct FakeActorSystem: DistributedActorSystem {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError("not implemented:\(#function)")
-  }
 
-  func resolve<Act>(id: ID, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor {
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+            Act.ID == ActorID {
     return nil
   }
 
@@ -50,7 +48,9 @@ struct FakeActorSystem: DistributedActorSystem {
     return .init(id)
   }
 
-  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     print("ready actor:\(actor), id:\(actor.id)")
   }
 

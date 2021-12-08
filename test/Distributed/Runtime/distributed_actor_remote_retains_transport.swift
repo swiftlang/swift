@@ -18,7 +18,7 @@ distributed actor SomeSpecificDistributedActor {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-struct FakeActorID: ActorIdentity {
+struct FakeActorID: Sendable, Hashable, Codable {
   let id: UInt64
 }
 
@@ -26,7 +26,7 @@ enum FakeActorSystemError: DistributedActorSystemError {
   case unsupportedActorIdentity(AnyActorIdentity)
 }
 
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address
@@ -37,10 +37,6 @@ final class FakeActorSystem: DistributedActorSystem {
 
   deinit {
     print("deinit \(self)")
-  }
-
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError("not implemented:\(#function)")
   }
 
   func resolve<Act>(id: ID, as actorType: Act.Type)
@@ -56,7 +52,9 @@ final class FakeActorSystem: DistributedActorSystem {
     return .init(id)
   }
 
-  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     print("actorReady actor:\(actor), id:\(actor.id)")
   }
 

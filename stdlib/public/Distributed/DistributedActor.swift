@@ -35,17 +35,14 @@ public protocol AnyActor: Sendable, AnyObject {
 /// The 'DistributedActor' protocol provides the core functionality of any
 /// distributed actor.
 @available(SwiftStdlib 5.6, *)
-public protocol DistributedActor: AnyActor,
+public protocol DistributedActor:
+    AnyActor,
     Identifiable,
     Hashable, Codable
-  where ID == ActorSystem.ActorID
-{
+  where ID == ActorSystem.ActorID {
   
   /// The type of transport used to communicate with actors of this type.
   associatedtype ActorSystem: DistributedActorSystem
-
-  /// The type of identity used by the transport.
-//  typealias ID = ActorSystem.ActorID
 
   /// Logical identity of this distributed actor.
   ///
@@ -57,7 +54,6 @@ public protocol DistributedActor: AnyActor,
   /// Conformance to this requirement is synthesized automatically for any
   /// `distributed actor` declaration.
   nonisolated override var id: ID { get }
-//  nonisolated var id: ID { get }
 
   /// The `ActorSystem` that is managing this distributed actor.
   ///

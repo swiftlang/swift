@@ -13,11 +13,6 @@ distributed actor DA: CustomStringConvertible {
   typealias ActorSystem = FakeActorSystem
 //  typealias ID = FakeActorSystem.ActorID
 
-//  struct Boom: Error {}
-//  static func resolve(id: FakeActorSystem.ActorID, using system: ActorSystem) throws -> DA {
-//    throw Boom()
-//  }
-
   nonisolated var description: String {
     "DA(\(self.id))"
   }
@@ -63,7 +58,9 @@ final class FakeActorSystem: DistributedActorSystem {
     return address
   }
 
-  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     print("ready actor:\(actor), address:\(actor.id)")
   }
 
@@ -223,10 +220,10 @@ func test() {
   let system = FakeActorSystem()
 
   // CHECK: assign type:DA, address:ActorAddress(address: "xxx")
+  // CHECK: ready actor:DA(ActorAddress(address: "xxx"))
   let da = DA(system: system)
 
-  // CHECK: encode: AnyActorIdentity(ActorAddress(address: "xxx"))
-  // CHECK: FakeActorSystem.decodeIdentity from:main.TestDecoder
+  // CHECK: encode: ActorAddress(address: "xxx")
   let encoder = TestEncoder(system: system)
   let data = try! encoder.encode(da)
 
@@ -234,7 +231,7 @@ func test() {
   // CHECK: decode ActorAddress -> ActorAddress(address: "xxx")
   let da2 = try! DA(from: TestDecoder(encoder: encoder, system: system, data: data))
 
-  // CHECK: decoded da2: DA(AnyActorIdentity(ActorAddress(address: "xxx")))
+  // CHECK: decoded da2: DA(ActorAddress(address: "xxx"))
   print("decoded da2: \(da2)")
 }
 

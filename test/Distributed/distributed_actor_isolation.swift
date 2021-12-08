@@ -10,7 +10,7 @@ import _Distributed
 /// Use the existential wrapper as the default actor transport.
 typealias DefaultDistributedActorSystem = AnyDistributedActorSystem
 
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address

@@ -139,18 +139,16 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 // ==== Fake Transport ---------------------------------------------------------
 
 @available(SwiftStdlib 5.6, *)
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
 }
 
 @available(SwiftStdlib 5.6, *)
 struct FakeActorSystem: DistributedActorSystem {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError("not implemented:\(#function)")
-  }
 
-  func resolve<Act>(id: ID, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor {
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+            Act.ID == ActorID {
     nil
   }
 
@@ -159,7 +157,9 @@ struct FakeActorSystem: DistributedActorSystem {
     .init(ActorAddress(address: ""))
   }
 
-  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+      Act.ID == ActorID {
   }
 
   func resignID(_ id: AnyActorIdentity) {

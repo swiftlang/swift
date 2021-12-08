@@ -53,7 +53,7 @@ distributed actor DA_state {
 // ==== Fake Transport ---------------------------------------------------------
 
 @available(SwiftStdlib 5.6, *)
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address
@@ -62,35 +62,62 @@ struct ActorAddress: ActorIdentity {
 
 @available(SwiftStdlib 5.6, *)
 final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias Invocation = FakeDistributedInvocation
 
   var n = 0
 
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    print("decode identity from:\(decoder)")
-    fatalError("not implemented \(#function)")
-  }
-
-  func resolve<Act>(id: ID, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor {
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+            Act.ID == ActorID {
     print("resolve type:\(actorType), address:\(id)")
     return nil
   }
 
-  func assignID<Act>(_ actorType: Act.Type) -> Act.ID
-      where Act: DistributedActor, Act.ID == ActorID {
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
+      where Act: DistributedActor,
+            Act.ID == ActorID {
     n += 1
     let address = ActorAddress(parse: "addr-\(n)")
     print("assign type:\(actorType), address:\(address)")
     return address
   }
 
-  public func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     print("ready actor:\(actor), address:\(actor.id)")
   }
 
-  func resignID(id: ID) {
+  func resignID(_ id: ActorID) {
     print("resign address:\(id)")
   }
+
+  @inlinable func makeInvocation() throws -> Invocation {
+    .init()
+  }
+}
+
+struct FakeDistributedInvocation: DistributedTargetInvocation {
+  typealias  ArgumentDecoder = FakeDistributedTargetInvocationArgumentDecoder
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws { }
+  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws { }
+  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws { }
+  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws { }
+  mutating func doneRecording() throws { }
+
+  // === Receiving / decoding -------------------------------------------------
+
+  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  mutating func argumentDecoder() -> Self.ArgumentDecoder { .init() }
+  mutating func decodeReturnType() throws -> Any.Type? { nil }
+  mutating func decodeErrorType() throws -> Any.Type? { nil }
+}
+
+struct FakeDistributedTargetInvocationArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
+  typealias SerializationRequirement = Codable
 }
 
 @available(SwiftStdlib 5.6, *)
@@ -113,40 +140,40 @@ func test() {
     DA(transport: transport)
   }()
   // CHECK: assign type:DA, address:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.DA, address:AnyActorIdentity(ActorAddress(address: "[[ADDR1:addr-[0-9]]]"))
-  // CHECK: resign address:AnyActorIdentity(ActorAddress(address: "[[ADDR1]]"))
+  // CHECK: ready actor:main.DA, address:ActorAddress(address: "[[ADDR1:addr-[0-9]]]")
+  // CHECK: resign address:ActorAddress(address: "[[ADDR1]]")
 
   _ = { () -> DA_userDefined in
     DA_userDefined(transport: transport)
   }()
   // CHECK: assign type:DA_userDefined, address:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.DA_userDefined, address:AnyActorIdentity(ActorAddress(address: "[[ADDR2:addr-[0-9]]]"))
-  // CHECK: resign address:AnyActorIdentity(ActorAddress(address: "[[ADDR2]]"))
+  // CHECK: ready actor:main.DA_userDefined, address:ActorAddress(address: "[[ADDR2:addr-[0-9]]]")
+  // CHECK: resign address:ActorAddress(address: "[[ADDR2]]")
 
   // resign must happen as the _last thing_ after user-deinit completed
   _ = { () -> DA_userDefined2 in
     DA_userDefined2(transport: transport)
   }()
   // CHECK: assign type:DA_userDefined2, address:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.DA_userDefined2, address:AnyActorIdentity(ActorAddress(address: "[[ADDR3:addr-[0-9]]]"))
-  // CHECK: Deinitializing AnyActorIdentity(ActorAddress(address: "[[ADDR3]]"))
-  // CHECK-NEXT: resign address:AnyActorIdentity(ActorAddress(address: "[[ADDR3]]"))
+  // CHECK: ready actor:main.DA_userDefined2, address:ActorAddress(address: "[[ADDR3:addr-[0-9]]]")
+  // CHECK: Deinitializing ActorAddress(address: "[[ADDR3]]")
+  // CHECK-NEXT: resign address:ActorAddress(address: "[[ADDR3]]")
 
   // resign must happen as the _last thing_ after user-deinit completed
   _ = { () -> DA_state in
     DA_state(transport: transport)
   }()
   // CHECK: assign type:DA_state, address:[[ADDRESS:.*]]
-  // CHECK: ready actor:main.DA_state, address:AnyActorIdentity(ActorAddress(address: "[[ADDR4:addr-[0-9]]]"))
-  // CHECK: Deinitializing AnyActorIdentity(ActorAddress(address: "[[ADDR4]]"))
-  // CHECK-NEXT: resign address:AnyActorIdentity(ActorAddress(address: "[[ADDR4]]"))
+  // CHECK: ready actor:main.DA_state, address:ActorAddress(address: "[[ADDR4:addr-[0-9]]]")
+  // CHECK: Deinitializing ActorAddress(address: "[[ADDR4]]")
+  // CHECK-NEXT: resign address:ActorAddress(address: "[[ADDR4]]")
 
   // a remote actor should not resign it's address, it was never "assigned" it
   let address = ActorAddress(parse: "remote-1")
   _ = { () -> DA_userDefined2 in
-    try! DA_userDefined2.resolve(.init(address), using: transport)
+    try! DA_userDefined2.resolve(id: address, using: transport)
   }()
-  // CHECK-NEXT: resolve type:DA_userDefined2, address:AnyActorIdentity(ActorAddress(address: "[[ADDR5:remote-1]]"))
+  // CHECK-NEXT: resolve type:DA_userDefined2, address:ActorAddress(address: "[[ADDR5:remote-1]]")
   // CHECK-NEXT: Deinitializing
 }
 

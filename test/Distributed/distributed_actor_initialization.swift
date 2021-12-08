@@ -71,7 +71,7 @@ distributed actor OKMultiDefaultValues {
 // ==== ------------------------------------------------------------------------
 // MARK: Specific transport
 
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address

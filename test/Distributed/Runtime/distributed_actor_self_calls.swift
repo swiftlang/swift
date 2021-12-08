@@ -32,7 +32,7 @@ distributed actor Philosopher {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address
@@ -40,12 +40,10 @@ struct ActorAddress: ActorIdentity {
 }
 
 struct FakeActorSystem: DistributedActorSystem {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError("not implemented \(#function)")
-  }
 
-  func resolve<Act>(id: ID, as actorType: Act.Type) throws -> Act?
-      where Act: DistributedActor {
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+            Act.ID == ActorID {
     return nil
   }
 

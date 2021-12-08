@@ -48,7 +48,9 @@ struct FakeActorSystem: DistributedActorSystem {
     return address
   }
 
-  public func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     print("ready actor:\(actor), address:\(actor.id)")
   }
 
