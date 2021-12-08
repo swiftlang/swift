@@ -113,6 +113,8 @@ public:
     return {index, true};
   }
 
+  bool count(const ValueT &value) { return map.count(value); }
+
   /// Replace \p value1 with \p value2 placing \p value2 into the position in
   /// the array where value1 used to be. If \p value2 is already in the set,
   /// this just erases \p value1.
