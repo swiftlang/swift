@@ -218,7 +218,7 @@ def run(*args, **kwargs):
         return(None, 0, args)
 
     my_pipe = subprocess.Popen(
-        *args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+        *args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **kwargs)
     (stdout, stderr) = my_pipe.communicate()
     ret = my_pipe.wait()
 
