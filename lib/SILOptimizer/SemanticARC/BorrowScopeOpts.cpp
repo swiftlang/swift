@@ -49,9 +49,8 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
 
   // Lexical borrow scopes must remain in order to ensure that value lifetimes
   // are not observably shortened.
-  if (bbi->isLexical()) {
-    if (!isRedundantLexicalBeginBorrow(bbi))
-      return false;
+  if (bbi->isLexical() && !isRedundantLexicalBeginBorrow(bbi)) {
+    return false;
   }
 
   auto kind = bbi->getOperand().getOwnershipKind();
