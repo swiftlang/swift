@@ -2203,8 +2203,7 @@ void IRGenSILFunction::emitSILFunction() {
   // by name at runtime through it.
   if (CurSILFn->isDistributed() && CurSILFn->isThunk()) {
     IGM.emitDistributedMethodAccessor(CurSILFn);
-    IGM.addAccessibleFunction(CurSILFn, IGM.getAddrOfDistributedMethodAccessor(
-                                            CurSILFn, NotForDefinition));
+    IGM.addAccessibleFunction(CurSILFn);
   }
 
   // Configure the dominance resolver.

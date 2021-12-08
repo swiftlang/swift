@@ -5050,10 +5050,9 @@ public:
   RelativeDirectPointer<const char, /*nullable*/ false> FunctionType;
 
   /// The fully-abstracted function to call.
-  RelativeDirectPointer<bool(void *outValue, void *outError, void **args,
-                             uint32_t numArgs),
-                        /*nullable*/ false>
-      Function;
+  ///
+  /// Could be a sync or async function pointer depending on flags.
+  RelativeDirectPointer<void *, /*nullable*/ false> Function;
 
   /// Flags providing more information about the function.
   AccessibleFunctionFlags Flags;

@@ -1041,8 +1041,7 @@ public:
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addObjCClassStub(llvm::Constant *addr);
   void addProtocolConformance(ConformanceDescription &&conformance);
-  void addAccessibleFunction(SILFunction *func,
-                             llvm::Function *thunk = nullptr);
+  void addAccessibleFunction(SILFunction *func);
 
   llvm::Constant *emitSwiftProtocols(bool asContiguousArray);
   llvm::Constant *emitProtocolConformances(bool asContiguousArray);
@@ -1178,10 +1177,8 @@ private:
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
   /// List of all of the functions, which can be lookup by name
-  /// up at runtime. Second element is an optional "accessor" thunk
-  /// to call the given function through.
-  SmallVector<std::pair<SILFunction *, llvm::Function *>, 4>
-      AccessibleFunctions;
+  /// up at runtime.
+  SmallVector<SILFunction *, 4> AccessibleFunctions;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.

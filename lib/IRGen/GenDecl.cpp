@@ -3894,9 +3894,8 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
   ProtocolConformances.push_back(std::move(record));
 }
 
-void IRGenModule::addAccessibleFunction(SILFunction *func,
-                                        llvm::Function *thunk) {
-  AccessibleFunctions.push_back({func, thunk});
+void IRGenModule::addAccessibleFunction(SILFunction *func) {
+  AccessibleFunctions.push_back(func);
 }
 
 /// Emit the protocol conformance list and return it (if asContiguousArray is
@@ -4123,10 +4122,7 @@ void IRGenModule::emitAccessibleFunctions() {
     break;
   }
 
-  for (const auto &entry : AccessibleFunctions) {
-    SILFunction *func = entry.first;
-    llvm::Function *thunk = entry.second;
-
+  for (auto *func : AccessibleFunctions) {
     auto mangledRecordName =
         LinkEntity::forAccessibleFunctionRecord(func).mangleAsString();
 
@@ -4151,8 +4147,16 @@ void IRGenModule::emitAccessibleFunctions() {
                                .first;
     llvm::Constant *relativeType = emitDirectRelativeReference(type, var, {1});
 
-    llvm::Function *funcAddr =
-        thunk ? thunk : getAddrOfSILFunction(func, NotForDefinition);
+    llvm::Constant *funcAddr = nullptr;
+    if (func->isDistributed()) {
+      funcAddr = getAddrOfAsyncFunctionPointer(
+          LinkEntity::forDistributedMethodAccessor(func));
+    } else if (func->isAsync()) {
+      funcAddr = getAddrOfAsyncFunctionPointer(func);
+    } else {
+      funcAddr = getAddrOfSILFunction(func, NotForDefinition);
+    }
+
     llvm::Constant *relativeFuncAddr =
         emitDirectRelativeReference(funcAddr, var, {2});
 
