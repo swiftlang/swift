@@ -145,7 +145,7 @@ void emitDistributedActorSystemWitnessCall(
     auto arg = args[i];
     if (params[i].isFormalIndirect() &&
         !arg->getType().isAddress() &&
-        methodName.getBaseIdentifier() != C.Id_assignID) { // FIXME: we want to detect and NOT handle $@thick DA.Type here - how to?
+        !dyn_cast<AnyMetatypeType>(arg->getType().getASTType())) {
       fprintf(stderr, "[%s:%d] (%s) push arg, make pointer\n", __FILE__, __LINE__, __FUNCTION__);
       auto buf = B.createAllocStack(loc, arg->getType(), None);
       auto argCopy = B.emitCopyValueOperation(loc, arg);
