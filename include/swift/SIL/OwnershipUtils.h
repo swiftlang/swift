@@ -1206,6 +1206,14 @@ void visitTransitiveEndBorrows(
     BorrowedValue beginBorrow,
     function_ref<void(EndBorrowInst *)> visitEndBorrow);
 
+/// Whether the specified lexical begin_borrow instruction is nested.
+///
+/// A begin_borrow [lexical] is nested if the borrowed value's lifetime is
+/// guaranteed by another lexical scope.  That happens if:
+/// - the value is a guaranteed argument to the function
+/// - the value is itself a begin_borrow [lexical]
+bool isNestedLexicalBeginBorrow(BeginBorrowInst *bbi);
+
 } // namespace swift
 
 #endif
