@@ -14,6 +14,12 @@
 #define SWIFT_SIL_SILBRIDGING_H
 
 #include "BridgedSwiftObject.h"
+
+#include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/ForeignAsyncConvention.h"
+#include "swift/SIL/SILBuilder.h"
+
 #include <stddef.h>
 #include <string>
 
@@ -144,6 +150,8 @@ typedef enum {
 
 typedef intptr_t SwiftInt;
 
+swift::SILBuilder SILBuilder_init(BridgedInstruction i);
+
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
 
 void OStream_write(BridgedOStream os, BridgedStringRef str);
@@ -235,10 +243,6 @@ BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
           BridgedInstruction insertionPoint,
           BridgedLocation loc, BridgedStringRef name,
           BridgedType operandType, BridgedType resultType, BridgedValueArray arguments);
-BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge);
-BridgedInstruction SILBuilder_createIntegerLiteral(BridgedInstruction insertionPoint,
-          BridgedLocation loc, BridgedType type, SwiftInt value);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

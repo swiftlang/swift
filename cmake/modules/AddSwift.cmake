@@ -782,8 +782,18 @@ function(add_libswift name)
               "-emit-module-path" "${build_dir}/${module}.swiftmodule"
               "-parse-as-library" ${sources}
               "-wmo" ${libswift_compile_options}
-              "-I" "${SWIFT_SOURCE_DIR}/include/swift"
-              "-I" "${SWIFT_SOURCE_DIR}/include"
+              "-I" "${CMAKE_SOURCE_DIR}/include/swift"
+              # The Swift source header includes:
+              "-I" "${CMAKE_SOURCE_DIR}/include"
+              # LLVM and Clang source header includes:
+              "-I" "${LLVM_MAIN_SRC_DIR}/../clang/include"
+              "-I" "${LLVM_MAIN_INCLUDE_DIR}"
+              # Swift build includes:
+              "-I" "${CMAKE_BINARY_DIR}/include"
+              # LLVM and Clang build includes:
+              "-I" "${LLVM_BINARY_DIR}/tools/clang/include"
+              "-I" "${LLVM_BINARY_DIR}/include"
+              # libSwift build includes:
               "-I" "${build_dir}"
       COMMENT "Building libswift module ${module}")
 
