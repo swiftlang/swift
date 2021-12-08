@@ -230,7 +230,7 @@ namespace {
 
 typedef uint64_t BufferStamp;
 
-struct FileContent : llvm::RefCountedBase<FileContent> {
+struct FileContent {
   ImmutableTextSnapshotRef Snapshot;
   std::string Filename;
   std::unique_ptr<llvm::MemoryBuffer> Buffer;
@@ -247,8 +247,6 @@ struct FileContent : llvm::RefCountedBase<FileContent> {
     return InputFile(Filename, IsPrimary, Buffer.get());
   }
 };
-
-using FileContentRef = llvm::IntrusiveRefCntPtr<FileContent>;
 
 /// An \c ASTBuildOperations builds an AST. Once the AST is built, it informs
 /// a list of \c SwiftASTConsumers about the built AST.
@@ -304,7 +302,7 @@ class ASTBuildOperation
 
   /// The contents of all explicit input files of the compiler invoation, which
   /// can be determined at construction time of the \c ASTBuildOperation.
-  const std::vector<FileContentRef> FileContents;
+  const std::vector<FileContent> FileContents;
 
   /// \c DependencyStamps contains the stamps of all module depenecies needed
   /// for the AST build. These stamps are only known after the AST is built.
@@ -366,7 +364,7 @@ class ASTBuildOperation
 
   /// Create a vector of \c FileContents containing all files explicitly
   /// referenced by the compiler invocation.
-  std::vector<FileContentRef> fileContentsForFilesInCompilerInvocation();
+  std::vector<FileContent> fileContentsForFilesInCompilerInvocation();
 
 public:
   ASTBuildOperation(IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
@@ -376,7 +374,7 @@ public:
         DidFinishCallback(DidFinishCallback) {
     // const_cast is fine here. We just want to guard against modifying these
     // fields later on. It's fine to set them in the constructor.
-    const_cast<std::vector<FileContentRef> &>(this->FileContents) =
+    const_cast<std::vector<FileContent> &>(this->FileContents) =
         fileContentsForFilesInCompilerInvocation();
   }
 
@@ -387,7 +385,7 @@ public:
            "not receive their callback.");
   }
 
-  ArrayRef<FileContentRef> getFileContents() const { return FileContents; }
+  ArrayRef<FileContent> getFileContents() const { return FileContents; }
 
   /// Returns true if the build operation has finished.
   bool isFinished() {
@@ -598,7 +596,7 @@ struct SwiftASTManager::Implementation {
 
   ASTProducerRef getASTProducer(SwiftInvocationRef InvokRef);
 
-  FileContentRef
+  FileContent
   getFileContent(StringRef FilePath, bool IsPrimary,
                  IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
                  std::string &Error) const;
@@ -634,10 +632,10 @@ SwiftASTManager::getMemoryBuffer(StringRef Filename, std::string &Error) {
 }
 
 static FrontendInputsAndOutputs
-convertFileContentsToInputs(ArrayRef<FileContentRef> contents) {
+convertFileContentsToInputs(ArrayRef<FileContent> contents) {
   FrontendInputsAndOutputs inputsAndOutputs;
-  for (FileContentRef content : contents)
-    inputsAndOutputs.addInput(InputFile(*content));
+  for (const FileContent &content : contents)
+    inputsAndOutputs.addInput(InputFile(content));
   return inputsAndOutputs;
 }
 
@@ -780,16 +778,15 @@ SwiftASTManager::Implementation::getASTProducer(SwiftInvocationRef InvokRef) {
   return Producer;
 }
 
-static FileContentRef getFileContentFromSnap(ImmutableTextSnapshotRef Snap,
-                                             bool IsPrimary,
-                                             StringRef FilePath) {
+static FileContent getFileContentFromSnap(ImmutableTextSnapshotRef Snap,
+                                          bool IsPrimary, StringRef FilePath) {
   auto Buf = llvm::MemoryBuffer::getMemBufferCopy(
       Snap->getBuffer()->getText(), FilePath);
-  return new FileContent(Snap, FilePath.str(), std::move(Buf), IsPrimary,
-                         Snap->getStamp());
+  return FileContent(Snap, FilePath.str(), std::move(Buf), IsPrimary,
+                     Snap->getStamp());
 }
 
-FileContentRef SwiftASTManager::Implementation::getFileContent(
+FileContent SwiftASTManager::Implementation::getFileContent(
     StringRef UnresolvedPath, bool IsPrimary,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) const {
@@ -802,8 +799,8 @@ FileContentRef SwiftASTManager::Implementation::getFileContent(
   // No need to check EditorDocs again. We did so above.
   auto Stamp = getBufferStamp(FilePath, FileSystem, /*CheckEditorDocs=*/false);
   auto Buffer = getMemoryBuffer(FilePath, FileSystem, Error);
-  return new FileContent(nullptr, UnresolvedPath.str(), std::move(Buffer),
-                         IsPrimary, Stamp);
+  return FileContent(nullptr, UnresolvedPath.str(), std::move(Buffer),
+                     IsPrimary, Stamp);
 }
 
 BufferStamp SwiftASTManager::Implementation::getBufferStamp(
@@ -845,12 +842,12 @@ SwiftASTManager::Implementation::getMemoryBuffer(
   return nullptr;
 }
 
-std::vector<FileContentRef>
+std::vector<FileContent>
 ASTBuildOperation::fileContentsForFilesInCompilerInvocation() {
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
   std::string Error; // is ignored
 
-  std::vector<FileContentRef> FileContents;
+  std::vector<FileContent> FileContents;
   FileContents.reserve(
       Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
 
@@ -862,14 +859,13 @@ ASTBuildOperation::fileContentsForFilesInCompilerInvocation() {
     bool IsPrimary = input.isPrimary();
     auto Content =
         ASTManager->Impl.getFileContent(Filename, IsPrimary, FileSystem, Error);
-    if (!Content->Buffer) {
+    if (!Content.Buffer) {
       LOG_WARN_FUNC("failed getting file contents for " << Filename << ": "
                                                         << Error);
       // File may not exist, continue and recover as if it was empty.
-      Content->Buffer =
-          llvm::WritableMemoryBuffer::getNewMemBuffer(0, Filename);
+      Content.Buffer = llvm::WritableMemoryBuffer::getNewMemBuffer(0, Filename);
     }
-    FileContents.push_back(Content);
+    FileContents.push_back(std::move(Content));
   }
   assert(FileContents.size() ==
          Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
@@ -882,7 +878,7 @@ bool ASTBuildOperation::matchesSourceState(
 
   auto Inputs = Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs();
   for (size_t I = 0; I < Inputs.size(); I++) {
-    if (getFileContents()[I]->Stamp !=
+    if (getFileContents()[I].Stamp !=
         ASTManager->Impl.getBufferStamp(Inputs[I].getFileName(),
                                         OtherFileSystem)) {
       return false;
@@ -1011,8 +1007,8 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
 
   ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, ASTManager->Impl.Stats);
   for (auto &Content : getFileContents()) {
-    if (Content->Snapshot)
-      ASTRef->Impl.Snapshots.push_back(Content->Snapshot);
+    if (Content.Snapshot)
+      ASTRef->Impl.Snapshots.push_back(Content.Snapshot);
   }
   auto &CompIns = ASTRef->Impl.CompInst;
   auto &Consumer = ASTRef->Impl.CollectDiagConsumer;
@@ -1180,7 +1176,7 @@ ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
     std::vector<ImmutableTextSnapshotRef> Snapshots;
     Snapshots.reserve(BuildOp->getFileContents().size());
     for (auto &FileContent : BuildOp->getFileContents()) {
-      Snapshots.push_back(FileContent->Snapshot);
+      Snapshots.push_back(FileContent.Snapshot);
     }
     if (BuildOp->matchesSourceState(FileSystem)) {
       ++Mgr->Impl.Stats->numASTCacheHits;
