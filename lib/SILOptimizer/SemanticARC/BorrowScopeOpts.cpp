@@ -24,24 +24,6 @@
 using namespace swift;
 using namespace swift::semanticarc;
 
-/// Whether the provided lexical begin_borrow instruction is redundant.
-///
-/// A begin_borrow [lexical] is redundant if the borrowed value's lifetime is
-/// otherwise guaranteed.  That happens if:
-/// - the value is a guaranteed argument to the function
-/// - the value is itself a begin_borrow [lexical]
-static bool isRedundantLexicalBeginBorrow(BeginBorrowInst *bbi) {
-  assert(bbi->isLexical());
-  auto value = bbi->getOperand();
-  if (auto *outerBBI = dyn_cast<BeginBorrowInst>(value)) {
-    return outerBBI->isLexical();
-  }
-  if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {
-    return arg->getOwnershipKind() == OwnershipKind::Guaranteed;
-  }
-  return false;
-}
-
 bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   // Quickly check if we are supposed to perform this transformation.
   if (!ctx.shouldPerform(ARCTransformKind::RedundantBorrowScopeElimPeephole))
@@ -49,7 +31,7 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
 
   // Non-redundant, lexical borrow scopes must remain in order to ensure that
   // value lifetimes are not observably shortened.
-  if (bbi->isLexical() && !isRedundantLexicalBeginBorrow(bbi)) {
+  if (bbi->isLexical() && !isNestedLexicalBeginBorrow(bbi)) {
     return false;
   }
 
