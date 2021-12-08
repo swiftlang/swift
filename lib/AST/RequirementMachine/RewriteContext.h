@@ -130,6 +130,8 @@ public:
   Histogram RuleTrieRootHistogram;
   Histogram PropertyTrieHistogram;
   Histogram PropertyTrieRootHistogram;
+  Histogram ConformanceRulesHistogram;
+  Histogram GeneratingConformancesHistogram;
 
   explicit RewriteContext(ASTContext &ctx);
 
