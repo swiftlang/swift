@@ -1487,3 +1487,21 @@ void swift::visitTransitiveEndBorrows(
     }
   }
 }
+
+/// Whether the specified lexical begin_borrow instruction is nested.
+///
+/// A begin_borrow [lexical] is nested if the borrowed value's lifetime is
+/// guaranteed by another lexical scope.  That happens if:
+/// - the value is a guaranteed argument to the function
+/// - the value is itself a begin_borrow [lexical]
+bool swift::isNestedLexicalBeginBorrow(BeginBorrowInst *bbi) {
+  assert(bbi->isLexical());
+  auto value = bbi->getOperand();
+  if (auto *outerBBI = dyn_cast<BeginBorrowInst>(value)) {
+    return outerBBI->isLexical();
+  }
+  if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {
+    return arg->getOwnershipKind() == OwnershipKind::Guaranteed;
+  }
+  return false;
+}
