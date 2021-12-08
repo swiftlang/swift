@@ -24,6 +24,7 @@ using namespace swift;
 using namespace rewriting;
 
 const StringRef Symbol::Kinds[] = {
+  "conformance",
   "protocol",
   "assocty",
   "generic",
@@ -108,6 +109,21 @@ struct Symbol::Storage final
       getSubstitutions()[i] = substitutions[i];
   }
 
+  Storage(CanType type, ArrayRef<Term> substitutions, const ProtocolDecl *proto) {
+    assert(!type->hasTypeVariable());
+    assert(type->hasTypeParameter() != substitutions.empty());
+
+    Kind = unsigned(Symbol::Kind::ConcreteConformance);
+    NumProtocols = 1;
+    NumSubstitutions = substitutions.size();
+    ConcreteType = type;
+
+    for (unsigned i : indices(substitutions))
+      getSubstitutions()[i] = substitutions[i];
+
+    getProtocols()[0] = proto;
+  }
+
   size_t numTrailingObjects(OverloadToken<const ProtocolDecl *>) const {
     return NumProtocols;
   }
@@ -149,8 +165,12 @@ Identifier Symbol::getName() const {
 
 /// Get the single protocol declaration associated with a protocol symbol.
 const ProtocolDecl *Symbol::getProtocol() const {
-  assert(getKind() == Kind::Protocol);
-  return Ptr->Proto;
+  if (getKind() == Kind::Protocol)
+    return Ptr->Proto;
+
+  assert(getKind() == Kind::ConcreteConformance);
+  assert(Ptr->getProtocols().size() == 1);
+  return Ptr->getProtocols()[0];
 }
 
 /// Get the list of protocols associated with a protocol or associated type
@@ -186,19 +206,21 @@ CanType Symbol::getSuperclass() const {
 
 /// Get the concrete type associated with a concrete type symbol.
 CanType Symbol::getConcreteType() const {
-  assert(getKind() == Kind::ConcreteType);
+  assert(getKind() == Kind::ConcreteType ||
+         getKind() == Kind::ConcreteConformance);
   return Ptr->ConcreteType;
 }
 
 ArrayRef<Term> Symbol::getSubstitutions() const {
   assert(getKind() == Kind::Superclass ||
-         getKind() == Kind::ConcreteType);
+         getKind() == Kind::ConcreteType ||
+         getKind() == Kind::ConcreteConformance);
   return Ptr->getSubstitutions();
 }
 
 /// Creates a new name symbol.
 Symbol Symbol::forName(Identifier name,
-                   RewriteContext &ctx) {
+                       RewriteContext &ctx) {
   llvm::FoldingSetNodeID id;
   id.AddInteger(unsigned(Kind::Name));
   id.AddPointer(name.get());
@@ -417,6 +439,40 @@ Symbol Symbol::forConcreteType(CanType type, ArrayRef<Term> substitutions,
   return symbol;
 }
 
+/// Creates a concrete type symbol, representing a superclass constraint.
+Symbol Symbol::forConcreteConformance(CanType type,
+                                      ArrayRef<Term> substitutions,
+                                      const ProtocolDecl *proto,
+                                      RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::ConcreteConformance));
+  id.AddPointer(type.getPointer());
+  id.AddInteger(unsigned(substitutions.size()));
+  for (auto substitution : substitutions)
+    id.AddPointer(substitution.getOpaquePointer());
+  id.AddPointer(proto);
+
+  void *insertPos = nullptr;
+  if (auto *symbol = ctx.Symbols.FindNodeOrInsertPos(id, insertPos))
+    return symbol;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
+      /*protos=*/1, substitutions.size());
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *symbol = new (mem) Storage(type, substitutions, proto);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  symbol->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Symbols.InsertNode(symbol, insertPos);
+  ctx.SymbolHistogram.add(unsigned(Kind::ConcreteConformance));
+
+  return symbol;
+}
+
 /// Given that this symbol is the first symbol of a term, return the
 /// "domain" of the term.
 ///
@@ -439,6 +495,7 @@ ArrayRef<const ProtocolDecl *> Symbol::getRootProtocols() const {
   case Symbol::Kind::Layout:
   case Symbol::Kind::Superclass:
   case Symbol::Kind::ConcreteType:
+  case Symbol::Kind::ConcreteConformance:
     break;
   }
 
@@ -449,6 +506,7 @@ ArrayRef<const ProtocolDecl *> Symbol::getRootProtocols() const {
 ///
 /// First, we order different kinds as follows, from smallest to largest:
 ///
+/// - ConcreteConformance
 /// - Protocol
 /// - AssociatedType
 /// - GenericParam
@@ -490,6 +548,11 @@ ArrayRef<const ProtocolDecl *> Symbol::getRootProtocols() const {
 ///   is used to break ties; based on the protocol name and parent module.
 ///
 /// * For layout symbols, we use LayoutConstraint::compare().
+///
+/// * For concrete conformance symbols with distinct protocols, we compare
+///   the protocols.
+///
+/// All other symbol kinds are incomparable.
 int Symbol::compare(Symbol other, RewriteContext &ctx) const {
   // Exit early if the symbols are equal.
   if (Ptr == other.Ptr)
@@ -556,15 +619,56 @@ int Symbol::compare(Symbol other, RewriteContext &ctx) const {
     result = getLayoutConstraint().compare(other.getLayoutConstraint());
     break;
 
-  case Kind::Superclass:
-  case Kind::ConcreteType: {
-    assert(false && "Cannot compare concrete types yet");
+  case Kind::ConcreteConformance: {
+    auto *proto = getProtocol();
+    auto *otherProto = other.getProtocol();
+
+    result = ctx.compareProtocols(proto, otherProto);
     break;
   }
+
+  case Kind::Superclass:
+  case Kind::ConcreteType:
+    llvm::errs() << "Cannot compare concrete types yet\n";
+    llvm::errs() << "LHS: " << *this << "\n";
+    llvm::errs() << "RHS: " << other << "\n";
+    abort();
+
   }
 
-  assert(result != 0 && "Two distinct symbols should not compare equal");
+  if (result == 0) {
+    llvm::errs() << "Two distinct symbols should not compare equal\n";
+    llvm::errs() << "LHS: " << *this << "\n";
+    llvm::errs() << "RHS: " << other << "\n";
+    abort();
+  }
+
   return result;
+}
+
+Symbol Symbol::withConcreteSubstitutions(
+    ArrayRef<Term> substitutions,
+    RewriteContext &ctx) const {
+  switch (getKind()) {
+  case Kind::Superclass:
+    return Symbol::forSuperclass(getSuperclass(), substitutions, ctx);
+
+  case Kind::ConcreteType:
+    return Symbol::forConcreteType(getConcreteType(), substitutions, ctx);
+
+  case Kind::ConcreteConformance:
+    return Symbol::forConcreteConformance(getConcreteType(), substitutions,
+                                          getProtocol(), ctx);
+
+  case Kind::GenericParam:
+  case Kind::Name:
+  case Kind::Protocol:
+  case Kind::AssociatedType:
+  case Kind::Layout:
+    break;
+  }
+
+  llvm_unreachable("Bad symbol kind");
 }
 
 /// For a superclass or concrete type symbol
@@ -582,7 +686,7 @@ int Symbol::compare(Symbol other, RewriteContext &ctx) const {
 Symbol Symbol::transformConcreteSubstitutions(
     llvm::function_ref<Term(Term)> fn,
     RewriteContext &ctx) const {
-  assert(isSuperclassOrConcreteType());
+  assert(hasSubstitutions());
 
   if (getSubstitutions().empty())
     return *this;
@@ -600,21 +704,7 @@ Symbol Symbol::transformConcreteSubstitutions(
   if (!anyChanged)
     return *this;
 
-  switch (getKind()) {
-  case Kind::Superclass:
-    return Symbol::forSuperclass(getSuperclass(), substitutions, ctx);
-  case Kind::ConcreteType:
-    return Symbol::forConcreteType(getConcreteType(), substitutions, ctx);
-
-  case Kind::GenericParam:
-  case Kind::Name:
-  case Kind::Protocol:
-  case Kind::AssociatedType:
-  case Kind::Layout:
-    break;
-  }
-
-  llvm_unreachable("Bad symbol kind");
+  return withConcreteSubstitutions(substitutions, ctx);
 }
 
 /// Print the symbol using our mnemonic representation.
@@ -682,6 +772,14 @@ void Symbol::dump(llvm::raw_ostream &out) const {
     dumpSubstitutions();
     out << "]";
     return;
+
+  case Kind::ConcreteConformance:
+    out << "[concrete: " << getConcreteType();
+    dumpSubstitutions();
+    out << " : ";
+    out << getProtocol()->getName();
+    out << "]";
+    return;
   }
 
   llvm_unreachable("Bad symbol kind");
@@ -726,6 +824,17 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     for (auto term : getSubstitutions())
       id.AddPointer(term.getOpaquePointer());
 
+    return;
+  }
+
+  case Symbol::Kind::ConcreteConformance: {
+    id.AddPointer(ConcreteType.getPointer());
+
+    id.AddInteger(NumSubstitutions);
+    for (auto term : getSubstitutions())
+      id.AddPointer(term.getOpaquePointer());
+
+    id.AddPointer(getProtocols()[0]);
     return;
   }
   }

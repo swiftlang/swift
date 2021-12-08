@@ -64,6 +64,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include "RewriteContext.h"
 #include "RewriteSystem.h"
 
 using namespace swift;
@@ -134,11 +135,13 @@ void RewriteLoop::findProtocolConformanceRules(
       case RewriteStep::AdjustConcreteType:
       case RewriteStep::Shift:
       case RewriteStep::Decompose:
+      case RewriteStep::ConcreteConformance:
+      case RewriteStep::SuperclassConformance:
         break;
       }
     }
 
-    step.apply(evaluator, system);
+    evaluator.apply(step, system);
   }
 }
 
@@ -596,6 +599,7 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
   case Symbol::Kind::Layout:
   case Symbol::Kind::Superclass:
   case Symbol::Kind::ConcreteType:
+  case Symbol::Kind::ConcreteConformance:
     break;
   }
 
@@ -678,7 +682,14 @@ void RewriteSystem::computeGeneratingConformances(
     }
   }
 
+  Context.ConformanceRulesHistogram.add(conformanceRules.size());
+
   computeCandidateConformancePaths(conformancePaths);
+
+  for (const auto &pair : conformancePaths) {
+    if (pair.second.size() > 1)
+      Context.GeneratingConformancesHistogram.add(pair.second.size());
+  }
 
   if (Debug.contains(DebugFlags::GeneratingConformances)) {
     llvm::dbgs() << "Initial set of equations:\n";

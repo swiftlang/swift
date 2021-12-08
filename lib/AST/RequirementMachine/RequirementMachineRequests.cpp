@@ -140,6 +140,11 @@ RequirementMachine::buildRequirementsFromRules(
         return;
       }
 
+      case Symbol::Kind::ConcreteConformance:
+        // FIXME
+        llvm::errs() << "Concrete conformance: " << rule << "\n";
+        break;
+
       case Symbol::Kind::Name:
       case Symbol::Kind::AssociatedType:
       case Symbol::Kind::GenericParam:
