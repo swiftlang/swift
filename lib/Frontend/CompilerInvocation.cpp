@@ -1538,6 +1538,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.LexicalLifetimes = LexicalLifetimesOption::Off;
     }
   }
+  // Disable lexical lifetimes when building the standard library.
+  if (FEOpts.ParseStdlib) {
+    Opts.LexicalLifetimes = LexicalLifetimesOption::Early;
+  }
 
   Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
   Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
