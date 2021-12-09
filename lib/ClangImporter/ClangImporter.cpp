@@ -2547,10 +2547,6 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   auto *Importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   auto ClangNode = Importer->getEffectiveClangNode(VD);
 
-  // Decls in the __ObjC bridging header is always visible.
-  if (VD->getModuleContext() == Importer->getImportedHeaderModule())
-    return true;
-
   // Macros can be "redeclared" by putting an equivalent definition in two
   // different modules. (We don't actually check the equivalence.)
   // FIXME: We're also not checking if the redeclaration is in /this/ module.
