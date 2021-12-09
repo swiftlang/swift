@@ -216,6 +216,13 @@ private:
                    llvm::TinyPtrVector<ProtocolConformance *> &conformances,
                    SmallVectorImpl<InducedRule> &inducedRules) const;
 
+  void concretizeTypeWitnessInConformance(
+                   Term key, RequirementKind requirementKind,
+                   CanType concreteType, ArrayRef<Term> substitutions,
+                   const ProtocolDecl *proto, ProtocolConformance *concrete,
+                   AssociatedTypeDecl *assocType,
+                   SmallVectorImpl<InducedRule> &inducedRules) const;
+
   MutableTerm computeConstraintTermForTypeWitness(
       Term key, CanType concreteType, CanType typeWitness,
       const MutableTerm &subjectType, ArrayRef<Term> substitutions) const;

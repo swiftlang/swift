@@ -428,7 +428,7 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
           RequirementKind::SameType,
           props->ConcreteType->getConcreteType(),
           props->ConcreteType->getSubstitutions(),
-          props->getConformsTo(),
+          props->ConformsTo,
           props->ConcreteConformances,
           inducedRules);
     }
@@ -523,70 +523,83 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       continue;
 
     for (auto *assocType : assocTypes) {
-      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
-        llvm::dbgs() << "^^ " << "Looking up type witness for "
-                     << proto->getName() << ":" << assocType->getName()
-                     << " on " << concreteType << "\n";
-      }
-
-      auto t = concrete->getTypeWitness(assocType);
-      if (!t) {
-        if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
-          llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
-                       << " of " << concreteType << " could not be inferred\n";
-        }
-
-        t = ErrorType::get(concreteType);
-      }
-
-      auto typeWitness = t->getCanonicalType();
-
-      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
-        llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
-                     << " of " << concreteType << " is " << typeWitness << "\n";
-      }
-
-      MutableTerm subjectType(key);
-      subjectType.add(Symbol::forAssociatedType(proto, assocType->getName(),
-                                                Context));
-
-      MutableTerm constraintType;
-
-      auto simplify = [&](CanType t) -> CanType {
-        return CanType(t.transformRec([&](Type t) -> Optional<Type> {
-          if (!t->isTypeParameter())
-            return None;
-
-          auto term = Context.getRelativeTermForType(t->getCanonicalType(),
-                                                     substitutions);
-          System.simplify(term);
-          return Context.getTypeForTerm(term, { });
-        }));
-      };
-
-      if (simplify(concreteType) == simplify(typeWitness) &&
-          requirementKind == RequirementKind::SameType) {
-        // FIXME: ConcreteTypeInDomainMap should support substitutions so
-        // that we can remove this.
-
-        if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
-          llvm::dbgs() << "^^ Type witness is the same as the concrete type\n";
-        }
-
-        // Add a rule T.[P:A] => T.
-        constraintType = MutableTerm(key);
-      } else {
-        constraintType = computeConstraintTermForTypeWitness(
-            key, concreteType, typeWitness, subjectType,
-            substitutions);
-      }
-
-      inducedRules.emplace_back(subjectType, constraintType);
-      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
-        llvm::dbgs() << "^^ Induced rule " << constraintType
-                     << " => " << subjectType << "\n";
-      }
+      concretizeTypeWitnessInConformance(key, requirementKind,
+                                         concreteType, substitutions,
+                                         proto, concrete, assocType,
+                                         inducedRules);
     }
+  }
+}
+
+void PropertyMap::concretizeTypeWitnessInConformance(
+    Term key, RequirementKind requirementKind,
+    CanType concreteType, ArrayRef<Term> substitutions,
+    const ProtocolDecl *proto, ProtocolConformance *concrete,
+    AssociatedTypeDecl *assocType,
+    SmallVectorImpl<InducedRule> &inducedRules) const {
+
+  if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+    llvm::dbgs() << "^^ " << "Looking up type witness for "
+                 << proto->getName() << ":" << assocType->getName()
+                 << " on " << concreteType << "\n";
+  }
+
+  auto t = concrete->getTypeWitness(assocType);
+  if (!t) {
+    if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+      llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
+                   << " of " << concreteType << " could not be inferred\n";
+    }
+
+    t = ErrorType::get(concreteType);
+  }
+
+  auto typeWitness = t->getCanonicalType();
+
+  if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+    llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
+                 << " of " << concreteType << " is " << typeWitness << "\n";
+  }
+
+  MutableTerm subjectType(key);
+  subjectType.add(Symbol::forAssociatedType(proto, assocType->getName(),
+                                            Context));
+
+  MutableTerm constraintType;
+
+  auto simplify = [&](CanType t) -> CanType {
+    return CanType(t.transformRec([&](Type t) -> Optional<Type> {
+      if (!t->isTypeParameter())
+        return None;
+
+      auto term = Context.getRelativeTermForType(t->getCanonicalType(),
+                                                 substitutions);
+      System.simplify(term);
+      return Context.getTypeForTerm(term, { });
+    }));
+  };
+
+  if (simplify(concreteType) == simplify(typeWitness) &&
+      requirementKind == RequirementKind::SameType) {
+    // FIXME: ConcreteTypeInDomainMap should support substitutions so
+    // that we can remove this.
+
+    if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+      llvm::dbgs() << "^^ Type witness is the same as the concrete type\n";
+    }
+
+    // Add a rule T.[P:A] => T.
+    constraintType = MutableTerm(key);
+  } else {
+    constraintType = computeConstraintTermForTypeWitness(
+        key, concreteType, typeWitness, subjectType,
+        substitutions);
+  }
+
+  inducedRules.emplace_back(subjectType, constraintType);
+  if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+    llvm::dbgs() << "^^ Induced rule " << constraintType
+                 << " => " << subjectType << "\n";
   }
 }
 
@@ -677,12 +690,36 @@ void PropertyMap::recordConcreteConformanceRules(
       // minimizes as
       //
       // <T where T == Int>.
+      //
+      // We model this by marking unsatisfied conformance rules as conflicts.
+
+      // The conformances in ConcreteConformances should appear in the same
+      // order as the protocols in ConformsTo.
+      auto conformanceIter = props->ConcreteConformances.begin();
+
       for (unsigned i : indices(props->ConformsTo)) {
-        auto *proto = props->ConformsTo[i];
         auto conformanceRuleID = props->ConformsToRules[i];
+        if (conformanceIter == props->ConcreteConformances.end()) {
+          // FIXME: We should mark the more specific rule of the conformance and
+          // concrete type rules as conflicting.
+          System.getRule(conformanceRuleID).markConflicting();
+          continue;
+        }
+
+        auto *proto = props->ConformsTo[i];
+        if (proto != (*conformanceIter)->getProtocol()) {
+          // FIXME: We should mark the more specific rule of the conformance and
+          // concrete type rules as conflicting.
+          System.getRule(conformanceRuleID).markConflicting();
+          continue;
+        }
+
         recordConcreteConformanceRule(concreteRuleID, conformanceRuleID, proto,
                                       inducedRules);
+        ++conformanceIter;
       }
+
+      assert(conformanceIter == props->ConcreteConformances.end());
     }
 
     if (props->Superclass) {
