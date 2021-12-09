@@ -52,6 +52,10 @@ static llvm::cl::opt<bool> SILPrintCanonicalModule(
     "sil-print-canonical-module", llvm::cl::init(false),
     llvm::cl::desc("Print the textual SIL module after diagnostics"));
 
+static llvm::cl::opt<bool> SILPrintFinalOSSAModule(
+    "sil-print-final-ossa-module", llvm::cl::init(false),
+    llvm::cl::desc("Print the textual SIL module before lowering from OSSA"));
+
 static llvm::cl::opt<bool> SILViewSILGenCFG(
     "sil-view-silgen-cfg", llvm::cl::init(false),
     llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
@@ -549,6 +553,9 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
       return;
 
+    if (SILPrintFinalOSSAModule) {
+      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
+    }
     P.addNonTransparentFunctionOwnershipModelEliminator();
   }
 
@@ -568,6 +575,9 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
       return;
 
+    if (SILPrintFinalOSSAModule) {
+      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
+    }
     P.addNonTransparentFunctionOwnershipModelEliminator();
   }
 
