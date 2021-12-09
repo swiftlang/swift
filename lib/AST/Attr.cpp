@@ -1164,6 +1164,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_UnavailableFromAsync: {
+    Printer.printAttrName("@_unavailableFromAsync");
+    const UnavailableFromAsyncAttr *attr = cast<UnavailableFromAsyncAttr>(this);
+    if (attr->hasMessage()) {
+      Printer << "(message: \"";
+      Printer << attr->Message;
+      Printer << "\")";
+    }
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1317,6 +1328,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "transpose";
   case DAK_TypeSequence:
     return "_typeSequence";
+  case DAK_UnavailableFromAsync:
+    return "_unavailableFromAsync";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

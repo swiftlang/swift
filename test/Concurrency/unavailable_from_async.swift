@@ -35,7 +35,7 @@ actor Baz { }
 
 @available(SwiftStdlib 5.1, *)
 struct Bop {
-  @_unavailableFromAsync
+  @_unavailableFromAsync(message: "Use Bop(a: Int) instead")
   init() {}                 // expected-note 4 {{'init()' declared here}}
 
   init(a: Int) { }
@@ -59,7 +59,7 @@ func foo() {}               // expected-note 4 {{'foo()' declared here}}
 func makeAsyncClosuresSynchronously(bop: inout Bop) -> (() async -> Void) {
   return { () async -> Void in
     // Unavailable methods
-    _ = Bop()     // expected-warning@:9{{'init' is unavailable from asynchronous contexts}}
+    _ = Bop()     // expected-warning@:9{{'init' is unavailable from asynchronous contexts; Use Bop(a: Int) instead}}
     _ = Bop(a: 32)
     bop.foo()     // expected-warning@:9{{'foo' is unavailable from asynchronous contexts}}
     bop.muppet()  // expected-warning@:9{{'muppet' is unavailable from asynchronous contexts}}
@@ -83,7 +83,7 @@ func makeAsyncClosuresSynchronously(bop: inout Bop) -> (() async -> Void) {
 func asyncFunc() async { // expected-error{{asynchronous global function 'asyncFunc()' must be available from asynchronous contexts}}
 
   var bop = Bop(a: 32)
-  _ = Bop()     // expected-warning@:7{{'init' is unavailable from asynchronous contexts}}
+  _ = Bop()     // expected-warning@:7{{'init' is unavailable from asynchronous contexts; Use Bop(a: Int) instead}}
   bop.foo()     // expected-warning@:7{{'foo' is unavailable from asynchronous contexts}}
   bop.muppet()  // expected-warning@:7{{'muppet' is unavailable from asynchronous contexts}}
   unavailableFunction() // expected-warning@:3{{'unavailableFunction' is unavailable from asynchronous contexts}}
@@ -107,13 +107,13 @@ func asyncFunc() async { // expected-error{{asynchronous global function 'asyncF
       foo()           // expected-warning@:7{{'foo' is unavailable from asynchronous contexts}}
       bop.foo()       // expected-warning@:11{{'foo' is unavailable from asynchronous contexts}}
       bop.muppet()    // expected-warning@:11{{'muppet' is unavailable from asynchronous contexts}}
-      _ = Bop()       // expected-warning@:11{{'init' is unavailable from asynchronous contexts}}
+      _ = Bop()       // expected-warning@:11{{'init' is unavailable from asynchronous contexts; Use Bop(a: Int) instead}}
       unavailableFunction() // expected-warning@:7{{'unavailableFunction' is unavailable from asynchronous contexts}}
     }
   }
 
   _ = { () async -> Void in
-    _ = Bop()     // expected-warning@:9{{'init' is unavailable from asynchronous contexts}}
+    _ = Bop()     // expected-warning@:9{{'init' is unavailable from asynchronous contexts; Use Bop(a: Int) instead}}
     foo()         // expected-warning@:5{{'foo' is unavailable from asynchronous contexts}}
     bop.foo()     // expected-warning@:9{{'foo' is unavailable from asynchronous contexts}}
     bop.muppet()  // expected-warning@:9{{'muppet' is unavailable from asynchronous contexts}}
@@ -128,3 +128,33 @@ func asyncFunc() async { // expected-error{{asynchronous global function 'asyncF
   }
 
 }
+
+// Parsing tests
+
+// expected-error@+2 {{expected declaration}}
+// expected-error@+1:24{{unknown option 'nope' for attribute '_unavailableFromAsync'}}
+@_unavailableFromAsync(nope: "almost right, but not quite")
+func blarp1() {}
+
+// expected-error@+2 {{expected declaration}}
+// expected-error@+1 {{expected ':' after label 'message'}}
+@_unavailableFromAsync(message; "almost right, but not quite")
+func blarp2() {}
+
+// expected-error@+1:31 {{'=' has been replaced with ':' in attribute arguments}}{{31-32=: }}
+@_unavailableFromAsync(message="almost right, but not quite")
+func blarp3() {}
+
+// expected-error@+2 {{expected declaration}}
+// expected-error@+1 {{expected string literal in '_unavailableFromAsync' attribute}}
+@_unavailableFromAsync(message: 32)
+func blarp4() {}
+
+// expected-error@+2 {{expected declaration}}
+// expected-error@+1 {{message cannot be an interpolated string}}
+@_unavailableFromAsync(message: "blarppy blarp \(31 + 10)")
+func blarp5() {}
+
+// expected-error@+1:48 {{expected ')' in '_unavailableFromAsync' attribute}}{{48-48=)}}
+@_unavailableFromAsync(message: "blarppy blarp"
+func blarp6() {}
