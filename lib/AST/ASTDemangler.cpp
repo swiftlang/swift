@@ -589,7 +589,11 @@ Type ASTBuilder::createProtocolCompositionType(
     members.push_back(protocol->getDeclaredInterfaceType());
   if (superclass && superclass->getClassOrBoundGenericClass())
     members.push_back(superclass);
-  return ProtocolCompositionType::get(Ctx, members, isClassBound);
+  Type composition = ProtocolCompositionType::get(Ctx, members, isClassBound);
+  if (Ctx.LangOpts.EnableExplicitExistentialTypes) {
+    composition = ExistentialType::get(composition);
+  }
+  return composition;
 }
 
 static MetatypeRepresentation
@@ -607,6 +611,8 @@ getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
 
 Type ASTBuilder::createExistentialMetatypeType(Type instance,
                           Optional<Demangle::ImplMetatypeRepresentation> repr) {
+  if (auto existential = instance->getAs<ExistentialType>())
+    instance = existential->getConstraintType();
   if (!instance->isAnyExistentialType())
     return Type();
   if (!repr)
