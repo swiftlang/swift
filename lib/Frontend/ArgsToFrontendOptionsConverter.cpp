@@ -516,6 +516,10 @@ bool ArgsToFrontendOptionsConverter::setUpImmediateArgs() {
 bool ArgsToFrontendOptionsConverter::computeModuleAliases() {
   auto list = Args.getAllArgValues(options::OPT_module_alias);
   if (!list.empty()) {
+    // ModuleAliasMap should initially be empty as setting
+    // it should be called only once
+    Opts.ModuleAliasMap.clear();
+
     auto validate = [this](StringRef value, bool allowModuleName) -> bool
     {
       if (!allowModuleName) {

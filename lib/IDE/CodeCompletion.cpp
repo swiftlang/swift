@@ -2204,7 +2204,18 @@ public:
         SemanticContextKind::None,
         expectedTypeContext);
     Builder.setAssociatedDecl(MD);
-    Builder.addBaseName(MD->getNameStr());
+    auto moduleName = MD->getName();
+ 
+    // This checks if module aliasing was used. For example, when editing
+    // `import ...`, and `-module-alias Foo=Bar` was passed, we want to show
+    // Foo as an option to import, instead of Bar (name of the binary), as
+    // Foo is the name that should appear in source files.
+    auto aliasedName = Ctx.getRealModuleName(moduleName, ASTContext::ModuleAliasLookupOption::aliasFromRealName);
+    if (aliasedName != moduleName && // check if module aliasing was applied
+        !aliasedName.empty()) { // check an alias mapped to the binary name exists
+      moduleName = aliasedName; // if so, use the aliased name
+    }
+    Builder.addBaseName(moduleName.str());
     Builder.addTypeAnnotation("Module");
     if (R)
       Builder.setNotRecommended(*R);

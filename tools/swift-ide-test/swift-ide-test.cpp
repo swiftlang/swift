@@ -338,6 +338,10 @@ EnableCrossImportOverlays("enable-cross-import-overlays",
                           llvm::cl::desc("Automatically import declared cross-import overlays."),
                           llvm::cl::cat(Category),
                           llvm::cl::init(false));
+static llvm::cl::list<std::string>
+ModuleAliases("module-alias",
+            llvm::cl::desc("Use '-module-alias <name>=<underlying_name>' to map a module of <name> to a different name"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 SkipDeinit("skip-deinit",
@@ -4231,6 +4235,10 @@ int main(int argc, char *argv[]) {
   if (options::AllowCompilerErrors) {
     InitInvok.getFrontendOptions().AllowModuleWithCompilerErrors = true;
     InitInvok.getLangOptions().AllowModuleWithCompilerErrors = true;
+  }
+
+  if (!options::ModuleAliases.empty()) {
+    InitInvok.setModuleAliasMap(options::ModuleAliases);
   }
 
   // Process the clang arguments last and allow them to override previously

@@ -309,6 +309,8 @@ public:
     return FrontendOpts.ModuleName;
   }
 
+  void setModuleAliasMap(std::vector<std::string> args);
+
   std::string getOutputFilename() const {
     return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
