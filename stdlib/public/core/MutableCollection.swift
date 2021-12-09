@@ -198,7 +198,7 @@ where SubSequence: MutableCollection
   ///
   /// This method calls `body(buffer)`, where `buffer` provides access to the
   /// contiguous mutable storage of the entire collection. If no such storage
-  /// exists, the collection creates is. If the collection doesn't support an
+  /// exists, the collection creates it. If the collection doesn't support an
   /// internal representation in the form of contiguous mutable storage, this
   /// method doesn't call `body` and immediately returns `nil` instead.
   ///
