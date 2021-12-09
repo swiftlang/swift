@@ -272,11 +272,6 @@ class MoveFunctionCanonicalization : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
-    // If we do not have experimental move only enabled, do not emit
-    // diagnostics.
-    if (!astContext.LangOpts.EnableExperimentalMoveOnly)
-      return;
-
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;

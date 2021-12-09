@@ -961,11 +961,6 @@ class MoveKillsCopyableAddressesCheckerPass : public SILFunctionTransform {
     auto *fn = getFunction();
     auto &astContext = fn->getASTContext();
 
-    // If we do not have experimental move only enabled, do not emit
-    // diagnostics.
-    if (!astContext.LangOpts.EnableExperimentalMoveOnly)
-      return;
-
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
