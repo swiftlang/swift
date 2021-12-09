@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-lexical-lifetimes)
-// RUN: %target-swift-emit-sil -Xllvm -debug-only=differentiation -disable-lexical-lifetimes -module-name null -o /dev/null 2>&1 %s | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-lexical-borrow-scopes=false)
+// RUN: %target-swift-emit-sil -Xllvm -debug-only=differentiation -enable-lexical-borrow-scopes=false -module-name null -o /dev/null 2>&1 %s | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: asserts

@@ -415,8 +415,8 @@ broadenSingleElementStores(StoreInst *storeInst,
 /// borrow scope--copy/destroy is insufficient by itself.
 ///
 /// FIXME: Technically this should be guarded by a compiler flag like
-/// -enable-copy-propagation until SILGen protects scoped variables by borrow
-/// scopes.
+/// -enable-copy-propagation until SILGen protects scoped variables by
+/// borrow scopes.
 static SILBasicBlock::iterator
 eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
   auto next = std::next(cvi->getIterator());
