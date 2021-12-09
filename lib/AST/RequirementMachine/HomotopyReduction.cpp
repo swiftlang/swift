@@ -30,19 +30,13 @@
 //
 // Any occurrence of the rule in the remaining loops is replaced with the
 // alternate definition obtained by splitting the loop that witnessed the
-// redundancy. After substitution, every loop is normalized to a cyclically
-// reduced left-canonical form. The loop witnessing the redundancy normalizes
-// to the empty loop and is deleted.
+// redundancy.
 //
 // Iterating this process eventually produces a minimal set of rewrite rules.
 //
 // For a description of the general algorithm, see "A Homotopical Completion
 // Procedure with Applications to Coherence of Monoids",
 // https://hal.inria.fr/hal-00818253.
-//
-// The idea of computing a left-canonical form for rewrite loops is from
-// "Homotopy reduction systems for monoid presentations",
-// https://www.sciencedirect.com/science/article/pii/S0022404997000959
 //
 // Note that in the world of Swift, rewrite rules for introducing associated
 // type symbols are marked 'permanent'; they are always re-added when a new
@@ -321,232 +315,6 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
   return true;
 }
 
-/// Returns true if this rewrite step is an inverse of \p other
-/// (and vice versa).
-bool RewriteStep::isInverseOf(const RewriteStep &other) const {
-  if (Kind != other.Kind)
-    return false;
-
-  if (StartOffset != other.StartOffset)
-    return false;
-
-  if (Inverse != !other.Inverse)
-    return false;
-
-  switch (Kind) {
-  case RewriteStep::ApplyRewriteRule:
-    return RuleID == other.RuleID;
-
-  case RewriteStep::AdjustConcreteType:
-    return true;
-
-  case RewriteStep::Shift:
-    return true;
-
-  case RewriteStep::Decompose:
-    return RuleID == other.RuleID;
-
-  case RewriteStep::ConcreteConformance:
-  case RewriteStep::SuperclassConformance:
-    return true;
-  }
-
-  assert(EndOffset == other.EndOffset && "Bad whiskering?");
-  return true;
-}
-
-bool RewriteStep::maybeSwapRewriteSteps(RewriteStep &other,
-                                        const RewriteSystem &system) {
-  if (Kind != RewriteStep::ApplyRewriteRule ||
-      other.Kind != RewriteStep::ApplyRewriteRule)
-    return false;
-
-  // Two rewrite steps are _orthogonal_ if they rewrite disjoint subterms
-  // in context. Orthogonal rewrite steps commute, so we can canonicalize
-  // a path by placing the left-most step first.
-  //
-  // Eg, A.U.B.(X => Y).C ⊗ A.(U => V).B.Y == A.(U => V).B.X ⊗ A.V.B.(X => Y).
-  //
-  // Or, in diagram form. We want to turn this:
-  //
-  //   ----- time ----->
-  // +---------+---------+
-  // |    A    |    A    |
-  // +---------+---------+
-  // |    U    | U ==> V |
-  // +---------+---------+
-  // |    B    |    B    |
-  // +---------+---------+
-  // | X ==> Y |    Y    |
-  // +---------+---------+
-  // |    C    |    C    |
-  // +---------+---------+
-  //
-  // Into this:
-  //
-  // +---------+---------+
-  // |    A    |    A    |
-  // +---------+---------+
-  // | U ==> V |    V    |
-  // +---------+---------+
-  // |    B    |    B    |
-  // +---------+---------+
-  // |    X    | X ==> Y |
-  // +---------+---------+
-  // |    C    |    C    |
-  // +---------+---------+
-  //
-  // Note that
-  //
-  // StartOffset == |A|+|U|+|B|
-  // EndOffset = |C|
-  //
-  // other.StartOffset = |A|
-  // other.EndOffset = |B|+|Y|+|C|
-  //
-  // After interchange, we adjust:
-  //
-  // StartOffset = |A|
-  // EndOffset = |B|+|X|+|C|
-  //
-  // other.StartOffset = |A|+|V|+|B|
-  // other.EndOffset = |C|
-
-  const auto &rule = system.getRule(RuleID);
-  auto lhs = (Inverse ? rule.getRHS() : rule.getLHS());
-  auto rhs = (Inverse ? rule.getLHS() : rule.getRHS());
-
-  const auto &otherRule = system.getRule(other.RuleID);
-  auto otherLHS = (other.Inverse ? otherRule.getRHS() : otherRule.getLHS());
-  auto otherRHS = (other.Inverse ? otherRule.getLHS() : otherRule.getRHS());
-
-  if (StartOffset < other.StartOffset + otherLHS.size())
-    return false;
-
-  std::swap(*this, other);
-  EndOffset += (lhs.size() - rhs.size());
-  other.StartOffset += (otherRHS.size() - otherLHS.size());
-
-  return true;
-}
-
-/// Cancels out adjacent rewrite steps that are inverses of each other.
-/// This does not change either endpoint of the path, and the path does
-/// not necessarily need to be a loop.
-bool RewritePath::computeFreelyReducedPath() {
-  SmallVector<RewriteStep, 4> newSteps;
-  bool changed = false;
-
-  for (const auto &step : Steps) {
-    if (!newSteps.empty() &&
-        newSteps.back().isInverseOf(step)) {
-      changed = true;
-      newSteps.pop_back();
-      continue;
-    }
-
-    newSteps.push_back(step);
-  }
-
-  std::swap(newSteps, Steps);
-  return changed;
-}
-
-/// Given a path that is a loop around the given basepoint, cancels out
-/// pairs of terms from the ends that are inverses of each other, applying
-/// the corresponding translation to the basepoint.
-///
-/// For example, consider this loop with basepoint 'X':
-///
-///   (X => Y.A) * (Y.A => Y.B) * Y.(B => A) * (Y.A => X)
-///
-/// The first step is the inverse of the last step, so the cyclic
-/// reduction is the loop (Y.A => Y.B) * Y.(B => A), with a new
-/// basepoint 'Y.A'.
-bool RewritePath::computeCyclicallyReducedLoop(MutableTerm &basepoint,
-                                               const RewriteSystem &system) {
-  RewritePathEvaluator evaluator(basepoint);
-  unsigned count = 0;
-
-  while (2 * count + 1 < size()) {
-    auto left = Steps[count];
-    auto right = Steps[Steps.size() - count - 1];
-    if (!left.isInverseOf(right))
-      break;
-
-    // Update the basepoint by applying the first step in the path.
-    evaluator.apply(left, system);
-
-    ++count;
-  }
-
-  std::rotate(Steps.begin(), Steps.begin() + count, Steps.end() - count);
-  Steps.erase(Steps.end() - 2 * count, Steps.end());
-
-  basepoint = evaluator.getCurrentTerm();
-  return count > 0;
-}
-
-/// Apply the interchange rule until fixed point (see maybeSwapRewriteSteps()).
-bool RewritePath::computeLeftCanonicalForm(const RewriteSystem &system) {
-  bool changed = false;
-
-  for (unsigned i = 1, e = Steps.size(); i < e; ++i) {
-    auto &prevStep = Steps[i - 1];
-    auto &step = Steps[i];
-
-    if (prevStep.maybeSwapRewriteSteps(step, system))
-      changed = true;
-  }
-
-  return changed;
-}
-
-/// Compute cyclically-reduced left-canonical normal form of a loop.
-void RewriteLoop::normalize(const RewriteSystem &system) {
-  // FIXME: This can be more efficient.
-  bool changed;
-  do {
-    changed = false;
-    changed |= Path.computeFreelyReducedPath();
-    changed |= Path.computeCyclicallyReducedLoop(Basepoint, system);
-    changed |= Path.computeLeftCanonicalForm(system);
-  } while (changed);
-}
-
-/// A loop is "in context" if every rewrite step has a left or right whisker.
-bool RewriteLoop::isInContext(const RewriteSystem &system) const {
-  RewritePathEvaluator evaluator(Basepoint);
-
-  unsigned minStartOffset = (unsigned) -1;
-  unsigned minEndOffset = (unsigned) -1;
-
-  for (const auto &step : Path) {
-    if (!evaluator.isInContext()) {
-      switch (step.Kind) {
-      case RewriteStep::ApplyRewriteRule:
-        minStartOffset = std::min(minStartOffset, step.StartOffset);
-        minEndOffset = std::min(minEndOffset, step.EndOffset);
-        break;
-
-      case RewriteStep::AdjustConcreteType:
-      case RewriteStep::Shift:
-      case RewriteStep::Decompose:
-      case RewriteStep::ConcreteConformance:
-      case RewriteStep::SuperclassConformance:
-        break;
-      }
-
-      if (minStartOffset == 0 && minEndOffset == 0)
-        break;
-    }
-
-    evaluator.apply(step, system);
-  }
-
-  return (minStartOffset > 0 || minEndOffset > 0);
-}
-
 /// Check if a rewrite rule is a candidate for deletion in this pass of the
 /// minimization algorithm.
 bool RewriteSystem::
@@ -586,7 +354,7 @@ isCandidateForDeletion(unsigned ruleID,
   // means that the set of generating conformances is always a superset
   // (or equal to) of the set of minimal protocol conformance
   // requirements that homotopy reduction alone would produce.
-  if (rule.isProtocolConformanceRule()) {
+  if (rule.isAnyConformanceRule()) {
     if (!redundantConformances)
       return false;
 
@@ -616,13 +384,18 @@ findRuleToDelete(const llvm::DenseSet<unsigned> *redundantConformances,
                  RewritePath &replacementPath) {
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
   for (unsigned loopID : indices(Loops)) {
-    const auto &loop = Loops[loopID];
+    auto &loop = Loops[loopID];
     if (loop.isDeleted())
       continue;
 
+    bool foundAny = false;
     for (unsigned ruleID : loop.findRulesAppearingOnceInEmptyContext(*this)) {
       redundancyCandidates.emplace_back(loopID, ruleID);
+      foundAny = true;
     }
+
+    if (!foundAny)
+      loop.markDeleted();
   }
 
   Optional<std::pair<unsigned, unsigned>> found;
@@ -688,39 +461,6 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     if (!changed)
       continue;
 
-    unsigned size = loop.Path.size();
-
-    loop.normalize(*this);
-
-    if (Debug.contains(DebugFlags::HomotopyReduction)) {
-      if (size != loop.Path.size()) {
-        llvm::dbgs() << "** Note: loop normalization eliminated "
-                     << (size - loop.Path.size()) << " steps\n";
-      }
-    }
-
-    if (loop.Path.empty()) {
-      if (Debug.contains(DebugFlags::HomotopyReduction)) {
-        llvm::dbgs() << "** Deleting trivial loop at basepoint ";
-        llvm::dbgs() << loop.Basepoint << "\n";
-      }
-
-      loop.markDeleted();
-      continue;
-    }
-
-    // FIXME: Is this correct?
-    if (loop.isInContext(*this)) {
-      if (Debug.contains(DebugFlags::HomotopyReduction)) {
-        llvm::dbgs() << "** Deleting loop in context: ";
-        loop.dump(llvm::dbgs(), *this);
-        llvm::dbgs() << "\n";
-      }
-
-      loop.markDeleted();
-      continue;
-    }
-
     if (Debug.contains(DebugFlags::HomotopyReduction)) {
       llvm::dbgs() << "** Updated loop: ";
       loop.dump(llvm::dbgs(), *this);
@@ -754,15 +494,6 @@ void RewriteSystem::minimizeRewriteSystem() {
   assert(!Minimized);
   Minimized = 1;
 
-  /// Begin by normalizing all loops to cyclically-reduced left-canonical
-  /// form.
-  for (auto &loop : Loops) {
-    if (loop.isDeleted())
-      continue;
-
-    loop.normalize(*this);
-  }
-
   // Check invariants before homotopy reduction.
   verifyRewriteLoops();
 
@@ -790,6 +521,23 @@ void RewriteSystem::minimizeRewriteSystem() {
   verifyMinimizedRules();
 }
 
+/// In a conformance-valid rewrite system, any rule with unresolved symbols on
+/// the left or right hand side should have been simplified by another rule.
+bool RewriteSystem::hasNonRedundantUnresolvedRules() const {
+  assert(Complete);
+  assert(Minimized);
+
+  for (const auto &rule : Rules) {
+    if (!rule.isRedundant() &&
+        !rule.isPermanent() &&
+        rule.containsUnresolvedSymbols()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Collect all non-permanent, non-redundant rules whose domain is equal to
 /// one of the protocols in \p proto. In other words, the first symbol of the
 /// left hand side term is either a protocol symbol or associated type symbol
@@ -805,11 +553,11 @@ RewriteSystem::getMinimizedProtocolRules(
   for (unsigned ruleID : indices(Rules)) {
     const auto &rule = getRule(ruleID);
 
-    if (rule.isPermanent())
+    if (rule.isPermanent() ||
+        rule.isRedundant() ||
+        rule.containsUnresolvedSymbols()) {
       continue;
-
-    if (rule.isRedundant())
-      continue;
+    }
 
     auto domain = rule.getLHS()[0].getProtocols();
     assert(domain.size() == 1);
@@ -834,11 +582,11 @@ RewriteSystem::getMinimizedGenericSignatureRules() const {
   for (unsigned ruleID : indices(Rules)) {
     const auto &rule = getRule(ruleID);
 
-    if (rule.isPermanent())
+    if (rule.isPermanent() ||
+        rule.isRedundant() ||
+        rule.containsUnresolvedSymbols()) {
       continue;
-
-    if (rule.isRedundant())
-      continue;
+    }
 
     if (rule.getLHS()[0].getKind() != Symbol::Kind::GenericParam)
       continue;
@@ -886,7 +634,7 @@ void RewriteSystem::verifyRedundantConformances(
            "Permanent rule cannot be redundant");
     assert(!rule.isIdentityConformanceRule() &&
            "Identity conformance cannot be redundant");
-    assert(rule.isProtocolConformanceRule() &&
+    assert(rule.isAnyConformanceRule() &&
            "Redundant conformance is not a conformance rule?");
 
     if (!rule.isRedundant()) {
@@ -917,26 +665,14 @@ void RewriteSystem::verifyMinimizedRules() const {
       continue;
     }
 
-    if (rule.isRedundant())
-      continue;
-
     // Simplified rules should be redundant, unless they're protocol conformance
     // rules, which unfortunately might no be redundant, because we try to keep
     // them in the original protocol definition for compatibility with the
     // GenericSignatureBuilder's minimization algorithm.
-    if (rule.isSimplified() && !rule.isProtocolConformanceRule()) {
+    if (rule.isSimplified() &&
+        !rule.isRedundant() &&
+        !rule.isProtocolConformanceRule()) {
       llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
-      dump(llvm::errs());
-      abort();
-    }
-
-    // Rules with unresolved name symbols (other than permanent rules for
-    // associated type introduction) should be redundant.
-    //
-    // FIXME: What about invalid code?
-    if (rule.getLHS().containsUnresolvedSymbols() ||
-        rule.getRHS().containsUnresolvedSymbols()) {
-      llvm::errs() << "Unresolved rule is not redundant: " << rule << "\n\n";
       dump(llvm::errs());
       abort();
     }

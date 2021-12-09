@@ -699,7 +699,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeConst,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   126)
 
-SIMPLE_DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
+DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
   OnFunc | OnConstructor | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIStableToRemove,

@@ -651,6 +651,7 @@ RequirementMachine *RewriteContext::getRequirementMachine(
                    << "machine for:";
       for (auto *proto : component.Protos)
         llvm::errs() << " " << proto->getName();
+      llvm::errs() << "\n";
       abort();
     }
 
@@ -666,6 +667,23 @@ RequirementMachine *RewriteContext::getRequirementMachine(
   // into Protos.
   newMachine->initWithProtocols(component.Protos);
   return newMachine;
+}
+
+bool RewriteContext::isRecursivelyConstructingRequirementMachine(
+    const ProtocolDecl *proto) {
+  auto found = Protos.find(proto);
+  if (found == Protos.end())
+    return false;
+
+  auto component = Components.find(found->second.ComponentID);
+  if (component == Components.end())
+    return false;
+
+  if (!component->second.Machine ||
+      component->second.Machine->isComplete())
+    return false;
+
+  return true;
 }
 
 /// We print stats in the destructor, which should get executed at the end of

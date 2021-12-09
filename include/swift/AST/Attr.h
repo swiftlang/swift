@@ -2085,6 +2085,26 @@ public:
   }
 };
 
+/// The @_unavailableFromAsync attribute, used to make function declarations
+/// unavailable from async contexts.
+class UnavailableFromAsyncAttr : public DeclAttribute {
+public:
+  UnavailableFromAsyncAttr(StringRef Message, SourceLoc AtLoc,
+                           SourceRange Range, bool Implicit)
+      : DeclAttribute(DAK_UnavailableFromAsync, AtLoc, Range, Implicit),
+        Message(Message) {}
+  UnavailableFromAsyncAttr(StringRef Message, bool Implicit)
+      : UnavailableFromAsyncAttr(Message, SourceLoc(), SourceRange(),
+                                 Implicit) {}
+  const StringRef Message;
+
+  bool hasMessage() const { return !Message.empty(); }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_UnavailableFromAsync;
+  }
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.

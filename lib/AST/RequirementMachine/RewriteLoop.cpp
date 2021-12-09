@@ -40,11 +40,14 @@ void RewriteStep::dump(llvm::raw_ostream &out,
     break;
   }
   case AdjustConcreteType: {
-    auto result = evaluator.applyAdjustment(*this, system);
+    auto pair = evaluator.applyAdjustment(*this, system);
 
     out << "(σ";
     out << (Inverse ? " - " : " + ");
-    out << result << ")";
+    out << pair.first << ")";
+
+    if (!pair.second.empty())
+      out << "." << pair.second;
 
     break;
   }
@@ -186,7 +189,7 @@ RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
   return {lhs, rhs, prefix, suffix};
 }
 
-MutableTerm
+std::pair<MutableTerm, MutableTerm>
 RewritePathEvaluator::applyAdjustment(const RewriteStep &step,
                                       const RewriteSystem &system) {
   auto &term = getCurrentTerm();
@@ -196,9 +199,19 @@ RewritePathEvaluator::applyAdjustment(const RewriteStep &step,
   auto &ctx = system.getRewriteContext();
   MutableTerm prefix(term.begin() + step.StartOffset,
                      term.begin() + step.StartOffset + step.RuleID);
+  MutableTerm suffix(term.end() - step.EndOffset - 1, term.end());
 
   // We're either adding or removing the prefix to each concrete substitution.
-  term.back() = term.back().transformConcreteSubstitutions(
+  Symbol &last = *(term.end() - step.EndOffset - 1);
+  if (!last.hasSubstitutions()) {
+    llvm::errs() << "Invalid rewrite path\n";
+    llvm::errs() << "- Term: " << term << "\n";
+    llvm::errs() << "- Start offset: " << step.StartOffset << "\n";
+    llvm::errs() << "- End offset: " << step.EndOffset << "\n";
+    abort();
+  }
+
+  last = last.transformConcreteSubstitutions(
     [&](Term t) -> Term {
       if (step.Inverse) {
         if (!std::equal(t.begin(),
@@ -208,6 +221,7 @@ RewritePathEvaluator::applyAdjustment(const RewriteStep &step,
           llvm::errs() << "- Term: " << term << "\n";
           llvm::errs() << "- Substitution: " << t << "\n";
           llvm::errs() << "- Start offset: " << step.StartOffset << "\n";
+          llvm::errs() << "- End offset: " << step.EndOffset << "\n";
           llvm::errs() << "- Expected subterm: " << prefix << "\n";
           abort();
         }
@@ -221,7 +235,7 @@ RewritePathEvaluator::applyAdjustment(const RewriteStep &step,
       }
     }, ctx);
 
-  return prefix;
+  return std::make_pair(prefix, suffix);
 }
 
 void RewritePathEvaluator::applyShift(const RewriteStep &step,
@@ -247,16 +261,15 @@ void RewritePathEvaluator::applyShift(const RewriteStep &step,
 void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
                                           const RewriteSystem &system) {
   assert(step.Kind == RewriteStep::Decompose);
-  assert(step.EndOffset == 0);
 
   auto &ctx = system.getRewriteContext();
   unsigned numSubstitutions = step.RuleID;
 
   if (!step.Inverse) {
-    // The top of the A stack must be a term ending with a superclass or
-    // concrete type symbol.
+    // The input term takes the form U.[concrete: C].V or U.[superclass: C].V,
+    // where |V| == EndOffset.
     const auto &term = getCurrentTerm();
-    auto symbol = term.back();
+    auto symbol = *(term.end() - step.EndOffset - 1);
     if (!symbol.hasSubstitutions()) {
       llvm::errs() << "Expected term with superclass or concrete type symbol"
                    << " on A stack\n";
@@ -277,7 +290,8 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
     }
   } else {
     // The A stack must store the number of substitutions, together with a
-    // term ending with a superclass or concrete type symbol.
+    // term that takes the form U.[concrete: C].V or U.[superclass: C].V,
+    // where |V| == EndOffset.
     if (A.size() < numSubstitutions + 1) {
       llvm::errs() << "Not enough terms on A stack\n";
       dump(llvm::errs());
@@ -287,7 +301,8 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
     // The term immediately underneath the substitutions is the one we're
     // updating with new substitutions.
     auto &term = *(A.end() - numSubstitutions - 1);
-    auto symbol = term.back();
+
+    auto &symbol = *(term.end() - step.EndOffset - 1);
     if (!symbol.hasSubstitutions()) {
       llvm::errs() << "Expected term with superclass or concrete type symbol"
                    << " on A stack\n";
@@ -312,7 +327,7 @@ void RewritePathEvaluator::applyDecompose(const RewriteStep &step,
     }
 
     // Build the new symbol with the new substitutions.
-    term.back() = symbol.withConcreteSubstitutions(substitutions, ctx);
+    symbol = symbol.withConcreteSubstitutions(substitutions, ctx);
 
     // Pop the substitutions from the A stack.
     A.resize(A.size() - numSubstitutions);
@@ -324,16 +339,23 @@ RewritePathEvaluator::applyConcreteConformance(const RewriteStep &step,
                                                const RewriteSystem &system) {
   checkA();
   auto &term = A.back();
+  Symbol *last = term.end() - step.EndOffset;
 
   auto &ctx = system.getRewriteContext();
 
   if (!step.Inverse) {
-    assert(term.size() > 2);
-    auto concreteType = *(term.end() - 2);
-    auto proto = *(term.end() - 1);
+    // The input term takes one of the following forms, where |V| == EndOffset:
+    // - U.[concrete: C].[P].V
+    // - U.[superclass: C].[P].V
+    assert(term.size() > step.EndOffset + 2);
+    auto concreteType = *(last - 2);
+    auto proto = *(last - 1);
     assert(proto.getKind() == Symbol::Kind::Protocol);
 
-    MutableTerm newTerm(term.begin(), term.end() - 2);
+    // Get the prefix U.
+    MutableTerm newTerm(term.begin(), last - 2);
+
+    // Build the term U.[concrete: C : P].
     if (step.Kind == RewriteStep::ConcreteConformance) {
       assert(concreteType.getKind() == Symbol::Kind::ConcreteType);
 
@@ -353,14 +375,21 @@ RewritePathEvaluator::applyConcreteConformance(const RewriteStep &step,
           ctx));
     }
 
+    // Add the suffix V to get the final term U.[concrete: C : P].V.
+    newTerm.append(last, term.end());
     term = newTerm;
   } else {
-    assert(term.size() > 1);
-    auto concreteConformance = term.back();
+    // The input term takes the form U.[concrete: C : P].V, where
+    // |V| == EndOffset.
+    assert(term.size() > step.EndOffset + 1);
+    auto concreteConformance = *(last - 1);
     assert(concreteConformance.getKind() == Symbol::Kind::ConcreteConformance);
 
-    MutableTerm newTerm(term.begin(), term.end() - 1);
+    // Build the term U.
+    MutableTerm newTerm(term.begin(), last - 1);
 
+    // Add the symbol [concrete: C] or [superclass: C] to get the term
+    // U.[concrete: C] or U.[superclass: C].
     if (step.Kind == RewriteStep::ConcreteConformance) {
       newTerm.add(Symbol::forConcreteType(
           concreteConformance.getConcreteType(),
@@ -374,10 +403,15 @@ RewritePathEvaluator::applyConcreteConformance(const RewriteStep &step,
           ctx));
     }
 
+    // Add the symbol [P] to get the term U.[concrete: C].[P] or
+    // U.[superclass: C].[P].
     newTerm.add(Symbol::forProtocol(
         concreteConformance.getProtocol(),
         ctx));
 
+    // Add the suffix V to get the final term U.[concrete: C].[P].V or
+    // U.[superclass: C].[P].V.
+    newTerm.append(last, term.end());
     term = newTerm;
   }
 }

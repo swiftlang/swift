@@ -762,8 +762,8 @@ void PropertyMap::recordConcreteConformanceRule(
   unsigned adjustment = rhs.size() - concreteRule.getRHS().size();
   if (adjustment > 0 &&
       !concreteSymbol.getSubstitutions().empty()) {
-    // FIXME: This needs an endOffset!
-    path.add(RewriteStep::forAdjustment(adjustment, /*inverse=*/false));
+    path.add(RewriteStep::forAdjustment(adjustment, /*endOffset=*/1,
+                                        /*inverse=*/false));
 
     concreteSymbol = concreteSymbol.prependPrefixToConcreteSubstitutions(
         MutableTerm(rhs.begin(), rhs.begin() + adjustment),

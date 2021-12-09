@@ -680,6 +680,9 @@ struct GenericSignatureBuilder::Implementation {
   /// requirements.
   bool RebuildingWithoutRedundantConformances = false;
 
+  /// Whether we are building a protocol requirement signature.
+  bool BuildingProtocolRequirementSignature = false;
+
   /// A mapping of redundant explicit requirements to the best root requirement
   /// that implies them. Built by computeRedundantRequirements().
   using RedundantRequirementMap =
@@ -2313,6 +2316,11 @@ void GenericSignatureBuilder::addConditionalRequirements(
   if (Impl->RebuildingWithoutRedundantConformances)
     return;
 
+  // We do not perform requirement inference, including conditional requirement
+  // inference, inside protocols.
+  if (Impl->BuildingProtocolRequirementSignature)
+    return;
+
   // Abstract conformances don't have associated decl-contexts/modules, but also
   // don't have conditional requirements.
   if (conformance.isConcrete()) {
@@ -3399,10 +3407,12 @@ void EquivalenceClass::modified(GenericSignatureBuilder &builder) {
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(
-                               ASTContext &ctx)
+                               ASTContext &ctx,
+                               bool requirementSignature)
   : Context(ctx), Diags(Context.Diags), Impl(new Implementation) {
   if (auto *Stats = Context.Stats)
     ++Stats->getFrontendCounters().NumGenericSignatureBuilders;
+  Impl->BuildingProtocolRequirementSignature = requirementSignature;
 }
 
 GenericSignatureBuilder::GenericSignatureBuilder(
@@ -3991,6 +4001,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   auto protocolSubMap = SubstitutionMap::getProtocolSubstitutions(
       proto, selfType.getDependentType(*this), ProtocolConformanceRef(proto));
 
+  auto result = ConstraintResult::Resolved;
+
   // Use the requirement signature to avoid rewalking the entire protocol.  This
   // cannot compute the requirement signature directly, because that may be
   // infinitely recursive: this code is also used to construct it.
@@ -4007,10 +4019,11 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       auto reqResult = substReq
                            ? addRequirement(*substReq, innerSource, nullptr)
                            : ConstraintResult::Conflicting;
-      if (isErrorResult(reqResult)) return reqResult;
+      if (isErrorResult(reqResult) && !isErrorResult(result))
+        result = reqResult;
     }
 
-    return ConstraintResult::Resolved;
+    return result;
   }
 
   if (!onlySameTypeConstraints) {
@@ -4018,8 +4031,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     auto inheritedReqResult =
       addInheritedRequirements(proto, selfType.getUnresolvedType(), source,
                                nullptr);
-    if (isErrorResult(inheritedReqResult))
-      return inheritedReqResult;
+    if (isErrorResult(inheritedReqResult) && !isErrorResult(inheritedReqResult))
+      result = inheritedReqResult;
   }
 
   // Add any requirements in the where clause on the protocol.
@@ -4048,7 +4061,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
                              getASTContext()),
                          innerSource);
 
-    return ConstraintResult::Resolved;
+    return result;
   }
 
   // Remaining logic is not relevant in ObjC protocol cases.
@@ -4156,11 +4169,13 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     Type assocType =
       DependentMemberType::get(selfType.getDependentType(*this), assocTypeDecl);
     if (!onlySameTypeConstraints) {
+      (void) resolve(assocType, source);
+
       auto assocResult =
         addInheritedRequirements(assocTypeDecl, assocType, source,
                                  /*inferForModule=*/nullptr);
-      if (isErrorResult(assocResult))
-        return assocResult;
+      if (isErrorResult(assocResult) && !isErrorResult(result))
+        result = assocResult;
     }
 
     // Add requirements from this associated type's where clause.
@@ -4314,7 +4329,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     }
   }
 
-  return ConstraintResult::Resolved;
+  return result;
 }
 
 ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
@@ -8830,7 +8845,8 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   }
 
   auto buildViaGSB = [&]() {
-    GenericSignatureBuilder builder(proto->getASTContext());
+    GenericSignatureBuilder builder(proto->getASTContext(),
+                                    /*requirementSignature=*/true);
 
     // Add all of the generic parameters.
     for (auto gp : *proto->getGenericParams())
@@ -8873,9 +8889,23 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     auto rqmResult = buildViaRQM();
     auto gsbResult = buildViaGSB();
 
-    if (rqmResult.size() != gsbResult.size() ||
-        !std::equal(rqmResult.begin(), rqmResult.end(),
-                    gsbResult.begin())) {
+    // For now, only compare conformance requirements, since those are the
+    // important ones from the ABI perspective.
+    SmallVector<Requirement, 2> rqmConformances;
+    for (auto req : rqmResult) {
+      if (req.getKind() == RequirementKind::Conformance)
+        rqmConformances.push_back(req);
+    }
+    SmallVector<Requirement, 2> gsbConformances;
+    for (auto req : gsbResult) {
+      if (req.getKind() == RequirementKind::Conformance)
+        gsbConformances.push_back(req);
+    }
+
+    if (rqmConformances.size() != gsbConformances.size() ||
+        !std::equal(rqmConformances.begin(),
+                    rqmConformances.end(),
+                    gsbConformances.begin())) {
       llvm::errs() << "RequirementMachine protocol signature minimization is broken:\n";
       llvm::errs() << "Protocol: " << proto->getName() << "\n";
 
