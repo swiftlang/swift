@@ -11662,7 +11662,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   // its sub-expressions.
   llvm::SmallDenseSet<ASTNode> anchors;
   for (const auto *fix : Fixes) {
-    // Warning fixes shouldn't be considered, because even if
+    // Warning fixes shouldn't be considered because even if
     // such fix is recorded at that anchor this should not
     // have any affect in the recording of any other fix.
     if (fix->isWarning())
