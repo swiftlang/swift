@@ -25,7 +25,7 @@ class Foo : NSRuncing, NSFunging, Ansible {
   @objc func foo() {}
   func anse() {}
 }
-// CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Foo = weak hidden constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
+// CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Foo = internal constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC:@[0-9]+]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3FooC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
@@ -50,7 +50,7 @@ extension Bar : NSRuncing, NSFunging {
 }
 
 // -- ...but the ObjC protocol conformances on its extension add some
-// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC14objc_protocols3Bar_$_objc_protocols" = weak hidden constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC14objc_protocols3Bar_$_objc_protocols" = internal constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3BarC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
@@ -66,7 +66,7 @@ extension Bas : NSRuncing {
   func foo() {}
 }
 
-// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas3Bas_$_objc_protocols" = weak hidden constant { i32, i32, [1 x { i8*, i8*, i8* }] } {
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas3Bas_$_objc_protocols" = internal constant { i32, i32, [1 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(foo)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s18objc_protocols_Bas0C0C0a1_B0E3fooyyFTo{{(\.ptrauth)?}}" to i8*) }
@@ -86,7 +86,7 @@ class Zim : Frungible {
   func frunge() {}
 }
 
-// CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Zim = weak hidden constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
+// CHECK: @_INSTANCE_METHODS__TtC14objc_protocols3Zim = internal constant { i32, i32, [3 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 3,
 // CHECK:   [3 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s14objc_protocols3ZimC5runceyyFTo{{(\.ptrauth)?}}" to i8*) },
@@ -106,7 +106,7 @@ extension Zang : Frungible {
   func frunge() {}
 }
 
-// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas4Zang_$_objc_protocols" = weak hidden constant { i32, i32, [2 x { i8*, i8*, i8* }] } {
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC18objc_protocols_Bas4Zang_$_objc_protocols" = internal constant { i32, i32, [2 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24, i32 2,
 // CHECK:   [2 x { i8*, i8*, i8* }] [
 // CHECK:     { i8*, i8*, i8* } { i8* getelementptr inbounds ([6 x i8], [6 x i8]* @"\01L_selector_data(runce)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[ENC]], i64 0, i64 0), i8* bitcast ({{.*}}* @"$s18objc_protocols_Bas4ZangC0a1_B0E5runceyyFTo{{(\.ptrauth)?}}" to i8*) },

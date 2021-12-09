@@ -105,7 +105,7 @@ class SomeWrapperTests {
 // CHECK-NEW: [[SHARED_NAME:@.*]] = private unnamed_addr constant [11 x i8] c"sharedProp\00"
 // CHECK-NEW: [[SHARED_ATTRS:@.*]] = private unnamed_addr constant [5 x i8] c"Tq,N\00"
 
-// CHECK-NEW: @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject = weak hidden constant { {{.*}}] } {
+// CHECK-NEW: @_CLASS_PROPERTIES__TtC15objc_properties10SomeObject = internal constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
 // CHECK-NEW:   i32 1,
 // CHECK-NEW:   [1 x { i8*, i8* }] [{
@@ -127,7 +127,7 @@ class SomeWrapperTests {
 // CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
 // CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 
-// CHECK: @_INSTANCE_METHODS__TtC15objc_properties10SomeObject = weak hidden constant { {{.*}}] } {
+// CHECK: @_INSTANCE_METHODS__TtC15objc_properties10SomeObject = internal constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 8,
 // CHECK:   [8 x { i8*, i8*, i8* }] [{
@@ -179,7 +179,7 @@ class SomeWrapperTests {
 // CHECK: [[WIBBLE_NAME:@.*]] = private unnamed_addr constant [7 x i8] c"wobble\00"
 // CHECK: [[WIBBLE_ATTRS:@.*]] = private unnamed_addr constant [50 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&,Vwibble\00"
 
-// CHECK: @_PROPERTIES__TtC15objc_properties10SomeObject = weak hidden constant { {{.*}}] } {
+// CHECK: @_PROPERTIES__TtC15objc_properties10SomeObject = internal constant { {{.*}}] } {
 // CHECK:   i32 16,
 // CHECK:   i32 4,
 // CHECK:   [4 x { i8*, i8* }] [{
@@ -208,7 +208,7 @@ class SomeWrapperTests {
 // CHECK:   { {{.+}} }* @_PROPERTIES__TtC15objc_properties10SomeObject
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
-// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties" = weak hidden constant { {{.*}}] } {
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties" = internal constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 2,
 // CHECK:   [2 x { i8*, i8*, i8* }] [{
@@ -224,7 +224,7 @@ class SomeWrapperTests {
 
 // CHECK: [[EXTENSIONPROPERTY_NAME:@.*]] = private unnamed_addr constant [18 x i8] c"extensionProperty\00"
 
-// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = weak hidden constant { {{.*}}] } {
+// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = internal constant { {{.*}}] } {
 // CHECK:   i32 16,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8* }] [{
@@ -237,7 +237,7 @@ class SomeWrapperTests {
 // CHECK-NEW: [[EXTENSIONCLASSPROPERTY_ATTRS:@.*]] = private unnamed_addr constant [7 x i8] c"T#,N,R\00"
 // CHECK-NEW: [[EXTENSIONSTATICPROPERTY_NAME:@.*]] = private unnamed_addr constant [26 x i8] c"extensionStoredStaticProp\00"
 
-// CHECK-NEW: @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = weak hidden constant { {{.*}}] } {
+// CHECK-NEW: @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = internal constant { {{.*}}] } {
 // CHECK-NEW:   i32 16,
 // CHECK-NEW:   i32 2,
 // CHECK-NEW:   [2 x { i8*, i8* }] [{

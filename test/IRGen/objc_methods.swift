@@ -54,7 +54,7 @@ class ObjcDestructible: NSObject {
 // CHECK-ios: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
 // CHECK-tvos: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
 // CHECK-watchos: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
-// CHECK: @_INSTANCE_METHODS__TtC12objc_methods3Foo = weak hidden constant { {{.*}}] } {
+// CHECK: @_INSTANCE_METHODS__TtC12objc_methods3Foo = internal constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 10,
 // CHECK:   [10 x { i8*, i8*, i8* }] [{
@@ -84,7 +84,7 @@ class ObjcDestructible: NSObject {
 // CHECK-ios:     i8* bitcast (i1 (i8*, i8*, %4**)* @"$s12objc_methods3FooC4failyyKFTo" to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, {{.*}}", align 8
-// CHECK: @_INSTANCE_METHODS__TtC12objc_methods16ObjcDestructible = weak hidden constant { {{.*}}] } {
+// CHECK: @_INSTANCE_METHODS__TtC12objc_methods16ObjcDestructible = internal constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 2,
 // CHECK:   [2 x { i8*, i8*, i8* }] [{

@@ -16,7 +16,7 @@ import gizmo
 // CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section {{"__DATA,__objc_protolist,coalesced,no_dead_strip"|"objc_protolist"|".objc_protolist\$B"}}
 // CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section {{"__DATA,__objc_protorefs,coalesced,no_dead_strip"|"objc_protorefs"|".objc_protorefs\$B"}}
 
-// CHECK: @_PROTOCOLS__TtC13generic_casts10ObjCClass2 = weak hidden constant { i64, [1 x i8*] } {
+// CHECK: @_PROTOCOLS__TtC13generic_casts10ObjCClass2 = internal constant { i64, [1 x i8*] } {
 // CHECK:   i64 1, 
 // CHECK:   @_PROTOCOL__TtP13generic_casts10ObjCProto2_
 // CHECK: }
