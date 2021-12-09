@@ -187,6 +187,7 @@ func _distributedActorRemoteInitialize(_ actorType: Builtin.RawPointer) -> Any
 
 // ==== Remote target accesss -------------------------------------------------
 
+@available(SwiftStdlib 5.6, *)
 @_silgen_name("swift_distributed_execute_target")
 func _executeDistributedTarget(
     on: AnyObject,
