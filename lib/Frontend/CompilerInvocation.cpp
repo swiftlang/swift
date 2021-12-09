@@ -891,6 +891,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
+  if (auto A = Args.getLastArg(OPT_enable_requirement_machine_merged_associated_types,
+                               OPT_disable_requirement_machine_merged_associated_types)) {
+    Opts.RequirementMachineMergedAssociatedTypes
+      = A->getOption().matches(OPT_enable_requirement_machine_merged_associated_types);
+  }
+
   Opts.DumpRequirementMachine = Args.hasArg(
       OPT_dump_requirement_machine);
   Opts.AnalyzeRequirementMachine = Args.hasArg(

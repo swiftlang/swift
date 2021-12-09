@@ -294,7 +294,8 @@ void RewriteSystem::processMergedAssociatedTypes() {
 /// types in RewriteSystem::processMergedAssociatedTypes().
 void RewriteSystem::checkMergedAssociatedType(Term lhs, Term rhs) {
   // FIXME: Figure out 3-cell representation for merged associated types
-  if (RecordLoops)
+  if (RecordLoops ||
+      !Context.getASTContext().LangOpts.RequirementMachineMergedAssociatedTypes)
     return;
 
   if (lhs.size() == rhs.size() &&
