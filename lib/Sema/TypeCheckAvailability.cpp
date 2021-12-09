@@ -1710,6 +1710,9 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
   ASTContext &ctx = ReferenceDC->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return;
+
+  if (!shouldCheckAvailability(ReferenceDC->getAsDecl()))
+    return;
   
   auto runningOS =
     TypeChecker::overApproximateAvailabilityAtLocation(
