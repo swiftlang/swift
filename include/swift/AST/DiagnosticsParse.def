@@ -1435,6 +1435,8 @@ ERROR(attr_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
 ERROR(attr_expected_label,none,
       "expected label '%0:' in '@%1' attribute", (StringRef, StringRef))
+ERROR(attr_expected_colon_after_label,none,
+      "expected ':' after label '%0'", (StringRef))
 
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
