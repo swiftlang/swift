@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
-// rdar://problem/56255858 - failing on no-asserts builds
+// The type of self in the allocator is inout only when building against an asserts stdlib.
 // XFAIL: no_asserts
 
 public struct stuffStruct {
