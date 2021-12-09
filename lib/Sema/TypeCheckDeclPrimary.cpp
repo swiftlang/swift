@@ -2618,10 +2618,12 @@ public:
       if (!SF || SF->Kind != SourceFileKind::Interface)
         TypeChecker::inferDefaultWitnesses(PD);
 
+    // Explicity compute the requirement signature to detect errors.
+    auto reqSig = PD->getRequirementSignature();
+
     if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
       auto requirementsSig =
-        GenericSignature::get({PD->getProtocolSelfType()},
-                              PD->getRequirementSignature());
+        GenericSignature::get({PD->getProtocolSelfType()}, reqSig);
 
       llvm::errs() << "\n";
       llvm::errs() << "Protocol requirement signature:\n";
@@ -2639,8 +2641,14 @@ public:
       llvm::errs() << "\n";
     }
 
-    // Explicity compute the requirement signature to detect errors.
-    (void) PD->getRequirementSignature();
+
+#ifndef NDEBUG
+    // In asserts builds, also verify some invariants of the requirement
+    // signature.
+    PD->getGenericSignature().verify(reqSig);
+#endif
+
+    (void) reqSig;
 
     checkExplicitAvailability(PD);
   }

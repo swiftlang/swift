@@ -217,6 +217,12 @@ public:
 
   /// Check invariants.
   void verify() const;
+
+  /// Check invariants for a list of requirements that are understood to
+  /// be valid in the given signature; used to verify a protocol's
+  /// requirement signature against the protocol generic signature
+  /// <Self where Self : P>.
+  void verify(ArrayRef<Requirement> reqts) const;
 };
 
 /// A reference to a canonical generic signature.
