@@ -651,3 +651,14 @@ struct SR15281_SC {
     a.flatMap(SR15281_CC.init(a:)) // expected-error{{cannot convert return expression of type 'SR15281_CC?' to return type 'SR15281_BC'}} {{35-35=!}}
   }
 }
+
+// SR-15562
+func test_SR_15562() {
+  let foo: [Int: Int] = [:]
+  let bar = [1, 2, 3, 4]
+
+  for baz in bar {
+    foo[baz] as! Int += 1 // expected-warning{{forced cast from 'Int?' to 'Int' only unwraps optionals; did you mean to use '!'?}}
+    // expected-error@-1{{left side of mutating operator has immutable type 'Int'}}
+  }
+}
