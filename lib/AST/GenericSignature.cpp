@@ -1564,20 +1564,20 @@ int swift::compareDependentTypes(Type type1, Type type2) {
 #pragma mark Generic signature verification
 
 void GenericSignature::verify() const {
+  verify(getRequirements());
+}
+
+void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
   auto canSig = getCanonicalSignature();
 
   PrettyStackTraceGenericSignature debugStack("checking", canSig);
-
-  auto canonicalRequirements = canSig.getRequirements();
 
   // We collect conformance requirements to check that they're minimal.
   llvm::SmallDenseMap<CanType, SmallVector<ProtocolDecl *, 2>, 2> conformances;
 
   // Check that the requirements satisfy certain invariants.
-  for (unsigned idx : indices(canonicalRequirements)) {
-    debugStack.setRequirement(idx);
-
-    const auto &reqt = canonicalRequirements[idx];
+  for (unsigned idx : indices(reqts)) {
+    const auto &reqt = reqts[idx].getCanonical();
 
     // Left-hand side must be a canonical type parameter.
     if (reqt.getKind() != RequirementKind::SameType) {
@@ -1661,7 +1661,7 @@ void GenericSignature::verify() const {
     if (idx == 0) continue;
 
     // Make sure that the left-hand sides are in nondecreasing order.
-    const auto &prevReqt = canonicalRequirements[idx-1];
+    const auto &prevReqt = reqts[idx-1];
     int compareLHS =
       compareDependentTypes(prevReqt.getFirstType(), reqt.getFirstType());
     if (compareLHS > 0) {
