@@ -279,7 +279,7 @@ bool RequirementMachine::isComplete() const {
 bool RequirementMachine::hadError() const {
   // FIXME: Implement other checks here
   // FIXME: Assert if hadError() is true but we didn't emit any diagnostics?
-  return System.hasNonRedundantUnresolvedRules();
+  return System.hadError();
 }
 
 void RequirementMachine::dump(llvm::raw_ostream &out) const {

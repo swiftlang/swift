@@ -250,7 +250,7 @@ static bool unifyConcreteTypes(
 ///
 /// Returns the most derived superclass, which becomes the new superclass
 /// that gets recorded in the property map.
-static Symbol unifySuperclasses(
+static std::pair<Symbol, bool> unifySuperclasses(
     Symbol lhs, Symbol rhs, RewriteContext &ctx,
     SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
@@ -282,7 +282,7 @@ static Symbol unifySuperclasses(
       llvm::dbgs() << "%% Unrelated superclass types\n";
     }
 
-    return lhs;
+    return std::make_pair(lhs, true);
   }
 
   if (lhsClass != rhsClass) {
@@ -300,14 +300,15 @@ static Symbol unifySuperclasses(
     if (debug) {
       llvm::dbgs() << "%% Superclass conflict\n";
     }
-    return rhs;
+    return std::make_pair(rhs, true);
   }
 
   // Record the more specific class.
-  return rhs;
+  return std::make_pair(rhs, false);
 }
 
-void PropertyBag::addProperty(
+/// Returns true if there was a conflict.
+bool PropertyBag::addProperty(
     Symbol property, unsigned ruleID, RewriteContext &ctx,
     SmallVectorImpl<InducedRule> &inducedRules,
     bool debug) {
@@ -316,46 +317,55 @@ void PropertyBag::addProperty(
   case Symbol::Kind::Protocol:
     ConformsTo.push_back(property.getProtocol());
     ConformsToRules.push_back(ruleID);
-    return;
+    return false;
 
   case Symbol::Kind::Layout:
     if (!Layout) {
       Layout = property.getLayoutConstraint();
       LayoutRule = ruleID;
-    } else
+    } else {
       Layout = Layout.merge(property.getLayoutConstraint());
+      if (!Layout->isKnownLayout())
+        return true;
+    }
 
-    return;
+    return false;
 
   case Symbol::Kind::Superclass: {
     // FIXME: Also handle superclass vs concrete
 
-    if (Superclass) {
-      Superclass = unifySuperclasses(*Superclass, property,
-                                     ctx, inducedRules, debug);
-    } else {
+    if (!Superclass) {
       Superclass = property;
       SuperclassRule = ruleID;
+    } else {
+      auto pair = unifySuperclasses(*Superclass, property,
+                                    ctx, inducedRules, debug);
+      Superclass = pair.first;
+      bool conflict = pair.second;
+      if (conflict)
+        return true;
     }
 
-    return;
+    return false;
   }
 
   case Symbol::Kind::ConcreteType: {
-    if (ConcreteType) {
-      (void) unifyConcreteTypes(*ConcreteType, property,
-                                ctx, inducedRules, debug);
-    } else {
+    if (!ConcreteType) {
       ConcreteType = property;
       ConcreteTypeRule = ruleID;
+    } else {
+      bool conflict = unifyConcreteTypes(*ConcreteType, property,
+                                         ctx, inducedRules, debug);
+      if (conflict)
+        return true;
     }
 
-    return;
+    return false;
   }
 
   case Symbol::Kind::ConcreteConformance:
     // FIXME
-    return;
+    return false;
 
   case Symbol::Kind::Name:
   case Symbol::Kind::GenericParam:

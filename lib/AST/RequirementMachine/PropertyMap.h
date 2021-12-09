@@ -100,7 +100,7 @@ class PropertyBag {
 
   explicit PropertyBag(Term key) : Key(key) {}
 
-  void addProperty(Symbol property,
+  bool addProperty(Symbol property,
                    unsigned ruleID,
                    RewriteContext &ctx,
                    SmallVectorImpl<InducedRule> &inducedRules,
@@ -202,7 +202,7 @@ public:
 
 private:
   void clear();
-  void addProperty(Term key, Symbol property, unsigned ruleID,
+  bool addProperty(Term key, Symbol property, unsigned ruleID,
                    SmallVectorImpl<InducedRule> &inducedRules);
 
   void computeConcreteTypeInDomainMap();
