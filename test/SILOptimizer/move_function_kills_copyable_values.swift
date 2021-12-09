@@ -248,3 +248,10 @@ public func performMoveOnVarGlobalError() {
 public func performMoveOnLetGlobalError() {
     let _ = _move(myVarGlobal) // expected-error {{_move applied to value that the compiler does not support checking}}
 }
+
+public func multipleVarsWithSubsequentBorrows() -> Bool {
+    let k = Klass()
+    let k2 = k
+    let k3 = _move(k)
+    return k2 === k3
+}
