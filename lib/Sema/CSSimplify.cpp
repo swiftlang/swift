@@ -5859,6 +5859,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                                   type1, type2, locator);
           return getTypeMatchSuccess();
         };
+
+      // Foreign reference types do *not* conform to AnyObject.
+      if (type1->isForeignReferenceType() && type2->isAnyObject())
+        return getTypeMatchFailure(locator);
       
       if (auto meta1 = type1->getAs<MetatypeType>()) {
         if (meta1->getInstanceType()->mayHaveSuperclass()

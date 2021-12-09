@@ -589,6 +589,9 @@ def create_argument_parser():
                 'module-only targets on Darwin platforms. These targets are '
                 'in addition to the full library targets.')
 
+    option('--swift-freestanding-is-darwin', toggle_true,
+           help='True if the freestanding platform is a Darwin one.')
+
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
 

@@ -183,6 +183,47 @@
                 "swift-installer-scripts": "main"
             }
         },
+        "release/5.6": {
+            "aliases": ["release/5.6", "swift/release/5.6"],
+            "repos": {
+                "llvm-project": "swift/release/5.6",
+                "swift": "release/5.6",
+                "cmark": "release/5.6",
+                "llbuild": "release/5.6",
+                "swift-tools-support-core": "release/5.6",
+                "swiftpm": "release/5.6",
+                "swift-argument-parser": "1.0.1",
+                "swift-atomics": "1.0.2",
+                "swift-collections": "1.0.1",
+                "swift-crypto": "1.1.5",
+                "swift-driver": "release/5.6",
+                "swift-numerics": "1.0.1",
+                "swift-syntax": "release/5.6",
+                "swift-system": "1.1.1",
+                "swift-stress-tester": "release/5.6",
+                "swift-corelibs-xctest": "release/5.6",
+                "swift-corelibs-foundation": "release/5.6",
+                "swift-corelibs-libdispatch": "release/5.6",
+                "swift-integration-tests": "release/5.6",
+                "swift-xcode-playground-support": "release/5.6",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "yams": "4.0.2",
+                "cmake": "v3.19.6",
+                "indexstore-db": "release/5.6",
+                "sourcekit-lsp": "release/5.6",
+                "swift-format": "release/5.6",
+                "swift-installer-scripts": "main",
+                "swift-docc": "release/5.6",
+                "swift-lmdb": "release/5.6",
+                "swift-docc-render-artifact": "release/5.6",
+                "swift-docc-symbolkit": "release/5.6",
+                "swift-markdown": "release/5.6",
+                "swift-cmark-gfm": "release/5.6-gfm",
+                "swift-nio": "2.31.2",
+                "swift-nio-ssl": "2.15.0"
+            }
+        },
        "release/5.5": {
             "aliases": ["release/5.5", "swift/release/5.5"],
             "repos": {

@@ -277,14 +277,3 @@ public func performMoveOnOneEltOfTPair2<T>(_ p: __owned TPair<T>) {
     let _ = _move(p.x) // expected-error {{_move applied to value that the compiler does not support checking}}
     nonConsumingUse(p.y)
 }
-
-/////////
-// Var //
-/////////
-
-public func performMoveOnVar<T>(_ p: T) {
-    var x = p
-    let _ = _move(x) // expected-error {{_move applied to value that the compiler does not support checking}}
-    x = p
-    nonConsumingUse(x)
-}

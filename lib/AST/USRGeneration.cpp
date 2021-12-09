@@ -280,7 +280,7 @@ swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
 
 bool ide::printModuleUSR(ModuleEntity Mod, raw_ostream &OS) {
   if (auto *D = Mod.getAsSwiftModule()) {
-    StringRef moduleName = D->getName().str();
+    StringRef moduleName = D->getRealName().str();
     return clang::index::generateFullUSRForTopLevelModuleName(moduleName, OS);
   } else if (auto ClangM = Mod.getAsClangModule()) {
     return clang::index::generateFullUSRForModule(ClangM, OS);

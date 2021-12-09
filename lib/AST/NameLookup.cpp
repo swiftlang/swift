@@ -1478,7 +1478,7 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     } else if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
       auto allFound = evaluateOrDefault(
           ctx.evaluator,
-          ClangRecordMemberLookup({cast<StructDecl>(decl), name}), {});
+          ClangRecordMemberLookup({cast<NominalTypeDecl>(decl), name}), {});
       // Add all the members we found, later we'll combine these with the
       // existing members.
       for (auto found : allFound)

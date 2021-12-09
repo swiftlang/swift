@@ -97,8 +97,12 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
 }
 
 static bool hasStoredProperties(NominalTypeDecl *decl) {
+  bool isForeignReferenceTy =
+      isa<ClassDecl>(decl) && cast<ClassDecl>(decl)->isForeignReferenceType();
+
   return (isa<StructDecl>(decl) ||
-          (isa<ClassDecl>(decl) && !decl->hasClangNode()));
+          (isa<ClassDecl>(decl) &&
+           (!decl->hasClangNode() || isForeignReferenceTy)));
 }
 
 static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
@@ -2264,6 +2268,9 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   } else if (auto *structDecl = dyn_cast<StructDecl>(dc)) {
     if (structDecl->hasClangNode())
       return false;
+  } else if (isa<ClassDecl>(dc) &&
+             cast<ClassDecl>(dc)->isForeignReferenceType()) {
+    return false;
   }
 
   // Stored properties in SIL mode don't get accessors.

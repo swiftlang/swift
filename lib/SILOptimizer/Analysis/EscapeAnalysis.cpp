@@ -2851,7 +2851,7 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
 // graph path exists from the referenced object to a global-escaping or
 // argument-escaping node.
 //
-// TODO: This API is inneffective for release hoisting, because the release
+// TODO: This API is ineffective for release hoisting, because the release
 // itself is often the only place that an object's contents may escape. We can't
 // currently determine that since the contents cannot escape prior to \p
 // releasePtr, then livePtr cannot possible point to the same memory!

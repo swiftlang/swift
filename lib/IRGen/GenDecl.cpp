@@ -3669,7 +3669,7 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
 
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     auto clas = dyn_cast<ClassDecl>(decl);
-    if (!clas) {
+    if (!clas || clas->isForeignReferenceType()) {
       return getTypeContextDescriptorEntityReference(*this, nominal);
     }
 

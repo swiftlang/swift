@@ -12,6 +12,7 @@
 
 #include "swift/SwiftRemoteMirror/Platform.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
+#include <iostream>
 
 #define SWIFT_CLASS_IS_SWIFT_MASK swift_reflection_classIsSwiftMask
 extern "C" {
@@ -200,7 +201,7 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
       || Info.capture.offset != 0
       || Info.type_references.offset != 0
       || Info.reflection_strings.offset != 0) {
-    fprintf(stderr, "reserved field in swift_reflection_info_t is not zero\n");
+    std::cerr << "reserved field in swift_reflection_info_t is not zero\n";
     abort();
   }
   
@@ -621,9 +622,9 @@ int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   if (TR == nullptr) {
-    fprintf(stdout, "<null type reference>\n");
+    std::cout << "<null type reference>\n";
   } else {
-    TR->dump(stdout);
+    TR->dump(std::cout);
   }
 }
 
@@ -633,27 +634,26 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   auto TI = Context->getTypeInfo(TR, nullptr);
   if (TI == nullptr) {
-    fprintf(stdout, "<null type info>\n");
+    std::cout << "<null type info>\n";
   } else {
-    TI->dump(stdout);
+    TI->dump(std::cout);
     Demangle::Demangler Dem;
     auto Mangling = mangleNode(TR->getDemangling(Dem));
     std::string MangledName;
     if (Mangling.isSuccess()) {
       MangledName = Mangling.result();
-      fprintf(stdout, "Mangled name: %s%s\n", MANGLING_PREFIX_STR,
-              MangledName.c_str());
+      std::cout << "Mangled name: " << MANGLING_PREFIX_STR << MangledName
+                << "\n";
     } else {
       MangledName = "<failed to mangle name>";
-      fprintf(stdout, "Failed to get mangled name: Node %p, error %d:%u\n",
-              Mangling.error().node,
-              Mangling.error().code,
-              Mangling.error().line);
+      std::cout << "Failed to get mangled name: Node " << Mangling.error().node
+                << " error " << Mangling.error().code << ":"
+                << Mangling.error().line << "\n";
     }
 
     char *DemangledName =
-      swift_reflection_copyDemangledNameForTypeRef(ContextRef, OpaqueTypeRef);
-    fprintf(stdout, "Demangled name: %s\n", DemangledName);
+        swift_reflection_copyDemangledNameForTypeRef(ContextRef, OpaqueTypeRef);
+    std::cout << "Demangled name: " << DemangledName << "\n";
     free(DemangledName);
   }
 }
@@ -663,9 +663,9 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
   auto Context = ContextRef->nativeContext;
   auto TI = Context->getMetadataTypeInfo(Metadata, nullptr);
   if (TI == nullptr) {
-    fprintf(stdout, "<null type info>\n");
+    std::cout << "<null type info>\n";
   } else {
-    TI->dump(stdout);
+    TI->dump(std::cout);
   }
 }
 
@@ -674,9 +674,9 @@ void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
   auto Context = ContextRef->nativeContext;
   auto TI = Context->getInstanceTypeInfo(Object, nullptr);
   if (TI == nullptr) {
-    fprintf(stdout, "%s", "<null type info>\n");
+    std::cout << "<null type info>\n";
   } else {
-    TI->dump(stdout);
+    TI->dump(std::cout);
   }
 }
 

@@ -488,6 +488,8 @@ public:
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
 
+  bool isForeignReferenceType(); // in Types.h
+
   CanType getOptionalObjectType() const {
     return getOptionalObjectTypeImpl(*this);
   }

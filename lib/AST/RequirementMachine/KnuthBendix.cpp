@@ -451,7 +451,7 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
     // perform the concrete type adjustment:
     //
     //     (σ - T)
-    if (xv.back().isSuperclassOrConcreteType() &&
+    if (xv.back().hasSubstitutions() &&
         !xv.back().getSubstitutions().empty() &&
         t.size() > 0) {
       path.add(RewriteStep::forAdjustment(t.size(), /*inverse=*/true));

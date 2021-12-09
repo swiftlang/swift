@@ -23,6 +23,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -1624,7 +1625,8 @@ namespace {
         VTable(IGM.getSILModule().lookUpVTable(getType())),
         Resilient(IGM.hasResilientMetadata(Type, ResilienceExpansion::Minimal)) {
 
-      if (getType()->isForeign()) return;
+      if (getType()->isForeign() || Type->isForeignReferenceType())
+        return;
 
       MetadataLayout = &IGM.getClassMetadataLayout(Type);
 
@@ -1654,6 +1656,7 @@ namespace {
     }
 
     void layout() {
+      assert(!getType()->isForeignReferenceType());
       super::layout();
       addVTable();
       addOverrideTable();
@@ -2830,6 +2833,13 @@ static void createNonGenericMetadataAccessFunction(IRGenModule &IGM,
 /// Emit the base-offset variable for the class.
 static void emitClassMetadataBaseOffset(IRGenModule &IGM,
                                         ClassDecl *classDecl) {
+  if (classDecl->isForeignReferenceType()) {
+    classDecl->getASTContext().Diags.diagnose(
+        classDecl->getLoc(), diag::foreign_reference_types_unsupported.ID,
+        {});
+    exit(1);
+  }
+
   // Otherwise, we know the offset at compile time, even if our
   // clients do not, so just emit a constant.
   auto &layout = IGM.getClassMetadataLayout(classDecl);
@@ -5030,6 +5040,8 @@ namespace {
 
     void emitInitializeMetadata(IRGenFunction &IGF, llvm::Value *metadata,
                                 MetadataDependencyCollector *collector) {
+      assert(!getTargetType()->isForeignReferenceType());
+      
       if (!Target->hasSuperclass()) {
         assert(IGM.getOptions().LazyInitializeClassMetadata &&
                "should have superclass if not lazy initializing class metadata");
@@ -5053,6 +5065,8 @@ namespace {
     // Visitor methods.
 
     void addValueWitnessTable() {
+      assert(!getTargetType()->isForeignReferenceType());
+
       // The runtime will fill in the default VWT during allocation for the
       // foreign class metadata.
       //
@@ -5081,6 +5095,7 @@ namespace {
     }
 
     void addMetadataFlags() {
+      assert(!getTargetType()->isForeignReferenceType());
       B.addInt(IGM.MetadataKindTy, (unsigned) MetadataKind::ForeignClass);
     }
 
@@ -5173,6 +5188,8 @@ bool irgen::requiresForeignTypeMetadata(CanType type) {
 
 bool irgen::requiresForeignTypeMetadata(NominalTypeDecl *decl) {
   if (auto *clas = dyn_cast<ClassDecl>(decl)) {
+    assert(!clas->isForeignReferenceType());
+    
     switch (clas->getForeignClassKind()) {
     case ClassDecl::ForeignKind::Normal:
     case ClassDecl::ForeignKind::RuntimeOnly:
@@ -5196,7 +5213,8 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
   init.setPacked(true);
 
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-    assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType);
+    assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType ||
+           classDecl->isForeignReferenceType());
 
     ForeignClassMetadataBuilder builder(IGM, classDecl, init);
     builder.layout();
