@@ -139,8 +139,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addSILSkippingChecker();
 #endif
 
-  if (Options.shouldOptimize() &&
-      Options.LexicalLifetimes != LexicalLifetimesOption::ExperimentalLate) {
+  if (Options.shouldOptimize()) {
     P.addDestroyHoisting();
   }
   P.addMandatoryInlining();

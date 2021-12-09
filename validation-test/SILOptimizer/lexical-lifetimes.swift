@@ -97,7 +97,8 @@ func test_localLet_keepsObjectAliveBeyondCallToClassWithWeakReference() {
 func test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference() {
   var d = D()
   let c = C(d)
-  // CHECK: cWillFoo{{.*}} test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference
+  // Reenable with rdar://86271875
+  // HECK: cWillFoo{{.*}} test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference
   c.foo(#function)
 }
 
@@ -147,7 +148,8 @@ func test_localVar_keepsObjectAliveBeyondCallToSynchronizationPointFunction() {
 
 func run() {
   test_localLet_keepsObjectAliveBeyondCallToClassWithWeakReference()
-  test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference()
+  // Reenable with rdar://86271875
+  // test_localVar_keepsObjectAliveBeyondCallToClassWithWeakReference()
   test_localLet_keepsObjectAliveBeyondCallToClassWithPointer()
   test_localVar_keepsObjectAliveBeyondCallToClassWithPointer()
   test_localLet_keepsObjectAliveBeyondCallToSynchronizationPointFunction()
