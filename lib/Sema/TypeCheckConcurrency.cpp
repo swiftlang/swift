@@ -3855,7 +3855,7 @@ bool swift::checkSendableConformance(
   return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }
 
-NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
+ProtocolConformance *GetImplicitSendableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   // Protocols never get implicit Sendable conformances.
   if (isa<ProtocolDecl>(nominal))
@@ -3900,14 +3900,14 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     return nullptr;
   }
 
+  ASTContext &ctx = nominal->getASTContext();
+  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
+  if (!proto)
+    return nullptr;
+
   // Local function to form the implicit conformance.
   auto formConformance = [&](const DeclAttribute *attrMakingUnavailable)
         -> NormalProtocolConformance * {
-    ASTContext &ctx = nominal->getASTContext();
-    auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
-    if (!proto)
-      return nullptr;
-
     DeclContext *conformanceDC = nominal;
     if (attrMakingUnavailable) {
       llvm::VersionTuple NoVersion;
@@ -3959,17 +3959,22 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
   // A non-protocol type with a global actor is implicitly Sendable.
   if (nominal->getGlobalActorAttr()) {
-    // If this is a class, check the superclass. We won't infer Sendable
-    // if the superclass is already Sendable, to avoid introducing redundant
-    // conformances.
+    // If this is a class, check the superclass. If it's already Sendable,
+    // form an inherited conformance.
     if (classDecl) {
       if (Type superclass = classDecl->getSuperclass()) {
         auto classModule = classDecl->getParentModule();
-        if (TypeChecker::conformsToKnownProtocol(
+        if (auto inheritedConformance = TypeChecker::conformsToProtocol(
                 classDecl->mapTypeIntoContext(superclass),
-                KnownProtocolKind::Sendable,
-                classModule, /*allowMissing=*/false))
-          return nullptr;
+                proto, classModule, /*allowMissing=*/false)) {
+          inheritedConformance = inheritedConformance
+              .mapConformanceOutOfContext();
+          if (inheritedConformance.isConcrete()) {
+            return ctx.getInheritedConformance(
+                nominal->getDeclaredInterfaceType(),
+                inheritedConformance.getConcrete());
+          }
+        }
       }
     }
 
