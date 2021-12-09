@@ -47,10 +47,10 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: typealias ForwardDeclaredClassTemplateOutOfLineChar = TemplatesNS1.TemplatesNS2.__CxxTemplateInstN12TemplatesNS112TemplatesNS237ForwardDeclaredClassTemplateOutOfLineIcEE
 // CHECK-NEXT: enum TemplatesNS4 {
-// CHECK-NEXT:   struct __CxxTemplateInstN12TemplatesNS417HasSpecializationIiEE {
+// CHECK-NEXT:   struct __CxxTemplateInstN12TemplatesNS417HasSpecializationIcEE {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
-// CHECK-NEXT:   struct __CxxTemplateInstN12TemplatesNS417HasSpecializationIcEE {
+// CHECK-NEXT:   struct __CxxTemplateInstN12TemplatesNS417HasSpecializationIiEE {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct HasSpecialization<> {
