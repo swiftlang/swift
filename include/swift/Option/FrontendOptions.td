@@ -325,6 +325,14 @@ def requirement_machine_depth_limit : Separate<["-"], "requirement-machine-depth
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum depth before we give up on confluent completion">;
 
+def disable_requirement_machine_merged_associated_types : Flag<["-"], "disable-requirement-machine-merged-associated-types">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable merged associated types">;
+
+def enable_requirement_machine_merged_associated_types : Flag<["-"], "enable-requirement-machine-merged-associated-types">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Enable merged associated types">;
+
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
 
