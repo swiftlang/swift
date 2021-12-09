@@ -200,7 +200,7 @@ where SubSequence: MutableCollection
   /// contiguous mutable storage of the entire collection. If no such storage
   /// exists, the collection creates it. If the collection doesn't support an
   /// internal representation in the form of contiguous mutable storage, this
-  /// method doesn't call `body` and immediately returns `nil` instead.
+  /// method doesn't call `body` but instead immediately returns `nil`.
   ///
   /// The optimizer can often eliminate bounds- and uniqueness-checking
   /// within an algorithm. When that fails, however, invoking the same
