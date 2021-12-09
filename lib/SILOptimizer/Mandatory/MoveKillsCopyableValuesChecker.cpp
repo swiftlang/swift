@@ -127,8 +127,16 @@ bool CheckerLivenessInfo::compute() {
         consumingUse.insert(use);
         break;
       case OperandOwnership::Borrow: {
-        bool failed = !liveness.updateForBorrowingOperand(use);
-        assert(!failed && "Shouldn't see reborrows this early in the pipeline");
+        if (auto *bbi = dyn_cast<BeginBorrowInst>(user)) {
+          // Only add borrows to liveness if the borrow isn't lexical. If it is
+          // a lexical borrow, we have created an entirely new source level
+          // binding that should be tracked separately.
+          if (!bbi->isLexical()) {
+            bool failed = !liveness.updateForBorrowingOperand(use);
+            assert(!failed &&
+                   "Shouldn't see reborrows this early in the pipeline");
+          }
+        }
         break;
       }
       case OperandOwnership::ForwardingBorrow:
