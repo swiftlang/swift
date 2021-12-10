@@ -1441,6 +1441,9 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   }
 
   // Note: Protocol composition types are not nominal, but we name them anyway.
+  if (auto existential = T->getAs<ExistentialType>()) {
+    T = existential->getConstraintType()->getCanonicalType();
+  }
   llvm::StructType *type;
   if (isa<ProtocolType>(T))
     type = IGM.createNominalType(T);
@@ -1550,6 +1553,11 @@ const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
 
 const TypeInfo *
 TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
+  return createExistentialTypeInfo(IGM, CanType(T));
+}
+
+const TypeInfo *
+TypeConverter::convertExistentialType(ExistentialType *T) {
   return createExistentialTypeInfo(IGM, CanType(T));
 }
 

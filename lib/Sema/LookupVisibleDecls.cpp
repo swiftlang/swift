@@ -669,6 +669,13 @@ static void lookupVisibleMemberDeclsImpl(
     return;
   }
 
+  if (auto *existential = BaseTy->getAs<ExistentialType>()) {
+    auto constraint = existential->getConstraintType();
+    lookupVisibleMemberDeclsImpl(constraint, Consumer, CurrDC, LS, Reason,
+                                 Sig, Visited);
+    return;
+  }
+
   // Enumerate members of archetype's requirements.
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
