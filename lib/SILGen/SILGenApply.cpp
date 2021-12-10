@@ -1910,7 +1910,9 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   RValue string = SGF.emitApplyAllocatingInitializer(
       expr, strInitDecl, std::move(strLiteralArgs),
       /*overriddenSelfType*/ Type(), SGFContext());
-  PreparedArguments args({AnyFunctionType::Param(ctx.getStringType())});
+  PreparedArguments args(
+      ArrayRef<AnyFunctionType::Param>({
+          AnyFunctionType::Param(ctx.getStringType())}));
   args.add(expr, std::move(string));
   return args;
 }
