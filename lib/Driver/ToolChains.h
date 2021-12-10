@@ -85,6 +85,8 @@ protected:
 
   const Optional<llvm::Triple> TargetVariant;
 
+  std::string getLinkerPath(const JobContext &context) const;
+
 public:
   Darwin(const Driver &D, const llvm::Triple &Triple,
          const Optional<llvm::Triple> &TargetVariant) :

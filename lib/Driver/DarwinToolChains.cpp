@@ -688,6 +688,50 @@ void toolchains::Darwin::addCommonFrontendArgs(
   }
 }
 
+// Reimplementation of Clang ToolChain::GetLinkerPath, mixed with the
+// previously existing logic in toolchains::Darwin::constructInvocation(
+// const DynamicLinkJobAction&, const JobContext&) below. When Swift targets
+// Darwin, it does not use Clang to link, and relies on its own code for
+// linking which used to ignore -use-ld=. This bit of code restores the
+// handling of -use-ld= for Darwin targets. Unix targets do not need this bit,
+// because they already handle -use-ld= and they use Clang for linking.
+std::string
+toolchains::Darwin::getLinkerPath(const JobContext &context) const  {
+  const Arg *AUseLd = context.Args.getLastArg(options::OPT_use_ld);
+  std::string Linker = AUseLd ? AUseLd->getValue() : "ld";
+  if (Linker.empty())
+    Linker = "ld";
+
+  // If provided with a full path, use it.
+  if (llvm::sys::path::is_absolute(Linker))
+    return Linker;
+
+  // Original behaviour: if -tools-directory is provided, try to find the
+  // linker in that directory. Difference: instead of only looking for
+  // ld, it will look for the provided -use-ld name.
+  if (const Arg *AToolsDirectory =
+          context.Args.getLastArg(options::OPT_tools_directory)) {
+    StringRef toolchainPath(AToolsDirectory->getValue());
+
+    if (auto toolchainLD =
+            llvm::sys::findProgramByName(Linker, {toolchainPath}))
+      return toolchainLD.get();
+  }
+
+  // Reproduce behaviour from Clang. -use-ld is a flavor, and needs
+  // specific prefixes depending on the platform. For Darwin the
+  // prefix is ld64.
+  llvm::SmallString<8> LinkerName;
+  LinkerName.append("ld64.");
+  LinkerName.append(Linker);
+
+  std::string LinkerPath = findProgramRelativeToSwift(LinkerName);
+  if (!LinkerPath.empty())
+    return LinkerPath;
+
+  return Linker;
+}
+
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
                                         const JobContext &context) const {
@@ -701,18 +745,8 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
 
   const llvm::Triple &Triple = getTriple();
 
-  // Configure the toolchain.
-  // By default, use the system `ld` to link.
-  const char *LD = "ld";
-  if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
-    StringRef toolchainPath(A->getValue());
-
-    // If there is a 'ld' in the toolchain folder, use that instead.
-    if (auto toolchainLD =
-            llvm::sys::findProgramByName("ld", {toolchainPath})) {
-      LD = context.Args.MakeArgString(toolchainLD.get());
-    }
-  }
+  const std::string LinkerPath = getLinkerPath(context);
+  const char *LD = context.Args.MakeArgString(LinkerPath);
 
   InvocationInfo II = {LD};
   ArgStringList &Arguments = II.Arguments;
