@@ -2030,10 +2030,14 @@ SWIFT_CC(swiftasync)
 SWIFT_RUNTIME_STDLIB_SPI
 TargetExecutorSignature::FunctionType swift_distributed_execute_target;
 
-/// Accessor takes a context, an argument buffer as a raw pointer,
-/// and a reference to an actor.
-using DistributedAccessorSignature = AsyncSignature<void(void *, HeapObject *),
-                                                    /*throws=*/true>;
+/// Accessor takes:
+///   - an async context
+///   - an argument buffer as a raw pointer
+///   - a result buffer as a raw pointer
+///   - a reference to an actor to execute method on.
+using DistributedAccessorSignature =
+    AsyncSignature<void(void *, void *, HeapObject *),
+                   /*throws=*/true>;
 
 SWIFT_CC(swiftasync)
 static DistributedAccessorSignature::ContinuationType
@@ -2073,6 +2077,5 @@ void ::swift_distributed_execute_target(
   calleeContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
       swift_distributed_execute_target_resume);
 
-  // TODO: Add resultBuffer as an argument to store an indirect result into.
-  accessorEntry(calleeContext, argumentBuffer, actor);
+  accessorEntry(calleeContext, argumentBuffer, resultBuffer, actor);
 }

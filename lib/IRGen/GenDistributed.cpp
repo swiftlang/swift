@@ -98,7 +98,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
                                           SILFunction *DistMethod) {
   auto &Context = IGM.Context;
 
-  auto getParamForArguments = [&]() {
+  auto getRawPointerParmeter = [&]() {
     auto ptrType = Context.getUnsafeRawPointerType();
     return SILParameterInfo(ptrType->getCanonicalType(),
                             ParameterConvention::Direct_Guaranteed);
@@ -121,9 +121,11 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
   // its result(s) out.
   return SILFunctionType::get(
       /*genericSignature=*/nullptr, extInfo, SILCoroutineKind::None,
-      ParameterConvention::Direct_Guaranteed, {getParamForArguments()},
+      ParameterConvention::Direct_Guaranteed,
+      {/*argumentBuffer=*/getRawPointerParmeter(),
+       /*resultBuffer=*/getRawPointerParmeter()},
       /*Yields=*/{},
-      /*Results=*/methodTy->getResults(),
+      /*Results=*/{},
       /*ErrorResult=*/methodTy->getErrorResult(),
       /*patternSubs=*/SubstitutionMap(),
       /*invocationSubs=*/SubstitutionMap(), Context);
@@ -257,23 +259,16 @@ void DistributedAccessor::computeArguments(llvm::Value *argumentBuffer,
 
 void DistributedAccessor::emit() {
   auto methodTy = Method->getLoweredFunctionType();
-  SILFunctionConventions conv(methodTy, IGF.getSILModule());
+  SILFunctionConventions targetConv(methodTy, IGF.getSILModule());
+  SILFunctionConventions accessorConv(AccessorType, IGF.getSILModule());
   TypeExpansionContext expansionContext = IGM.getMaximalTypeExpansionContext();
 
   auto params = IGF.collectParameters();
 
-  auto directResultTy = conv.getSILResultType(expansionContext);
+  auto directResultTy = targetConv.getSILResultType(expansionContext);
   const auto &directResultTI = IGM.getTypeInfo(directResultTy);
-  auto &resultSchema = directResultTI.nativeReturnValueSchema(IGM);
-  llvm::Value *indirectResultSlot = nullptr;
-
-  if (resultSchema.requiresIndirect())
-    indirectResultSlot = params.claimNext();
 
   Explosion arguments;
-  // Claim indirect results first, they are going to be passed
-  // through to the distributed method.
-  params.transferInto(arguments, conv.getNumIndirectSILResults());
 
   unsigned numAsyncContextParams =
       (unsigned)AsyncFunctionArgumentIndex::Context + 1;
@@ -281,6 +276,8 @@ void DistributedAccessor::emit() {
 
   // UnsafeRawPointer that holds all of the argument values.
   auto *argBuffer = params.claimNext();
+  // UnsafeRawPointer that is used to store the result.
+  auto *resultBuffer = params.claimNext();
   // Reference to a `self` of the actor to be called.
   auto *actorSelf = params.claimNext();
 
@@ -296,6 +293,17 @@ void DistributedAccessor::emit() {
     auto entity = LinkEntity::forDistributedMethodAccessor(Method);
     emitAsyncFunctionEntry(IGF, AsyncLayout, entity, asyncContextIdx);
     emitAsyncFunctionPointer(IGM, IGF.CurFn, entity, AsyncLayout.getSize());
+  }
+
+  auto *typedResultBuffer = IGF.Builder.CreateBitCast(
+    resultBuffer, IGM.getStoragePointerType(directResultTy));
+
+  if (targetConv.getNumIndirectSILResults()) {
+    // Since tuples are not allowed as valid result types (because they cannot
+    // conform to protocols), there could be only a single indirect result type
+    // associated with distributed method.
+    assert(targetConv.getNumIndirectSILResults() == 1);
+    arguments.add(typedResultBuffer);
   }
 
   // Step one is to load all of the data from argument buffer,
@@ -316,13 +324,15 @@ void DistributedAccessor::emit() {
     emission->setArgs(arguments, /*isOutlined=*/false,
                       /*witnessMetadata=*/nullptr);
 
-    if (resultSchema.requiresIndirect()) {
-      Address resultAddr(indirectResultSlot,
+    // Load result of the thunk into the location provided by the caller.
+    // This would only generate code for direct results, if thunk has an
+    // indirect result (e.g. large struct) it result buffer would be passed
+    // as an argument.
+    {
+      Address resultAddr(typedResultBuffer,
                          directResultTI.getBestKnownAlignment());
       emission->emitToMemory(resultAddr, cast<LoadableTypeInfo>(directResultTI),
                              /*isOutlined=*/false);
-    } else {
-      emission->emitToExplosion(result, /*isOutlined=*/false);
     }
 
     // Both accessor and distributed method are always `async throws`
@@ -330,7 +340,7 @@ void DistributedAccessor::emit() {
     {
       assert(methodTy->hasErrorResult());
 
-      SILType errorType = conv.getSILErrorType(expansionContext);
+      SILType errorType = accessorConv.getSILErrorType(expansionContext);
       Address calleeErrorSlot =
           emission->getCalleeErrorSlot(errorType, /*isCalleeAsync=*/true);
       error.add(IGF.Builder.CreateLoad(calleeErrorSlot));
@@ -338,8 +348,10 @@ void DistributedAccessor::emit() {
 
     emission->end();
 
-    emitAsyncReturn(IGF, AsyncLayout, directResultTy, AccessorType, result,
-                    error);
+    Explosion voidResult;
+    emitAsyncReturn(IGF, AsyncLayout,
+                    accessorConv.getSILResultType(expansionContext),
+                    AccessorType, voidResult, error);
   }
 }
 

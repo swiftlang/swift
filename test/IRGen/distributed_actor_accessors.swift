@@ -139,7 +139,7 @@ public distributed actor MyOtherActor {
 
 // CHECK: define hidden swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTE"
 
-// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTETF"(%swift.context* swiftasync %0, i8* %1, %swift.refcounted* swiftself %2)
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple1yySiFTETF"(%swift.context* swiftasync %0, i8* %1, i8* %2, %swift.refcounted* swiftself %3)
 
 /// Read the current offset and cast an element to `Int`
 
@@ -192,14 +192,22 @@ public distributed actor MyOtherActor {
 // CHECK: [[STR_STRUCT:%.*]] = insertvalue { i64, %swift.bridge* } {{.*}}, %swift.bridge* {{.*}}, 1
 // CHECK: [[STR_SIZE:%.*]] = extractvalue { i64, %swift.bridge* } [[STR_STRUCT]], 0
 // CHECK-NEXT: [[STR_VAL:%.*]] = extractvalue { i64, %swift.bridge* } [[STR_STRUCT]], 1
-// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, i64 [[STR_SIZE]], %swift.bridge* [[STR_VAL]], %swift.error* {{.*}})
+
+/// Initialize the result buffer with values produced by the thunk
+
+// CHECK: store i64 [[STR_SIZE]], i64* %._guts._object._countAndFlagsBits._value, align 8
+// CHECK: store %swift.bridge* [[STR_VAL]], %swift.bridge** %._guts._object._object, align 8
+
+// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
 /// ---> Thunk and distributed method accessor for `simple3`
 
 // CHECK: define hidden swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTE"
 
 /// !!! in `simple3` interesting bits are: argument value extraction (because string is exploded into N arguments) and call to distributed thunk
-// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTETF"
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSFTETF"(%swift.context* swiftasync {{.*}}, i8* [[ARG_BUFF:%.*]], i8* [[RESULT_BUFF:%.*]], %swift.refcounted* swiftself {{.*}})
+
+// CHECK: [[TYPED_RESULT_BUFF:%.*]] = bitcast i8* [[RESULT_BUFF]] to %TSi*
 
 // CHECK: %argval = load %TSS, %TSS* {{.*}}, align 8
 // CHECK: [[NATIVE_STR_PTR:%.*]] = bitcast %TSS* %argval.coercion.coerced to { i64, %swift.bridge* }*
@@ -220,13 +228,15 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, i64, %swift.error* } [[THUNK_RESULT]], 0
 // CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
 // CHECK: [[INT_RES:%.*]] = extractvalue { i8*, i64, %swift.error* } [[THUNK_RESULT]], 1
-// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, i64 [[INT_RES]], %swift.error* {{.*}})
+// CHECK: %._value = getelementptr inbounds %TSi, %TSi* [[TYPED_RESULT_BUFF]], i32 0, i32 0
+// CHECK: store i64 [[INT_RES]], i64* %._value, align 8
+// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
 /// --> Thunk and distributed method accessor for `single_case_enum`
 
 // CHECK: define hidden swifttailcc void @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTE"
 
-// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTETF"(%swift.context* swiftasync %0, i8* [[BUFFER:%.*]], %swift.refcounted* swiftself %2)
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFFTETF"(%swift.context* swiftasync %0, i8* [[BUFFER:%.*]], i8* [[RESULT_BUFF:%.*]], %swift.refcounted* swiftself {{.*}})
 
 /// First, let's check that there were no loads from the argument buffer and no stores to "current offset".
 
@@ -251,6 +261,7 @@ public distributed actor MyOtherActor {
 
 /// First, Load both arguments from the buffer.
 
+// CHECK: [[TYPED_RESULT_BUFF:%.*]] = bitcast i8* %2 to %T27distributed_actor_accessors9IndirectEO*
 // CHECK: store i8* %1, i8** %offset, align 8
 // CHECK-NEXT: %elt_offset = load i8*, i8** %offset, align 8
 // CHECK-NEXT: [[ENUM_PTR:%.*]] = bitcast i8* %elt_offset to %T27distributed_actor_accessors9IndirectEO*
@@ -261,7 +272,7 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[NATIVE_ENUM_VAL:%.*]] = load i64, i64* [[COERCED_ENUM_PTR]], align 8
 // CHECK: [[ENUM_PTR_INT:%.*]] = ptrtoint %T27distributed_actor_accessors9IndirectEO* [[ENUM_PTR]] to i64
 // CHECK-NEXT: [[NEXT_ELT_LOC:%.*]] = add i64 [[ENUM_PTR_INT]], 8
-// CHECK-NEXT: [[NEXT_ELT_PTR:%.*]] = inttoptr i64 %13 to i8*
+// CHECK-NEXT: [[NEXT_ELT_PTR:%.*]] = inttoptr i64 [[NEXT_ELT_LOC]] to i8*
 // CHECK-NEXT: store i8* [[NEXT_ELT_PTR]], i8** %offset, align 8
 // CHECK-NEXT: %elt_offset1 = load i8*, i8** %offset, align 8
 // CHECK-NEXT: [[INT_PTR:%.*]] = bitcast i8* %elt_offset1 to %TSi*
@@ -277,15 +288,21 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, i64, %swift.error* } [[THUNK_RESULT]], 0
 // CHECK-NEXT: {{.*}} = call i8* @__swift_async_resume_project_context(i8* [[TASK_REF]])
 // CHECK: [[ENUM_RESULT:%.*]] = extractvalue { i8*, i64, %swift.error* } [[THUNK_RESULT]], 1
-// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, i64 [[ENUM_RESULT]], %swift.error* {{.*}})
+// CHECK: [[NATIVE_RESULT_PTR:%.*]] = bitcast %T27distributed_actor_accessors9IndirectEO* [[TYPED_RESULT_BUFF]] to i64*
+// CHECK-NEXT: store i64 [[ENUM_RESULT]], i64* [[NATIVE_RESULT_PTR]], align 8
+
+// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
 /// ---> Thunk and distributed method for `complex`
 
 // CHECK: define hidden swifttailcc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTE"
 
-// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTETF"(%T27distributed_actor_accessors11LargeStructV* noalias nocapture [[INDIRECT_RES:%.*]], %swift.context* swiftasync %1, i8* %2, %swift.refcounted* swiftself %3)
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtFTETF"(%swift.context* swiftasync {{.*}}, i8* [[ARG_BUFF:%.*]], i8* [[RESULT_BUFF:%.*]], %swift.refcounted* swiftself {{.*}})
 
 /// First, let's check that all of the different argument types here are loaded correctly.
+
+/// Cast result buffer to the expected result type (in this case its indirect opaque pointer)
+// CHECK: [[TYPED_RESULT_BUFF:%.*]] = bitcast i8* [[RESULT_BUFF]] to %swift.opaque*
 
 /// -> [Int]
 
@@ -307,7 +324,7 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[NATIVE_OBJ_VAL:%.*]] = load %T27distributed_actor_accessors3ObjC*, %T27distributed_actor_accessors3ObjC** [[OBJ_PTR]], align 8
 // CHECK-NEXT: [[OBJ_PTR_INT:%.*]] = ptrtoint %T27distributed_actor_accessors3ObjC** [[OBJ_PTR]] to i64
 // CHECK-NEXT: [[NEXT_ELT:%.*]] = add i64 [[OBJ_PTR_INT]], 8
-// CHECK-NEXT: [[NEXT_ELT_PTR:%.*]] = inttoptr i64 %18 to i8*
+// CHECK-NEXT: [[NEXT_ELT_PTR:%.*]] = inttoptr i64 [[NEXT_ELT]] to i8*
 // CHECK-NEXT: store i8* [[NEXT_ELT_PTR]], i8** %offset, align 8
 
 /// -> String?
@@ -330,13 +347,16 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: %elt_offset5 = load i8*, i8** %offset, align 8
 // CHECK-NEXT: [[STRUCT_PTR:%.*]] = bitcast i8* %elt_offset5 to %T27distributed_actor_accessors11LargeStructV*
 // CHECK-NEXT: [[STRUCT_VAL:%.*]] = load %T27distributed_actor_accessors11LargeStructV, %T27distributed_actor_accessors11LargeStructV* [[STRUCT_PTR]], align 8
+
+// CHECK: [[INDIRECT_RESULT_BUFF:%.*]] = bitcast %swift.opaque* [[TYPED_RESULT_BUFF]] to %T27distributed_actor_accessors11LargeStructV*
+
 // CHECK: store %T27distributed_actor_accessors11LargeStructV [[STRUCT_VAL]], %T27distributed_actor_accessors11LargeStructV* %argval6.coercion.coerced, align 8
 // CHECK-NEXT: [[PTR_TO_STRUCT:%.*]] = bitcast %T27distributed_actor_accessors11LargeStructV* %argval6.coercion.coerced to %T27distributed_actor_accessors11LargeStructV**
 // CHECK-NEXT: [[NATIVE_STRUCT_VAL:%.*]] = load %T27distributed_actor_accessors11LargeStructV*, %T27distributed_actor_accessors11LargeStructV** [[PTR_TO_STRUCT]], align 8
 
 /// Now let's make sure that distributed thunk call uses the arguments correctly
 
-// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, %T27distributed_actor_accessors11LargeStructV* [[INDIRECT_RES]], %swift.context* {{.*}}, %swift.bridge* [[NATIVE_ARR_VAL]], %T27distributed_actor_accessors3ObjC* [[NATIVE_OBJ_VAL]], i64 [[NATIVE_OPT_VAL_0]], i64 [[NATIVE_OPT_VAL_1]], %T27distributed_actor_accessors11LargeStructV* [[NATIVE_STRUCT_VAL]], %T27distributed_actor_accessors7MyActorC* {{.*}})
+// CHECK: [[THUNK_RESULT:%.*]] = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, %T27distributed_actor_accessors11LargeStructV* [[INDIRECT_RESULT_BUFF]], %swift.context* {{.*}}, %swift.bridge* [[NATIVE_ARR_VAL]], %T27distributed_actor_accessors3ObjC* [[NATIVE_OBJ_VAL]], i64 [[NATIVE_OPT_VAL_0]], i64 [[NATIVE_OPT_VAL_1]], %T27distributed_actor_accessors11LargeStructV* [[NATIVE_STRUCT_VAL]], %T27distributed_actor_accessors7MyActorC* {{.*}})
 
 /// RESULT is returned indirectly so there is nothing to pass to `end`
 
@@ -346,12 +366,13 @@ public distributed actor MyOtherActor {
 
 /// Let's check that there is no offset allocation here since parameter list is empty
 
-// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETF"
+// CHECK: define internal swifttailcc void @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETF"(%swift.context* swiftasync {{.*}}, i8* [[ARG_BUFF:%.*]], i8* [[RESULT_BUFF:%.*]], %swift.refcounted* swiftself {{.*}})
 // CHECK-NEXT: entry:
 // CHECK-NEXT: {{.*}} = alloca %swift.context*, align 8
 // CHECK-NEXT: %swifterror = alloca swifterror %swift.error*, align 8
 // CHECK-NEXT: {{.*}} = call token @llvm.coro.id.async(i32 20, i32 16, i32 0, i8* bitcast (%swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTETFTu" to i8*))
-// CHECK-NEXT: {{.*}} = call i8* @llvm.coro.begin(token %4, i8* null)
+// CHECK-NEXT: {{.*}} = call i8* @llvm.coro.begin(token {{%.*}}, i8* null)
 // CHECK-NEXT: store %swift.context* {{.*}}, %swift.context** {{.*}}, align 8
 // CHECK-NEXT: store %swift.error* null, %swift.error** %swifterror, align 8
+// CHECK-NEXT: {{.*}} = bitcast i8* [[RESULT_BUFF]] to %swift.opaque*
 // CHECK-NEXT: {{.*}} = load i32, i32* getelementptr inbounds (%swift.async_func_pointer, %swift.async_func_pointer* bitcast (void (%swift.context*, %T27distributed_actor_accessors12MyOtherActorC*)* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyFTE" to %swift.async_func_pointer*), i32 0, i32 0), align 8
