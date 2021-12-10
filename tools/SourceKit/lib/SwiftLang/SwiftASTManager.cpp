@@ -457,7 +457,8 @@ class ASTProducer : public std::enable_shared_from_this<ASTProducer> {
   /// execute. Operations are guaranteed to be in FIFO order, that is the first
   /// one in the vector is the oldes build operation.
   SmallVector<ASTBuildOperationRef, 4> BuildOperations = {};
-  llvm::sys::Mutex BuildOperationsMtx;
+  WorkQueue BuildOperationsQueue = WorkQueue(
+      WorkQueue::Dequeuing::Serial, "ASTProducer.BuildOperationsQueue");
 
   /// Erase all finished build operations with a result except for the latest
   /// one which contains a successful results.
@@ -465,7 +466,7 @@ class ASTProducer : public std::enable_shared_from_this<ASTProducer> {
   /// but keeps the latest AST around, so that new consumers can be served from
   /// it, if possible.
   ///
-  /// Assumes that \c BuildOperationsMtx has been claimed.
+  /// Must be executed on \c BuildOperationsQueue.
   void cleanBuildOperations() {
     auto ReverseOperations = llvm::reverse(BuildOperations);
     auto LastOperationWithResultIt =
@@ -485,7 +486,7 @@ class ASTProducer : public std::enable_shared_from_this<ASTProducer> {
   /// Returns the latest build operation which can serve the \p Consumer or
   /// \c nullptr if no such build operation exists.
   ///
-  /// Assumes that \c BuildOperationsMtx has been claimed.
+  /// Must be executed on \c BuildOperationsQueue.
   ASTBuildOperationRef getBuildOperationForConsumer(
       SwiftASTConsumerRef Consumer,
       IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
@@ -1162,13 +1163,13 @@ bool ASTBuildOperation::addConsumer(SwiftASTConsumerRef Consumer) {
   } else {
     assert(OperationState != State::Finished);
     auto WeakThis = std::weak_ptr<ASTBuildOperation>(shared_from_this());
+    Consumers.push_back(Consumer);
     Consumer->setCancellationRequestCallback(
         [WeakThis](SwiftASTConsumerRef Consumer) {
           if (auto This = WeakThis.lock()) {
             This->requestConsumerCancellation(Consumer);
           }
         });
-    Consumers.push_back(Consumer);
   }
   return true;
 }
@@ -1201,35 +1202,40 @@ void ASTProducer::enqueueConsumer(
     SwiftASTConsumerRef Consumer,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     SwiftASTManagerRef Mgr) {
-  // We can't use a llvm::sys::ScopedLock here because we need to unlock it
-  // before calling enqueueConsumer again in the !WasAdded case below.
-  std::unique_lock<llvm::sys::Mutex> BuildOperationsLock(BuildOperationsMtx);
-  if (auto BuildOp = getBuildOperationForConsumer(Consumer, FileSystem, Mgr)) {
-    bool WasAdded = BuildOp->addConsumer(Consumer);
-    if (!WasAdded) {
-      // The build operation was cancelled after the call to
-      // getBuildOperationForConsumer but before the consumer could be added.
-      // This should be an absolute edge case. Let's just try again.
-      BuildOperationsLock.unlock();
-      enqueueConsumer(Consumer, FileSystem, Mgr);
-      return;
-    }
-  } else {
-    auto WeakThis = std::weak_ptr<ASTProducer>(shared_from_this());
-    auto DidFinishCallback = [WeakThis, Mgr]() {
-      if (auto This = WeakThis.lock()) {
-        {
-          llvm::sys::ScopedLock L(This->BuildOperationsMtx);
-          This->cleanBuildOperations();
-        }
-        // Re-register the object with the cache to update its memory cost.
-        Mgr->Impl.ASTCache.set(This->InvokRef->Impl.Key, This);
+  // Enqueue the consumer in the background because getBuildOperationForConsumer
+  // consults the file system and might be slow. Also, there's no need to do
+  // this synchronously since all results will be delivered async anyway.
+  auto This = shared_from_this();
+  BuildOperationsQueue.dispatch([Consumer, FileSystem, Mgr, This]() {
+    if (auto BuildOp =
+            This->getBuildOperationForConsumer(Consumer, FileSystem, Mgr)) {
+      bool WasAdded = BuildOp->addConsumer(Consumer);
+      if (!WasAdded) {
+        // The build operation was cancelled after the call to
+        // getBuildOperationForConsumer but before the consumer could be
+        // added. This should be an absolute edge case. Let's just try
+        // again.
+        This->enqueueConsumer(Consumer, FileSystem, Mgr);
       }
-    };
-    ASTBuildOperationRef NewBuildOp = std::make_shared<ASTBuildOperation>(
-        FileSystem, InvokRef, Mgr, DidFinishCallback);
-    BuildOperations.push_back(NewBuildOp);
-    NewBuildOp->addConsumer(Consumer);
-    NewBuildOp->schedule(Mgr->Impl.ASTBuildQueue);
-  }
+    } else {
+      auto WeakThis = std::weak_ptr<ASTProducer>(This);
+      auto DidFinishCallback = [WeakThis, Mgr]() {
+        if (auto This = WeakThis.lock()) {
+          This->BuildOperationsQueue.dispatchSync(
+              [This]() { This->cleanBuildOperations(); });
+          // Re-register the object with the cache to update its memory
+          // cost.
+          Mgr->Impl.ASTCache.set(This->InvokRef->Impl.Key, This);
+        }
+      };
+      ASTBuildOperationRef NewBuildOp = std::make_shared<ASTBuildOperation>(
+          FileSystem, This->InvokRef, Mgr, DidFinishCallback);
+      This->BuildOperations.push_back(NewBuildOp);
+      bool WasAdded = NewBuildOp->addConsumer(Consumer);
+      assert(WasAdded && "Consumer wasn't added to a new build operation "
+                         "that can't have been cancelled yet?");
+      (void)WasAdded;
+      NewBuildOp->schedule(Mgr->Impl.ASTBuildQueue);
+    }
+  });
 }
