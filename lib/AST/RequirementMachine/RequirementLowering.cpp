@@ -342,12 +342,6 @@ void swift::rewriting::realizeRequirement(
     ModuleDecl *moduleForInference,
     SmallVectorImpl<StructuralRequirement> &result) {
   auto firstType = req.getFirstType();
-  if (moduleForInference) {
-    auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
-                             : SourceLoc());
-    inferRequirements(firstType, firstLoc, moduleForInference, result);
-  }
-
   auto loc = (reqRepr ? reqRepr->getSeparatorLoc() : SourceLoc());
 
   switch (req.getKind()) {
@@ -355,7 +349,11 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::Conformance: {
     auto secondType = req.getSecondType();
     if (moduleForInference) {
-      auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
+      auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
+                               : SourceLoc());
+      inferRequirements(firstType, firstLoc, moduleForInference, result);
+
+      auto secondLoc = (reqRepr ? reqRepr->getConstraintRepr()->getStartLoc()
                                 : SourceLoc());
       inferRequirements(secondType, secondLoc, moduleForInference, result);
     }
@@ -365,6 +363,12 @@ void swift::rewriting::realizeRequirement(
   }
 
   case RequirementKind::Layout: {
+    if (moduleForInference) {
+      auto firstLoc = (reqRepr ? reqRepr->getSubjectRepr()->getStartLoc()
+                               : SourceLoc());
+      inferRequirements(firstType, firstLoc, moduleForInference, result);
+    }
+
     SmallVector<Requirement, 2> reqs;
     desugarLayoutRequirement(firstType, req.getLayoutConstraint(), reqs);
 
@@ -377,6 +381,10 @@ void swift::rewriting::realizeRequirement(
   case RequirementKind::SameType: {
     auto secondType = req.getSecondType();
     if (moduleForInference) {
+      auto firstLoc = (reqRepr ? reqRepr->getFirstTypeRepr()->getStartLoc()
+                               : SourceLoc());
+      inferRequirements(firstType, firstLoc, moduleForInference, result);
+
       auto secondLoc = (reqRepr ? reqRepr->getSecondTypeRepr()->getStartLoc()
                                 : SourceLoc());
       inferRequirements(secondType, secondLoc, moduleForInference, result);
