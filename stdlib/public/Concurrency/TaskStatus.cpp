@@ -468,6 +468,27 @@ swift_task_detachChildImpl(ChildTaskStatusRecord *record) {
   swift_task_removeStatusRecord(record);
 }
 
+SWIFT_CC(swift)
+static void swift_taskGroup_attachChildImpl(TaskGroup *group,
+                                            AsyncTask *child) {
+  SWIFT_TASK_DEBUG_LOG("attach child task = %p to group = %p", child, group);
+
+  // We are always called from the context of the parent
+  //
+  // Acquire the status record lock of parent - we want to synchronize with
+  // concurrent cancellation or escalation as we're adding new tasks to the
+  // group.
+
+  Optional<StatusRecordLockRecord> recordLockRecord;
+  auto parent = swift_task_getCurrent();
+  auto oldStatus =
+      acquireStatusRecordLock(parent, recordLockRecord, LockContext::OnTask);
+  group->addChildTask(child);
+
+  // Release the status record lock, restoring exactly the old status.
+  releaseStatusRecordLock(parent, oldStatus, recordLockRecord);
+}
+
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
 
