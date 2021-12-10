@@ -173,6 +173,7 @@ set(SWIFTLIB_ESSENTIAL
   SwiftNativeNSArray.swift
   TemporaryAllocation.swift
   ThreadLocalStorage.swift
+  TypeDiscovery.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift
   UnicodeData.swift

@@ -59,7 +59,7 @@ struct SectionInfo {
 
 // Called by injected constructors when a dynamic library is loaded.
 SWIFT_RUNTIME_EXPORT
-void swift_addNewDSOImage(const void *addr);
+void swift_addNewDSOImage(const void *imageAddress, const void *addr);
 
 #ifndef NDEBUG
 

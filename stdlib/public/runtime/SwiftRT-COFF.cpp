@@ -83,7 +83,7 @@ static void swift_image_constructor() {
 
 #undef SWIFT_SECTION_RANGE
 
-  swift_addNewDSOImage(&sections);
+  swift_addNewDSOImage(__ImageBase, &sections);
 }
 
 #pragma section(".CRT$XCIS", long, read)

@@ -44,7 +44,7 @@ void record(swift::MetadataSections *sections) {
 }
 
 SWIFT_RUNTIME_EXPORT
-void swift_addNewDSOImage(const void *addr) {
+void swift_addNewDSOImage(const void *imageAddress, const void *addr) {
   // We cast off the const in order to update the linked list
   // data structure. This is safe to do since we don't touch 
   // any other fields.
@@ -56,19 +56,23 @@ void swift_addNewDSOImage(const void *addr) {
   const auto &protocols_section = sections->swift5_protocols;
   const void *protocols = reinterpret_cast<void *>(protocols_section.start);
   if (protocols_section.length)
-    swift::addImageProtocolsBlockCallback(protocols, protocols_section.length);
+    swift::addImageProtocolsBlockCallback(image,
+                                          protocols,
+                                          protocols_section.length);
 
   const auto &protocol_conformances = sections->swift5_protocol_conformances;
   const void *conformances =
       reinterpret_cast<void *>(protocol_conformances.start);
   if (protocol_conformances.length)
-    swift::addImageProtocolConformanceBlockCallback(conformances,
+    swift::addImageProtocolConformanceBlockCallback(image, conformances,
                                              protocol_conformances.length);
 
   const auto &type_metadata = sections->swift5_type_metadata;
   const void *metadata = reinterpret_cast<void *>(type_metadata.start);
   if (type_metadata.length)
-    swift::addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length);
+    swift::addImageTypeMetadataRecordBlockCallback(image,
+                                                   metadata,
+                                                   type_metadata.length);
 
   const auto &dynamic_replacements = sections->swift5_replace;
   const auto *replacements =
@@ -77,7 +81,7 @@ void swift_addNewDSOImage(const void *addr) {
     const auto &dynamic_replacements_some = sections->swift5_replac2;
     const auto *replacements_some =
       reinterpret_cast<void *>(dynamic_replacements_some.start);
-    swift::addImageDynamicReplacementBlockCallback(
+    swift::addImageDynamicReplacementBlockCallback(image,
         replacements, dynamic_replacements.length, replacements_some,
         dynamic_replacements_some.length);
   }
@@ -89,7 +93,7 @@ void swift::initializeProtocolLookup() {
     const swift::MetadataSectionRange &protocols =
       sections->swift5_protocols;
     if (protocols.length)
-      addImageProtocolsBlockCallbackUnsafe(
+      addImageProtocolsBlockCallbackUnsafe(image,
           reinterpret_cast<void *>(protocols.start), protocols.length);
 
     if (sections->next == registered)
@@ -104,7 +108,7 @@ void swift::initializeProtocolConformanceLookup() {
     const swift::MetadataSectionRange &conformances =
         sections->swift5_protocol_conformances;
     if (conformances.length)
-      addImageProtocolConformanceBlockCallbackUnsafe(
+      addImageProtocolConformanceBlockCallbackUnsafe(image,
           reinterpret_cast<void *>(conformances.start), conformances.length);
 
     if (sections->next == registered)
@@ -119,7 +123,7 @@ void swift::initializeTypeMetadataRecordLookup() {
     const swift::MetadataSectionRange &type_metadata =
         sections->swift5_type_metadata;
     if (type_metadata.length)
-      addImageTypeMetadataRecordBlockCallbackUnsafe(
+      addImageTypeMetadataRecordBlockCallbackUnsafe(image,
           reinterpret_cast<void *>(type_metadata.start), type_metadata.length);
 
     if (sections->next == registered)

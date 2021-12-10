@@ -35,6 +35,8 @@
 #include "Private.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ImageInspection.h"
+#include "ImageInspectionCommon.h"
+#include "TypeDiscovery.h"
 #include <functional>
 #include <vector>
 #include <list>
@@ -48,6 +50,10 @@ using namespace reflection;
 #include <objc/message.h>
 #include <objc/objc.h>
 #include <dlfcn.h>
+#endif
+
+#if defined(__MACH__)
+#include <mach-o/getsect.h>
 #endif
 
 /// A Demangler suitable for resolving runtime type metadata strings.
@@ -200,13 +206,38 @@ ExpandResolvedSymbolicReferences::operator()(SymbolicReferenceKind kind,
 
 namespace {
   struct TypeMetadataSection {
+  private:
     const TypeMetadataRecord *Begin, *End;
+#if !defined(__MACH__)
+    const void *ImageAddress;
+#endif
+  public:
+    TypeMetadataSection(const TypeMetadataRecord *begin,
+                        const TypeMetadataRecord *end,
+                        const void *imageAddress)
+    : Begin(begin), End(end) {
+#if !defined(__MACH__)
+      ImageAddress = imageAddress;
+#endif
+    }
+#if defined(__MACH__)
+    TypeMetadataSection(const void *ptr, size_t size) {
+      auto bytes = reinterpret_cast<const char *>(ptr);
+      Begin = reinterpret_cast<const TypeMetadataRecord *>(ptr);
+      End = reinterpret_cast<const TypeMetadataRecord *>(bytes + size);
+    }
+#endif
     const TypeMetadataRecord *begin() const {
       return Begin;
     }
     const TypeMetadataRecord *end() const {
       return End;
     }
+#if !defined(__MACH__)
+    const void *imageAddress() const {
+      return ImageAddress;
+    }
+#endif
   };
 
   struct NominalTypeDescriptorCacheEntry {
@@ -257,12 +288,14 @@ static Lazy<TypeMetadataPrivateState> TypeMetadataRecords;
 
 static void
 _registerTypeMetadataRecords(TypeMetadataPrivateState &T,
+                             const void *imageAddress,
                              const TypeMetadataRecord *begin,
                              const TypeMetadataRecord *end) {
-  T.SectionsToScan.push_back(TypeMetadataSection{begin, end});
+  T.SectionsToScan.push_back(TypeMetadataSection(begin, end, imageAddress));
 }
 
 void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
+    const void *imageAddress,
     const void *records, uintptr_t recordsSize) {
   assert(recordsSize % sizeof(TypeMetadataRecord) == 0
          && "weird-sized type metadata section?!");
@@ -279,20 +312,23 @@ void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
   // since we register records during the initialization of
   // TypeMetadataRecords.
   _registerTypeMetadataRecords(TypeMetadataRecords.unsafeGetAlreadyInitialized(),
-                               recordsBegin, recordsEnd);
+                               imageAddress, recordsBegin, recordsEnd);
 }
 
-void swift::addImageTypeMetadataRecordBlockCallback(const void *records,
+void swift::addImageTypeMetadataRecordBlockCallback(const void *imageAddress,
+                                                    const void *records,
                                                     uintptr_t recordsSize) {
   TypeMetadataRecords.get();
-  addImageTypeMetadataRecordBlockCallbackUnsafe(records, recordsSize);
+  addImageTypeMetadataRecordBlockCallbackUnsafe(imageAddress,
+                                                records,
+                                                recordsSize);
 }
 
 void
 swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
                                          const TypeMetadataRecord *end) {
   auto &T = TypeMetadataRecords.get();
-  _registerTypeMetadataRecords(T, begin, end);
+  _registerTypeMetadataRecords(T, nullptr, begin, end);
 }
 
 static const ContextDescriptor *
@@ -834,7 +870,8 @@ _registerProtocols(ProtocolMetadataPrivateState &C,
   C.SectionsToScan.push_back(ProtocolSection{begin, end});
 }
 
-void swift::addImageProtocolsBlockCallbackUnsafe(const void *protocols,
+void swift::addImageProtocolsBlockCallbackUnsafe(const void *imageAddress,
+                                                 const void *protocols,
                                                  uintptr_t protocolsSize) {
   assert(protocolsSize % sizeof(ProtocolRecord) == 0 &&
          "protocols section not a multiple of ProtocolRecord");
@@ -851,10 +888,11 @@ void swift::addImageProtocolsBlockCallbackUnsafe(const void *protocols,
                      recordsBegin, recordsEnd);
 }
 
-void swift::addImageProtocolsBlockCallback(const void *protocols,
+void swift::addImageProtocolsBlockCallback(const void *imageAddress,
+                                           const void *protocols,
                                            uintptr_t protocolsSize) {
   Protocols.get();
-  addImageProtocolsBlockCallbackUnsafe(protocols, protocolsSize);
+  addImageProtocolsBlockCallbackUnsafe(imageAddress, protocols, protocolsSize);
 }
 
 void swift::swift_registerProtocols(const ProtocolRecord *begin,
@@ -952,6 +990,145 @@ public:
 };
 
 } // namespace
+
+#pragma mark - Type Discovery
+
+/// Instantiate the \c Metadata pointer for a type given the specified type
+/// context descriptor.
+///
+/// \param tcd A pointer to the type context descriptor of the type to be
+///   instantiated.
+///
+/// \returns The \c Metadata pointer corresponding to \a tcd. If it could not be
+///   instantiated, returns \c nullptr.
+static const Metadata *
+_getMetadataFromEnumeratedContextDescriptor(const TypeContextDescriptor *tcd) {
+  auto accessFunction = tcd->getAccessFunction();
+  if (accessFunction) {
+    return accessFunction(MetadataState::Abstract).Value;
+  }
+
+  return nullptr;
+}
+
+/// Walk the type metadata records in a \c TypeMetadataSection instance and call
+/// \a body for each one.
+///
+/// \param sections A pointer to the first of \a count type metadata sections.
+/// \param count The number of type metadata sections pointed to by \a sections.
+/// \param body A closure to invoke once per matching type.
+/// \param bodyContext The Swift context pointer for \a body.
+/// \param context The Swift context pointer for this function. Ignored.
+/// \param error An error pointer passed to \a body. If \a body throws an
+///   error, enumeration is stopped and the error is rethrown.
+SWIFT_CC(swift)
+static void _enumerateAllTypesFromSections(
+  const TypeMetadataSection *sections, size_t count,
+  TypeEnumerationFunction body, void *bodyContext,
+  SWIFT_CONTEXT void *context, SWIFT_ERROR_RESULT SwiftError **error) {
+
+  bool stop = false;
+  *error = nullptr;
+
+  for (size_t i = 0; i < count; i++) {
+    const auto &section = sections[i];
+    for (const auto &record : section) {
+      // Resolve the record to a type context descriptor. If we can't resolve it
+      // or its name, skip this record as potentially corrupted.
+      auto cd = record.getContextDescriptor();
+      if (!cd || cd->isGeneric()) {
+        continue;
+      }
+      auto tcd = dyn_cast<TypeContextDescriptor>(cd);
+      if (!tcd) {
+        continue;
+      }
+      auto name = tcd->Name.get();
+      if (!name) {
+        continue;
+      }
+
+      body(name, tcd, _getMetadataFromEnumeratedContextDescriptor, &stop,
+           bodyContext, error);
+      if (stop || *error) {
+        return;
+      }
+    }
+  }
+}
+
+#if defined(__MACH__)
+/// An alias for the current architecture's Mach header variant.
+#ifdef __LP64__
+typedef const mach_header_64 *MachHeaderAddress;
+#else
+typedef const mach_header *MachHeaderAddress;
+#endif
+#endif
+
+SWIFT_CC(swift)
+void swift::swift_enumerateAllTypesFromImage(
+  const void *imageAddress,
+  TypeEnumerationFunction body,
+  void *bodyContext,
+  SWIFT_CONTEXT void *context,
+  SWIFT_ERROR_RESULT SwiftError **error) {
+
+#if defined(__WASM__)
+  // Swift+WASM does not support dynamic linking and #dsohandle is 0, so
+  // ignore the passed image address and iterate over any/all available
+  // sections. Presumably only one will be available.
+  imageAddress = nullptr;
+#endif
+
+#if SWIFT_OBJC_INTEROP
+  // TODO: walk Objective-C classes in this image.
+#endif
+
+  if (imageAddress) {
+#if defined(__MACH__)
+    // This platform has dyld and we can use it instead of walking the type
+    // metadata table.
+    unsigned long sectionSize = 0;
+    auto sectionData = getsectiondata(
+      reinterpret_cast<MachHeaderAddress>(imageAddress),
+      SEG_TEXT, MachOTypeMetadataRecordSection, &sectionSize);
+    if (sectionData) {
+      auto section = TypeMetadataSection(sectionData, sectionSize);
+      _enumerateAllTypesFromSections(&section, 1,
+                                     body, bodyContext,
+                                     context, error);
+    }
+#else
+
+    // This platform doesn't have dyld, so walk all sections in the type
+    // metadata table and try to find one that matches the input image address.
+    auto snapshot = TypeMetadataRecords.get().SectionsToScan.snapshot();
+
+    for (const auto &section : snapshot) {
+      // Check if this section came from the image of interest.
+      if (section.imageAddress() != imageAddress) {
+        continue;
+      }
+
+      if (info.baseAddress == imageAddress) {
+        _enumerateAllTypesFromSections(&section, 1,
+                                       body, bodyContext,
+                                       context, error);
+        return;
+      }
+    }
+#endif
+
+  } else {
+    // Walk all sections. The presence of the dyld shared cache does not
+    // (currently) affect the type metadata records table.
+    auto snapshot = TypeMetadataRecords.get().SectionsToScan.snapshot();
+    _enumerateAllTypesFromSections(snapshot.begin(), snapshot.count(),
+                                   body, bodyContext,
+                                   context, error);
+  }
+}
 
 #pragma mark Metadata lookup via mangled name
 
@@ -2477,6 +2654,7 @@ public:
 } // anonymous namespace
 
 void swift::addImageDynamicReplacementBlockCallback(
+    const void *imageAddress,
     const void *replacements, uintptr_t replacementsSize,
     const void *replacementsSome, uintptr_t replacementsSomeSize) {
 

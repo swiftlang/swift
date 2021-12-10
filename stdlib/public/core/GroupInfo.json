@@ -155,7 +155,8 @@
     "Mirror.swift",
     "Mirrors.swift",
     "ReflectionMirror.swift",
-    "ObjectIdentifier.swift"
+    "ObjectIdentifier.swift",
+    "TypeDiscovery.swift"
   ],
   "Math": [
     "SetAlgebra.swift",

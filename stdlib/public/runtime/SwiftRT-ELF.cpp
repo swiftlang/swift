@@ -37,6 +37,8 @@ DECLARE_SWIFT_SECTION(swift5_replace)
 DECLARE_SWIFT_SECTION(swift5_replac2)
 DECLARE_SWIFT_SECTION(swift5_builtin)
 DECLARE_SWIFT_SECTION(swift5_capture)
+
+extern void const *const __dso_handle;
 }
 
 #undef DECLARE_SWIFT_SECTION
@@ -74,7 +76,7 @@ static void swift_image_constructor() {
 
 #undef SWIFT_SECTION_RANGE
 
-  swift_addNewDSOImage(&sections);
+  swift_addNewDSOImage(__dso_handle, &sections);
 }
 
 __asm__(".section \".note.swift_reflection_metadata\", \"aw\"");
