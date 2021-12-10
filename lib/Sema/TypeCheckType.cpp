@@ -3382,8 +3382,9 @@ TypeResolver::resolveIdentifierType(IdentTypeRepr *IdType,
     return ErrorType::get(getASTContext());
   }
 
-  bool isConstraintType = (result->is<ProtocolType>() ||
-                           result->is<ProtocolCompositionType>());
+  // FIXME: Don't use ExistentialType for AnyObject for now.
+  bool isConstraintType = (result->is<ProtocolType>() &&
+                           !result->isAnyObject());
   if (isConstraintType &&
       getASTContext().LangOpts.EnableExplicitExistentialTypes &&
       options.isConstraintImplicitExistential()) {
@@ -3756,7 +3757,8 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       ProtocolCompositionType::get(getASTContext(), Members,
                                    /*HasExplicitAnyObject=*/false);
   if (getASTContext().LangOpts.EnableExplicitExistentialTypes &&
-      options.isConstraintImplicitExistential()) {
+      options.isConstraintImplicitExistential() &&
+      !composition->isAny()) {
     composition = ExistentialType::get(composition);
   }
   return composition;
@@ -3785,6 +3787,7 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
     diagnose(repr->getLoc(), diag::unnecessary_any,
              constraintType)
       .fixItRemove({anyStart, anyEnd});
+    return constraintType;
   }
 
   return ExistentialType::get(constraintType);
@@ -3972,7 +3975,7 @@ public:
     // Arbitrary protocol constraints are okay for 'any' types.
     if (isa<ExistentialTypeRepr>(T))
       return false;
-    
+
     visit(T);
     return true;
   }
