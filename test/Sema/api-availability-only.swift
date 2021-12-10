@@ -1,7 +1,7 @@
 /// Test that -check-api-availability-only skips what is expected while checking
 /// the module API and SPI.
 
-// RUN: %target-typecheck-verify-swift -module-name MyModule -target %target-cpu-apple-macosx10.15 -check-api-availability-only -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -module-name MyModule -target %target-cpu-apple-macosx10.14 -check-api-availability-only -enable-library-evolution
 
 /// The flag -check-api-availability-only should reject builds going up to IR and further.
 // RUN: not %target-build-swift -emit-executable %s -g -o %t -emit-module -Xfrontend -check-api-availability-only 2>&1 | %FileCheck %s
@@ -131,4 +131,25 @@ public struct Struct {
 // expected-note @+1 {{add @available attribute to enclosing}}
 extension NewProto { // expected-error {{'NewProto' is only available in macOS 11.0 or newer}}
     public func foo() {}
+}
+
+func asyncFunc() async -> Bool {
+    fatalError()
+}
+
+// expected-note @+1 {{add @available attribute to enclosing}}
+public func publicAsyncFunc() async -> Bool { // expected-error {{concurrency is only available in macOS 10.15.0 or newer}}
+    fatalError()
+}
+
+// expected-note @+1 {{add @available attribute to enclosing}}
+@usableFromInline func usableFromInlineAsyncFunc() async -> Bool { // expected-error {{concurrency is only available in macOS 10.15.0 or newer}}
+    fatalError()
+}
+
+actor InternalActor {
+}
+
+// expected-note @+1 {{add @available attribute to enclosing}}
+public actor PublicActor { // expected-error {{concurrency is only available in macOS 10.15.0 or newer}}
 }
