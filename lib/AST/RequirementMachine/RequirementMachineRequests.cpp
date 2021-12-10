@@ -21,6 +21,7 @@
 #include "RequirementMachine.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Requirement.h"
@@ -247,7 +248,25 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
       ctx.getRewriteContext()));
 
-  machine->initWithProtocols(component);
+  auto status = machine->initWithProtocols(component);
+  if (status != CompletionResult::Success) {
+    // All we can do at this point is diagnose and give each protocol an empty
+    // requirement signature.
+    for (const auto *otherProto : component) {
+      ctx.Diags.diagnose(otherProto->getLoc(),
+                         diag::requirement_machine_completion_failed,
+                         /*protocol=*/1,
+                         status == CompletionResult::MaxIterations ? 0 : 1);
+
+      if (otherProto != proto) {
+        ctx.evaluator.cacheOutput(
+          RequirementSignatureRequestRQM{const_cast<ProtocolDecl *>(otherProto)},
+          ArrayRef<Requirement>());
+      }
+    }
+
+    return ArrayRef<Requirement>();
+  }
 
   auto minimalRequirements = machine->computeMinimalProtocolRequirements();
 
@@ -400,7 +419,10 @@ InferredGenericSignatureRequestRQM::evaluate(
     return false;
   };
 
+  SourceLoc loc;
   if (genericParamList) {
+    loc = genericParamList->getLAngleLoc();
+
     // Extensions never have a parent signature.
     assert(genericParamList->getOuterParameters() == nullptr || !parentSig);
 
@@ -440,6 +462,9 @@ InferredGenericSignatureRequestRQM::evaluate(
   }
 
   if (whereClause) {
+    if (loc.isInvalid())
+      loc = whereClause.getLoc();
+
     std::move(whereClause).visitRequirements(
         TypeResolutionStage::Structural,
         visitRequirement);
@@ -464,7 +489,16 @@ InferredGenericSignatureRequestRQM::evaluate(
   std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
       ctx.getRewriteContext()));
 
-  machine->initWithWrittenRequirements(genericParams, requirements);
+  auto status = machine->initWithWrittenRequirements(genericParams, requirements);
+  if (status != CompletionResult::Success) {
+    ctx.Diags.diagnose(loc,
+                       diag::requirement_machine_completion_failed,
+                       /*protocol=*/0,
+                       status == CompletionResult::MaxIterations ? 0 : 1);
+
+    auto result = GenericSignature::get(genericParams, {});
+    return GenericSignatureWithError(result, /*hadError=*/true);
+  }
 
   auto minimalRequirements =
     machine->computeMinimalGenericSignatureRequirements();

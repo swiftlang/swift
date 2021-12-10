@@ -86,17 +86,17 @@ class RequirementMachine final {
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
   void initWithGenericSignature(CanGenericSignature sig);
-  void initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
+  CompletionResult initWithProtocols(ArrayRef<const ProtocolDecl *> protos);
   void initWithAbstractRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<Requirement> requirements);
-  void initWithWrittenRequirements(
+  CompletionResult initWithWrittenRequirements(
       ArrayRef<GenericTypeParamType *> genericParams,
       ArrayRef<StructuralRequirement> requirements);
 
   bool isComplete() const;
 
-  void computeCompletion(RewriteSystem::ValidityPolicy policy);
+  CompletionResult computeCompletion(RewriteSystem::ValidityPolicy policy);
 
   MutableTerm getLongestValidPrefix(const MutableTerm &term) const;
 
