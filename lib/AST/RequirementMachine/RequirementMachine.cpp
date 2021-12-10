@@ -35,12 +35,32 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
 
 RequirementMachine::~RequirementMachine() {}
 
+static void checkCompletionResult(const RequirementMachine &machine,
+                                  CompletionResult result) {
+  switch (result) {
+  case CompletionResult::Success:
+    break;
+
+  case CompletionResult::MaxIterations:
+    llvm::errs() << "Rewrite system exceeds maximum completion step count\n";
+    machine.dump(llvm::errs());
+    abort();
+
+  case CompletionResult::MaxDepth:
+    llvm::errs() << "Rewrite system exceeds maximum completion depth\n";
+    machine.dump(llvm::errs());
+    abort();
+  }
+}
+
 /// Build a requirement machine for the requirements of a generic signature.
 ///
 /// This must only be called exactly once, before any other operations are
 /// performed on this requirement machine.
 ///
 /// Used by ASTContext::getOrCreateRequirementMachine().
+///
+/// Asserts if completion fails within the configured number of steps.
 void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
   Sig = sig;
   Params.append(sig.getGenericParams().begin(),
@@ -64,7 +84,8 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
-  computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+  auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+  checkCompletionResult(*this, result);
 
   if (Dump) {
     llvm::dbgs() << "}\n";
@@ -79,7 +100,10 @@ void RequirementMachine::initWithGenericSignature(CanGenericSignature sig) {
 /// performed on this requirement machine.
 ///
 /// Used by RequirementSignatureRequest.
-void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
+///
+/// Returns failure if completion fails within the configured number of steps.
+CompletionResult
+RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos) {
   Protos = protos;
 
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
@@ -100,12 +124,13 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
-  // FIXME: Only if the protocols were written in source, though.
-  computeCompletion(RewriteSystem::AllowInvalidRequirements);
+  auto result = computeCompletion(RewriteSystem::AllowInvalidRequirements);
 
   if (Dump) {
     llvm::dbgs() << "}\n";
   }
+
+  return result;
 }
 
 /// Build a requirement machine from a set of generic parameters and
@@ -115,6 +140,8 @@ void RequirementMachine::initWithProtocols(ArrayRef<const ProtocolDecl *> protos
 /// performed on this requirement machine.
 ///
 /// Used by AbstractGenericSignatureRequest.
+///
+/// Asserts if completion fails within the configured number of steps.
 void RequirementMachine::initWithAbstractRequirements(
     ArrayRef<GenericTypeParamType *> genericParams,
     ArrayRef<Requirement> requirements) {
@@ -139,7 +166,8 @@ void RequirementMachine::initWithAbstractRequirements(
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
-  computeCompletion(RewriteSystem::AllowInvalidRequirements);
+  auto result = computeCompletion(RewriteSystem::AllowInvalidRequirements);
+  checkCompletionResult(*this, result);
 
   if (Dump) {
     llvm::dbgs() << "}\n";
@@ -153,7 +181,10 @@ void RequirementMachine::initWithAbstractRequirements(
 /// performed on this requirement machine.
 ///
 /// Used by InferredGenericSignatureRequest.
-void RequirementMachine::initWithWrittenRequirements(
+///
+/// Returns failure if completion fails within the configured number of steps.
+CompletionResult
+RequirementMachine::initWithWrittenRequirements(
     ArrayRef<GenericTypeParamType *> genericParams,
     ArrayRef<StructuralRequirement> requirements) {
   Params.append(genericParams.begin(), genericParams.end());
@@ -177,17 +208,20 @@ void RequirementMachine::initWithWrittenRequirements(
                     std::move(builder.PermanentRules),
                     std::move(builder.RequirementRules));
 
-  computeCompletion(RewriteSystem::AllowInvalidRequirements);
+  auto result = computeCompletion(RewriteSystem::AllowInvalidRequirements);
 
   if (Dump) {
     llvm::dbgs() << "}\n";
   }
+
+  return result;
 }
 
 /// Attempt to obtain a confluent rewrite system by iterating the Knuth-Bendix
 /// completion procedure together with property map construction until fixed
 /// point.
-void RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
+CompletionResult
+RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
   while (true) {
     // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
     auto result = System.computeConfluentCompletion(
@@ -200,26 +234,8 @@ void RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy)
     }
 
     // Check for failure.
-    auto checkCompletionResult = [&]() {
-      switch (result.first) {
-      case CompletionResult::Success:
-        break;
-
-      case CompletionResult::MaxIterations:
-        llvm::errs() << "Generic signature " << Sig
-                     << " exceeds maximum completion step count\n";
-        System.dump(llvm::errs());
-        abort();
-
-      case CompletionResult::MaxDepth:
-        llvm::errs() << "Generic signature " << Sig
-                     << " exceeds maximum completion depth\n";
-        System.dump(llvm::errs());
-        abort();
-      }
-    };
-
-    checkCompletionResult();
+    if (result.first != CompletionResult::Success)
+      return result.first;
 
     // Check invariants.
     System.verifyRewriteRules(policy);
@@ -236,7 +252,9 @@ void RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy)
         .NumRequirementMachineUnifiedConcreteTerms += result.second;
     }
 
-    checkCompletionResult();
+    // Check for failure.
+    if (result.first != CompletionResult::Success)
+      return result.first;
 
     // If buildPropertyMap() added new rules, we run another round of
     // Knuth-Bendix, and build the property map again.
@@ -250,6 +268,8 @@ void RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy)
 
   assert(!Complete);
   Complete = true;
+
+  return CompletionResult::Success;
 }
 
 bool RequirementMachine::isComplete() const {
