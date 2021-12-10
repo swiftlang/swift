@@ -626,6 +626,9 @@ void RewriteContext::getProtocolComponentRec(
 
 /// Lazily construct a requirement machine for the given protocol's strongly
 /// connected component (SCC) in the protocol dependency graph.
+///
+/// This can only be called once, to prevent multiple requirement machines
+/// for being built with the same component.
 ArrayRef<const ProtocolDecl *> RewriteContext::getProtocolComponent(
     const ProtocolDecl *proto) {
   auto found = Protos.find(proto);
@@ -649,6 +652,8 @@ ArrayRef<const ProtocolDecl *> RewriteContext::getProtocolComponent(
     llvm::errs() << "\n";
     abort();
   }
+
+  component.InProgress = true;
 
   return component.Protos;
 }
