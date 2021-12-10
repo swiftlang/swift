@@ -127,8 +127,16 @@ bool CheckerLivenessInfo::compute() {
         consumingUse.insert(use);
         break;
       case OperandOwnership::Borrow: {
-        bool failed = !liveness.updateForBorrowingOperand(use);
-        assert(!failed && "Shouldn't see reborrows this early in the pipeline");
+        if (auto *bbi = dyn_cast<BeginBorrowInst>(user)) {
+          // Only add borrows to liveness if the borrow isn't lexical. If it is
+          // a lexical borrow, we have created an entirely new source level
+          // binding that should be tracked separately.
+          if (!bbi->isLexical()) {
+            bool failed = !liveness.updateForBorrowingOperand(use);
+            assert(!failed &&
+                   "Shouldn't see reborrows this early in the pipeline");
+          }
+        }
         break;
       }
       case OperandOwnership::ForwardingBorrow:
@@ -422,11 +430,6 @@ class MoveKillsCopyableValuesCheckerPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
     auto &astContext = fn->getASTContext();
-
-    // If we do not have experimental move only enabled, do not emit
-    // diagnostics.
-    if (!astContext.LangOpts.EnableExperimentalMoveOnly)
-      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
