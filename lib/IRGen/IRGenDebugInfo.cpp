@@ -1458,6 +1458,7 @@ private:
                                 Flags, MangledName);
     }
 
+    case TypeKind::Existential:
     case TypeKind::ProtocolComposition: {
       auto *Decl = DbgTy.getDecl();
       auto L = getFilenameAndLocation(*this, Decl);

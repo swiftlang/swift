@@ -479,6 +479,12 @@ void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(Constraint, Printer, Opts);
 }
 
+void ExistentialTypeRepr::printImpl(ASTPrinter &Printer,
+                                    const PrintOptions &Opts) const {
+  Printer.printKeyword("any", Opts, /*Suffix=*/" ");
+  printTypeRepr(Constraint, Printer, Opts);
+}
+
 SourceLoc NamedOpaqueReturnTypeRepr::getStartLocImpl() const {
   return GenericParams->getLAngleLoc();
 }

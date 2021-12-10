@@ -5266,6 +5266,11 @@ bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
   return true;
 }
 
+bool ProtocolDecl::existentialRequiresAny() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    ExistentialRequiresAnyRequest{const_cast<ProtocolDecl *>(this)}, true);
+}
+
 StringRef ProtocolDecl::getObjCRuntimeName(
                           llvm::SmallVectorImpl<char> &buffer) const {
   // If there is an 'objc' attribute with a name, use that name.

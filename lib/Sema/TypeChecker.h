@@ -245,6 +245,22 @@ Type getOptionalType(SourceLoc loc, Type elementType);
 Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
                          bool replaceInvalidRefsWithErrors);
 
+/// Check for invalid existential types in the given declaration.
+void checkExistentialTypes(Decl *decl);
+
+/// Check for invalid existential types in the given statement.
+void checkExistentialTypes(ASTContext &ctx, Stmt *stmt);
+
+/// Check for invalid existential types in the given generic requirement
+/// list.
+void checkExistentialTypes(ASTContext &ctx,
+                           TrailingWhereClause *whereClause);
+
+/// Check for invalid existential types in the given generic requirement
+/// list.
+void checkExistentialTypes(ASTContext &ctx,
+                           GenericParamList *genericParams);
+
 /// Substitute the given base type into the type of the given nested type,
 /// producing the effective type that the nested type will have.
 ///

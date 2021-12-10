@@ -3564,13 +3564,14 @@ public:
                                        StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isClassBounded, isObjC;
+    bool isImplicit, isClassBounded, isObjC, existentialRequiresAny;
     uint8_t rawAccessLevel;
     unsigned numInheritedTypes;
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
+                                            existentialRequiresAny,
                                             rawAccessLevel, numInheritedTypes,
                                             rawInheritedAndDependencyIDs);
 
@@ -3596,6 +3597,8 @@ public:
 
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
                               std::move(isClassBounded));
+    ctx.evaluator.cacheOutput(ExistentialRequiresAnyRequest{proto},
+                              std::move(existentialRequiresAny));
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       proto->setAccess(*accessLevel);
@@ -5604,6 +5607,18 @@ public:
     }
 
     return ProtocolCompositionType::get(ctx, protocols, hasExplicitAnyObject);
+  }
+
+  Expected<Type> deserializeExistentialType(ArrayRef<uint64_t> scratch,
+                                            StringRef blobData) {
+    TypeID constraintID;
+    decls_block::ExistentialTypeLayout::readRecord(scratch, constraintID);
+
+    auto constraintType = MF.getTypeChecked(constraintID);
+    if (!constraintType)
+      return constraintType.takeError();
+
+    return ExistentialType::get(constraintType.get());
   }
 
   Expected<Type> deserializeDependentMemberType(ArrayRef<uint64_t> scratch,
