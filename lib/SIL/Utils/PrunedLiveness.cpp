@@ -154,10 +154,14 @@ bool PrunedLiveness::isWithinBoundary(SILInstruction *inst) const {
 }
 
 bool PrunedLiveness::areUsesWithinBoundary(ArrayRef<Operand *> uses,
-                                           DeadEndBlocks &deadEndBlocks) const {
+                                           DeadEndBlocks *deadEndBlocks) const {
+  auto checkDeadEnd = [deadEndBlocks](SILInstruction *inst) {
+    return deadEndBlocks && deadEndBlocks->isDeadEnd(inst->getParent());
+  };
+
   for (auto *use : uses) {
     auto *user = use->getUser();
-    if (!isWithinBoundary(user) && !deadEndBlocks.isDeadEnd(user->getParent()))
+    if (!isWithinBoundary(user) && !checkDeadEnd(user))
       return false;
   }
   return true;
