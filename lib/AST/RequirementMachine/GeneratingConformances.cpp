@@ -815,7 +815,12 @@ void GeneratingConformances::computeGeneratingConformances(
       bool derivedViaConcrete = false;
       for (const auto &path : paths) {
         if (path.empty())
-          break;
+          continue;
+
+        // If the rule is itself a concrete conformance, it is not
+        // derived-via-concrete via itself.
+        if (path.size() == 1 && path.front() == ruleID)
+          continue;
 
         if (System.getRule(path.back()).getLHS().back().getKind() ==
             Symbol::Kind::ConcreteConformance) {
