@@ -150,7 +150,10 @@ namespace {
 /// Utility class to encapsulate some shared state.
 class GeneratingConformances {
   const RewriteSystem &System;
+
   RewriteContext &Context;
+
+  DebugOptions Debug;
 
   // All conformance rules, sorted by (isExplicit(), getLHS()), with non-explicit
   // rules with longer left hand sides coming first.
@@ -209,6 +212,7 @@ public:
                                   llvm::DenseSet<unsigned> &redundantConformances)
     : System(system),
       Context(system.getRewriteContext()),
+      Debug(system.getDebugOptions()),
       RedundantConformances(redundantConformances) {}
 
   void collectConformanceRules();
@@ -481,7 +485,7 @@ void GeneratingConformances::computeCandidateConformancePaths() {
     if (result.empty())
       continue;
 
-    if (System.getDebugOptions().contains(DebugFlags::GeneratingConformances)) {
+    if (Debug.contains(DebugFlags::GeneratingConformances)) {
       llvm::dbgs() << "Candidate homotopy generator: ";
       loop.dump(llvm::dbgs(), System);
       llvm::dbgs() << "\n";
@@ -497,7 +501,7 @@ void GeneratingConformances::computeCandidateConformancePaths() {
       if (inEmptyContext.empty())
         continue;
 
-      if (System.getDebugOptions().contains(DebugFlags::GeneratingConformances)) {
+      if (Debug.contains(DebugFlags::GeneratingConformances)) {
         llvm::dbgs() << "* Protocol " << proto->getName() << ":\n";
         llvm::dbgs() << "** Conformance rules not in context:\n";
         for (unsigned ruleID : inEmptyContext) {
@@ -755,7 +759,7 @@ void GeneratingConformances::verifyGeneratingConformanceEquations() const {
         llvm::errs() << "Mismatched conformance:\n";
         llvm::errs() << "Base rule: " << rule << "\n";
         llvm::errs() << "Final rule: " << otherRule << "\n\n";
-        System.dump(llvm::errs());
+        dumpGeneratingConformanceEquations(llvm::errs());
         abort();
       }
 
@@ -772,7 +776,7 @@ void GeneratingConformances::verifyGeneratingConformanceEquations() const {
                                             pair.first, pair.second);
           llvm::errs() << "\n";
           llvm::errs() << "Term: " << rule << "\n";
-          System.dump(llvm::errs());
+          dumpGeneratingConformanceEquations(llvm::errs());
           abort();
         }
 
@@ -789,7 +793,7 @@ void GeneratingConformances::verifyGeneratingConformanceEquations() const {
         llvm::errs() << "Invalid conformance path:\n";
         llvm::errs() << "Expected: " << baseTerm << "\n";
         llvm::errs() << "Got: " << otherTerm << "\n\n";
-        System.dump(llvm::errs());
+        dumpGeneratingConformanceEquations(llvm::errs());
         abort();
       }
     }
@@ -824,6 +828,12 @@ void GeneratingConformances::computeGeneratingConformances(
       // considered in the second pass.
       if (!derivedViaConcrete)
         continue;
+
+      if (Debug.contains(DebugFlags::GeneratingConformances)) {
+        llvm::dbgs() << "Derived-via-concrete: ";
+        dumpGeneratingConformanceEquation(llvm::dbgs(), ruleID, paths);
+        llvm::dbgs() << "\n";
+      }
     } else {
       // Ignore rules already determined to be redundant by the first pass.
       if (RedundantConformances.count(ruleID) > 0)
@@ -843,6 +853,14 @@ void GeneratingConformances::computeGeneratingConformances(
 
       if (isValidConformancePath(visited, path,
                                  /*allowConcrete=*/true)) {
+        if (Debug.contains(DebugFlags::GeneratingConformances)) {
+          llvm::dbgs() << "Redundant rule in ";
+          llvm::dbgs() << (firstPass ? "first" : "second");
+          llvm::dbgs() << " pass: ";
+          llvm::dbgs() << System.getRule(ruleID).getLHS();
+          llvm::dbgs() << "\n";
+        }
+
         RedundantConformances.insert(ruleID);
         break;
       }
@@ -869,7 +887,7 @@ void GeneratingConformances::verifyGeneratingConformances() const {
                                   /*allowConcrete=*/true)) {
         llvm::errs() << "Redundant conformance is not recoverable:\n";
         llvm::errs() << rule << "\n\n";
-        System.dump(llvm::errs());
+        dumpGeneratingConformanceEquations(llvm::errs());
         abort();
       }
 
@@ -879,14 +897,14 @@ void GeneratingConformances::verifyGeneratingConformances() const {
     if (rule.isRedundant()) {
       llvm::errs() << "Generating conformance is redundant: ";
       llvm::errs() << rule << "\n\n";
-      System.dump(llvm::errs());
+      dumpGeneratingConformanceEquations(llvm::errs());
       abort();
     }
 
     if (rule.getLHS().containsUnresolvedSymbols()) {
       llvm::errs() << "Generating conformance contains unresolved symbols: ";
       llvm::errs() << rule << "\n\n";
-      System.dump(llvm::errs());
+      dumpGeneratingConformanceEquations(llvm::errs());
       abort();
     }
   }
