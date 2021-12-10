@@ -793,6 +793,10 @@ bool CompilerInvocation::shouldImportSwiftConcurrency() const {
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
+bool CompilerInvocation::shouldImportSwiftStringProcessing() const {
+  return getLangOptions().EnableExperimentalStringProcessing;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -833,6 +837,20 @@ bool CompilerInstance::canImportSwiftConcurrency() const {
       {getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME), SourceLoc()});
 }
 
+void CompilerInstance::verifyImplicitStringProcessingImport() {
+  if (Invocation.shouldImportSwiftStringProcessing() &&
+      !canImportSwiftStringProcessing()) {
+    Diagnostics.diagnose(SourceLoc(),
+                         diag::warn_implicit_string_processing_import_failed);
+  }
+}
+
+bool CompilerInstance::canImportSwiftStringProcessing() const {
+  return getASTContext().canImportModule(
+      {getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME),
+       SourceLoc()});
+}
+
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   auto &frontendOpts = Invocation.getFrontendOptions();
 
@@ -869,6 +887,19 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     case ImplicitStdlibKind::Stdlib:
       if (canImportSwiftConcurrency())
         pushImport(SWIFT_CONCURRENCY_NAME);
+      break;
+    }
+  }
+
+  if (Invocation.shouldImportSwiftStringProcessing()) {
+    switch (imports.StdlibKind) {
+    case ImplicitStdlibKind::Builtin:
+    case ImplicitStdlibKind::None:
+      break;
+
+    case ImplicitStdlibKind::Stdlib:
+      if (canImportSwiftStringProcessing())
+        pushImport(SWIFT_STRING_PROCESSING_NAME);
       break;
     }
   }
@@ -1084,6 +1115,7 @@ bool CompilerInstance::loadStdlibIfNeeded() {
   }
 
   verifyImplicitConcurrencyImport();
+  verifyImplicitStringProcessingImport();
 
   // If we failed to load, we should have already diagnosed.
   if (M->failedToLoad()) {

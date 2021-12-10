@@ -3668,9 +3668,6 @@ ERROR(builtin_string_literal_broken_proto,none,
 ERROR(string_literal_broken_proto,none,
       "protocol 'ExpressibleByStringLiteral' is broken", ())
 
-ERROR(regex_decl_broken,none,
-      "cannot find 'Regex' type in scope", ())
-
 // Array literals
 ERROR(should_use_dictionary_literal,none,
       "dictionary of type %0 cannot be %select{used|initialized}1 "
@@ -4721,6 +4718,14 @@ ERROR(async_named_decl_must_be_available_from_async,none,
 ERROR(async_unavailable_decl,none,
       "%0 %1 is unavailable from asynchronous contexts%select{|; %3}2",
       (DescriptiveDeclKind, DeclBaseName, bool, StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: String Processing
+//------------------------------------------------------------------------------
+
+ERROR(string_processing_lib_missing,none,
+      "missing '%0' declaration, probably because the '_StringProcessing' "
+      "module was not imported properly", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types
