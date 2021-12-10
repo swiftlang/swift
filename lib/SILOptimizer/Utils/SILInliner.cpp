@@ -659,41 +659,18 @@ void SILInlineCloner::visitBuiltinInst(BuiltinInst *Inst) {
       if (*kind == BuiltinValueKind::Move) {
         auto otherResultAddr = getOpValue(Inst->getOperand(0));
         auto otherSrcAddr = getOpValue(Inst->getOperand(1));
-        auto otherType = otherSrcAddr->getType();
         auto opLoc = getOpLocation(Inst->getLoc());
 
-        // If our otherType is loadable, convert it to move_value.
         getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
 
-        if (!otherType.isLoadable(*Inst->getFunction())) {
-          // If otherType is not loadable, convert the builtin to a
-          // mark_unresolved_move_addr. This builtin is a +1, but
-          // mark_unresolved_move_addr simulates a +0, so we put in our own
-          // destroy_addr.
-          getBuilder().createMarkUnresolvedMoveAddr(opLoc, otherSrcAddr,
-                                                    otherResultAddr);
-          getBuilder().createDestroyAddr(opLoc, otherSrcAddr);
-          auto *tup = getBuilder().createTuple(opLoc, {});
-          return recordFoldedValue(Inst, tup);
-        }
-
-        assert(otherType.isAddress());
-
-        // We stash otherValue in originalOtherValue in case we need to
-        // perform a writeback.
-        SILValue otherValue = getBuilder().emitLoadValueOperation(
-            opLoc, otherSrcAddr, LoadOwnershipQualifier::Take);
-
-        // Create a move_value and set that we want it to be used for diagnostic
-        // emission.
-        auto *mvi = getBuilder().createMoveValue(opLoc, otherValue);
-        mvi->setAllowsDiagnostics(true);
-        getBuilder().emitStoreValueOperation(opLoc, mvi, otherResultAddr,
-                                             StoreOwnershipQualifier::Init);
-
-        // We know that Inst returns a tuple value that isn't used by anything
-        // else, so this /should/ be safe.
-        return recordClonedInstruction(Inst, mvi);
+        // Convert the builtin to a mark_unresolved_move_addr. This builtin is a
+        // +1, but mark_unresolved_move_addr simulates a +0, so we put in our
+        // own destroy_addr.
+        getBuilder().createMarkUnresolvedMoveAddr(opLoc, otherSrcAddr,
+                                                  otherResultAddr);
+        getBuilder().createDestroyAddr(opLoc, otherSrcAddr);
+        auto *tup = getBuilder().createTuple(opLoc, {});
+        return recordFoldedValue(Inst, tup);
       }
 
       if (*kind == BuiltinValueKind::Copy) {

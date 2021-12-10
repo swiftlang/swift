@@ -2664,18 +2664,7 @@ public:
   sourcekitd_response_t createResponse();
 
   bool needsSemanticInfo() override {
-    if (Opts.SyntacticOnly) {
-      return false;
-    } else if (isSemanticEditorDisabled()) {
-      return false;
-    } else if (!documentStructureEnabled() &&
-               !syntaxMapEnabled() &&
-               !diagnosticsEnabled() &&
-               !syntaxTreeEnabled()) {
-      return false;
-    } else {
-      return true;
-    }
+    return !Opts.SyntacticOnly && !isSemanticEditorDisabled();
   }
 
   void handleRequestError(const char *Description) override;

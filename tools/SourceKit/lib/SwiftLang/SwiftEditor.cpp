@@ -245,14 +245,18 @@ SwiftEditorDocumentFileMap::getByUnresolvedName(StringRef FilePath) {
 }
 
 SwiftEditorDocumentRef
-SwiftEditorDocumentFileMap::findByPath(StringRef FilePath) {
+SwiftEditorDocumentFileMap::findByPath(StringRef FilePath, bool IsRealpath) {
   SwiftEditorDocumentRef EditorDoc;
 
-  std::string ResolvedPath = SwiftLangSupport::resolvePathSymlinks(FilePath);
+  std::string Scratch;
+  if (!IsRealpath) {
+    Scratch = SwiftLangSupport::resolvePathSymlinks(FilePath);
+    FilePath = Scratch;
+  }
   Queue.dispatchSync([&]{
     for (auto &Entry : Docs) {
       if (Entry.getKey() == FilePath ||
-          Entry.getValue().ResolvedPath == ResolvedPath) {
+          Entry.getValue().ResolvedPath == FilePath) {
         EditorDoc = Entry.getValue().DocRef;
         break;
       }
