@@ -36,6 +36,7 @@ class InferredGenericSignatureRequestRQM;
 class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
+class RequirementSignatureRequestRQM;
 class Type;
 class UnifiedStatsReporter;
 
@@ -47,6 +48,7 @@ class RewriteContext;
 class RequirementMachine final {
   friend class swift::ASTContext;
   friend class swift::rewriting::RewriteContext;
+  friend class swift::RequirementSignatureRequestRQM;
   friend class swift::AbstractGenericSignatureRequestRQM;
   friend class swift::InferredGenericSignatureRequestRQM;
 

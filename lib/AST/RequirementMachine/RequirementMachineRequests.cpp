@@ -241,8 +241,15 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
 
   // We build requirement signatures for all protocols in a strongly connected
   // component at the same time.
-  auto *machine = ctx.getRewriteContext().getRequirementMachine(proto);
-  auto requirements = machine->computeMinimalProtocolRequirements();
+  auto component = ctx.getRewriteContext().getProtocolComponent(proto);
+
+  // Heap-allocate the requirement machine to save stack space.
+  std::unique_ptr<RequirementMachine> machine(new RequirementMachine(
+      ctx.getRewriteContext()));
+
+  machine->initWithProtocols(component);
+
+  auto minimalRequirements = machine->computeMinimalProtocolRequirements();
 
   bool debug = machine->getDebugOptions().contains(DebugFlags::Minimization);
 
@@ -250,7 +257,7 @@ RequirementSignatureRequestRQM::evaluate(Evaluator &evaluator,
   // was kicked off with.
   ArrayRef<Requirement> result;
 
-  for (const auto &pair : requirements) {
+  for (const auto &pair : minimalRequirements) {
     auto *otherProto = pair.first;
     const auto &reqs = pair.second;
 
