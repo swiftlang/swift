@@ -1833,6 +1833,12 @@ private:
     visitExistentialType(PCT, optionalKind, /*isMetatype=*/false);
   }
 
+  void visitExistentialType(ExistentialType *ET,
+                            Optional<OptionalTypeKind> optionalKind) {
+    visitExistentialType(ET, optionalKind,
+        /*isMetatype=*/ET->getConstraintType()->is<AnyMetatypeType>());
+  }
+
   void visitExistentialMetatypeType(ExistentialMetatypeType *MT,
                                     Optional<OptionalTypeKind> optionalKind) {
     Type instanceTy = MT->getInstanceType();

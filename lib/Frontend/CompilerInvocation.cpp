@@ -438,6 +438,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalNamedOpaqueTypes |=
       Args.hasArg(OPT_enable_experimental_named_opaque_types);
 
+  Opts.EnableExplicitExistentialTypes |=
+      Args.hasArg(OPT_enable_explicit_existential_types);
+
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);
 

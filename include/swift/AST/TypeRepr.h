@@ -1158,6 +1158,35 @@ private:
   friend class TypeRepr;
 };
 
+/// A TypeRepr for an existential type spelled with \c any
+///
+/// Can appear anywhere a normal existential type would. This is
+/// purely a more explicit spelling for existential types.
+class ExistentialTypeRepr: public TypeRepr {
+  TypeRepr *Constraint;
+  SourceLoc AnyLoc;
+
+public:
+  ExistentialTypeRepr(SourceLoc anyLoc, TypeRepr *constraint)
+    : TypeRepr(TypeReprKind::Existential), Constraint(constraint),
+      AnyLoc(anyLoc) {}
+
+  TypeRepr *getConstraint() const { return Constraint; }
+  SourceLoc getAnyLoc() const { return AnyLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Existential;
+  }
+  static bool classof(const ExistentialTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return AnyLoc; }
+  SourceLoc getEndLocImpl() const { return Constraint->getEndLoc(); }
+  SourceLoc getLocImpl() const { return AnyLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// TypeRepr for a user-specified placeholder (essentially, a user-facing
 /// representation of an anonymous type variable.
 ///
@@ -1285,6 +1314,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Composition:
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
+  case TypeReprKind::Existential:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:

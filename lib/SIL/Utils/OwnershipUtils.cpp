@@ -627,7 +627,7 @@ void BorrowedValue::computeLiveness(PrunedLiveness &liveness) const {
 }
 
 bool BorrowedValue::areUsesWithinLocalScope(
-    ArrayRef<Operand *> uses, DeadEndBlocks &deadEndBlocks) const {
+    ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
   // First make sure that we actually have a local scope. If we have a non-local
   // scope, then we have something (like a SILFunctionArgument) where a larger
   // semantic construct (in the case of SILFunctionArgument, the function
@@ -906,14 +906,14 @@ bool AddressOwnership::areUsesWithinLifetime(
   SILValue root = base.getOwnershipReferenceRoot();
   BorrowedValue borrow(root);
   if (borrow)
-    return borrow.areUsesWithinLocalScope(uses, deadEndBlocks);
+    return borrow.areUsesWithinLocalScope(uses, &deadEndBlocks);
 
   // --- A reference no borrow scope. Currently happens for project_box.
 
   // Compute the reference value's liveness.
   PrunedLiveness liveness;
   liveness.computeSSALiveness(root);
-  return liveness.areUsesWithinBoundary(uses, deadEndBlocks);
+  return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
 }
 
 //===----------------------------------------------------------------------===//
