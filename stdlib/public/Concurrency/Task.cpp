@@ -432,7 +432,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     size_t rawTaskCreateFlags,
     TaskOptionRecord *options,
     const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, void *closureContext,
+    TaskContinuationFunction *function, void *closureContext,
     size_t initialContextSize) {
   TaskCreateFlags taskCreateFlags(rawTaskCreateFlags);
 
@@ -745,7 +745,8 @@ AsyncTaskAndContext swift::swift_task_create(
     >(closureEntry, closureContext);
 
   return swift_task_create_common(
-      taskCreateFlags, options, futureResultType, taskEntry, closureContext,
+      taskCreateFlags, options, futureResultType,
+      reinterpret_cast<TaskContinuationFunction *>(taskEntry), closureContext,
       initialContextSize);
 }
 
