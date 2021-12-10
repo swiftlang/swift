@@ -1525,3 +1525,31 @@ bb3(%7 : @owned $FakeOptional<Builtin.NativeObject>):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// SemanticARCOptVisitor::performGuaranteedCopyValueOptimization should not optimize this case.
+
+sil [ossa] @testDeadInterleavedBorrow : $@convention(c) (@owned FakeOptional<AnyObject>) -> () {
+bb0(%opt : @owned $FakeOptional<AnyObject>):
+    %opt_borrow = begin_borrow [lexical] %opt : $FakeOptional<AnyObject>
+    %opt_borrow_copy = copy_value %opt_borrow : $FakeOptional<AnyObject>
+    switch_enum %opt_borrow_copy : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: some, case #FakeOptional.none!enumelt: none
+
+some(%obj : @owned $AnyObject):
+    %_borrow = begin_borrow [lexical] %obj : $AnyObject
+    end_borrow %opt_borrow : $FakeOptional<AnyObject>
+    end_borrow %_borrow : $AnyObject
+    destroy_value %obj : $AnyObject
+    br die
+
+die:
+    unreachable
+
+none:
+    end_borrow %opt_borrow : $FakeOptional<AnyObject>
+    br exit
+
+exit:
+    destroy_value %opt : $FakeOptional<AnyObject>
+    %res = tuple ()
+    return %res : $()
+}

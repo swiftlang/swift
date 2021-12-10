@@ -334,8 +334,9 @@ public:
   /// client already knows that inst occurs after the start of liveness.
   bool isWithinBoundary(SILInstruction *inst) const;
 
+  /// \p deadEndBlocks is optional.
   bool areUsesWithinBoundary(ArrayRef<Operand *> uses,
-                             DeadEndBlocks &deadEndBlocks) const;
+                             DeadEndBlocks *deadEndBlocks) const;
 
   /// Compute liveness for a single SSA definition.
   void computeSSALiveness(SILValue def);
