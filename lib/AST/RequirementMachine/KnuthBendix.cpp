@@ -528,11 +528,6 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       auto to = lhs.getLHS().end();
       while (from < to) {
         Trie.findAll(from, to, [&](unsigned j) {
-          // We don't have to consider the same pair of rules more than once,
-          // since those critical pairs were already resolved.
-          if (!CheckedOverlaps.insert(std::make_pair(i, j)).second)
-            return;
-
           const auto &rhs = getRule(j);
           if (rhs.isSimplified())
             return;
@@ -553,6 +548,11 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
             if (rhs.getLHS().size() > lhs.getLHS().size())
               return;
           }
+
+          // We don't have to consider the same pair of rules more than once,
+          // since those critical pairs were already resolved.
+          if (!CheckedOverlaps.insert(std::make_pair(i, j)).second)
+            return;
 
           // Try to repair the confluence violation by adding a new rule.
           if (computeCriticalPair(from, lhs, rhs,

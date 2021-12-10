@@ -1,5 +1,11 @@
 // RUN: %target-typecheck-verify-swift -requirement-machine-protocol-signatures=on -requirement-machine-inferred-signatures=on
 
+protocol ABA // expected-error {{cannot build rewrite system for protocol; depth limit exceeded}}
+    where A.B == A.B.A { // expected-error *{{is not a member type}}
+  associatedtype A : ABA
+  associatedtype B : ABA
+}
+
 protocol Undecidable // expected-error {{cannot build rewrite system for protocol; depth limit exceeded}}
     where A.C == C.A, // expected-error *{{is not a member type}}
           A.D == D.A, // expected-error *{{is not a member type}}
