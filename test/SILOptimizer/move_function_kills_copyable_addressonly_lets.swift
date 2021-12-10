@@ -277,3 +277,10 @@ public func performMoveOnOneEltOfTPair2<T>(_ p: __owned TPair<T>) {
     let _ = _move(p.x) // expected-error {{_move applied to value that the compiler does not support checking}}
     nonConsumingUse(p.y)
 }
+
+public func multipleVarsWithSubsequentBorrows<T : Equatable>(_ p: T) -> Bool {
+    let k = p
+    let k2 = k
+    let k3 = _move(k)
+    return k2 == k3
+}
