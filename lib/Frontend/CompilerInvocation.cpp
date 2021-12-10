@@ -262,9 +262,6 @@ void CompilerInvocation::setSDKPath(const std::string &Path) {
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
-// This assumes the param args contains valid strings for module
-// aliasing. The full validation of input for aliasing is done at
-// ArgsToFrontendOptionsConverter::computeModulealiases.
 void CompilerInvocation::setModuleAliasMap(std::vector<std::string> args) {
   // ModuleAliasMap should initially be empty as setting
   // it should be called only once

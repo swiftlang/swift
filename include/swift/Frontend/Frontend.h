@@ -309,6 +309,9 @@ public:
     return FrontendOpts.ModuleName;
   }
 
+  /// Sets module alias map with string args passed in via `-module-alias`. This assumes
+  /// the args are valid strings; full validation of input args for module aliasing is done at
+  /// \c ArgsToFrontendOptionsConverter::computeModulealiases.
   void setModuleAliasMap(std::vector<std::string> args);
 
   std::string getOutputFilename() const {
