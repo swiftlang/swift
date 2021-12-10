@@ -620,9 +620,6 @@ public:
   ConcreteDeclRef getBuiltinInitDecl(NominalTypeDecl *decl,
                                      KnownProtocolKind builtinProtocol,
                 llvm::function_ref<DeclName (ASTContext &ctx)> initName) const;
-
-  /// Retrieve _StringProcessing.Regex.init(_regexString: String).
-  ConcreteDeclRef getRegexInitDecl(Type regexType) const;
   
   /// Retrieve the declaration of Swift.<(Int, Int) -> Bool.
   FuncDecl *getLessThanIntDecl() const;

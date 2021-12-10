@@ -1909,10 +1909,7 @@ public:
   }
   void visitRegexLiteralExpr(RegexLiteralExpr *E) {
     printCommon(E, "regex_literal_expr");
-    PrintWithColorRAII(OS, LiteralValueColor)
-        << " text=" << QuotedString(E->getRegexText())
-        << " initializer=";
-    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    printRec(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 

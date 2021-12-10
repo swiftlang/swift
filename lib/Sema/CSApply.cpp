@@ -2792,10 +2792,7 @@ namespace {
     }
 
     Expr *visitRegexLiteralExpr(RegexLiteralExpr *expr) {
-      simplifyExprType(expr);
-      expr->setInitializer(
-          cs.getASTContext().getRegexInitDecl(cs.getType(expr)));
-      return expr;
+      return simplifyExprType(expr);
     }
 
     Expr *visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {

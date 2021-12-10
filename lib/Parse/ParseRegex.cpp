@@ -54,6 +54,30 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
     diagnose(Tok, diag::regex_literal_parsing_error, errorStr);
 
   auto loc = consumeToken();
+
+  // Create an implicit .init(_regexString: "<regex text>") call to serve as the
+  // semantic expression for the regex. The type-checker will provide it with
+  // the correct contextual type. We delay the contextual type for a couple of
+  // reasons:
+  // 1. We need to delay type lookup until after parsing.
+  // 2. Even if the AST synthesis were done lazily in e.g a request, we don't
+  //    currently have great support for implicit TypeExprs for unopened generic
+  //    types, as we want to phase out the use of UnboundGenericType. The Regex
+  //    type isn't currently generic, but might be in the future.
+  auto *regexStringExpr =
+      new (Context) StringLiteralExpr(Context.AllocateCopy(regexText), loc);
+  regexStringExpr->setImplicit();
+
+  DeclName initName(Context, DeclBaseName::createConstructor(),
+                    {Context.Id__regexString});
+  DeclNameRef initNameRef(initName);
+  auto *dotInit = new (Context) UnresolvedMemberExpr(
+      /*dotLoc*/ loc, DeclNameLoc(loc), initNameRef, /*implicit*/ true);
+
+  auto *args =
+      ArgumentList::forImplicitCallTo(initNameRef, {regexStringExpr}, Context);
+  auto *call = CallExpr::createImplicit(Context, dotInit, args);
+
   return makeParserResult(
-      RegexLiteralExpr::createParsed(Context, loc, regexText));
+      RegexLiteralExpr::createParsed(Context, loc, regexText, call));
 }

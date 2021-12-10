@@ -966,17 +966,25 @@ public:
 class RegexLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
   StringRef RegexText;
+  Expr *SemanticExpr;
 
-  RegexLiteralExpr(SourceLoc loc, StringRef regexText, bool isImplicit)
+  RegexLiteralExpr(SourceLoc loc, StringRef regexText, Expr *semanticExpr,
+                   bool isImplicit)
       : LiteralExpr(ExprKind::RegexLiteral, isImplicit), Loc(loc),
-        RegexText(regexText) {}
+        RegexText(regexText), SemanticExpr(semanticExpr) {}
 
 public:
   static RegexLiteralExpr *createParsed(ASTContext &ctx, SourceLoc loc,
-                                        StringRef regexText);
+                                        StringRef regexText,
+                                        Expr *semanticExpr);
 
   /// Retrieve the raw regex text.
   StringRef getRegexText() const { return RegexText; }
+
+  /// Retrieve the semantic expression that the regex will be type-checked and
+  /// emitted as.
+  Expr *getSemanticExpr() const { return SemanticExpr; }
+  void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
 
   SourceRange getSourceRange() const { return Loc; }
 

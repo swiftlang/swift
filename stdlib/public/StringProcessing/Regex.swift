@@ -1,10 +1,8 @@
 import Swift
 import _MatchingEngine
 
-@frozen
-public struct Regex<Match> {
-  @usableFromInline
-  init(_regexString: String) {}
+public struct DummyRegex<Match> {
+  public init() {
+    fatalError("Unimplemented")
+  }
 }
-
-public enum DynamicCaptures {}

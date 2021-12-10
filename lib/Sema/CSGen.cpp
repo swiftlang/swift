@@ -1163,6 +1163,35 @@ namespace {
       return tv;
     }
 
+    Type visitRegexLiteralExpr(RegexLiteralExpr *expr) {
+      auto &ctx = CS.getASTContext();
+      auto exprLoc = expr->getLoc();
+
+      // TODO: This should eventually be a known stdlib decl.
+      auto regexLookup = TypeChecker::lookupUnqualified(
+          CurDC, DeclNameRef(ctx.Id_Regex), exprLoc);
+      if (regexLookup.size() != 1) {
+        ctx.Diags.diagnose(exprLoc, diag::regex_decl_broken);
+        return Type();
+      }
+      auto result = regexLookup.allResults()[0];
+      auto *regexDecl = dyn_cast<NominalTypeDecl>(result.getValueDecl());
+      if (!regexDecl || isa<ProtocolDecl>(regexDecl)) {
+        ctx.Diags.diagnose(exprLoc, diag::regex_decl_broken);
+        return Type();
+      }
+
+      auto *loc = CS.getConstraintLocator(expr);
+      auto regexTy = CS.replaceInferableTypesWithTypeVars(
+          regexDecl->getDeclaredType(), loc);
+
+      // The semantic expr should be of regex type.
+      auto semanticExprTy = CS.getType(expr->getSemanticExpr());
+      CS.addConstraint(ConstraintKind::Bind, regexTy, semanticExprTy, loc);
+
+      return regexTy;
+    }
+
     Type visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
       switch (expr->getKind()) {
       // Magic pointer identifiers are of type UnsafeMutableRawPointer.
@@ -1255,29 +1284,6 @@ namespace {
         return OptionalType::get(witnessType);
 
       return witnessType;
-    }
-
-    Type visitRegexLiteralExpr(RegexLiteralExpr *E) {
-      auto &ctx = CS.getASTContext();
-      auto *regexDecl = ctx.getRegexDecl();
-      if (!regexDecl) {
-        ctx.Diags.diagnose(E->getLoc(),
-                           diag::string_processing_lib_missing,
-                           ctx.Id_Regex.str());
-        return Type();
-      }
-      auto substringType = ctx.getSubstringType();
-      auto dynCapturesType = ctx.getDynamicCapturesType();
-      if (!dynCapturesType) {
-        ctx.Diags.diagnose(E->getLoc(),
-                           diag::string_processing_lib_missing,
-                           "DynamicCaptures");
-        return Type();
-      }
-      // TODO: Replace `(Substring, DynamicCaptures)` with type inferred from
-      // the regex.
-      auto matchType = TupleType::get({substringType, dynCapturesType}, ctx);
-      return BoundGenericStructType::get(regexDecl, Type(), {matchType});
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {

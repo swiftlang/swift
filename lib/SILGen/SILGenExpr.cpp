@@ -2528,7 +2528,7 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 }
 
 RValue RValueEmitter::visitRegexLiteralExpr(RegexLiteralExpr *E, SGFContext C) {
-  return SGF.emitLiteral(E, C);
+  return SGF.emitRValue(E->getSemanticExpr());
 }
 
 RValue RValueEmitter::
