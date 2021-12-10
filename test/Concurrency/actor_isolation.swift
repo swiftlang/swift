@@ -639,6 +639,27 @@ func checkLocalFunctions() async {
   print(k)
 }
 
+@available(SwiftStdlib 5.1, *)
+actor LocalFunctionIsolatedActor {
+  func a() -> Bool { // expected-note{{calls to instance method 'a()' from outside of its actor context are implicitly asynchronous}}
+    return true
+  }
+
+  func b() -> Bool {
+    func c() -> Bool {
+      return true && a() // okay, c is isolated
+    }
+    return c()
+  }
+
+  func b2() -> Bool {
+    @Sendable func c() -> Bool {
+      return true && a() // expected-error{{actor-isolated instance method 'a()' can not be referenced from a non-isolated context}}
+    }
+    return c()
+  }
+}
+
 // ----------------------------------------------------------------------
 // Lazy properties with initializers referencing 'self'
 // ----------------------------------------------------------------------

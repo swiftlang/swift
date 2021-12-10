@@ -2640,7 +2640,7 @@ namespace {
       if (isSendableClosure(closure, /*forActorIsolation=*/true))
         return ClosureActorIsolation::forIndependent();
 
-      // A non-escaping closure gets its isolation from its context.
+      // A non-Sendable closure gets its isolation from its context.
       auto parentIsolation = getActorIsolationOfContext(closure->getParent());
 
       // We must have parent isolation determined to get here.
@@ -2658,25 +2658,9 @@ namespace {
 
       case ActorIsolation::ActorInstance:
       case ActorIsolation::DistributedActorInstance: {
-        SmallVector<CapturedValue, 2> localCaptures;
-        closure->getCaptureInfo().getLocalCaptures(localCaptures);
-        for (const auto &localCapture : localCaptures) {
-          if (localCapture.isDynamicSelfMetadata())
-            continue;
+        if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
+          return ClosureActorIsolation::forActorInstance(param);
 
-          auto param = dyn_cast_or_null<ParamDecl>(localCapture.getDecl());
-          if (!param)
-            continue;
-
-          // If we have captured an isolated parameter, the closure is isolated
-          // to that actor instance.
-          if (param->isIsolated()) {
-            return ClosureActorIsolation::forActorInstance(param);
-          }
-        }
-
-        // When no actor instance  is not captured, this closure is
-        // actor-independent.
         return ClosureActorIsolation::forIndependent();
       }
     }
@@ -3328,17 +3312,21 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return inferred;
   };
 
-  // If this is a "defer" function body, inherit the global actor isolation
-  // from its context.
+  // If this is a local function, inherit the actor isolation from its
+  // context if it global or was captured.
   if (auto func = dyn_cast<FuncDecl>(value)) {
-    if (func->isDeferBody()) {
+    if (func->isLocalCapture() && !func->isSendable()) {
       switch (auto enclosingIsolation =
                   getActorIsolationOfContext(func->getDeclContext())) {
-      case ActorIsolation::ActorInstance:
-      case ActorIsolation::DistributedActorInstance:
       case ActorIsolation::Independent:
       case ActorIsolation::Unspecified:
         // Do nothing.
+        break;
+
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::DistributedActorInstance:
+        if (auto param = func->getCaptureInfo().getIsolatedParamCapture())
+          return inferredIsolation(enclosingIsolation);
         break;
 
       case ActorIsolation::GlobalActor:
