@@ -590,7 +590,8 @@ Type ASTBuilder::createProtocolCompositionType(
   if (superclass && superclass->getClassOrBoundGenericClass())
     members.push_back(superclass);
   Type composition = ProtocolCompositionType::get(Ctx, members, isClassBound);
-  if (Ctx.LangOpts.EnableExplicitExistentialTypes) {
+  if (Ctx.LangOpts.EnableExplicitExistentialTypes &&
+      !(composition->isAny() || composition->isAnyObject())) {
     composition = ExistentialType::get(composition);
   }
   return composition;
