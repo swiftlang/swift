@@ -1185,7 +1185,9 @@ ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
     std::vector<ImmutableTextSnapshotRef> Snapshots;
     Snapshots.reserve(BuildOp->getFileContents().size());
     for (auto &FileContent : BuildOp->getFileContents()) {
-      Snapshots.push_back(FileContent.Snapshot);
+      if (FileContent.Snapshot) {
+        Snapshots.push_back(FileContent.Snapshot);
+      }
     }
     if (BuildOp->matchesSourceState(FileSystem)) {
       ++Mgr->Impl.Stats->numASTCacheHits;
