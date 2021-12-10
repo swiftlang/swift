@@ -14,8 +14,8 @@
 // RUN: %FileCheck %s -check-prefix CHECK1 < %t/result1.txt
 
 // CHECK1-NOT: AppleLogging
-// CHECK1: found code completion token MODULE_NAME at offset 43
-// CHECK1: Begin completions, 335 items
+// CHECK1: found code completion token MODULE_NAME
+// CHECK1: Begin completions
 // CHECK1: Decl[Module]/None:                  XLogging[#Module#]; name=XLogging
 // CHECK1: Decl[Protocol]/OtherModule[XLogging]: Logging[#Logging#]; name=Logging
 // CHECK1: Decl[Struct]/OtherModule[XLogging]: Logger[#Logger#]; name=Logger
@@ -26,8 +26,8 @@
 // RUN: %FileCheck %s -check-prefix CHECK2 < %t/result2.txt
 
 // CHECK2-NOT: AppleLogging
-// CHECK2: found code completion token MODULE_NAME at offset 48
-// CHECK2: Begin completions, 335 items
+// CHECK2: found code completion token MODULE_NAME
+// CHECK2: Begin completions
 // CHECK2: Decl[Module]/None:                  XLogging[#Module#]; name=XLogging
 // CHECK2: Decl[Protocol]/OtherModule[XLogging]: Logging[#Logging#]; name=Logging
 // CHECK2: Decl[Struct]/OtherModule[XLogging]: Logger[#Logger#]; name=Logger
@@ -38,8 +38,8 @@
 // RUN: %FileCheck %s -check-prefix CHECK3 < %t/result3.txt
 
 // CHECK3-NOT: AppleLogging
-// CHECK3: found code completion token MODULE_NAME at offset 49
-// CHECK3: Begin completions, 516 items
+// CHECK3: found code completion token MODULE_NAME
+// CHECK3: Begin completions
 // CHECK3: Decl[Module]/None:                  XLogging[#Module#]; name=XLogging
 // CHECK3: Decl[Protocol]/OtherModule[XLogging]/Flair[RareType]: Logging[#Logging#]; name=Logging
 // CHECK3: Decl[Struct]/OtherModule[XLogging]: Logger[#Logger#]; name=Logger
@@ -51,8 +51,8 @@
 // RUN: %FileCheck %s -check-prefix CHECK4 < %t/result4.txt
 
 // CHECK4-NOT: AppleLogging
-// CHECK4: found code completion token MODULE_NAME at offset 58
-// CHECK4: Begin completions, 3 items
+// CHECK4: found code completion token MODULE_NAME
+// CHECK4: Begin completions
 // CHECK4: Decl[Protocol]/OtherModule[XLogging]/Flair[RareType]: Logging[#Logging#]; name=Logging
 // CHECK4: Decl[Struct]/OtherModule[XLogging]: Logger[#Logger#]; name=Logger
 // CHECK4: Decl[FreeFunction]/OtherModule[XLogging]: setupLogger()[#Logger?#]; name=setupLogger()
@@ -66,8 +66,8 @@
 /// In search paths, only AppleLogging.swiftmodule exists, but when `-module-alias XLogging=AppleLogging` is passed,
 /// we want to only show XLogging as an option to import, not AppleLogging
 // CHECK5-NOT: AppleLogging
-// CHECK5: found code completion token MODULE_NAME at offset 7
-// CHECK5: Begin completions, 233 items
+// CHECK5: found code completion token MODULE_NAME
+// CHECK5: Begin completions
 // CHECK5: Decl[Module]/None:                  XLogging[#Module#]; name=XLogging
 // CHECK5: End completions
 
@@ -78,8 +78,8 @@
 /// In search paths, only AppleLogging.swiftmodule exists, and no module aliasing option is passed, so
 /// just show AppleLogging as one of the modules that can be imported
 // CHECK6-NOT: XLogging
-// CHECK6: found code completion token MODULE_NAME at offset 7
-// CHECK6: Begin completions, 233 items
+// CHECK6: found code completion token MODULE_NAME
+// CHECK6: Begin completions
 // CHECK6: Decl[Module]/None:                  AppleLogging[#Module#]; name=AppleLogging
 // CHECK6: End completions
 
