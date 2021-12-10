@@ -3095,7 +3095,7 @@ public:
 /// the Sendable protocol.
 class GetImplicitSendableRequest :
     public SimpleRequest<GetImplicitSendableRequest,
-                         NormalProtocolConformance *(NominalTypeDecl *),
+                         ProtocolConformance *(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3103,7 +3103,7 @@ public:
 private:
   friend SimpleRequest;
 
-  NormalProtocolConformance *evaluate(
+  ProtocolConformance *evaluate(
       Evaluator &evaluator, NominalTypeDecl *nominal) const;
 
 public:

@@ -354,7 +354,7 @@ SWIFT_REQUEST(TypeChecker, SimpleDidSetRequest,
 SWIFT_REQUEST(TypeChecker, SynthesizeMainFunctionRequest,
               FuncDecl *(Decl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GetImplicitSendableRequest,
-              NormalProtocolConformance *(NominalTypeDecl *),
+              ProtocolConformance *(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               ValueDecl *(const ValueDecl *),
