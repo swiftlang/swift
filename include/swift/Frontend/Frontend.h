@@ -309,6 +309,16 @@ public:
     return FrontendOpts.ModuleName;
   }
 
+  /// Sets the module alias map with string args passed in via `-module-alias`.
+  /// \param args The arguments to `-module-alias`. If input has `-module-alias Foo=Bar
+  ///             -module-alias Baz=Qux`, the args are ['Foo=Bar', 'Baz=Qux'].  The name
+  ///             Foo is the name that appears in source files, while it maps to Bar, the name
+  ///             of the binary on disk, /path/to/Bar.swiftmodule(interface), under the hood.
+  /// \param diags Used to print diagnostics in case validation of the string args fails.
+  ///        See \c ModuleAliasesConverter::computeModuleAliases on validation details.
+  /// \return Whether setting module alias map succeeded; false if args validation fails.
+  bool setModuleAliasMap(std::vector<std::string> args, DiagnosticEngine &diags);
+
   std::string getOutputFilename() const {
     return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
