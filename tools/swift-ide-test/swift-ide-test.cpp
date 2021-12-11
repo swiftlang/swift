@@ -4238,7 +4238,11 @@ int main(int argc, char *argv[]) {
   }
 
   if (!options::ModuleAliases.empty()) {
-    InitInvok.setModuleAliasMap(options::ModuleAliases);
+    PrintingDiagnosticConsumer PDC;
+    SourceManager SM;
+    DiagnosticEngine Diags(SM);
+    Diags.addConsumer(PDC);
+    InitInvok.setModuleAliasMap(options::ModuleAliases, Diags);
   }
 
   // Process the clang arguments last and allow them to override previously

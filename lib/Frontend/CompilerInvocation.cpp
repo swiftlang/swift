@@ -262,28 +262,9 @@ void CompilerInvocation::setSDKPath(const std::string &Path) {
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
-void CompilerInvocation::setModuleAliasMap(std::vector<std::string> args) {
-  // ModuleAliasMap should initially be empty as setting
-  // it should be called only once
-  FrontendOpts.ModuleAliasMap.clear();
-  for (auto item: args) {
-    auto str = StringRef(item);
-    // splits to an alias and the underlying name
-    auto pair = str.split('=');
-    auto lhs = pair.first;
-    auto rhs = pair.second;
-    if (rhs.empty()) // bad format, so skip to the next
-        continue;
-    if (!FrontendOpts.ModuleAliasMap.insert({rhs, StringRef()}).second) {
-      // the underlying name was already added, so skip
-      continue;
-    }
-    auto underlyingName = FrontendOpts.ModuleAliasMap.find(rhs)->first();
-    if (!FrontendOpts.ModuleAliasMap.insert({lhs, underlyingName}).second) {
-      // the alias was already added, so skip
-      continue;
-    }
-  }
+void CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
+                                           DiagnosticEngine &diags) {
+  ModuleAliasesConverter::computeModuleAliases(args, FrontendOpts, diags);
 }
 
 static bool ParseFrontendArgs(
