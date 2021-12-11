@@ -12,6 +12,7 @@ public class Klass {}
 
 func consumingUse(_ k: __owned Klass) {}
 var booleanValue: Bool { false }
+var booleanValue2: Bool { false }
 func nonConsumingUse(_ k: Klass) {}
 
 ///////////
@@ -91,6 +92,57 @@ public func performMoveOnVarMultiBlockError2(_ p: Klass) {
     nonConsumingUse(x)
 
     x = p
+    nonConsumingUse(x)
+}
+
+public func performMoveConditionalReinitalization(_ p: Klass) {
+    var x = p
+
+    if booleanValue {
+        nonConsumingUse(x)
+        let _ = _move(x)
+        x = p
+        nonConsumingUse(x)
+    } else {
+        nonConsumingUse(x)
+    }
+
+    nonConsumingUse(x)
+}
+
+public func performMoveConditionalReinitalization2(_ p: Klass) {
+    var x = p // expected-error {{'x' used after being moved}}
+
+    if booleanValue {
+        nonConsumingUse(x)
+        let _ = _move(x) // expected-note {{move here}}
+        nonConsumingUse(x) // expected-note {{use here}}
+        x = p
+        nonConsumingUse(x)
+    } else {
+        nonConsumingUse(x)
+    }
+
+    nonConsumingUse(x)
+}
+
+public func performMoveConditionalReinitalization3(_ p: Klass, _ p2: Klass, _ p3: Klass) {
+    var x = p // expected-error {{'x' used after being moved}}
+              // expected-error @-1 {{'x' used after being moved}}
+
+    if booleanValue {
+        nonConsumingUse(x)
+        let _ = _move(x)   // expected-note {{move here}}
+        nonConsumingUse(x) // expected-note {{use here}}
+        nonConsumingUse(x) // We only emit for the first one.
+        x = p2
+        nonConsumingUse(x)
+        let _ = _move(x)   // expected-note {{move here}}
+        nonConsumingUse(x) // expected-note {{use here}}
+    } else {
+        nonConsumingUse(x)
+    }
+
     nonConsumingUse(x)
 }
 
