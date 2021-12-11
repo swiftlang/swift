@@ -340,7 +340,7 @@ EnableCrossImportOverlays("enable-cross-import-overlays",
                           llvm::cl::init(false));
 static llvm::cl::list<std::string>
 ModuleAliases("module-alias",
-            llvm::cl::desc("Use '-module-alias <name>=<underlying_name>' to map a module of <name> to a different name"),
+            llvm::cl::desc("Use '-module-alias <name>=<binary_name>' to map a module of <name> that appears in source code to <binary_name>"),
             llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
