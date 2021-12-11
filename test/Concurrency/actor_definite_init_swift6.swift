@@ -445,6 +445,6 @@ actor Rain {
 
     defer { _ = self.x }
 
-    defer { Task { await self.f() } }
+    defer { Task { self.f() } }
   }
 }
