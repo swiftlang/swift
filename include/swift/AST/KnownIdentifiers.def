@@ -250,9 +250,10 @@ IDENTIFIER(pullback)
 IDENTIFIER(TangentVector)
 IDENTIFIER(zero)
 
-// Regex literals
+// String processing
 IDENTIFIER(Regex)
-IDENTIFIER(_regexString)
+IDENTIFIER_(regexString)
+IDENTIFIER_(StringProcessing)
 
 // Distributed actors
 IDENTIFIER(transport)

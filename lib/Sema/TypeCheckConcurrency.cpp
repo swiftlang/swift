@@ -2640,7 +2640,7 @@ namespace {
       if (isSendableClosure(closure, /*forActorIsolation=*/true))
         return ClosureActorIsolation::forIndependent();
 
-      // A non-escaping closure gets its isolation from its context.
+      // A non-Sendable closure gets its isolation from its context.
       auto parentIsolation = getActorIsolationOfContext(closure->getParent());
 
       // We must have parent isolation determined to get here.
@@ -2658,25 +2658,9 @@ namespace {
 
       case ActorIsolation::ActorInstance:
       case ActorIsolation::DistributedActorInstance: {
-        SmallVector<CapturedValue, 2> localCaptures;
-        closure->getCaptureInfo().getLocalCaptures(localCaptures);
-        for (const auto &localCapture : localCaptures) {
-          if (localCapture.isDynamicSelfMetadata())
-            continue;
+        if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
+          return ClosureActorIsolation::forActorInstance(param);
 
-          auto param = dyn_cast_or_null<ParamDecl>(localCapture.getDecl());
-          if (!param)
-            continue;
-
-          // If we have captured an isolated parameter, the closure is isolated
-          // to that actor instance.
-          if (param->isIsolated()) {
-            return ClosureActorIsolation::forActorInstance(param);
-          }
-        }
-
-        // When no actor instance  is not captured, this closure is
-        // actor-independent.
         return ClosureActorIsolation::forIndependent();
       }
     }
@@ -3328,17 +3312,21 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return inferred;
   };
 
-  // If this is a "defer" function body, inherit the global actor isolation
-  // from its context.
+  // If this is a local function, inherit the actor isolation from its
+  // context if it global or was captured.
   if (auto func = dyn_cast<FuncDecl>(value)) {
-    if (func->isDeferBody()) {
+    if (func->isLocalCapture() && !func->isSendable()) {
       switch (auto enclosingIsolation =
                   getActorIsolationOfContext(func->getDeclContext())) {
-      case ActorIsolation::ActorInstance:
-      case ActorIsolation::DistributedActorInstance:
       case ActorIsolation::Independent:
       case ActorIsolation::Unspecified:
         // Do nothing.
+        break;
+
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::DistributedActorInstance:
+        if (auto param = func->getCaptureInfo().getIsolatedParamCapture())
+          return inferredIsolation(enclosingIsolation);
         break;
 
       case ActorIsolation::GlobalActor:
@@ -3855,7 +3843,7 @@ bool swift::checkSendableConformance(
   return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }
 
-NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
+ProtocolConformance *GetImplicitSendableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   // Protocols never get implicit Sendable conformances.
   if (isa<ProtocolDecl>(nominal))
@@ -3900,14 +3888,14 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     return nullptr;
   }
 
+  ASTContext &ctx = nominal->getASTContext();
+  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
+  if (!proto)
+    return nullptr;
+
   // Local function to form the implicit conformance.
   auto formConformance = [&](const DeclAttribute *attrMakingUnavailable)
         -> NormalProtocolConformance * {
-    ASTContext &ctx = nominal->getASTContext();
-    auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
-    if (!proto)
-      return nullptr;
-
     DeclContext *conformanceDC = nominal;
     if (attrMakingUnavailable) {
       llvm::VersionTuple NoVersion;
@@ -3959,17 +3947,22 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
   // A non-protocol type with a global actor is implicitly Sendable.
   if (nominal->getGlobalActorAttr()) {
-    // If this is a class, check the superclass. We won't infer Sendable
-    // if the superclass is already Sendable, to avoid introducing redundant
-    // conformances.
+    // If this is a class, check the superclass. If it's already Sendable,
+    // form an inherited conformance.
     if (classDecl) {
       if (Type superclass = classDecl->getSuperclass()) {
         auto classModule = classDecl->getParentModule();
-        if (TypeChecker::conformsToKnownProtocol(
+        if (auto inheritedConformance = TypeChecker::conformsToProtocol(
                 classDecl->mapTypeIntoContext(superclass),
-                KnownProtocolKind::Sendable,
-                classModule, /*allowMissing=*/false))
-          return nullptr;
+                proto, classModule, /*allowMissing=*/false)) {
+          inheritedConformance = inheritedConformance
+              .mapConformanceOutOfContext();
+          if (inheritedConformance.isConcrete()) {
+            return ctx.getInheritedConformance(
+                nominal->getDeclaredInterfaceType(),
+                inheritedConformance.getConcrete());
+          }
+        }
       }
     }
 
@@ -4335,20 +4328,10 @@ bool swift::isPotentiallyIsolatedActor(
   if (auto param = dyn_cast<ParamDecl>(var))
     return isIsolated(param);
 
-  if (var->isSelfParamCapture()) {
-    // Find the "self" parameter that we captured and determine whether
-    // it is potentially isolated.
-    for (auto dc = var->getDeclContext(); dc; dc = dc->getParent()) {
-      if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-        if (auto selfDecl = func->getImplicitSelfDecl()) {
-          return selfDecl->isIsolated();
-        }
-      }
-
-      if (dc->isModuleScopeContext() || dc->isTypeContext())
-        break;
-    }
-  }
+  // If this is a captured 'self', check whether the original 'self' is
+  // isolated.
+  if (var->isSelfParamCapture())
+    return var->isSelfParamCaptureIsolated();
 
   return false;
 }

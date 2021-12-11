@@ -309,6 +309,16 @@ public:
     return FrontendOpts.ModuleName;
   }
 
+  /// Sets the module alias map with string args passed in via `-module-alias`.
+  /// \param args The arguments to `-module-alias`. If input has `-module-alias Foo=Bar
+  ///             -module-alias Baz=Qux`, the args are ['Foo=Bar', 'Baz=Qux'].  The name
+  ///             Foo is the name that appears in source files, while it maps to Bar, the name
+  ///             of the binary on disk, /path/to/Bar.swiftmodule(interface), under the hood.
+  /// \param diags Used to print diagnostics in case validation of the string args fails.
+  ///        See \c ModuleAliasesConverter::computeModuleAliases on validation details.
+  /// \return Whether setting module alias map succeeded; false if args validation fails.
+  bool setModuleAliasMap(std::vector<std::string> args, DiagnosticEngine &diags);
+
   std::string getOutputFilename() const {
     return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
@@ -353,6 +363,10 @@ public:
   /// Whether the Swift Concurrency support library should be implicitly
   /// imported.
   bool shouldImportSwiftConcurrency() const;
+
+  /// Whether the Swift String Processing support library should be implicitly
+  /// imported.
+  bool shouldImportSwiftStringProcessing() const;
 
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
@@ -532,6 +546,14 @@ public:
   /// Whether the Swift Concurrency support library can be imported
   /// i.e. if it can be found.
   bool canImportSwiftConcurrency() const;
+
+  /// Verify that if an implicit import of the `StringProcessing` module if
+  /// expected, it can actually be imported. Emit a warning, otherwise.
+  void verifyImplicitStringProcessingImport();
+
+  /// Whether the Swift String Processing support library can be imported
+  /// i.e. if it can be found.
+  bool canImportSwiftStringProcessing() const;
 
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;

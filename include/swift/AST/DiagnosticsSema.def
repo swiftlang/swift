@@ -2533,6 +2533,11 @@ WARNING(associated_type_override_typealias,none,
         "associated type %0 is redundant with type %0 declared in inherited "
         "%1 %2", (Identifier, DescriptiveDeclKind, Type))
 
+ERROR(requirement_machine_completion_failed,none,
+      "cannot build rewrite system for %select{generic signature|protocol}0; "
+      "%select{step|depth}1 limit exceeded",
+      (unsigned, unsigned))
+
 ERROR(associated_type_objc,none,
       "associated type %0 cannot be declared inside '@objc' protocol %1",
       (Identifier, Identifier))
@@ -3668,9 +3673,6 @@ ERROR(builtin_string_literal_broken_proto,none,
 ERROR(string_literal_broken_proto,none,
       "protocol 'ExpressibleByStringLiteral' is broken", ())
 
-ERROR(regex_decl_broken,none,
-      "cannot find 'Regex' type in scope", ())
-
 // Array literals
 ERROR(should_use_dictionary_literal,none,
       "dictionary of type %0 cannot be %select{used|initialized}1 "
@@ -4618,6 +4620,19 @@ ERROR(unchecked_not_inheritance_clause,none,
 ERROR(unchecked_not_existential,none,
       "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
+WARNING(unnecessary_any,none,
+         "'any' is redundant on type %0", (Type))
+ERROR(any_not_existential,none,
+       "'any' has no effect on %select{concrete type|type parameter}0 %1",
+       (bool, Type))
+ERROR(existential_requires_any,none,
+      "protocol %0 as a type must be explicitly marked as 'any'",
+      (Identifier))
+ERROR(explicit_existential_not_supported,none,
+       "explicit 'any' not supported; use frontend flag "
+       "-enable-explicit-existential-types to enable this feature",
+       ())
+
 ERROR(nonisolated_let,none,
       "'nonisolated' is meaningless on 'let' declarations because "
       "they are immutable",
@@ -4721,6 +4736,14 @@ ERROR(async_named_decl_must_be_available_from_async,none,
 ERROR(async_unavailable_decl,none,
       "%0 %1 is unavailable from asynchronous contexts%select{|; %3}2",
       (DescriptiveDeclKind, DeclBaseName, bool, StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: String Processing
+//------------------------------------------------------------------------------
+
+ERROR(string_processing_lib_missing,none,
+      "missing '%0' declaration, probably because the '_StringProcessing' "
+      "module was not imported properly", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types

@@ -553,7 +553,7 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
 
 /// Implement Tarjan's algorithm to compute strongly-connected components in
 /// the protocol dependency graph.
-void RewriteContext::getRequirementMachineRec(
+void RewriteContext::getProtocolComponentRec(
     const ProtocolDecl *proto,
     SmallVectorImpl<const ProtocolDecl *> &stack) {
   assert(Protos.count(proto) == 0);
@@ -575,7 +575,7 @@ void RewriteContext::getRequirementMachineRec(
     auto found = Protos.find(depProto);
     if (found == Protos.end()) {
       // Successor has not yet been visited. Recurse.
-      getRequirementMachineRec(depProto, stack);
+      getProtocolComponentRec(depProto, stack);
 
       auto &entry = Protos[proto];
       assert(Protos.count(depProto) != 0);
@@ -620,18 +620,18 @@ void RewriteContext::getRequirementMachineRec(
       llvm::dbgs() << "]\n";
     }
 
-    Components[id] = {Context.AllocateCopy(protos), nullptr};
+    Components[id].Protos = Context.AllocateCopy(protos);
   }
 }
 
 /// Lazily construct a requirement machine for the given protocol's strongly
 /// connected component (SCC) in the protocol dependency graph.
-RequirementMachine *RewriteContext::getRequirementMachine(
+ArrayRef<const ProtocolDecl *> RewriteContext::getProtocolComponent(
     const ProtocolDecl *proto) {
   auto found = Protos.find(proto);
   if (found == Protos.end()) {
     SmallVector<const ProtocolDecl *, 3> stack;
-    getRequirementMachineRec(proto, stack);
+    getProtocolComponentRec(proto, stack);
     assert(stack.empty());
 
     found = Protos.find(proto);
@@ -641,36 +641,23 @@ RequirementMachine *RewriteContext::getRequirementMachine(
   assert(Components.count(found->second.ComponentID) != 0);
   auto &component = Components[found->second.ComponentID];
 
-  auto *&machine = component.Machine;
-
-  if (machine) {
-    // If this component has a machine already, make sure it is ready
-    // for use.
-    if (!machine->isComplete()) {
-      llvm::errs() << "Re-entrant construction of requirement "
-                   << "machine for:";
-      for (auto *proto : component.Protos)
-        llvm::errs() << " " << proto->getName();
-      llvm::errs() << "\n";
-      abort();
-    }
-
-    return machine;
+  if (component.InProgress) {
+    llvm::errs() << "Re-entrant construction of requirement "
+                 << "machine for:";
+    for (auto *proto : component.Protos)
+      llvm::errs() << " " << proto->getName();
+    llvm::errs() << "\n";
+    abort();
   }
 
-  // Construct a requirement machine from the structural requirements of
-  // the given set of protocols.
-  auto *newMachine = new RequirementMachine(*this);
-  machine = newMachine;
-
-  // This might re-entrantly invalidate 'machine', which is a reference
-  // into Protos.
-  newMachine->initWithProtocols(component.Protos);
-  return newMachine;
+  return component.Protos;
 }
 
 bool RewriteContext::isRecursivelyConstructingRequirementMachine(
     const ProtocolDecl *proto) {
+  if (proto->isRequirementSignatureComputed())
+    return false;
+
   auto found = Protos.find(proto);
   if (found == Protos.end())
     return false;
@@ -679,11 +666,7 @@ bool RewriteContext::isRecursivelyConstructingRequirementMachine(
   if (component == Components.end())
     return false;
 
-  if (!component->second.Machine ||
-      component->second.Machine->isComplete())
-    return false;
-
-  return true;
+  return component->second.InProgress;
 }
 
 /// We print stats in the destructor, which should get executed at the end of
@@ -693,11 +676,6 @@ RewriteContext::~RewriteContext() {
     delete pair.second;
 
   Machines.clear();
-
-  for (const auto &pair : Components)
-    delete pair.second.Machine;
-
-  Components.clear();
 
   if (Context.LangOpts.AnalyzeRequirementMachine) {
     llvm::dbgs() << "--- Requirement Machine Statistics ---\n";

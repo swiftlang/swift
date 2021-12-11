@@ -2792,7 +2792,10 @@ namespace {
     }
 
     Expr *visitRegexLiteralExpr(RegexLiteralExpr *expr) {
-      return simplifyExprType(expr);
+      simplifyExprType(expr);
+      expr->setInitializer(
+          cs.getASTContext().getRegexInitDecl(cs.getType(expr)));
+      return expr;
     }
 
     Expr *visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
@@ -6942,6 +6945,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Struct:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
+  case TypeKind::Existential:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::GenericFunction:
@@ -6954,6 +6958,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   auto desugaredToType = toType->getDesugaredType();
   switch (desugaredToType->getKind()) {
   // Coercions from a type to an existential type.
+  case TypeKind::Existential:
   case TypeKind::ExistentialMetatype:
   case TypeKind::ProtocolComposition:
   case TypeKind::Protocol:

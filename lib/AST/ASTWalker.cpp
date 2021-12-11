@@ -1153,11 +1153,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitRegexLiteralExpr(RegexLiteralExpr *E) {
-    if (auto *newExpr = doIt(E->getSemanticExpr())) {
-      E->setSemanticExpr(newExpr);
-    } else {
-      return nullptr;
-    }
     return E;
   }
 
@@ -1861,6 +1856,10 @@ bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
 
 bool Traversal::visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T) {
   return doIt(T->getBase());
+}
+
+bool Traversal::visitExistentialTypeRepr(ExistentialTypeRepr *T) {
+  return doIt(T->getConstraint());
 }
 
 bool Traversal::visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {

@@ -873,7 +873,8 @@ ERROR(sil_function_subs_without_generics,none,
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
-      "'some' should appear at the beginning of a composition", ())
+      "'%0' should appear at the beginning of a composition",
+      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Layout constraint diagnostics

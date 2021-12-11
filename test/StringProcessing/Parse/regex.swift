@@ -1,10 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-string-processing
 // REQUIRES: libswift
 
-struct Regex {
-  init(_regexString: String) {}
-}
-
 var s = 'abc'
 
 var s1 = ('*', '+', '?')

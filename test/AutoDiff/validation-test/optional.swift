@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-lexical-lifetimes)
+// RUN: %target-run-simple-swift
 
 // REQUIRES: executable_test
 

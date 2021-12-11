@@ -1898,6 +1898,27 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
 
 static inline PreparedArguments
 buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
+                        RegexLiteralExpr *expr) {
+  auto &ctx = SGF.getASTContext();
+  // %0 = string_literal <regex text>
+  auto strLiteralArgs = emitStringLiteral(SGF, expr, expr->getRegexText(), C,
+                                          StringLiteralExpr::Encoding::UTF8);
+  // %1 = function_ref String.init(
+  //   _builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  // %2 = apply %1(%0, ..., ...) -> $String
+  auto strInitDecl = ctx.getStringBuiltinInitDecl(ctx.getStringDecl());
+  RValue string = SGF.emitApplyAllocatingInitializer(
+      expr, strInitDecl, std::move(strLiteralArgs),
+      /*overriddenSelfType*/ Type(), SGFContext());
+  PreparedArguments args(
+      ArrayRef<AnyFunctionType::Param>({
+          AnyFunctionType::Param(ctx.getStringType())}));
+  args.add(expr, std::move(string));
+  return args;
+}
+
+static inline PreparedArguments
+buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         MagicIdentifierLiteralExpr *magicLiteral) {
   ASTContext &ctx = SGF.getASTContext();
   SourceLoc loc = magicLiteral->getStartLoc();
@@ -1961,6 +1982,8 @@ static inline PreparedArguments buildBuiltinLiteralArgs(SILGenFunction &SGF,
     return buildBuiltinLiteralArgs(SGF, C, integerLiteral);
   } else if (auto floatLiteral = dyn_cast<FloatLiteralExpr>(literal)) {
     return buildBuiltinLiteralArgs(SGF, C, floatLiteral);
+  } else if (auto regexLiteral = dyn_cast<RegexLiteralExpr>(literal)) {
+    return buildBuiltinLiteralArgs(SGF, C, regexLiteral);
   } else {
     return buildBuiltinLiteralArgs(
         SGF, C, cast<MagicIdentifierLiteralExpr>(literal));

@@ -219,4 +219,14 @@ func testMirrored(instance: ClassWithAsync) async {
   }
 }
 
+@MainActor class MyView: NXView {
+  func f() {
+    Task {
+      await self.g()
+    }
+  }
+
+  func g() async { }
+}
+
 } // SwiftStdlib 5.5

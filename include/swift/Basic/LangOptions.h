@@ -310,6 +310,10 @@ namespace swift {
     /// `func f() -> <T> T`.
     bool EnableExperimentalNamedOpaqueTypes = false;
 
+    /// Enable support for explicit existential types via the \c any
+    /// keyword.
+    bool EnableExplicitExistentialTypes = false;
+
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
@@ -467,6 +471,9 @@ namespace swift {
     /// Whether the new experimental generics implementation is enabled.
     RequirementMachineMode EnableRequirementMachine =
         RequirementMachineMode::Enabled;
+
+    /// Enables merged associated type support, which might go away.
+    bool RequirementMachineMergedAssociatedTypes = true;
 
     /// Enables dumping rewrite systems from the requirement machine.
     bool DumpRequirementMachine = false;

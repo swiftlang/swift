@@ -4739,11 +4739,18 @@ public:
       case MetatypeRepresentation::ObjC:  Printer << "@objc_metatype "; break;
       }
     }
+
+    auto &ctx = T->getASTContext();
+    if (T->is<ExistentialMetatypeType>() &&
+        ctx.LangOpts.EnableExplicitExistentialTypes)
+      Printer << "any ";
+
     printWithParensIfNotSimple(T->getInstanceType());
 
     // We spell normal metatypes of existential types as .Protocol.
     if (isa<MetatypeType>(T) &&
-        T->getInstanceType()->isAnyExistentialType()) {
+        T->getInstanceType()->isAnyExistentialType() &&
+        !ctx.LangOpts.EnableExplicitExistentialTypes) {
       Printer << ".Protocol";
     } else {
       Printer << ".Type";
@@ -5327,6 +5334,11 @@ public:
       if (T->hasExplicitAnyObject())
         Printer << " & AnyObject";
     }
+  }
+
+  void visitExistentialType(ExistentialType *T) {
+    Printer << "any ";
+    visit(T->getConstraintType());
   }
 
   void visitLValueType(LValueType *T) {

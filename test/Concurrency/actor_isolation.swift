@@ -593,6 +593,35 @@ func f() {
 // Local function isolation restrictions
 // ----------------------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
+actor AnActorWithClosures {
+  var counter: Int = 0 // expected-note 2 {{mutation of this property is only permitted within the actor}}
+  func exec() {
+    acceptEscapingClosure { [unowned self] in
+      self.counter += 1
+
+      acceptEscapingClosure {
+        self.counter += 1
+
+        acceptEscapingClosure { [self] in
+          self.counter += 1
+        }
+
+        acceptConcurrentClosure { [self] in
+          self.counter += 1 // expected-error{{actor-isolated property 'counter' can not be mutated from a Sendable closure}}
+
+          acceptEscapingClosure {
+            self.counter += 1 // expected-error{{actor-isolated property 'counter' can not be mutated from a non-isolated context}}
+          }
+        }
+      }
+    }
+  }
+}
+
+// ----------------------------------------------------------------------
+// Local function isolation restrictions
+// ----------------------------------------------------------------------
+@available(SwiftStdlib 5.1, *)
 func checkLocalFunctions() async {
   var i = 0
   var j = 0
@@ -637,6 +666,27 @@ func checkLocalFunctions() async {
   }
 
   print(k)
+}
+
+@available(SwiftStdlib 5.1, *)
+actor LocalFunctionIsolatedActor {
+  func a() -> Bool { // expected-note{{calls to instance method 'a()' from outside of its actor context are implicitly asynchronous}}
+    return true
+  }
+
+  func b() -> Bool {
+    func c() -> Bool {
+      return true && a() // okay, c is isolated
+    }
+    return c()
+  }
+
+  func b2() -> Bool {
+    @Sendable func c() -> Bool {
+      return true && a() // expected-error{{actor-isolated instance method 'a()' can not be referenced from a non-isolated context}}
+    }
+    return c()
+  }
 }
 
 // ----------------------------------------------------------------------

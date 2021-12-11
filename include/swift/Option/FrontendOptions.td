@@ -213,7 +213,8 @@ def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
   HelpText<"Emit remarks indicating use of the serialized module dependency scanning cache.">;
 
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
-  HelpText<"Run SIL copy propagation to shorten object lifetime.">;
+  HelpText<"Run SIL copy propagation with lexical lifetimes to shorten object "
+           "lifetimes while preserving variable lifetimes.">;
 def disable_copy_propagation : Flag<["-"], "disable-copy-propagation">,
   HelpText<"Don't run SIL copy propagation to preserve object lifetime.">;
 
@@ -259,15 +260,18 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
-def disable_lexical_lifetimes :
-  Flag<["-"], "disable-lexical-lifetimes">,
-  HelpText<"Disables early lexical lifetimes. Mutually exclusive with "
-           "-enable-lexical-lifetimes">;
-
+def enable_lexical_borrow_scopes :
+  Joined<["-"], "enable-lexical-borrow-scopes=">,
+  HelpText<"Whether to emit lexical borrow scopes (default: true)">,
+  MetaVarName<"true|false">;
+          
 def enable_lexical_lifetimes :
+  Joined<["-"], "enable-lexical-lifetimes=">,
+  HelpText<"Whether to enable lexical lifetimes">,
+  MetaVarName<"true|false">;
+def enable_lexical_lifetimes_noArg :
   Flag<["-"], "enable-lexical-lifetimes">,
-  HelpText<"Enable lexical lifetimes. Mutually exclusive with "
-           "-disable-lexical-lifetimes">;
+  HelpText<"Enable lexical lifetimes">;
 
 def enable_experimental_move_only :
   Flag<["-"], "enable-experimental-move-only">,
@@ -320,6 +324,14 @@ def requirement_machine_step_limit : Separate<["-"], "requirement-machine-step-l
 def requirement_machine_depth_limit : Separate<["-"], "requirement-machine-depth-limit">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum depth before we give up on confluent completion">;
+
+def disable_requirement_machine_merged_associated_types : Flag<["-"], "disable-requirement-machine-merged-associated-types">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable merged associated types">;
+
+def enable_requirement_machine_merged_associated_types : Flag<["-"], "enable-requirement-machine-merged-associated-types">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Enable merged associated types">;
 
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
@@ -471,6 +483,10 @@ def enable_experimental_named_opaque_types :
 def enable_experimental_structural_opaque_types :
   Flag<["-"], "enable-experimental-structural-opaque-types">,
   HelpText<"Enable experimental support for structural opaque result types">;
+
+def enable_explicit_existential_types :
+  Flag<["-"], "enable-explicit-existential-types">,
+  HelpText<"Enable experimental support for explicit existential types">;
 
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,

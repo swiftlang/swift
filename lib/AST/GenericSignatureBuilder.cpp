@@ -8025,132 +8025,6 @@ void GenericSignatureBuilder::addGenericSignature(GenericSignature sig) {
     addRequirement(reqt, FloatingRequirementSource::forAbstract(), nullptr);
 }
 
-#ifndef NDEBUG
-
-static void checkGenericSignature(CanGenericSignature canSig,
-                                  GenericSignatureBuilder &builder) {
-  PrettyStackTraceGenericSignature debugStack("checking", canSig);
-
-  auto canonicalRequirements = canSig.getRequirements();
-
-  // We collect conformance requirements to check that they're minimal.
-  llvm::SmallDenseMap<CanType, SmallVector<ProtocolDecl *, 2>, 2> conformances;
-
-  // Check that the signature is canonical.
-  for (unsigned idx : indices(canonicalRequirements)) {
-    debugStack.setRequirement(idx);
-
-    const auto &reqt = canonicalRequirements[idx];
-
-    // Left-hand side must be canonical in its context.
-    // Check canonicalization of requirement itself.
-    switch (reqt.getKind()) {
-    case RequirementKind::Superclass:
-      assert(canSig->isCanonicalTypeInContext(reqt.getFirstType(), builder) &&
-             "Left-hand side is not canonical");
-      assert(canSig->isCanonicalTypeInContext(reqt.getSecondType(), builder) &&
-             "Superclass type isn't canonical in its own context");
-      break;
-
-    case RequirementKind::Layout:
-      assert(canSig->isCanonicalTypeInContext(reqt.getFirstType(), builder) &&
-             "Left-hand side is not canonical");
-      break;
-
-    case RequirementKind::SameType: {
-      auto isCanonicalAnchor = [&](Type type) {
-        if (auto *dmt = type->getAs<DependentMemberType>())
-          return canSig->isCanonicalTypeInContext(dmt->getBase(), builder);
-        return type->is<GenericTypeParamType>();
-      };
-
-      auto firstType = reqt.getFirstType();
-      auto secondType = reqt.getSecondType();
-      assert(isCanonicalAnchor(firstType));
-
-      if (reqt.getSecondType()->isTypeParameter()) {
-        assert(isCanonicalAnchor(secondType));
-        assert(compareDependentTypes(firstType, secondType) < 0 &&
-               "Out-of-order type parameters in same-type constraint");
-      } else {
-        assert(canSig->isCanonicalTypeInContext(secondType, builder) &&
-               "Concrete same-type isn't canonical in its own context");
-      }
-      break;
-    }
-
-    case RequirementKind::Conformance:
-      assert(canSig->isCanonicalTypeInContext(reqt.getFirstType(), builder) &&
-             "Left-hand side is not canonical");
-      assert(reqt.getFirstType()->isTypeParameter() &&
-             "Left-hand side must be a type parameter");
-      assert(isa<ProtocolType>(reqt.getSecondType().getPointer()) &&
-             "Right-hand side of conformance isn't a protocol type");
-
-      // Collect all conformance requirements on each type parameter.
-      conformances[CanType(reqt.getFirstType())].push_back(
-          reqt.getProtocolDecl());
-      break;
-    }
-
-    // From here on, we're only interested in requirements beyond the first.
-    if (idx == 0) continue;
-
-    // Make sure that the left-hand sides are in nondecreasing order.
-    const auto &prevReqt = canonicalRequirements[idx-1];
-    int compareLHS =
-      compareDependentTypes(prevReqt.getFirstType(), reqt.getFirstType());
-    assert(compareLHS <= 0 && "Out-of-order left-hand sides");
-
-    // If we have two same-type requirements where the left-hand sides differ
-    // but fall into the same equivalence class, we can check the form.
-    if (compareLHS < 0 && reqt.getKind() == RequirementKind::SameType &&
-        prevReqt.getKind() == RequirementKind::SameType &&
-        canSig->areSameTypeParameterInContext(prevReqt.getFirstType(),
-                                              reqt.getFirstType(),
-                                              builder)) {
-      // If it's a it's a type parameter, make sure the equivalence class is
-      // wired together sanely.
-      if (prevReqt.getSecondType()->isTypeParameter()) {
-        assert(prevReqt.getSecondType()->isEqual(reqt.getFirstType()) &&
-               "same-type constraints within an equiv. class are out-of-order");
-      } else {
-        // Otherwise, the concrete types must match up.
-        assert(prevReqt.getSecondType()->isEqual(reqt.getSecondType()) &&
-               "inconsistent concrete same-type constraints in equiv. class");
-      }
-    }
-
-    // If we have a concrete same-type requirement, we shouldn't have any
-    // other requirements on the same type.
-    if (reqt.getKind() == RequirementKind::SameType &&
-        !reqt.getSecondType()->isTypeParameter()) {
-      assert(compareLHS < 0 &&
-             "Concrete subject type should not have any other requirements");
-    }
-
-    assert(prevReqt.compare(reqt) < 0 &&
-           "Out-of-order requirements");
-  }
-
-  // Make sure we don't have redundant protocol conformance requirements.
-  for (auto pair : conformances) {
-    const auto &protos = pair.second;
-    auto canonicalProtos = protos;
-
-    // canonicalizeProtocols() will sort them and filter out any protocols that
-    // are refined by other protocols in the list. It should be a no-op at this
-    // point.
-    ProtocolType::canonicalizeProtocols(canonicalProtos);
-
-    assert(protos.size() == canonicalProtos.size() &&
-           "redundant conformance requirements");
-    assert(std::equal(protos.begin(), protos.end(), canonicalProtos.begin()) &&
-           "out-of-order conformance requirements");
-  }
-}
-#endif
-
 static Type stripBoundDependentMemberTypes(Type t) {
   if (auto *depMemTy = t->getAs<DependentMemberType>()) {
     return DependentMemberType::get(
@@ -8444,14 +8318,7 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   // Form the generic signature.
   auto sig = GenericSignature::get(getGenericParams(), requirements);
 
-#ifndef NDEBUG
   bool hadAnyError = Impl->HadAnyError;
-
-  if (requirementSignatureSelfProto &&
-      !hadAnyError) {
-    checkGenericSignature(sig.getCanonicalSignature(), *this);
-  }
-#endif
 
   // When we can, move this generic signature builder to make it the canonical
   // builder, rather than constructing a new generic signature builder that
@@ -8461,7 +8328,7 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   //
   // Also, we cannot do this when building a requirement signature.
   if (requirementSignatureSelfProto == nullptr &&
-      !Impl->HadAnyError) {
+      !hadAnyError) {
     // Register this generic signature builder as the canonical builder for the
     // given signature.
     Context.registerGenericSignatureBuilder(sig, std::move(*this));
@@ -8472,7 +8339,7 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   Impl.reset();
 
 #ifndef NDEBUG
-  if (!requirementSignatureSelfProto &&
+  if (requirementSignatureSelfProto == nullptr &&
       !hadAnyError) {
     sig.verify();
   }

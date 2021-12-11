@@ -2920,7 +2920,13 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
   // Handle existential metatypes.
   if (auto meta1 = type1->getAs<MetatypeType>()) {
-    if (auto meta2 = type2->getAs<ExistentialMetatypeType>()) {
+    ExistentialMetatypeType *meta2;
+    if (auto existential = type2->getAs<ExistentialType>()) {
+      meta2 = existential->getConstraintType()->getAs<ExistentialMetatypeType>();
+    } else {
+      meta2 = type2->getAs<ExistentialMetatypeType>();
+    }
+    if (meta2) {
       return matchExistentialTypes(meta1->getInstanceType(),
                                    meta2->getInstanceType(), kind, subflags,
                                    locator.withPathElement(
@@ -5674,6 +5680,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::GenericFunction:
       llvm_unreachable("Polymorphic function type should have been opened");
 
+    case TypeKind::Existential:
     case TypeKind::ProtocolComposition:
       switch (kind) {
       case ConstraintKind::Equal:
@@ -6318,6 +6325,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::DynamicSelf:
   case TypeKind::ProtocolComposition:
   case TypeKind::Protocol:
+  case TypeKind::Existential:
     // Break out to handle the actual construction below.
     break;
 
@@ -10694,6 +10702,11 @@ getDynamicCallableMethods(Type type, ConstraintSystem &CS,
     if (auto protocolComp = dyn_cast<ProtocolCompositionType>(canType))
       return calculateForComponentTypes(protocolComp->getMembers());
 
+    if (auto existential = dyn_cast<ExistentialType>(canType)) {
+      auto constraint = existential->getConstraintType();
+      return getDynamicCallableMethods(constraint, CS, locator);
+    }
+
     // Otherwise, this must be a nominal type.
     // Dynamic calling doesn't work for tuples, etc.
     auto nominal = canType->getAnyNominal();
@@ -11661,9 +11674,16 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   // current anchor or, in case of anchor being an expression, any of
   // its sub-expressions.
   llvm::SmallDenseSet<ASTNode> anchors;
-  for (const auto *fix : Fixes)
-    anchors.insert(fix->getAnchor());
+  for (const auto *fix : Fixes) {
+    // Warning fixes shouldn't be considered because even if
+    // such fix is recorded at that anchor this should not
+    // have any affect in the recording of any other fix.
+    if (fix->isWarning())
+      continue;
 
+    anchors.insert(fix->getAnchor());
+  }
+  
   bool found = false;
   if (auto *expr = getAsExpr(anchor)) {
     forEachExpr(expr, [&](Expr *subExpr) -> Expr * {

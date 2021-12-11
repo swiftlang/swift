@@ -71,7 +71,7 @@ AsyncTaskAndContext swift_task_create_common(
     size_t taskCreateFlags,
     TaskOptionRecord *options,
     const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, void *closureContext,
+    TaskContinuationFunction *function, void *closureContext,
     size_t initialContextSize);
 
 /// Allocate memory in a task.

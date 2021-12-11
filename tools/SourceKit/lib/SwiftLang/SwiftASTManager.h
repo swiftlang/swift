@@ -145,6 +145,8 @@ class SwiftASTConsumer : public std::enable_shared_from_this<SwiftASTConsumer> {
   Optional<std::function<void(std::shared_ptr<SwiftASTConsumer>)>>
       CancellationRequestCallback;
 
+  bool IsCancelled = false;
+
 public:
   virtual ~SwiftASTConsumer() { }
 
@@ -157,6 +159,7 @@ public:
   /// depending on it.
   void requestCancellation() {
     llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
+    IsCancelled = true;
     if (CancellationRequestCallback.hasValue()) {
       (*CancellationRequestCallback)(shared_from_this());
       CancellationRequestCallback = None;
@@ -168,12 +171,18 @@ public:
   /// currently no callback set.
   /// The cancellation request callback will automatically be removed when the
   /// SwiftASTManager is cancelled.
+  /// If this \c SwiftASTConsumer has already been cancelled when this method is
+  /// called, \c NewCallback will be called immediately.
   void setCancellationRequestCallback(
       std::function<void(std::shared_ptr<SwiftASTConsumer>)> NewCallback) {
     llvm::sys::ScopedLock L(CancellationRequestCallbackMtx);
     assert(!CancellationRequestCallback.hasValue() &&
            "Can't set two cancellation callbacks on a SwiftASTConsumer");
-    CancellationRequestCallback = NewCallback;
+    if (IsCancelled) {
+      NewCallback(shared_from_this());
+    } else {
+      CancellationRequestCallback = NewCallback;
+    }
   }
 
   /// Removes the cancellation request callback previously set by \c
@@ -248,9 +257,7 @@ public:
   processASTAsync(SwiftInvocationRef Invok, SwiftASTConsumerRef ASTConsumer,
                   const void *OncePerASTToken,
                   SourceKitCancellationToken CancellationToken,
-                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
-                  ArrayRef<ImmutableTextSnapshotRef> Snapshots =
-                      ArrayRef<ImmutableTextSnapshotRef>());
+                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem);
 
   std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
                                                       std::string &Error);
