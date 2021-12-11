@@ -4328,20 +4328,10 @@ bool swift::isPotentiallyIsolatedActor(
   if (auto param = dyn_cast<ParamDecl>(var))
     return isIsolated(param);
 
-  if (var->isSelfParamCapture()) {
-    // Find the "self" parameter that we captured and determine whether
-    // it is potentially isolated.
-    for (auto dc = var->getDeclContext(); dc; dc = dc->getParent()) {
-      if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-        if (auto selfDecl = func->getImplicitSelfDecl()) {
-          return selfDecl->isIsolated();
-        }
-      }
-
-      if (dc->isModuleScopeContext() || dc->isTypeContext())
-        break;
-    }
-  }
+  // If this is a captured 'self', check whether the original 'self' is
+  // isolated.
+  if (var->isSelfParamCapture())
+    return var->isSelfParamCaptureIsolated();
 
   return false;
 }

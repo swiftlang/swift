@@ -593,6 +593,35 @@ func f() {
 // Local function isolation restrictions
 // ----------------------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
+actor AnActorWithClosures {
+  var counter: Int = 0 // expected-note 2 {{mutation of this property is only permitted within the actor}}
+  func exec() {
+    acceptEscapingClosure { [unowned self] in
+      self.counter += 1
+
+      acceptEscapingClosure {
+        self.counter += 1
+
+        acceptEscapingClosure { [self] in
+          self.counter += 1
+        }
+
+        acceptConcurrentClosure { [self] in
+          self.counter += 1 // expected-error{{actor-isolated property 'counter' can not be mutated from a Sendable closure}}
+
+          acceptEscapingClosure {
+            self.counter += 1 // expected-error{{actor-isolated property 'counter' can not be mutated from a non-isolated context}}
+          }
+        }
+      }
+    }
+  }
+}
+
+// ----------------------------------------------------------------------
+// Local function isolation restrictions
+// ----------------------------------------------------------------------
+@available(SwiftStdlib 5.1, *)
 func checkLocalFunctions() async {
   var i = 0
   var j = 0

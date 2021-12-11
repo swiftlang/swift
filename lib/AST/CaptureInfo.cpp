@@ -78,7 +78,7 @@ getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
   }
 }
 
-ParamDecl *CaptureInfo::getIsolatedParamCapture() const {
+VarDecl *CaptureInfo::getIsolatedParamCapture() const {
   if (!hasLocalCaptures())
     return nullptr;
 
@@ -89,13 +89,18 @@ ParamDecl *CaptureInfo::getIsolatedParamCapture() const {
     if (capture.isDynamicSelfMetadata())
       continue;
 
-    auto param = dyn_cast_or_null<ParamDecl>(capture.getDecl());
-    if (!param)
-      continue;
+    // If we captured an isolated parameter, return it.
+    if (auto param = dyn_cast_or_null<ParamDecl>(capture.getDecl())) {
+      // If we have captured an isolated parameter, return it.
+      if (param->isIsolated())
+        return param;
+    }
 
-    // If we have captured an isolated parameter, return it.
-    if (param->isIsolated())
-      return param;
+    // If we captured 'self', check whether it is (still) isolated.
+    if (auto var = dyn_cast_or_null<VarDecl>(capture.getDecl())) {
+      if (var->isSelfParamCapture() && var->isSelfParamCaptureIsolated())
+        return var;
+    }
   }
 
   return nullptr;

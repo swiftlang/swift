@@ -5162,6 +5162,9 @@ public:
       Bits.VarDecl.IsSelfParamCapture = IsSelfParamCapture;
   }
 
+  /// Check whether this capture of the self param is actor-isolated.
+  bool isSelfParamCaptureIsolated() const;
+
   /// Determines if this var has an initializer expression that should be
   /// exposed to clients.
   ///

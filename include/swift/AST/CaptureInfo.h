@@ -36,7 +36,7 @@ namespace swift {
 class ValueDecl;
 class FuncDecl;
 class OpaqueValueExpr;
-class ParamDecl;
+class VarDecl;
 
 /// CapturedValue includes both the declaration being captured, along with flags
 /// that indicate how it is captured.
@@ -220,8 +220,10 @@ public:
     return StorageAndFlags.getPointer()->getOpaqueValue();
   }
 
-  /// Retrieve the isolated parameter that has been captured, if there is one.
-  ParamDecl *getIsolatedParamCapture() const;
+  /// Retrieve the variable corresponding to an isolated parameter that has
+  /// been captured, if there is one. This might be a capture variable
+  /// that was initialized with an isolated parameter.
+  VarDecl *getIsolatedParamCapture() const;
 
   SWIFT_DEBUG_DUMP;
   void print(raw_ostream &OS) const;
