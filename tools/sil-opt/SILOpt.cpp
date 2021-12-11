@@ -529,6 +529,8 @@ int main(int argc, char **argv) {
 
   if (EnableCopyPropagation)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
+  if (DisableCopyPropagation)
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
 
   // Enable lexical lifetimes if it is set or if experimental move only is
   // enabled. This is because move only depends on lexical lifetimes being
