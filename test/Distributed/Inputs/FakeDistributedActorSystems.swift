@@ -40,6 +40,12 @@ public struct FakeActorSystem: DistributedActorSystem {
   public typealias Invocation = FakeInvocation
   public typealias SerializationRequirement = Codable
 
+  // just so that the struct does not get optimized away entirely
+  let someValue: String = ""
+  let someValue2: String = ""
+  let someValue3: String = ""
+  let someValue4: String = ""
+
   init() {
     print("Initialized new FakeActorSystem")
   }

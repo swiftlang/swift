@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -enable-experimental-distributed -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --dump-input=always
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -enable-experimental-distributed -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --color
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -9,7 +9,7 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
-class SomeClass {}
+final class SomeClass: Sendable {}
 
 distributed actor MyDistActor {
   let localOnlyField: SomeClass
@@ -39,7 +39,7 @@ distributed actor MyDistActor {
 // CHECK:   [[SYS_REF:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
 // CHECK:   [[ID_LOAD:%[0-9]+]] = load [[ID_REF]] : $*ActorAddress
 // CHECK:   [[SYS_LOAD:%[0-9]+]] = load [[SYS_REF]] : $*FakeActorSystem
-// CHECK:   [[RESIGN:%[0-9]+]] = function_ref @$s16FakeDistributedActorSystems0aB6SystemV8resignIDyyAA0B7AddressVF : $@convention(method) (@guaranteed ActorAddress, FakeActorSystem) -> ()
+// CHECK:   [[RESIGN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0aC6SystemV8resignIDyyAA0C7AddressVF : $@convention(method) (@guaranteed ActorAddress, @guaranteed FakeActorSystem) -> ()
 // CHECK:   apply [[RESIGN]]([[ID_LOAD]], [[SYS_LOAD]])
 // CHECK:   br [[CONTINUE:bb[0-9]+]]
 

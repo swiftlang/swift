@@ -872,8 +872,8 @@ public:
 
   /// Assert that two types are equal.
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
-    _require(type1 == type2, complaint, // FIXME(distributed): REMOVE THIS !!!!! fprintf(stderr, "[
-             [&] { llvm::dbgs() << "       got: " << type1 << "\n  expected: " << type2 << '\n'; });
+    _require(type1 == type2, complaint,
+             [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
   }
 
   /// Require two function types to be ABI-compatible.

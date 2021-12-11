@@ -62,7 +62,7 @@ public protocol DistributedActorSystem: Sendable {
   ///
   /// The address MUST uniquely identify the actor, and allow resolving it.
   /// E.g. if an actor is created under address `addr1` then immediately invoking
-  /// `transport.resolve(id: addr1, as: Greeter.self)` MUST return a reference
+  /// `system.resolve(id: addr1, as: Greeter.self)` MUST return a reference
   /// to the same actor.
   func assignID<Act>(_ actorType: Act.Type) -> ActorID
       where Act: DistributedActor,
@@ -280,7 +280,7 @@ public struct RemoteCallTarget {
 ///
 /// ## Decoding an invocation
 /// Since every actor system is going to deal with a concrete invocation type, they may
-/// implement decoding them whichever way is most optimal for the given transport.
+/// implement decoding them whichever way is most optimal for the given system.
 ///
 /// Once decided, the invocation must be passed to `executeDistributedTarget`
 /// which will decode the substitutions, argument values, return and error types (in that order).

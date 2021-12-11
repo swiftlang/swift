@@ -2033,7 +2033,7 @@ public:
   /// Specifically, this code emits SIL that performs the call
   ///
   /// \verbatim
-  ///   self.transport.resignID(self.id)
+  ///   self.system.resignID(self.id)
   /// \endverbatim
   ///
   /// using the current builder's state as the injection point.

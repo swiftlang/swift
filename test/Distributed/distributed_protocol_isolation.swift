@@ -7,7 +7,7 @@
 import _Distributed
 import FakeDistributedActorSystems
 
-/// Use the existential wrapper as the default actor transport.
+/// Use the existential wrapper as the default actor system.
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== -----------------------------------------------------------------------

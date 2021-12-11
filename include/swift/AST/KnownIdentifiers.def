@@ -268,8 +268,6 @@ IDENTIFIER(resolve)
 IDENTIFIER(system)
 IDENTIFIER(ID)
 IDENTIFIER(id)
-//IDENTIFIER(identity) // TODO(distributed): remove
-//IDENTIFIER(identifier)
 IDENTIFIER(Invocation)
 IDENTIFIER(_distributedActorRemoteInitialize)
 IDENTIFIER(_distributedActorDestroy)

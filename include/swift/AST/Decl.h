@@ -3312,7 +3312,6 @@ public:
   /// Find, or potentially synthesize, the implicit 'id' property of this actor.
   ValueDecl *getDistributedActorIDProperty() const;
 
-
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
