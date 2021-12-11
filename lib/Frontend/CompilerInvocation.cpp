@@ -262,9 +262,9 @@ void CompilerInvocation::setSDKPath(const std::string &Path) {
   updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
 }
 
-void CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
+bool CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
                                            DiagnosticEngine &diags) {
-  ModuleAliasesConverter::computeModuleAliases(args, FrontendOpts, diags);
+  return ModuleAliasesConverter::computeModuleAliases(args, FrontendOpts, diags);
 }
 
 static bool ParseFrontendArgs(

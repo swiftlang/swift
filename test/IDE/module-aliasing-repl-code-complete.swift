@@ -19,7 +19,7 @@
 
 // CHECK: Begin completions
 // CHECK-NOT: AppleLogging
-// CHECK-DAG: XLogging
+// CHECK: XLogging
 // CHECK: End completions
 
 // BEGIN FileLogging.swift

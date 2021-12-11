@@ -4242,7 +4242,10 @@ int main(int argc, char *argv[]) {
     SourceManager SM;
     DiagnosticEngine Diags(SM);
     Diags.addConsumer(PDC);
-    InitInvok.setModuleAliasMap(options::ModuleAliases, Diags);
+    if (!InitInvok.setModuleAliasMap(options::ModuleAliases, Diags)) {
+      llvm::errs() << "invalid module alias arguments\n";
+      return 1;
+    }
   }
 
   // Process the clang arguments last and allow them to override previously
