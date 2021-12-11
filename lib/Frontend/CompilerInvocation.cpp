@@ -1519,6 +1519,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_copy_propagation))
     Opts.LexicalLifetimes = LexicalLifetimesOption::On;
 
+  // -disable-copy-propagation implies -enable-lexical-lifetimes=false
+  if (Args.hasArg(OPT_disable_copy_propagation))
+    Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
+
   // If move-only is enabled, always enable lexical lifetime as well.  Move-only
   // depends on lexical lifetimes.
   if (Args.hasArg(OPT_enable_experimental_move_only))
