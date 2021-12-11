@@ -4,6 +4,8 @@ import Builtin
 
 sil_stage raw
 
+protocol Error {}
+
 class Klass {}
 class SubKlass : Klass {}
 
@@ -236,6 +238,626 @@ bb0(%0 : @owned $(Builtin.NativeObject, Builtin.NativeObject)):
   end_borrow %4 : $Builtin.NativeObject
   destroy_value %2 : $Builtin.NativeObject
   destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testRoundTripDestructureTuple : $@convention(thin) (@owned (Klass, Klass)) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK-NOT: tuple ({{%.*}} : $Klass,
+// CHECK: } // end sil function 'testRoundTripDestructureTuple'
+sil [ossa] @testRoundTripDestructureTuple : $@convention(thin) (@owned (Klass, Klass)) -> () {
+bb0(%0 : @owned $(Klass, Klass)):
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  %3 = tuple(%1 : $Klass, %2: $Klass)
+  destroy_value %3 : $(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Fail case where the tuple is partially from a destructure and partially from
+// something else.
+//
+// CHECK-LABEL: sil [ossa] @testRoundTripDestructureTuple2 : $@convention(thin) (@owned (Klass, Klass), @owned Klass) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRoundTripDestructureTuple2'
+sil [ossa] @testRoundTripDestructureTuple2 : $@convention(thin) (@owned (Klass, Klass), @owned Klass) -> () {
+bb0(%0 : @owned $(Klass, Klass), %0a : @owned $Klass):
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  %3 = tuple (%1 : $Klass, %0a: $Klass)
+  destroy_value %2 : $Klass
+  destroy_value %3 : $(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we don't crash when we check if %0a is a destructure_tuple.
+// CHECK-LABEL: sil [ossa] @testRoundTripDestructureTuple3 : $@convention(thin) (@owned (Klass, Klass), @owned Klass) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRoundTripDestructureTuple3'
+sil [ossa] @testRoundTripDestructureTuple3 : $@convention(thin) (@owned (Klass, Klass), @owned Klass) -> () {
+bb0(%0 : @owned $(Klass, Klass), %0a : @owned $Klass):
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  %3 = tuple (%0a : $Klass, %1 : $Klass)
+  destroy_value %2 : $Klass
+  destroy_value %3 : $(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We are very conservative and do not perform this optimization if we have any
+// uses of the destructure elements.
+//
+// CHECK-LABEL: sil [ossa] @testRoundTripDestructureTuple4 : $@convention(thin) (@owned (Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRoundTripDestructureTuple4'
+sil [ossa] @testRoundTripDestructureTuple4 : $@convention(thin) (@owned (Klass, Klass)) -> () {
+bb0(%0 : @owned $(Klass, Klass)):
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  debug_value %1 : $Klass, let, name "oops"
+  %3 = tuple(%1 : $Klass, %2: $Klass)
+  destroy_value %3 : $(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Can't handle this case because of named parameters of the tuple.
+//
+// CHECK-LABEL: sil [ossa] @testRoundTripDestructureTuple5 : $@convention(thin) (@owned (Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRoundTripDestructureTuple5'
+sil [ossa] @testRoundTripDestructureTuple5 : $@convention(thin) (@owned (Klass, Klass)) -> () {
+bb0(%0 : @owned $(Klass, Klass)):
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  %3 = tuple $(bar: Klass, baz: Klass) (%1, %2)
+  destroy_value %3 : $(bar: Klass, baz: Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testRoundTripTupleDestructure : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK: } // end sil function 'testRoundTripTupleDestructure'
+sil [ossa] @testRoundTripTupleDestructure : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = tuple(%0 : $Klass, %1 : $Klass)
+  (%3, %4) = destructure_tuple %2 : $(Klass, Klass)
+  destroy_value %3 : $Klass
+  destroy_value %4 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testRoundTripTupleDestructure2 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRoundTripTupleDestructure2'
+sil [ossa] @testRoundTripTupleDestructure2 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = tuple(%0 : $Klass, %1 : $Klass)
+  debug_value %2 : $(Klass, Klass), let, name "oops2"
+  (%3, %4) = destructure_tuple %2 : $(Klass, Klass)
+  destroy_value %3 : $Klass
+  destroy_value %4 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testRValueTupleDestructureElimination1 : $@convention(thin) (@owned (Klass, Klass, Int)) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleDestructureElimination1'
+sil [ossa] @testRValueTupleDestructureElimination1 : $@convention(thin) (@owned (Klass, Klass, Int)) -> () {
+bb0(%arg : @owned $(Klass, Klass, Int)):
+  %alloc = alloc_stack $(Klass, Klass, Int)
+  %t0 = tuple_element_addr %alloc : $*(Klass, Klass, Int), 0
+  %t1 = tuple_element_addr %alloc : $*(Klass, Klass, Int), 1
+  %t2 = tuple_element_addr %alloc : $*(Klass, Klass, Int), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Klass, Klass, Int)
+  store %0 to [init] %t0 : $*Klass
+  store %1 to [init] %t1 : $*Klass
+  store %2 to [trivial] %t2 : $*Int
+  destroy_addr %alloc : $*(Klass, Klass, Int)
+  dealloc_stack %alloc : $*(Klass, Klass, Int)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testRValueTupleDestructureElimination2 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleDestructureElimination2'
+sil [ossa] @testRValueTupleDestructureElimination2 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  store %0 to [trivial] %t0 : $*Int
+  store %1 to [init] %t1 : $*Klass
+  store %2 to [init] %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testRValueTupleDestructureElimination3 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleDestructureElimination3'
+sil [ossa] @testRValueTupleDestructureElimination3 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  assign %0 to %t0 : $*Int
+  assign %1 to %t1 : $*Klass
+  assign %2 to %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do handle this case despite having multiple uses since our tuple_element_addr isn't an interleaved case.
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleDestructureElimination4 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleDestructureElimination4'
+sil [ossa] @testRValueTupleDestructureElimination4 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  store %0 to [trivial] %t0 : $*Int
+  store %1 to [init] %t1 : $*Klass
+  store %2 to [init] %t2 : $*Klass
+  %3 = load_borrow %t2 : $*Klass
+  end_borrow %3 : $Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not handle this case since the SILGen cases that we want to handle
+// /always/ are consistently either stores or assigns... never mixes.
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleDestructureEliminationFail1 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleDestructureEliminationFail1'
+sil [ossa] @testRValueTupleDestructureEliminationFail1 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  store %0 to [trivial] %t0 : $*Int
+  store %1 to [init] %t1 : $*Klass
+  assign %2 to %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not handle this case since the SILGen cases that we want to handle
+// never mix store assign or store trivial.
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleDestructureEliminationFail2 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleDestructureEliminationFail2'
+sil [ossa] @testRValueTupleDestructureEliminationFail2 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  // This extra tuple_element_addr is important since we require that our
+  // tuple_element_addr only have a single use to directly match the SILGen
+  // pattern. We test that we fail when we have multiple uses in a different
+  // test.
+  %t22 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  %2a = copy_value %2 : $Klass
+  store %2a to [init] %t22 : $*Klass
+  store %0 to [trivial] %t0 : $*Int
+  store %1 to [init] %t1 : $*Klass
+  store %2 to [assign] %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not handle this case since our stores are in the wrong order. We are
+// pattern matching SILGen exactly.
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleDestructureEliminationFail3 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleDestructureEliminationFail3'
+sil [ossa] @testRValueTupleDestructureEliminationFail3 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  store %0 to [trivial] %t0 : $*Int
+  store %2 to [init] %t2 : $*Klass
+  store %1 to [init] %t1 : $*Klass
+  %3 = load_borrow %t2 : $*Klass
+  end_borrow %3 : $Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not handle this case since the SILGen cases that we want to handle
+// never mix different kinds of assigns
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleDestructureEliminationFail4 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleDestructureEliminationFail4'
+sil [ossa] @testRValueTupleDestructureEliminationFail4 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  // This extra tuple_element_addr is important since we require that our
+  // tuple_element_addr only have a single use to directly match the SILGen
+  // pattern. We test that we fail when we have multiple uses in a different
+  // test.
+  %t22 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  %2a = copy_value %2 : $Klass
+  store %2a to [init] %t22 : $*Klass
+  assign %0 to %t0 : $*Int
+  assign %1 to [init] %t1 : $*Klass
+  assign %2 to %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This makes sure that we do not handle a case if one of our tuple_element_addr
+// has the right tuple element but stores into a different allocation.
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleDestructureEliminationFail5 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleDestructureEliminationFail5'
+sil [ossa] @testRValueTupleDestructureEliminationFail5 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  %alloc2 = alloc_stack $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc2 : $*(Int, Klass, Klass), 0
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  store %0 to [trivial] %t0 : $*Int
+  store %1 to [init] %t1 : $*Klass
+  store %2 to [init]%t2 : $*Klass
+  dealloc_stack %alloc2 : $*(Int, Klass, Klass)
+  %t0a = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  store %0 to [trivial] %t0a : $*Int
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Fail because of typed elts
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleDestructureEliminationFail6 : $@convention(thin) (@owned (biz: Int, baz: Klass, buz: Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleDestructureEliminationFail6'
+sil [ossa] @testRValueTupleDestructureEliminationFail6 : $@convention(thin) (@owned (biz: Int, baz: Klass, buz: Klass)) -> () {
+bb0(%arg : @owned $(biz: Int, baz: Klass, buz: Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(biz: Int, baz: Klass, buz: Klass)
+  store %0 to [trivial] %t0 : $*Int
+  store %1 to [init] %t1 : $*Klass
+  store %2 to [init] %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testRValueTupleInterleavedDestructureElimination1 : $@convention(thin) (@owned (Klass, Klass, Int)) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleInterleavedDestructureElimination1'
+sil [ossa] @testRValueTupleInterleavedDestructureElimination1 : $@convention(thin) (@owned (Klass, Klass, Int)) -> () {
+bb0(%arg : @owned $(Klass, Klass, Int)):
+  %alloc = alloc_stack $(Klass, Klass, Int)
+  (%0, %1, %2) = destructure_tuple %arg : $(Klass, Klass, Int)
+  %t0 = tuple_element_addr %alloc : $*(Klass, Klass, Int), 0
+  store %0 to [init] %t0 : $*Klass
+  %t1 = tuple_element_addr %alloc : $*(Klass, Klass, Int), 1
+  store %1 to [init] %t1 : $*Klass
+  %t2 = tuple_element_addr %alloc : $*(Klass, Klass, Int), 2
+  store %2 to [trivial] %t2 : $*Int
+  destroy_addr %alloc : $*(Klass, Klass, Int)
+  dealloc_stack %alloc : $*(Klass, Klass, Int)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testRValueTupleInterleavedDestructureElimination2 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleInterleavedDestructureElimination2'
+sil [ossa] @testRValueTupleInterleavedDestructureElimination2 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  store %0 to [trivial] %t0 : $*Int
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  store %1 to [init] %t1 : $*Klass
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  store %2 to [init] %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testRValueTupleInterleavedDestructureElimination3 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleInterleavedDestructureElimination3'
+sil [ossa] @testRValueTupleInterleavedDestructureElimination3 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  assign %0 to %t0 : $*Int
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  assign %1 to %t1 : $*Klass
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  assign %2 to %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not handle this case since the SILGen cases that we want to handle
+// /always/ are consistently either stores or assigns... never mixes.
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail1 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleInterleavedDestructureEliminationFail1'
+sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail1 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  store %0 to [trivial] %t0 : $*Int
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  store %1 to [init] %t1 : $*Klass
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  assign %2 to %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not handle this case since the SILGen cases that we want to handle
+// never mix store assign or store trivial.
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail2 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleInterleavedDestructureEliminationFail2'
+sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail2 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  // This extra tuple_element_addr is important since we require that our
+  // tuple_element_addr only have a single use to directly match the SILGen
+  // pattern. We test that we fail when we have multiple uses in a different
+  // test.
+  %t22 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  %2a = copy_value %2 : $Klass
+  store %2a to [init] %t22 : $*Klass
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  store %0 to [trivial] %t0 : $*Int
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  store %1 to [init] %t1 : $*Klass
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  store %2 to [assign] %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not handle this case since our stores are in the wrong order. We are
+// pattern matching SILGen exactly.
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail3 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleInterleavedDestructureEliminationFail3'
+sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail3 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  store %0 to [trivial] %t0 : $*Int
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  store %2 to [init] %t2 : $*Klass
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  store %1 to [init] %t1 : $*Klass
+  %3 = load_borrow %t2 : $*Klass
+  end_borrow %3 : $Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not handle this case since our stores are in the wrong order. We are
+// pattern matching SILGen exactly.
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail3a : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleInterleavedDestructureEliminationFail3a'
+sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail3a : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  store %0 to [trivial] %t0 : $*Int
+  store %2 to [init] %t2 : $*Klass
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  store %1 to [init] %t1 : $*Klass
+  %3 = load_borrow %t2 : $*Klass
+  end_borrow %3 : $Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not handle this case since the SILGen cases that we want to handle
+// never mix different kinds of assigns
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail4 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleInterleavedDestructureEliminationFail4'
+sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail4 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  // This extra tuple_element_addr is important since we require that our
+  // tuple_element_addr only have a single use to directly match the SILGen
+  // pattern. We test that we fail when we have multiple uses in a different
+  // test.
+  %t22 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  %2a = copy_value %2 : $Klass
+  store %2a to [init] %t22 : $*Klass
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  assign %0 to %t0 : $*Int
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  assign %1 to [init] %t1 : $*Klass
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  assign %2 to %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not handle this case since we are in an interleaved case and our
+// tuple_element_addr has multiple uses
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail5 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleInterleavedDestructureEliminationFail5'
+sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail5 : $@convention(thin) (@owned (Int, Klass, Klass)) -> () {
+bb0(%arg : @owned $(Int, Klass, Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  (%0, %1, %2) = destructure_tuple %arg : $(Int, Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  store %0 to [trivial] %t0 : $*Int
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  store %1 to [init] %t1 : $*Klass
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  store %2 to [init] %t2 : $*Klass
+  %3 = load_borrow %t2 : $*Klass
+  end_borrow %3 : $Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Fail because of typed elts
+//
+// CHECK-LABEL: sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail6 : $@convention(thin) (@owned (biz: Int, baz: Klass, buz: Klass)) -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testRValueTupleInterleavedDestructureEliminationFail6'
+sil [ossa] @testRValueTupleInterleavedDestructureEliminationFail6 : $@convention(thin) (@owned (biz: Int, baz: Klass, buz: Klass)) -> () {
+bb0(%arg : @owned $(biz: Int, baz: Klass, buz: Klass)):
+  %alloc = alloc_stack $(Int, Klass, Klass)
+  (%0, %1, %2) = destructure_tuple %arg : $(biz: Int, baz: Klass, buz: Klass)
+  %t0 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 0
+  store %0 to [trivial] %t0 : $*Int
+  %t1 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 1
+  store %1 to [init] %t1 : $*Klass
+  %t2 = tuple_element_addr %alloc : $*(Int, Klass, Klass), 2
+  store %2 to [init] %t2 : $*Klass
+  destroy_addr %alloc : $*(Int, Klass, Klass)
+  dealloc_stack %alloc : $*(Int, Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We do not support this case since the destructure_tuple is needed to split
+// the Int so we do not need to deal with the named tuple elements of the out
+// parameter.
+//
+// CHECK-LABEL: sil [ossa] @testDestructureNamedLabelAddress : $@convention(thin) (@noescape @callee_guaranteed () -> ((Int, Int), @error Error)) -> (@out (lhs: Int, rhs: Int), @error Error) {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'testDestructureNamedLabelAddress'
+sil [ossa] @testDestructureNamedLabelAddress : $@convention(thin) (@noescape @callee_guaranteed () -> ((Int, Int), @error Error)) -> (@out (lhs: Int, rhs: Int), @error Error) {
+bb0(%0 : $*(lhs: Int, rhs: Int), %1 : $@noescape @callee_guaranteed () -> ((Int, Int), @error Error)):
+  %3 = tuple_element_addr %0 : $*(lhs: Int, rhs: Int), 0
+  %4 = tuple_element_addr %0 : $*(lhs: Int, rhs: Int), 1
+  try_apply %1() : $@noescape @callee_guaranteed () -> ((Int, Int), @error Error), normal bb1, error bb2
+
+bb1(%6 : $(Int, Int)):
+  (%7, %8) = destructure_tuple %6 : $(Int, Int)
+  store %7 to [trivial] %3 : $*Int
+  store %8 to [trivial] %4 : $*Int
+  %11 = tuple ()
+  return %11 : $()
+
+bb2(%13 : @owned $Error):
+  throw %13 : $Error
+}
+
+sil @return_tuple_nativeobject : $@convention(thin) () -> (@owned Klass, @owned Klass)
+
+// CHECK-LABEL: sil [ossa] @test_noopt_apply_result_tuple_destructure : $@convention(thin)
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'test_noopt_apply_result_tuple_destructure'
+sil [ossa] @test_noopt_apply_result_tuple_destructure : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @return_tuple_nativeobject : $@convention(thin) () -> (@owned Klass, @owned Klass)
+  %0 = apply %f() : $@convention(thin) () -> (@owned Klass, @owned Klass)
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  %3 = tuple(%1 : $Klass, %2: $Klass)
+  destroy_value %3 : $(Klass, Klass)
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_noopt_apply_result_tuple_destructure_2 : $@convention(thin) () -> () {
+// CHECK: destructure_tuple
+// CHECK: } // end sil function 'test_noopt_apply_result_tuple_destructure_2'
+sil [ossa] @test_noopt_apply_result_tuple_destructure_2 : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_stack $(Klass, Klass)
+  %f = function_ref @return_tuple_nativeobject : $@convention(thin) () -> (@owned Klass, @owned Klass)
+  %result = apply %f() : $@convention(thin) () -> (@owned Klass, @owned Klass)
+  (%0, %1) = destructure_tuple %result : $(Klass, Klass)
+  %t0 = tuple_element_addr %alloc : $*(Klass, Klass), 0
+  store %0 to [init] %t0 : $*Klass
+  %t1 = tuple_element_addr %alloc : $*(Klass, Klass), 1
+  store %1 to [init] %t1 : $*Klass
+  destroy_addr %alloc : $*(Klass, Klass)
+  dealloc_stack %alloc : $*(Klass, Klass)
   %9999 = tuple()
   return %9999 : $()
 }

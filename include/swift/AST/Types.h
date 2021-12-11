@@ -2244,6 +2244,14 @@ public:
   /// getNamedElementId - If this tuple has an element with the specified name,
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
+
+  /// Returns true if any element of this tuple type has a name.
+  bool hasAnyNamedElement() const {
+    return llvm::any_of(getElements(),
+                        [](const TupleTypeElt &eltTy) {
+                          return eltTy.hasName();
+                        });
+  }
   
   /// Returns true if this tuple has inout, __shared or __owned elements.
   bool hasElementWithOwnership() const {
