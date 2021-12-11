@@ -1660,6 +1660,12 @@ static void extractDirectlyReferencedNominalTypes(
     return;
   }
 
+  if (auto existential = type->getAs<ExistentialType>()) {
+    extractDirectlyReferencedNominalTypes(
+        existential->getConstraintType(), decls);
+    return;
+  }
+
   llvm_unreachable("Not a type containing nominal types?");
 }
 
@@ -2319,6 +2325,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
 
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
+  case TypeReprKind::Existential:
     return { };
 
   case TypeReprKind::Fixed:

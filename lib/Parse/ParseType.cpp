@@ -804,10 +804,15 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
   // This is only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
   SourceLoc opaqueLoc;
+  SourceLoc anyLoc;
   if (Tok.isContextualKeyword("some")) {
     // Treat some as a keyword.
     TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
     opaqueLoc = consumeToken();
+  } else if (Tok.isContextualKeyword("any")) {
+    // Treat any as a keyword.
+    TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
+    anyLoc = consumeToken();
   } else {
     // This isn't a some type.
     SomeTypeContext.setTransparent();
@@ -816,6 +821,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr* {
     if (opaqueLoc.isValid()) {
       type = new (Context) OpaqueReturnTypeRepr(opaqueLoc, type);
+    } else if (anyLoc.isValid()) {
+      type = new (Context) ExistentialTypeRepr(anyLoc, type);
     }
     return type;
   };
@@ -866,16 +873,21 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
       consumeToken(); // consume '&'
     }
     
-    // Diagnose invalid `some` after an ampersand.
-    if (Tok.isContextualKeyword("some")) {
+    // Diagnose invalid `some` or `any` after an ampersand.
+    if (Tok.isContextualKeyword("some") ||
+        Tok.isContextualKeyword("any")) {
+      auto keyword = Tok.getText();
       auto badLoc = consumeToken();
 
-      diagnose(badLoc, diag::opaque_mid_composition)
+      diagnose(badLoc, diag::opaque_mid_composition, keyword)
           .fixItRemove(badLoc)
-          .fixItInsert(FirstTypeLoc, "some ");
+          .fixItInsert(FirstTypeLoc, keyword.str() + " ");
 
-      if (opaqueLoc.isInvalid())
+      if (opaqueLoc.isInvalid()) {
         opaqueLoc = badLoc;
+      } else if (anyLoc.isInvalid()) {
+        anyLoc = badLoc;
+      }
     }
 
     // Parse next type.
@@ -1441,8 +1453,11 @@ bool Parser::canParseType() {
   // Accept 'inout' at for better recovery.
   consumeIf(tok::kw_inout);
 
-  if (Tok.isContextualKeyword("some"))
+  if (Tok.isContextualKeyword("some")) {
     consumeToken();
+  } else if (Tok.isContextualKeyword("any")) {
+    consumeToken();
+  }
 
   switch (Tok.getKind()) {
   case tok::kw_Self:

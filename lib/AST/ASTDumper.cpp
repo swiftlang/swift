@@ -3095,6 +3095,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitExistentialTypeRepr(ExistentialTypeRepr *T) {
+    printCommon("type_existential");
+    printRec(T->getConstraint());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {
     printCommon("type_placeholder");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -3924,6 +3930,13 @@ namespace {
       for (auto proto : T->getMembers()) {
         printRec(proto);
       }
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitExistentialType(ExistentialType *T,
+                              StringRef label) {
+      printCommon(label, "existential_type");
+      printRec(T->getConstraintType());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

@@ -328,6 +328,12 @@ public:
                                type1->getMembers(), type2->getMembers());
   }
 
+  bool visitExistentialType(CanExistentialType type1,
+                            CanExistentialType type2) {
+    return asImpl().visit(type1.getConstraintType(),
+                          type2.getConstraintType());
+  }
+
   bool visitLValueType(CanLValueType type1, CanLValueType type2) {
     return asImpl().visit(type1.getObjectType(), type2.getObjectType());
   }
