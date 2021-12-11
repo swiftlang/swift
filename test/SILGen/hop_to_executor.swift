@@ -93,6 +93,20 @@ struct GlobalActor {
 func testGlobalActor() async {
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A17GlobalActorUnsafeyyYaF : $@convention(thin) @async () -> () {
+// CHECK:   [[F:%[0-9]+]] = function_ref @$s4test11GlobalActorV6sharedAA02MyC0Cvau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK:   [[P:%[0-9]+]] = apply [[F]]() : $@convention(thin) () -> Builtin.RawPointer
+// CHECK:   [[A:%[0-9]+]] = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*MyActor
+// CHECK:   [[ACC:%[0-9]+]] = begin_access [read] [dynamic] [[A]] : $*MyActor
+// CHECK:   [[L:%[0-9]+]] = load [copy] [[ACC]] : $*MyActor
+// CHECK:   [[B:%[0-9]+]] = begin_borrow [[L]] : $MyActor
+// CHECK:   hop_to_executor [[B]] : $MyActor
+// CHECK: }
+@GlobalActor
+@_predatesConcurrency
+func testGlobalActorUnsafe() async {
+}
+
 ///// testGlobalActorWithClosure()
 // CHECK: sil hidden [ossa] @$s4test0A22GlobalActorWithClosureyyYaF : $@convention(thin) @async () -> () {
 // CHECK:     hop_to_executor [[A:%[0-9]+]] : $MyActor
