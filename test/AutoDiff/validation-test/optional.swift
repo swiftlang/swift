@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-lexical-borrow-scopes=false)
+// RUN: %target-run-simple-swift
 
 // REQUIRES: executable_test
 
