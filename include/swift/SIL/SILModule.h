@@ -911,14 +911,17 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {
   case SILStage::Raw:
-    // In Raw SIL, we support lexical lifetimes as long as lexical lifetimes is
-    // not turned off all the way. This means lexical lifetimes is set to either
-    // early or experimental late.
+    // In raw SIL, lexical markers are used for diagnostics.  These markers are
+    // present as long as the lexical lifetimes feature is not disabled
+    // entirely.
     return LexicalLifetimes != LexicalLifetimesOption::Off;
   case SILStage::Canonical:
-    // In Canonical SIL, we only support lexical lifetimes when in experimental
-    // late mode.
-    return LexicalLifetimes == LexicalLifetimesOption::ExperimentalLate;
+    // In Canonical SIL, lexical markers are used to ensure that object
+    // lifetimes do not get observably shortened from the end of a lexical
+    // scope.  That behavior only occurs when lexical lifetimes is (fully)
+    // enabled.  (When only diagnostic markers are enabled, the markers are
+    // stripped as part of lowering from raw to canonical SIL.)
+    return LexicalLifetimes == LexicalLifetimesOption::On;
   case SILStage::Lowered:
     // We do not support OSSA in Lowered SIL, so this is always false.
     return false;
