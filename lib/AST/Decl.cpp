@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/CaptureInfo.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -8609,6 +8610,41 @@ void ClassDecl::setSuperclass(Type superclass) {
     true);
 }
 
+bool VarDecl::isSelfParamCaptureIsolated() const {
+  assert(isSelfParamCapture());
+
+  // Find the "self" parameter that we captured and determine whether
+  // it is potentially isolated.
+  for (auto dc = getDeclContext(); dc; dc = dc->getParent()) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+      if (auto selfDecl = func->getImplicitSelfDecl()) {
+        return selfDecl->isIsolated();
+      }
+
+      if (auto capture = func->getCaptureInfo().getIsolatedParamCapture())
+        return capture->isSelfParameter() || capture->isSelfParamCapture();
+    }
+
+    if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+      switch (auto isolation = closure->getActorIsolation()) {
+      case ClosureActorIsolation::Independent:
+      case ClosureActorIsolation::GlobalActor:
+        return false;
+
+      case ClosureActorIsolation::ActorInstance:
+        auto isolatedVar = isolation.getActorInstance();
+        return isolatedVar->isSelfParameter() ||
+            isolatedVar-isSelfParamCapture();
+      }
+    }
+
+    if (dc->isModuleScopeContext() || dc->isTypeContext())
+      break;
+  }
+
+  return false;
+}
+
 ActorIsolation swift::getActorIsolation(ValueDecl *value) {
   auto &ctx = value->getASTContext();
   return evaluateOrDefault(
@@ -8638,7 +8674,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
 
     case ClosureActorIsolation::ActorInstance: {
       auto selfDecl = isolation.getActorInstance();
-      auto actorClass = selfDecl->getType()->getRValueType()
+      auto actorClass = selfDecl->getType()->getReferenceStorageReferent()
           ->getClassOrBoundGenericClass();
       // FIXME: Doesn't work properly with generics
       assert(actorClass && "Bad closure actor isolation?");
