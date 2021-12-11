@@ -118,7 +118,8 @@ insertDeallocStackAtEndOf(SmallVectorImpl<SILInstruction *> &FunctionExits,
   // Insert dealloc_stack in the exit blocks.
   for (auto *Exit : FunctionExits) {
     SILBuilderWithScope Builder(Exit);
-    Builder.createDeallocStack(AllocStack->getLoc(), AllocStack);
+    Builder.createDeallocStack(CleanupLocation(AllocStack->getLoc()),
+                               AllocStack);
   }
 }
 
