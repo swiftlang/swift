@@ -80,8 +80,6 @@ struct CheckerLivenessInfo {
 } // end anonymous namespace
 
 bool CheckerLivenessInfo::compute() {
-  bool foundEscapes = false;
-
   LLVM_DEBUG(llvm::dbgs() << "LivenessVisitor Begin!\n");
   while (SILValue value = defUseWorklist.pop()) {
     LLVM_DEBUG(llvm::dbgs() << "New Value: " << value);
@@ -108,7 +106,8 @@ bool CheckerLivenessInfo::compute() {
       // escape. Is it legal to canonicalize ForwardingUnowned?
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
-        foundEscapes = true;
+        // This is an escape but it is up to the user to handle this, move
+        // checking stops here.
         break;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
@@ -133,8 +132,8 @@ bool CheckerLivenessInfo::compute() {
           // binding that should be tracked separately.
           if (!bbi->isLexical()) {
             bool failed = !liveness.updateForBorrowingOperand(use);
-            assert(!failed &&
-                   "Shouldn't see reborrows this early in the pipeline");
+            if (failed)
+              return false;
           }
         }
         break;
@@ -178,8 +177,8 @@ bool CheckerLivenessInfo::compute() {
     }
   }
 
-  // We succeeded if we did not find any escapes.
-  return !foundEscapes;
+  // We succeeded if we reached this point since we handled all uses.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -380,11 +379,12 @@ bool MoveKillsCopyableValuesChecker::check() {
     // Then compute liveness.
     SWIFT_DEFER { livenessInfo.clear(); };
     livenessInfo.initDef(lexicalValue);
-    // We do not care if we find an escape. We just want to make sure that any
-    // non-escaping users obey our property. If the user does something unsafe
-    // that is on them to manage.
-    bool foundEscape = livenessInfo.compute();
-    (void)foundEscape;
+
+    // We only fail to optimize if for some reason we hit reborrows. This is
+    // temporary since we really should just ban reborrows in Raw SIL.
+    bool canOptimize = livenessInfo.compute();
+    if (!canOptimize)
+      continue;
 
     // Then look at all of our found consuming uses. See if any of these are
     // _move that are within the boundary.
