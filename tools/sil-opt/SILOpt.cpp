@@ -528,7 +528,7 @@ int main(int argc, char **argv) {
   SILOpts.DisableCopyPropagation = DisableCopyPropagation;
 
   if (EnableCopyPropagation)
-    SILOpts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
 
   // Enable lexical lifetimes if it is set or if experimental move only is
   // enabled. This is because move only depends on lexical lifetimes being
@@ -541,7 +541,7 @@ int main(int argc, char **argv) {
     exit(-1);
   }
   if (enableLexicalLifetimes)
-    SILOpts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+    SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
   if (!EnableLexicalBorrowScopes)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::Off;
 
