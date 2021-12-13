@@ -316,8 +316,7 @@ static bool shouldAddLexicalLifetime(AllocStackInst *asi) {
          asi->getFunction()
                  ->getModule()
                  .getASTContext()
-                 .SILOpts.LexicalLifetimes ==
-             LexicalLifetimesOption::ExperimentalLate &&
+                 .SILOpts.LexicalLifetimes == LexicalLifetimesOption::On &&
          asi->isLexical() &&
          !asi->getElementType().isTrivial(*asi->getFunction());
 }

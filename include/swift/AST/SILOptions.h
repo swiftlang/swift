@@ -31,15 +31,17 @@
 namespace swift {
 
 enum class LexicalLifetimesOption : uint8_t {
-  // Do not insert any lexical lifetimes.
+  // Do not insert lexical markers.
   Off = 0,
 
-  // Insert lexical lifetimes in SILGen, but remove them before leaving Raw SIL.
-  Early,
+  // Insert lexical markers via lexical borrow scopes and the lexical flag on
+  // alloc_stacks produced from alloc_boxes, but strip them when lowering out of
+  // Raw SIL.
+  DiagnosticMarkersOnly,
 
-  // Insert lexical lifetimes and do not remove them until OSSA is lowered. This
-  // is experimental.
-  ExperimentalLate,
+  // Insert lexical markers and use them to lengthen object lifetime based on
+  // lexical scope.
+  On,
 };
 
 class SILModule;
@@ -59,7 +61,8 @@ public:
   bool RemoveRuntimeAsserts = false;
 
   /// Enable experimental support for emitting defined borrow scopes.
-  LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::Early;
+  LexicalLifetimesOption LexicalLifetimes =
+      LexicalLifetimesOption::DiagnosticMarkersOnly;
 
   /// Force-run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.

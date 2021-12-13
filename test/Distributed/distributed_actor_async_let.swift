@@ -1,17 +1,20 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 import _Distributed
+import FakeDistributedActorSystems
 
 distributed actor Philosopher {
+  typealias ActorSystem = FakeActorSystem
+
   let philosophy: String
 
-  typealias Transport = AnyActorTransport
-
-  init(transport: AnyActorTransport) {
+  init(system: FakeActorSystem) {
     philosophy = "Epistemology"
   }
 

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Onone -Xfrontend -g -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Onone -Xfrontend -g -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -10,14 +10,12 @@
 
 import _Distributed
 
-@available(SwiftStdlib 5.6, *)
 distributed actor SomeSpecificDistributedActor {
   distributed func hello() async throws -> String {
     "local impl"
   }
 }
 
-@available(SwiftStdlib 5.6, *)
 extension SomeSpecificDistributedActor {
 
   @_dynamicReplacement(for: _remote_hello())
@@ -28,54 +26,77 @@ extension SomeSpecificDistributedActor {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
-struct FakeActorID: ActorIdentity {
+struct FakeActorID: Sendable, Hashable, Codable {
   let id: UInt64
 }
 
-@available(SwiftStdlib 5.6, *)
-enum FakeTransportError: ActorTransportError {
-  case unsupportedActorIdentity(AnyActorIdentity)
+enum FakeActorSystemError: DistributedActorSystemError {
+  case unsupportedActorIdentity(Any)
 }
 
-@available(SwiftStdlib 5.6, *)
-struct ActorAddress: ActorIdentity {
+struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
   init(parse address : String) {
     self.address = address
   }
 }
 
-@available(SwiftStdlib 5.6, *)
-struct FakeTransport: ActorTransport {
-  func decodeIdentity(from decoder: Decoder) throws -> AnyActorIdentity {
-    fatalError("not implemented:\(#function)")
-  }
+struct FakeActorSystem: DistributedActorSystem {
+  typealias ActorID = ActorAddress
+  typealias Invocation = FakeInvocation
+  typealias SerializationRequirement = Codable
 
-  func resolve<Act>(_ identity: AnyActorIdentity, as actorType: Act.Type)
-  throws -> Act?
-      where Act: DistributedActor {
+  func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+            Act.ID == ActorID  {
     return nil
   }
 
-  func assignIdentity<Act>(_ actorType: Act.Type) -> AnyActorIdentity
+  func assignID<Act>(_ actorType: Act.Type) -> ActorID
       where Act: DistributedActor {
     let id = ActorAddress(parse: "xxx")
-    print("assignIdentity type:\(actorType), id:\(id)")
-    return .init(id)
+    print("assignID type:\(actorType), id:\(id)")
+    return id
   }
 
-  func actorReady<Act>(_ actor: Act) where Act: DistributedActor {
+  func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+      Act.ID == ActorID {
     print("actorReady actor:\(actor), id:\(actor.id)")
   }
 
-  func resignIdentity(_ id: AnyActorIdentity) {
-    print("resignIdentity id:\(id)")
+  func resignID(_ id: ActorID) {
+    print("assignID id:\(id)")
+  }
+
+  func makeInvocation() -> Invocation {
+    .init()
   }
 }
 
-@available(SwiftStdlib 5.6, *)
-typealias DefaultActorTransport = FakeTransport
+struct FakeInvocation: DistributedTargetInvocation {
+  typealias ArgumentDecoder = FakeArgumentDecoder
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(mangledType: T.Type) throws {}
+  mutating func recordArgument<Argument: SerializationRequirement>(argument: Argument) throws {}
+  mutating func recordReturnType<R: SerializationRequirement>(mangledType: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(mangledType: E.Type) throws {}
+  mutating func doneRecording() throws {}
+
+  // === Receiving / decoding -------------------------------------------------
+
+  mutating func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  mutating func argumentDecoder() -> FakeArgumentDecoder { .init() }
+  mutating func decodeReturnType() throws -> Any.Type? { nil }
+  mutating func decodeErrorType() throws -> Any.Type? { nil }
+
+  struct FakeArgumentDecoder: DistributedTargetInvocationArgumentDecoder {
+    typealias SerializationRequirement = Codable
+  }
+}
+
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
 // ==== Execute ----------------------------------------------------------------
 
@@ -88,32 +109,30 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(SwiftStdlib 5.6, *)
 func test_remote() async {
   let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
-  let transport = FakeTransport()
+  let system = FakeActorSystem()
 
-  let local = SomeSpecificDistributedActor(transport: transport)
+  let local = SomeSpecificDistributedActor(system: system)
   assert(__isLocalActor(local) == true, "should be local")
   assert(__isRemoteActor(local) == false, "should be local")
   print("isRemote(local) = \(__isRemoteActor(local))") // CHECK: isRemote(local) = false
-  print("local.id = \(local.id)") // CHECK: local.id = AnyActorIdentity(ActorAddress(address: "xxx"))
-  print("local.transport = \(local.actorTransport)") // CHECK: local.transport = FakeTransport()
+  print("local.id = \(local.id)") // CHECK: local.id = ActorAddress(address: "xxx")
+  print("local.system = \(local.actorSystem)") // CHECK: local.system = FakeActorSystem()
 
   // assume it always makes a remote one
-  let remote = try! SomeSpecificDistributedActor.resolve(.init(address), using: transport)
+  let remote = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
   assert(__isLocalActor(remote) == false, "should be remote")
   assert(__isRemoteActor(remote) == true, "should be remote")
   print("isRemote(remote) = \(__isRemoteActor(remote))") // CHECK: isRemote(remote) = true
 
-  // Check the id and transport are the right values, and not trash memory
-  print("remote.id = \(remote.id)") // CHECK: remote.id = AnyActorIdentity(ActorAddress(address: "sact://127.0.0.1/example#1234"))
-  print("remote.transport = \(remote.actorTransport)") // CHECK: remote.transport = FakeTransport()
+  // Check the id and system are the right values, and not trash memory
+  print("remote.id = \(remote.id)") // CHECK: remote.id = ActorAddress(address: "sact://127.0.0.1/example#1234")
+  print("remote.system = \(remote.actorSystem)") // CHECK: remote.system = FakeActorSystem()
 
   print("done") // CHECK: done
 }
 
-@available(SwiftStdlib 5.6, *)
 @main struct Main {
   static func main() async {
     await test_remote()

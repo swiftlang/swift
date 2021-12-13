@@ -4,10 +4,9 @@
 
 actor SomeActor { }
 
-@available(SwiftStdlib 5.6, *)
 distributed actor MissingImportDistributedActor_0 { }
 // expected-error@-1{{'_Distributed' module not imported, required for 'distributed actor'}}
 
-let t: ActorTransport // expected-error{{cannot find type 'ActorTransport' in scope}}
+let t: DistributedActorSystem // expected-error{{cannot find type 'DistributedActorSystem' in scope}}
 let a: ActorAddress // expected-error{{cannot find type 'ActorAddress' in scope}}
 
