@@ -1458,7 +1458,8 @@ extension Collection {
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
   ///
-  /// The resulting subsequence *includes* the element at the position `end`. 
+  /// The resulting subsequence *includes* the element at the position
+  /// specified by the `through` parameter.
   /// The following example searches for the index of the number `40` in an
   /// array of integers, and then prints the prefix of the array up to, and
   /// including, that index:
@@ -1481,7 +1482,7 @@ extension Collection {
   /// - Parameter end: The index of the last element to include in the
   ///   resulting subsequence. `end` must be a valid index of the collection
   ///   that is not equal to the `endIndex` property.
-  /// - Returns: A subsequence up to, and including, the `end` position.
+  /// - Returns: A subsequence up to, and including, the given position.
   ///
   /// - Complexity: O(1)
   @inlinable
