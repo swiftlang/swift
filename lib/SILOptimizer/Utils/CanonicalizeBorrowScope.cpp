@@ -327,13 +327,18 @@ public:
       // For borrows, record the scope-ending instructions to outer use
       // points. Note: The logic in filterOuterBorrowUseInsts that checks
       // whether a borrow scope is an outer use must visit the same set of uses.
-      borrowingOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
+      //
+      // FIXME: visitExtendedScopeEndingUses can't return false here once dead
+      // borrows are disallowed.
+      if (!borrowingOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
         auto *endInst = endBorrow->getUser();
         if (!isUserInLiveOutBlock(endInst)) {
           useInsts.insert(endInst);
         }
         return true;
-      });
+      })) {
+        useInsts.insert(user);
+      }
     }
     return true;
   }
