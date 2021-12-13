@@ -1044,18 +1044,13 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
     CompIns.getSourceMgr().setFileSystem(FileSystem);
   }
 
-  if (CompIns.setup(Invocation)) {
+  if (CompIns.setup(Invocation, Error)) {
     // FIXME: Report the diagnostic.
     LOG_WARN_FUNC("Compilation setup failed!!!");
     Error = "compilation setup failed";
     return nullptr;
   }
   CompIns.getASTContext().CancellationFlag = CancellationFlag;
-  if (CompIns.loadStdlibIfNeeded()) {
-    LOG_WARN_FUNC("Loading the stdlib failed");
-    Error = "Loading the stdlib failed";
-    return nullptr;
-  }
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
     TracedOp.start(TraceInfo);

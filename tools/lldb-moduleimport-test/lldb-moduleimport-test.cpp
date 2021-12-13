@@ -316,8 +316,9 @@ int main(int argc, char **argv) {
     Invocation.setRuntimeResourcePath(ResourceDir);
   }
 
-  if (CI.setup(Invocation)) {
-    llvm::errs() << "error: Failed setup invocation!\n";
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return 1;
   }
 

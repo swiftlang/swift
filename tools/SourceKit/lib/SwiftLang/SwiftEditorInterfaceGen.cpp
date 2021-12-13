@@ -225,7 +225,8 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), /*isPrimary*/false, Buf.get(),
                 file_types::TY_Swift));
-  return CI.setup(Invocation);
+  std::string InstanceSetupError;
+  return CI.setup(Invocation, InstanceSetupError);
 }
 
 static void reportSyntacticAnnotations(CompilerInstance &CI,
@@ -373,8 +374,7 @@ SwiftInterfaceGenContext::create(StringRef DocumentName,
   CI.addDiagnosticConsumer(&IFaceGenCtx->Impl.DiagConsumer);
 
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
-  if (CI.setup(Invocation)) {
-    ErrMsg = "Error during invocation setup";
+  if (CI.setup(Invocation, ErrMsg)) {
     return nullptr;
   }
 
@@ -432,8 +432,7 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
   // Display diagnostics to stderr.
   CI.addDiagnosticConsumer(&IFaceGenCtx->Impl.DiagConsumer);
 
-  if (CI.setup(Invocation)) {
-    ErrorMsg = "Error during invocation setup";
+  if (CI.setup(Invocation, ErrorMsg)) {
     return nullptr;
   }
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);

@@ -584,8 +584,11 @@ int main(int argc, char **argv) {
     return retValue ? retValue : diagnosticsError;
   };
 
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return finishDiagProcessing(1);
+  }
 
   CI.performSema();
 

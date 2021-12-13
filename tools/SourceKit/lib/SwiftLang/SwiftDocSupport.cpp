@@ -882,7 +882,8 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(Buf.get()->getBufferIdentifier(), /*isPrimary*/false, Buf.get(),
                 file_types::TY_Swift));
-  return CI.setup(Invocation);
+  std::string InstanceSetupError;
+  return CI.setup(Invocation, InstanceSetupError);
 }
 
 static void collectFuncEntities(std::vector<TextEntity> &Ents,
@@ -1076,8 +1077,11 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    Consumer.failed(InstanceSetupError);
     return true;
+  }
 
   ASTContext &Ctx = CI.getASTContext();
   registerIDERequestFunctions(Ctx.evaluator);
@@ -1200,8 +1204,11 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   CI.addDiagnosticConsumer(&DiagConsumer);
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
-  if (CI.setup(Invocation))
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    Consumer.failed(InstanceSetupError);
     return true;
+  }
   DiagConsumer.setInputBufferIDs(CI.getInputBufferIDs());
 
   ASTContext &Ctx = CI.getASTContext();
@@ -1467,8 +1474,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
       InputFile(InputBuf->getBufferIdentifier(), /*isPrimary*/false, InputBuf,
                 file_types::TY_Swift));
 
-  if (ParseCI.setup(Invocation)) {
-    Error = "Compiler invocation set up failed";
+  if (ParseCI.setup(Invocation, Error)) {
     return nullptr;
   }
 
@@ -1550,8 +1556,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
-  if (CI.setup(Invocation)) {
-    Error = "Compiler invocation set up fails.";
+  if (CI.setup(Invocation, Error)) {
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
