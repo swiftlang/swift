@@ -213,7 +213,9 @@ where SubSequence: MutableCollection
   /// receive a temporary copy rather than direct access to the collection's
   /// storage.
   ///
-  /// - Warning: Your `body` closure must not replace `buffer`.
+  /// - Warning: Your `body` closure must not replace `buffer`. This leads
+  ///   to a crash in all implementations of this method within the standard
+  ///   library
   ///
   /// Successive calls to this method may provide a different pointer on each
   /// call. Don't store `buffer` outside of this method.
@@ -228,9 +230,6 @@ where SubSequence: MutableCollection
   /// - Parameters:
   ///   - body: A closure that receives an in-out
   ///     `UnsafeMutableBufferPointer` to the collection's contiguous storage.
-  ///     Use the buffer pointer directly; don't replace it, because this leads
-  ///     to a crash in all implementations of this method within the standard
-  ///     library.
   /// - Returns: The value returned from `body`, unless the collection doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
