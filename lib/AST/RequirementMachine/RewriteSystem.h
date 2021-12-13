@@ -278,7 +278,7 @@ public:
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  void simplifySubstitutions(MutableTerm &term, RewritePath &path) const;
+  bool simplifySubstitutions(Symbol &symbol, RewritePath &path) const;
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -290,7 +290,9 @@ public:
   computeConfluentCompletion(unsigned maxIterations,
                              unsigned maxDepth);
 
-  void simplifyRewriteSystem();
+  void simplifyLeftHandSides();
+
+  void simplifyRightHandSidesAndSubstitutions();
 
   enum ValidityPolicy {
     AllowInvalidRequirements,

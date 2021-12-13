@@ -596,7 +596,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       }
     }
 
-    simplifyRewriteSystem();
+    simplifyLeftHandSides();
 
     assert(resolvedCriticalPairs.size() == resolvedPaths.size());
 
@@ -628,6 +628,8 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     resolvedCriticalPairs.clear();
     resolvedPaths.clear();
     resolvedLoops.clear();
+
+    simplifyRightHandSidesAndSubstitutions();
 
     // If the added rules merged any associated types, process the merges now
     // before we continue with the completion procedure. This is important
