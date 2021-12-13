@@ -6,10 +6,10 @@ set(swift_stubs_sources
     Stubs.cpp
     ThreadLocalStorage.cpp
     MathStubs.cpp
-    UnicodeData.cpp
-    UnicodeGrapheme.cpp
-    UnicodeNormalization.cpp
-    UnicodeScalarProps.cpp
+    Unicode/UnicodeData.cpp
+    Unicode/UnicodeGrapheme.cpp
+    Unicode/UnicodeNormalization.cpp
+    Unicode/UnicodeScalarProps.cpp
 )
 set(swift_stubs_objc_sources
     Availability.mm
