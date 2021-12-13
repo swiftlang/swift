@@ -35,7 +35,7 @@ public func emitCollection<C: Collection>(
   emitCollection(
     collection,
     name: name,
-    type: "__swift_uint\(C.Element.bitWidth)_t",
+    type: "__swift_\(C.Element.isSigned ? "" : "u")int\(C.Element.bitWidth)_t",
     into: &result
   ) {
     "0x\(String($0, radix: 16, uppercase: true))"
@@ -43,7 +43,18 @@ public func emitCollection<C: Collection>(
 }
 
 // Emits an abstract minimal perfect hash function into C arrays.
-public func emitMph(_ mph: Mph, name: String, into result: inout String) {
+public func emitMph(
+  _ mph: Mph,
+  name: String,
+  defineLabel: String,
+  into result: inout String
+) {
+  result += """
+  #define \(defineLabel)_LEVEL_COUNT \(mph.bitArrays.count)
+  
+  
+  """
+  
   emitMphSizes(mph, name, into: &result)
   emitMphBitarrays(mph, name, into: &result)
   emitMphRanks(mph, name, into: &result)
