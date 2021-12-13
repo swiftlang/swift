@@ -221,8 +221,8 @@ private:
 
   void concretizeTypeWitnessInConformance(
                    Term key, RequirementKind requirementKind,
-                   CanType concreteType, ArrayRef<Term> substitutions,
-                   const ProtocolDecl *proto, ProtocolConformance *concrete,
+                   Symbol concreteConformanceSymbol,
+                   ProtocolConformance *concrete,
                    AssociatedTypeDecl *assocType,
                    SmallVectorImpl<InducedRule> &inducedRules) const;
 
@@ -233,8 +233,9 @@ private:
   void recordConcreteConformanceRule(
     unsigned concreteRuleID,
     unsigned conformanceRuleID,
-    const ProtocolDecl *proto,
-    SmallVectorImpl<InducedRule> &inducedRules);
+    RequirementKind requirementKind,
+    Symbol concreteConformanceSymbol,
+    SmallVectorImpl<InducedRule> &inducedRules) const;
 
   void verify() const;
 };

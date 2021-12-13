@@ -541,12 +541,24 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
 
     auto *concrete = conformance.getConcrete();
 
-    recordConcreteConformanceRule(concreteRuleID, conformanceRuleID, proto,
-                                  inducedRules);
-
     // Record the conformance for use by
     // PropertyBag::getConformsToExcludingSuperclassConformances().
     conformances.push_back(concrete);
+
+    // All subsequent logic just records new rewrite rules, and can be
+    // skipped if we've already processed this pair of rules.
+    if (!ConcreteConformanceRules.insert(
+        std::make_pair(concreteRuleID, conformanceRuleID)).second) {
+      // We've already processed this pair of rules.
+      continue;
+    }
+
+    auto concreteConformanceSymbol = Symbol::forConcreteConformance(
+        concreteType, substitutions, proto, Context);
+
+    recordConcreteConformanceRule(concreteRuleID, conformanceRuleID,
+                                  requirementKind, concreteConformanceSymbol,
+                                  inducedRules);
 
     auto assocTypes = proto->getAssociatedTypeMembers();
     if (assocTypes.empty())
@@ -554,8 +566,8 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
 
     for (auto *assocType : assocTypes) {
       concretizeTypeWitnessInConformance(key, requirementKind,
-                                         concreteType, substitutions,
-                                         proto, concrete, assocType,
+                                         concreteConformanceSymbol,
+                                         concrete, assocType,
                                          inducedRules);
     }
   }
@@ -563,10 +575,13 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
 
 void PropertyMap::concretizeTypeWitnessInConformance(
     Term key, RequirementKind requirementKind,
-    CanType concreteType, ArrayRef<Term> substitutions,
-    const ProtocolDecl *proto, ProtocolConformance *concrete,
+    Symbol concreteConformanceSymbol,
+    ProtocolConformance *concrete,
     AssociatedTypeDecl *assocType,
     SmallVectorImpl<InducedRule> &inducedRules) const {
+  auto concreteType = concreteConformanceSymbol.getConcreteType();
+  auto substitutions = concreteConformanceSymbol.getSubstitutions();
+  auto *proto = concreteConformanceSymbol.getProtocol();
 
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
     llvm::dbgs() << "^^ " << "Looking up type witness for "
@@ -591,7 +606,9 @@ void PropertyMap::concretizeTypeWitnessInConformance(
                  << " of " << concreteType << " is " << typeWitness << "\n";
   }
 
+  // Build the term T.[concrete: C : P].[P:X].
   MutableTerm subjectType(key);
+  subjectType.add(concreteConformanceSymbol);
   subjectType.add(Symbol::forAssociatedType(proto, assocType->getName(),
                                             Context));
 
@@ -682,11 +699,19 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     // The type witness is a type parameter of the form τ_0_n.X.Y...Z,
     // where 'n' is an index into the substitution array.
     //
-    // Add a rule T => S.X.Y...Z, where S is the nth substitution term.
+    // Add a rule:
+    //
+    // T.[concrete: C : P].[P:X] => S[n].X.Y...Z
+    //
+    // Where S[n] is the nth substitution term.
     return Context.getRelativeTermForType(typeWitness, substitutions);
   }
 
   // The type witness is a concrete type.
+  //
+  // Add a rule:
+  //
+  // T.[concrete: C : P].[P:X].[concrete: Foo.A] => T.[concrete: C : P].[P:A].
   MutableTerm constraintType = subjectType;
 
   SmallVector<Term, 3> result;
@@ -694,7 +719,6 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
       remapConcreteSubstitutionSchema(typeWitness, substitutions,
                                       Context, result);
 
-  // Add a rule T.[P:A].[concrete: Foo.A] => T.[P:A].
   constraintType.add(
       Symbol::forConcreteType(
           typeWitnessSchema, result, Context));
@@ -705,24 +729,28 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
 void PropertyMap::recordConcreteConformanceRule(
     unsigned concreteRuleID,
     unsigned conformanceRuleID,
-    const ProtocolDecl *proto,
-    SmallVectorImpl<InducedRule> &inducedRules) {
-  if (!ConcreteConformanceRules.insert(
-        std::make_pair(concreteRuleID, conformanceRuleID)).second) {
-    // We've already emitted this rule.
-    return;
-  }
-
+    RequirementKind requirementKind,
+    Symbol concreteConformanceSymbol,
+    SmallVectorImpl<InducedRule> &inducedRules) const {
   const auto &concreteRule = System.getRule(concreteRuleID);
   const auto &conformanceRule = System.getRule(conformanceRuleID);
 
-  auto conformanceSymbol = *conformanceRule.isPropertyRule();
-  assert(conformanceSymbol.getKind() == Symbol::Kind::Protocol);
-  assert(conformanceSymbol.getProtocol() == proto);
+#ifndef NDEBUG
+  {
+    auto conformanceSymbol = *conformanceRule.isPropertyRule();
+    assert(conformanceSymbol.getKind() == Symbol::Kind::Protocol);
+    assert(conformanceSymbol.getProtocol() ==
+           concreteConformanceSymbol.getProtocol());
 
-  auto concreteSymbol = *concreteRule.isPropertyRule();
-  assert(concreteSymbol.getKind() == Symbol::Kind::ConcreteType ||
-         concreteSymbol.getKind() == Symbol::Kind::Superclass);
+    auto concreteSymbol = *concreteRule.isPropertyRule();
+    if (concreteSymbol.getKind() == Symbol::Kind::Superclass)
+      assert(requirementKind == RequirementKind::Superclass);
+    else {
+      assert(concreteSymbol.getKind() == Symbol::Kind::ConcreteType);
+      assert(requirementKind == RequirementKind::SameType);
+    }
+  }
+#endif
 
   RewritePath path;
 
@@ -752,32 +780,18 @@ void PropertyMap::recordConcreteConformanceRule(
   // than T.
   unsigned adjustment = rhs.size() - concreteRule.getRHS().size();
   if (adjustment > 0 &&
-      !concreteSymbol.getSubstitutions().empty()) {
+      !concreteConformanceSymbol.getSubstitutions().empty()) {
     path.add(RewriteStep::forAdjustment(adjustment, /*endOffset=*/1,
                                         /*inverse=*/false));
-
-    concreteSymbol = concreteSymbol.prependPrefixToConcreteSubstitutions(
-        MutableTerm(rhs.begin(), rhs.begin() + adjustment),
-        Context);
   }
 
   // Now, transform T''.[concrete: C].[P] into T''.[concrete: C : P].
-  Symbol concreteConformanceSymbol = [&]() {
-    if (concreteSymbol.getKind() == Symbol::Kind::ConcreteType) {
-      path.add(RewriteStep::forConcreteConformance(/*inverse=*/false));
-      return Symbol::forConcreteConformance(
-          concreteSymbol.getConcreteType(),
-          concreteSymbol.getSubstitutions(),
-          proto, Context);
-    } else {
-      assert(concreteSymbol.getKind() == Symbol::Kind::Superclass);
-      path.add(RewriteStep::forSuperclassConformance(/*inverse=*/false));
-      return Symbol::forConcreteConformance(
-          concreteSymbol.getSuperclass(),
-          concreteSymbol.getSubstitutions(),
-          proto, Context);
-    }
-  }();
+  if (requirementKind == RequirementKind::Superclass) {
+    path.add(RewriteStep::forSuperclassConformance(/*inverse=*/false));
+  } else {
+    assert(requirementKind == RequirementKind::SameType);
+    path.add(RewriteStep::forConcreteConformance(/*inverse=*/false));
+  }
 
   MutableTerm lhs(rhs);
   lhs.add(concreteConformanceSymbol);
