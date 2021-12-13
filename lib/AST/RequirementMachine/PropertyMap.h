@@ -207,14 +207,17 @@ private:
 
   void computeConcreteTypeInDomainMap();
   void concretizeNestedTypesFromConcreteParents(
-                   SmallVectorImpl<InducedRule> &inducedRules) const;
+                   SmallVectorImpl<InducedRule> &inducedRules);
 
   void concretizeNestedTypesFromConcreteParent(
                    Term key, RequirementKind requirementKind,
-                   CanType concreteType, ArrayRef<Term> substitutions,
+                   unsigned concreteRuleID,
+                   CanType concreteType,
+                   ArrayRef<Term> substitutions,
+                   ArrayRef<unsigned> conformsToRules,
                    ArrayRef<const ProtocolDecl *> conformsTo,
                    llvm::TinyPtrVector<ProtocolConformance *> &conformances,
-                   SmallVectorImpl<InducedRule> &inducedRules) const;
+                   SmallVectorImpl<InducedRule> &inducedRules);
 
   void concretizeTypeWitnessInConformance(
                    Term key, RequirementKind requirementKind,
@@ -226,9 +229,6 @@ private:
   MutableTerm computeConstraintTermForTypeWitness(
       Term key, CanType concreteType, CanType typeWitness,
       const MutableTerm &subjectType, ArrayRef<Term> substitutions) const;
-
-  void recordConcreteConformanceRules(
-      SmallVectorImpl<InducedRule> &inducedRules);
 
   void recordConcreteConformanceRule(
     unsigned concreteRuleID,

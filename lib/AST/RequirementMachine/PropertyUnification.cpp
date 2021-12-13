@@ -404,7 +404,7 @@ void PropertyMap::computeConcreteTypeInDomainMap() {
 }
 
 void PropertyMap::concretizeNestedTypesFromConcreteParents(
-    SmallVectorImpl<InducedRule> &inducedRules) const {
+    SmallVectorImpl<InducedRule> &inducedRules) {
   for (const auto &props : Entries) {
     if (props->getConformsTo().empty())
       continue;
@@ -426,8 +426,10 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
       concretizeNestedTypesFromConcreteParent(
           props->getKey(),
           RequirementKind::SameType,
+          *props->ConcreteTypeRule,
           props->ConcreteType->getConcreteType(),
           props->ConcreteType->getSubstitutions(),
+          props->ConformsToRules,
           props->ConformsTo,
           props->ConcreteConformances,
           inducedRules);
@@ -441,9 +443,11 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
       concretizeNestedTypesFromConcreteParent(
           props->getKey(),
           RequirementKind::Superclass,
+          *props->SuperclassRule,
           props->Superclass->getSuperclass(),
           props->Superclass->getSubstitutions(),
-          props->getConformsTo(),
+          props->ConformsToRules,
+          props->ConformsTo,
           props->SuperclassConformances,
           inducedRules);
     }
@@ -484,14 +488,21 @@ void PropertyMap::concretizeNestedTypesFromConcreteParents(
 ///
 void PropertyMap::concretizeNestedTypesFromConcreteParent(
     Term key, RequirementKind requirementKind,
-    CanType concreteType, ArrayRef<Term> substitutions,
+    unsigned concreteRuleID,
+    CanType concreteType,
+    ArrayRef<Term> substitutions,
+    ArrayRef<unsigned> conformsToRules,
     ArrayRef<const ProtocolDecl *> conformsTo,
     llvm::TinyPtrVector<ProtocolConformance *> &conformances,
-    SmallVectorImpl<InducedRule> &inducedRules) const {
+    SmallVectorImpl<InducedRule> &inducedRules) {
   assert(requirementKind == RequirementKind::SameType ||
          requirementKind == RequirementKind::Superclass);
+  assert(conformsTo.size() == conformsToRules.size());
 
-  for (auto *proto : conformsTo) {
+  for (unsigned i : indices(conformsTo)) {
+    auto *proto = conformsTo[i];
+    unsigned conformanceRuleID = conformsToRules[i];
+
     // FIXME: Either remove the ModuleDecl entirely from conformance lookup,
     // or pass the correct one down in here.
     auto *module = proto->getParentModule();
@@ -499,7 +510,23 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     auto conformance = module->lookupConformance(concreteType,
                                                  const_cast<ProtocolDecl *>(proto));
     if (conformance.isInvalid()) {
-      // FIXME: Diagnose conflict
+      // For superclass rules, it is totally fine to have a signature like:
+      //
+      // protocol P {}
+      // class C {}
+      // <T  where T : P, T : C>
+      //
+      // There is no relation between P and C here.
+      //
+      // With concrete types, a missing conformance is a conflict.
+      if (requirementKind == RequirementKind::SameType) {
+        // FIXME: Diagnose conflict
+        //
+        // FIXME: We should mark the more specific rule of the two
+        // as conflicting.
+        System.getRule(conformanceRuleID).markConflicting();
+      }
+
       if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
         llvm::dbgs() << "^^ " << concreteType << " does not conform to "
                      << proto->getName() << "\n";
@@ -513,6 +540,9 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     assert(!conformance.isAbstract());
 
     auto *concrete = conformance.getConcrete();
+
+    recordConcreteConformanceRule(concreteRuleID, conformanceRuleID, proto,
+                                  inducedRules);
 
     // Record the conformance for use by
     // PropertyBag::getConformsToExcludingSuperclassConformances().
@@ -670,92 +700,6 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
           typeWitnessSchema, result, Context));
 
   return constraintType;
-}
-
-void PropertyMap::recordConcreteConformanceRules(
-    SmallVectorImpl<InducedRule> &inducedRules) {
-  for (const auto &props : Entries) {
-    if (props->getConformsTo().empty())
-      continue;
-
-    if (props->ConcreteType) {
-      unsigned concreteRuleID = *props->ConcreteTypeRule;
-
-      // The GSB drops all conformance requirements on a type parameter equated
-      // to a concrete type, even if the concrete type doesn't conform. That is,
-      //
-      // protocol P {}
-      // <T where T : P, T == Int>
-      //
-      // minimizes as
-      //
-      // <T where T == Int>.
-      //
-      // We model this by marking unsatisfied conformance rules as conflicts.
-
-      // The conformances in ConcreteConformances should appear in the same
-      // order as the protocols in ConformsTo.
-      auto conformanceIter = props->ConcreteConformances.begin();
-
-      for (unsigned i : indices(props->ConformsTo)) {
-        auto conformanceRuleID = props->ConformsToRules[i];
-        if (conformanceIter == props->ConcreteConformances.end()) {
-          // FIXME: We should mark the more specific rule of the conformance and
-          // concrete type rules as conflicting.
-          System.getRule(conformanceRuleID).markConflicting();
-          continue;
-        }
-
-        auto *proto = props->ConformsTo[i];
-        if (proto != (*conformanceIter)->getProtocol()) {
-          // FIXME: We should mark the more specific rule of the conformance and
-          // concrete type rules as conflicting.
-          System.getRule(conformanceRuleID).markConflicting();
-          continue;
-        }
-
-        recordConcreteConformanceRule(concreteRuleID, conformanceRuleID, proto,
-                                      inducedRules);
-        ++conformanceIter;
-      }
-
-      assert(conformanceIter == props->ConcreteConformances.end());
-    }
-
-    if (props->Superclass) {
-      unsigned superclassRuleID = *props->SuperclassRule;
-
-      // For superclass rules, we only introduce a concrete conformance if the
-      // superclass actually conforms. Otherwise, it is totally fine to have a
-      // signature like
-      //
-      // protocol P {}
-      // class C {}
-      // <T  where T : P, T : C>
-      //
-      // There is no relation between P and C here.
-
-      // The conformances in SuperclassConformances should appear in the same
-      // order as the protocols in ConformsTo.
-      auto conformanceIter = props->SuperclassConformances.begin();
-
-      for (unsigned i : indices(props->ConformsTo)) {
-        if (conformanceIter == props->SuperclassConformances.end())
-          break;
-
-        auto *proto = props->ConformsTo[i];
-        if (proto != (*conformanceIter)->getProtocol())
-          continue;
-
-        unsigned conformanceRuleID = props->ConformsToRules[i];
-        recordConcreteConformanceRule(superclassRuleID, conformanceRuleID, proto,
-                                      inducedRules);
-        ++conformanceIter;
-      }
-
-      assert(conformanceIter == props->SuperclassConformances.end());
-    }
-  }
 }
 
 void PropertyMap::recordConcreteConformanceRule(
