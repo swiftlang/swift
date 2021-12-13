@@ -3541,6 +3541,12 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   // If the isolation matches, we're done.
   if (isolation == overriddenIsolation)
     return;
+  
+  // FIXME: do we need this?
+  if (overriddenIsolation == ActorIsolation::Unspecified &&
+      isolation == ActorIsolation::Independent) {
+    return;
+  }
 
   // If the overriding declaration is non-isolated, it's okay.
   if (isolation.isIndependent() || isolation.isUnspecified())

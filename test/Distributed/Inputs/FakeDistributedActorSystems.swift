@@ -1,14 +1,18 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift open source project
+//
+// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0
+//
+// See LICENSE.txt for license information
+// See CONTRIBUTORS.txt for the list of Swift project authors
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+
 import _Distributed
-
-/// Use the existential wrapper as the default actor system.
-typealias DefaultDistributedActorSystem = FakeActorSystem
-
-@available(SwiftStdlib 5.6, *)
-public distributed actor DA {
-  public distributed func doSomethingDistributed(param: String) async -> Int {
-    return 0
-  }
-}
 
 // ==== Fake Address -----------------------------------------------------------
 
@@ -35,6 +39,12 @@ public struct FakeActorSystem: DistributedActorSystem {
   public typealias ActorID = ActorAddress
   public typealias Invocation = FakeInvocation
   public typealias SerializationRequirement = Codable
+
+  // just so that the struct does not get optimized away entirely
+  let someValue: String = ""
+  let someValue2: String = ""
+  let someValue3: String = ""
+  let someValue4: String = ""
 
   init() {
     print("Initialized new FakeActorSystem")
@@ -86,4 +96,3 @@ public struct FakeInvocation: DistributedTargetInvocation {
     public typealias SerializationRequirement = Codable
   }
 }
-

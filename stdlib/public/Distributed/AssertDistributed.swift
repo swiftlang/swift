@@ -13,9 +13,9 @@
 import Swift
 
 /// Report a call to a _remote function on a distributed (remote) actor,
-/// that was not dynamically replaced by some specific ActorTransport library.
+/// that was not dynamically replaced by some specific DistributedActorSystem library.
 @_transparent
-public func _missingDistributedActorTransport(
+public func _missingDistributedActorSystem(
   className: StaticString, functionName: StaticString,
   file: StaticString, line: UInt, column: UInt
 ) -> Never {
@@ -27,7 +27,7 @@ public func _missingDistributedActorTransport(
     """
     Invoked remote placeholder function '\(functionName)' on remote \
     distributed actor of type '\(className)'. Configure an appropriate \
-    'ActorTransport' for this actor to resolve this error (e.g. by depending \
-    on some specific transport library).
+    'DistributedActorSystem' for this actor to resolve this error (e.g. by depending \
+    on some specific actor system library).
     """, file: file, line: line)
 }

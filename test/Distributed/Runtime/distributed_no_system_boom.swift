@@ -1,46 +1,27 @@
-// RUN: %target-run-simple-swift(-Onone -Xfrontend -g -Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-fail-simple-swift(-Xfrontend -enable-experimental-distributed -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) 2>&1 | %FileCheck %s
+//
+// // TODO: could not figure out how to use 'not --crash' it never is used with target-run-simple-swift
+// This test is intended to *crash*, so we're using target-fail-simple-swift
+// which expects the exit code of the program to be non-zero;
+// We then check stderr for the expected error message using filecheck as usual.
 
+// UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-// rdar://76038845
-// UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: back_deployment_runtime
+// FIXME(distributed): remote functions dont seem to work on windows?
+// XFAIL: OS=windows-msvc
 
 import _Distributed
 
 distributed actor SomeSpecificDistributedActor {
-  typealias Transport = FakeActorSystem
-
-  let name: String
-  let surname: String
-  let age: Int
-
-  init(name: String, system: FakeActorSystem) {
-    self.name = name
-    self.surname = "Surname"
-    self.age = 42
-  }
-
-  deinit {
-    print("deinit \(self.id)")
-  }
-
   distributed func hello() async throws -> String {
-    "Hello, from \(name)"
+    "local impl"
   }
 }
 
 // ==== Fake Transport ---------------------------------------------------------
-
-struct FakeActorID: Sendable, Hashable, Codable {
-  let id: UInt64
-}
-
-enum FakeActorSystemError: DistributedActorSystemError {
-  case unsupportedActorIdentity(Any)
-}
 
 struct ActorAddress: Sendable, Hashable, Codable {
   let address: String
@@ -56,25 +37,25 @@ struct FakeActorSystem: DistributedActorSystem {
 
   func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
       where Act: DistributedActor,
-            Act.ID == ActorID  {
+            Act.ID == ActorID {
     return nil
   }
 
   func assignID<Act>(_ actorType: Act.Type) -> ActorID
       where Act: DistributedActor {
     let id = ActorAddress(parse: "xxx")
-    print("assignID type:\(actorType), id:\(id)")
+    print("assign type:\(actorType), id:\(id)")
     return id
   }
 
   func actorReady<Act>(_ actor: Act)
       where Act: DistributedActor,
       Act.ID == ActorID {
-    print("actorReady actor:\(actor), id:\(actor.id)")
+    print("ready actor:\(actor), id:\(actor.id)")
   }
 
   func resignID(_ id: ActorID) {
-    print("assignID id:\(id)")
+    print("ready id:\(id)")
   }
 
   func makeInvocation() -> Invocation {
@@ -109,17 +90,13 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 // ==== Execute ----------------------------------------------------------------
 
 func test_remote() async {
-  let address = ActorAddress(parse: "sact://127.0.0.1/example#1234")
+  let address = ActorAddress(parse: "")
   let system = FakeActorSystem()
 
-  var remote: SomeSpecificDistributedActor? =
-      try! SomeSpecificDistributedActor.resolve(id: address, using: system)
-  // Check the id and system are the right values, and not trash memory
-  print("remote.id = \(remote!.id)") // CHECK: remote.id = ActorAddress(address: "sact://127.0.0.1/example#1234")
-  print("remote.system = \(remote!.actorSystem)") // CHECK: remote.system = FakeActorSystem()
+  let remote = try! SomeSpecificDistributedActor.resolve(id: address, using: system)
+  _ = try! await remote.hello() // let it crash!
 
-  remote = nil // CHECK: deinit ActorAddress(address: "sact://127.0.0.1/example#1234")
-  print("done") // CHECK: done
+  // CHECK: SOURCE_DIR/test/Distributed/Runtime/distributed_no_system_boom.swift:{{[0-9]+}}: Fatal error: Invoked remote placeholder function '_remote_hello' on remote distributed actor of type 'main.SomeSpecificDistributedActor'. Configure an appropriate 'DistributedActorSystem' for this actor to resolve this error (e.g. by depending on some specific actor system library).
 }
 
 @main struct Main {
