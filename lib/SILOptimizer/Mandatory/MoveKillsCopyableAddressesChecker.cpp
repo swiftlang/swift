@@ -162,7 +162,7 @@ static llvm::cl::opt<bool>
     DisableUnhandledMoveDiagnostic("sil-disable-unknown-moveaddr-diagnostic");
 
 //===----------------------------------------------------------------------===//
-//                            Diagnostic Utilities
+//                                 Utilities
 //===----------------------------------------------------------------------===//
 
 template <typename... T, typename... U>
@@ -170,6 +170,15 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
+
+namespace llvm {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const SmallBitVector &bv) {
+  for (unsigned index : range(bv.size())) {
+    os << (bv[index] ? 1 : 0);
+  }
+  return os;
+}
+} // namespace llvm
 
 //===----------------------------------------------------------------------===//
 //                               Use Gathering
@@ -610,11 +619,16 @@ cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
   bool madeChange = false;
   BasicBlockWorklist worklist(fn);
   SILValue daiOperand;
+  LLVM_DEBUG(llvm::dbgs() << "Cleanup up destroy addr!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Visiting destroys!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Destroy Indices: " << destroyIndices << "\n");
   for (int index = destroyIndices.find_first(); index != -1;
        index = destroyIndices.find_next(index)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Index: " << index << "\n");
     auto dai = useState.destroys[index];
     if (!dai)
       continue;
+    LLVM_DEBUG(llvm::dbgs() << "    Destroy: " << *dai);
     SILValue op = (*dai)->getOperand();
     assert(daiOperand == SILValue() || op == daiOperand);
     daiOperand = op;
@@ -622,17 +636,19 @@ cleanupAllDestroyAddr(SILFunction *fn, SmallBitVector &destroyIndices,
       worklist.pushIfNotVisited(predBlock);
     }
   }
-
+  LLVM_DEBUG(llvm::dbgs() << "    Visiting reinit!\n");
   for (int index = reinitIndices.find_first(); index != -1;
        index = reinitIndices.find_next(index)) {
     auto reinit = useState.reinits[index];
     if (!reinit)
       continue;
+    LLVM_DEBUG(llvm::dbgs() << "  Reinit: " << *reinit);
     for (auto *predBlock : (*reinit)->getParent()->getPredecessorBlocks()) {
       worklist.pushIfNotVisited(predBlock);
     }
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "Processing worklist!\n");
   while (auto *next = worklist.pop()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Looking at block: bb" << next->getDebugID() << "\n");
@@ -699,10 +715,6 @@ bool MoveKillsCopyableAddressesObjectChecker::performGlobalDataflow(
   BasicBlockSet blocksWithMovesThatAreNowTakes(fn);
   bool convertedMarkMoveToTake = false;
   for (auto *mvi : markMovesToDataflow) {
-    // At the end of this if we already initialized indices of paired destroys,
-    // clear it.
-    SWIFT_DEFER { getIndicesOfPairedDestroys().clear(); };
-
     bool emittedSingleDiagnostic = false;
 
     LLVM_DEBUG(llvm::dbgs() << "Checking Multi Block Dataflow for: " << *mvi);

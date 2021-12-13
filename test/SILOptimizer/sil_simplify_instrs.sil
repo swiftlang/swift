@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 import Builtin
 import Swift
@@ -132,7 +132,7 @@ bb0(%x : $Builtin.Int64):
 class IntClass {
   @_hasStorage var value: Builtin.Int32 { get set }
   init(value: Builtin.Int32)
-  @objc deinit
+  deinit
 }
 
 enum SortaOptional1 {

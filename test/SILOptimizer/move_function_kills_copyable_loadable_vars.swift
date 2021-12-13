@@ -93,3 +93,23 @@ public func performMoveOnVarMultiBlockError2(_ p: Klass) {
     x = p
     nonConsumingUse(x)
 }
+
+// Even though the examples below are for lets, since the let is not initially
+// defined it comes out like a var.
+public func performMoveOnLaterDefinedInit(_ p: Klass) {
+    let x: Klass // expected-error {{'x' used after being moved}}
+    do {
+        x = p
+    }
+    let _ = _move(x) // expected-note {{move here}}
+    nonConsumingUse(x) // expected-note {{use here}}
+}
+
+public func performMoveOnLaterDefinedInit2(_ p: Klass) {
+    let x: Klass
+    do {
+        x = p
+    }
+    nonConsumingUse(x)
+    let _ = _move(x)
+}

@@ -180,7 +180,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Now that we have finished performing diagnostics that rely on lexical
   // scopes, if lexical lifetimes are not enabled, eliminate lexical lfietimes.
-  if (Options.LexicalLifetimes != LexicalLifetimesOption::ExperimentalLate) {
+  if (Options.LexicalLifetimes != LexicalLifetimesOption::On) {
     P.addLexicalLifetimeEliminator();
   }
 

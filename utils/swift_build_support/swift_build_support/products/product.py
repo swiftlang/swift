@@ -195,17 +195,22 @@ class Product(object):
         """toolchain_path() -> string
 
         Returns the path to the toolchain that is being created as part of this
-        build, or to a native prebuilt toolchain that was passed in.
+        build
         """
-        if self.args.native_swift_tools_path is not None:
-            return os.path.split(self.args.native_swift_tools_path)[0]
-
         install_destdir = self.args.install_destdir
         if self.args.cross_compile_hosts:
-            build_root = os.path.dirname(self.build_dir)
-            install_destdir = '%s/intermediate-install/%s' % (build_root, host_target)
+            if self.is_darwin_host(host_target):
+                install_destdir = self.host_install_destdir(host_target)
+            else:
+                install_destdir = os.path.join(install_destdir, self.args.host_target)
         return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
+
+    def native_toolchain_path(self, host_target):
+        if self.args.native_swift_tools_path is not None:
+            return os.path.split(self.args.native_swift_tools_path)[0]
+        else:
+            return self.install_toolchain_path(host_target)
 
     def is_darwin_host(self, host_target):
         return host_target.startswith("macosx") or \

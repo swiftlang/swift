@@ -113,7 +113,10 @@ tryHandlingLoadableVarMovePattern(MarkUnresolvedMoveAddrInst *markMoveAddr,
   LLVM_DEBUG(llvm::dbgs() << "Found LI: " << *li);
   SILValue operand = stripAccessMarkers(li->getOperand());
   auto *originalASI = dyn_cast<AllocStackInst>(operand);
-  if (!originalASI || !originalASI->isLexical() || !originalASI->isVar())
+  // Make sure that we have a lexical alloc_stack marked as a var or a let. We
+  // don't want properties.
+  if (!originalASI || !originalASI->isLexical() ||
+      !(originalASI->isVar() || originalASI->isLet()))
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "Found OriginalASI: " << *originalASI);

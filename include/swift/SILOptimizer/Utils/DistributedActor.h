@@ -31,32 +31,32 @@ class SILLocation;
 class SILType;
 class SILValue;
 
-/// Finds the first `ActorTransport`-compatible parameter of the given function.
+/// Finds the first `DistributedActorSystem`-compatible parameter of the given function.
 /// \returns nullptr if the function does not have such a parameter.
-SILArgument *findFirstActorTransportArg(SILFunction &F);
+SILArgument *findFirstDistributedActorSystemArg(SILFunction &F);
 
-/// Emit a call to a witness of the actor transport protocol.
+/// Emit a call to a witness of the actor actorSystem protocol.
 ///
-/// \param methodName The name of the method on the ActorTransport protocol.
-/// \param transport The transport on which to invoke the method
+/// \param methodName The name of the method on the DistributedActorSystem protocol.
+/// \param actorSystem The actorSystem on which to invoke the method
 /// \param actorType If non-empty, the type of the distributed actor that is
 /// provided as one of the arguments.
-/// \param args The arguments provided to the call, not including the transport.
+/// \param args The arguments provided to the call, not including the actorSystem.
 /// \param tryTargets For a call that can throw, the normal and error basic
 /// blocks that the call will branch to.
-void emitActorTransportWitnessCall(
+void emitDistributedActorSystemWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName,
-    SILValue transport, SILType actorType, llvm::ArrayRef<SILValue> args,
+    SILValue actorSystem, SILType actorType, llvm::ArrayRef<SILValue> args,
     llvm::Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets =
         llvm::None);
 
-/// Emits code that notifies the distributed actor's transport that the
+/// Emits code that notifies the distributed actor's actorSystem that the
 /// actor is ready for execution.
 /// \param B the builder to use when emitting the code.
-/// \param actor the distributed actor instance to pass to the transport as
-/// being "ready" \param transport a value representing the ActorTransport
+/// \param actor the distributed actor instance to pass to the actorSystem as
+/// being "ready" \param actorSystem a value representing the DistributedActorSystem
 void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,
-                        SILValue transport);
+                        SILValue actorSystem);
 
 } // namespace swift
 

@@ -1,13 +1,15 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-distributed -disable-availability-checking
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -enable-experimental-distributed -disable-availability-checking -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
 import _Distributed
+import FakeDistributedActorSystems
 
-/// Use the existential wrapper as the default actor transport.
-typealias DefaultActorTransport = AnyActorTransport
+@available(SwiftStdlib 5.5, *)
+typealias DefaultDistributedActorSystem = FakeActorSystem
 
-@available(SwiftStdlib 5.6, *)
 distributed actor DA {
 
   let local: Int = 42
@@ -22,14 +24,14 @@ distributed actor DA {
     _ = self.local // expected-error{{distributed actor-isolated property 'local' can only be referenced inside the distributed actor}}
 
     _ = self.id // ok, special handled and always available
-    _ = self.actorTransport // ok, special handled and always available
+    _ = self.actorSystem // ok, special handled and always available
   }
 
   distributed func dist() {}
 
   nonisolated func access() async throws {
     _ = self.id // ok
-    _ = self.actorTransport // ok
+    _ = self.actorSystem // ok
     
     // self is a distributed actor self is NOT isolated
     _ = self.local // expected-error{{distributed actor-isolated property 'local' can only be referenced inside the distributed actor}}
