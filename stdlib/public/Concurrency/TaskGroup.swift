@@ -32,7 +32,7 @@ import Swift
 /// If you need more control or only a few results,
 /// you can call `next()` directly:
 ///
-///     guard let first = await group.next() {
+///     guard let first = await group.next() else {
 ///         group.cancelAll()
 ///         return 0
 ///     }
@@ -106,7 +106,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// If you need more control or only a few results,
 /// you can call `next()` directly:
 ///
-///     guard let first = await group.next() {
+///     guard let first = await group.next() else {
 ///         group.cancelAll()
 ///         return 0
 ///     }
