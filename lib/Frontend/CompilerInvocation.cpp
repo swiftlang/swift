@@ -1525,23 +1525,27 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -enable-copy-propagation implies -enable-lexical-lifetimes unless
   // otherwise specified.
   if (Args.hasArg(OPT_enable_copy_propagation))
-    Opts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+    Opts.LexicalLifetimes = LexicalLifetimesOption::On;
+
+  // -disable-copy-propagation implies -enable-lexical-lifetimes=false
+  if (Args.hasArg(OPT_disable_copy_propagation))
+    Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
 
   // If move-only is enabled, always enable lexical lifetime as well.  Move-only
   // depends on lexical lifetimes.
   if (Args.hasArg(OPT_enable_experimental_move_only))
-    Opts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+    Opts.LexicalLifetimes = LexicalLifetimesOption::On;
 
   if (enableLexicalLifetimesFlag) {
     if (*enableLexicalLifetimesFlag) {
-      Opts.LexicalLifetimes = LexicalLifetimesOption::ExperimentalLate;
+      Opts.LexicalLifetimes = LexicalLifetimesOption::On;
     } else {
-      Opts.LexicalLifetimes = LexicalLifetimesOption::Early;
+      Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
     }
   }
   if (enableLexicalBorrowScopesFlag) {
     if (*enableLexicalBorrowScopesFlag) {
-      Opts.LexicalLifetimes = LexicalLifetimesOption::Early;
+      Opts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
     } else {
       Opts.LexicalLifetimes = LexicalLifetimesOption::Off;
     }
