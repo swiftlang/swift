@@ -12,18 +12,25 @@
 
 import GenUtils
 
-func generateScalarProps() {
-  var result = readFile("Input/UnicodeScalarProps.cpp")
+func generateScalarProps(for platform: String) {
+  var result = readFile("Input/ScalarPropData.h")
   
-  generateBinaryProps(into: &result)
-  genericNumericProps(into: &result)
+  generateBinaryProps(for: platform, into: &result)
+  generateNumericProps(into: &result)
   generateNameAliasProp(into: &result)
-  generateMappingProps(into: &result)
+  generateMappingProps(for: platform, into: &result)
   generateNameProp(into: &result)
   generateAgeProp(into: &result)
   generateGeneralCategory(into: &result)
   
-  write(result, to: "../../stdlib/public/stubs/UnicodeScalarProps.cpp")
+  result += """
+  #endif // #ifndef SCALAR_PROP_DATA_H
+  
+  """
+  
+  write(result, to: "Output/\(platform)/ScalarPropData.h")
 }
 
-generateScalarProps()
+for platform in ["Common", "Apple"] {
+  generateScalarProps(for: platform)
+}

@@ -10,7 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "UnicodeScalarProps.h"
+#if defined(__APPLE__)
+#include "Apple/ScalarPropsData.h"
+#else
+#include "Common/ScalarPropsData.h"
+#endif
+
 #include "../SwiftShims/UnicodeData.h"
 #include <limits>
 
@@ -18,7 +23,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar) {
 
   auto lowerBoundIndex = 0;
-  auto endIndex = 4855;
+  auto endIndex = BIN_PROPS_COUNT;
   auto upperBoundIndex = endIndex - 1;
 
   while (upperBoundIndex >= lowerBoundIndex) {
@@ -72,7 +77,7 @@ __swift_uint64_t _swift_stdlib_getBinaryProperties(__swift_uint32_t scalar) {
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getNumericType(__swift_uint32_t scalar) {
   auto lowerBoundIndex = 0;
-  auto endIndex = 233;
+  auto endIndex = NUMERIC_TYPE_COUNT;
   auto upperBoundIndex = endIndex - 1;
 
   while (upperBoundIndex >= lowerBoundIndex) {
@@ -109,7 +114,8 @@ __swift_uint8_t _swift_stdlib_getNumericType(__swift_uint32_t scalar) {
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 double _swift_stdlib_getNumericValue(__swift_uint32_t scalar) {
-  __swift_intptr_t scalarIdx = _swift_stdlib_getMphIdx(scalar, 11,
+  auto levelCount = NUMERIC_VALUES_LEVEL_COUNT;
+  __swift_intptr_t scalarIdx = _swift_stdlib_getMphIdx(scalar, levelCount,
                                                   _swift_stdlib_numeric_values_keys,
                                                   _swift_stdlib_numeric_values_ranks,
                                                   _swift_stdlib_numeric_values_sizes);
@@ -299,7 +305,7 @@ __swift_intptr_t _swift_stdlib_getScalarName(__swift_uint32_t scalar,
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint16_t _swift_stdlib_getAge(__swift_uint32_t scalar) {
   auto lowerBoundIndex = 0;
-  auto endIndex = 1659;
+  auto endIndex = AGE_COUNT;
   auto upperBoundIndex = endIndex - 1;
 
   while (upperBoundIndex >= lowerBoundIndex) {
@@ -337,7 +343,7 @@ __swift_uint16_t _swift_stdlib_getAge(__swift_uint32_t scalar) {
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getGeneralCategory(__swift_uint32_t scalar) {
   auto lowerBoundIndex = 0;
-  auto endIndex = 3968;
+  auto endIndex = GENERAL_CATEGORY_COUNT;
   auto upperBoundIndex = endIndex - 1;
 
   while (upperBoundIndex >= lowerBoundIndex) {

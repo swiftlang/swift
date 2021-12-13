@@ -13,11 +13,19 @@
 import GenUtils
 
 // Main entry point into the normalization generator.
-func generateNormalization() {
-  var result = readFile("Input/UnicodeNormalization.cpp")
+func generateNormalization(for platform: String) {
+  var result = readFile("Input/NormalizationData.h")
   
   let derivedNormalizationProps = readFile("Data/DerivedNormalizationProps.txt")
-  let unicodeData = readFile("Data/UnicodeData.txt")
+  
+  let unicodeData: String
+  
+  switch platform {
+  case "Apple":
+    unicodeData = readFile("Data/Apple/UnicodeData.txt")
+  default:
+    unicodeData = readFile("Data/UnicodeData.txt")
+  }
   
   // Get all NFX_QC information and put it together with CCC info.
   var normData: [UInt32: UInt16] = [:]
@@ -32,7 +40,6 @@ func generateNormalization() {
   let decompData = getDecompData(from: unicodeData)
   let decompMph = mph(for: decompData.map { UInt64($0.0) })
   emitDecomp(decompMph, decompData, into: &result)
-  emitDecompAccessor(decompMph, into: &result)
   
   // Get and emit composition data. (Remove composition exclusions)
   let compExclusions = getCompExclusions(from: derivedNormalizationProps)
@@ -43,10 +50,16 @@ func generateNormalization() {
   }
   let compMph = mph(for: Array(Set(filteredDecomp.map { UInt64($0.1[1]) })))
   emitComp(compMph, filteredDecomp, into: &result)
-  emitCompAccessor(compMph, into: &result)
+  
+  result += """
+  #endif // #ifndef NORMALIZATION_DATA_H
+  
+  """
   
   // Finally, write it out.
-  write(result, to: "../../stdlib/public/stubs/UnicodeNormalization.cpp")
+  write(result, to: "Output/\(platform)/NormalizationData.h")
 }
 
-generateNormalization()
+for platform in ["Common", "Apple"] {
+  generateNormalization(for: platform)
+}
