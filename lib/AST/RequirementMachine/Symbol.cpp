@@ -623,17 +623,42 @@ int Symbol::compare(Symbol other, RewriteContext &ctx) const {
     auto *proto = getProtocol();
     auto *otherProto = other.getProtocol();
 
+    // For concrete conformance symbols, order by protocol first.
     result = ctx.compareProtocols(proto, otherProto);
-    break;
+    if (result != 0)
+      return result;
+
+    // Then, check if they have the same concrete type and order
+    // substitutions.
+    LLVM_FALLTHROUGH;
   }
 
   case Kind::Superclass:
-  case Kind::ConcreteType:
+  case Kind::ConcreteType: {
+    if (kind == Kind::Superclass
+        ? (getSuperclass() == other.getSuperclass())
+        : (getConcreteType() == other.getConcreteType())) {
+
+      // If the concrete types are identical, compare substitution terms.
+      assert(getSubstitutions().size() == other.getSubstitutions().size());
+      for (unsigned i : indices(getSubstitutions())) {
+        auto term = getSubstitutions()[i];
+        auto otherTerm = other.getSubstitutions()[i];
+
+        result = term.compare(otherTerm, ctx);
+        if (result != 0)
+          return result;
+      }
+
+      break;
+    }
+
+    // We don't support comparing arbitrary concrete types.
     llvm::errs() << "Cannot compare concrete types yet\n";
     llvm::errs() << "LHS: " << *this << "\n";
     llvm::errs() << "RHS: " << other << "\n";
     abort();
-
+  }
   }
 
   if (result == 0) {
