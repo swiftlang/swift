@@ -205,24 +205,23 @@ bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
       auto ruleID = Trie.find(from, end);
       if (ruleID) {
         const auto &rule = getRule(*ruleID);
-        if (!rule.isSimplified()) {
-          auto to = from + rule.getLHS().size();
-          assert(std::equal(from, to, rule.getLHS().begin()));
 
-          unsigned startOffset = (unsigned)(from - term.begin());
-          unsigned endOffset = term.size() - rule.getLHS().size() - startOffset;
+        auto to = from + rule.getLHS().size();
+        assert(std::equal(from, to, rule.getLHS().begin()));
 
-          term.rewriteSubTerm(from, to, rule.getRHS());
+        unsigned startOffset = (unsigned)(from - term.begin());
+        unsigned endOffset = term.size() - rule.getLHS().size() - startOffset;
 
-          if (path || debug) {
-            subpath.add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
-                                                    /*inverse=*/false));
-          }
+        term.rewriteSubTerm(from, to, rule.getRHS());
 
-          changed = true;
-          tryAgain = true;
-          break;
+        if (path || debug) {
+          subpath.add(RewriteStep::forRewriteRule(startOffset, endOffset, *ruleID,
+                                                  /*inverse=*/false));
         }
+
+        changed = true;
+        tryAgain = true;
+        break;
       }
 
       ++from;
@@ -433,6 +432,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
     MutableTerm term = lhs;
     simplify(lhs);
 
+    dump(llvm::errs());
     abort();
   }
 
