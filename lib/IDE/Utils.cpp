@@ -273,7 +273,8 @@ public:
 
 bool ide::initCompilerInvocation(
     CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
-    DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
+    FrontendOptions::ActionType Action, DiagnosticEngine &Diags,
+    StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const std::string &runtimeResourcePath,
     const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,

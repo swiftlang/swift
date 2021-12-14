@@ -357,30 +357,49 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
-bool CompilerInstance::setup(const CompilerInvocation &Invok) {
+bool CompilerInstance::setup(const CompilerInvocation &Invok,
+                             std::string &Error) {
   Invocation = Invok;
 
   setupDependencyTrackerIfNeeded();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
-  if (setUpVirtualFileSystemOverlays())
+  if (setUpVirtualFileSystemOverlays()) {
+    Error = "Setting up virtual file system overlays failed";
     return true;
+  }
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
-  if (setUpInputs())
+  if (setUpInputs()) {
+    Error = "Setting up inputs failed";
     return true;
+  }
 
-  if (setUpASTContextIfNeeded())
+  if (setUpASTContextIfNeeded()) {
+    Error = "Setting up ASTContext failed";
     return true;
+  }
 
   setupStatsReporter();
 
-  if (setupDiagnosticVerifierIfNeeded())
+  if (setupDiagnosticVerifierIfNeeded()) {
+    Error = "Setting up diagnostics verified failed";
     return true;
+  }
+
+  // If we expect an implicit stdlib import, load in the standard library. If we
+  // either fail to find it or encounter an error while loading it, bail early. Continuing will at best
+  // trigger a bunch of other errors due to the stdlib being missing, or at
+  // worst crash downstream as many call sites don't currently handle a missing
+  // stdlib.
+  if (loadStdlibIfNeeded()) {
+    Error = "Loading the standard library failed";
+    return true;
+  }
 
   return false;
 }
@@ -1101,6 +1120,10 @@ void CompilerInstance::performSema() {
 }
 
 bool CompilerInstance::loadStdlibIfNeeded() {
+  if (!FrontendOptions::doesActionRequireSwiftStandardLibrary(
+          Invocation.getFrontendOptions().RequestedAction)) {
+    return false;
+  }
   // If we aren't expecting an implicit stdlib import, there's nothing to do.
   if (getImplicitImportInfo().StdlibKind != ImplicitStdlibKind::Stdlib)
     return false;

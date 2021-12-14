@@ -1860,7 +1860,7 @@ void SwiftLangSupport::getCursorInfo(
 
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getInvocation(Args, InputFile, fileSystem, Error);
+      ASTMgr->getTypecheckInvocation(Args, InputFile, fileSystem, Error);
   if (!Error.empty()) {
     LOG_WARN_FUNC("error creating ASTInvocation: " << Error);
   }
@@ -1887,8 +1887,8 @@ void SwiftLangSupport::getDiagnostics(
   }
 
   std::string InvocationError;
-  SwiftInvocationRef Invok =
-      ASTMgr->getInvocation(Args, InputFile, FileSystem, InvocationError);
+  SwiftInvocationRef Invok = ASTMgr->getTypecheckInvocation(
+      Args, InputFile, FileSystem, InvocationError);
   if (!InvocationError.empty()) {
     LOG_WARN_FUNC("error creating ASTInvocation: " << InvocationError);
   }
@@ -1913,7 +1913,8 @@ void SwiftLangSupport::getRangeInfo(
     return;
   }
   std::string Error;
-  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, InputFile, Error);
+  SwiftInvocationRef Invok =
+      ASTMgr->getTypecheckInvocation(Args, InputFile, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<RangeInfo>::fromError(Error));
@@ -1956,7 +1957,8 @@ void SwiftLangSupport::getNameInfo(
   }
 
   std::string Error;
-  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, InputFile, Error);
+  SwiftInvocationRef Invok =
+      ASTMgr->getTypecheckInvocation(Args, InputFile, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<NameTranslatingInfo>::fromError(Error));
@@ -2121,7 +2123,7 @@ void SwiftLangSupport::getCursorInfoFromUSR(
 
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getInvocation(Args, filename, fileSystem, Error);
+      ASTMgr->getTypecheckInvocation(Args, filename, fileSystem, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<CursorInfoData>::fromError(Error));
@@ -2241,7 +2243,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
     std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver) {
 
   std::string Error;
-  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, InputFile, Error);
+  SwiftInvocationRef Invok =
+      ASTMgr->getTypecheckInvocation(Args, InputFile, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<RelatedIdentsInfo>::fromError(Error));
@@ -2363,7 +2366,8 @@ void SwiftLangSupport::semanticRefactoring(
     ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
     CategorizedEditsReceiver Receiver) {
   std::string Error;
-  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, Filename, Error);
+  SwiftInvocationRef Invok =
+      ASTMgr->getTypecheckInvocation(Args, Filename, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(Error));
@@ -2420,7 +2424,8 @@ void SwiftLangSupport::collectExpressionTypes(
     std::function<void(const RequestResult<ExpressionTypesInFile> &)>
         Receiver) {
   std::string Error;
-  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, FileName, Error);
+  SwiftInvocationRef Invok =
+      ASTMgr->getTypecheckInvocation(Args, FileName, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<ExpressionTypesInFile>::fromError(Error));
@@ -2480,7 +2485,8 @@ void SwiftLangSupport::collectVariableTypes(
     Optional<unsigned> Length, SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver) {
   std::string Error;
-  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, FileName, Error);
+  SwiftInvocationRef Invok =
+      ASTMgr->getTypecheckInvocation(Args, FileName, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<VariableTypesInFile>::fromError(Error));

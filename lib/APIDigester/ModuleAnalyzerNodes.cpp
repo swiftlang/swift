@@ -2247,8 +2247,9 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
   // The PrintDiags is only responsible compiler errors, we should remove the
   // consumer immediately after importing is done.
   SWIFT_DEFER { CI.getDiags().removeConsumer(PrintDiags); };
-  if (CI.setup(Invocation)) {
-    llvm::errs() << "Failed to setup the compiler instance\n";
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
     return nullptr;
   }
 

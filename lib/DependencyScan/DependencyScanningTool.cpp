@@ -194,7 +194,10 @@ DependencyScanningTool::initCompilerInstanceForScan(
   }
 
   // Setup the instance
-  Instance->setup(Invocation);
+  std::string InstanceSetupError;
+  if (Instance->setup(Invocation, InstanceSetupError)) {
+    return std::make_error_code(std::errc::not_supported);
+  }
   (void)Instance->getMainModule();
 
   return Instance;
