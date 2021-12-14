@@ -58,6 +58,18 @@ enum class OptGroup {
   Lowering
 };
 
+Optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
+  switch (defaultable) {
+  case llvm::cl::BOU_TRUE:
+    return true;
+  case llvm::cl::BOU_FALSE:
+    return false;
+  case llvm::cl::BOU_UNSET:
+    return None;
+  }
+  llvm_unreachable("Bad case for llvm::cl::boolOrDefault!");
+}
+
 } // end anonymous namespace
 
 static llvm::cl::opt<std::string>
@@ -105,20 +117,20 @@ static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
 
-static llvm::cl::opt<bool> EnableLexicalLifetimes(
-    "enable-lexical-lifetimes", llvm::cl::init(false),
+static llvm::cl::opt<llvm::cl::boolOrDefault> EnableLexicalLifetimes(
+    "enable-lexical-lifetimes", llvm::cl::init(llvm::cl::BOU_UNSET),
     llvm::cl::desc("Enable lexical lifetimes. Mutually exclusive with "
                    "enable-lexical-borrow-scopes and "
                    "disable-lexical-lifetimes."));
 
-static llvm::cl::opt<bool>
+static llvm::cl::opt<llvm::cl::boolOrDefault>
     EnableLexicalBorrowScopes("enable-lexical-borrow-scopes",
-                              llvm::cl::init(true),
+                              llvm::cl::init(llvm::cl::BOU_UNSET),
                               llvm::cl::desc("Enable lexical borrow scopes."));
 
-static llvm::cl::opt<bool>
-EnableExperimentalMoveOnly("enable-experimental-move-only",
-                   llvm::cl::desc("Enable experimental distributed actors."));
+static llvm::cl::opt<llvm::cl::boolOrDefault> EnableExperimentalMoveOnly(
+    "enable-experimental-move-only", llvm::cl::init(llvm::cl::BOU_UNSET),
+    llvm::cl::desc("Enable experimental distributed actors."));
 
 static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
@@ -520,8 +532,11 @@ int main(int argc, char **argv) {
     EnableExperimentalConcurrency;
   Invocation.getLangOptions().EnableExperimentalDistributed =
     EnableExperimentalDistributed;
-  Invocation.getLangOptions().EnableExperimentalMoveOnly =
-    EnableExperimentalMoveOnly;
+  Optional<bool> enableExperimentalMoveOnly =
+      toOptionalBool(EnableExperimentalMoveOnly);
+  if (enableExperimentalMoveOnly)
+    Invocation.getLangOptions().EnableExperimentalMoveOnly =
+        *enableExperimentalMoveOnly;
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :
@@ -623,12 +638,19 @@ int main(int argc, char **argv) {
   if (SILOpts.CopyPropagation == CopyPropagationOption::Off)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
 
+  Optional<bool> enableLexicalLifetimes =
+      toOptionalBool(EnableLexicalLifetimes);
+  Optional<bool> enableLexicalBorrowScopes =
+      toOptionalBool(EnableLexicalBorrowScopes);
+
   // Enable lexical lifetimes if it is set or if experimental move only is
   // enabled. This is because move only depends on lexical lifetimes being
   // enabled and it saved some typing ; ).
-  bool enableLexicalLifetimes =
-      EnableLexicalLifetimes | EnableExperimentalMoveOnly;
-  if (enableLexicalLifetimes && !EnableLexicalBorrowScopes) {
+  bool specifiedLexicalLifetimesEnabled =
+      enableExperimentalMoveOnly && *enableExperimentalMoveOnly &&
+      enableLexicalLifetimes && *enableLexicalLifetimes;
+  if (specifiedLexicalLifetimesEnabled && enableLexicalBorrowScopes &&
+      !*enableLexicalBorrowScopes) {
     fprintf(
         stderr,
         "Error! Cannot specify both -enable-lexical-borrow-scopes=false and "
@@ -636,9 +658,14 @@ int main(int argc, char **argv) {
     exit(-1);
   }
   if (enableLexicalLifetimes)
-    SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
-  if (!EnableLexicalBorrowScopes)
-    SILOpts.LexicalLifetimes = LexicalLifetimesOption::Off;
+    SILOpts.LexicalLifetimes =
+        *enableLexicalLifetimes ? LexicalLifetimesOption::On
+                                : LexicalLifetimesOption::DiagnosticMarkersOnly;
+  if (enableLexicalBorrowScopes)
+    SILOpts.LexicalLifetimes =
+        *enableLexicalBorrowScopes
+            ? LexicalLifetimesOption::DiagnosticMarkersOnly
+            : LexicalLifetimesOption::Off;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
