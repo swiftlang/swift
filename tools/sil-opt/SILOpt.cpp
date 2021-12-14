@@ -537,9 +537,14 @@ int main(int argc, char **argv) {
     SILOpts.CopyPropagation = CopyPropagationOption::RequestedPassesOnly;
   }
 
-  if (EnableCopyPropagation)
+  // Unless overridden below, enabling copy propagation means enabling lexical
+  // lifetimes.
+  if (SILOpts.CopyPropagation == CopyPropagationOption::On)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
-  if (DisableCopyPropagation)
+
+  // Unless overridden below, disable copy propagation means disabling lexical
+  // lifetimes.
+  if (SILOpts.CopyPropagation == CopyPropagationOption::Off)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::DiagnosticMarkersOnly;
 
   // Enable lexical lifetimes if it is set or if experimental move only is
