@@ -220,50 +220,6 @@ Type TypeResolution::resolveDependentMemberType(
                                               baseTy);
 }
 
-Type TypeResolution::resolveSelfAssociatedType(Type baseTy,
-                                               DeclContext *DC,
-                                               Identifier name) const {
-  switch (stage) {
-  case TypeResolutionStage::Structural:
-    return DependentMemberType::get(baseTy, name);
-
-  case TypeResolutionStage::Interface:
-    // Handled below.
-    break;
-  }
-
-  assert(stage == TypeResolutionStage::Interface);
-  auto genericSig = getGenericSignature();
-  if (!genericSig)
-    return ErrorType::get(baseTy);
-
-  // Look for a nested type with the given name.
-  auto nestedType = genericSig->lookupNestedType(baseTy, name);
-  assert(nestedType);
-
-  // If the nested type has been resolved to an associated type, use it.
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(nestedType)) {
-    return DependentMemberType::get(baseTy, assocType);
-  }
-
-  if (nestedType->getDeclContext()->getSelfClassDecl()) {
-    // We found a member of a class from a protocol or protocol
-    // extension.
-    //
-    // Get the superclass of the 'Self' type parameter.
-    if (auto concreteTy = genericSig->getConcreteType(baseTy))
-      baseTy = concreteTy;
-    else {
-      baseTy = genericSig->getSuperclassBound(baseTy);
-      assert(baseTy);
-    }
-    assert(baseTy);
-  }
-
-  return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), nestedType,
-                                              baseTy);
-}
-
 bool TypeResolution::areSameType(Type type1, Type type2) const {
   if (type1->isEqual(type2))
     return true;
@@ -462,8 +418,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
           // the Collection.SubSequence default, even when the conforming
           // type wants to conform to Collection.
           if (getStage() == TypeResolutionStage::Structural) {
-            return resolveSelfAssociatedType(selfType, foundDC,
-                                             typeDecl->getName());
+            return DependentMemberType::get(selfType, typeDecl->getName());
           } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
             typeDecl = assocType->getAssociatedTypeAnchor();
           }
