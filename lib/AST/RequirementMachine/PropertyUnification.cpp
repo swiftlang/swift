@@ -753,6 +753,9 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
     MutableTerm result(key);
     result.add(concreteConformanceSymbol);
 
+    path.add(RewriteStep::forSameTypeWitness(
+        witnessID, /*inverse=*/true));
+
     return result;
   }
 
