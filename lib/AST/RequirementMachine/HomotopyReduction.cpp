@@ -92,6 +92,7 @@ RewriteLoop::findRulesAppearingOnceInEmptyContext(
     case RewriteStep::Decompose:
     case RewriteStep::ConcreteConformance:
     case RewriteStep::SuperclassConformance:
+    case RewriteStep::ConcreteTypeWitness:
       break;
     }
 
@@ -208,6 +209,7 @@ RewritePath RewritePath::splitCycleAtRule(unsigned ruleID) const {
     case RewriteStep::Decompose:
     case RewriteStep::ConcreteConformance:
     case RewriteStep::SuperclassConformance:
+    case RewriteStep::ConcreteTypeWitness:
       break;
     }
 
@@ -306,6 +308,7 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
     case RewriteStep::Decompose:
     case RewriteStep::ConcreteConformance:
     case RewriteStep::SuperclassConformance:
+    case RewriteStep::ConcreteTypeWitness:
       newSteps.push_back(step);
       break;
     }

@@ -78,6 +78,14 @@ void RewriteStep::dump(llvm::raw_ostream &out,
                     : "SuperclassConformance");
     break;
   }
+  case ConcreteTypeWitness: {
+    evaluator.applyConcreteTypeWitness(*this, system);
+
+    out << (Inverse ? "ConcreteTypeWitness⁻¹"
+                    : "ConcreteTypeWitness");
+    break;
+  }
+
   }
 }
 
@@ -416,6 +424,64 @@ RewritePathEvaluator::applyConcreteConformance(const RewriteStep &step,
   }
 }
 
+void RewritePathEvaluator::applyConcreteTypeWitness(const RewriteStep &step,
+                                                  const RewriteSystem &system) {
+  checkA();
+  auto &term = A.back();
+
+  const auto &witness = system.getConcreteTypeWitness(step.RuleID);
+  auto fail = [&]() {
+    llvm::errs() << "Bad concrete type witness term:\n";
+    llvm::errs() << term << "\n\n";
+    llvm::errs() << "Conformance: " << witness.ConcreteConformance << "\n";
+    llvm::errs() << "Assoc type: " << witness.AssocType << "\n";
+    llvm::errs() << "Concrete type: " << witness.ConcreteType << "\n";
+    abort();
+  };
+
+  if (!step.Inverse) {
+    // Make sure the term takes the following form, where |V| == EndOffset:
+    //
+    //    U.[concrete: C : P].[P:X].[concrete: C.X].V
+    if (term.size() <= step.EndOffset + 3 ||
+        *(term.end() - step.EndOffset - 3) != witness.ConcreteConformance ||
+        *(term.end() - step.EndOffset - 2) != witness.AssocType ||
+        *(term.end() - step.EndOffset - 1) != witness.ConcreteType) {
+      fail();
+    }
+
+    // Get the subterm U.[concrete: C : P].[P:X].
+    MutableTerm newTerm(term.begin(), term.end() - step.EndOffset - 1);
+
+    // Add the subterm V, to get U.[concrete: C : P].[P:X].V.
+    newTerm.append(term.end() - step.EndOffset, term.end());
+
+    term = newTerm;
+  } else {
+    // Make sure the term takes the following form, where |V| == EndOffset:
+    //
+    //    U.[concrete: C : P].[P:X].V
+    if (term.size() <= step.EndOffset + 2 ||
+        *(term.end() - step.EndOffset - 2) != witness.ConcreteConformance ||
+        *(term.end() - step.EndOffset - 1) != witness.AssocType) {
+      fail();
+    }
+
+    // Get the subterm U.[concrete: C : P].[P:X].
+    MutableTerm newTerm(term.begin(), term.end() - step.EndOffset);
+
+    // Add the symbol [concrete: C.X].
+    newTerm.add(witness.ConcreteType);
+
+    // Add the subterm V, to get
+    //
+    //    U.[concrete: C : P].[P:X].[concrete: C.X].V
+    newTerm.append(term.end() - step.EndOffset, term.end());
+
+    term = newTerm;
+  }
+}
+
 void RewritePathEvaluator::apply(const RewriteStep &step,
                                  const RewriteSystem &system) {
   switch (step.Kind) {
@@ -438,6 +504,10 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
   case RewriteStep::ConcreteConformance:
   case RewriteStep::SuperclassConformance:
     applyConcreteConformance(step, system);
+    break;
+
+  case RewriteStep::ConcreteTypeWitness:
+    applyConcreteTypeWitness(step, system);
     break;
   }
 }

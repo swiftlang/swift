@@ -95,7 +95,21 @@ struct RewriteStep {
     /// concrete conformance symbol [concrete: C : P]. This symbol is replaced
     /// with the superclass symbol [superclass: C] followed by the protocol
     /// symbol [P].
-    SuperclassConformance
+    SuperclassConformance,
+
+    /// If not inverted: the top of the A stack must be a term ending in a
+    /// concrete conformance symbol [concrete: C : P] followed by an associated
+    /// type symbol [P:X], and the concrete type symbol [concrete: C.X] for the
+    /// type witness of 'X' in the conformance 'C : P'. The concrete type symbol
+    /// is eliminated.
+    ///
+    /// If inverted: the concrete type symbol [concrete: C.X] is introduced.
+    ///
+    /// The RuleID field is repurposed to store the result of calling
+    /// RewriteSystem::recordConcreteTypeWitness(). This index is then
+    /// passed in to RewriteSystem::getConcreteTypeWitness() when applying
+    /// the step.
+    ConcreteTypeWitness
   };
 
   /// The rewrite step kind.
@@ -163,6 +177,11 @@ struct RewriteStep {
   static RewriteStep forSuperclassConformance(bool inverse) {
     return RewriteStep(SuperclassConformance, /*startOffset=*/0, /*endOffset=*/0,
                        /*ruleID=*/0, inverse);
+  }
+
+  static RewriteStep forConcreteTypeWitness(unsigned witnessID, bool inverse) {
+    return RewriteStep(ConcreteTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
+                       /*ruleID=*/witnessID, inverse);
   }
 
   bool isInContext() const {
@@ -329,6 +348,9 @@ struct RewritePathEvaluator {
                       const RewriteSystem &system);
 
   void applyConcreteConformance(const RewriteStep &step,
+                                const RewriteSystem &system);
+
+  void applyConcreteTypeWitness(const RewriteStep &step,
                                 const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
