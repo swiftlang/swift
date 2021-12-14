@@ -27,6 +27,7 @@ headers = [
   'string.h',
   'tgmath.h',
   'time.h',
+  'util.h',
   'utmp.h',
 
   # POSIX
@@ -69,6 +70,7 @@ headers = [
   'sys/ioctl.h',
   'sys/ipc.h',
   'sys/mman.h',
+  'sys/mount.h',
   'sys/msg.h',
   'sys/resource.h',
   'sys/select.h',
