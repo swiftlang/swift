@@ -359,3 +359,6 @@ SWIFT_REQUEST(TypeChecker, GetImplicitSendableRequest,
 SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               ValueDecl *(const ValueDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ClosureEffectsRequest,
+              FunctionType::ExtInfo(ClosureExpr *),
+              Cached, NoLocationInfo)

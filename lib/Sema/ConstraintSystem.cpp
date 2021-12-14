@@ -2339,20 +2339,18 @@ isInvalidPartialApplication(ConstraintSystem &cs,
   return {true, level};
 }
 
-/// Walk a closure AST to determine its effects.
-///
-/// \returns a function's extended info describing the effects, as
-/// determined syntactically.
 FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
-  auto known = closureEffectsCache.find(expr);
-  if (known != closureEffectsCache.end())
-    return known->second;
+  return evaluateOrDefault(
+      getASTContext().evaluator, ClosureEffectsRequest{expr},
+      FunctionType::ExtInfo());
+}
 
+FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
+  Evaluator &evaluator, ClosureExpr *expr) const {
   // A walker that looks for 'try' and 'throw' expressions
   // that aren't nested within closures, nested declarations,
   // or exhaustive catches.
   class FindInnerThrows : public ASTWalker {
-    ConstraintSystem &CS;
     DeclContext *DC;
     bool FoundThrow = false;
 
@@ -2449,7 +2447,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
       // Okay, now it should be safe to coerce the pattern.
       // Pull the top-level pattern back out.
       pattern = LabelItem.getPattern();
-      Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredInterfaceType();
+      Type exnType = DC->getASTContext().getErrorDecl()->getDeclaredInterfaceType();
 
       if (!exnType)
         return false;
@@ -2501,8 +2499,8 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
     }
 
   public:
-    FindInnerThrows(ConstraintSystem &cs, DeclContext *dc)
-        : CS(cs), DC(dc) {}
+    FindInnerThrows(DeclContext *dc)
+        : DC(dc) {}
 
     bool foundThrow() { return FoundThrow; }
   };
@@ -2525,23 +2523,21 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
   if (!body)
     return ASTExtInfoBuilder().withConcurrent(concurrent).build();
 
-  auto throwFinder = FindInnerThrows(*this, expr);
+  auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
-  auto result = ASTExtInfoBuilder()
-                    .withThrows(throwFinder.foundThrow())
-                    .withAsync(bool(findAsyncNode(expr)))
-                    .withConcurrent(concurrent)
-                    .build();
-  closureEffectsCache[expr] = result;
-  return result;
+  return ASTExtInfoBuilder()
+      .withThrows(throwFinder.foundThrow())
+      .withAsync(bool(findAsyncNode(expr)))
+      .withConcurrent(concurrent)
+      .build();
 }
 
 bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
     return func->isAsyncContext();
 
-  if (auto closure = dyn_cast<ClosureExpr>(dc))
-    return closureEffects(closure).isAsync();
+  if (auto closure = dyn_cast<AbstractClosureExpr>(dc))
+    return closure->isBodyAsync();
 
   return false;
 }

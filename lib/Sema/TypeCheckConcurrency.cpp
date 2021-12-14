@@ -1851,11 +1851,7 @@ namespace {
       }
 
       if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-        if (auto type = closure->getType()) {
-          if (auto fnType = type->getAs<AnyFunctionType>()) {
-            return fnType->isAsync();
-          }
-        }
+        return closure->isBodyAsync();
       }
 
       return false;
@@ -3580,12 +3576,9 @@ bool swift::contextRequiresStrictConcurrencyChecking(const DeclContext *dc) {
           return true;
       }
 
-      // Async and concurrent closures use concurrency features.
-      if (auto closureType = closure->getType()) {
-        if (auto fnType = closureType->getAs<AnyFunctionType>())
-          if (fnType->isAsync() || fnType->isSendable())
-            return true;
-      }
+      // Async and @Sendable closures use concurrency features.
+      if (closure->isBodyAsync() || closure->isSendable())
+        return true;
     } else if (auto decl = dc->getAsDecl()) {
       // If any isolation attributes are present, we're using concurrency
       // features.

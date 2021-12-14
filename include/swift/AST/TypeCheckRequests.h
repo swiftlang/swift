@@ -3147,6 +3147,23 @@ public:
   bool isCached() const { return true; }
 };
 
+class ClosureEffectsRequest
+    : public SimpleRequest<ClosureEffectsRequest,
+                           FunctionType::ExtInfo(ClosureExpr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FunctionType::ExtInfo evaluate(
+      Evaluator &evaluator, ClosureExpr *closure) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
