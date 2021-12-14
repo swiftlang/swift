@@ -558,16 +558,24 @@ function(add_swift_host_library name)
 
     if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
       swift_windows_get_sdk_vfs_overlay(ASHL_VFS_OVERLAY)
-      target_compile_options(${name} PRIVATE
-        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang -ivfsoverlay -Xclang ${ASHL_VFS_OVERLAY}">)
+      # Both clang and clang-cl on Windows set CMAKE_C_SIMULATE_ID to MSVC.
+      # We are using CMAKE_C_COMPILER_FRONTEND_VARIANT to detect the correct
+      # way to pass -Xclang arguments.
+      if ("${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC")
+        target_compile_options(${name} PRIVATE
+          $<$<COMPILE_LANGUAGE:C,CXX>:SHELL:/clang:-Xclang /clang:-ivfsoverlay /clang:-Xclang /clang:${ASHL_VFS_OVERLAY}>)
+      else()
+        target_compile_options(${name} PRIVATE
+          $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang -ivfsoverlay -Xclang ${ASHL_VFS_OVERLAY}">)
 
-      # MSVC doesn't support -Xclang. We don't need to manually specify
-      # the dependent libraries as `cl` does so.
-      target_compile_options(${name} PRIVATE
-        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=oldnames">
-        # TODO(compnerd) handle /MT, /MTd
-        $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>">
-        )
+          # MSVC doesn't support -Xclang. We don't need to manually specify
+          # the dependent libraries as `cl`/`clang-cl` does so.
+          target_compile_options(${name} PRIVATE
+            $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=oldnames">
+            # TODO(compnerd) handle /MT, /MTd
+            $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=msvcrt$<$<CONFIG:Debug>:d>">
+            )
+      endif()
     endif()
 
     set_target_properties(${name} PROPERTIES
@@ -978,9 +986,12 @@ function(add_swift_host_tool executable)
     target_include_directories(${executable} SYSTEM PRIVATE
       ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
 
-    if(NOT ${CMAKE_C_COMPILER_ID} STREQUAL MSVC)
+    # On Windows both clang-cl and clang simulate MSVC.
+    # We are using CMAKE_C_COMPILER_FRONTEND_VARIANT to distinguish
+    # clang from clang-cl.
+    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" AND NOT "${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC")
       # MSVC doesn't support -Xclang. We don't need to manually specify
-      # the dependent libraries as `cl` does so.
+      # the dependent libraries as `cl`/`clang-cl` does so.
       target_compile_options(${executable} PRIVATE
         $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"SHELL:-Xclang --dependent-lib=oldnames">
         # TODO(compnerd) handle /MT, /MTd
