@@ -71,14 +71,12 @@ using namespace swift;
 /// file.
 static void checkInheritanceClause(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion) {
-  const DeclContext *DC;
   ArrayRef<InheritedEntry> inheritedClause;
   const ExtensionDecl *ext = nullptr;
   const TypeDecl *typeDecl = nullptr;
   const Decl *decl;
   if ((ext = declUnion.dyn_cast<const ExtensionDecl *>())) {
     decl = ext;
-    DC = ext;
 
     inheritedClause = ext->getInherited();
 
@@ -95,12 +93,6 @@ static void checkInheritanceClause(
   } else {
     typeDecl = declUnion.get<const TypeDecl *>();
     decl = typeDecl;
-    if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
-      DC = nominal;
-    } else {
-      DC = typeDecl->getDeclContext();
-    }
-
     inheritedClause = typeDecl->getInherited();
   }
 
