@@ -616,34 +616,9 @@ void PropertyMap::concretizeTypeWitnessInConformance(
 
   RewritePath path;
 
-  auto simplify = [&](CanType t) -> CanType {
-    return CanType(t.transformRec([&](Type t) -> Optional<Type> {
-      if (!t->isTypeParameter())
-        return None;
-
-      auto term = Context.getRelativeTermForType(t->getCanonicalType(),
-                                                 substitutions);
-      System.simplify(term);
-      return Context.getTypeForTerm(term, { });
-    }));
-  };
-
-  if (simplify(concreteType) == simplify(typeWitness) &&
-      requirementKind == RequirementKind::SameType) {
-    // FIXME: ConcreteTypeInDomainMap should support substitutions so
-    // that we can remove this.
-
-    if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
-      llvm::dbgs() << "^^ Type witness is the same as the concrete type\n";
-    }
-
-    // Add a rule T.[P:A] => T.
-    constraintType = MutableTerm(key);
-  } else {
-    constraintType = computeConstraintTermForTypeWitness(
-        key, concreteType, typeWitness, subjectType,
-        substitutions, path);
-  }
+  constraintType = computeConstraintTermForTypeWitness(
+      key, requirementKind, concreteType, typeWitness, subjectType,
+      substitutions, path);
 
   inducedRules.emplace_back(constraintType, subjectType, path);
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
@@ -721,9 +696,69 @@ RewriteSystem::getConcreteTypeWitness(unsigned index) const {
 ///
 ///        T.[P:A] => V
 MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
-    Term key, CanType concreteType, CanType typeWitness,
-    const MutableTerm &subjectType, ArrayRef<Term> substitutions,
+    Term key, RequirementKind requirementKind,
+    CanType concreteType, CanType typeWitness,
+    const MutableTerm &subjectType,
+    ArrayRef<Term> substitutions,
     RewritePath &path) const {
+  // If the type witness is abstract, introduce a same-type requirement
+  // between two type parameters.
+  if (typeWitness->isTypeParameter()) {
+    // The type witness is a type parameter of the form τ_0_n.X.Y...Z,
+    // where 'n' is an index into the substitution array.
+    //
+    // Add a rule:
+    //
+    // T.[concrete: C : P].[P:X] => S[n].X.Y...Z
+    //
+    // Where S[n] is the nth substitution term.
+
+    // FIXME: Record a rewrite path.
+    return Context.getRelativeTermForType(typeWitness, substitutions);
+  }
+
+  // Otherwise the type witness is concrete, but may contain type
+  // parameters in structural position.
+
+  // Compute the concrete type symbol [concrete: C.X].
+  SmallVector<Term, 3> result;
+  auto typeWitnessSchema =
+      remapConcreteSubstitutionSchema(typeWitness, substitutions,
+                                      Context, result);
+  auto typeWitnessSymbol =
+      Symbol::forConcreteType(typeWitnessSchema, result, Context);
+  System.simplifySubstitutions(typeWitnessSymbol);
+
+  auto concreteConformanceSymbol = *(subjectType.end() - 2);
+  auto assocTypeSymbol = *(subjectType.end() - 1);
+
+  RewriteSystem::ConcreteTypeWitness witness(concreteConformanceSymbol,
+                                             assocTypeSymbol,
+                                             typeWitnessSymbol);
+  unsigned witnessID = System.recordConcreteTypeWitness(witness);
+
+  // If it is equal to the parent type, introduce a same-type requirement
+  // between the two parameters.
+  if (requirementKind == RequirementKind::SameType &&
+      typeWitnessSymbol.getConcreteType() == concreteType &&
+      typeWitnessSymbol.getSubstitutions() == substitutions) {
+    // FIXME: ConcreteTypeInDomainMap should support substitutions so
+    // that we can remove this.
+
+    if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+      llvm::dbgs() << "^^ Type witness is the same as the concrete type\n";
+    }
+
+    // Add a rule T.[concrete: C : P].[P:X] => T.[concrete: C : P].
+    MutableTerm result(key);
+    result.add(concreteConformanceSymbol);
+
+    return result;
+  }
+
+  // If the type witness is completely concrete, try to introduce a
+  // same-type requirement with another representative type parameter,
+  // if we have one.
   if (!typeWitness->hasTypeParameter()) {
     // Check if we have a shorter representative we can use.
     auto domain = key.getRootProtocols();
@@ -737,46 +772,23 @@ MutableTerm PropertyMap::computeConstraintTermForTypeWitness(
           llvm::dbgs() << "^^ Type witness can re-use property bag of "
                        << found->second << "\n";
         }
+
+        // FIXME: Record a rewrite path.
         return result;
       }
     }
   }
 
-  if (typeWitness->isTypeParameter()) {
-    // The type witness is a type parameter of the form τ_0_n.X.Y...Z,
-    // where 'n' is an index into the substitution array.
-    //
-    // Add a rule:
-    //
-    // T.[concrete: C : P].[P:X] => S[n].X.Y...Z
-    //
-    // Where S[n] is the nth substitution term.
-    return Context.getRelativeTermForType(typeWitness, substitutions);
-  }
-
-  // The type witness is a concrete type.
+  // Otherwise, add a concrete type requirement for the type witness.
   //
   // Add a rule:
   //
-  // T.[concrete: C : P].[P:X].[concrete: Foo.A] => T.[concrete: C : P].[P:A].
+  // T.[concrete: C : P].[P:X].[concrete: C.X] => T.[concrete: C : P].[P:X].
   MutableTerm constraintType = subjectType;
-
-  SmallVector<Term, 3> result;
-  auto typeWitnessSchema =
-      remapConcreteSubstitutionSchema(typeWitness, substitutions,
-                                      Context, result);
-
-  constraintType.add(
-      Symbol::forConcreteType(
-          typeWitnessSchema, result, Context));
-
-  RewriteSystem::ConcreteTypeWitness witness(*(constraintType.end() - 3),
-                                             *(constraintType.end() - 2),
-                                             *(constraintType.end() - 1));
-  unsigned index = System.recordConcreteTypeWitness(witness);
+  constraintType.add(typeWitnessSymbol);
 
   path.add(RewriteStep::forConcreteTypeWitness(
-      index, /*inverse=*/false));
+      witnessID, /*inverse=*/false));
 
   return constraintType;
 }
