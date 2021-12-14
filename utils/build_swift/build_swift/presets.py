@@ -361,11 +361,23 @@ class PresetParser(object):
     def _interpolate_preset_vars(self, preset, vars):
         interpolated_options = []
         for (name, value) in preset.options:
-            try:
-                value = _interpolate_string(value, vars)
-            except KeyError as e:
-                raise InterpolationError(
-                    preset.name, name, value, e.args[0])
+            # If the option is a key-value pair, e.g. 
+            # install-destdir=%(install_dir)s
+            # interpolate the value. If it is a raw option, e.g. 
+            # %(some_flag)s
+            # is a raw option without a value, expand the name.
+            if value:
+                try:
+                    value = _interpolate_string(value, vars)
+                except KeyError as e:
+                    raise InterpolationError(
+                        preset.name, name, value, e.args[0])
+            else:
+                try:
+                    name = _interpolate_string(name, vars)
+                except KeyError as e:
+                    raise InterpolationError(
+                        preset.name, name, name, e.args[0])
 
             interpolated_options.append((name, value))
 
