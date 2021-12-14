@@ -529,10 +529,13 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Error! Cannot specify both -enable-copy-propagation "
                     "and -disable-copy-propagation.");
     exit(-1);
+  } else if (EnableCopyPropagation && !DisableCopyPropagation) {
+    SILOpts.CopyPropagation = CopyPropagationOption::On;
+  } else if (!EnableCopyPropagation && DisableCopyPropagation) {
+    SILOpts.CopyPropagation = CopyPropagationOption::Off;
+  } else /*if (!EnableCopyPropagation && !DisableCopyPropagation)*/ {
+    SILOpts.CopyPropagation = CopyPropagationOption::RequestedPassesOnly;
   }
-
-  SILOpts.EnableCopyPropagation = EnableCopyPropagation;
-  SILOpts.DisableCopyPropagation = DisableCopyPropagation;
 
   if (EnableCopyPropagation)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
