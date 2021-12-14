@@ -538,8 +538,10 @@ int main(int argc, char **argv) {
   bool enableLexicalLifetimes =
       EnableLexicalLifetimes | EnableExperimentalMoveOnly;
   if (enableLexicalLifetimes && !EnableLexicalBorrowScopes) {
-    fprintf(stderr, "Error! Cannot specify both -enable-lexical-lifetimes "
-                    "and either -enable-lexical-borrow-scopes=false");
+    fprintf(
+        stderr,
+        "Error! Cannot specify both -enable-lexical-borrow-scopes=false and "
+        "either -enable-lexical-lifetimes or -enable-experimental-move-only.");
     exit(-1);
   }
   if (enableLexicalLifetimes)
