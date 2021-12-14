@@ -543,10 +543,6 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
       noteLoc = loc;
   }
 
-  if (contextSig) {
-    parentTy = contextSig.getGenericEnvironment()->mapTypeIntoContext(parentTy);
-  }
-
   const auto subMap = parentTy->getContextSubstitutions(decl->getDeclContext());
   const auto genericSig = decl->getGenericSignature();
 
@@ -556,7 +552,16 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
         decl->getDeclaredInterfaceType(),
         genericSig.getGenericParams(),
         genericSig.getRequirements(),
-        QueryTypeSubstitutionMap{subMap});
+        [&](SubstitutableType *type) -> Type {
+          auto result = QueryTypeSubstitutionMap{subMap}(type);
+          if (result->hasTypeParameter()) {
+            if (contextSig) {
+              auto *genericEnv = contextSig.getGenericEnvironment();
+              return genericEnv->mapTypeIntoContext(result);
+            }
+          }
+          return result;
+        });
 
   switch (result) {
   case RequirementCheckResult::Failure:
@@ -845,15 +850,6 @@ Type TypeResolution::applyUnboundGenericArguments(
     // Check the generic arguments against the requirements of the declaration's
     // generic signature.
 
-    // First, map substitutions into context.
-    TypeSubstitutionMap contextualSubs = subs;
-    if (const auto contextSig = getGenericSignature()) {
-      auto *genericEnv = contextSig.getGenericEnvironment();
-      for (auto &pair : contextualSubs) {
-        pair.second = genericEnv->mapTypeIntoContext(pair.second);
-      }
-    }
-
     SourceLoc noteLoc = decl->getLoc();
     if (noteLoc.isInvalid())
       noteLoc = loc;
@@ -862,7 +858,16 @@ Type TypeResolution::applyUnboundGenericArguments(
         module, loc, noteLoc,
         UnboundGenericType::get(decl, parentTy, getASTContext()),
         genericSig.getGenericParams(), genericSig.getRequirements(),
-        QueryTypeSubstitutionMap{contextualSubs});
+        [&](SubstitutableType *type) -> Type {
+          auto result = QueryTypeSubstitutionMap{subs}(type);
+          if (result->hasTypeParameter()) {
+            if (const auto contextSig = getGenericSignature()) {
+              auto *genericEnv = contextSig.getGenericEnvironment();
+              return genericEnv->mapTypeIntoContext(result);
+            }
+          }
+          return result;
+        });
 
     switch (result) {
     case RequirementCheckResult::Failure:
