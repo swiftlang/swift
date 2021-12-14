@@ -309,14 +309,15 @@ void PropertyMap::clear() {
 
 /// Record a protocol conformance, layout or superclass constraint on the given
 /// key. Must be called in monotonically non-decreasing key order.
-void PropertyMap::addProperty(
+bool PropertyMap::addProperty(
     Term key, Symbol property, unsigned ruleID,
     SmallVectorImpl<InducedRule> &inducedRules) {
   assert(property.isProperty());
   assert(*System.getRule(ruleID).isPropertyRule() == property);
   auto *props = getOrCreateProperties(key);
-  props->addProperty(property, ruleID, Context,
-                     inducedRules, Debug.contains(DebugFlags::ConcreteUnification));
+  bool debug = Debug.contains(DebugFlags::ConcreteUnification);
+  return props->addProperty(property, ruleID, Context,
+                            inducedRules, debug);
 }
 
 /// Build the property map from all rules of the form T.[p] => T, where
@@ -375,7 +376,10 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
 
   for (const auto &bucket : properties) {
     for (auto property : bucket) {
-      addProperty(property.key, property.symbol, property.ruleID, inducedRules);
+      bool conflict = addProperty(property.key, property.symbol,
+                                  property.ruleID, inducedRules);
+      if (conflict)
+        System.getRule(property.ruleID).markConflicting();
     }
   }
 
@@ -387,10 +391,6 @@ PropertyMap::buildPropertyMap(unsigned maxIterations,
   // relations between associated type members of type parameters with
   // the concrete type witnesses in the concrete type's conformance.
   concretizeNestedTypesFromConcreteParents(inducedRules);
-
-  // Finally, introduce concrete conformance rules, relating conformance rules
-  // to concrete type and superclass rules.
-  recordConcreteConformanceRules(inducedRules);
 
   // Some of the induced rules might be trivial; only count the induced rules
   // where the left hand side is not already equivalent to the right hand side.

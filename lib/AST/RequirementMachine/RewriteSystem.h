@@ -66,6 +66,17 @@ class Rule final {
   /// set of requirements in a generic signature.
   unsigned Redundant : 1;
 
+  /// A 'conflicting' rule is a property rule which cannot be satisfied by any
+  /// concrete type because it is mutually exclusive with some other rule.
+  /// An example would be a pair of concrete type rules:
+  ///
+  ///    T.[concrete: Int] => T
+  ///    T.[concrete: String] => T
+  ///
+  /// Conflicting rules are detected in property map construction, and are
+  /// dropped from the minimal set of requirements.
+  unsigned Conflicting : 1;
+
 public:
   Rule(Term lhs, Term rhs)
       : LHS(lhs), RHS(rhs) {
@@ -73,6 +84,7 @@ public:
     Explicit = false;
     Simplified = false;
     Redundant = false;
+    Conflicting = false;
   }
 
   const Term &getLHS() const { return LHS; }
@@ -105,6 +117,10 @@ public:
     return Redundant;
   }
 
+  bool isConflicting() const {
+    return Conflicting;
+  }
+
   bool containsUnresolvedSymbols() const {
     return (LHS.containsUnresolvedSymbols() ||
             RHS.containsUnresolvedSymbols());
@@ -130,6 +146,13 @@ public:
   void markRedundant() {
     assert(!Redundant);
     Redundant = true;
+  }
+
+  void markConflicting() {
+    // It's okay to mark a rule as conflicting multiple times, but it must not
+    // be a permanent rule.
+    assert(!Permanent && "Permanent rule should not conflict with anything");
+    Conflicting = true;
   }
 
   unsigned getDepth() const;
@@ -278,7 +301,7 @@ public:
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
-  void simplifySubstitutions(MutableTerm &term, RewritePath &path) const;
+  bool simplifySubstitutions(Symbol &symbol, RewritePath &path) const;
 
   //////////////////////////////////////////////////////////////////////////////
   ///
@@ -290,7 +313,9 @@ public:
   computeConfluentCompletion(unsigned maxIterations,
                              unsigned maxDepth);
 
-  void simplifyRewriteSystem();
+  void simplifyLeftHandSides();
+
+  void simplifyRightHandSidesAndSubstitutions();
 
   enum ValidityPolicy {
     AllowInvalidRequirements,
@@ -354,7 +379,7 @@ private:
 public:
   void minimizeRewriteSystem();
 
-  bool hasNonRedundantUnresolvedRules() const;
+  bool hadError() const;
 
   llvm::DenseMap<const ProtocolDecl *, std::vector<unsigned>>
   getMinimizedProtocolRules(ArrayRef<const ProtocolDecl *> protos) const;
