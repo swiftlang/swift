@@ -1098,6 +1098,21 @@ doesStorageProduceLValue(AbstractStorageDecl *storage, Type baseType,
           !storage->isSetterMutating());
 }
 
+Type GetClosureType::operator()(const AbstractClosureExpr *expr) const {
+  if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+    // Look through type bindings, if we have them.
+    auto mutableClosure = const_cast<ClosureExpr *>(closure);
+    if (cs.hasType(mutableClosure)) {
+      return cs.getFixedTypeRecursive(
+          cs.getType(mutableClosure), /*wantRValue=*/true);
+    }
+
+    return cs.getClosureTypeIfAvailable(closure);
+  }
+
+  return Type();
+}
+
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     ConstraintLocator *memberLocator, bool wantInterfaceType) {
@@ -1113,18 +1128,20 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
       },
-      memberLocator, wantInterfaceType);
+      memberLocator, wantInterfaceType, GetClosureType{*this});
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     llvm::function_ref<Type(VarDecl *)> getType,
-    ConstraintLocator *memberLocator, bool wantInterfaceType) {
+    ConstraintLocator *memberLocator, bool wantInterfaceType,
+    llvm::function_ref<Type(const AbstractClosureExpr *)> getClosureType) {
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
   // Adjust the type for concurrency.
-  requestedType = adjustVarTypeForConcurrency(requestedType, value, UseDC);
+  requestedType = adjustVarTypeForConcurrency(
+      requestedType, value, UseDC, getClosureType);
 
   // If we're dealing with contextual types, and we referenced this type from
   // a different context, map the type.
@@ -1298,6 +1315,13 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
   return false;
 }
 
+AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
+    AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
+    unsigned numApplies, bool isMainDispatchQueue) {
+  return swift::adjustFunctionTypeForConcurrency(
+      fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this});
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
@@ -1314,7 +1338,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         ->castTo<AnyFunctionType>();
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(value, false, functionRefKind);
-      funcType = adjustFunctionTypeForConcurrency(funcType, func, useDC, numApplies, false);
+      funcType = adjustFunctionTypeForConcurrency(
+          funcType, func, useDC, numApplies, false);
     }
     auto openedType = openFunctionType(
         funcType, locator, replacements, func->getDeclContext());
@@ -2085,7 +2110,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       } else if (type->hasDynamicSelfType()) {
         type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
       }
-      type = adjustVarTypeForConcurrency(type, var, useDC);
+      type = adjustVarTypeForConcurrency(
+          type, var, useDC, GetClosureType{*this});
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
@@ -2536,8 +2562,14 @@ bool ConstraintSystem::isAsynchronousContext(DeclContext *dc) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
     return func->isAsyncContext();
 
-  if (auto closure = dyn_cast<AbstractClosureExpr>(dc))
-    return closure->isBodyAsync();
+  if (auto abstractClosure = dyn_cast<AbstractClosureExpr>(dc)) {
+    if (Type type = GetClosureType{*this}(abstractClosure)) {
+      if (auto fnType = type->getAs<AnyFunctionType>())
+        return fnType->isAsync();
+    }
+
+    return abstractClosure->isBodyAsync();
+  }
 
   return false;
 }
