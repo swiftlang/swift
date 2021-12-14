@@ -34,6 +34,10 @@ struct RewritePathEvaluator;
 /// Records an evaluation step in a rewrite path.
 struct RewriteStep {
   enum StepKind : unsigned {
+    ///
+    /// *** Rewrite step kinds introduced by Knuth-Bendix completion ***
+    ///
+
     /// Apply a rewrite rule to the term at the top of the A stack.
     ///
     /// Formally, this is a whiskered, oriented rewrite rule. For example,
@@ -60,6 +64,10 @@ struct RewriteStep {
     /// The StartOffset field encodes the length of the prefix.
     AdjustConcreteType,
 
+    ///
+    /// *** Rewrite step kinds introduced by simplifySubstitutions() ***
+    ///
+
     /// Move a term from the A stack to the B stack (if not inverted) or
     /// B stack to A stack (if inverted).
     Shift,
@@ -74,6 +82,10 @@ struct RewriteStep {
     ///
     /// The RuleID field encodes the number of substitutions.
     Decompose,
+
+    ///
+    /// *** Rewrite step kinds introduced by the property map ***
+    ///
 
     /// If not inverted: the top of the A stack must be a term ending in a
     /// concrete type symbol [concrete: C] followed by a protocol symbol [P].
@@ -109,7 +121,19 @@ struct RewriteStep {
     /// RewriteSystem::recordConcreteTypeWitness(). This index is then
     /// passed in to RewriteSystem::getConcreteTypeWitness() when applying
     /// the step.
-    ConcreteTypeWitness
+    ConcreteTypeWitness,
+
+    /// If not inverted: the top of the A stack must be a term ending in a
+    /// concrete conformance symbol [concrete: C : P] followed by an associated
+    /// type symbol [P:X]. The associated type symbol is eliminated.
+    ///
+    /// If inverted: the associated type symbol [P:X] is introduced.
+    ///
+    /// The RuleID field is repurposed to store the result of calling
+    /// RewriteSystem::recordConcreteTypeWitness(). This index is then
+    /// passed in to RewriteSystem::getConcreteTypeWitness() when applying
+    /// the step.
+    SameTypeWitness,
   };
 
   /// The rewrite step kind.
@@ -181,6 +205,11 @@ struct RewriteStep {
 
   static RewriteStep forConcreteTypeWitness(unsigned witnessID, bool inverse) {
     return RewriteStep(ConcreteTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
+                       /*ruleID=*/witnessID, inverse);
+  }
+
+  static RewriteStep forSameTypeWitness(unsigned witnessID, bool inverse) {
+    return RewriteStep(SameTypeWitness, /*startOffset=*/0, /*endOffset=*/0,
                        /*ruleID=*/witnessID, inverse);
   }
 
@@ -352,6 +381,9 @@ struct RewritePathEvaluator {
 
   void applyConcreteTypeWitness(const RewriteStep &step,
                                 const RewriteSystem &system);
+
+  void applySameTypeWitness(const RewriteStep &step,
+                            const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
 };

@@ -138,6 +138,7 @@ void RewriteLoop::findProtocolConformanceRules(
       case RewriteStep::ConcreteConformance:
       case RewriteStep::SuperclassConformance:
       case RewriteStep::ConcreteTypeWitness:
+      case RewriteStep::SameTypeWitness:
         break;
       }
     }
