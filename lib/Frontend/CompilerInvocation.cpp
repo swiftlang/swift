@@ -1549,10 +1549,18 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
                    "enable-copy-propagation", "disable-copy-propagation");
     return true;
+  } else if (Args.hasArg(OPT_enable_copy_propagation) &&
+             !Args.hasArg(OPT_disable_copy_propagation)) {
+    Opts.CopyPropagation = CopyPropagationOption::On;
+  } else if (!Args.hasArg(OPT_enable_copy_propagation) &&
+             Args.hasArg(OPT_disable_copy_propagation)) {
+    Opts.CopyPropagation = CopyPropagationOption::Off;
+  } else /*if (!Args.hasArg(OPT_enable_copy_propagation) &&
+            !Args.hasArg(OPT_disable_copy_propagation))*/
+  {
+    Opts.CopyPropagation = CopyPropagationOption::RequestedPassesOnly;
   }
 
-  Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
-  Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);

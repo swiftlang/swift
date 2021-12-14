@@ -44,6 +44,20 @@ enum class LexicalLifetimesOption : uint8_t {
   On,
 };
 
+enum class CopyPropagationOption : uint8_t {
+  // Do not add any copy propagation passes.
+  Off = 0,
+
+  // Only add the copy propagation passes requested by other flags, currently
+  // just -enable-ossa-modules.
+  RequestedPassesOnly,
+
+  // Add all relevant copy propagation passes.  If a setting, e.g.
+  // -enable-ossa-modules, requests to add copy propagation to the pipeline, do
+  // so.
+  On
+};
+
 class SILModule;
 
 class SILOptions {
@@ -64,15 +78,12 @@ public:
   LexicalLifetimesOption LexicalLifetimes =
       LexicalLifetimesOption::DiagnosticMarkersOnly;
 
-  /// Force-run SIL copy propagation to shorten object lifetime in whatever
+  /// Whether to run SIL copy propagation to shorten object lifetime in whatever
   /// optimization pipeline is currently used.
-  /// When this is 'false' the pipeline has default behavior.
-  bool EnableCopyPropagation = false;
-
-  /// Disable SIL copy propagation to preserve object lifetime in whatever
-  /// optimization pipeline is currently used.
-  /// When this is 'false' the pipeline has default behavior.
-  bool DisableCopyPropagation = false;
+  ///
+  /// When this is 'RequestedPassesOnly' the pipeline has default behavior.
+  CopyPropagationOption CopyPropagation =
+      CopyPropagationOption::RequestedPassesOnly;
 
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
