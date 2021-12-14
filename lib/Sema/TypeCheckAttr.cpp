@@ -2987,8 +2987,10 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
   Type T = attr->getProtocolType();
   if (!T && attr->getProtocolTypeRepr()) {
+    auto context = TypeResolverContext::GenericRequirement;
     T = TypeResolution::resolveContextualType(attr->getProtocolTypeRepr(), DC,
-                                              None, /*unboundTyOpener*/ nullptr,
+                                              TypeResolutionOptions(context),
+                                              /*unboundTyOpener*/ nullptr,
                                               /*placeholderHandler*/ nullptr);
   }
 
